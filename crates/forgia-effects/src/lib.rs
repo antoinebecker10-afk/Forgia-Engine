@@ -33,7 +33,8 @@ pub mod arena_feedback;
 
 pub mod prelude {
     pub use crate::ForgiaEffectsPlugin;
-    pub use crate::weapon_vfx::{WeaponVfxEffects, MuzzleVfxMarker, ImpactVfxMarker};
+    pub use crate::weapon_vfx::{WeaponVfxEffects, MuzzleVfxMarker, ImpactVfxMarker, Lifetime, spawn_muzzle_flash, spawn_impact_vfx};
+    pub use crate::weapon_vfx::tracer::{TracerResources, EmissiveFade, spawn_hitscan_tracer};
     pub use crate::arena_feedback::{ArenaFeedbackPlugin, ArenaFeedbackStats};
 }
 
@@ -45,8 +46,47 @@ impl Plugin for ForgiaEffectsPlugin {
         // BEFORE first shot (pattern story-436 / reference_hanabi_shader_compile_lazy_pattern.md)
         app.add_systems(Startup, prespawn_hanabi_dummies)
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
+            .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
             .add_plugins(arena_feedback::ArenaFeedbackPlugin)
-            .add_systems(Update, effects_tick.in_set(GameSet::Effects));
+            .add_systems(Update, (effects_tick, emissive_fade_tick, lifetime_tick).in_set(GameSet::Effects));
+    }
+}
+
+/// Tick `Lifetime` timers — despawn entity à expiration (Muzzle/Impact VFX).
+fn lifetime_tick(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut weapon_vfx::Lifetime)>,
+) {
+    for (entity, mut life) in q.iter_mut() {
+        life.0.tick(time.delta());
+        if life.0.is_finished() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+/// Tick `EmissiveFade` timers — interpolate emissive vers 0 puis despawn entité.
+fn emissive_fade_tick(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut q: Query<(Entity, &mut weapon_vfx::tracer::EmissiveFade, &MeshMaterial3d<StandardMaterial>)>,
+) {
+    for (entity, mut fade, mat) in q.iter_mut() {
+        fade.timer.tick(time.delta());
+        let pct = 1.0 - fade.timer.fraction();
+        if let Some(material) = materials.get_mut(&mat.0) {
+            material.emissive = LinearRgba::new(
+                fade.initial.red * pct,
+                fade.initial.green * pct,
+                fade.initial.blue * pct,
+                fade.initial.alpha,
+            );
+        }
+        if fade.timer.is_finished() {
+            commands.entity(entity).despawn();
+        }
     }
 }
 

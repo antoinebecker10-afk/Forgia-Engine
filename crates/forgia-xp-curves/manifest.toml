@@ -5,7 +5,7 @@ name = "forgia-xp-curves"
 category = "gameplay"
 intent = "XP/level curves genome-driven (Forgia unique)"
 version = "0.1.0"
-status = "stub"   # stub | wip | ready | stable
+status = "ready"   # stub | wip | ready | stable
 
 # Genes exposed via TOML hot-reload (filled when impl).
 genes = []
@@ -21,3 +21,4 @@ sensor = ""
 
 # Workspace deps (filled by scaffold).
 depends = []
+

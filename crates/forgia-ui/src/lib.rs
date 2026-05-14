@@ -10,6 +10,7 @@
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
+use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod prelude {
@@ -26,11 +27,12 @@ impl Plugin for ForgiaUiPlugin {
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
         // Anti-trap V1 : éviter le frame où aucune caméra n'existe (ESC bug).
-        app.add_systems(Startup, spawn_menu_camera_permanent)
+        app.init_resource::<HitmarkerState>()
+            .add_systems(Startup, spawn_menu_camera_permanent)
             .add_systems(OnEnter(AppMode::Menu), release_cursor)
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
-            .add_systems(EguiPrimaryContextPass, (main_menu_ui, draw_crosshair))
-            .add_systems(Update, escape_handler);
+            .add_systems(EguiPrimaryContextPass, (main_menu_ui, draw_crosshair, draw_hitmarker))
+            .add_systems(Update, (escape_handler, hitmarker_trigger).in_set(GameSet::UI));
     }
 }
 
@@ -142,6 +144,63 @@ fn escape_handler(
                 info!("[forgia-ui] ESC pressed in {other:?} — no transition");
             }
         }
+    }
+}
+
+/// HitmarkerState — Resource Local pour fade visual après hit confirmé.
+/// Pattern V1 : 4 segments diagonaux blancs autour crosshair, fade 220ms.
+#[derive(Resource, Default)]
+pub struct HitmarkerState {
+    /// Time remaining (s). >0 = visible, fade linéaire.
+    pub time_left: f32,
+}
+
+const HITMARKER_DURATION: f32 = 0.22; // V1 hud_hitmarker_duration_ms = 220ms
+
+/// Lit `CombatHitEvent` → reset `HitmarkerState.time_left` à HITMARKER_DURATION.
+fn hitmarker_trigger(
+    mut hits: MessageReader<CombatHitEvent>,
+    mut state: ResMut<HitmarkerState>,
+    time: Res<Time>,
+) {
+    if !hits.is_empty() {
+        state.time_left = HITMARKER_DURATION;
+        for _ in hits.read() {} // drain
+    } else if state.time_left > 0.0 {
+        state.time_left = (state.time_left - time.delta_secs()).max(0.0);
+    }
+}
+
+/// Dessine 4 segments diagonaux blancs autour du crosshair quand HitmarkerState actif.
+fn draw_hitmarker(
+    mut contexts: EguiContexts,
+    state: Res<HitmarkerState>,
+    app_state: Res<State<AppMode>>,
+) {
+    if *app_state.get() != AppMode::InGame || state.time_left <= 0.0 {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+    let center = ctx.content_rect().center();
+    let alpha_pct = state.time_left / HITMARKER_DURATION;
+    let alpha = (alpha_pct * 220.0) as u8;
+    let color = egui::Color32::from_rgba_unmultiplied(255, 255, 255, alpha);
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Background,
+        egui::Id::new("forgia_hitmarker"),
+    ));
+    let inner = 7.0; // gap autour crosshair
+    let outer = 14.0; // longueur segment
+    let stroke = egui::Stroke::new(2.5, color);
+    // 4 segments diagonaux X
+    for &(dx, dy) in &[(1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)] {
+        painter.line_segment(
+            [
+                egui::pos2(center.x + dx * inner, center.y + dy * inner),
+                egui::pos2(center.x + dx * outer, center.y + dy * outer),
+            ],
+            stroke,
+        );
     }
 }
 

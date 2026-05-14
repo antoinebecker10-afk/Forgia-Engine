@@ -2,7 +2,7 @@
 name = "forgia-rpg"
 version = "0.1.0"
 edition = "2021"
-description = "Forgia V2 — Mode RPG OpenWorld : quêtes, NPCs, dialog, inventaire. Squelette V1 (dev V2.M2)."
+description = "Forgia V2 — Mode RPG OpenWorld : spawn world + NPCs + interactions. Phase 0."
 
 [lints]
 workspace = true
@@ -12,7 +12,11 @@ bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
 forgia-assets = { workspace = true }
+forgia-input = { workspace = true }
 forgia-player = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-ui = { workspace = true }
+forgia-dialogue = { workspace = true }
+noise = { workspace = true }
+leafwing-input-manager = { workspace = true }

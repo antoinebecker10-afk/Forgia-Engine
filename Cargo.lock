@@ -4872,6 +4872,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_rapier3d",
+ "forgia-combat",
  "forgia-core",
  "forgia-input",
  "leafwing-input-manager",
@@ -5498,9 +5499,13 @@ dependencies = [
  "forgia-assets",
  "forgia-combat",
  "forgia-core",
+ "forgia-dialogue",
+ "forgia-input",
  "forgia-player",
  "forgia-terrain",
  "forgia-ui",
+ "leafwing-input-manager",
+ "noise",
 ]
 
 [[package]]
@@ -5671,6 +5676,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "forgia-combat",
  "forgia-core",
  "forgia-input",
  "leafwing-input-manager",

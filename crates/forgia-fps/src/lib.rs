@@ -12,7 +12,12 @@ use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_combat::prelude::*;
+use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::*;
+use forgia_effects::prelude::{
+    spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources,
+    WeaponVfxEffects,
+};
 use forgia_player::prelude::*;
 
 pub mod prelude {
@@ -37,7 +42,8 @@ impl Plugin for ForgiaFpsPlugin {
             .add_systems(OnExit(GameMode::Fps), cleanup_arena)
             .add_systems(
                 Update,
-                fire_weapon_minimal
+                (fire_weapon_minimal, despawn_dead_cubes)
+                    .chain()
                     .in_set(GameSet::Combat)
                     .run_if(in_state(GameMode::Fps)),
             );
@@ -204,8 +210,19 @@ fn fire_weapon_minimal(
     mut q_target: Query<(&MeshMaterial3d<StandardMaterial>, &mut Health), With<TargetCube>>,
     mut commands: Commands,
     flash_cache: Res<HitFlashCache>,
+    tracer_res: Option<Res<TracerResources>>,
+    weapon_vfx: Option<Res<WeaponVfxEffects>>,
+    cooldown: Option<Res<WeaponFireCooldown>>,
+    mut virtual_time: ResMut<Time<Virtual>>,
     mut hit_events: MessageWriter<CombatHitEvent>,
+    mut recoil_events: MessageWriter<WeaponRecoilImpulse>,
 ) {
+    // Cooldown anti-spam : ModernAR ~0.1s entre tirs
+    if cooldown.is_some() {
+        // Drain les events pour ne pas fire au prochain frame
+        for _ in mouse_evs.read() {}
+        return;
+    }
     let mut left_pressed = false;
     for ev in mouse_evs.read() {
         if ev.button == MouseButton::Left && ev.state == ButtonState::Pressed {
@@ -227,13 +244,56 @@ fn fire_weapon_minimal(
     let origin = cam_tf.translation();
     let direction = cam_tf.forward().as_vec3();
 
+    // Insert cooldown 100ms (10 shots/sec ModernAR)
+    commands.insert_resource(WeaponFireCooldown {
+        timer: Timer::from_seconds(0.1, TimerMode::Once),
+    });
+
+    // Camera recoil DÉSACTIVÉ — choix design Antoine 2026-05-14 : pas de visual recoil
+    // (style Valorant skill-ceiling pur). Le système weapon_recoil_apply reste wired
+    // dans forgia-player mais ne reçoit jamais d'event = no-op.
+    // Pour réactiver : décommenter le write ci-dessous.
+    // let yaw_jitter = ((origin.x * 1000.0).sin() * 0.012).clamp(-0.012, 0.012);
+    // recoil_events.write(WeaponRecoilImpulse { pitch_rad: 0.045, yaw_rad: yaw_jitter });
+    let _ = &mut recoil_events; // suppress unused warning
+
+    // Muzzle flash au barrel tip (0.3m devant cam, 0.1m sous = position canon)
+    let barrel_tip = origin + direction * 0.3 + Vec3::new(0.0, -0.1, 0.0);
+    if let Some(vfx) = weapon_vfx.as_deref() {
+        spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, ());
+    }
+
     // Exclure le Player du raycast (sinon hit immédiat le collider capsule du player
     // car FpsCamera est enfant de Player → origin ray DANS le collider, toi=0).
     let player_entity = q_player.single().ok();
     let predicate = |e: Entity| Some(e) != player_entity;
     let filter = QueryFilter::default().predicate(&predicate);
-    if let Some((entity, toi)) = ctx.cast_ray(origin, direction, 100.0, true, filter) {
-        // Cherche dans target query mut (1 seule query)
+    let hit_result = ctx.cast_ray(origin, direction, 100.0, true, filter);
+    let hit_dist = hit_result.map(|(_, t)| t).unwrap_or(50.0);
+
+    // Tracer visuel (toujours, même sur miss — fly to max range)
+    if let Some(tres) = tracer_res.as_deref() {
+        spawn_hitscan_tracer(
+            &mut commands,
+            tres,
+            origin,
+            direction,
+            hit_dist,
+            &WeaponType::ModernAR,
+            120.0, // tracer_max_length (V1 wfx_tracer_max_length)
+            0.30,  // tracer_fade — 300ms (V1=80ms trop court à 60fps = 5 frames invisible)
+        );
+    }
+
+    // Impact VFX au point d'impact (cube, mur, colonne — pas miss)
+    if let Some((_, toi)) = hit_result {
+        let impact_pos = origin + direction * toi;
+        if let Some(vfx) = weapon_vfx.as_deref() {
+            spawn_impact_vfx(&mut commands, vfx, impact_pos, ());
+        }
+    }
+
+    if let Some((entity, toi)) = hit_result {
         if let Ok((mat, mut hp)) = q_target.get_mut(entity) {
             let damage = 25.0;
             hp.current = (hp.current - damage).max(0.0);
@@ -251,6 +311,13 @@ fn fire_weapon_minimal(
                     original_handle: Some(mat_handle),
                 });
 
+            // Hit-stop pattern Apex : 50ms de pause Time<Virtual> sur hit confirmé
+            virtual_time.set_relative_speed(0.05);
+            commands.insert_resource(HitStopState {
+                timer: Timer::from_seconds(0.05, TimerMode::Once),
+                restore_speed: 1.0,
+            });
+
             hit_events.write(CombatHitEvent {
                 target: entity,
                 damage,
@@ -266,6 +333,19 @@ fn fire_weapon_minimal(
         }
     } else {
         info!("[fire] miss");
+    }
+}
+
+/// Despawn les cubes morts (HP=0). Système séparé chained après fire.
+fn despawn_dead_cubes(
+    mut commands: Commands,
+    q: Query<(Entity, &Health), With<TargetCube>>,
+) {
+    for (entity, hp) in &q {
+        if hp.is_dead() {
+            commands.entity(entity).despawn();
+            info!("[death] cube {:?} despawned (HP=0)", entity);
+        }
     }
 }
 

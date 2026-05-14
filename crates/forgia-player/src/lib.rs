@@ -5,6 +5,7 @@
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
@@ -49,7 +50,7 @@ impl Plugin for ForgiaPlayerPlugin {
             .add_systems(OnExit(AppMode::InGame), despawn_player)
             .add_systems(
                 Update,
-                (mouse_look, player_movement)
+                (mouse_look, weapon_recoil_apply, player_movement)
                     .chain()
                     .run_if(in_state(AppMode::InGame)),
             );
@@ -119,6 +120,58 @@ fn mouse_look(
         if let Ok(mut cam_tf) = q_cam.single_mut() {
             cam_tf.rotation = Quat::from_rotation_x(player.pitch);
         }
+    }
+}
+
+/// Camera recoil system — pattern Apex/COD :
+/// - Lit `WeaponRecoilImpulse` events (émis par fire_weapon)
+/// - Push pitch ↑ + yaw jitter sur Player.pitch/yaw
+/// - Decay exponentielle de `WeaponRecoilDebt` → auto-recenter caméra si pas d'input
+fn weapon_recoil_apply(
+    time: Res<Time>,
+    mut impulses: MessageReader<WeaponRecoilImpulse>,
+    mut debt: Option<ResMut<WeaponRecoilDebt>>,
+    mut q_player: Query<(&mut Transform, &mut Player), Without<FpsCamera>>,
+    mut q_cam: Query<&mut Transform, With<FpsCamera>>,
+    mut commands: Commands,
+) {
+    let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
+        return;
+    };
+
+    // Init Resource on first run if missing
+    if debt.is_none() {
+        commands.insert_resource(WeaponRecoilDebt::default());
+    }
+    let Some(ref mut debt) = debt else {
+        return;
+    };
+
+    // Apply impulses (push pitch UP + yaw jitter, accumulate dans debt aussi)
+    for ev in impulses.read() {
+        player.pitch = (player.pitch + ev.pitch_rad).clamp(-1.5, 1.5);
+        player.yaw -= ev.yaw_rad;
+        debt.pitch_rad += ev.pitch_rad;
+        debt.yaw_rad += ev.yaw_rad;
+    }
+
+    // Decay exponentielle 8/s — recenter auto en ~125ms
+    let decay = 8.0 * time.delta_secs();
+    let pitch_recover = (debt.pitch_rad * decay).min(debt.pitch_rad);
+    let yaw_recover = (debt.yaw_rad * decay)
+        .abs()
+        .min(debt.yaw_rad.abs())
+        * debt.yaw_rad.signum();
+
+    player.pitch = (player.pitch - pitch_recover).clamp(-1.5, 1.5);
+    player.yaw += yaw_recover;
+    debt.pitch_rad -= pitch_recover;
+    debt.yaw_rad -= yaw_recover;
+
+    // Apply to transforms
+    player_tf.rotation = Quat::from_rotation_y(player.yaw);
+    if let Ok(mut cam_tf) = q_cam.single_mut() {
+        cam_tf.rotation = Quat::from_rotation_x(player.pitch);
     }
 }
 

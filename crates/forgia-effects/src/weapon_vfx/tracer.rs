@@ -103,9 +103,11 @@ pub fn setup_tracer_resources(
     // TODO: replace with forgia_core::resources::FpsTuning when ported
     // tuning: Res<FpsTuning>,
 ) {
-    // TODO: read wfx_tracer_width from FpsTuning; using placeholder 0.004 until ported
-    let core_width = 0.004_f32; // placeholder — V1 read from tuning.wfx_tracer_width
-    let glow_width = core_width * 3.5;
+    // TODO: read wfx_tracer_width from FpsTuning; using placeholder x10 V1 default
+    // V1 default 0.004m = 4mm = invisible >5m distance. V2 placeholder = 5cm core / 17cm glow
+    // jusqu'au portage FpsTuning (genome combat.toml wfx_tracer_width).
+    let core_width = 0.05_f32; // 5cm
+    let glow_width = core_width * 3.5; // 17.5cm
 
     let core_mesh = meshes.add(Cuboid::new(core_width, core_width, 1.0));
     let glow_mesh = meshes.add(Cuboid::new(glow_width, glow_width, 1.0));
@@ -172,22 +174,24 @@ pub fn spawn_hitscan_tracer(
         .looking_to(shot_dir, Vec3::Y)
         .with_scale(Vec3::new(1.0, 1.0, tracer_seg_len));
 
-    // Layer 1: Core beam
+    // Layer 1: Core beam (NotShadowCaster pour anti-ombre 4mm sur sol)
     commands.spawn((
         Mesh3d(tracer_res.core_mesh.clone()),
         MeshMaterial3d(pair.core.clone()),
         base_tf,
+        bevy::light::NotShadowCaster,
         EmissiveFade {
             timer: Timer::from_seconds(tracer_fade, TimerMode::Once),
             initial: pair.core_color,
         },
     ));
 
-    // Layer 2: Glow envelope
+    // Layer 2: Glow envelope (NotShadowCaster + NotShadowReceiver)
     commands.spawn((
         Mesh3d(tracer_res.glow_mesh.clone()),
         MeshMaterial3d(pair.glow.clone()),
         base_tf,
+        bevy::light::NotShadowCaster,
         EmissiveFade {
             timer: Timer::from_seconds(tracer_fade * 1.3, TimerMode::Once),
             initial: pair.glow_color,
