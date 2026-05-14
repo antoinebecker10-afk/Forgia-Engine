@@ -55,8 +55,8 @@ pub fn run_game() -> AppExit {
         forgia_terrain::prelude::ForgiaTerrainPlugin,
     ));
 
-    // ClearColor = skybox bleu ciel sombre (au lieu du gris Bevy default)
-    app.insert_resource(ClearColor(Color::srgb(0.4, 0.6, 0.85)));
+    // ClearColor = skybox sunset/dusk warm — ambiance forge ruines (vs bleu ciel jour)
+    app.insert_resource(ClearColor(Color::srgb(0.35, 0.22, 0.18)));
 
     // Boot transition (mode-spec plugins gèrent leur arène/world via OnEnter(GameMode))
     app.add_systems(Startup, boot_to_menu);

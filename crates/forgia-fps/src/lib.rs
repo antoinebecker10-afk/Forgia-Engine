@@ -25,7 +25,7 @@ pub mod prelude {
 }
 
 const TILE_SIZE: f32 = 4.0;
-const ARENA_SIZE: i32 = 5; // 5×5 tiles = 20×20m
+const ARENA_SIZE: i32 = 11; // 11×11 tiles = 44×44m (vrai map FPS multi-zones)
 
 #[derive(Component)]
 pub struct ArenaMarker;
@@ -56,34 +56,60 @@ fn spawn_arena(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    // ── Asset handles (1 load chacun, clone Arc partout) ────────────────
     let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
+    let floor_dirt: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
+    let floor_rocks: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_rocks.glb#Scene0");
     let wall: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall.glb#Scene0");
+    let wall_arched: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_arched.glb#Scene0");
+    let wall_window: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_window.glb#Scene0");
+    let wall_broken: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_broken.glb#Scene0");
     let column: Handle<Scene> = asset_server.load("models/kaykit/dungeon/column.glb#Scene0");
+    let pillar: Handle<Scene> = asset_server.load("models/kaykit/dungeon/pillar.glb#Scene0");
+    let pillar_deco: Handle<Scene> = asset_server.load("models/kaykit/dungeon/pillar_deco.glb#Scene0");
+    let torch: Handle<Scene> = asset_server.load("models/kaykit/dungeon/torch.glb#Scene0");
+    let torch_wall: Handle<Scene> = asset_server.load("models/kaykit/dungeon/torch_wall.glb#Scene0");
+    let banner_red: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_red.glb#Scene0");
+    let banner_blue: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_blue.glb#Scene0");
+    let banner_yellow: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_yellow.glb#Scene0");
+    let chest: Handle<Scene> = asset_server.load("models/kaykit/dungeon/chest.glb#Scene0");
+    let chest_gold: Handle<Scene> = asset_server.load("models/kaykit/dungeon/chest_gold.glb#Scene0");
+    let crates: Handle<Scene> = asset_server.load("models/kaykit/dungeon/crates.glb#Scene0");
+    let rubble: Handle<Scene> = asset_server.load("models/kaykit/dungeon/rubble.glb#Scene0");
+    let table: Handle<Scene> = asset_server.load("models/kaykit/dungeon/table.glb#Scene0");
     let barrel: Handle<Scene> = asset_server.load("models/kaykit/dungeon/barrel.glb#Scene0");
+    let barrels_stack: Handle<Scene> = asset_server.load("models/kaykit/dungeon/barrels_stack.glb#Scene0");
 
     let half = ARENA_SIZE / 2;
+    let arena_extent = (ARENA_SIZE as f32 * TILE_SIZE) / 2.0;
 
-    // ── Sol : grille de tiles ────────────────────────────────────────────
+    // ── Sol : grille 11×11 = 121 tiles, mix variations selon zone ────────
+    // Centre = floor classique, périphérie = dirt/rocks pour ambiance ruines
     for x in -half..=half {
         for z in -half..=half {
+            let dist = (x.abs().max(z.abs())) as i32;
+            let tile_handle = if dist >= 4 {
+                // Zone périphérique : mix dirt/rocks
+                if (x + z).rem_euclid(3) == 0 {
+                    floor_rocks.clone()
+                } else {
+                    floor_dirt.clone()
+                }
+            } else {
+                floor.clone()
+            };
             let pos = Vec3::new(x as f32 * TILE_SIZE, 0.0, z as f32 * TILE_SIZE);
             commands.spawn((
                 ArenaMarker,
                 Transform::from_translation(pos),
                 Visibility::default(),
-                Name::new(format!("FloorTile_{x}_{z}")),
-                children![(
-                    SceneRoot(floor.clone()),
-                    Transform::default(),
-                )],
+                Name::new(format!("Floor_{x}_{z}")),
+                children![(SceneRoot(tile_handle), Transform::default())],
             ));
         }
     }
 
-    // ── Sol invisible Collider (1 seul, épais pour anti-tunneling) ──────
-    // Épaisseur 1m (vs 0.05m initial) : protection contre tunneling à haute vitesse.
-    // Spawn player à y=2 maintenant (vs y=5) pour limiter vélocité d'impact.
-    let arena_extent = (ARENA_SIZE as f32 * TILE_SIZE) / 2.0;
+    // ── Sol Collider 1m épais anti-tunneling ─────────────────────────────
     commands.spawn((
         ArenaMarker,
         Transform::from_xyz(0.0, -0.5, 0.0),
@@ -92,22 +118,32 @@ fn spawn_arena(
         Name::new("ArenaGroundCollider"),
     ));
 
-    // ── Murs périphérie ──────────────────────────────────────────────────
+    // ── Murs périphérie : MIX wall classique + arched (passages) + broken (ruines) + window
     let edge = (half as f32 + 0.5) * TILE_SIZE;
     for i in -half..=half {
         let offset = i as f32 * TILE_SIZE;
-        // Mur Nord (z = +edge), face vers -Z
-        spawn_wall(&mut commands, &wall, Vec3::new(offset, 0.0, edge), 0.0);
-        // Mur Sud (z = -edge), face vers +Z
-        spawn_wall(&mut commands, &wall, Vec3::new(offset, 0.0, -edge), std::f32::consts::PI);
-        // Mur Est (x = +edge), face vers -X
-        spawn_wall(&mut commands, &wall, Vec3::new(edge, 0.0, offset), -std::f32::consts::FRAC_PI_2);
-        // Mur Ouest (x = -edge), face vers +X
-        spawn_wall(&mut commands, &wall, Vec3::new(-edge, 0.0, offset), std::f32::consts::FRAC_PI_2);
+        // Choix du wall variant selon position (pour casser la monotonie)
+        let pick_wall = |idx: i32| -> Handle<Scene> {
+            match idx.rem_euclid(7) {
+                0 => wall_window.clone(),
+                3 => wall_broken.clone(),
+                _ => wall.clone(),
+            }
+        };
+        // Passages arched aux 4 cardinales (i==0)
+        let nord = if i == 0 { wall_arched.clone() } else { pick_wall(i) };
+        let sud = if i == 0 { wall_arched.clone() } else { pick_wall(i + 1) };
+        let est = if i == 0 { wall_arched.clone() } else { pick_wall(i + 2) };
+        let ouest = if i == 0 { wall_arched.clone() } else { pick_wall(i + 3) };
+
+        spawn_wall(&mut commands, &nord, Vec3::new(offset, 0.0, edge), 0.0);
+        spawn_wall(&mut commands, &sud, Vec3::new(offset, 0.0, -edge), std::f32::consts::PI);
+        spawn_wall(&mut commands, &est, Vec3::new(edge, 0.0, offset), -std::f32::consts::FRAC_PI_2);
+        spawn_wall(&mut commands, &ouest, Vec3::new(-edge, 0.0, offset), std::f32::consts::FRAC_PI_2);
     }
 
-    // ── 4 Colonnes intérieures (repères) ─────────────────────────────────
-    let col_d = TILE_SIZE * 1.5;
+    // ── Centre arena : 4 piliers décorés en carré (zone tactique) ───────
+    let col_d = TILE_SIZE * 2.5;
     for &(x, z) in &[(col_d, col_d), (-col_d, col_d), (col_d, -col_d), (-col_d, -col_d)] {
         commands.spawn((
             ArenaMarker,
@@ -115,51 +151,156 @@ fn spawn_arena(
             Visibility::default(),
             RigidBody::Fixed,
             Collider::cylinder(2.0, 0.5),
-            Name::new(format!("Column_{x}_{z}")),
-            children![(
-                SceneRoot(column.clone()),
-                Transform::default(),
-            )],
+            Name::new(format!("CenterPillar_{x}_{z}")),
+            children![(SceneRoot(pillar_deco.clone()), Transform::default())],
         ));
     }
 
-    // ── 3 Barrels — repères mouvement ────────────────────────────────────
-    for &(x, z) in &[(2.0, 0.0), (-2.0, 5.0), (5.0, -5.0)] {
+    // ── 4 colonnes outer ring (cover supplémentaire) ────────────────────
+    let outer_d = TILE_SIZE * 4.5;
+    for &(x, z) in &[(outer_d, 0.0), (-outer_d, 0.0), (0.0, outer_d), (0.0, -outer_d)] {
         commands.spawn((
             ArenaMarker,
             Transform::from_xyz(x, 0.0, z),
             Visibility::default(),
             RigidBody::Fixed,
-            Collider::cylinder(0.5, 0.4),
-            Name::new(format!("Barrel_{x}_{z}")),
-            children![(
-                SceneRoot(barrel.clone()),
-                Transform::default(),
-            )],
+            Collider::cylinder(2.0, 0.5),
+            Name::new(format!("OuterPillar_{x}_{z}")),
+            children![(SceneRoot(pillar.clone()), Transform::default())],
         ));
     }
 
-    // ── Lumière ──────────────────────────────────────────────────────────
+    // ── 4 colonnes décor intermédiaires (sans collider, juste visuel) ───
+    for &(x, z) in &[(col_d, 0.0), (-col_d, 0.0), (0.0, col_d), (0.0, -col_d)] {
+        commands.spawn((
+            ArenaMarker,
+            Transform::from_xyz(x, 0.0, z),
+            Visibility::default(),
+            RigidBody::Fixed,
+            Collider::cylinder(2.0, 0.4),
+            Name::new(format!("MidColumn_{x}_{z}")),
+            children![(SceneRoot(column.clone()), Transform::default())],
+        ));
+    }
+
+    // ── Cover tactique : crates, rubble, barrels stack, table dispersés ─
+    let cover_props: &[(&str, f32, f32, Handle<Scene>, f32, f32)] = &[
+        ("Crates_NE", 8.0, -8.0, crates.clone(), 0.6, 0.6),
+        ("Crates_SW", -8.0, 8.0, crates.clone(), 0.6, 0.6),
+        ("Rubble_N", 0.0, -14.0, rubble.clone(), 1.0, 0.4),
+        ("Rubble_S", 0.0, 14.0, rubble.clone(), 1.0, 0.4),
+        ("Rubble_E", 14.0, 0.0, rubble.clone(), 1.0, 0.4),
+        ("Rubble_W", -14.0, 0.0, rubble.clone(), 1.0, 0.4),
+        ("BarrelStack_NW", -10.0, -10.0, barrels_stack.clone(), 0.7, 0.7),
+        ("BarrelStack_SE", 10.0, 10.0, barrels_stack.clone(), 0.7, 0.7),
+        ("Table_E", 6.0, 4.0, table.clone(), 1.5, 0.6),
+        ("Table_W", -6.0, -4.0, table.clone(), 1.5, 0.6),
+        ("Barrel_1", 3.0, 12.0, barrel.clone(), 0.5, 0.4),
+        ("Barrel_2", -3.0, -12.0, barrel.clone(), 0.5, 0.4),
+        ("Barrel_3", 12.0, -3.0, barrel.clone(), 0.5, 0.4),
+        ("Barrel_4", -12.0, 3.0, barrel.clone(), 0.5, 0.4),
+    ];
+    for (name, x, z, scene, half_w, half_h) in cover_props {
+        commands.spawn((
+            ArenaMarker,
+            Transform::from_xyz(*x, 0.0, *z),
+            Visibility::default(),
+            RigidBody::Fixed,
+            Collider::cuboid(*half_w, *half_h, *half_w),
+            Name::new(name.to_string()),
+            children![(SceneRoot(scene.clone()), Transform::default())],
+        ));
+    }
+
+    // ── Chests précieux dans coins (objectifs visuels) ──────────────────
+    commands.spawn((
+        ArenaMarker,
+        Transform::from_xyz(16.0, 0.0, 16.0),
+        Visibility::default(),
+        Name::new("ChestGold_NE"),
+        children![(SceneRoot(chest_gold.clone()), Transform::default())],
+    ));
+    commands.spawn((
+        ArenaMarker,
+        Transform::from_xyz(-16.0, 0.0, -16.0),
+        Visibility::default(),
+        Name::new("Chest_SW"),
+        children![(SceneRoot(chest.clone()), Transform::default())],
+    ));
+
+    // ── Banners colorés sur murs (décor faction) ────────────────────────
+    let banners: &[(&str, f32, f32, Handle<Scene>, f32)] = &[
+        ("Banner_N_red", -6.0, edge - 0.3, banner_red.clone(), 0.0),
+        ("Banner_N_blue", 6.0, edge - 0.3, banner_blue.clone(), 0.0),
+        ("Banner_S_yellow", 0.0, -edge + 0.3, banner_yellow.clone(), std::f32::consts::PI),
+        ("Banner_E_red", edge - 0.3, -6.0, banner_red.clone(), -std::f32::consts::FRAC_PI_2),
+        ("Banner_W_blue", -edge + 0.3, 6.0, banner_blue.clone(), std::f32::consts::FRAC_PI_2),
+    ];
+    for (name, x, z, scene, yaw) in banners {
+        commands.spawn((
+            ArenaMarker,
+            Transform::from_xyz(*x, 3.0, *z).with_rotation(Quat::from_rotation_y(*yaw)),
+            Visibility::default(),
+            Name::new(name.to_string()),
+            children![(SceneRoot(scene.clone()), Transform::default())],
+        ));
+    }
+
+    // ── Torches lit (avec PointLight orange) — ambiance forge ──────────
+    let torch_positions: &[(&str, f32, f32, Handle<Scene>)] = &[
+        ("Torch_NE", 18.0, -18.0, torch.clone()),
+        ("Torch_NW", -18.0, -18.0, torch.clone()),
+        ("Torch_SE", 18.0, 18.0, torch.clone()),
+        ("Torch_SW", -18.0, 18.0, torch.clone()),
+        ("TorchWall_N", -10.0, edge - 0.5, torch_wall.clone()),
+        ("TorchWall_S", 10.0, -edge + 0.5, torch_wall.clone()),
+        ("TorchWall_E", edge - 0.5, 10.0, torch_wall.clone()),
+        ("TorchWall_W", -edge + 0.5, -10.0, torch_wall.clone()),
+    ];
+    for (name, x, z, scene) in torch_positions {
+        commands.spawn((
+            ArenaMarker,
+            Transform::from_xyz(*x, 0.0, *z),
+            Visibility::default(),
+            Name::new(name.to_string()),
+            children![
+                (SceneRoot(scene.clone()), Transform::default()),
+                (
+                    PointLight {
+                        intensity: 50_000.0,
+                        color: Color::srgb(1.0, 0.55, 0.2),
+                        radius: 0.3,
+                        range: 12.0,
+                        shadows_enabled: false,
+                        ..default()
+                    },
+                    Transform::from_xyz(0.0, 1.8, 0.0),
+                )
+            ],
+        ));
+    }
+
+    // ── Lumière directionnelle (sunset rasant pour ombres dramatiques) ──
     commands.spawn((
         ArenaMarker,
         DirectionalLight {
-            illuminance: 12_000.0,
+            illuminance: 8_000.0,
+            color: Color::srgb(1.0, 0.85, 0.7), // warm sunset
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_xyz(15.0, 30.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(20.0, 25.0, -10.0).looking_at(Vec3::ZERO, Vec3::Y),
         Name::new("ArenaSunLight"),
     ));
 
-    // ── 3 Cubes target rouges (testables au tir) ────────────────────────
+    // ── Target cubes (5 maintenant, dispersés dans la map plus grande) ──
     let cube_mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let cube_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.85, 0.15, 0.15),
-        emissive: LinearRgba::new(0.5, 0.0, 0.0, 1.0),
+        emissive: LinearRgba::new(0.8, 0.0, 0.0, 1.0),
         ..default()
     });
-    // Position cubes : ligne de 3 devant le spawn (face -Z), DANS l'arène (z > -10)
-    for &(x, z) in &[(-4.0, -7.0), (0.0, -7.0), (4.0, -7.0)] {
+    for &(x, z) in &[(-4.0, -7.0), (0.0, -7.0), (4.0, -7.0), (10.0, -14.0), (-14.0, 10.0)] {
         commands.spawn((
             ArenaMarker,
             TargetCube,
@@ -173,7 +314,11 @@ fn spawn_arena(
         ));
     }
 
-    info!("[forgia-fps] Arena spawned : 25 floor tiles + 20 walls + 4 columns + 3 barrels + 3 target cubes");
+    info!(
+        "[forgia-fps] Arena spawned : {}×{}m, 121 floor tiles + 44 walls + 12 pillars + 14 cover props + 5 banners + 8 torches + 5 target cubes",
+        (ARENA_SIZE as f32 * TILE_SIZE) as i32,
+        (ARENA_SIZE as f32 * TILE_SIZE) as i32
+    );
 }
 
 fn spawn_wall(
