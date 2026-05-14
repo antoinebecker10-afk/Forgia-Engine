@@ -27,18 +27,10 @@ pub mod prelude {
 const TILE_SIZE: f32 = 4.0;
 const ARENA_SIZE: i32 = 11; // 11×11 tiles = 44×44m (vrai map FPS multi-zones)
 
-// ── Sky / cloud constants (cosmétiques cartoon dusk forge) ───────────
-// Futur : à porter en `config/genomes/sky_arena.toml` quand FpsTuning V2 ready.
-const SKY_DOME_RADIUS: f32 = 250.0;
-const SKY_DOME_COLOR: Color = Color::srgb(1.0, 0.55, 0.35); // warm dusk orange
-const SKY_DOME_EMISSIVE: LinearRgba = LinearRgba::new(0.6, 0.30, 0.18, 1.0);
-const SUN_DISK_RADIUS: f32 = 8.0;
-const SUN_DISK_POS: Vec3 = Vec3::new(80.0, 100.0, -40.0);
-const SUN_DISK_COLOR: Color = Color::srgb(1.0, 0.95, 0.85);
-const SUN_DISK_EMISSIVE: LinearRgba = LinearRgba::new(15.0, 12.0, 8.0, 1.0);
+// ── Cloud constants (skybox cubemap V1 wired par forgia-player) ──────
 const CLOUD_COLOR: Color = Color::srgb(0.95, 0.96, 0.97);
 const CLOUD_EMISSIVE: LinearRgba = LinearRgba::new(0.05, 0.05, 0.06, 1.0);
-const CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min, doux mais visible
+const CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min
 
 #[derive(Component)]
 pub struct ArenaMarker;
@@ -344,40 +336,8 @@ fn spawn_arena(
         ));
     }
 
-    // ── Cartoon skybox dome warm dusk (sphère inverted unlit) ───────────
-    let sky_mesh = meshes.add(Sphere::new(SKY_DOME_RADIUS).mesh().ico(3).unwrap());
-    let sky_mat = materials.add(StandardMaterial {
-        base_color: SKY_DOME_COLOR,
-        emissive: SKY_DOME_EMISSIVE,
-        unlit: true,
-        cull_mode: Some(bevy::render::render_resource::Face::Front),
-        ..default()
-    });
-    commands.spawn((
-        ArenaMarker,
-        Mesh3d(sky_mesh),
-        MeshMaterial3d(sky_mat),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-        bevy::light::NotShadowCaster,
-        Name::new("CartoonSkyDome"),
-    ));
-
-    // ── Sun disk visible (sphère blanche émissive HDR) ──────────────────
-    let sun_mesh = meshes.add(Sphere::new(SUN_DISK_RADIUS).mesh().ico(2).unwrap());
-    let sun_mat = materials.add(StandardMaterial {
-        base_color: SUN_DISK_COLOR,
-        emissive: SUN_DISK_EMISSIVE,
-        unlit: true,
-        ..default()
-    });
-    commands.spawn((
-        ArenaMarker,
-        Mesh3d(sun_mesh),
-        MeshMaterial3d(sun_mat),
-        Transform::from_translation(SUN_DISK_POS),
-        bevy::light::NotShadowCaster,
-        Name::new("SunDisk"),
-    ));
+    // Sky dome retiré : Skybox cubemap V1 (sky_129_stacked.png) wired sur FpsCamera
+    // par forgia-player::attach_skybox_to_camera. Sun disk retiré aussi (le HDRI a son sun peint).
 
     // ── Nuages cartoon volumétriques : clusters de sphères "popcorn" ──────
     // Pattern Mario Galaxy / Studio Ghibli : chaque nuage = 6 blobs sphériques
