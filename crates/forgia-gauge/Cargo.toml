@@ -1,0 +1,12 @@
+[package]
+name = "forgia-gauge"
+version = "0.1.0"
+edition = "2021"
+description = "Thin wrapper around bevy_gauge (flexible attribute/stat system)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_gauge = "0.4"

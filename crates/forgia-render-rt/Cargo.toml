@@ -1,0 +1,12 @@
+[package]
+name = "forgia-render-rt"
+version = "0.1.0"
+edition = "2021"
+description = "Raytracing (optional, hardware)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

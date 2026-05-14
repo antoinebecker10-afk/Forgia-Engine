@@ -1,0 +1,149 @@
+id = "character_default"
+name = "Character Default"
+domain = "Character"
+category = "Humanoid"
+description = "Basic character proportions: height, width, head, arms, legs"
+version = "1.0.0"
+
+[[genes]]
+id = "body_height"
+label = "Body Height"
+chromosome = "Core"
+target = "Value"
+min = 0.5
+max = 2.5
+default = 1.0
+layer = "structure"
+
+[[genes]]
+id = "body_width"
+label = "Body Width"
+chromosome = "Core"
+target = "Value"
+min = 0.3
+max = 2.0
+default = 1.0
+layer = "structure"
+
+[[genes]]
+id = "head_size"
+label = "Head Size"
+chromosome = "Head"
+target = "Value"
+min = 0.5
+max = 1.5
+default = 1.0
+layer = "proportions"
+
+[[genes]]
+id = "arm_length"
+label = "Arm Length"
+chromosome = "Arms"
+target = "Value"
+min = 0.5
+max = 1.5
+default = 1.0
+layer = "proportions"
+
+[[genes]]
+id = "leg_length"
+label = "Leg Length"
+chromosome = "Legs"
+target = "Value"
+min = 0.5
+max = 1.5
+default = 1.0
+layer = "proportions"
+
+# === Locomotion ===
+
+[[genes]]
+id = "run_speed"
+label = "Run Speed (m/s)"
+chromosome = "Locomotion"
+target = "Value"
+min = 4.0
+max = 14.0
+default = 8.0
+layer = "movement"
+
+[[genes]]
+id = "sprint_speed"
+label = "Sprint Speed (m/s)"
+chromosome = "Locomotion"
+target = "Value"
+min = 8.0
+max = 20.0
+default = 12.0
+layer = "movement"
+
+[[genes]]
+id = "jump_impulse"
+label = "Jump Force"
+chromosome = "Locomotion"
+target = "Value"
+min = 3.0
+max = 25.0
+default = 14.0
+layer = "movement"
+
+[[genes]]
+id = "swim_speed"
+label = "Swim Speed (m/s)"
+chromosome = "Locomotion"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 4.0
+layer = "movement"
+
+[[genes]]
+id = "eye_height"
+label = "Eye Height (m)"
+chromosome = "Camera"
+target = "Value"
+min = 0.4
+max = 1.2
+default = 0.70
+layer = "camera"
+
+# === Constraints ===
+
+[[constraints]]
+source = "body_height"
+target = "leg_length"
+ratio = 0.8
+
+[[constraints]]
+source = "body_height"
+target = "arm_length"
+ratio = 0.6
+
+[[constraints]]
+source = "body_width"
+target = "head_size"
+ratio = 0.3
+
+# Taller body → higher eye
+[[constraints]]
+source = "body_height"
+target = "eye_height"
+ratio = 0.3
+
+# Longer legs → faster run
+[[constraints]]
+source = "leg_length"
+target = "run_speed"
+ratio = 3.0
+
+# Run speed → sprint speed (proportional)
+[[constraints]]
+source = "run_speed"
+target = "sprint_speed"
+ratio = 1.5
+
+# Longer legs → better jump
+[[constraints]]
+source = "leg_length"
+target = "jump_impulse"
+ratio = 2.0

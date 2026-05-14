@@ -1,0 +1,12 @@
+[package]
+name = "forgia-status-effects"
+version = "0.1.0"
+edition = "2021"
+description = "Burn/slow/stun/poison status with stacking"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

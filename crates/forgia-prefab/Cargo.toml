@@ -1,0 +1,12 @@
+[package]
+name = "forgia-prefab"
+version = "0.1.0"
+edition = "2021"
+description = "Blueprint/prefab system for AI assembly"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

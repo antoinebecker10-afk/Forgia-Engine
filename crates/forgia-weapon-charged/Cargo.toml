@@ -1,0 +1,12 @@
+[package]
+name = "forgia-weapon-charged"
+version = "0.1.0"
+edition = "2021"
+description = "Charged shot (hold to charge)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

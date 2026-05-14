@@ -1,0 +1,328 @@
+id = "biome_particles_default"
+name = "Biome Ambient Particles"
+domain = "World"
+category = "Custom"
+description = "Per-biome atmospheric particles: pollen, leaves, snow, dust, embers, mist"
+version = "1.0.0"
+
+# === Global Particle Budget ===
+[[genes]]
+id = "emitter_height_offset"
+label = "Emitter Y Offset"
+chromosome = "Budget"
+target = "Value"
+min = 2.0
+max = 15.0
+default = 5.0
+layer = "budget"
+
+# === Plains (Pollen) ===
+[[genes]]
+id = "plains_particle_count"
+label = "Plains Count"
+chromosome = "Plains"
+target = "Value"
+min = 50.0
+max = 500.0
+default = 192.0
+layer = "biome_plains"
+
+[[genes]]
+id = "plains_spawn_rate"
+label = "Plains Spawn Rate"
+chromosome = "Plains"
+target = "Value"
+min = 2.0
+max = 30.0
+default = 9.0
+layer = "biome_plains"
+
+[[genes]]
+id = "plains_particle_size"
+label = "Plains Particle Size"
+chromosome = "Plains"
+target = "Value"
+min = 0.01
+max = 0.2
+default = 0.05
+layer = "biome_plains"
+
+[[genes]]
+id = "plains_lifetime"
+label = "Plains Lifetime"
+chromosome = "Plains"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 4.5
+layer = "biome_plains"
+
+# === Forest (Leaves) ===
+[[genes]]
+id = "forest_particle_count"
+label = "Forest Count"
+chromosome = "Forest"
+target = "Value"
+min = 50.0
+max = 600.0
+default = 256.0
+layer = "biome_forest"
+
+[[genes]]
+id = "forest_spawn_rate"
+label = "Forest Spawn Rate"
+chromosome = "Forest"
+target = "Value"
+min = 3.0
+max = 30.0
+default = 12.0
+layer = "biome_forest"
+
+[[genes]]
+id = "forest_particle_size"
+label = "Forest Leaf Size"
+chromosome = "Forest"
+target = "Value"
+min = 0.02
+max = 0.3
+default = 0.10
+layer = "biome_forest"
+
+[[genes]]
+id = "forest_fall_speed"
+label = "Forest Fall Speed"
+chromosome = "Forest"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.8
+layer = "biome_forest"
+
+[[genes]]
+id = "forest_pollen_ratio"
+label = "Forest Pollen/Dust Ratio (0=leaves only, 1=pollen only)"
+chromosome = "Forest"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "biome_forest"
+
+# === Desert (Dust) ===
+[[genes]]
+id = "desert_particle_count"
+label = "Desert Count"
+chromosome = "Desert"
+target = "Value"
+min = 100.0
+max = 800.0
+default = 320.0
+layer = "biome_desert"
+
+[[genes]]
+id = "desert_spawn_rate"
+label = "Desert Spawn Rate"
+chromosome = "Desert"
+target = "Value"
+min = 5.0
+max = 40.0
+default = 15.0
+layer = "biome_desert"
+
+[[genes]]
+id = "desert_wind_speed"
+label = "Desert Wind Drift"
+chromosome = "Desert"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 3.0
+layer = "biome_desert"
+
+[[genes]]
+id = "desert_drag"
+label = "Desert Particle Drag"
+chromosome = "Desert"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.0
+layer = "biome_desert"
+
+# === Mountain (Snow) ===
+[[genes]]
+id = "mountain_particle_count"
+label = "Mountain Count"
+chromosome = "Mountain"
+target = "Value"
+min = 100.0
+max = 800.0
+default = 384.0
+layer = "biome_mountain"
+
+[[genes]]
+id = "mountain_fall_speed"
+label = "Snow Fall Speed"
+chromosome = "Mountain"
+target = "Value"
+min = 0.2
+max = 3.0
+default = 1.2
+layer = "biome_mountain"
+
+# === Swamp (Mist) ===
+[[genes]]
+id = "swamp_particle_count"
+label = "Swamp Count"
+chromosome = "Swamp"
+target = "Value"
+min = 30.0
+max = 400.0
+default = 128.0
+layer = "biome_swamp"
+
+[[genes]]
+id = "swamp_particle_size"
+label = "Swamp Mist Size"
+chromosome = "Swamp"
+target = "Value"
+min = 0.05
+max = 1.0
+default = 0.30
+layer = "biome_swamp"
+
+[[genes]]
+id = "swamp_lifetime"
+label = "Swamp Mist Lifetime"
+chromosome = "Swamp"
+target = "Value"
+min = 3.0
+max = 15.0
+default = 7.5
+layer = "biome_swamp"
+
+# === Volcanic (Embers) ===
+[[genes]]
+id = "volcanic_particle_count"
+label = "Volcanic Count"
+chromosome = "Volcanic"
+target = "Value"
+min = 50.0
+max = 600.0
+default = 288.0
+layer = "biome_volcanic"
+
+[[genes]]
+id = "volcanic_fall_speed"
+label = "Ember Fall Speed"
+chromosome = "Volcanic"
+target = "Value"
+min = 0.3
+max = 3.0
+default = 1.5
+layer = "biome_volcanic"
+
+[[genes]]
+id = "volcanic_ember_size"
+label = "Ember Size"
+chromosome = "Volcanic"
+target = "Value"
+min = 0.01
+max = 0.15
+default = 0.05
+layer = "biome_volcanic"
+
+# === Tundra (Blizzard) ===
+[[genes]]
+id = "tundra_particle_count"
+label = "Tundra Count"
+chromosome = "Tundra"
+target = "Value"
+min = 100.0
+max = 600.0
+default = 256.0
+layer = "biome_tundra"
+
+[[genes]]
+id = "tundra_wind_speed"
+label = "Blizzard Wind"
+chromosome = "Tundra"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 1.5
+layer = "biome_tundra"
+
+# === Jungle (Rain + Pollen) ===
+[[genes]]
+id = "jungle_particle_count"
+label = "Jungle Count"
+chromosome = "Jungle"
+target = "Value"
+min = 100.0
+max = 800.0
+default = 320.0
+layer = "biome_jungle"
+
+[[genes]]
+id = "jungle_spawn_rate"
+label = "Jungle Spawn Rate"
+chromosome = "Jungle"
+target = "Value"
+min = 5.0
+max = 40.0
+default = 16.0
+layer = "biome_jungle"
+
+# === Canyon (Wind-blown Dust) ===
+[[genes]]
+id = "canyon_particle_count"
+label = "Canyon Count"
+chromosome = "Canyon"
+target = "Value"
+min = 50.0
+max = 600.0
+default = 256.0
+layer = "biome_canyon"
+
+[[genes]]
+id = "canyon_wind_speed"
+label = "Canyon Wind Drift"
+chromosome = "Canyon"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 2.0
+layer = "biome_canyon"
+
+# === Savanna (Seed Pods) ===
+[[genes]]
+id = "savanna_particle_count"
+label = "Savanna Count"
+chromosome = "Savanna"
+target = "Value"
+min = 50.0
+max = 400.0
+default = 160.0
+layer = "biome_savanna"
+
+[[genes]]
+id = "savanna_spawn_rate"
+label = "Savanna Spawn Rate"
+chromosome = "Savanna"
+target = "Value"
+min = 2.0
+max = 20.0
+default = 7.0
+layer = "biome_savanna"
+
+# Constraints
+[[constraints]]
+source = "desert_wind_speed"
+target = "desert_drag"
+ratio = 0.3
+
+[[constraints]]
+source = "mountain_fall_speed"
+target = "mountain_particle_count"
+ratio = 200.0

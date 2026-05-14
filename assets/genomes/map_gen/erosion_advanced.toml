@@ -1,0 +1,221 @@
+id = "erosion_advanced"
+name = "Advanced Erosion"
+domain = "Terrain"
+category = "Custom"
+description = "Hydraulic erosion, noise variety (Ridged, Worley, Billow), terrain destructibility"
+version = "1.0.0"
+
+# === Hydraulic Erosion ===
+[[genes]]
+id = "hydro_enabled"
+label = "Hydraulic Erosion"
+chromosome = "Hydraulic"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_iterations"
+label = "Droplet Iterations"
+chromosome = "Hydraulic"
+target = "Value"
+min = 1000.0
+max = 100000.0
+default = 80000.0  # AAA: 4x more droplets for visible drainage networks
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_droplet_inertia"
+label = "Droplet Inertia"
+chromosome = "Hydraulic"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.18  # AAA: more winding paths (was 0.05)
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_sediment_capacity"
+label = "Sediment Capacity"
+chromosome = "Hydraulic"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 6.0  # Carries more sediment (was 4.0)
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_deposition_rate"
+label = "Deposition Rate"
+chromosome = "Hydraulic"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.10  # Slower filling = deeper valleys (was 0.15)
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_erosion_rate"
+label = "Hydraulic Erosion Rate"
+chromosome = "Hydraulic"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.22  # Realistic carving (was 0.35 = too aggressive, parallel gullies)
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_evaporation"
+label = "Evaporation Rate"
+chromosome = "Hydraulic"
+target = "Value"
+min = 0.001
+max = 0.1
+default = 0.008  # Slower evaporation = longer rivers (was 0.01)
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_droplet_lifetime"
+label = "Max Droplet Steps"
+chromosome = "Hydraulic"
+target = "Value"
+min = 10.0
+max = 100.0
+default = 64.0  # AAA: longer drainage networks (was 30)
+layer = "hydraulic"
+
+[[genes]]
+id = "hydro_brush_radius"
+label = "Erosion Brush Radius"
+chromosome = "Hydraulic"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 3.0
+layer = "hydraulic"
+
+# === Thermal Erosion ===
+[[genes]]
+id = "thermal_talus_angle"
+label = "Talus Angle (max stable diff)"
+chromosome = "Thermal"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.5
+layer = "thermal"
+
+# === Noise Types ===
+[[genes]]
+id = "noise_type_primary"
+label = "Primary Noise (0=Perlin,1=Simplex,2=OpenSimplex)"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.0
+layer = "noise"
+
+[[genes]]
+id = "noise_ridged_weight"
+label = "Ridged Multifractal Weight"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "noise"
+
+[[genes]]
+id = "noise_ridged_frequency"
+label = "Ridged Frequency"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.001
+max = 0.02
+default = 0.005
+layer = "noise"
+
+[[genes]]
+id = "noise_billow_weight"
+label = "Billow Noise Weight"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "noise"
+
+[[genes]]
+id = "noise_billow_frequency"
+label = "Billow Frequency"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.001
+max = 0.02
+default = 0.004
+layer = "noise"
+
+[[genes]]
+id = "noise_worley_weight"
+label = "Worley Noise Weight"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "noise"
+
+[[genes]]
+id = "noise_worley_frequency"
+label = "Worley Frequency"
+chromosome = "NoiseTypes"
+target = "Value"
+min = 0.005
+max = 0.05
+default = 0.01
+layer = "noise"
+
+# === Terrain Destructibility ===
+[[genes]]
+id = "terrain_destructible"
+label = "Terrain Destructible"
+chromosome = "Destruct"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "destruct"
+
+[[genes]]
+id = "terrain_destruct_radius"
+label = "Destruction Radius"
+chromosome = "Destruct"
+target = "Value"
+min = 0.5
+max = 10.0
+default = 2.0
+layer = "destruct"
+
+[[genes]]
+id = "terrain_regen_speed"
+label = "Terrain Regen Speed"
+chromosome = "Destruct"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "destruct"
+
+# Constraints
+[[constraints]]
+source = "hydro_erosion_rate"
+target = "hydro_deposition_rate"
+ratio = 0.7
+
+[[constraints]]
+source = "hydro_iterations"
+target = "hydro_droplet_lifetime"
+ratio = 0.001

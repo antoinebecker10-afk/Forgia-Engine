@@ -1,0 +1,313 @@
+id = "weapon_vfx_default"
+name = "Weapon Visual Effects"
+domain = "Combat"
+category = "VFX"
+description = "Hitscan weapon VFX: muzzle flash, impact sparks, tracers, screen shake"
+version = "1.0.0"
+
+# Screen Shake
+[[genes]]
+id = "wfx_fire_shake"
+label = "Fire Shake"
+chromosome = "ScreenShake"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.12
+layer = "shake"
+
+# Impact
+# NOTE story-432 V3 (2026-05-13) : `wfx_impact_light_*` (3 genes infra) sont
+# DESIGN_DISABLED — PointLight retire dans effects/weapon_vfx/mod.rs:154
+# "too bright with Atmosphere, breaks immersion". Genes conserves pour eviter
+# casser saves utilisateur mais inactifs runtime. Sparks/dust/flash 3-layer
+# hanabi suffisent au feedback impact.
+[[genes]]
+id = "wfx_impact_spark_radius"
+label = "Spark Radius"
+chromosome = "Impact"
+target = "Value"
+min = 0.02
+max = 0.2
+default = 0.08
+layer = "impact"
+
+[[genes]]
+id = "wfx_impact_spark_lifetime"
+label = "Spark Lifetime"
+chromosome = "Impact"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.12
+layer = "impact"
+
+[[genes]]
+id = "wfx_impact_light_intensity"
+label = "Impact Light"
+chromosome = "Impact"
+target = "Value"
+min = 10000.0
+max = 200000.0
+default = 80000.0
+layer = "impact"
+
+[[genes]]
+id = "wfx_impact_light_range"
+label = "Impact Range"
+chromosome = "Impact"
+target = "Value"
+min = 2.0
+max = 20.0
+default = 8.0
+layer = "impact"
+
+[[genes]]
+id = "wfx_impact_light_lifetime"
+label = "Impact Light Lifetime"
+chromosome = "Impact"
+target = "Value"
+min = 0.02
+max = 0.3
+default = 0.08
+layer = "impact"
+
+# Muzzle
+# NOTE story-432 V3 (2026-05-13) : `wfx_muzzle_light_*` (3 genes infra) sont
+# DESIGN_DISABLED — PointLight retire dans effects/weapon_vfx/mod.rs:119
+# meme raison qu'impact light (Atmosphere conflict). 5-layer hanabi suffisent.
+[[genes]]
+id = "wfx_muzzle_light_intensity"
+label = "Muzzle Light"
+chromosome = "Muzzle"
+target = "Value"
+min = 50000.0
+max = 500000.0
+default = 150000.0
+layer = "muzzle"
+
+[[genes]]
+id = "wfx_muzzle_light_range"
+label = "Muzzle Range"
+chromosome = "Muzzle"
+target = "Value"
+min = 4.0
+max = 30.0
+default = 12.0
+layer = "muzzle"
+
+[[genes]]
+id = "wfx_muzzle_flash_lifetime"
+label = "Flash Lifetime"
+chromosome = "Muzzle"
+target = "Value"
+min = 0.02
+max = 0.2
+default = 0.06
+layer = "muzzle"
+
+[[genes]]
+id = "wfx_muzzle_glow_radius"
+label = "Glow Radius"
+chromosome = "Muzzle"
+target = "Value"
+min = 0.04
+max = 0.3
+default = 0.12
+layer = "muzzle"
+
+[[genes]]
+id = "wfx_muzzle_glow_lifetime"
+label = "Glow Lifetime"
+chromosome = "Muzzle"
+target = "Value"
+min = 0.02
+max = 0.2
+default = 0.05
+layer = "muzzle"
+
+# Tracer
+[[genes]]
+id = "wfx_tracer_width"
+label = "Tracer Width"
+chromosome = "Tracer"
+target = "Value"
+min = 0.01
+max = 0.1
+default = 0.035
+layer = "tracer"
+
+[[genes]]
+id = "wfx_tracer_max_length"
+label = "Tracer Max Length"
+chromosome = "Tracer"
+target = "Value"
+min = 10.0
+max = 100.0
+default = 40.0
+layer = "tracer"
+
+[[genes]]
+id = "wfx_tracer_lifetime"
+label = "Tracer Lifetime"
+chromosome = "Tracer"
+target = "Value"
+min = 0.02
+max = 0.3
+default = 0.08
+layer = "tracer"
+
+# Screen Effects
+[[genes]]
+id = "wfx_chromatic_intensity"
+label = "Chromatic Aberration Spike"
+chromosome = "ScreenEffects"
+target = "Value"
+min = 0.0
+max = 0.4
+default = 0.12
+layer = "screen"
+
+# story-432 V5-B (2026-05-13) : cap accumulation pour eviter "CA TOO STRONG"
+# en auto-fire (decay 15Hz pas assez rapide vs 11 tirs/sec, intensity cumulee
+# atteint 0.062 vs sain 0.020). Cap = floor de securite.
+[[genes]]
+id = "wfx_chromatic_cap"
+label = "Chromatic Aberration Cap"
+chromosome = "ScreenEffects"
+target = "Value"
+min = 0.005
+max = 0.1
+default = 0.025
+layer = "screen"
+
+[[genes]]
+id = "wfx_chromatic_decay"
+label = "Chromatic Decay Speed"
+chromosome = "ScreenEffects"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 15.0
+layer = "screen"
+
+[[genes]]
+id = "wfx_fov_punch_deg"
+label = "FOV Punch (degrees)"
+chromosome = "ScreenEffects"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 0.8
+layer = "screen"
+
+[[genes]]
+id = "wfx_fov_punch_decay"
+label = "FOV Punch Decay Speed"
+chromosome = "ScreenEffects"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 12.0
+layer = "screen"
+
+# === Hit-Stop (story-432 V2 — gunfeel framework) ===
+# Pause virtuelle gameplay (Time<Virtual>) sur impact lourd. Migration des
+# hardcodes de combat_juice.rs (was 50ms / threshold 20 / scale 0.0).
+[[genes]]
+id = "wfx_hit_stop_ms"
+label = "Hit-Stop Duration (ms)"
+chromosome = "GunfeelImpact"
+target = "Value"
+min = 0.0
+max = 200.0
+default = 50.0
+layer = "hit_stop"
+
+[[genes]]
+id = "wfx_hit_stop_threshold_dmg"
+label = "Hit-Stop Threshold (dmg)"
+chromosome = "GunfeelImpact"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 20.0
+layer = "hit_stop"
+
+[[genes]]
+id = "wfx_hit_stop_scale"
+label = "Hit-Stop Time Scale"
+chromosome = "GunfeelImpact"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.0
+layer = "hit_stop"
+
+# === Camera Recoil (story-432 V2 — distinct from viewmodel kick) ===
+# Apex/COD pattern : pitch push haut + yaw petit random, recover spring.
+# Modifie CameraState.pitch/yaw + dette compensée par decay (auto-recenter).
+[[genes]]
+id = "wfx_cam_kick_pitch_deg"
+label = "Camera Pitch Kick (deg)"
+chromosome = "GunfeelRecoil"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 1.2
+layer = "cam_recoil"
+
+[[genes]]
+id = "wfx_cam_kick_yaw_max_deg"
+label = "Camera Yaw Kick Max (deg)"
+chromosome = "GunfeelRecoil"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.4
+layer = "cam_recoil"
+
+[[genes]]
+id = "wfx_cam_recover_hz"
+label = "Camera Recoil Recover Rate"
+chromosome = "GunfeelRecoil"
+target = "Value"
+min = 5.0
+max = 40.0
+default = 18.0
+layer = "cam_recoil"
+
+# === Damage Falloff (story-432 V5-D — gunfeel TTK skill) ===
+# Hitscan damage scaling avec distance. start_pct = fraction du range max
+# avant que falloff commence (0.5 = 50% range = full dmg, 100% range = floor).
+# floor_mult = multiplicateur damage au range max (Apex 0.65, Halo 0.7).
+[[genes]]
+id = "wfx_falloff_start_pct"
+label = "Damage Falloff Start (% range)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.5
+layer = "falloff"
+
+[[genes]]
+id = "wfx_falloff_floor_mult"
+label = "Damage Floor at Max Range"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.2
+max = 1.0
+default = 0.65
+layer = "falloff"
+
+# Audio
+[[genes]]
+id = "wfx_sfx_volume"
+label = "SFX Volume"
+chromosome = "Audio"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "audio"

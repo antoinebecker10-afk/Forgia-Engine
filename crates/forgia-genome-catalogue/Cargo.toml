@@ -1,0 +1,14 @@
+[package]
+name = "forgia-genome-catalogue"
+version = "0.1.0"
+edition = "2021"
+description = "Catalogue of all genomes (weapon, biome, enemy)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

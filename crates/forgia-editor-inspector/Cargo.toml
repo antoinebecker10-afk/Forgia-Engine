@@ -1,0 +1,13 @@
+[package]
+name = "forgia-editor-inspector"
+version = "0.1.0"
+edition = "2021"
+description = "Reflect-based component inspector"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+bevy_egui = "0.39.1"

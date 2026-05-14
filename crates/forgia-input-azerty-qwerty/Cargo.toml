@@ -1,0 +1,13 @@
+[package]
+name = "forgia-input-azerty-qwerty"
+version = "0.1.0"
+edition = "2021"
+description = "AZERTY/QWERTY layout swap"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+leafwing-input-manager = { workspace = true }

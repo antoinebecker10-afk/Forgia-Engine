@@ -1,0 +1,229 @@
+id = "npc_default"
+name = "NPC & AI Default"
+domain = "Npc"
+category = "Creature"
+description = "Goblin AI, NPC behaviors, patrol, vision, boss — extracted from FpsTuning"
+version = "1.0.0"
+
+# Vision & Detection
+[[genes]]
+id = "goblin_vision_range"
+label = "Vision Range"
+chromosome = "Detection"
+target = "Value"
+min = 10.0
+max = 80.0
+default = 40.0
+layer = "detection"
+
+[[genes]]
+id = "goblin_vision_fov_deg"
+label = "Vision FOV"
+chromosome = "Detection"
+target = "Value"
+min = 90.0
+max = 360.0
+default = 270.0
+layer = "detection"
+
+[[genes]]
+id = "goblin_chase_range"
+label = "Chase Range"
+chromosome = "Detection"
+target = "Value"
+min = 10.0
+max = 80.0
+default = 40.0
+layer = "detection"
+
+[[genes]]
+id = "goblin_alert_duration"
+label = "Alert Duration"
+chromosome = "Detection"
+target = "Value"
+min = 0.3
+max = 5.0
+default = 1.0
+layer = "detection"
+
+# Combat
+[[genes]]
+id = "goblin_melee_range"
+label = "Melee Range"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "combat"
+
+[[genes]]
+id = "goblin_melee_damage"
+label = "Melee Damage"
+chromosome = "Combat"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "combat"
+
+[[genes]]
+id = "goblin_melee_cooldown"
+label = "Melee Cooldown"
+chromosome = "Combat"
+target = "Value"
+min = 0.3
+max = 2.0
+default = 0.8
+layer = "combat"
+
+# Movement
+[[genes]]
+id = "goblin_chase_speed"
+label = "Chase Speed"
+chromosome = "Movement"
+target = "Value"
+min = 3.0
+max = 15.0
+default = 8.0
+layer = "movement"
+
+[[genes]]
+id = "goblin_turn_speed"
+label = "Turn Speed"
+chromosome = "Movement"
+target = "Value"
+min = 2.0
+max = 15.0
+default = 8.0
+layer = "movement"
+
+# Patrol
+[[genes]]
+id = "goblin_patrol_speed"
+label = "Patrol Speed"
+chromosome = "Patrol"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.0
+layer = "patrol"
+
+[[genes]]
+id = "goblin_patrol_radius"
+label = "Patrol Radius"
+chromosome = "Patrol"
+target = "Value"
+min = 3.0
+max = 20.0
+default = 8.0
+layer = "patrol"
+
+[[genes]]
+id = "goblin_patrol_wait"
+label = "Patrol Wait"
+chromosome = "Patrol"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 3.0
+layer = "patrol"
+
+# NPC Behaviors
+[[genes]]
+id = "npc_guard_alert_range"
+label = "Guard Alert Range"
+chromosome = "NPC"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 15.0
+layer = "npc"
+
+[[genes]]
+id = "npc_follower_distance"
+label = "Follow Distance"
+chromosome = "NPC"
+target = "Value"
+min = 2.0
+max = 10.0
+default = 4.0
+layer = "npc"
+
+[[genes]]
+id = "npc_wanderer_radius"
+label = "Wander Radius"
+chromosome = "NPC"
+target = "Value"
+min = 8.0
+max = 40.0
+default = 20.0
+layer = "npc"
+
+[[genes]]
+id = "npc_merchant_radius"
+label = "Merchant Radius"
+chromosome = "NPC"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 3.0
+layer = "npc"
+
+# Boss
+[[genes]]
+id = "npc_boss_health"
+label = "Boss Health"
+chromosome = "Boss"
+target = "Value"
+min = 100.0
+max = 2000.0
+default = 500.0
+layer = "boss"
+
+[[genes]]
+id = "npc_boss_damage"
+label = "Boss Damage"
+chromosome = "Boss"
+target = "Value"
+min = 10.0
+max = 80.0
+default = 25.0
+layer = "boss"
+
+[[genes]]
+id = "npc_boss_phase_threshold"
+label = "Boss Phase Trigger"
+chromosome = "Boss"
+target = "Value"
+min = 0.2
+max = 0.8
+default = 0.5
+layer = "boss"
+
+# Spawn distribution
+[[genes]]
+id = "terrain_enemy_grunt_pct"
+label = "Grunt %"
+chromosome = "Spawning"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 60.0
+layer = "spawning"
+
+# Constraints
+[[constraints]]
+source = "goblin_vision_range"
+target = "goblin_chase_range"
+ratio = 0.9
+
+[[constraints]]
+source = "goblin_melee_damage"
+target = "goblin_melee_cooldown"
+ratio = 0.02
+
+[[constraints]]
+source = "npc_boss_health"
+target = "npc_boss_damage"
+ratio = 0.05

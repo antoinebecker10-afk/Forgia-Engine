@@ -1,0 +1,12 @@
+[package]
+name = "forgia-silk"
+version = "0.1.0"
+edition = "2021"
+description = "Cloth physics (STUB — bevy_silk 0.10 targets Bevy 0.16, needs port to 0.18 or vendoring)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+# bevy_silk = "0.10"  # Bevy 0.16 only — re-enable when upstream supports 0.18 or vendor source

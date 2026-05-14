@@ -1,0 +1,60 @@
+id = "mood_realistic"
+name = "Realistic Immersion"
+domain = "Meta"
+category = "Mood"
+description = "Cross-domain constraints for photorealistic immersion: coherent fog, vegetation density, particle density, water clarity, lighting warmth"
+version = "1.0.0"
+
+# === Fog → Vegetation Density (more fog = less visible vegetation needed) ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "fog_density_terrain" }
+target = { domain = "vegetation_default", gene = "veg_density_global" }
+ratio = -150.0
+
+# === Wind → Tree Sway (wind speed drives vegetation animation) ===
+[[cross_constraints]]
+source = { domain = "wind_default", gene = "wind_base_speed" }
+target = { domain = "wind_default", gene = "tree_sway_angle" }
+ratio = 0.005
+
+# === Wind → Particle Drift (stronger wind = more particle movement) ===
+[[cross_constraints]]
+source = { domain = "wind_default", gene = "wind_base_speed" }
+target = { domain = "biome_particles_default", gene = "desert_wind_speed" }
+ratio = 0.4
+
+# === Water Opacity → Specular (clearer water = more light transmission) ===
+[[cross_constraints]]
+source = { domain = "water_default", gene = "water_opacity" }
+target = { domain = "water_default", gene = "water_specular_transmission" }
+ratio = -0.6
+
+# === Ambient Light → NPC Vision (darker = reduced AI sight) ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "ambient_brightness" }
+target = { domain = "npc_default", gene = "goblin_vision_range" }
+ratio = 8.0
+
+# === Fog → Lamppost Intensity (foggy = brighter lights for visibility) ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "fog_density_terrain" }
+target = { domain = "lampposts_default", gene = "light_intensity" }
+ratio = 3000000.0
+
+# === Wind → Wave Amplitude (wind drives ocean waves) ===
+[[cross_constraints]]
+source = { domain = "wind_default", gene = "wind_base_speed" }
+target = { domain = "water_default", gene = "wave_amp_primary" }
+ratio = 0.02
+
+# === Biome Difficulty → Gold Reward (harder biome = better loot) ===
+[[cross_constraints]]
+source = { domain = "biome_volcanic", gene = "enemy_hp_mult" }
+target = { domain = "economy_default", gene = "coin_spawn_height" }
+ratio = 0.5
+
+# === Sun Elevation → Bloom (low sun = more bloom/glare) ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "sun_elevation" }
+target = { domain = "atmosphere_default", gene = "bloom_intensity" }
+ratio = -0.002

@@ -1,0 +1,202 @@
+id = "biome_jungle"
+name = "Biome: Jungle"
+domain = "Biome"
+category = "Custom"
+description = "Genome wrapper for Jungle biome — terrain generation + enemy modifiers"
+version = "1.0.0"
+
+[[genes]]
+id = "warp_strength"
+label = "Warp Strength"
+chromosome = "Terrain"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 2.0
+layer = "generation"
+
+[[genes]]
+id = "erosion_passes"
+label = "Erosion Passes"
+chromosome = "Terrain"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 3.0
+layer = "generation"
+
+[[genes]]
+id = "erosion_rate"
+label = "Erosion Rate"
+chromosome = "Terrain"
+target = "Value"
+min = 0.0
+max = 0.1
+default = 0.07
+layer = "generation"
+
+[[genes]]
+id = "micro_roughness_amp"
+label = "Micro Roughness"
+chromosome = "Terrain"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 0.55
+layer = "generation"
+
+[[genes]]
+id = "roughness"
+label = "Surface Roughness"
+chromosome = "Visual"
+target = "Value"
+min = 0.5
+max = 1.0
+default = 0.82
+layer = "visual"
+
+[[genes]]
+id = "spawn_weight"
+label = "Spawn Weight"
+chromosome = "Distribution"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.0
+layer = "distribution"
+
+[[genes]]
+id = "enemy_hp_mult"
+label = "Enemy HP Mult"
+chromosome = "Enemies"
+target = "Value"
+min = 0.5
+max = 2.0
+default = 1.2
+layer = "enemies"
+
+[[genes]]
+id = "enemy_speed_mult"
+label = "Enemy Speed Mult"
+chromosome = "Enemies"
+target = "Value"
+min = 0.5
+max = 2.0
+default = 0.8
+layer = "enemies"
+
+[[genes]]
+id = "enemy_dmg_mult"
+label = "Enemy Dmg Mult"
+chromosome = "Enemies"
+target = "Value"
+min = 0.5
+max = 2.0
+default = 1.2
+layer = "enemies"
+
+# === Noise Layers (multi-noise per biome) ===
+[[genes]]
+id = "noise_ridged_weight"
+label = "Ridged Weight"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.15
+layer = "noise"
+
+[[genes]]
+id = "noise_billow_weight"
+label = "Billow Weight"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "noise"
+
+[[genes]]
+id = "noise_worley_weight"
+label = "Worley Weight"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.05
+layer = "noise"
+
+[[genes]]
+id = "noise_swiss_weight"
+label = "Swiss Turbulence"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.1
+layer = "noise"
+
+[[genes]]
+id = "noise_swiss_warp"
+label = "Swiss Warp Factor"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.5
+layer = "noise"
+
+[[genes]]
+id = "noise_ridged_freq_mult"
+label = "Ridged Freq Mult"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.0
+layer = "noise"
+
+[[genes]]
+id = "noise_worley_freq_mult"
+label = "Worley Freq Mult"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 2.0
+layer = "noise"
+
+[[genes]]
+id = "noise_slope_amp"
+label = "Slope Amplitude"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "noise"
+
+[[genes]]
+id = "noise_lacunarity"
+label = "Lacunarity"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 1.5
+max = 3.5
+default = 2.4
+layer = "noise"
+
+[[genes]]
+id = "noise_persistence"
+label = "Persistence"
+chromosome = "NoiseLayers"
+target = "Value"
+min = 0.2
+max = 0.7
+default = 0.5
+layer = "noise"
+
+[[constraints]]
+source = "enemy_hp_mult"
+target = "enemy_dmg_mult"
+ratio = 0.5

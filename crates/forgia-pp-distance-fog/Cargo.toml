@@ -1,0 +1,12 @@
+[package]
+name = "forgia-pp-distance-fog"
+version = "0.1.0"
+edition = "2021"
+description = "Depth-based fog"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

@@ -1,0 +1,12 @@
+[package]
+name = "forgia-assets"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — GameAssets Resource + preload. Whitelist asset_load_whitelist.txt enforced (Lock L1 reborn)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

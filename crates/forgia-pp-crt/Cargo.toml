@@ -1,0 +1,12 @@
+[package]
+name = "forgia-pp-crt"
+version = "0.1.0"
+edition = "2021"
+description = "CRT TV scanline + curvature"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

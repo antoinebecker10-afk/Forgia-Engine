@@ -1,0 +1,12 @@
+[package]
+name = "forgia-script-hot-reload"
+version = "0.1.0"
+edition = "2021"
+description = "Hot-reload Luau on file change"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

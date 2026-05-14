@@ -1,0 +1,294 @@
+id = "water_advanced"
+name = "Water Advanced"
+domain = "Water"
+category = "Custom"
+description = "Advanced water: refraction, caustics, foam, depth fog, waves, underwater effects"
+version = "1.0.0"
+
+# === Wave Simulation ===
+[[genes]]
+id = "water_wave_height"
+label = "Wave Height"
+chromosome = "Waves"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 0.4
+layer = "waves"
+
+[[genes]]
+id = "water_wave_speed"
+label = "Wave Speed"
+chromosome = "Waves"
+target = "Value"
+min = 0.1
+max = 5.0
+default = 1.2
+layer = "waves"
+
+[[genes]]
+id = "water_wave_frequency"
+label = "Wave Frequency"
+chromosome = "Waves"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 2.0
+layer = "waves"
+
+[[genes]]
+id = "water_wave_octaves"
+label = "Wave Detail Octaves"
+chromosome = "Waves"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "waves"
+
+# === Refraction ===
+[[genes]]
+id = "water_refraction_strength"
+label = "Refraction Distortion"
+chromosome = "Refraction"
+target = "Value"
+min = 0.0
+max = 0.3
+default = 0.08
+layer = "refraction"
+
+[[genes]]
+id = "water_ior"
+label = "Index of Refraction"
+chromosome = "Refraction"
+target = "Value"
+min = 1.0
+max = 2.0
+default = 1.33
+layer = "refraction"
+
+[[genes]]
+id = "water_clarity"
+label = "Water Clarity"
+chromosome = "Refraction"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "refraction"
+
+# === Depth Fog ===
+[[genes]]
+id = "water_depth_fog_density"
+label = "Depth Fog Density"
+chromosome = "DepthFog"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.1
+layer = "depth"
+
+[[genes]]
+id = "water_depth_fog_color_r"
+label = "Depth Fog R"
+chromosome = "DepthFog"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.05
+layer = "depth"
+
+[[genes]]
+id = "water_depth_fog_color_g"
+label = "Depth Fog G"
+chromosome = "DepthFog"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.15
+layer = "depth"
+
+[[genes]]
+id = "water_depth_fog_color_b"
+label = "Depth Fog B"
+chromosome = "DepthFog"
+target = "Value"
+min = 0.0
+max = 0.8
+default = 0.4
+layer = "depth"
+
+# === Caustics ===
+[[genes]]
+id = "water_caustic_intensity"
+label = "Caustic Intensity"
+chromosome = "Caustics"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.6
+layer = "caustics"
+
+[[genes]]
+id = "water_caustic_scale"
+label = "Caustic Pattern Scale"
+chromosome = "Caustics"
+target = "Value"
+min = 0.1
+max = 5.0
+default = 1.5
+layer = "caustics"
+
+[[genes]]
+id = "water_caustic_speed"
+label = "Caustic Animation Speed"
+chromosome = "Caustics"
+target = "Value"
+min = 0.1
+max = 3.0
+default = 0.8
+layer = "caustics"
+
+[[genes]]
+id = "water_caustic_depth"
+label = "Caustic Max Depth"
+chromosome = "Caustics"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 8.0
+layer = "caustics"
+
+# === Foam ===
+[[genes]]
+id = "water_foam_shore_width"
+label = "Shore Foam Width"
+chromosome = "Foam"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 1.5
+layer = "foam"
+
+[[genes]]
+id = "water_foam_intensity"
+label = "Foam Intensity"
+chromosome = "Foam"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "foam"
+
+[[genes]]
+id = "water_foam_speed"
+label = "Foam Animation Speed"
+chromosome = "Foam"
+target = "Value"
+min = 0.1
+max = 3.0
+default = 0.6
+layer = "foam"
+
+# === Reflections ===
+[[genes]]
+id = "water_reflection_strength"
+label = "Reflection Strength"
+chromosome = "Reflections"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "reflections"
+
+[[genes]]
+id = "water_fresnel_power"
+label = "Fresnel Power"
+chromosome = "Reflections"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 4.0
+layer = "reflections"
+
+[[genes]]
+id = "water_specular_intensity"
+label = "Specular (sun sparkle)"
+chromosome = "Reflections"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 2.0
+layer = "reflections"
+
+# === Biome Water Tint ===
+[[genes]]
+id = "water_tint_swamp_r"
+label = "Swamp Water R"
+chromosome = "BiomeWater"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.15
+layer = "biome_water"
+
+[[genes]]
+id = "water_tint_swamp_g"
+label = "Swamp Water G"
+chromosome = "BiomeWater"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.25
+layer = "biome_water"
+
+[[genes]]
+id = "water_tint_swamp_b"
+label = "Swamp Water B"
+chromosome = "BiomeWater"
+target = "Value"
+min = 0.0
+max = 0.3
+default = 0.08
+layer = "biome_water"
+
+[[genes]]
+id = "water_tint_tundra_r"
+label = "Tundra Water R"
+chromosome = "BiomeWater"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.3
+layer = "biome_water"
+
+[[genes]]
+id = "water_tint_tundra_g"
+label = "Tundra Water G"
+chromosome = "BiomeWater"
+target = "Value"
+min = 0.0
+max = 0.7
+default = 0.5
+layer = "biome_water"
+
+[[genes]]
+id = "water_tint_tundra_b"
+label = "Tundra Water B"
+chromosome = "BiomeWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "biome_water"
+
+# Constraints
+[[constraints]]
+source = "water_wave_height"
+target = "water_foam_intensity"
+ratio = 1.0
+
+[[constraints]]
+source = "water_clarity"
+target = "water_depth_fog_density"
+ratio = -0.15

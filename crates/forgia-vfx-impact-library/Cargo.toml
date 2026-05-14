@@ -1,0 +1,13 @@
+[package]
+name = "forgia-vfx-impact-library"
+version = "0.1.0"
+edition = "2021"
+description = "Impact preset library per surface type"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+bevy_hanabi = { workspace = true }

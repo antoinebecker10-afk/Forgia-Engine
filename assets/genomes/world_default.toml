@@ -1,0 +1,219 @@
+id = "world_default"
+name = "World Default"
+domain = "World"
+category = "Custom"
+description = "World generation parameters: terrain, sea level, atmosphere, vegetation"
+version = "1.0.0"
+
+# Terrain heightmap
+[[genes]]
+id = "seed"
+label = "Seed"
+chromosome = "Heightmap"
+target = "Value"
+min = 0.0
+max = 99999.0
+default = 2026.0
+layer = "heightmap"
+
+[[genes]]
+id = "max_height"
+label = "Max Height"
+chromosome = "Heightmap"
+target = "Value"
+min = 32.0
+max = 256.0
+default = 128.0
+layer = "heightmap"
+
+[[genes]]
+id = "sea_level"
+label = "Sea Level"
+chromosome = "Heightmap"
+target = "Value"
+min = 0.0
+max = 64.0
+default = 20.0
+layer = "heightmap"
+
+[[genes]]
+id = "base_frequency"
+label = "Base Frequency"
+chromosome = "Heightmap"
+target = "Value"
+min = 0.001
+max = 0.01
+default = 0.003
+layer = "heightmap"
+
+[[genes]]
+id = "octaves"
+label = "Detail Octaves"
+chromosome = "Heightmap"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 5.0
+layer = "heightmap"
+
+# Deformation
+[[genes]]
+id = "warp_strength"
+label = "Domain Warp"
+chromosome = "Deformation"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.0
+layer = "deformation"
+
+[[genes]]
+id = "erosion_passes"
+label = "Erosion Passes"
+chromosome = "Deformation"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 3.0
+layer = "deformation"
+
+[[genes]]
+id = "erosion_rate"
+label = "Erosion Rate"
+chromosome = "Deformation"
+target = "Value"
+min = 0.01
+max = 0.1
+default = 0.04
+layer = "deformation"
+
+# Biome layout
+[[genes]]
+id = "biome_cell_size"
+label = "Biome Cell Size"
+chromosome = "Biomes"
+target = "Value"
+min = 64.0
+max = 512.0
+default = 192.0
+layer = "biomes"
+
+[[genes]]
+id = "vegetation_density"
+label = "Vegetation Density"
+chromosome = "Biomes"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.0
+layer = "biomes"
+
+# Atmosphere
+[[genes]]
+id = "fog_density"
+label = "Fog Density"
+chromosome = "Atmosphere"
+target = "Value"
+min = 0.0
+max = 0.01
+default = 0.0012
+layer = "ambiance"
+
+[[genes]]
+id = "wind_strength"
+label = "Wind Strength"
+chromosome = "Atmosphere"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "ambiance"
+
+# === Biome Interpolation ===
+[[genes]]
+id = "biome_interp_radius"
+label = "Biome Blend Radius (m)"
+chromosome = "Biomes"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "biomes"
+
+[[genes]]
+id = "biome_interp_neighbors"
+label = "Blend Neighbor Count"
+chromosome = "Biomes"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 3.0
+layer = "biomes"
+
+# === Infinite World ===
+[[genes]]
+id = "map_infinite"
+label = "Infinite World (no boundary)"
+chromosome = "Scale"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "scale"
+
+[[genes]]
+id = "map_region_size"
+label = "Region Size (chunk groups)"
+chromosome = "Scale"
+target = "Value"
+min = 4.0
+max = 32.0
+default = 8.0
+layer = "scale"
+
+# === Feature Placement Rules ===
+[[genes]]
+id = "feature_rules_enabled"
+label = "Procedural Feature Placement"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "features"
+
+[[genes]]
+id = "feature_lake_min_depression"
+label = "Lake Min Depression (m)"
+chromosome = "Features"
+target = "Value"
+min = 2.0
+max = 20.0
+default = 5.0
+layer = "features"
+
+[[genes]]
+id = "feature_river_follow_slope"
+label = "River Follow Slope Strength"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "features"
+
+# Constraints
+[[constraints]]
+source = "max_height"
+target = "sea_level"
+ratio = 0.2
+
+[[constraints]]
+source = "base_frequency"
+target = "octaves"
+ratio = -0.5
+
+[[constraints]]
+source = "biome_interp_radius"
+target = "biome_cell_size"
+ratio = 0.25

@@ -1,0 +1,284 @@
+id = "terrain_materials"
+name = "Terrain Material Layers"
+domain = "Terrain"
+category = "Custom"
+description = "Material layers: PBR textures, moss/snow/wet/rust overlays, triplanar blending, weathering"
+version = "1.0.0"
+
+# === Triplanar Texturing ===
+[[genes]]
+id = "mat_triplanar_enabled"
+label = "Triplanar Enabled"
+chromosome = "Triplanar"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "triplanar"
+
+[[genes]]
+id = "mat_triplanar_sharpness"
+label = "Triplanar Blend Sharpness"
+chromosome = "Triplanar"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 8.0
+layer = "triplanar"
+
+[[genes]]
+id = "mat_texture_scale"
+label = "Texture UV Scale"
+chromosome = "Triplanar"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.1
+layer = "triplanar"
+
+[[genes]]
+id = "mat_detail_texture_scale"
+label = "Detail UV Scale (close-up)"
+chromosome = "Triplanar"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.5
+layer = "triplanar"
+
+[[genes]]
+id = "mat_detail_blend_start"
+label = "Detail Blend Start (m)"
+chromosome = "Triplanar"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 5.0
+layer = "triplanar"
+
+[[genes]]
+id = "mat_detail_blend_end"
+label = "Detail Blend End (m)"
+chromosome = "Triplanar"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "triplanar"
+
+# === Biome Blend ===
+[[genes]]
+id = "mat_biome_blend_width"
+label = "Biome Transition Width (m)"
+chromosome = "BiomeBlend"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 60.0
+layer = "biome_blend"
+
+[[genes]]
+id = "mat_slope_grass_max"
+label = "Max Slope for Grass (deg)"
+chromosome = "BiomeBlend"
+target = "Value"
+min = 15.0
+max = 60.0
+default = 35.0
+layer = "biome_blend"
+
+[[genes]]
+id = "mat_slope_rock_min"
+label = "Min Slope for Rock (deg)"
+chromosome = "BiomeBlend"
+target = "Value"
+min = 20.0
+max = 70.0
+default = 45.0
+layer = "biome_blend"
+
+[[genes]]
+id = "mat_altitude_snow_start"
+label = "Snow Altitude Start (m)"
+chromosome = "BiomeBlend"
+target = "Value"
+min = 30.0
+max = 200.0
+default = 120.0
+layer = "biome_blend"
+
+# === Material Layers (Weathering Overlays) ===
+[[genes]]
+id = "mat_moss_coverage"
+label = "Moss Coverage"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "layers"
+
+[[genes]]
+id = "mat_moss_height_max"
+label = "Moss Max Height (m)"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 40.0
+layer = "layers"
+
+[[genes]]
+id = "mat_moss_slope_max"
+label = "Moss Max Slope (deg)"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 90.0
+default = 50.0
+layer = "layers"
+
+[[genes]]
+id = "mat_snow_coverage"
+label = "Snow Coverage"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.15
+layer = "layers"
+
+[[genes]]
+id = "mat_snow_altitude_blend"
+label = "Snow Altitude Blend (m)"
+chromosome = "Layers"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 15.0
+layer = "layers"
+
+[[genes]]
+id = "mat_wetness"
+label = "Surface Wetness (0=dry, 1=soaked)"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "layers"
+
+[[genes]]
+id = "mat_wetness_roughness_mult"
+label = "Wet Roughness Multiplier"
+chromosome = "Layers"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.3
+layer = "layers"
+
+[[genes]]
+id = "mat_wetness_darkening"
+label = "Wet Albedo Darkening"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.2
+layer = "layers"
+
+[[genes]]
+id = "mat_rust_coverage"
+label = "Rust/Patina Coverage"
+chromosome = "Layers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "layers"
+
+# === Stone Mesh Wetness (applied to GLB StandardMaterials tagged StoneSurface) ===
+# Permanent subtle wet look on castle walls / cobblestone / brick meshes.
+# WoW Durotar feel: roughness reduced + albedo slightly darkened.
+[[genes]]
+id = "mat_stone_wetness_roughness_mult"
+label = "Stone Mesh Wet Roughness"
+chromosome = "Layers"
+target = "Value"
+min = 0.3
+max = 1.0
+default = 0.7
+layer = "layers"
+
+[[genes]]
+id = "mat_stone_albedo_darkening"
+label = "Stone Mesh Wet Darkening"
+chromosome = "Layers"
+target = "Value"
+min = 0.6
+max = 1.0
+default = 0.9
+layer = "layers"
+
+# === Per-Biome Moss/Snow Defaults ===
+[[genes]]
+id = "mat_moss_forest"
+label = "Forest Moss Level"
+chromosome = "BiomeLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "biome_layers"
+
+[[genes]]
+id = "mat_moss_swamp"
+label = "Swamp Moss Level"
+chromosome = "BiomeLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "biome_layers"
+
+[[genes]]
+id = "mat_moss_jungle"
+label = "Jungle Moss Level"
+chromosome = "BiomeLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.9
+layer = "biome_layers"
+
+[[genes]]
+id = "mat_snow_tundra"
+label = "Tundra Snow Level"
+chromosome = "BiomeLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "biome_layers"
+
+[[genes]]
+id = "mat_snow_mountain"
+label = "Mountain Snow Level"
+chromosome = "BiomeLayers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "biome_layers"
+
+# Constraints
+[[constraints]]
+source = "mat_wetness"
+target = "mat_wetness_roughness_mult"
+ratio = -0.5
+
+[[constraints]]
+source = "mat_moss_coverage"
+target = "mat_rust_coverage"
+ratio = -0.5

@@ -1,0 +1,12 @@
+[package]
+name = "forgia-hyworld-import"
+version = "0.1.0"
+edition = "2021"
+description = "HyWorld .hyworld importer"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

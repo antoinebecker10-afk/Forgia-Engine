@@ -1,0 +1,17 @@
+[package]
+name = "forgia-terrain"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Terrain procédural OpenWorld (port verbatim V1, DAG-libre). Désactivé en mode FPS, activé en mode RPG."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+noise = { workspace = true }
+fast-surface-nets = { workspace = true }
+ndshape = { workspace = true }
+voronoice = { workspace = true }
+rayon = { workspace = true }
+forgia-core = { workspace = true }

@@ -1,0 +1,14 @@
+[package]
+name = "forgia-qa-replay"
+version = "0.1.0"
+edition = "2021"
+description = "Input replay for regression testing"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

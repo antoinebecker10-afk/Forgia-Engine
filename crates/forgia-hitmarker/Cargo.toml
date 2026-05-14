@@ -1,0 +1,12 @@
+[package]
+name = "forgia-hitmarker"
+version = "0.1.0"
+edition = "2021"
+description = "Hit confirmation visual + audio"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

@@ -1,0 +1,12 @@
+[package]
+name = "forgia-navigator"
+version = "0.1.0"
+edition = "2021"
+description = "Thin wrapper around vleue_navigator (navmesh pathfinding)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+vleue_navigator = "0.15"

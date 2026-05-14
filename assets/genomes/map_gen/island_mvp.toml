@@ -1,0 +1,268 @@
+id = "island_mvp"
+name = "Cartoon Island MVP — Story 350"
+domain = "World"
+category = "Custom"
+description = "All tunable parameters for the Cartoon Island AAA MVP (Phase 1). Controls toon render look, island shape, toon water, LUT color grading. Hot-reloadable via Shift+F12."
+version = "1.0.0"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOON RENDER — Cel-shading look (Phase 1)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "toon_cel_bands"
+label = "Cel-Shading Band Count"
+chromosome = "ToonRender"
+target = "Value"
+min = 2.0
+max = 5.0
+default = 3.0
+layer = "global"
+# Overwatch style = 3 bands. WoW classic = 5. Higher = smoother.
+
+[[genes]]
+id = "toon_outline_strength"
+label = "Outline Strength"
+chromosome = "ToonRender"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.5
+layer = "global"
+# Inverted-hull scale offset. 1.5 = net Overwatch silhouette.
+
+[[genes]]
+id = "toon_rim_intensity"
+label = "Rim Light Intensity"
+chromosome = "ToonRender"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "global"
+# Alpha component of rim_color in ToonParams. 0.4 = subtle back-lighting.
+
+[[genes]]
+id = "toon_rim_power"
+label = "Rim Light Power (Fresnel Exponent)"
+chromosome = "ToonRender"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 3.0
+layer = "global"
+# Higher = tighter rim liseré. 3.0 = natural. 6.0 = thin glitter edge.
+
+[[genes]]
+id = "gfx_biome_saturation_boost"
+label = "Per-Biome Saturation Boost"
+chromosome = "ToonRender"
+target = "Value"
+min = 1.0
+max = 1.6
+# 2026-04-26 00:50 : 1.3 → 1.1 (-15%). À 1.3 + sunset → over-saturation
+# rose/blanc partout (cf. screenshot 00:41). 1.1 = subtle Overwatch boost
+# sans blow-out scènes chaudes. User peut remonter Shift+F12 si jugé fade.
+default = 1.1
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ISLAND SHAPE — Procgen silhouette (Phase 1 J3)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "island_radius_m"
+label = "Island Radius (m)"
+chromosome = "IslandShape"
+target = "Value"
+min = 500.0
+max = 3000.0
+default = 1500.0
+layer = "global"
+# 1500m radius = ~7 km² (target 3 km² story decision = R ~975m, 1500m gives margin).
+
+[[genes]]
+id = "island_falloff_steepness"
+label = "Island Coastline Falloff Steepness"
+chromosome = "IslandShape"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 2.5
+layer = "global"
+# Controls coast→ocean transition. 2.5 = clean shore. 5.0 = steep cliffs.
+
+[[genes]]
+id = "island_voronoi_seeds"
+label = "Voronoi Seeds (Bays Count)"
+chromosome = "IslandShape"
+target = "Value"
+min = 3.0
+max = 24.0
+default = 12.0
+layer = "global"
+# Number of Voronoi points for bay/peninsula carving.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOON WATER — Phase 1 J5
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "toon_water_foam_width"
+label = "Toon Water Foam Width"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.8
+layer = "global"
+
+[[genes]]
+id = "toon_water_shallow_r"
+label = "Toon Water Shallow Color R"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.494
+layer = "global"
+# #7ec8d4 = 0.494, 0.784, 0.831
+
+[[genes]]
+id = "toon_water_shallow_g"
+label = "Toon Water Shallow Color G"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.784
+layer = "global"
+
+[[genes]]
+id = "toon_water_shallow_b"
+label = "Toon Water Shallow Color B"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.831
+layer = "global"
+
+[[genes]]
+id = "toon_water_deep_r"
+label = "Toon Water Deep Color R"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.118
+layer = "global"
+# #1e4a6b = 0.118, 0.290, 0.420
+
+[[genes]]
+id = "toon_water_deep_g"
+label = "Toon Water Deep Color G"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.290
+layer = "global"
+
+[[genes]]
+id = "toon_water_deep_b"
+label = "Toon Water Deep Color B"
+chromosome = "ToonWater"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.420
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LUT COLOR GRADING — Phase 1 J5
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "gfx_lut_strength"
+label = "LUT Color Grading Strength"
+chromosome = "PostProcess"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.85
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FLOATING ISLANDS — V2.5 (future)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "floating_islands_enabled"
+label = "Floating Islands Enabled"
+chromosome = "IslandShape"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "floating_island_z2_pos_x"
+label = "Sky-Island Z2 Position X (m from center)"
+chromosome = "IslandShape"
+target = "Value"
+min = -2000.0
+max = 2000.0
+default = -800.0
+layer = "global"
+
+[[genes]]
+id = "floating_island_z2_pos_z"
+label = "Sky-Island Z2 Position Z (m from center)"
+chromosome = "IslandShape"
+target = "Value"
+min = -2000.0
+max = 2000.0
+default = -700.0
+layer = "global"
+
+[[genes]]
+id = "floating_island_z2_altitude_y"
+label = "Sky-Island Z2 Altitude Y (m)"
+chromosome = "IslandShape"
+target = "Value"
+min = 50.0
+max = 500.0
+default = 200.0
+layer = "global"
+
+[[genes]]
+id = "floating_island_z2_radius_m"
+label = "Sky-Island Z2 Radius (m)"
+chromosome = "IslandShape"
+target = "Value"
+min = 20.0
+max = 200.0
+default = 80.0
+layer = "global"
+
+[[genes]]
+id = "floating_island_z2_thickness_m"
+label = "Sky-Island Z2 Thickness (m)"
+chromosome = "IslandShape"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 40.0
+layer = "global"
+
+[[genes]]
+id = "streaming_y_range_m"
+label = "Streaming Y Range (m)"
+chromosome = "IslandShape"
+target = "Value"
+min = 64.0
+max = 512.0
+default = 256.0
+layer = "global"

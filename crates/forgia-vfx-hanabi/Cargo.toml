@@ -1,0 +1,13 @@
+[package]
+name = "forgia-vfx-hanabi"
+version = "0.1.0"
+edition = "2021"
+description = "Hanabi VFX wrapper + pre-spawn dummy anti-freeze"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+bevy_hanabi = { workspace = true }

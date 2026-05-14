@@ -1,0 +1,13 @@
+[package]
+name = "forgia-input"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Leafwing PlayerAction AZERTY + KeybindRegistry + InputBlockers."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+leafwing-input-manager = { workspace = true }
+forgia-core = { workspace = true }

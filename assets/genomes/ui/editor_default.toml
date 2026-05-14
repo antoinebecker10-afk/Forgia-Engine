@@ -1,0 +1,344 @@
+id = "editor_default"
+name = "Editor Default"
+domain = "Editor"
+category = "Custom"
+description = "Build-mode editor parameters — grid, snap, placement, selection, gizmo, tools"
+version = "1.0.0"
+
+# ─── Grid ───────────────────────────────────────────────────
+
+[[genes]]
+id = "grid_cell_size"
+label = "Grid Cell Size"
+chromosome = "Grid"
+target = "Value"
+min = 0.25
+max = 4.0
+default = 1.0
+layer = "core"
+
+[[genes]]
+id = "grid_local_radius"
+label = "Grid Visible Radius (cells)"
+chromosome = "Grid"
+target = "Value"
+min = 4.0
+max = 30.0
+default = 10.0
+layer = "core"
+
+[[genes]]
+id = "grid_vertical_levels"
+label = "Vertical Grid Levels"
+chromosome = "Grid"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 5.0
+layer = "core"
+
+[[genes]]
+id = "grid_line_opacity"
+label = "Grid Line Opacity"
+chromosome = "Grid"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.25
+layer = "visual"
+
+[[genes]]
+id = "grid_accent_interval"
+label = "Grid Accent Interval (cells)"
+chromosome = "Grid"
+target = "Value"
+min = 5.0
+max = 20.0
+default = 10.0
+layer = "visual"
+
+[[genes]]
+id = "grid_hover_opacity"
+label = "Hovered Cell Opacity"
+chromosome = "Grid"
+target = "Value"
+min = 0.2
+max = 0.8
+default = 0.5
+layer = "visual"
+
+# ─── Snap ───────────────────────────────────────────────────
+
+[[genes]]
+id = "snap_enabled"
+label = "Snap Enabled by Default"
+chromosome = "Snap"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "core"
+
+[[genes]]
+id = "snap_translate_step"
+label = "Snap Translate Step (m)"
+chromosome = "Snap"
+target = "Value"
+min = 0.25
+max = 4.0
+default = 1.0
+layer = "core"
+
+[[genes]]
+id = "snap_rotate_step"
+label = "Snap Rotate Step (degrees)"
+chromosome = "Snap"
+target = "Value"
+min = 5.0
+max = 90.0
+default = 15.0
+layer = "core"
+
+[[genes]]
+id = "snap_scale_step"
+label = "Snap Scale Step"
+chromosome = "Snap"
+target = "Value"
+min = 0.05
+max = 1.0
+default = 0.1
+layer = "core"
+
+# ─── Placement ──────────────────────────────────────────────
+
+[[genes]]
+id = "placement_preview_opacity"
+label = "Ghost Preview Opacity"
+chromosome = "Placement"
+target = "Value"
+min = 0.1
+max = 0.8
+default = 0.4
+layer = "visual"
+
+[[genes]]
+id = "placement_max_range"
+label = "Placement Max Range (m)"
+chromosome = "Placement"
+target = "Value"
+min = 20.0
+max = 200.0
+default = 50.0
+layer = "core"
+
+[[genes]]
+id = "placement_terrain_embed"
+label = "Default Terrain Embed Offset"
+chromosome = "Placement"
+target = "Value"
+min = -1.0
+max = 0.0
+default = -0.3
+layer = "core"
+
+# ─── Selection ──────────────────────────────────────────────
+
+[[genes]]
+id = "select_hover_color_r"
+label = "Hover Highlight Red"
+chromosome = "Selection"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "visual"
+
+[[genes]]
+id = "select_hover_color_g"
+label = "Hover Highlight Green"
+chromosome = "Selection"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.85
+layer = "visual"
+
+[[genes]]
+id = "select_hover_color_b"
+label = "Hover Highlight Blue"
+chromosome = "Selection"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "visual"
+
+[[genes]]
+id = "select_active_color_r"
+label = "Selected Highlight Red"
+chromosome = "Selection"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "visual"
+
+[[genes]]
+id = "select_active_color_g"
+label = "Selected Highlight Green"
+chromosome = "Selection"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "visual"
+
+[[genes]]
+id = "select_active_color_b"
+label = "Selected Highlight Blue"
+chromosome = "Selection"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "visual"
+
+[[genes]]
+id = "select_outline_thickness"
+label = "Selection Outline Thickness"
+chromosome = "Selection"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 2.5
+layer = "visual"
+
+# ─── Move Tool ──────────────────────────────────────────────
+
+[[genes]]
+id = "move_drag_threshold"
+label = "Move Drag Threshold (m)"
+chromosome = "MoveTool"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.1
+layer = "core"
+
+[[genes]]
+id = "move_surface_offset"
+label = "Move Surface Y Offset"
+chromosome = "MoveTool"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.0
+layer = "core"
+
+# ─── Gizmo ──────────────────────────────────────────────────
+
+[[genes]]
+id = "gizmo_arrow_length"
+label = "Gizmo Arrow Length"
+chromosome = "Gizmo"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.5
+layer = "visual"
+
+[[genes]]
+id = "gizmo_arrow_thickness"
+label = "Gizmo Arrow Thickness"
+chromosome = "Gizmo"
+target = "Value"
+min = 0.01
+max = 0.2
+default = 0.05
+layer = "visual"
+
+[[genes]]
+id = "gizmo_circle_radius"
+label = "Gizmo Rotation Circle Radius"
+chromosome = "Gizmo"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.2
+layer = "visual"
+
+# ─── Undo/Redo ──────────────────────────────────────────────
+
+[[genes]]
+id = "undo_max_depth"
+label = "Undo Stack Max Depth"
+chromosome = "History"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "core"
+
+# ─── Action Bar ─────────────────────────────────────────────
+
+[[genes]]
+id = "quickbar_slots"
+label = "Quick Bar Slot Count"
+chromosome = "ActionBar"
+target = "Value"
+min = 5.0
+max = 12.0
+default = 10.0
+layer = "core"
+
+[[genes]]
+id = "quickbar_slot_size"
+label = "Quick Bar Slot Size (px)"
+chromosome = "ActionBar"
+target = "Value"
+min = 32.0
+max = 96.0
+default = 58.0
+layer = "visual"
+
+[[genes]]
+id = "quickbar_slot_spacing"
+label = "Quick Bar Slot Spacing (px)"
+chromosome = "ActionBar"
+target = "Value"
+min = 1.0
+max = 12.0
+default = 4.0
+layer = "visual"
+
+# ─── Atomization ────────────────────────────────────────────
+
+[[genes]]
+id = "atom_solid_tint_r"
+label = "Atomize Solid Tint Red"
+chromosome = "Atomization"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "visual"
+
+[[genes]]
+id = "atom_solid_tint_g"
+label = "Atomize Solid Tint Green"
+chromosome = "Atomization"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "visual"
+
+[[genes]]
+id = "atom_solid_tint_b"
+label = "Atomize Solid Tint Blue"
+chromosome = "Atomization"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "visual"

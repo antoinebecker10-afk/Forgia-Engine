@@ -1,0 +1,12 @@
+[package]
+name = "forgia-app-state"
+version = "0.1.0"
+edition = "2021"
+description = "States/SubStates wrapper + transitions safe"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

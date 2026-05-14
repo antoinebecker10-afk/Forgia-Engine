@@ -1,0 +1,133 @@
+id = "enemy_elite"
+name = "Goblin Elite"
+domain = "Creature"
+category = "Creature"
+description = "Tank bruiser: massive HP, charge burst, high damage, slow"
+version = "1.0.0"
+
+# === Combat Stats ===
+
+[[genes]]
+id = "elite_max_hp"
+label = "Max HP"
+chromosome = "Combat"
+target = "Value"
+min = 60.0
+max = 200.0
+default = 120.0
+layer = "elite"
+
+[[genes]]
+id = "elite_melee_damage"
+label = "Melee Damage"
+chromosome = "Combat"
+target = "Value"
+min = 15.0
+max = 40.0
+default = 25.0
+layer = "elite"
+
+[[genes]]
+id = "elite_melee_range"
+label = "Melee Range (m)"
+chromosome = "Combat"
+target = "Value"
+min = 2.5
+max = 5.0
+default = 3.5
+layer = "elite"
+
+[[genes]]
+id = "elite_chase_speed"
+label = "Chase Speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 3.0
+max = 8.0
+default = 5.0
+layer = "elite"
+
+[[genes]]
+id = "elite_charge_speed_mult"
+label = "Charge Speed Mult"
+chromosome = "Movement"
+target = "Value"
+min = 1.5
+max = 4.0
+default = 2.5
+layer = "elite"
+
+[[genes]]
+id = "elite_vision_range"
+label = "Vision Range (m)"
+chromosome = "Senses"
+target = "Value"
+min = 15.0
+max = 40.0
+default = 25.0
+layer = "elite"
+
+# === Appearance ===
+
+[[genes]]
+id = "elite_model_scale"
+label = "Model Scale"
+chromosome = "Appearance"
+target = "Value"
+min = 1.0
+max = 1.8
+default = 1.3
+layer = "elite"
+
+# === Rewards ===
+
+[[genes]]
+id = "elite_gold_reward"
+label = "Gold Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 30.0
+max = 100.0
+default = 60.0
+layer = "elite"
+
+[[genes]]
+id = "elite_xp_reward"
+label = "XP Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 20.0
+max = 80.0
+default = 40.0
+layer = "elite"
+
+# === Constraints ===
+
+# More HP → more XP reward (bigger challenge = bigger reward)
+[[constraints]]
+source = "elite_max_hp"
+target = "elite_xp_reward"
+ratio = 0.25
+
+# Higher charge speed → less HP (glass cannon burst)
+[[constraints]]
+source = "elite_charge_speed_mult"
+target = "elite_max_hp"
+ratio = -15.0
+
+# Bigger model → more HP + melee range
+[[constraints]]
+source = "elite_model_scale"
+target = "elite_max_hp"
+ratio = 40.0
+
+[[constraints]]
+source = "elite_model_scale"
+target = "elite_melee_range"
+ratio = 1.0
+
+# More damage → more gold
+[[constraints]]
+source = "elite_melee_damage"
+target = "elite_gold_reward"
+ratio = 2.0

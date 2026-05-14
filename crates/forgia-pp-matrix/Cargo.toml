@@ -1,0 +1,12 @@
+[package]
+name = "forgia-pp-matrix"
+version = "0.1.0"
+edition = "2021"
+description = "Matrix code rain"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

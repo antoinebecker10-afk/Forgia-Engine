@@ -1,0 +1,12 @@
+[package]
+name = "forgia-pp-sketch"
+version = "0.1.0"
+edition = "2021"
+description = "Pencil sketch hatch lines"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

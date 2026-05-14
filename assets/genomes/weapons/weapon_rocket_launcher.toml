@@ -1,0 +1,240 @@
+id = "weapon_rocket_launcher"
+name = "Rocket Launcher"
+domain = "Weapon"
+category = "Weapon"
+description = "Heavy explosive: massive AoE damage, slow fire rate, scope capable"
+version = "1.0.0"
+
+# === Ballistics ===
+
+[[genes]]
+id = "rocket_damage"
+label = "Damage"
+chromosome = "Ballistics"
+target = "Value"
+min = 50.0
+max = 200.0
+default = 100.0
+layer = "rocket"
+
+[[genes]]
+id = "rocket_fire_rate"
+label = "Fire Rate (s)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.8
+max = 3.0
+default = 1.2
+layer = "rocket"
+
+[[genes]]
+id = "rocket_speed"
+label = "Projectile Speed (m/s)"
+chromosome = "Ballistics"
+target = "Value"
+min = 30.0
+max = 100.0
+default = 60.0
+layer = "rocket"
+
+[[genes]]
+id = "rocket_splash_radius"
+label = "Splash Radius (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 2.0
+max = 12.0
+default = 5.0
+layer = "rocket"
+
+[[genes]]
+id = "rocket_range"
+label = "Range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 50.0
+max = 300.0
+default = 200.0
+layer = "rocket"
+
+# === Scope ===
+
+[[genes]]
+id = "rocket_scope_fov_deg"
+label = "Scope FOV (deg)"
+chromosome = "Scope"
+target = "Value"
+min = 15.0
+max = 60.0
+default = 30.0
+layer = "scope"
+
+[[genes]]
+id = "rocket_scope_sensitivity"
+label = "Scope Sensitivity"
+chromosome = "Scope"
+target = "Value"
+min = 0.1
+max = 0.8
+default = 0.3
+layer = "scope"
+
+# === Handling ===
+
+[[genes]]
+id = "rocket_recoil_kick_back"
+label = "Recoil Back"
+chromosome = "Handling"
+target = "Value"
+min = 0.05
+max = 0.2
+default = 0.08
+layer = "recoil"
+
+[[genes]]
+id = "rocket_recoil_kick_up"
+label = "Recoil Up"
+chromosome = "Handling"
+target = "Value"
+min = 0.03
+max = 0.15
+default = 0.06
+layer = "recoil"
+
+[[genes]]
+id = "rocket_recoil_duration"
+label = "Recoil Time (s)"
+chromosome = "Handling"
+target = "Value"
+min = 0.1
+max = 0.4
+default = 0.2
+layer = "recoil"
+
+# === Viewmodel ===
+
+[[genes]]
+id = "rocket_viewmodel_scale"
+label = "Model Scale"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.3
+max = 0.8
+default = 0.5
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_barrel_length"
+label = "Barrel Length (m)"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.3
+max = 0.9
+default = 0.6
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_offset_x"
+label = "Hip Offset X"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.1
+max = 0.5
+default = 0.35
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_offset_y"
+label = "Hip Offset Y"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.6
+max = -0.2
+default = -0.40
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_offset_z"
+label = "Hip Offset Z"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.8
+max = -0.3
+default = -0.55
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_ads_offset_x"
+label = "ADS Offset X"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.1
+max = 0.1
+default = 0.0
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_ads_offset_y"
+label = "ADS Offset Y"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.5
+max = -0.1
+default = -0.30
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_ads_offset_z"
+label = "ADS Offset Z"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.6
+max = -0.2
+default = -0.42
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_target_length"
+label = "Target Size (m)"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.5
+max = 1.5
+default = 0.75
+layer = "viewmodel"
+
+[[genes]]
+id = "rocket_spread_deg"
+label = "Spread (deg)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.5
+layer = "rocket"
+
+# === Constraints ===
+
+# More damage → bigger splash
+[[constraints]]
+source = "rocket_damage"
+target = "rocket_splash_radius"
+ratio = 0.05
+
+# Bigger splash → slower fire rate (heavier warhead)
+[[constraints]]
+source = "rocket_splash_radius"
+target = "rocket_fire_rate"
+ratio = 0.15
+
+# More damage → more recoil
+[[constraints]]
+source = "rocket_damage"
+target = "rocket_recoil_kick_back"
+ratio = 0.001
+
+# Narrower scope FOV → higher sensitivity
+[[constraints]]
+source = "rocket_scope_fov_deg"
+target = "rocket_scope_sensitivity"
+ratio = -0.005

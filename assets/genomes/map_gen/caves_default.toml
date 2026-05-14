@@ -1,0 +1,348 @@
+id = "caves_default"
+name = "Caves & Underground"
+domain = "Terrain"
+category = "Custom"
+description = "Cave generation: Worley noise tunnels, chambers, stalactites, underground biomes"
+version = "1.0.0"
+
+# === Cave Network ===
+[[genes]]
+id = "cave_enabled"
+label = "Caves Enabled"
+chromosome = "Network"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "network"
+
+[[genes]]
+id = "cave_frequency"
+label = "Tunnel Frequency"
+chromosome = "Network"
+target = "Value"
+min = 0.005
+max = 0.05
+default = 0.02
+layer = "network"
+
+[[genes]]
+id = "cave_threshold"
+label = "Tunnel Threshold"
+chromosome = "Network"
+target = "Value"
+min = 0.3
+max = 0.8
+default = 0.55
+layer = "network"
+
+[[genes]]
+id = "cave_min_height"
+label = "Min Cave Y"
+chromosome = "Network"
+target = "Value"
+min = 0.0
+max = 30.0
+default = 5.0
+layer = "network"
+
+[[genes]]
+id = "cave_max_height"
+label = "Max Cave Y"
+chromosome = "Network"
+target = "Value"
+min = 20.0
+max = 100.0
+default = 60.0
+layer = "network"
+
+[[genes]]
+id = "cave_layers"
+label = "Cave Layers"
+chromosome = "Network"
+target = "Value"
+min = 1.0
+max = 4.0
+default = 2.0
+layer = "network"
+
+[[genes]]
+id = "cave_worm_radius"
+label = "Tunnel Radius"
+chromosome = "Network"
+target = "Value"
+min = 1.5
+max = 8.0
+default = 3.5
+layer = "network"
+
+[[genes]]
+id = "cave_worm_length"
+label = "Tunnel Length"
+chromosome = "Network"
+target = "Value"
+min = 20.0
+max = 200.0
+default = 80.0
+layer = "network"
+
+# === Chambers ===
+[[genes]]
+id = "cave_chamber_probability"
+label = "Chamber Probability"
+chromosome = "Chambers"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.15
+layer = "chambers"
+
+[[genes]]
+id = "cave_chamber_radius_min"
+label = "Chamber Min Radius"
+chromosome = "Chambers"
+target = "Value"
+min = 4.0
+max = 15.0
+default = 6.0
+layer = "chambers"
+
+[[genes]]
+id = "cave_chamber_radius_max"
+label = "Chamber Max Radius"
+chromosome = "Chambers"
+target = "Value"
+min = 10.0
+max = 40.0
+default = 20.0
+layer = "chambers"
+
+# === Cave Features ===
+[[genes]]
+id = "cave_stalactite_density"
+label = "Stalactite Density"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "features"
+
+[[genes]]
+id = "cave_water_table"
+label = "Underground Water Level"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 8.0
+layer = "features"
+
+[[genes]]
+id = "cave_crystal_probability"
+label = "Crystal Formation Prob"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 0.3
+default = 0.05
+layer = "features"
+
+[[genes]]
+id = "cave_mushroom_density"
+label = "Bioluminescent Mushrooms"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "features"
+
+[[genes]]
+id = "cave_ambient_light"
+label = "Cave Ambient Light"
+chromosome = "Features"
+target = "Value"
+min = 0.0
+max = 0.3
+default = 0.05
+layer = "features"
+
+# === Per-Biome Cave Probability ===
+[[genes]]
+id = "cave_prob_plains"
+label = "Plains Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_forest"
+label = "Forest Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_mountain"
+label = "Mountain Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_volcanic"
+label = "Volcanic Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_canyon"
+label = "Canyon Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_desert"
+label = "Desert Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.1
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_swamp"
+label = "Swamp Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.15
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_tundra"
+label = "Tundra Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.25
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_savanna"
+label = "Savanna Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.15
+layer = "biome_caves"
+
+[[genes]]
+id = "cave_prob_jungle"
+label = "Jungle Cave Prob"
+chromosome = "BiomeCaves"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "biome_caves"
+
+# === Mega Network (Blackreach-style interconnected caves) ===
+
+[[genes]]
+id = "cave_network_enabled"
+label = "Cave Network"
+chromosome = "MegaNetwork"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "mega_network"
+
+[[genes]]
+id = "cave_network_hub_depth"
+label = "Hub Depth"
+chromosome = "MegaNetwork"
+target = "Value"
+min = 15.0
+max = 40.0
+default = 25.0
+layer = "mega_network"
+
+[[genes]]
+id = "cave_network_hub_radius"
+label = "Hub Chamber Size"
+chromosome = "MegaNetwork"
+target = "Value"
+min = 10.0
+max = 30.0
+default = 20.0
+layer = "mega_network"
+
+[[genes]]
+id = "cave_network_tunnel_radius"
+label = "Tunnel Width"
+chromosome = "MegaNetwork"
+target = "Value"
+min = 2.5
+max = 8.0
+default = 4.5
+layer = "mega_network"
+
+[[genes]]
+id = "cave_network_entrance_dist"
+label = "Entrance Spacing"
+chromosome = "MegaNetwork"
+target = "Value"
+min = 150.0
+max = 600.0
+default = 300.0
+layer = "mega_network"
+
+[[genes]]
+id = "cave_network_junction_gap"
+label = "Junction Max Gap"
+chromosome = "MegaNetwork"
+target = "Value"
+min = 200.0
+max = 800.0
+default = 400.0
+layer = "mega_network"
+
+# Constraints
+[[constraints]]
+source = "cave_worm_radius"
+target = "cave_chamber_radius_min"
+ratio = 1.5
+
+[[constraints]]
+source = "cave_frequency"
+target = "cave_threshold"
+ratio = -5.0
+
+[[constraints]]
+source = "cave_network_tunnel_radius"
+target = "cave_network_hub_radius"
+ratio = 4.0

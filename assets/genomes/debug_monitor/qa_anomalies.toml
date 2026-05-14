@@ -1,0 +1,384 @@
+# Forgia QA — Anomaly Rules (story-391 P2 W2 + W6 closure)
+#
+# Source de vérité : `forgia-qa-telemetry/src/config.rs` (DetectorSpec enum).
+# Métriques disponibles : `docs/qa/METRICS_NAMING.md` (66 domaines, ~398 metrics).
+#
+# Hot-reload Shift+F12 (genome system, branchement W7) : modification de ce
+# fichier sans redémarrer le jeu pour tuner les seuils en runtime.
+#
+# Détecteurs supportés :
+# - robust_z_score      : MAD-based, défaut Forgia (Iglewicz-Hoaglin 1993)
+# - welford_z_score     : gaussien strict, Welford 1962 online stable
+# - ewma                : exponentially weighted moving average (IEEE 2016)
+# - threshold           : seuil absolu Min/Max/Range
+# - growth_rate_pattern : RESIN-inspired Microsoft Azure 2025 (leak detection)
+# - cusum               : cumulative sum change-point (IEEE Ulster 2015)
+#
+# Sévérités : cosmetic / minor / major / critical / blocker
+
+schema_version = 1
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Performance / Frames
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "perf.frame_time_ms"
+severity = "minor"
+tr_ref = "TR-budget-frame-001"
+description = "Frame time absolu > 33ms (en deçà de 30 FPS — accessibility threshold)"
+detector = { type = "threshold", max = 33.0 }
+
+[[rule]]
+metric = "perf.frame_time_ms"
+severity = "major"
+tr_ref = "TR-budget-frame-001"
+description = "Frame time spike Robust Z > 4.0 (MAD-based, insensible aux lag spikes ponctuels)"
+detector = { type = "robust_z_score", window = 600, threshold = 4.0 }
+
+[[rule]]
+metric = "gameset.total_ms"
+severity = "major"
+description = "GameSet 7-step chain dépasse budget gameplay 8ms"
+detector = { type = "threshold", max = 8.0 }
+
+[[rule]]
+metric = "gameset.physics_ms"
+severity = "major"
+tr_ref = "TR-budget-physics-001"
+description = "Physics step > 4ms — Rapier suspect (collisions, joints)"
+detector = { type = "threshold", max = 4.0 }
+
+[[rule]]
+metric = "lag.event_count"
+severity = "major"
+description = "Plus de 10 freeze events détectés sur la fenêtre"
+detector = { type = "threshold", max = 10.0 }
+
+[[rule]]
+metric = "perf_guardian.flapping_detected"
+severity = "minor"
+description = "Perf guardian flap détecté (transitions throttle répétées) — config seuil suspecte"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Mémoire / VRAM / handles
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "vram.gpu_estimated_mb"
+severity = "major"
+description = "VRAM estimée > 8 GB (warning sustained pour GPU 8GB)"
+detector = { type = "threshold", max = 8000.0 }
+
+[[rule]]
+metric = "vram.consecutive_danger"
+severity = "critical"
+description = "VRAM danger sustained 3+ checks consécutifs (auto-reduction triggered)"
+detector = { type = "threshold", min = 3.0 }
+
+[[rule]]
+metric = "vram.seconds_in_emergency"
+severity = "critical"
+description = "VRAM emergency sustained > 60s — escalade auto-reduction critique"
+detector = { type = "threshold", max = 60.0 }
+
+[[rule]]
+metric = "memory.process_total_mb"
+severity = "major"
+description = "RAM process drift > 0.5 MB/s sur 10min = leak (RESIN-inspired Azure 2025)"
+detector = { type = "growth_rate_pattern", window_secs = 600, min_growth_per_sec = 0.5 }
+
+[[rule]]
+metric = "leak.process_memory_mb"
+severity = "major"
+description = "Memory leak detector growth pattern soutenu"
+detector = { type = "growth_rate_pattern", window_secs = 600, min_growth_per_sec = 0.5 }
+
+[[rule]]
+metric = "handles.recent_delta_meshes"
+severity = "major"
+description = "Handle leak meshes — > 200 nouveaux meshes en 50s sustained"
+detector = { type = "threshold", max = 200.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Entités / ECS
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "entity.delta_per_sec"
+severity = "major"
+description = "Croissance entités > 50/s sustained = spawn loop ou leak"
+detector = { type = "growth_rate_pattern", window_secs = 60, min_growth_per_sec = 50.0 }
+
+[[rule]]
+metric = "entity_breakdown.leak_suspected"
+severity = "major"
+description = "Heuristic entity breakdown flag leak (delta_per_sec > 50 + entities > 18000)"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "physics.nan_transforms"
+severity = "critical"
+description = "NaN transform détecté — physics explosion imminente"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "physics.inf_transforms"
+severity = "critical"
+description = "Inf transform détecté — physics explosion imminente"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Combat / NPCs
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "combat.fireballs"
+severity = "minor"
+description = "Plus de 100 fireballs simultanées — leak VFX ou spam attack"
+detector = { type = "threshold", max = 100.0 }
+
+[[rule]]
+metric = "npcs.manager_leak_ratio"
+severity = "major"
+description = "NPC manager leak ratio > 30% (entities tracked mais pas alive)"
+detector = { type = "threshold", max = 0.30 }
+
+[[rule]]
+metric = "vehicle.speed_nan"
+severity = "critical"
+description = "Vehicle speed NaN détecté — physics corruption"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Terrain / Vegetation
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "vegetation.total"
+severity = "major"
+description = "VEG ZERO sustained — vegetation manager init mais aucune entity (faux positif fix 2026-05-03)"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "roads.cliff_count"
+severity = "major"
+description = "Roads cliffs > 0 — visuellement cassé (story-2026-05-02)"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "seams.pairs_critical"
+severity = "major"
+description = "Terrain seams critical pairs > 0 — heightmap mismatch entre chunks"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "terrain_holes.holes_suspected"
+severity = "major"
+description = "Terrain holes detected — sparse vertex chunks suspects"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "streaming.player_outside_loaded"
+severity = "minor"
+description = "Player en dehors de la zone chargée — streaming late ou téléport"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Rendering
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "shader.pink_fallback_suspected"
+severity = "major"
+description = "Pink fallback material — texture missing ou shader load failed"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "shader.wgpu_errors"
+severity = "major"
+description = "WGPU validation errors dans run.log — GPU state invalide"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "textures.srgb_normal_mismatch"
+severity = "major"
+description = "Normal map en sRGB format (PIÈGE PBR doc'd story-390)"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "textures.failed_albedo"
+severity = "major"
+description = "Albedo texture load failed — visual regression"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "render.floating_objects"
+severity = "major"
+description = "Floating objects > 100 — height placement incomplete ou SDF not ready"
+detector = { type = "threshold", max = 100.0 }
+
+[[rule]]
+metric = "render.tpose_enemies"
+severity = "minor"
+description = "T-pose enemies > 10 — animation loading failed"
+detector = { type = "threshold", max = 10.0 }
+
+[[rule]]
+metric = "material_autofix.pure_metals_fixed_last"
+severity = "minor"
+description = "Material auto-fix sweep activé — \"mobs blancs\" symptom (story-2026-05-04)"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Health / Diagnostic
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "health.critical_alert_count"
+severity = "critical"
+description = "Health monitor signale critical alerts — investigation immédiate"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "diag.critical_issues"
+severity = "critical"
+description = "Diagnostic 360° flag critical issues"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "last_state.freeze_risk"
+severity = "minor"
+description = "Freeze risk précurseur (gen+mesh+castle pending && frame_ms>30)"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "sensor_health.stale"
+severity = "minor"
+description = "Meta-sensor : ≥3 sensors stale — chaîne observability rompue"
+detector = { type = "threshold", max = 3.0 }
+
+[[rule]]
+metric = "a11y.low_fps_sustained_s"
+severity = "major"
+description = "FPS < 30 sustained > 30s — accessibility regression"
+detector = { type = "cusum", target = 0.0, threshold = 30.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Crash / Determinism
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "crash_signature.has_log"
+severity = "blocker"
+description = "Crash log présent — panic au précédent run, BugReport(Panic) déjà émis par crash_dump"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Persistence / Save
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "persistence.time_dirty_secs"
+severity = "minor"
+description = "Save dirty > 5min sans autosave — risk perte données"
+detector = { type = "threshold", max = 300.0 }
+
+[[rule]]
+metric = "persistence.file_exists"
+severity = "minor"
+description = "placed_objects.json absent (premier run OK, mais sustained = save broken)"
+detector = { type = "threshold", min = 0.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Network (multiplayer lightyear)
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "network.client_disconnected_flag"
+severity = "minor"
+description = "Client disconnected unexpectedly (lightyear UDP)"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "network.time_disconnected_secs"
+severity = "major"
+description = "Client disconnected > 30s sans reconnexion auto"
+detector = { type = "threshold", max = 30.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Sky / Atmosphere (visual)
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "sky.time_stuck"
+severity = "major"
+description = "DayNightCycle stuck — time_of_day immobile 2+ ticks consécutifs"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "sky.atmosphere_active"
+severity = "minor"
+description = "Atmosphere component manquante sur camera (sky regression)"
+detector = { type = "threshold", min = 0.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Genome / Asset registry
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "genome.failed_resolutions_last"
+severity = "major"
+description = "Genome resolutions failed — pack TOML cassé ou alias manquant"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "genome.packs_loaded"
+severity = "major"
+description = "Genome registry vide — Shift+F12 reload broken"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "asset_inventory.missing"
+severity = "major"
+description = "Asset paths corruption — > 0 path missing dans inventory.json sample"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "lua.error_count"
+severity = "major"
+description = "Lua scripting errors détectées dans run.log"
+detector = { type = "threshold", min = 1.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Build mode (createur productivity)
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "build.placements_per_minute"
+severity = "minor"
+description = "Build cadence > 120/min — script suspect ou hold-LMB spam"
+detector = { type = "threshold", max = 120.0 }
+
+[[rule]]
+metric = "build.idle_secs"
+severity = "cosmetic"
+description = "Build mode idle > 90s avec road builder actif — user stuck ?"
+detector = { type = "threshold", max = 90.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Editor (Inspector / Hierarchy / Undo)
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[rule]]
+metric = "editor.undo_near_overflow"
+severity = "minor"
+description = "Undo stack near overflow — risque perte historique edit"
+detector = { type = "threshold", min = 1.0 }
+
+[[rule]]
+metric = "editor.hierarchy_max_depth"
+severity = "minor"
+description = "Hierarchy depth > 30 — perf risk + UX drift"
+detector = { type = "threshold", max = 30.0 }

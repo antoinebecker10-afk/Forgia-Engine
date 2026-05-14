@@ -1,0 +1,12 @@
+[package]
+name = "forgia-core"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Core types : States, GameSet, Resources globales. 0 dépendance workspace (DAG-libre)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }

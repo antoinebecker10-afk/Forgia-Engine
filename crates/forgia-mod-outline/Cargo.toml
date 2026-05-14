@@ -1,0 +1,12 @@
+[package]
+name = "forgia-mod-outline"
+version = "0.1.0"
+edition = "2021"
+description = "Thin wrapper around bevy_mod_outline 0.10 (mesh outlining plugin)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_mod_outline = "0.12"

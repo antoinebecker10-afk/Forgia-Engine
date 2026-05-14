@@ -1,0 +1,17 @@
+[package]
+name = "forgia-combat"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Gunfeel V5-F partagé FPS/RPG : weapons, viewmodel, hit-stop, recoil, hitmarker, damage falloff."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+leafwing-input-manager = { workspace = true }
+forgia-core = { workspace = true }
+# forgia-assets = { workspace = true }    # TODO: uncomment when GameAssets V2 ported
+# forgia-player = { workspace = true }    # TODO: uncomment when Player/FpsCamera/GoblinGuard ported
+# forgia-effects = { workspace = true }   # TODO: circular dep risk — combat_juice events only; re-evaluate

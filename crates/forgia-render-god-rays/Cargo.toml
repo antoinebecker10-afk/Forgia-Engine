@@ -1,0 +1,12 @@
+[package]
+name = "forgia-render-god-rays"
+version = "0.1.0"
+edition = "2021"
+description = "Volumetric god rays"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

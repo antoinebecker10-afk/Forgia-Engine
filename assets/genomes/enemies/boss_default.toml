@@ -1,0 +1,133 @@
+id = "boss_default"
+name = "Boss Fight"
+domain = "Creature"
+category = "Creature"
+description = "Boss encounter: phase transitions, enrage mechanic, loot tables"
+version = "1.0.0"
+
+# === Core Stats ===
+
+[[genes]]
+id = "boss_max_hp"
+label = "Boss HP"
+chromosome = "Combat"
+target = "Value"
+min = 200.0
+max = 1000.0
+default = 500.0
+layer = "boss"
+
+[[genes]]
+id = "boss_melee_damage"
+label = "Base Damage"
+chromosome = "Combat"
+target = "Value"
+min = 15.0
+max = 50.0
+default = 25.0
+layer = "boss"
+
+# === Phase Transitions ===
+
+[[genes]]
+id = "boss_phase2_threshold"
+label = "Phase 2 HP %"
+chromosome = "Phases"
+target = "Value"
+min = 0.3
+max = 0.7
+default = 0.5
+layer = "phases"
+
+[[genes]]
+id = "boss_enrage_threshold"
+label = "Enrage HP %"
+chromosome = "Phases"
+target = "Value"
+min = 0.1
+max = 0.35
+default = 0.2
+layer = "phases"
+
+[[genes]]
+id = "boss_enrage_timeout"
+label = "Enrage Timer (s)"
+chromosome = "Phases"
+target = "Value"
+min = 90.0
+max = 300.0
+default = 180.0
+layer = "phases"
+
+[[genes]]
+id = "boss_phase2_damage_mult"
+label = "Phase 2 Damage Mult"
+chromosome = "Phases"
+target = "Value"
+min = 1.0
+max = 2.0
+default = 1.25
+layer = "phases"
+
+[[genes]]
+id = "boss_enrage_damage_mult"
+label = "Enrage Damage Mult"
+chromosome = "Phases"
+target = "Value"
+min = 1.2
+max = 3.0
+default = 1.5
+layer = "phases"
+
+# === Rewards ===
+
+[[genes]]
+id = "boss_gold_reward"
+label = "Gold Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 200.0
+max = 1000.0
+default = 500.0
+layer = "boss"
+
+[[genes]]
+id = "boss_xp_reward"
+label = "XP Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 200.0
+max = 1000.0
+default = 500.0
+layer = "boss"
+
+# === Constraints ===
+
+# More HP → longer enrage timeout (fair fight window)
+[[constraints]]
+source = "boss_max_hp"
+target = "boss_enrage_timeout"
+ratio = 0.2
+
+# Higher enrage damage → lower threshold (triggers earlier = less time at max power)
+[[constraints]]
+source = "boss_enrage_damage_mult"
+target = "boss_enrage_threshold"
+ratio = -0.05
+
+# More HP → more rewards
+[[constraints]]
+source = "boss_max_hp"
+target = "boss_gold_reward"
+ratio = 0.8
+
+[[constraints]]
+source = "boss_max_hp"
+target = "boss_xp_reward"
+ratio = 0.8
+
+# Phase 2 threshold → enrage threshold (maintain gap)
+[[constraints]]
+source = "boss_phase2_threshold"
+target = "boss_enrage_threshold"
+ratio = 0.3

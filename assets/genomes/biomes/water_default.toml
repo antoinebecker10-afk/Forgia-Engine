@@ -1,0 +1,185 @@
+id = "water_default"
+name = "Water & Rivers"
+domain = "World"
+category = "Custom"
+description = "Ocean, rivers, waterfalls — color, waves, material, flow parameters"
+version = "1.0.0"
+
+# === Ocean Material ===
+[[genes]]
+id = "water_color_r"
+label = "Water Red"
+chromosome = "Color"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.08
+layer = "material"
+
+[[genes]]
+id = "water_color_g"
+label = "Water Green"
+chromosome = "Color"
+target = "Value"
+min = 0.0
+max = 0.6
+default = 0.22
+layer = "material"
+
+[[genes]]
+id = "water_color_b"
+label = "Water Blue"
+chromosome = "Color"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.42
+layer = "material"
+
+[[genes]]
+id = "water_opacity"
+label = "Opacity"
+chromosome = "Color"
+target = "Value"
+min = 0.3
+max = 1.0
+default = 0.75
+layer = "material"
+
+[[genes]]
+id = "water_roughness"
+label = "Roughness"
+chromosome = "Material"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.05
+layer = "material"
+
+[[genes]]
+id = "water_metallic"
+label = "Metallic"
+chromosome = "Material"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "material"
+
+[[genes]]
+id = "water_specular_transmission"
+label = "Specular Transmission"
+chromosome = "Material"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "material"
+
+# === Wave Dynamics ===
+[[genes]]
+id = "wave_freq_primary"
+label = "Primary Wave Freq"
+chromosome = "Waves"
+target = "Value"
+min = 0.05
+max = 2.0
+default = 0.4
+layer = "waves"
+
+[[genes]]
+id = "wave_freq_secondary"
+label = "Secondary Wave Freq"
+chromosome = "Waves"
+target = "Value"
+min = 0.05
+max = 1.5
+default = 0.25
+layer = "waves"
+
+[[genes]]
+id = "wave_freq_detail"
+label = "Detail Wave Freq"
+chromosome = "Waves"
+target = "Value"
+min = 0.1
+max = 3.0
+default = 0.65
+layer = "waves"
+
+[[genes]]
+id = "wave_amp_primary"
+label = "Primary Wave Height"
+chromosome = "Waves"
+target = "Value"
+min = 0.01
+max = 1.0
+default = 0.15
+layer = "waves"
+
+[[genes]]
+id = "wave_amp_secondary"
+label = "Secondary Wave Height"
+chromosome = "Waves"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.08
+layer = "waves"
+
+[[genes]]
+id = "wave_amp_detail"
+label = "Detail Wave Height"
+chromosome = "Waves"
+target = "Value"
+min = 0.005
+max = 0.3
+default = 0.04
+layer = "waves"
+
+# === Waterfalls ===
+[[genes]]
+id = "waterfall_max_count"
+label = "Max Waterfalls"
+chromosome = "Waterfalls"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 3.0
+layer = "waterfalls"
+
+[[genes]]
+id = "waterfall_cull_dist"
+label = "Waterfall Visibility"
+chromosome = "Waterfalls"
+target = "Value"
+min = 40.0
+max = 200.0
+default = 80.0
+layer = "waterfalls"
+
+[[genes]]
+id = "waterfall_min_drop"
+label = "Min Cliff Drop"
+chromosome = "Waterfalls"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 2.5
+layer = "waterfalls"
+
+# Constraints
+[[constraints]]
+source = "wave_amp_primary"
+target = "wave_amp_secondary"
+ratio = 0.5
+
+[[constraints]]
+source = "wave_amp_secondary"
+target = "wave_amp_detail"
+ratio = 0.5
+
+[[constraints]]
+source = "water_opacity"
+target = "water_specular_transmission"
+ratio = -0.5

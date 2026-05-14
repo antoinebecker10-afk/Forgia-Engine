@@ -1,0 +1,12 @@
+[package]
+name = "forgia-viewmodel"
+version = "0.1.0"
+edition = "2021"
+description = "FPS arms viewmodel (1P weapon render)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

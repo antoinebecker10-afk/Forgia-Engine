@@ -1,0 +1,142 @@
+id = "village_default"
+name = "Village Default"
+domain = "World"
+category = "Building"
+description = "Village layout: spacing, rings, density, fences, building count"
+version = "1.0.0"
+
+[[genes]]
+id = "village_min_dist"
+label = "Min Distance"
+chromosome = "Layout"
+target = "Value"
+min = 60.0
+max = 250.0
+default = 120.0
+layer = "structure"
+
+[[genes]]
+id = "target_villages"
+label = "Village Count"
+chromosome = "Layout"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 8.0
+layer = "structure"
+
+[[genes]]
+id = "village_radius"
+label = "Village Radius"
+chromosome = "Layout"
+target = "Value"
+min = 30.0
+max = 100.0
+default = 60.0
+layer = "structure"
+
+[[genes]]
+id = "center_ring_max"
+label = "Center Ring Radius"
+chromosome = "Rings"
+target = "Value"
+min = 4.0
+max = 15.0
+default = 8.0
+layer = "rings"
+
+[[genes]]
+id = "inner_ring_max"
+label = "Inner Ring Radius"
+chromosome = "Rings"
+target = "Value"
+min = 10.0
+max = 35.0
+default = 25.0
+layer = "rings"
+
+[[genes]]
+id = "outer_ring_max"
+label = "Outer Ring Radius"
+chromosome = "Rings"
+target = "Value"
+min = 20.0
+max = 55.0
+default = 42.0
+layer = "rings"
+
+[[genes]]
+id = "fence_spacing"
+label = "Fence Spacing"
+chromosome = "Decoration"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.5
+layer = "decoration"
+
+[[genes]]
+id = "max_fences"
+label = "Max Fences"
+chromosome = "Decoration"
+target = "Value"
+min = 0.0
+max = 48.0
+default = 24.0
+layer = "decoration"
+
+[[genes]]
+id = "fence_offset"
+label = "Fence Offset"
+chromosome = "Decoration"
+target = "Value"
+min = 2.0
+max = 10.0
+default = 5.5
+layer = "decoration"
+
+[[genes]]
+id = "fence_max_dist"
+label = "Fence Max Dist"
+chromosome = "Decoration"
+target = "Value"
+min = 20.0
+max = 100.0
+default = 60.0
+layer = "decoration"
+
+[[genes]]
+id = "building_scale_variation"
+label = "Scale Variation"
+chromosome = "Buildings"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.15
+layer = "buildings"
+
+[[genes]]
+id = "path_alignment_prob"
+label = "Path Alignment"
+chromosome = "Buildings"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "buildings"
+
+# Constraints
+[[constraints]]
+source = "village_radius"
+target = "outer_ring_max"
+ratio = 0.7
+
+[[constraints]]
+source = "village_radius"
+target = "max_fences"
+ratio = 0.4
+
+[[constraints]]
+source = "target_villages"
+target = "village_min_dist"
+ratio = -0.3

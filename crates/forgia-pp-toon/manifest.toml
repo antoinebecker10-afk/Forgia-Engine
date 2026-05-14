@@ -1,0 +1,30 @@
+# Forgia capability manifest — consumed by AI assembly agent.
+# Schema v1.
+
+name = "forgia-pp-toon"
+category = "postprocess"
+intent = "Cel-shading band quantization (cel-shaded look, companion to forgia-pp-outline)"
+version = "0.1.0"
+status = "wip"   # shader + settings ready ; render-graph node TODO
+
+# Genes exposed via TOML hot-reload.
+genes = [
+    { name = "bands",     range = [2.0, 16.0], default = 4.0,  doc = "Number of luminance bands" },
+    { name = "strength",  range = [0.0, 1.0],  default = 1.0,  doc = "Blend factor toon vs original" },
+    { name = "edge_dark", range = [0.0, 1.0],  default = 0.15, doc = "Shadow band darkening" },
+]
+
+# ECS events/signals emitted.
+emits = []
+
+# ECS events/signals consumed.
+consumes = ["ToonSettings (Component on Camera entity)"]
+
+# Sensor JSON file (forgia_<feature>.json) — required if runtime feature.
+sensor = ""
+
+# Shader file used.
+shader = "shaders/post_process/toon.wgsl"
+
+# Workspace deps.
+depends = ["forgia-core"]

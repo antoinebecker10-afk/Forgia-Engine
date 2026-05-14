@@ -1,0 +1,12 @@
+[package]
+name = "forgia-pp-auto-exposure"
+version = "0.1.0"
+edition = "2021"
+description = "Auto-exposure (luminance adaptation)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

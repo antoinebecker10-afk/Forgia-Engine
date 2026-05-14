@@ -1,0 +1,323 @@
+id = "grass_default"
+name = "Procedural Grass"
+domain = "Vegetation"
+category = "Custom"
+description = "3D grass blades: globals only (geometry, wind sway, physics). Per-biome density/color live in biome_*.toml via BiomeRegistry."
+version = "1.1.0"
+
+# === Blade Geometry ===
+[[genes]]
+id = "grass_blade_height_min"
+label = "Min Blade Height"
+chromosome = "Geometry"
+target = "Value"
+min = 0.1
+max = 1.5
+default = 0.4
+layer = "geometry"
+
+[[genes]]
+id = "grass_blade_height_max"
+label = "Max Blade Height"
+chromosome = "Geometry"
+target = "Value"
+min = 0.3
+max = 3.0
+default = 1.5
+layer = "geometry"
+
+[[genes]]
+id = "grass_blade_width"
+label = "Blade Width"
+chromosome = "Geometry"
+target = "Value"
+min = 0.02
+max = 0.3
+default = 0.06
+layer = "geometry"
+
+# AAA tuning 2026-04-28 : spacing 0.4→0.20 (×4 brins, ~25/m² vs ~10/m² avant).
+# Compensé par cull_distance 90→70 pour budget perf constant.
+# Pour 100+/m² réaliste, attendre M7 GPU instancing (story-348).
+[[genes]]
+id = "grass_spacing"
+label = "Blade Spacing"
+chromosome = "Geometry"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.20
+layer = "geometry"
+
+# === Wind Interaction ===
+[[genes]]
+id = "grass_wind_sway_amp"
+label = "Wind Sway Amplitude"
+chromosome = "Wind"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.25
+layer = "wind"
+
+[[genes]]
+id = "grass_wind_sway_freq"
+label = "Wind Sway Frequency"
+chromosome = "Wind"
+target = "Value"
+min = 0.1
+max = 3.0
+default = 1.0
+layer = "wind"
+
+# === Player Interaction ===
+[[genes]]
+id = "grass_crush_radius"
+label = "Crush Radius"
+chromosome = "Physics"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 2.0
+layer = "physics"
+
+[[genes]]
+id = "grass_spring_back_secs"
+label = "Spring Back Time"
+chromosome = "Physics"
+target = "Value"
+min = 0.3
+max = 5.0
+default = 1.5
+layer = "physics"
+
+# === Lighting (Vague 3C — 2026-05-05) ===
+# Ces genes alimentent les uniforms du fragment shader. Hardcodes elimines :
+# ambient 0.25, diffuse coef 0.55, AO floor 0.35, self_shadow floor 0.85.
+[[genes]]
+id = "grass_ambient"
+label = "Ambient Light"
+chromosome = "Lighting"
+target = "Value"
+min = 0.0
+max = 0.6
+default = 0.25
+layer = "lighting"
+
+[[genes]]
+id = "grass_diffuse"
+label = "Diffuse Coefficient"
+chromosome = "Lighting"
+target = "Value"
+min = 0.2
+max = 1.5
+default = 0.55
+layer = "lighting"
+
+[[genes]]
+id = "grass_ao_floor"
+label = "Ground AO Floor"
+chromosome = "Lighting"
+target = "Value"
+min = 0.0
+max = 0.7
+default = 0.35
+layer = "lighting"
+
+[[genes]]
+id = "grass_self_shadow_floor"
+label = "Self Shadow Floor"
+chromosome = "Lighting"
+target = "Value"
+min = 0.5
+max = 1.0
+default = 0.85
+layer = "lighting"
+
+# === Crush Effect (Vague 3C) ===
+# Hardcodes elimines : flatten 1.2, push 0.5.
+[[genes]]
+id = "grass_crush_flatten"
+label = "Crush Flatten"
+chromosome = "Physics"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.2
+layer = "physics"
+
+[[genes]]
+id = "grass_crush_push"
+label = "Crush Push"
+chromosome = "Physics"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.5
+layer = "physics"
+
+# === Builder Filters (Vague 2 — story-411) ===
+# Genes du pipeline mesh-builder grass.rs. Avant V2, hardcodes `0.7`, `0.05`,
+# `0.25` etc dans build_grass_mesh_from_sdf.
+[[genes]]
+id = "grass_slope_min"
+label = "Slope Min Filter"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "placement"
+
+[[genes]]
+id = "grass_slope_scale_factor"
+label = "Slope Scale Range"
+chromosome = "Placement"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.15
+layer = "placement"
+
+[[genes]]
+id = "grass_clump_lo_freq"
+label = "Clump Low Freq"
+chromosome = "Placement"
+target = "Value"
+min = 0.01
+max = 0.3
+default = 0.05
+layer = "placement"
+
+[[genes]]
+id = "grass_clump_hi_freq"
+label = "Clump High Freq"
+chromosome = "Placement"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.15
+layer = "placement"
+
+[[genes]]
+id = "grass_clump_threshold_min"
+label = "Clump Threshold Min"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 0.6
+default = 0.25
+layer = "placement"
+
+[[genes]]
+id = "grass_clump_threshold_jit"
+label = "Clump Threshold Jitter"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 0.3
+default = 0.10
+layer = "placement"
+
+[[genes]]
+id = "grass_altitude_max"
+label = "Altitude Fade Start"
+chromosome = "Placement"
+target = "Value"
+min = 30.0
+max = 200.0
+default = 80.0
+layer = "placement"
+
+[[genes]]
+id = "grass_altitude_fade_range"
+label = "Altitude Fade Range"
+chromosome = "Placement"
+target = "Value"
+min = 5.0
+max = 80.0
+default = 20.0
+layer = "placement"
+
+# === Visual Variation (Vague 2) ===
+[[genes]]
+id = "grass_color_brightness_min"
+label = "Color Brightness Min"
+chromosome = "Visual"
+target = "Value"
+min = 0.3
+max = 1.0
+default = 0.80
+layer = "visual"
+
+[[genes]]
+id = "grass_color_brightness_max"
+label = "Color Brightness Max"
+chromosome = "Visual"
+target = "Value"
+min = 0.7
+max = 1.6
+default = 1.20
+layer = "visual"
+
+[[genes]]
+id = "grass_blade_taper"
+label = "Blade Tip Taper"
+chromosome = "Geometry"
+target = "Value"
+min = 0.0
+max = 0.95
+default = 0.7
+layer = "geometry"
+
+# === Cap (Vague 2) ===
+[[genes]]
+id = "grass_max_chunks_total"
+label = "Max Grass Chunks"
+chromosome = "Performance"
+target = "Value"
+min = 30.0
+max = 500.0
+default = 120.0
+layer = "performance"
+
+# === Culling ===
+# story-407 vague 1A : split into hide/show distances for proper hysteresis.
+# `hide` = beyond this distance → grass invisible. `show` = come back into view
+# at this closer distance. Gap = anti-flicker hysteresis (~10m default).
+[[genes]]
+id = "grass_cull_hide"
+label = "Cull Hide Distance"
+chromosome = "Performance"
+target = "Value"
+min = 30.0
+max = 200.0
+default = 70.0
+layer = "performance"
+
+[[genes]]
+id = "grass_cull_show"
+label = "Cull Show Distance"
+chromosome = "Performance"
+target = "Value"
+min = 20.0
+max = 180.0
+default = 60.0
+layer = "performance"
+
+# Constraints
+[[constraints]]
+source = "grass_blade_height_min"
+target = "grass_blade_height_max"
+ratio = 1.5
+
+[[constraints]]
+source = "grass_blade_height_max"
+target = "grass_spacing"
+ratio = 0.3
+
+# Hysteresis : show < hide always (anti-flicker)
+[[constraints]]
+source = "grass_cull_show"
+target = "grass_cull_hide"
+ratio = 1.0

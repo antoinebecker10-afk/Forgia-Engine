@@ -1,0 +1,12 @@
+[package]
+name = "forgia-render-clouds"
+version = "0.1.0"
+edition = "2021"
+description = "Volumetric clouds"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
