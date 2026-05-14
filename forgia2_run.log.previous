@@ -1,31 +1,76 @@
-[2m2026-05-14T21:43:33.611016Z[0m [32m INFO[0m [2mforgia_game[0m[2m:[0m [forgia-game] Forgia V2 boot OK
-[2m2026-05-14T21:43:33.621125Z[0m [32m INFO[0m [2mbevy_hanabi::plugin[0m[2m:[0m Initializing Hanabi for GPU adapter NVIDIA GeForce RTX 4070 Ti
-[2m2026-05-14T21:43:33.627678Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Forgia V2 (0v0)
-[2m2026-05-14T21:43:33.656342Z[0m [32m INFO[0m [2mforgia_assets[0m[2m:[0m [forgia-assets] preload_assets — Phase 0 (no assets yet)
-[2m2026-05-14T21:43:33.656344Z[0m [32m INFO[0m [2mforgia_effects[0m[2m:[0m [forgia-effects] prespawn_hanabi_dummies — placeholder (Phase 2 adds 8 dummies)
-[2m2026-05-14T21:43:33.656346Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] MenuCamera2d spawned (permanent, order=10, clear=None)
-[2m2026-05-14T21:43:33.656379Z[0m [32m INFO[0m [2mforgia_effects::weapon_vfx[0m[2m:[0m Weapon VFX initialises (5-layer muzzle + 3-layer impact)
-[2m2026-05-14T21:43:33.656400Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)
-[2m2026-05-14T21:43:33.658513Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
-[2m2026-05-14T21:43:33.662609Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
-[2m2026-05-14T21:43:34.693141Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World spawned : procedural heightmap 80x80m grid 96x96 + sun + 2 buildings + 5 NPCs
-[2m2026-05-14T21:43:34.693320Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
-[2m2026-05-14T21:43:34.693337Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
-[2m2026-05-14T21:43:34.693697Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
-[2m2026-05-14T21:43:42.453590Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
-[2m2026-05-14T21:43:42.453621Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
-[2m2026-05-14T21:43:42.467399Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
-[2m2026-05-14T21:43:42.467517Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World cleaned : 9 entities despawned
-[2m2026-05-14T21:43:42.467599Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
-[2m2026-05-14T21:43:42.467740Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
-[2m2026-05-14T21:43:43.726894Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed in Menu — no transition
-[2m2026-05-14T21:43:44.348647Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World spawned : procedural heightmap 80x80m grid 96x96 + sun + 2 buildings + 5 NPCs
-[2m2026-05-14T21:43:44.348722Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
-[2m2026-05-14T21:43:44.348725Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
-[2m2026-05-14T21:43:44.349063Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
-[2m2026-05-14T21:43:55.712396Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
-[2m2026-05-14T21:43:55.712428Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
-[2m2026-05-14T21:43:55.725669Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
-[2m2026-05-14T21:43:55.725723Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World cleaned : 9 entities despawned
-[2m2026-05-14T21:43:55.725770Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
-[2m2026-05-14T21:43:55.725981Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-14T21:45:21.187328Z[0m [32m INFO[0m [2mforgia_game[0m[2m:[0m [forgia-game] Forgia V2 boot OK
+[2m2026-05-14T21:45:21.196924Z[0m [32m INFO[0m [2mbevy_hanabi::plugin[0m[2m:[0m Initializing Hanabi for GPU adapter NVIDIA GeForce RTX 4070 Ti
+[2m2026-05-14T21:45:21.203847Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Forgia V2 (0v0)
+[2m2026-05-14T21:45:21.231397Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] MenuCamera2d spawned (permanent, order=10, clear=None)
+[2m2026-05-14T21:45:21.231420Z[0m [32m INFO[0m [2mforgia_effects[0m[2m:[0m [forgia-effects] prespawn_hanabi_dummies — placeholder (Phase 2 adds 8 dummies)
+[2m2026-05-14T21:45:21.231399Z[0m [32m INFO[0m [2mforgia_assets[0m[2m:[0m [forgia-assets] preload_assets — Phase 0 (no assets yet)
+[2m2026-05-14T21:45:21.231450Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)
+[2m2026-05-14T21:45:21.231481Z[0m [32m INFO[0m [2mforgia_effects::weapon_vfx[0m[2m:[0m Weapon VFX initialises (5-layer muzzle + 3-layer impact)
+[2m2026-05-14T21:45:21.234003Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-14T21:45:21.238214Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-14T21:45:22.188739Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] Arena spawned : 44×44m, 121 floor + 44 walls + 12 pillars + 14 covers + 5 banners + 8 torches + 5 cubes + cartoon sky dome + sun disk + 18 cloud clusters (3 shapes : popcorn/stratus/puff)
+[2m2026-05-14T21:45:22.189293Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-14T21:45:22.189319Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-14T21:45:22.190026Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-14T21:45:43.015713Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 228v0 toi=8.91 dmg=25 hp=75/100 dead=false
+[2m2026-05-14T21:45:43.569646Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 228v0 toi=6.38 dmg=25 hp=50/100 dead=false
+[2m2026-05-14T21:45:43.747986Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 228v0 toi=6.38 dmg=25 hp=25/100 dead=false
+[2m2026-05-14T21:45:43.920916Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 228v0 toi=6.11 dmg=25 hp=0/100 dead=true
+[2m2026-05-14T21:45:43.920993Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [death] cube 228v0 despawned (HP=0)
+[2m2026-05-14T21:45:44.098597Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 151v0 toi=23.85
+[2m2026-05-14T21:45:45.116687Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 229v0 toi=9.04 dmg=25 hp=75/100 dead=false
+[2m2026-05-14T21:45:45.284693Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 229v0 toi=9.64 dmg=25 hp=50/100 dead=false
+[2m2026-05-14T21:45:45.450081Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 229v0 toi=10.24 dmg=25 hp=25/100 dead=false
+[2m2026-05-14T21:45:45.615525Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 229v0 toi=10.83 dmg=25 hp=0/100 dead=true
+[2m2026-05-14T21:45:45.615588Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [death] cube 229v0 despawned (HP=0)
+[2m2026-05-14T21:46:08.571938Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 141v0 toi=9.77
+[2m2026-05-14T21:46:09.319756Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss
+[2m2026-05-14T21:46:09.782532Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss
+[2m2026-05-14T21:46:10.109915Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss
+[2m2026-05-14T21:46:11.053558Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss
+[2m2026-05-14T21:46:18.633149Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 190v0 toi=12.33
+[2m2026-05-14T21:46:20.121707Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 194v0 toi=1.67
+[2m2026-05-14T21:46:20.323752Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.43
+[2m2026-05-14T21:46:20.492896Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.63
+[2m2026-05-14T21:46:20.956663Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.61
+[2m2026-05-14T21:46:21.158694Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.62
+[2m2026-05-14T21:46:21.558709Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.64
+[2m2026-05-14T21:46:21.764649Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 194v0 toi=1.69
+[2m2026-05-14T21:46:21.934703Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 194v0 toi=1.86
+[2m2026-05-14T21:46:22.122000Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.40
+[2m2026-05-14T21:46:22.310938Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 194v0 toi=1.69
+[2m2026-05-14T21:46:23.026742Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 179v0 toi=24.63
+[2m2026-05-14T21:46:23.216923Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 194v0 toi=1.78
+[2m2026-05-14T21:46:23.398607Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss
+[2m2026-05-14T21:46:23.580080Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 194v0 toi=1.71
+[2m2026-05-14T21:46:25.808402Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 183v0 toi=23.81
+[2m2026-05-14T21:46:26.016691Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 190v0 toi=0.88
+[2m2026-05-14T21:46:26.535652Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 183v0 toi=23.24
+[2m2026-05-14T21:46:28.367797Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 190v0 toi=6.35
+[2m2026-05-14T21:46:29.277742Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 183v0 toi=30.27
+[2m2026-05-14T21:46:29.475363Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 183v0 toi=29.28
+[2m2026-05-14T21:46:29.648276Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 183v0 toi=28.42
+[2m2026-05-14T21:46:29.809349Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 183v0 toi=27.61
+[2m2026-05-14T21:46:37.557974Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] hit non-target entity 169v0 toi=20.14
+[2m2026-05-14T21:46:38.725791Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 232v0 toi=8.98 dmg=25 hp=75/100 dead=false
+[2m2026-05-14T21:46:38.908758Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 232v0 toi=8.71 dmg=25 hp=50/100 dead=false
+[2m2026-05-14T21:46:39.073907Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 232v0 toi=8.90 dmg=25 hp=25/100 dead=false
+[2m2026-05-14T21:46:39.227506Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] HIT cube 232v0 toi=9.43 dmg=25 hp=0/100 dead=true
+[2m2026-05-14T21:46:39.227570Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [death] cube 232v0 despawned (HP=0)
+[2m2026-05-14T21:46:44.528938Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-14T21:46:44.528968Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-14T21:46:44.531407Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-14T21:46:44.531587Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] Arena cleaned : 230 entities despawned
+[2m2026-05-14T21:46:44.531979Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-14T21:46:44.532099Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-14T21:46:44.907661Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed in Menu — no transition
+[2m2026-05-14T21:46:45.872949Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World spawned : procedural heightmap 80x80m grid 96x96 + sun + 2 buildings + 5 NPCs
+[2m2026-05-14T21:46:45.873093Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-14T21:46:45.873097Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-14T21:46:45.873347Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-14T21:46:47.204412Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-14T21:46:47.204444Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-14T21:46:47.213761Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-14T21:46:47.213864Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World cleaned : 9 entities despawned
+[2m2026-05-14T21:46:47.213917Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-14T21:46:47.214090Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu

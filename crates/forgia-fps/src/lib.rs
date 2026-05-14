@@ -38,8 +38,7 @@ const SUN_DISK_COLOR: Color = Color::srgb(1.0, 0.95, 0.85);
 const SUN_DISK_EMISSIVE: LinearRgba = LinearRgba::new(15.0, 12.0, 8.0, 1.0);
 const CLOUD_COLOR: Color = Color::srgb(0.95, 0.96, 0.97);
 const CLOUD_EMISSIVE: LinearRgba = LinearRgba::new(0.05, 0.05, 0.06, 1.0);
-const CLOUD_DRIFT_SPEED: f32 = 0.8; // m/s vent doux vers +X
-const CLOUD_WRAP_DIST: f32 = 150.0; // wrap autour ±150m horizon
+const CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min, doux mais visible
 
 #[derive(Component)]
 pub struct ArenaMarker;
@@ -48,9 +47,14 @@ pub struct ArenaMarker;
 #[derive(Component)]
 pub struct TargetCube;
 
-/// Marker pour les cluster nuages — animation drift wind via cloud_drift_system.
+/// Cluster nuage en orbit circulaire autour du centre arène (Y axis).
+/// Stocke angle/radius/height pour calcul polaire continu (pas de wrap brusque).
 #[derive(Component)]
-pub struct CloudDrift;
+pub struct CloudOrbit {
+    pub angle: f32,  // radians, current
+    pub radius: f32, // distance horizontale du centre arène
+    pub height: f32, // Y position (constant)
+}
 
 pub struct ForgiaFpsPlugin;
 
@@ -455,10 +459,13 @@ fn spawn_arena(
             _ => "popcorn",
         };
 
+        // Polar coords pour orbit : angle initial depuis (cx, cz), radius = distance horizontale
+        let angle = cz.atan2(cx);
+        let radius = (cx * cx + cz * cz).sqrt();
         let parent_id = commands
             .spawn((
                 ArenaMarker,
-                CloudDrift,
+                CloudOrbit { angle, radius, height: cy },
                 Transform::from_xyz(cx, cy, cz).with_scale(Vec3::new(scale, hscale * scale, scale)),
                 Visibility::default(),
                 Name::new(format!("Cloud_{preset_name}_{ci}")),
@@ -648,16 +655,22 @@ fn fire_weapon_minimal(
 
 /// Drift wind lent des nuages vers +X (pattern V1 sky/clouds.rs).
 /// Wrap autour de ±150m pour cycle continu sans pop.
+/// Orbit nuages autour du centre Y axis : rotation continue, jamais wrap brusque.
+/// Pattern : angle += speed * dt, position recalculée polaire (radius, angle, height).
 fn cloud_drift_system(
     time: Res<Time>,
-    mut q: Query<&mut Transform, With<CloudDrift>>,
+    mut q: Query<(&mut Transform, &mut CloudOrbit)>,
 ) {
-    let drift = CLOUD_DRIFT_SPEED * time.delta_secs();
-    for mut tf in q.iter_mut() {
-        tf.translation.x += drift;
-        if tf.translation.x > CLOUD_WRAP_DIST {
-            tf.translation.x -= 2.0 * CLOUD_WRAP_DIST;
+    let dt = time.delta_secs();
+    for (mut tf, mut orbit) in q.iter_mut() {
+        orbit.angle += CLOUD_ORBIT_SPEED * dt;
+        // Wrap angle dans [0, 2π) pour éviter accumulation float (peu critique mais propre)
+        if orbit.angle > std::f32::consts::TAU {
+            orbit.angle -= std::f32::consts::TAU;
         }
+        tf.translation.x = orbit.angle.cos() * orbit.radius;
+        tf.translation.z = orbit.angle.sin() * orbit.radius;
+        tf.translation.y = orbit.height;
     }
 }
 
