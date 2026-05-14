@@ -22,5 +22,6 @@ forgia-effects = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-fps = { workspace = true }
 forgia-rpg = { workspace = true }
+forgia-dialogue = { workspace = true }
 forgia-ui = { workspace = true }
 forgia-sensors = { workspace = true }

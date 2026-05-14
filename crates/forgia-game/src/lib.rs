@@ -48,7 +48,10 @@ pub fn run_game() -> AppExit {
         forgia_sensors::prelude::ForgiaSensorsPlugin,
     ));
 
-    // 6. Mode-specific plugins (run_if interne par GameMode)
+    // 6. Cross-mode systems (utilisés par forgia-rpg, requis init_resource avant Startup)
+    app.add_plugins(forgia_dialogue::ForgiaDialoguePlugin);
+
+    // 7. Mode-specific plugins (run_if interne par GameMode)
     app.add_plugins((
         forgia_fps::prelude::ForgiaFpsPlugin,
         forgia_rpg::prelude::ForgiaRpgPlugin,

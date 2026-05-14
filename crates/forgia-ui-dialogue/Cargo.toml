@@ -2,7 +2,7 @@
 name = "forgia-ui-dialogue"
 version = "0.1.0"
 edition = "2021"
-description = "Dialogue UI (choices, portrait)"
+description = "Dialogue modal (egui-based) reading DialogueSession + DialogueRegistry"
 
 [lints]
 workspace = true
@@ -10,4 +10,5 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 forgia-core = { workspace = true }
+forgia-dialogue = { workspace = true }
 bevy_egui = { workspace = true }

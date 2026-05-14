@@ -27,12 +27,30 @@ pub mod prelude {
 const TILE_SIZE: f32 = 4.0;
 const ARENA_SIZE: i32 = 11; // 11×11 tiles = 44×44m (vrai map FPS multi-zones)
 
+// ── Sky / cloud constants (cosmétiques cartoon dusk forge) ───────────
+// Futur : à porter en `config/genomes/sky_arena.toml` quand FpsTuning V2 ready.
+const SKY_DOME_RADIUS: f32 = 250.0;
+const SKY_DOME_COLOR: Color = Color::srgb(1.0, 0.55, 0.35); // warm dusk orange
+const SKY_DOME_EMISSIVE: LinearRgba = LinearRgba::new(0.6, 0.30, 0.18, 1.0);
+const SUN_DISK_RADIUS: f32 = 8.0;
+const SUN_DISK_POS: Vec3 = Vec3::new(80.0, 100.0, -40.0);
+const SUN_DISK_COLOR: Color = Color::srgb(1.0, 0.95, 0.85);
+const SUN_DISK_EMISSIVE: LinearRgba = LinearRgba::new(15.0, 12.0, 8.0, 1.0);
+const CLOUD_COLOR: Color = Color::srgb(0.95, 0.96, 0.97);
+const CLOUD_EMISSIVE: LinearRgba = LinearRgba::new(0.05, 0.05, 0.06, 1.0);
+const CLOUD_DRIFT_SPEED: f32 = 0.8; // m/s vent doux vers +X
+const CLOUD_WRAP_DIST: f32 = 150.0; // wrap autour ±150m horizon
+
 #[derive(Component)]
 pub struct ArenaMarker;
 
 /// Marker pour les cubes-cibles (testables via fire_weapon_minimal).
 #[derive(Component)]
 pub struct TargetCube;
+
+/// Marker pour les cluster nuages — animation drift wind via cloud_drift_system.
+#[derive(Component)]
+pub struct CloudDrift;
 
 pub struct ForgiaFpsPlugin;
 
@@ -45,6 +63,12 @@ impl Plugin for ForgiaFpsPlugin {
                 (fire_weapon_minimal, despawn_dead_cubes)
                     .chain()
                     .in_set(GameSet::Combat)
+                    .run_if(in_state(GameMode::Fps)),
+            )
+            .add_systems(
+                Update,
+                cloud_drift_system
+                    .in_set(GameSet::Effects)
                     .run_if(in_state(GameMode::Fps)),
             );
     }
@@ -280,16 +304,18 @@ fn spawn_arena(
         ));
     }
 
-    // ── Lumière directionnelle (sunset rasant pour ombres dramatiques) ──
+    // ── Sun DirectionalLight (pattern V1 — direction via euler pour Atmosphere) ──
+    // Atmosphere Hillaire utilise la rotation du DirectionalLight comme position du soleil.
+    // Quat::from_euler XYZ (-0.35, -0.78, 0) = soleil mi-haut SE (V1 pattern terrain_systems.rs:282)
     commands.spawn((
         ArenaMarker,
         DirectionalLight {
-            illuminance: 8_000.0,
-            color: Color::srgb(1.0, 0.85, 0.7), // warm sunset
+            color: Color::srgb(1.0, 0.96, 0.88), // golden warm
+            illuminance: 22_000.0, // V1 default (was 8K = trop sombre pour Atmosphere)
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_xyz(20.0, 25.0, -10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.35, -0.78, 0.0)),
         Name::new("ArenaSunLight"),
     ));
 
@@ -314,8 +340,147 @@ fn spawn_arena(
         ));
     }
 
+    // ── Cartoon skybox dome warm dusk (sphère inverted unlit) ───────────
+    let sky_mesh = meshes.add(Sphere::new(SKY_DOME_RADIUS).mesh().ico(3).unwrap());
+    let sky_mat = materials.add(StandardMaterial {
+        base_color: SKY_DOME_COLOR,
+        emissive: SKY_DOME_EMISSIVE,
+        unlit: true,
+        cull_mode: Some(bevy::render::render_resource::Face::Front),
+        ..default()
+    });
+    commands.spawn((
+        ArenaMarker,
+        Mesh3d(sky_mesh),
+        MeshMaterial3d(sky_mat),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        bevy::light::NotShadowCaster,
+        Name::new("CartoonSkyDome"),
+    ));
+
+    // ── Sun disk visible (sphère blanche émissive HDR) ──────────────────
+    let sun_mesh = meshes.add(Sphere::new(SUN_DISK_RADIUS).mesh().ico(2).unwrap());
+    let sun_mat = materials.add(StandardMaterial {
+        base_color: SUN_DISK_COLOR,
+        emissive: SUN_DISK_EMISSIVE,
+        unlit: true,
+        ..default()
+    });
+    commands.spawn((
+        ArenaMarker,
+        Mesh3d(sun_mesh),
+        MeshMaterial3d(sun_mat),
+        Transform::from_translation(SUN_DISK_POS),
+        bevy::light::NotShadowCaster,
+        Name::new("SunDisk"),
+    ));
+
+    // ── Nuages cartoon volumétriques : clusters de sphères "popcorn" ──────
+    // Pattern Mario Galaxy / Studio Ghibli : chaque nuage = 6 blobs sphériques
+    // de tailles variées agglomérés (cumulus stylisé). 3D vrai, pas plat.
+    let cloud_blob_mesh = meshes.add(Sphere::new(1.0).mesh().ico(3).unwrap());
+    // Pattern V1 (sky/clouds.rs) : blanc pur quasi neutre, lit par DirectionalLight.
+    let cloud_mat = materials.add(StandardMaterial {
+        base_color: CLOUD_COLOR,
+        emissive: CLOUD_EMISSIVE,
+        perceptual_roughness: 1.0,
+        metallic: 0.0,
+        reflectance: 0.0,
+        ..default()
+    });
+
+    // 3 PRESETS de formes nuage (offset XYZ + radius local par blob)
+    // Popcorn : cluster compact 6 blobs jitter (cumulus classique stylisé)
+    let blobs_popcorn: &[(f32, f32, f32, f32)] = &[
+        (0.0, 0.0, 0.0, 5.0),
+        (4.5, 0.8, 1.2, 3.5),
+        (-4.0, 0.4, -1.8, 3.2),
+        (1.5, 1.5, 4.5, 2.8),
+        (-2.0, -0.6, -4.2, 2.6),
+        (3.5, -0.4, -3.0, 2.2),
+    ];
+    // Stratus : nuage allongé horizontal 8 blobs en ligne avec variations
+    let blobs_stratus: &[(f32, f32, f32, f32)] = &[
+        (-12.0, 0.0, 0.0, 2.5),
+        (-8.0, 0.5, 0.8, 3.0),
+        (-4.0, 0.3, -0.5, 3.5),
+        (0.0, 0.0, 0.5, 4.0),
+        (4.0, 0.4, -0.3, 3.6),
+        (8.0, 0.2, 0.7, 3.0),
+        (12.0, 0.0, -0.4, 2.4),
+        (15.0, -0.3, 0.0, 1.8),
+    ];
+    // Puff : petit nuage compact dense 4 blobs (cumulus mini)
+    let blobs_puff: &[(f32, f32, f32, f32)] = &[
+        (0.0, 0.0, 0.0, 3.0),
+        (2.5, 0.5, 0.5, 2.2),
+        (-2.0, 0.3, -0.5, 2.0),
+        (0.5, -0.3, 1.8, 1.8),
+    ];
+
+    // 18 clusters dispersés autour arène : (x, y, z, scale_xz, scale_y, blobs_preset_idx)
+    // preset 0 = popcorn, 1 = stratus, 2 = puff
+    let clusters: &[(f32, f32, f32, f32, f32, u8)] = &[
+        // === Anneau intérieur (45-65m hauteur, plus proches) ===
+        (-40.0, 55.0, -55.0, 1.0, 1.0, 0),   // popcorn NO
+        (55.0, 62.0, -35.0, 1.3, 1.2, 0),    // popcorn NE big
+        (5.0, 68.0, 65.0, 1.6, 0.9, 0),      // popcorn S overhead
+        (-60.0, 50.0, 38.0, 1.0, 1.1, 0),    // popcorn SW
+        (45.0, 58.0, 55.0, 0.85, 1.0, 0),    // popcorn SE
+        (-25.0, 60.0, -80.0, 1.2, 0.8, 1),   // stratus N
+        (70.0, 55.0, 20.0, 1.0, 0.9, 1),     // stratus E allongé
+        (-80.0, 52.0, -10.0, 1.1, 0.85, 1),  // stratus W
+        (15.0, 48.0, -25.0, 0.7, 1.0, 2),    // puff petit central
+        (-15.0, 50.0, 25.0, 0.8, 1.0, 2),    // puff petit
+        // === Anneau extérieur (75-95m hauteur, lointain horizon) ===
+        (-100.0, 80.0, -60.0, 1.8, 0.7, 1),  // stratus far NW big
+        (90.0, 85.0, -90.0, 1.5, 0.8, 0),    // popcorn far NE
+        (-50.0, 90.0, 100.0, 2.0, 0.7, 1),   // stratus far S big
+        (100.0, 75.0, 70.0, 1.4, 1.0, 0),    // popcorn far SE
+        (0.0, 95.0, -120.0, 1.6, 0.8, 1),    // stratus far N horizon
+        (-110.0, 70.0, 40.0, 1.2, 0.9, 0),   // popcorn far W
+        (60.0, 88.0, 110.0, 1.7, 0.75, 1),   // stratus far SE
+        (30.0, 78.0, -70.0, 0.9, 1.1, 2),    // puff mid-distance
+    ];
+
+    for (ci, &(cx, cy, cz, scale, hscale, preset)) in clusters.iter().enumerate() {
+        let blobs: &[(f32, f32, f32, f32)] = match preset {
+            1 => blobs_stratus,
+            2 => blobs_puff,
+            _ => blobs_popcorn,
+        };
+        let preset_name = match preset {
+            1 => "stratus",
+            2 => "puff",
+            _ => "popcorn",
+        };
+
+        let parent_id = commands
+            .spawn((
+                ArenaMarker,
+                CloudDrift,
+                Transform::from_xyz(cx, cy, cz).with_scale(Vec3::new(scale, hscale * scale, scale)),
+                Visibility::default(),
+                Name::new(format!("Cloud_{preset_name}_{ci}")),
+            ))
+            .id();
+
+        for (bi, &(bx, by, bz, br)) in blobs.iter().enumerate() {
+            let child = commands
+                .spawn((
+                    Mesh3d(cloud_blob_mesh.clone()),
+                    MeshMaterial3d(cloud_mat.clone()),
+                    Transform::from_xyz(bx, by, bz).with_scale(Vec3::splat(br)),
+                    bevy::light::NotShadowCaster,
+                    Name::new(format!("Blob_{ci}_{bi}")),
+                ))
+                .id();
+            commands.entity(parent_id).add_child(child);
+        }
+    }
+
     info!(
-        "[forgia-fps] Arena spawned : {}×{}m, 121 floor tiles + 44 walls + 12 pillars + 14 cover props + 5 banners + 8 torches + 5 target cubes",
+        "[forgia-fps] Arena spawned : {}×{}m, 121 floor + 44 walls + 12 pillars + 14 covers + 5 banners + 8 torches + 5 cubes + cartoon sky dome + sun disk + 18 cloud clusters (3 shapes : popcorn/stratus/puff)",
         (ARENA_SIZE as f32 * TILE_SIZE) as i32,
         (ARENA_SIZE as f32 * TILE_SIZE) as i32
     );
@@ -478,6 +643,21 @@ fn fire_weapon_minimal(
         }
     } else {
         info!("[fire] miss");
+    }
+}
+
+/// Drift wind lent des nuages vers +X (pattern V1 sky/clouds.rs).
+/// Wrap autour de ±150m pour cycle continu sans pop.
+fn cloud_drift_system(
+    time: Res<Time>,
+    mut q: Query<&mut Transform, With<CloudDrift>>,
+) {
+    let drift = CLOUD_DRIFT_SPEED * time.delta_secs();
+    for mut tf in q.iter_mut() {
+        tf.translation.x += drift;
+        if tf.translation.x > CLOUD_WRAP_DIST {
+            tf.translation.x -= 2.0 * CLOUD_WRAP_DIST;
+        }
     }
 }
 

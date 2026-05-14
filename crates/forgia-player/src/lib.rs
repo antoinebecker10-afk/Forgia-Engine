@@ -3,6 +3,7 @@
 //! Player controller : KinematicCharacterController rapier + FpsCamera 1P + spawn/respawn.
 
 use bevy::input::mouse::MouseMotion;
+use bevy::pbr::ScatteringMedium;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_combat::prelude::*;
@@ -57,7 +58,13 @@ impl Plugin for ForgiaPlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands) {
+fn spawn_player(
+    mut commands: Commands,
+    _scattering_mediums: ResMut<Assets<ScatteringMedium>>,
+) {
+    // Atmosphere temporairement désactivée — debug en cours.
+    // Voir ARCHITECTURE.md "Atmosphere setup pending".
+
     let map = default_input_map();
     // Spawn y=2 (vs y=5) : limite vélocité d'impact pour éviter tunneling.
     commands.spawn((

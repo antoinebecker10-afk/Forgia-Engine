@@ -4398,6 +4398,7 @@ dependencies = [
  "forgia-assets",
  "forgia-combat",
  "forgia-core",
+ "forgia-dialogue",
  "forgia-effects",
  "forgia-fps",
  "forgia-input",
@@ -5645,12 +5646,18 @@ name = "forgia-terrain"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_rapier3d",
  "fast-surface-nets",
  "forgia-core",
  "ndshape",
  "noise",
  "rayon",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "toml",
  "voronoice",
+ "zstd",
 ]
 
 [[package]]
@@ -5698,6 +5705,7 @@ dependencies = [
  "bevy",
  "bevy_egui",
  "forgia-core",
+ "forgia-dialogue",
 ]
 
 [[package]]

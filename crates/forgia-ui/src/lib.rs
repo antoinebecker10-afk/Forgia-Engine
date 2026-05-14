@@ -7,6 +7,7 @@
 //! - `MenuCamera2d` isolé OnEnter(Menu)/OnExit(Menu)
 //! - `Time<Real>` pour sensors UI
 
+use bevy::camera::ClearColorConfig;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
@@ -52,12 +53,15 @@ fn spawn_menu_camera_permanent(
             Camera2d,
             Camera {
                 order: 10,
+                // CRITICAL : None sinon Camera2d écrase tout le framebuffer Camera3d/Atmosphere
+                // chaque frame avec ClearColor (Resource brun). Egui render par-dessus en transparent.
+                clear_color: ClearColorConfig::None,
                 ..default()
             },
             MenuCamera2d,
             Name::new("MenuCamera2d (permanent)"),
         ));
-        info!("[forgia-ui] MenuCamera2d spawned (permanent, order=10)");
+        info!("[forgia-ui] MenuCamera2d spawned (permanent, order=10, clear=None)");
     }
 }
 
