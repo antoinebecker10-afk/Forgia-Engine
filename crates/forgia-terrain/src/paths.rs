@@ -84,14 +84,22 @@ pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> Pa
 
         let mut last_pos = start;
         let mut acc_dist = 0.0_f32;
+        let dt = 1.0 / steps_per_segment as f32;
         for step in 1..=steps_per_segment {
             let t = step as f32 / steps_per_segment as f32;
             let pos = bezier_quadratic(start, control, end, t);
             let delta = (pos - last_pos).length();
+            if delta < 1e-5 { continue; }
             acc_dist += delta;
+            // Interpolation correcte : si on a dépassé l'intervalle, calculer
+            // précisément où placer le sample (vs ancienne version : tous
+            // samples consécutifs au même `t` → planches qui se chevauchent).
             while acc_dist >= SAMPLE_INTERVAL_M {
-                let p = bezier_quadratic(start, control, end, t);
-                let tg = bezier_tangent(start, control, end, t);
+                let overshoot = acc_dist - SAMPLE_INTERVAL_M;
+                let frac_back = (overshoot / delta).clamp(0.0, 1.0);
+                let t_sample = t - frac_back * dt;
+                let p = bezier_quadratic(start, control, end, t_sample);
+                let tg = bezier_tangent(start, control, end, t_sample);
                 samples.push(PathSample { pos: p, tangent: tg, tier });
                 acc_dist -= SAMPLE_INTERVAL_M;
             }

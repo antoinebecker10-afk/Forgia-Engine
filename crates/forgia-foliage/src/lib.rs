@@ -19,8 +19,8 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
 use forgia_terrain::{
-    sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, TerrainConfig,
-    CHUNK_X, CHUNK_Z,
+    sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, PathNetwork,
+    TerrainConfig, CHUNK_X, CHUNK_Z,
 };
 use std::collections::HashMap;
 
@@ -137,6 +137,7 @@ fn populate_new_chunks(
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
+    path_net: Option<Res<PathNetwork>>,
     q_chunks: Query<(Entity, &ChunkCoord, Option<&ChunkLod>)>,
 ) {
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
@@ -229,6 +230,17 @@ fn populate_new_chunks(
 
             // Skip si sous le sea_level (un poil de marge cosmétique).
             if h < terrain_cfg.sea_level + 0.3 { continue; }
+
+            // Skip si trop proche d'un PathSample (sentier dégagé). Buffer =
+            // road half_width + 1.2m extra pour respiration visuelle.
+            if let Some(ref pn) = path_net {
+                let p = Vec2::new(wx, wz);
+                let too_close = pn.samples.iter().any(|s| {
+                    let buf = s.tier.half_width() + 1.2;
+                    p.distance_squared(s.pos) < buf * buf
+                });
+                if too_close { continue; }
+            }
 
             // Variation de taille déterministe par index.
             let scale = 0.85 + ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.45;
