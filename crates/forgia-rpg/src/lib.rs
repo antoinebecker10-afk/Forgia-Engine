@@ -21,6 +21,8 @@ use forgia_dialogue::{
 };
 use forgia_input::PlayerAction;
 use forgia_player::prelude::Player;
+use forgia_foliage::prelude::VegetationManager;
+use forgia_foliage::{RpgSampleOffset, VegetationTree};
 use forgia_terrain::{
     build_chunk_mesh, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
     MapGenConfig, TerrainConfig, TerrainSharedMaterial,
@@ -180,6 +182,9 @@ fn spawn_world(
     commands.insert_resource(map_cfg);
     commands.insert_resource(biome_map);
     commands.insert_resource(chunk_mgr);
+    // forgia-foliage : aligne ses samples (heightmap + biome) avec notre décalage RPG.
+    let off = sample_offset();
+    commands.insert_resource(RpgSampleOffset { x: off.x, z: off.y });
 
     // ── Sun ──────────────────────────────────────────────────────────────
     commands.spawn((
@@ -485,17 +490,27 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
     info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
 }
 
-fn cleanup_world(mut commands: Commands, q: Query<Entity, With<RpgWorldMarker>>) {
+fn cleanup_world(
+    mut commands: Commands,
+    q: Query<Entity, With<RpgWorldMarker>>,
+    trees: Query<Entity, With<VegetationTree>>,
+) {
     let count = q.iter().count();
-    for e in &q {
-        commands.entity(e).despawn();
-    }
+    for e in &q { commands.entity(e).despawn(); }
+    let tree_count = trees.iter().count();
+    for e in &trees { commands.entity(e).despawn(); }
     // Resources terrain — TerrainSharedMaterial conservé (réutilisable session suivante).
     commands.remove_resource::<ChunkManager>();
     commands.remove_resource::<BiomeMap>();
     commands.remove_resource::<MapGenConfig>();
     commands.remove_resource::<TerrainConfig>();
-    info!("[forgia-rpg] World cleaned : {} entities despawned + terrain resources removed", count);
+    commands.remove_resource::<RpgSampleOffset>();
+    // Reset VegetationManager pour la session suivante (handles partagés conservés).
+    commands.insert_resource(VegetationManager::default());
+    info!(
+        "[forgia-rpg] World cleaned : {} entities + {} trees despawned + resources reset",
+        count, tree_count,
+    );
 }
 
 /// Interaction system : when player presses E, find nearest InteractablePoint

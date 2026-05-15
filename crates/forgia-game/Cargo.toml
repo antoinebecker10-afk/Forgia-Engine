@@ -20,6 +20,7 @@ forgia-player = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-effects = { workspace = true }
 forgia-terrain = { workspace = true }
+forgia-foliage = { workspace = true }
 forgia-fps = { workspace = true }
 forgia-rpg = { workspace = true }
 forgia-dialogue = { workspace = true }
