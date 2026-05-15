@@ -22,13 +22,23 @@ pub enum RoadTier {
 }
 
 impl RoadTier {
-    /// Demi-largeur du centre plat de la route (mètres). Élargi pour le rendu
-    /// V2 (avant : 2.0/1.25/0.6 cartoonesque). Échelle médiévale crédible.
+    /// Demi-largeur du centre plat (mètres). Échelle médiévale crédible.
     pub fn half_width(self) -> f32 {
         match self {
-            Self::Primary => 3.5,
-            Self::Secondary => 2.5,
-            Self::Trail => 1.2,
+            Self::Primary => 2.5,   // 5m total — voie pavée principale
+            Self::Secondary => 1.8, // 3.6m total — chemin village (default V2)
+            Self::Trail => 0.8,     // 1.6m total — sentier forestier
+        }
+    }
+
+    /// Zone fade vers herbe (mètres). Les bords du ribbon s'étendent au-delà
+    /// du centre et leur couleur blend vers la teinte herbe → transition
+    /// progressive vs ligne nette.
+    pub fn edge_fade(self) -> f32 {
+        match self {
+            Self::Primary => 0.8,
+            Self::Secondary => 0.6,
+            Self::Trail => 0.4,
         }
     }
 }

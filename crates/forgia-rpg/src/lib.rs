@@ -522,21 +522,24 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
     info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
 }
 
-/// Construit 1 mesh contenant N polylines ribbon distinctes (pas de triangle
-/// inter-polyline → couture coin POI propre vs ancien triangle tordu).
-/// Le Y de chaque vertex left/right est échantillonné séparément depuis
-/// `heightmap_at` → le ribbon **s'incline sur la pente** dans toutes les
-/// directions (gauche-droite ET le long du chemin). compute_normals() est
-/// utilisé pour avoir l'éclairage correct sur les portions inclinées.
+/// Construit 1 mesh contenant N polylines ribbon distinctes avec **4 vertex par
+/// sample** : outer_left / inner_left / inner_right / outer_right. Les outer
+/// vertices fondent vers la couleur herbe pour une transition douce 1m vs ligne
+/// nette. Y per-vertex via `heightmap_at` + léger bruit (-0.06..+0.02m) →
+/// ornières usées. compute_normals() pour éclairage correct sur les pentes.
 fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -> Mesh {
     use bevy::asset::RenderAssetUsages;
     use bevy::mesh::{Indices, PrimitiveTopology};
 
+    // Couleurs cibles : dirt foncé (centre) vs herbe (bord) pour le blend edge.
+    const DIRT_BASE: [f32; 3] = [0.13, 0.09, 0.05];
+    const GRASS_BASE: [f32; 3] = [0.22, 0.32, 0.12];
+
     let total_samples: usize = path_net.polylines.iter().map(|p| p.samples.len()).sum();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_samples * 2);
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_samples * 2);
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_samples * 2);
-    let mut indices: Vec<u32> = Vec::with_capacity(total_samples * 6);
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_samples * 4);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_samples * 4);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_samples * 4);
+    let mut indices: Vec<u32> = Vec::with_capacity(total_samples * 18);
 
     let mut base_vertex: u32 = 0;
     for polyline in &path_net.polylines {
@@ -544,48 +547,82 @@ fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -
         if n < 2 { continue; }
 
         let mut v_dist = 0.0_f32;
-        let mut prev_left: Option<[f32; 3]> = None;
+        let mut prev_center: Option<Vec2> = None;
         for (i, s) in polyline.samples.iter().enumerate() {
             let perp = Vec2::new(-s.tangent.y, s.tangent.x);
             let hw = s.tier.half_width();
-            let left = s.pos - perp * hw;
-            let right = s.pos + perp * hw;
-            // Sample Y séparément aux deux côtés → ribbon s'incline gauche-droite
-            // sur les pentes. + 0.04 m pour éviter z-fight avec le mesh terrain.
-            let y_l = terrain_height_local(left.x, left.y, terrain_cfg) + 0.04;
-            let y_r = terrain_height_local(right.x, right.y, terrain_cfg) + 0.04;
-            let l = [left.x, y_l, left.y];
-            let r = [right.x, y_r, right.y];
+            let ef = s.tier.edge_fade();
+            // 4 positions XZ : outer_l, inner_l, inner_r, outer_r.
+            let p_ol = s.pos - perp * (hw + ef);
+            let p_il = s.pos - perp * hw;
+            let p_ir = s.pos + perp * hw;
+            let p_or = s.pos + perp * (hw + ef);
 
-            if let Some(pl) = prev_left {
-                let dx = l[0] - pl[0];
-                let dy = l[1] - pl[1];
-                let dz = l[2] - pl[2];
-                v_dist += (dx * dx + dy * dy + dz * dz).sqrt();
+            // Y par vertex → tilt slope. + 0.03m anti-z-fight. Centre légèrement
+            // creusé (-0.05) pour faux effet ornière. Outer level = terrain
+            // exact pour fondre dans l'herbe (pas de step visible).
+            let h_or_outer = |p: Vec2| terrain_height_local(p.x, p.y, terrain_cfg) + 0.005;
+            let h_or_inner = |p: Vec2, i: usize| {
+                let n = ((i as u32).wrapping_mul(2_246_822_507) as f32 / u32::MAX as f32) - 0.5;
+                terrain_height_local(p.x, p.y, terrain_cfg) + 0.03 + n * 0.06
+            };
+            let y_ol = h_or_outer(p_ol);
+            let y_il = h_or_inner(p_il, i);
+            let y_ir = h_or_inner(p_ir, i.wrapping_add(7));
+            let y_or = h_or_outer(p_or);
+
+            let center = s.pos;
+            if let Some(pc) = prev_center {
+                v_dist += (center - pc).length();
             }
-            prev_left = Some(l);
+            prev_center = Some(center);
 
-            positions.push(l);
-            positions.push(r);
+            positions.push([p_ol.x, y_ol, p_ol.y]);
+            positions.push([p_il.x, y_il, p_il.y]);
+            positions.push([p_ir.x, y_ir, p_ir.y]);
+            positions.push([p_or.x, y_or, p_or.y]);
+
             uvs.push([0.0, v_dist * 0.5]);
+            uvs.push([0.35, v_dist * 0.5]);
+            uvs.push([0.65, v_dist * 0.5]);
             uvs.push([1.0, v_dist * 0.5]);
-            // Variation déterministe brun foncé (i hashé) → texture dirt.
-            let h = ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.10;
-            colors.push([0.20 + h, 0.13 + h * 0.7, 0.08 + h * 0.5, 1.0]);
-            colors.push([0.20 + h, 0.13 + h * 0.7, 0.08 + h * 0.5, 1.0]);
+
+            // Variation dirt déterministe (i hashé) — texture procédurale.
+            let h = ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.20;
+            let dirt = [
+                (DIRT_BASE[0] + h).min(0.5),
+                (DIRT_BASE[1] + h * 0.7).min(0.4),
+                (DIRT_BASE[2] + h * 0.5).min(0.3),
+                1.0,
+            ];
+            // Outer = blend vers herbe (couleur fondue, vertex_color éclaire le
+            // material WHITE → c'est notre seul moyen sans 2e material).
+            let outer = [
+                GRASS_BASE[0] * 0.7 + dirt[0] * 0.3,
+                GRASS_BASE[1] * 0.7 + dirt[1] * 0.3,
+                GRASS_BASE[2] * 0.7 + dirt[2] * 0.3,
+                1.0,
+            ];
+            colors.push(outer);
+            colors.push(dirt);
+            colors.push(dirt);
+            colors.push(outer);
 
             if i > 0 {
-                let l0 = base_vertex + ((i - 1) * 2) as u32;
-                let r0 = l0 + 1;
-                let l1 = base_vertex + (i * 2) as u32;
-                let r1 = l1 + 1;
-                // CCW vu de DESSUS (+Y) → normale UP → visible depuis le ciel.
-                // `forward × right` = -Y donc winding (l0,l1,r0) faisait face vers
-                // le bas (sol) et était cullé. Swap → (l0,r0,l1) + (r0,r1,l1).
-                indices.extend_from_slice(&[l0, r0, l1, r0, r1, l1]);
+                // 3 bandes : outer-L→inner-L, inner-L→inner-R, inner-R→outer-R.
+                // Chacune = 2 tri (6 indices). Winding CCW vu d'en haut.
+                let base0 = base_vertex + ((i - 1) * 4) as u32;
+                let base1 = base_vertex + (i * 4) as u32;
+                for band in 0..3 {
+                    let a0 = base0 + band as u32;
+                    let b0 = a0 + 1;
+                    let a1 = base1 + band as u32;
+                    let b1 = a1 + 1;
+                    indices.extend_from_slice(&[a0, b0, a1, b0, b1, a1]);
+                }
             }
         }
-        base_vertex += (n * 2) as u32;
+        base_vertex += (n * 4) as u32;
     }
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
@@ -593,7 +630,6 @@ fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(indices));
-    // compute_normals() après les indices → normales par face (pente correcte).
     mesh.compute_normals();
     mesh
 }
