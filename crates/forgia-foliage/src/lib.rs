@@ -154,11 +154,14 @@ fn populate_new_chunks(
 
     for (chunk_entity, coord, lod) in &q_chunks {
         if veg.chunk_entities.contains_key(coord) { continue; }
-        // Vegetation seulement sur les chunks LOD0 (proches du joueur). LOD1+
-        // gardent leur mesh terrain mais sans arbres (économie ~30 % entités).
-        if !matches!(lod.copied().unwrap_or(ChunkLod::Lod0), ChunkLod::Lod0) {
-            continue;
-        }
+        let lod_val = lod.copied().unwrap_or(ChunkLod::Lod0);
+        // Vegetation sur LOD0 (full) + LOD1 (clairsemé ×0.2). LOD2 = pas d'arbres
+        // (mega-tiles plates, distance > 320 m). Pattern AAA mid-distance fade-out.
+        let density_factor = match lod_val {
+            ChunkLod::Lod0 => 1.0_f32,
+            ChunkLod::Lod1 => 0.2,
+            ChunkLod::Lod2 => continue,
+        };
 
         let origin = coord.world_origin();
         let center = coord.world_center();
@@ -166,8 +169,10 @@ fn populate_new_chunks(
         let sample_z = center.z + rpg_offset.z;
         let biome = biome_map.biome_at(sample_x, sample_z);
 
-        let target = biome_max_per_chunk(biome);
-        let spacing = biome_min_spacing(biome);
+        let target = ((biome_max_per_chunk(biome) as f32) * density_factor).round() as usize;
+        // LOD1 : espacement Poisson augmenté pour distribution naturelle (sinon
+        // les ×0.2 premiers points s'agglutinent dans un coin).
+        let spacing = biome_min_spacing(biome) / density_factor.sqrt();
         let seed = derive_chunk_seed(coord, terrain_cfg.seed);
 
         let pts = poisson_disk_sample(
@@ -264,15 +269,16 @@ fn populate_new_chunks(
     }
 }
 
-/// Quand un chunk passe à LOD1 ou LOD2 (loin du joueur), despawn ses arbres
-/// pour libérer entités/CPU. Pattern V1 GTA5 — vegetation = LOD0 only.
+/// Quand un chunk passe en LOD2 (>320 m, mega-tile plate), despawn ses arbres.
+/// LOD0↔LOD1 : on garde les arbres en place (la densité spawned à LOD1 est déjà
+/// clairsemée ×0.2, pas la peine de les re-thinner aux transitions).
 fn despawn_far_lod_vegetation(
     mut commands: Commands,
     mut veg: ResMut<VegetationManager>,
     q_far_chunks: Query<(&ChunkCoord, &ChunkLod), Changed<ChunkLod>>,
 ) {
     for (coord, lod) in &q_far_chunks {
-        if matches!(lod, ChunkLod::Lod0) { continue; }
+        if !matches!(lod, ChunkLod::Lod2) { continue; }
         if let Some(entities) = veg.chunk_entities.remove(coord) {
             let count = entities.len();
             for e in entities {
