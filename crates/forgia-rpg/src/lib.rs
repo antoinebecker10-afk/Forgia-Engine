@@ -24,8 +24,9 @@ use forgia_player::prelude::Player;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{RpgSampleOffset, VegetationTree};
 use forgia_terrain::{
-    build_chunk_mesh, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager, Lod2TileManager,
-    LodSampleOffset, LodStats, MapGenConfig, TerrainConfig, TerrainSharedMaterial,
+    build_chunk_mesh, build_path_network, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
+    Lod2TileManager, LodSampleOffset, LodStats, MapGenConfig, PathNetwork, RoadTier,
+    TerrainConfig, TerrainSharedMaterial,
 };
 use leafwing_input_manager::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -191,6 +192,26 @@ fn spawn_world(
     commands.insert_resource(LodSampleOffset { x: off.x, z: off.y });
     // Marque qu'un teleport joueur doit firer ce cycle Rpg (consommé en Update).
     commands.insert_resource(PendingPlayerTeleport);
+
+    // ── Path network + visual ribbons ────────────────────────────────────
+    // 4 POIs structurels en anneau autour du spawn (16, _, 16). Coords monde
+    // dans le chunk visible [0, 32] × [0, 32]. Bezier warp 0.25 donne des
+    // courbes naturelles vs lignes droites cartoonesques.
+    let pois = vec![
+        Vec2::new(4.0, 4.0),    // NW corner sentier
+        Vec2::new(28.0, 4.0),   // NE
+        Vec2::new(28.0, 28.0),  // SE
+        Vec2::new(4.0, 28.0),   // SW
+    ];
+    let path_net = build_path_network(&pois, RoadTier::Secondary, 0.25);
+    spawn_path_ribbons(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &path_net,
+        &make_terrain_config(),
+    );
+    commands.insert_resource(path_net);
 
     // ── Sun ──────────────────────────────────────────────────────────────
     commands.spawn((
@@ -501,6 +522,63 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
     info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
 }
 
+/// Spawn 1 mesh Cuboid mince par échantillon de la PathNetwork, orienté selon
+/// la tangente, posé à la hauteur du terrain + 0.05 m pour éviter z-fight.
+/// Material brun shared (1 handle, N entities). Tag RpgWorldMarker pour cleanup.
+fn spawn_path_ribbons(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    path_net: &PathNetwork,
+    terrain_cfg: &TerrainConfig,
+) {
+    if path_net.samples.is_empty() { return; }
+
+    // Material chemin = terre tassée brune, mat. 1 instance shared.
+    let road_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.32, 0.22, 0.14),
+        perceptual_roughness: 0.95,
+        ..default()
+    });
+    // Mesh : 1 cuboid par tier (3 tiers max → 3 mesh handles).
+    let mesh_for_tier = |tier: RoadTier, meshes: &mut ResMut<Assets<Mesh>>| {
+        let w = tier.half_width() * 2.0;
+        // Length = SAMPLE_INTERVAL + petit overlap pour cacher les jointures.
+        meshes.add(Cuboid::new(w, 0.04, 3.4))
+    };
+    let primary_mesh = mesh_for_tier(RoadTier::Primary, meshes);
+    let secondary_mesh = mesh_for_tier(RoadTier::Secondary, meshes);
+    let trail_mesh = mesh_for_tier(RoadTier::Trail, meshes);
+
+    for s in &path_net.samples {
+        let mesh = match s.tier {
+            RoadTier::Primary => primary_mesh.clone(),
+            RoadTier::Secondary => secondary_mesh.clone(),
+            RoadTier::Trail => trail_mesh.clone(),
+        };
+        let y = terrain_height_local(s.pos.x, s.pos.y, terrain_cfg) + 0.05;
+        // Yaw orientation : tangent dans le plan XZ → atan2(tg.y, tg.x) avec
+        // y de Vec2 mappé sur z monde. Le Cuboid local long axis = Z.
+        let yaw = s.tangent.y.atan2(s.tangent.x);
+        // Cuboid local long axis = Z donc rotation autour de Y = -yaw pour
+        // aligner Z local sur la direction tangent.
+        let rot = Quat::from_rotation_y(-yaw + std::f32::consts::FRAC_PI_2);
+        commands.spawn((
+            RpgWorldMarker,
+            Mesh3d(mesh),
+            MeshMaterial3d(road_mat.clone()),
+            Transform {
+                translation: Vec3::new(s.pos.x, y, s.pos.y),
+                rotation: rot,
+                scale: Vec3::ONE,
+            },
+            Name::new("PathSegment"),
+        ));
+    }
+
+    info!("[forgia-rpg] Path ribbons spawned : {} segments", path_net.samples.len());
+}
+
 fn cleanup_world(
     mut commands: Commands,
     q: Query<Entity, With<RpgWorldMarker>>,
@@ -520,6 +598,7 @@ fn cleanup_world(
     commands.remove_resource::<TerrainConfig>();
     commands.remove_resource::<RpgSampleOffset>();
     commands.remove_resource::<LodSampleOffset>();
+    commands.remove_resource::<PathNetwork>();
     commands.insert_resource(LodStats::default());
     commands.insert_resource(VegetationManager::default());
     info!(

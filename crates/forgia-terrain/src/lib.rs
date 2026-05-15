@@ -41,6 +41,7 @@ pub use terrain_material::{init_terrain_material, TerrainSharedMaterial};
 pub use lod::{
     ChunkLod, Lod2TileManager, LodSampleOffset, LodStats, LOD0_MAX_M, LOD1_MAX_M, LOD2_MAX_M,
 };
+pub use paths::{build_path_network, PathNetwork, PathSample, RoadTier};
 
 pub mod biome_registry;
 pub mod biome_spec;
