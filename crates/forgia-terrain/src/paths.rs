@@ -22,12 +22,13 @@ pub enum RoadTier {
 }
 
 impl RoadTier {
-    /// Demi-largeur du centre plat de la route (mètres).
+    /// Demi-largeur du centre plat de la route (mètres). Élargi pour le rendu
+    /// V2 (avant : 2.0/1.25/0.6 cartoonesque). Échelle médiévale crédible.
     pub fn half_width(self) -> f32 {
         match self {
-            Self::Primary => 2.0,
-            Self::Secondary => 1.25,
-            Self::Trail => 0.6,
+            Self::Primary => 3.5,
+            Self::Secondary => 2.5,
+            Self::Trail => 1.2,
         }
     }
 }
@@ -41,9 +42,27 @@ pub struct PathSample {
     pub tier: RoadTier,
 }
 
+/// Une polyline = série de samples connectés (1 segment Bezier). Le ribbon
+/// mesh ne triangulera qu'à l'intérieur d'une polyline → aux coins POI où
+/// la tangente flip brutalement, on a deux polylines distinctes plutôt
+/// qu'un triangle tordu.
+#[derive(Default, Clone, Debug)]
+pub struct PathPolyline {
+    pub samples: Vec<PathSample>,
+}
+
 #[derive(Resource, Default, Clone)]
 pub struct PathNetwork {
-    pub samples: Vec<PathSample>,
+    /// Une polyline par segment Bezier (entre 2 POIs).
+    pub polylines: Vec<PathPolyline>,
+}
+
+impl PathNetwork {
+    /// Vue plate de tous les samples — pratique pour les queries de distance
+    /// (foliage anti-spawn, etc.). Order : segment 1 puis segment 2 etc.
+    pub fn samples_iter(&self) -> impl Iterator<Item = &PathSample> {
+        self.polylines.iter().flat_map(|p| p.samples.iter())
+    }
 }
 
 // ─────────────────────────── Génération Bezier ───────────────────────────
@@ -69,10 +88,11 @@ fn bezier_tangent(start: Vec2, control: Vec2, end: Vec2, t: f32) -> Vec2 {
 /// poi[0] → poi[1] → … → poi[n-1] → poi[0]).
 /// `bezier_warp` contrôle l'arc des segments (0 = ligne droite, 0.3 = courbe).
 pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> PathNetwork {
-    let mut samples: Vec<PathSample> = Vec::new();
-    if pois.len() < 2 { return PathNetwork { samples }; }
+    let mut polylines: Vec<PathPolyline> = Vec::new();
+    if pois.len() < 2 { return PathNetwork { polylines }; }
 
     let steps_per_segment = 1 << BEZIER_SUBDIVISIONS; // 16 sub-steps
+    let dt = 1.0 / steps_per_segment as f32;
     for i in 0..pois.len() {
         let start = pois[i];
         let end = pois[(i + 1) % pois.len()];
@@ -82,18 +102,22 @@ pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> Pa
         let seg_len = (end - start).length();
         let control = mid + perp * (seg_len * bezier_warp);
 
+        let mut samples: Vec<PathSample> = Vec::new();
+        // Premier sample : exactement le départ (assure couture polyline propre).
+        samples.push(PathSample {
+            pos: start,
+            tangent: bezier_tangent(start, control, end, 0.0),
+            tier,
+        });
+
         let mut last_pos = start;
         let mut acc_dist = 0.0_f32;
-        let dt = 1.0 / steps_per_segment as f32;
         for step in 1..=steps_per_segment {
             let t = step as f32 / steps_per_segment as f32;
             let pos = bezier_quadratic(start, control, end, t);
             let delta = (pos - last_pos).length();
             if delta < 1e-5 { continue; }
             acc_dist += delta;
-            // Interpolation correcte : si on a dépassé l'intervalle, calculer
-            // précisément où placer le sample (vs ancienne version : tous
-            // samples consécutifs au même `t` → planches qui se chevauchent).
             while acc_dist >= SAMPLE_INTERVAL_M {
                 let overshoot = acc_dist - SAMPLE_INTERVAL_M;
                 let frac_back = (overshoot / delta).clamp(0.0, 1.0);
@@ -105,8 +129,18 @@ pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> Pa
             }
             last_pos = pos;
         }
+        // Dernier sample : exactement l'arrivée.
+        samples.push(PathSample {
+            pos: end,
+            tangent: bezier_tangent(start, control, end, 1.0),
+            tier,
+        });
+
+        if samples.len() >= 2 {
+            polylines.push(PathPolyline { samples });
+        }
     }
-    PathNetwork { samples }
+    PathNetwork { polylines }
 }
 
 #[cfg(test)]
@@ -116,18 +150,19 @@ mod tests {
     #[test]
     fn empty_network_when_too_few_pois() {
         let net = build_path_network(&[Vec2::ZERO], RoadTier::Trail, 0.0);
-        assert!(net.samples.is_empty());
+        assert!(net.polylines.is_empty());
     }
 
     #[test]
-    fn ring_of_two_pois_produces_samples() {
+    fn ring_of_two_pois_produces_polylines() {
         let pois = vec![Vec2::ZERO, Vec2::new(60.0, 0.0)];
         let net = build_path_network(&pois, RoadTier::Secondary, 0.2);
-        assert!(!net.samples.is_empty(), "should produce samples");
-        assert!(net.samples.len() > 20 && net.samples.len() < 60);
-        assert_eq!(net.samples[0].tier, RoadTier::Secondary);
-        let t = net.samples[0].tangent;
-        assert!((t.length() - 1.0).abs() < 0.01);
+        assert_eq!(net.polylines.len(), 2, "ring of 2 POIs = 2 segments");
+        for pl in &net.polylines {
+            assert!(pl.samples.len() >= 5, "polyline should have samples");
+            let t = pl.samples[0].tangent;
+            assert!((t.length() - 1.0).abs() < 0.01);
+        }
     }
 
     #[test]

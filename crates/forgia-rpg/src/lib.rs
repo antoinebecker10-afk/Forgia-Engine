@@ -522,63 +522,76 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
     info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
 }
 
-/// Build 1 mesh "ribbon" continu suivant tous les samples : pour chaque sample,
-/// 2 vertex (gauche, droite) à `pos ± perp * half_width`, hauteur Y suivant le
-/// terrain + 0.04m. Triangles strip entre samples successifs → courbe lisse
-/// plutôt que N planches rectangulaires (réalisme +++).
+/// Construit 1 mesh contenant N polylines ribbon distinctes (pas de triangle
+/// inter-polyline → couture coin POI propre vs ancien triangle tordu).
+/// Le Y de chaque vertex left/right est échantillonné séparément depuis
+/// `heightmap_at` → le ribbon **s'incline sur la pente** dans toutes les
+/// directions (gauche-droite ET le long du chemin). compute_normals() est
+/// utilisé pour avoir l'éclairage correct sur les portions inclinées.
 fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -> Mesh {
     use bevy::asset::RenderAssetUsages;
     use bevy::mesh::{Indices, PrimitiveTopology};
 
-    let n = path_net.samples.len();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(n * 2);
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(n * 2);
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(n * 2);
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(n * 2);
+    let total_samples: usize = path_net.polylines.iter().map(|p| p.samples.len()).sum();
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_samples * 2);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_samples * 2);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_samples * 2);
+    let mut indices: Vec<u32> = Vec::with_capacity(total_samples * 6);
 
-    let mut v_dist = 0.0_f32;
-    for (i, s) in path_net.samples.iter().enumerate() {
-        let perp = Vec2::new(-s.tangent.y, s.tangent.x);
-        let hw = s.tier.half_width();
-        let left = s.pos - perp * hw;
-        let right = s.pos + perp * hw;
-        let y_l = terrain_height_local(left.x, left.y, terrain_cfg) + 0.04;
-        let y_r = terrain_height_local(right.x, right.y, terrain_cfg) + 0.04;
-        positions.push([left.x, y_l, left.y]);
-        positions.push([right.x, y_r, right.y]);
-        normals.push([0.0, 1.0, 0.0]);
-        normals.push([0.0, 1.0, 0.0]);
-        uvs.push([0.0, v_dist * 0.5]);
-        uvs.push([1.0, v_dist * 0.5]);
-        // Variation déterministe brun foncé (i hashé) — dirt usé.
-        let h = ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.10;
-        colors.push([0.20 + h, 0.13 + h * 0.7, 0.08 + h * 0.5, 1.0]);
-        colors.push([0.20 + h, 0.13 + h * 0.7, 0.08 + h * 0.5, 1.0]);
+    let mut base_vertex: u32 = 0;
+    for polyline in &path_net.polylines {
+        let n = polyline.samples.len();
+        if n < 2 { continue; }
 
-        if i > 0 {
-            let prev_left = positions[(i - 1) * 2];
-            let dx = positions[i * 2][0] - prev_left[0];
-            let dz = positions[i * 2][2] - prev_left[2];
-            v_dist += (dx * dx + dz * dz).sqrt();
+        let mut v_dist = 0.0_f32;
+        let mut prev_left: Option<[f32; 3]> = None;
+        for (i, s) in polyline.samples.iter().enumerate() {
+            let perp = Vec2::new(-s.tangent.y, s.tangent.x);
+            let hw = s.tier.half_width();
+            let left = s.pos - perp * hw;
+            let right = s.pos + perp * hw;
+            // Sample Y séparément aux deux côtés → ribbon s'incline gauche-droite
+            // sur les pentes. + 0.04 m pour éviter z-fight avec le mesh terrain.
+            let y_l = terrain_height_local(left.x, left.y, terrain_cfg) + 0.04;
+            let y_r = terrain_height_local(right.x, right.y, terrain_cfg) + 0.04;
+            let l = [left.x, y_l, left.y];
+            let r = [right.x, y_r, right.y];
+
+            if let Some(pl) = prev_left {
+                let dx = l[0] - pl[0];
+                let dy = l[1] - pl[1];
+                let dz = l[2] - pl[2];
+                v_dist += (dx * dx + dy * dy + dz * dz).sqrt();
+            }
+            prev_left = Some(l);
+
+            positions.push(l);
+            positions.push(r);
+            uvs.push([0.0, v_dist * 0.5]);
+            uvs.push([1.0, v_dist * 0.5]);
+            // Variation déterministe brun foncé (i hashé) → texture dirt.
+            let h = ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.10;
+            colors.push([0.20 + h, 0.13 + h * 0.7, 0.08 + h * 0.5, 1.0]);
+            colors.push([0.20 + h, 0.13 + h * 0.7, 0.08 + h * 0.5, 1.0]);
+
+            if i > 0 {
+                let l0 = base_vertex + ((i - 1) * 2) as u32;
+                let r0 = l0 + 1;
+                let l1 = base_vertex + (i * 2) as u32;
+                let r1 = l1 + 1;
+                indices.extend_from_slice(&[l0, l1, r0, r0, l1, r1]);
+            }
         }
-    }
-
-    let mut indices: Vec<u32> = Vec::with_capacity((n - 1) * 6);
-    for i in 0..(n - 1) {
-        let l0 = (i * 2) as u32;
-        let r0 = l0 + 1;
-        let l1 = ((i + 1) * 2) as u32;
-        let r1 = l1 + 1;
-        // 2 tri par quad : (l0, l1, r0) + (r0, l1, r1) ordre CCW vu de dessus.
-        indices.extend_from_slice(&[l0, l1, r0, r0, l1, r1]);
+        base_vertex += (n * 2) as u32;
     }
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(indices));
+    // compute_normals() après les indices → normales par face (pente correcte).
+    mesh.compute_normals();
     mesh
 }
 
@@ -590,7 +603,7 @@ fn spawn_path_ribbons(
     path_net: &PathNetwork,
     terrain_cfg: &TerrainConfig,
 ) {
-    if path_net.samples.len() < 2 { return; }
+    if path_net.polylines.is_empty() { return; }
 
     let mesh = build_path_ribbon_mesh(path_net, terrain_cfg);
     let mesh_handle = meshes.add(mesh);
@@ -610,7 +623,11 @@ fn spawn_path_ribbons(
         Name::new("PathRibbon"),
     ));
 
-    info!("[forgia-rpg] Path ribbon spawned : 1 mesh, {} samples", path_net.samples.len());
+    let total: usize = path_net.polylines.iter().map(|p| p.samples.len()).sum();
+    info!(
+        "[forgia-rpg] Path ribbon spawned : {} polylines, {} samples total",
+        path_net.polylines.len(), total
+    );
 }
 
 fn cleanup_world(

@@ -232,11 +232,11 @@ fn populate_new_chunks(
             if h < terrain_cfg.sea_level + 0.3 { continue; }
 
             // Skip si trop proche d'un PathSample (sentier dégagé). Buffer =
-            // road half_width + 1.2m extra pour respiration visuelle.
+            // road half_width + 3m extra pour clairière nette autour du chemin.
             if let Some(ref pn) = path_net {
                 let p = Vec2::new(wx, wz);
-                let too_close = pn.samples.iter().any(|s| {
-                    let buf = s.tier.half_width() + 1.2;
+                let too_close = pn.samples_iter().any(|s| {
+                    let buf = s.tier.half_width() + 3.0;
                     p.distance_squared(s.pos) < buf * buf
                 });
                 if too_close { continue; }
