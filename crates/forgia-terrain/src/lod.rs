@@ -22,13 +22,19 @@ use crate::chunk::{ChunkManager, CHUNK_X};
 
 pub const LOD0_MAX_M: f32 = 96.0;
 pub const LOD1_MAX_M: f32 = 320.0;
-pub const LOD2_MAX_M: f32 = 700.0;
+/// Vision lointaine. V1 = 700m (sea_level=20). V2 étendu à 1500m vu que les
+/// mega-tiles sont quasi-gratuites (1 plane unlit par cluster 128m).
+pub const LOD2_MAX_M: f32 = 1500.0;
 pub const LOD_HYSTERESIS_M: f32 = 16.0;
 
 const CLUSTER_CHUNKS: i32 = 4;
 const CHUNK_SIZE_M: f32 = CHUNK_X as f32;
 const CLUSTER_SIZE_M: f32 = CLUSTER_CHUNKS as f32 * CHUNK_SIZE_M;
-const LOD2_Y_OFFSET: f32 = -2.0;
+/// V1 = -2.0 (sea_level=20, tiles sunk sous le terrain low). V2 sea_level=4
+/// avec heights 2-28 → tile à -2 cachée. Y=8 = entre sea_level et mid-range,
+/// couvre les plats, sommets ressortent, pas de z-fight (LOD1 termine 320m
+/// loin de la tile à 320-1500m).
+const LOD2_Y_OFFSET: f32 = 8.0;
 
 // ─────────────────────────── ChunkLod (Component) ───────────────────────────
 

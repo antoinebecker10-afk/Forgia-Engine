@@ -195,9 +195,20 @@ fn populate_new_chunks(
             .canopy_mats
             .entry(biome as u8)
             .or_insert_with(|| {
+                // Boost ×1.8 + roughness 0.65 + léger emissive : sans ces fixes
+                // la sphère canopy reçoit toutes les ombres et apparaît noire
+                // au sunset (couleurs biome déjà sombres × 0 IBL × roughness 0.9).
+                let lin = canopy_color.to_linear();
+                let boosted = Color::linear_rgb(
+                    (lin.red * 1.8).min(1.0),
+                    (lin.green * 1.8).min(1.0),
+                    (lin.blue * 1.8).min(1.0),
+                );
+                let emiss = Color::linear_rgb(lin.red * 0.25, lin.green * 0.25, lin.blue * 0.25);
                 materials.add(StandardMaterial {
-                    base_color: canopy_color,
-                    perceptual_roughness: 0.92,
+                    base_color: boosted,
+                    emissive: emiss.to_linear(),
+                    perceptual_roughness: 0.65,
                     ..default()
                 })
             })
