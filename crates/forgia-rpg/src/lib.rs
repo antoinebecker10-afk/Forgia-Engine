@@ -208,6 +208,7 @@ fn spawn_world(
         &mut commands,
         &mut meshes,
         &mut materials,
+        &asset_server,
         &path_net,
         &make_terrain_config(),
     );
@@ -634,11 +635,12 @@ fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -
     mesh
 }
 
-/// Spawn le ribbon continu (1 entity) + material dirt + NotShadowCaster.
+/// Spawn le ribbon continu (1 entity) + material PBR dirt + NotShadowCaster.
 fn spawn_path_ribbons(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    asset_server: &Res<AssetServer>,
     path_net: &PathNetwork,
     terrain_cfg: &TerrainConfig,
 ) {
@@ -646,10 +648,21 @@ fn spawn_path_ribbons(
 
     let mesh = build_path_ribbon_mesh(path_net, terrain_cfg);
     let mesh_handle = meshes.add(mesh);
-    // base_color blanc → la teinte vient des vertex_colors variation per-sample.
+
+    // V1 path PBR pack via junction textures-v1/. Diff (albedo) + normal +
+    // roughness JPG → vrai dirt path crédible (vs vertex colors aplats).
+    // vertex_color reste actif comme MULTIPLICATEUR (full dirt au centre,
+    // blend grass tint sur les outer pour fade naturel bord/herbe).
+    let diff: Handle<Image> = asset_server.load("textures-v1/terrain/path/diff.jpg");
+    let normal: Handle<Image> = asset_server.load("textures-v1/terrain/path/normal.jpg");
+    let rough: Handle<Image> = asset_server.load("textures-v1/terrain/path/roughness.jpg");
+
     let road_mat = materials.add(StandardMaterial {
         base_color: Color::WHITE,
-        perceptual_roughness: 0.98,
+        base_color_texture: Some(diff),
+        normal_map_texture: Some(normal),
+        metallic_roughness_texture: Some(rough),
+        perceptual_roughness: 0.95,
         reflectance: 0.02,
         ..default()
     });
