@@ -21,3 +21,6 @@ toml = { workspace = true }
 thiserror = { workspace = true }
 zstd = { workspace = true }
 forgia-core = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

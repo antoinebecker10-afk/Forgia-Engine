@@ -25,16 +25,19 @@ mod erosion;
 mod droplet;
 mod caves;
 mod heightmap;
-mod chunk_sdf;
+// W1 — chunk_sdf désactivé : pipeline voxel/SDF non utilisé en heightmap-grid path.
+// Réactiver quand pipeline_diag.rs sera porté V1 (story-future).
+// mod chunk_sdf;
 mod island_mask;
 
 // Re-export API publique du split (callers externes : forgia-game + siblings).
 pub use droplet::HydroErosionParams;
 pub use caves::{carve_cave_worms, carve_village_caves, CaveWormParams};
 pub use island_mask::{island_mask_at, IslandMaskParams};
-pub(crate) use caves::carve_sphere; // used by cave_network.rs (sibling)
+#[allow(unused_imports)]
+pub(crate) use caves::carve_sphere; // used by cave_network.rs full V1 port (dormant W1)
 pub use heightmap::{heightmap_at, heightmap_at_gen, heightmap_at_gen_ext, heightmap_at_gen_ext_fast, procedural_sdf_at};
-pub use chunk_sdf::{generate_chunk, generate_chunk_lod, generate_initial_chunks, GenDetail};
+// pub use chunk_sdf::{generate_chunk, generate_chunk_lod, generate_initial_chunks, GenDetail};
 
 // ─────────────────────────── Noise Layer System ───────────────────────────
 

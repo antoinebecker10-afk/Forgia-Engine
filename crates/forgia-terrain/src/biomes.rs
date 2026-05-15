@@ -7,7 +7,7 @@ use crate::worldmap::WorldMapIntent;
 
 // ─────────────────────────── Biome Types ───────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum BiomeType {
     Plains   = 0,
