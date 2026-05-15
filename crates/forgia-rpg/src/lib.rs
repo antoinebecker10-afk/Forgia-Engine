@@ -24,8 +24,8 @@ use forgia_player::prelude::Player;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{RpgSampleOffset, VegetationTree};
 use forgia_terrain::{
-    build_chunk_mesh, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
-    MapGenConfig, TerrainConfig, TerrainSharedMaterial,
+    build_chunk_mesh, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager, Lod2TileManager,
+    LodSampleOffset, LodStats, MapGenConfig, TerrainConfig, TerrainSharedMaterial,
 };
 use leafwing_input_manager::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -59,10 +59,12 @@ const RPG_SEED: u32 = 1337;
 const RPG_SEA_LEVEL: f32 = 4.0;
 const RPG_MAX_HEIGHT: f32 = 28.0;
 
-/// W2 — rayon de streaming Manhattan autour du joueur (chunks 32×32m → 256m).
-const RENDER_DIST: i32 = 4;
-/// W2 — chunks max meshés par frame (anti-freeze démarrage).
-const CHUNKS_PER_FRAME: usize = 2;
+/// Rayon Manhattan de streaming chunks. Cible la couverture LOD1 (320m) :
+/// ceil(LOD1_MAX_M / CHUNK_X) = 10. Au-delà : LOD2 mega-tiles, pas de chunk.
+const RENDER_DIST: i32 = 10;
+/// Chunks max meshés par frame (anti-freeze démarrage). 4 pour atteindre la
+/// pleine ring LOD1 en ~1s (221 chunks Manhattan disk).
+const CHUNKS_PER_FRAME: usize = 4;
 /// W2 — intervalle d'export sensor JSON (secondes).
 const SENSOR_INTERVAL_S: f32 = 1.0;
 
@@ -182,9 +184,11 @@ fn spawn_world(
     commands.insert_resource(map_cfg);
     commands.insert_resource(biome_map);
     commands.insert_resource(chunk_mgr);
-    // forgia-foliage : aligne ses samples (heightmap + biome) avec notre décalage RPG.
+    // forgia-foliage + forgia-terrain LOD : aligne les samples (heightmap + biome)
+    // avec notre décalage RPG (sample_offset = map_size/2).
     let off = sample_offset();
     commands.insert_resource(RpgSampleOffset { x: off.x, z: off.y });
+    commands.insert_resource(LodSampleOffset { x: off.x, z: off.y });
     // Marque qu'un teleport joueur doit firer ce cycle Rpg (consommé en Update).
     commands.insert_resource(PendingPlayerTeleport);
 
@@ -501,21 +505,25 @@ fn cleanup_world(
     mut commands: Commands,
     q: Query<Entity, With<RpgWorldMarker>>,
     trees: Query<Entity, With<VegetationTree>>,
+    mut lod2_mgr: ResMut<Lod2TileManager>,
 ) {
     let count = q.iter().count();
     for e in &q { commands.entity(e).despawn(); }
     let tree_count = trees.iter().count();
     for e in &trees { commands.entity(e).despawn(); }
+    // LOD2 mega-tiles : despawn explicite (entités non taggées RpgWorldMarker).
+    lod2_mgr.despawn_all(&mut commands);
     // Resources terrain — TerrainSharedMaterial conservé (réutilisable session suivante).
     commands.remove_resource::<ChunkManager>();
     commands.remove_resource::<BiomeMap>();
     commands.remove_resource::<MapGenConfig>();
     commands.remove_resource::<TerrainConfig>();
     commands.remove_resource::<RpgSampleOffset>();
-    // Reset VegetationManager pour la session suivante (handles partagés conservés).
+    commands.remove_resource::<LodSampleOffset>();
+    commands.insert_resource(LodStats::default());
     commands.insert_resource(VegetationManager::default());
     info!(
-        "[forgia-rpg] World cleaned : {} entities + {} trees despawned + resources reset",
+        "[forgia-rpg] World cleaned : {} entities + {} trees + LOD2 tiles despawned",
         count, tree_count,
     );
 }

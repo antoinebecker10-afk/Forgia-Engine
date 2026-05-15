@@ -38,6 +38,9 @@ pub use map_gen_config::{BiomeMode, MapGenConfig, preset_island, preset_forgia_s
 pub use generation::heightmap_at;
 pub use meshing_heightmap::{build_chunk_mesh, spawn_chunk_entity, ChunkMeshData, VERTS_PER_AXIS};
 pub use terrain_material::{init_terrain_material, TerrainSharedMaterial};
+pub use lod::{
+    ChunkLod, Lod2TileManager, LodSampleOffset, LodStats, LOD0_MAX_M, LOD1_MAX_M, LOD2_MAX_M,
+};
 
 pub mod biome_registry;
 pub mod biome_spec;
@@ -57,6 +60,8 @@ pub mod worldmap;
 // W1 — heightmap-grid mesher (industry-standard RPG) + minimal PBR material.
 pub mod meshing_heightmap;
 pub mod terrain_material;
+// W5 — LOD 3-niveaux GTA5 style (chunks + mega-tiles).
+pub mod lod;
 
 pub mod prelude {
     pub use crate::{
@@ -70,19 +75,20 @@ pub struct ForgiaTerrainPlugin;
 
 impl Plugin for ForgiaTerrainPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, terrain_material::init_terrain_material)
+        app.init_resource::<lod::LodStats>()
+            .init_resource::<lod::Lod2TileManager>()
+            .add_systems(Startup, terrain_material::init_terrain_material)
             .add_systems(
                 Update,
-                terrain_tick
+                (
+                    lod::update_chunk_lod,
+                    lod::build_lod2_tiles_system,
+                    lod::export_lod_sensor_system,
+                )
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
             );
     }
-}
-
-fn terrain_tick() {
-    // W1 : no-op (1 chunk spawné OnEnter Rpg côté forgia-rpg).
-    // W2 : streaming N chunks autour joueur (poll + spawn/unload).
 }
 
 #[cfg(test)]

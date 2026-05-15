@@ -19,8 +19,8 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
 use forgia_terrain::{
-    sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, TerrainConfig, CHUNK_X,
-    CHUNK_Z,
+    sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, TerrainConfig,
+    CHUNK_X, CHUNK_Z,
 };
 use std::collections::HashMap;
 
@@ -104,6 +104,7 @@ impl Plugin for ForgiaFoliagePlugin {
                 Update,
                 (
                     populate_new_chunks,
+                    despawn_far_lod_vegetation,
                     despawn_unloaded_chunks,
                     write_vegetation_sensor,
                 )
@@ -136,7 +137,7 @@ fn populate_new_chunks(
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
-    q_chunks: Query<(Entity, &ChunkCoord)>,
+    q_chunks: Query<(Entity, &ChunkCoord, Option<&ChunkLod>)>,
 ) {
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
         (biome_map, terrain_cfg, rpg_offset) else { return };
@@ -151,8 +152,13 @@ fn populate_new_chunks(
     let trunk_mesh = veg.trunk_mesh.clone().unwrap();
     let canopy_mesh = veg.canopy_mesh.clone().unwrap();
 
-    for (chunk_entity, coord) in &q_chunks {
+    for (chunk_entity, coord, lod) in &q_chunks {
         if veg.chunk_entities.contains_key(coord) { continue; }
+        // Vegetation seulement sur les chunks LOD0 (proches du joueur). LOD1+
+        // gardent leur mesh terrain mais sans arbres (économie ~30 % entités).
+        if !matches!(lod.copied().unwrap_or(ChunkLod::Lod0), ChunkLod::Lod0) {
+            continue;
+        }
 
         let origin = coord.world_origin();
         let center = coord.world_center();
@@ -244,6 +250,25 @@ fn populate_new_chunks(
         // l'entité chunk qui propage le despawn aux enfants Bevy. On utilise donc
         // `add_children` (Bevy 0.18 hierarchy) plutôt qu'un Resource opaque.
         let _ = chunk_entity; // évite warn unused (lifecycle géré côté despawn_unloaded_chunks)
+    }
+}
+
+/// Quand un chunk passe à LOD1 ou LOD2 (loin du joueur), despawn ses arbres
+/// pour libérer entités/CPU. Pattern V1 GTA5 — vegetation = LOD0 only.
+fn despawn_far_lod_vegetation(
+    mut commands: Commands,
+    mut veg: ResMut<VegetationManager>,
+    q_far_chunks: Query<(&ChunkCoord, &ChunkLod), Changed<ChunkLod>>,
+) {
+    for (coord, lod) in &q_far_chunks {
+        if matches!(lod, ChunkLod::Lod0) { continue; }
+        if let Some(entities) = veg.chunk_entities.remove(coord) {
+            let count = entities.len();
+            for e in entities {
+                if let Ok(mut ec) = commands.get_entity(e) { ec.despawn(); }
+            }
+            veg.total_trees = veg.total_trees.saturating_sub(count);
+        }
     }
 }
 
