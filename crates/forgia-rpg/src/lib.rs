@@ -579,7 +579,10 @@ fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -
                 let r0 = l0 + 1;
                 let l1 = base_vertex + (i * 2) as u32;
                 let r1 = l1 + 1;
-                indices.extend_from_slice(&[l0, l1, r0, r0, l1, r1]);
+                // CCW vu de DESSUS (+Y) → normale UP → visible depuis le ciel.
+                // `forward × right` = -Y donc winding (l0,l1,r0) faisait face vers
+                // le bas (sol) et était cullé. Swap → (l0,r0,l1) + (r0,r1,l1).
+                indices.extend_from_slice(&[l0, r0, l1, r0, r1, l1]);
             }
         }
         base_vertex += (n * 2) as u32;
