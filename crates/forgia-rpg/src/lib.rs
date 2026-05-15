@@ -185,6 +185,8 @@ fn spawn_world(
     // forgia-foliage : aligne ses samples (heightmap + biome) avec notre décalage RPG.
     let off = sample_offset();
     commands.insert_resource(RpgSampleOffset { x: off.x, z: off.y });
+    // Marque qu'un teleport joueur doit firer ce cycle Rpg (consommé en Update).
+    commands.insert_resource(PendingPlayerTeleport);
 
     // ── Sun ──────────────────────────────────────────────────────────────
     commands.spawn((
@@ -381,16 +383,21 @@ fn write_chunks_sensor(
     let _ = std::fs::write("forgia_chunks_snapshot.json", json);
 }
 
-/// Once-per-session : snap the player above the procedural terrain.
-/// Le player est spawn par forgia-player à (0,2,0) AVANT que `forgia-rpg`
-/// pose son chunk → on attend que `TerrainConfig` soit présent puis on
-/// téléporte le joueur sur la surface échantillonnée.
+/// Marqueur Resource posée OnEnter(Rpg), consommée par `teleport_player_to_terrain`
+/// dès qu'il a vraiment téléporté le joueur (présence Player + TerrainConfig).
+/// Garantit que la téléportation fire à CHAQUE entrée Rpg (vs Local<bool> qui
+/// persistait à travers les state transitions → joueur restait à (0,2,0) en
+/// dessous du terrain h=15+, fall through).
+#[derive(Resource)]
+struct PendingPlayerTeleport;
+
 fn teleport_player_to_terrain(
+    mut commands: Commands,
+    pending: Option<Res<PendingPlayerTeleport>>,
     cfg: Option<Res<TerrainConfig>>,
     mut q: Query<&mut Transform, With<Player>>,
-    mut done: Local<bool>,
 ) {
-    if *done { return; }
+    if pending.is_none() { return; }
     let Some(cfg) = cfg else { return };
     let Ok(mut tf) = q.single_mut() else { return };
     // Pose le joueur à world (16, h+2, 16) — milieu du chunk (0,0).
@@ -398,7 +405,7 @@ fn teleport_player_to_terrain(
     let target_z = 16.0_f32;
     let h = terrain_height_local(target_x, target_z, &cfg);
     tf.translation = Vec3::new(target_x, h + 2.0, target_z);
-    *done = true;
+    commands.remove_resource::<PendingPlayerTeleport>();
     info!("[forgia-rpg] Player teleported to terrain surface (h={:.2})", h);
 }
 

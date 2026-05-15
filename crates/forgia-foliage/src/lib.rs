@@ -121,23 +121,35 @@ fn init_proc_meshes(mut veg: ResMut<VegetationManager>, mut meshes: ResMut<Asset
     veg.canopy_mesh = Some(meshes.add(Sphere::new(1.4)));
 }
 
-/// Detect chunks Added depuis la frame précédente et spawn vegetation seedée
-/// depuis le `ChunkCoord` (déterministe par chunk).
+/// Pour chaque chunk présent qui n'a pas encore reçu de vegetation, échantillonne
+/// N positions par Poisson disk et spawn arbres procéduraux. On NE dépend PAS de
+/// `Added<ChunkCoord>` (timing fragile entre systèmes streamer/foliage dans des
+/// plugins différents) — on filtre par contains_key sur le tracking interne.
+///
+/// Si trunk/canopy meshes pas encore initialisés (cleanup OnExit a remplacé la
+/// Resource par défaut), on les ré-initialise lazily.
 fn populate_new_chunks(
     mut commands: Commands,
     mut veg: ResMut<VegetationManager>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
-    q_chunks: Query<(Entity, &ChunkCoord), Added<ChunkCoord>>,
+    q_chunks: Query<(Entity, &ChunkCoord)>,
 ) {
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
         (biome_map, terrain_cfg, rpg_offset) else { return };
 
-    let trunk_mesh = veg.trunk_mesh.clone();
-    let canopy_mesh = veg.canopy_mesh.clone();
-    let (Some(trunk_mesh), Some(canopy_mesh)) = (trunk_mesh, canopy_mesh) else { return };
+    // Lazy init des meshes procéduraux (idempotent, survit aux resets OnExit).
+    if veg.trunk_mesh.is_none() {
+        veg.trunk_mesh = Some(meshes.add(Cylinder::new(0.15, 2.5)));
+    }
+    if veg.canopy_mesh.is_none() {
+        veg.canopy_mesh = Some(meshes.add(Sphere::new(1.4)));
+    }
+    let trunk_mesh = veg.trunk_mesh.clone().unwrap();
+    let canopy_mesh = veg.canopy_mesh.clone().unwrap();
 
     for (chunk_entity, coord) in &q_chunks {
         if veg.chunk_entities.contains_key(coord) { continue; }
