@@ -78,6 +78,34 @@ fn biome_tree_colors(biome: BiomeType) -> (Color, Color) {
 #[derive(Component)]
 pub struct VegetationTree;
 
+/// 3 variants d'arbre : standard / tall_thin (pin) / wide_low (broussailleux).
+/// `TreeVariant::PARAMS` donne (trunk_radius, trunk_h, canopy_radius, canopy_y).
+#[derive(Clone, Copy, Debug)]
+pub enum TreeVariant {
+    Standard = 0,
+    TallThin = 1,
+    WideLow = 2,
+}
+
+impl TreeVariant {
+    pub const COUNT: usize = 3;
+    /// (trunk_radius, trunk_half_height, canopy_radius, canopy_local_y)
+    pub fn params(self) -> (f32, f32, f32, f32) {
+        match self {
+            Self::Standard => (0.15, 1.25, 1.4, 1.6),
+            Self::TallThin => (0.12, 2.0, 1.0, 2.3),  // pin élancé
+            Self::WideLow  => (0.22, 0.9, 1.8, 1.1),  // touffu bas
+        }
+    }
+    pub fn from_index(i: usize) -> Self {
+        match i % Self::COUNT {
+            0 => Self::Standard,
+            1 => Self::TallThin,
+            _ => Self::WideLow,
+        }
+    }
+}
+
 #[derive(Resource, Default)]
 pub struct VegetationManager {
     /// Tracking pour despawn ciblé quand un chunk est déchargé.
@@ -86,9 +114,9 @@ pub struct VegetationManager {
     pub total_trees: usize,
     /// Distribution par biome (sensor).
     pub per_biome: HashMap<&'static str, usize>,
-    /// Caches mesh procéduraux (tronc + canopée, partagés tous arbres).
-    pub trunk_mesh: Option<Handle<Mesh>>,
-    pub canopy_mesh: Option<Handle<Mesh>>,
+    /// Caches mesh procéduraux par variant (3 troncs + 3 canopées, shared).
+    pub trunk_meshes: [Option<Handle<Mesh>>; TreeVariant::COUNT],
+    pub canopy_meshes: [Option<Handle<Mesh>>; TreeVariant::COUNT],
     /// Caches material par biome (1 tronc + 1 canopée / biome).
     pub trunk_mats: HashMap<u8, Handle<StandardMaterial>>,
     pub canopy_mats: HashMap<u8, Handle<StandardMaterial>>,
@@ -116,10 +144,11 @@ impl Plugin for ForgiaFoliagePlugin {
 }
 
 fn init_proc_meshes(mut veg: ResMut<VegetationManager>, mut meshes: ResMut<Assets<Mesh>>) {
-    // Tronc cylindre 0.3m diamètre × 2.5m haut.
-    veg.trunk_mesh = Some(meshes.add(Cylinder::new(0.15, 2.5)));
-    // Canopée sphère 1.4m diamètre.
-    veg.canopy_mesh = Some(meshes.add(Sphere::new(1.4)));
+    for i in 0..TreeVariant::COUNT {
+        let (tr, th, cr, _cy) = TreeVariant::from_index(i).params();
+        veg.trunk_meshes[i] = Some(meshes.add(Cylinder::new(tr, th * 2.0)));
+        veg.canopy_meshes[i] = Some(meshes.add(Sphere::new(cr)));
+    }
 }
 
 /// Pour chaque chunk présent qui n'a pas encore reçu de vegetation, échantillonne
@@ -143,15 +172,17 @@ fn populate_new_chunks(
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
         (biome_map, terrain_cfg, rpg_offset) else { return };
 
-    // Lazy init des meshes procéduraux (idempotent, survit aux resets OnExit).
-    if veg.trunk_mesh.is_none() {
-        veg.trunk_mesh = Some(meshes.add(Cylinder::new(0.15, 2.5)));
+    // Lazy init des 3 variants mesh (idempotent, survit aux resets OnExit).
+    for vi in 0..TreeVariant::COUNT {
+        if veg.trunk_meshes[vi].is_none() {
+            let (tr, th, _, _) = TreeVariant::from_index(vi).params();
+            veg.trunk_meshes[vi] = Some(meshes.add(Cylinder::new(tr, th * 2.0)));
+        }
+        if veg.canopy_meshes[vi].is_none() {
+            let (_, _, cr, _) = TreeVariant::from_index(vi).params();
+            veg.canopy_meshes[vi] = Some(meshes.add(Sphere::new(cr)));
+        }
     }
-    if veg.canopy_mesh.is_none() {
-        veg.canopy_mesh = Some(meshes.add(Sphere::new(1.4)));
-    }
-    let trunk_mesh = veg.trunk_mesh.clone().unwrap();
-    let canopy_mesh = veg.canopy_mesh.clone().unwrap();
 
     for (chunk_entity, coord, lod) in &q_chunks {
         if veg.chunk_entities.contains_key(coord) { continue; }
@@ -246,21 +277,32 @@ fn populate_new_chunks(
             let scale = 0.85 + ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.45;
 
             // Tronc + canopée parent-enfant pour atomic transform.
+            // Variant déterministe par hash (i + chunk coord), 3 silhouettes
+            // distinctes par biome → forêts moins répétitives.
+            let variant_idx = ((i as u32)
+                .wrapping_add((coord.x as u32).wrapping_mul(31))
+                .wrapping_add((coord.z as u32).wrapping_mul(17)) as usize)
+                % TreeVariant::COUNT;
+            let variant = TreeVariant::from_index(variant_idx);
+            let (_, trunk_half_h, _, canopy_y) = variant.params();
+            let trunk_mesh = veg.trunk_meshes[variant_idx].clone().unwrap();
+            let canopy_mesh = veg.canopy_meshes[variant_idx].clone().unwrap();
+
             let trunk_entity = commands
                 .spawn((
-                    Mesh3d(trunk_mesh.clone()),
+                    Mesh3d(trunk_mesh),
                     MeshMaterial3d(trunk_mat.clone()),
-                    Transform::from_xyz(wx, h + 1.25 * scale, wz).with_scale(Vec3::splat(scale)),
+                    Transform::from_xyz(wx, h + trunk_half_h * scale, wz).with_scale(Vec3::splat(scale)),
                     RigidBody::Fixed,
-                    Collider::cylinder(1.25 * scale, 0.18 * scale),
+                    Collider::cylinder(trunk_half_h * scale, 0.18 * scale),
                     VegetationTree,
-                    Name::new(format!("Tree_{:?}_{}_{}_{i}", biome, coord.x, coord.z)),
+                    Name::new(format!("Tree_{:?}_{:?}_{}_{}_{i}", biome, variant, coord.x, coord.z)),
                 ))
                 .with_children(|p| {
                     p.spawn((
-                        Mesh3d(canopy_mesh.clone()),
+                        Mesh3d(canopy_mesh),
                         MeshMaterial3d(canopy_mat.clone()),
-                        Transform::from_xyz(0.0, 1.6, 0.0),
+                        Transform::from_xyz(0.0, canopy_y, 0.0),
                     ));
                 })
                 .id();
