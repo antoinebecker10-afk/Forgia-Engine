@@ -26,8 +26,12 @@
 
 use bevy::prelude::*;
 use forgia_terrain::BiomeType;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// Chemin du manifest TOML versionnable. Généré au 1er boot, lu ensuite.
+const REGISTRY_TOML_PATH: &str = "assets/asset_registry.toml";
 
 pub mod prelude {
     pub use crate::{
@@ -38,7 +42,7 @@ pub mod prelude {
 
 // ─────────────────────────── Tag enums ───────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AssetCategory {
     Tree,
     Bush,
@@ -49,14 +53,14 @@ pub enum AssetCategory {
     Other,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AssetSeason {
     Default, // été/printemps neutre
     Autumn,
     Winter,  // = snow
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BiomeCompat {
     Any,
     Desert,
@@ -67,7 +71,7 @@ pub enum BiomeCompat {
 
 // ─────────────────────────── AssetEntry ───────────────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetEntry {
     /// Chemin asset relatif au workspace (utilisable par `asset_server.load`).
     pub path: String,
@@ -75,7 +79,23 @@ pub struct AssetEntry {
     pub category: AssetCategory,
     pub season: AssetSeason,
     pub biome_compat: BiomeCompat,
+    #[serde(default)]
     pub is_dead: bool,
+    /// `true` si le GLB pointé par `path` est introuvable sur disque. Skippé
+    /// par `query()`. Permet de conserver l'entry dans le TOML pour history /
+    /// résurrection si l'asset revient.
+    #[serde(default)]
+    pub missing: bool,
+    /// `true` si l'utilisateur veut désactiver temporairement cet asset sans
+    /// le supprimer (ex : tester un visuel sans les arbres morts).
+    #[serde(default)]
+    pub disabled: bool,
+}
+
+/// Wrapper TOML — array `[[asset]]` au top-level.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct RegistryToml {
+    asset: Vec<AssetEntry>,
 }
 
 // ─────────────────────────── Query ───────────────────────────
@@ -120,6 +140,7 @@ impl AssetRegistry {
         let biome_compat = q.biome.map(biome_to_compat);
         self.entries
             .iter()
+            .filter(|e| !e.missing && !e.disabled) // skip disabled/missing
             .filter(|e| q.category.is_none_or(|c| e.category == c))
             .filter(|e| q.season.is_none_or(|s| e.season == s))
             .filter(|e| {
@@ -193,6 +214,8 @@ fn tag_from_filename(stem: &str) -> AssetEntry {
         season,
         biome_compat,
         is_dead,
+        missing: false,
+        disabled: false,
     }
 }
 
@@ -233,34 +256,144 @@ pub struct ForgiaAssetRegistryPlugin;
 impl Plugin for ForgiaAssetRegistryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AssetRegistry>()
-            .add_systems(Startup, populate_registry);
+            .add_systems(Startup, populate_registry)
+            .add_systems(Update, hot_reload_input);
     }
 }
 
+/// Charge le TOML manifest s'il existe, sinon scan + write au 1er boot.
+/// Détecte les nouveaux GLBs (présents sur disque, absents du TOML) → ajoutés.
+/// Détecte les entries fantômes (présentes au TOML, GLB disparu) → marquées
+/// `missing = true` (skippées par query, mais conservées pour history/restore).
 fn populate_registry(mut registry: ResMut<AssetRegistry>) {
-    // Scan le dossier nature V1 via la junction V2 `assets/models-v1/`.
+    let mut entries = match load_toml() {
+        Some(loaded) => {
+            info!("[asset-registry] Loaded {} entries from {REGISTRY_TOML_PATH}", loaded.len());
+            loaded
+        }
+        None => {
+            info!("[asset-registry] No TOML manifest → first-boot scan");
+            let scanned = scan_nature_root();
+            // Écriture initiale du TOML pour que l'user puisse l'éditer.
+            if !scanned.is_empty() {
+                if let Err(e) = save_toml(&scanned) {
+                    warn!("[asset-registry] Failed to write initial TOML : {e}");
+                }
+            }
+            scanned
+        }
+    };
+
+    // Réconciliation filesystem ↔ TOML.
+    reconcile_with_filesystem(&mut entries);
+
+    // Stats + sensor.
+    let total = entries.len();
+    let active = entries.iter().filter(|e| !e.missing && !e.disabled).count();
+    let trees = entries.iter().filter(|e| e.category == AssetCategory::Tree && !e.missing).count();
+    let autumn = entries.iter().filter(|e| e.season == AssetSeason::Autumn && !e.missing).count();
+    let snow = entries.iter().filter(|e| e.season == AssetSeason::Winter && !e.missing).count();
+    let dead = entries.iter().filter(|e| e.is_dead).count();
+    let missing = entries.iter().filter(|e| e.missing).count();
+    let disabled = entries.iter().filter(|e| e.disabled).count();
+    info!(
+        "[asset-registry] Active {active}/{total} : {trees} trees ({autumn} autumn, {snow} snow, {dead} dead) | missing={missing} disabled={disabled}"
+    );
+
+    let json = format!(
+        "{{\"total\":{total},\"active\":{active},\"trees\":{trees},\"autumn\":{autumn},\"snow\":{snow},\"dead\":{dead},\"missing\":{missing},\"disabled\":{disabled}}}"
+    );
+    let _ = fs::write("forgia_asset_registry.json", json);
+
+    registry.entries = entries;
+}
+
+/// Scan filesystem `assets/models-v1/nature/` → entries fraîchement taggés
+/// par convention filename.
+fn scan_nature_root() -> Vec<AssetEntry> {
     let root = Path::new("assets/models-v1/nature");
     if !root.exists() {
         warn!("[asset-registry] {:?} introuvable — scan skipped. CWD must be workspace root.", root);
-        return;
+        return Vec::new();
     }
-    registry.entries = scan_dir(root, "models-v1/nature");
+    scan_dir(root, "models-v1/nature")
+}
 
-    // Stats summary
-    let total = registry.entries.len();
-    let trees = registry.entries.iter().filter(|e| e.category == AssetCategory::Tree).count();
-    let autumn = registry.entries.iter().filter(|e| e.season == AssetSeason::Autumn).count();
-    let snow = registry.entries.iter().filter(|e| e.season == AssetSeason::Winter).count();
-    let dead = registry.entries.iter().filter(|e| e.is_dead).count();
-    info!(
-        "[asset-registry] Scanned {total} GLBs : {trees} trees ({autumn} autumn, {snow} snow, {dead} dead)"
-    );
+fn load_toml() -> Option<Vec<AssetEntry>> {
+    let content = fs::read_to_string(REGISTRY_TOML_PATH).ok()?;
+    match toml::from_str::<RegistryToml>(&content) {
+        Ok(r) => Some(r.asset),
+        Err(e) => {
+            warn!("[asset-registry] TOML parse error : {e}. Rescanning filesystem.");
+            None
+        }
+    }
+}
 
-    // Sensor JSON pour debug (observability-required).
-    let json = format!(
-        "{{\"total\":{total},\"trees\":{trees},\"autumn\":{autumn},\"snow\":{snow},\"dead\":{dead}}}"
-    );
-    let _ = fs::write("forgia_asset_registry.json", json);
+fn save_toml(entries: &[AssetEntry]) -> std::io::Result<()> {
+    let wrapper = RegistryToml { asset: entries.to_vec() };
+    let body = toml::to_string_pretty(&wrapper)
+        .map_err(|e| std::io::Error::other(format!("toml serialize : {e}")))?;
+    let header = "# forgia-asset-registry — manifest auto-généré au 1er boot.\n# Éditable à la main. Hot-reload via Shift+F12 en cours de jeu.\n# Les entries `missing = true` sont conservées pour history (le GLB peut\n# revenir). `disabled = true` désactive temporairement sans supprimer.\n\n";
+    fs::write(REGISTRY_TOML_PATH, format!("{header}{body}"))
+}
+
+/// Détecte les nouveaux GLBs (filesystem sans entry TOML) → ajoute taggés.
+/// Détecte les entries TOML sans GLB → `missing = true`.
+/// Écrit le TOML mis à jour si changements.
+fn reconcile_with_filesystem(entries: &mut Vec<AssetEntry>) {
+    let scanned = scan_nature_root();
+    let mut changed = false;
+
+    // 1. Marque missing les TOML entries dont le GLB n'existe plus.
+    let scanned_paths: std::collections::HashSet<&str> =
+        scanned.iter().map(|e| e.path.as_str()).collect();
+    for e in entries.iter_mut() {
+        let prev = e.missing;
+        e.missing = !scanned_paths.contains(e.path.as_str());
+        if e.missing != prev { changed = true; }
+    }
+
+    // 2. Ajoute les nouveaux scannés (filesystem présents, TOML absents).
+    let existing_paths: std::collections::HashSet<String> =
+        entries.iter().map(|e| e.path.clone()).collect();
+    let mut added = 0;
+    for s in scanned {
+        if !existing_paths.contains(&s.path) {
+            entries.push(s);
+            added += 1;
+            changed = true;
+        }
+    }
+    if added > 0 {
+        info!("[asset-registry] {added} new assets detected and added to TOML");
+    }
+
+    if changed {
+        if let Err(e) = save_toml(entries) {
+            warn!("[asset-registry] Failed to write updated TOML : {e}");
+        }
+    }
+}
+
+/// Shift+F12 → reload TOML à chaud. Permet d'éditer asset_registry.toml en
+/// cours de jeu et voir les nouveaux tags appliqués au prochain spawn chunk.
+fn hot_reload_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut registry: ResMut<AssetRegistry>,
+) {
+    let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    if shift && keys.just_pressed(KeyCode::F12) {
+        match load_toml() {
+            Some(mut new_entries) => {
+                reconcile_with_filesystem(&mut new_entries);
+                let n = new_entries.len();
+                registry.entries = new_entries;
+                info!("[asset-registry] Hot-reloaded TOML : {n} entries");
+            }
+            None => warn!("[asset-registry] Hot-reload failed (TOML invalid or missing)"),
+        }
+    }
 }
 
 #[cfg(test)]

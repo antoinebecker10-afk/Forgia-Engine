@@ -11,3 +11,5 @@ workspace = true
 bevy = { workspace = true }
 forgia-core = { workspace = true }
 forgia-terrain = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
