@@ -1,0 +1,13 @@
+[package]
+name = "forgia-asset-registry"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Asset registry runtime : scan assets/ + tag par convention filename + Resource queryable (foliage, rpg cavernes, villages, NPCs...)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+forgia-terrain = { workspace = true }

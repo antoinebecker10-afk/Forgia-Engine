@@ -18,6 +18,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
+use forgia_asset_registry::{AssetCategory, AssetQuery, AssetRegistry, AssetSeason};
 use forgia_terrain::{
     sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, PathNetwork,
     TerrainConfig, CHUNK_X, CHUNK_Z,
@@ -57,7 +58,9 @@ fn biome_min_spacing(biome: BiomeType) -> f32 {
     }
 }
 
-/// Couleur trunk + canopy approximative par biome (tint variation cosmétique).
+/// Couleur trunk + canopy approximative par biome (legacy procedural variants —
+/// gardé en cas de fallback si AssetRegistry vide).
+#[allow(dead_code)]
 fn biome_tree_colors(biome: BiomeType) -> (Color, Color) {
     let trunk = Color::srgb(0.38, 0.26, 0.18); // brun bois neutre toutes biomes
     let canopy = match biome {
@@ -161,8 +164,8 @@ fn init_proc_meshes(mut veg: ResMut<VegetationManager>, mut meshes: ResMut<Asset
 fn populate_new_chunks(
     mut commands: Commands,
     mut veg: ResMut<VegetationManager>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+    registry: Res<AssetRegistry>,
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
@@ -172,17 +175,8 @@ fn populate_new_chunks(
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
         (biome_map, terrain_cfg, rpg_offset) else { return };
 
-    // Lazy init des 3 variants mesh (idempotent, survit aux resets OnExit).
-    for vi in 0..TreeVariant::COUNT {
-        if veg.trunk_meshes[vi].is_none() {
-            let (tr, th, _, _) = TreeVariant::from_index(vi).params();
-            veg.trunk_meshes[vi] = Some(meshes.add(Cylinder::new(tr, th * 2.0)));
-        }
-        if veg.canopy_meshes[vi].is_none() {
-            let (_, _, cr, _) = TreeVariant::from_index(vi).params();
-            veg.canopy_meshes[vi] = Some(meshes.add(Sphere::new(cr)));
-        }
-    }
+    // Skip si le registry n'a pas encore scanné (1ère frame avant Startup).
+    if registry.is_empty() { return }
 
     for (chunk_entity, coord, lod) in &q_chunks {
         if veg.chunk_entities.contains_key(coord) { continue; }
@@ -215,41 +209,20 @@ fn populate_new_chunks(
             30,
         );
 
-        // Tronc/canopée material lazily cachés par biome.
-        let (trunk_color, canopy_color) = biome_tree_colors(biome);
-        let trunk_mat = veg
-            .trunk_mats
-            .entry(biome as u8)
-            .or_insert_with(|| {
-                materials.add(StandardMaterial {
-                    base_color: trunk_color,
-                    perceptual_roughness: 0.88,
-                    ..default()
-                })
-            })
-            .clone();
-        let canopy_mat = veg
-            .canopy_mats
-            .entry(biome as u8)
-            .or_insert_with(|| {
-                // Boost ×1.8 + roughness 0.65 + léger emissive : sans ces fixes
-                // la sphère canopy reçoit toutes les ombres et apparaît noire
-                // au sunset (couleurs biome déjà sombres × 0 IBL × roughness 0.9).
-                let lin = canopy_color.to_linear();
-                let boosted = Color::linear_rgb(
-                    (lin.red * 1.8).min(1.0),
-                    (lin.green * 1.8).min(1.0),
-                    (lin.blue * 1.8).min(1.0),
-                );
-                let emiss = Color::linear_rgb(lin.red * 0.25, lin.green * 0.25, lin.blue * 0.25);
-                materials.add(StandardMaterial {
-                    base_color: boosted,
-                    emissive: emiss.to_linear(),
-                    perceptual_roughness: 0.65,
-                    ..default()
-                })
-            })
-            .clone();
+        // Query AssetRegistry pour arbres compatibles avec ce biome.
+        // Bonus visuel : pour Forest/Plains, on inclut les arbres rouges autumn
+        // pour donner une variation visuelle marquée (env. 30% des picks).
+        let trees_all: Vec<&forgia_asset_registry::AssetEntry> = registry.query(
+            &AssetQuery::new().category(AssetCategory::Tree).biome(biome).alive(),
+        );
+        let trees_autumn: Vec<&forgia_asset_registry::AssetEntry> = registry.query(
+            &AssetQuery::new()
+                .category(AssetCategory::Tree)
+                .biome(biome)
+                .season(AssetSeason::Autumn)
+                .alive(),
+        );
+        if trees_all.is_empty() { continue; }
 
         let mut spawned: Vec<Entity> = Vec::with_capacity(target.min(pts.len()));
         for (i, (lx, lz)) in pts.iter().take(target).enumerate() {
@@ -273,38 +246,40 @@ fn populate_new_chunks(
                 if too_close { continue; }
             }
 
-            // Variation de taille déterministe par index.
-            let scale = 0.85 + ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.45;
-
-            // Tronc + canopée parent-enfant pour atomic transform.
-            // Variant déterministe par hash (i + chunk coord), 3 silhouettes
-            // distinctes par biome → forêts moins répétitives.
-            let variant_idx = ((i as u32)
+            // Hash déterministe (i + chunk_coord) — pool autumn ou pool default.
+            let hash = (i as u32)
                 .wrapping_add((coord.x as u32).wrapping_mul(31))
-                .wrapping_add((coord.z as u32).wrapping_mul(17)) as usize)
-                % TreeVariant::COUNT;
-            let variant = TreeVariant::from_index(variant_idx);
-            let (_, trunk_half_h, _, canopy_y) = variant.params();
-            let trunk_mesh = veg.trunk_meshes[variant_idx].clone().unwrap();
-            let canopy_mesh = veg.canopy_meshes[variant_idx].clone().unwrap();
+                .wrapping_add((coord.z as u32).wrapping_mul(17));
+            // 30% chance autumn si dispo (Forest/Plains/Jungle).
+            let use_autumn = !trees_autumn.is_empty() && (hash % 100) < 30;
+            let pool: &Vec<&forgia_asset_registry::AssetEntry> =
+                if use_autumn { &trees_autumn } else { &trees_all };
+            let entry = pool[(hash as usize) % pool.len()];
 
+            // Scale jitter 0.7-1.3 (GLBs V1 Quaternius/Synty ~3m baseline).
+            let scale = 0.7 + ((hash.wrapping_mul(2_654_435_761) as f32) / u32::MAX as f32) * 0.6;
+            // Yaw aléatoire pour variation visuelle.
+            let yaw = (hash.wrapping_mul(0x9E37_79B1) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
+
+            let scene_handle: Handle<Scene> = asset_server.load(
+                bevy::asset::AssetPath::from(entry.path.clone()).with_label("Scene0")
+            );
+
+            // Collider générique (GLBs dimensions inconnues sans AABB) :
+            // capsule trunk-like ~3m haut × 0.3m radius scalée.
             let trunk_entity = commands
                 .spawn((
-                    Mesh3d(trunk_mesh),
-                    MeshMaterial3d(trunk_mat.clone()),
-                    Transform::from_xyz(wx, h + trunk_half_h * scale, wz).with_scale(Vec3::splat(scale)),
+                    SceneRoot(scene_handle),
+                    Transform {
+                        translation: Vec3::new(wx, h, wz),
+                        rotation: Quat::from_rotation_y(yaw),
+                        scale: Vec3::splat(scale),
+                    },
                     RigidBody::Fixed,
-                    Collider::cylinder(trunk_half_h * scale, 0.18 * scale),
+                    Collider::cylinder(1.5, 0.3),
                     VegetationTree,
-                    Name::new(format!("Tree_{:?}_{:?}_{}_{}_{i}", biome, variant, coord.x, coord.z)),
+                    Name::new(format!("Tree_{}_{}_{}_{i}", entry.species, coord.x, coord.z)),
                 ))
-                .with_children(|p| {
-                    p.spawn((
-                        Mesh3d(canopy_mesh),
-                        MeshMaterial3d(canopy_mat.clone()),
-                        Transform::from_xyz(0.0, canopy_y, 0.0),
-                    ));
-                })
                 .id();
             spawned.push(trunk_entity);
         }

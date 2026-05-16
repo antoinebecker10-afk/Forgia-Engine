@@ -53,6 +53,7 @@ pub fn run_game() -> AppExit {
 
     // 7. Mode-specific plugins (run_if interne par GameMode)
     app.add_plugins((
+        forgia_asset_registry::prelude::ForgiaAssetRegistryPlugin,
         forgia_fps::prelude::ForgiaFpsPlugin,
         forgia_rpg::prelude::ForgiaRpgPlugin,
         forgia_terrain::prelude::ForgiaTerrainPlugin,

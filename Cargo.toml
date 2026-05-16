@@ -21,6 +21,7 @@ members = [
     "crates/forgia-asset-atlas-packer",
     "crates/forgia-asset-cdn",
     "crates/forgia-asset-lod-generator",
+    "crates/forgia-asset-registry",
     "crates/forgia-assets",
     "crates/forgia-assets-bundle",
     "crates/forgia-audio-biome",
@@ -96,6 +97,7 @@ members = [
     "crates/forgia-loot-tables",
     "crates/forgia-manifest",
     "crates/forgia-marketplace-client",
+    "crates/forgia-mesh-fader",
     "crates/forgia-meshy-import",
     "crates/forgia-mod-outline",
     "crates/forgia-mode-fps-arena",
@@ -311,6 +313,7 @@ forgia-armor = { path = "crates/forgia-armor" }
 forgia-asset-atlas-packer = { path = "crates/forgia-asset-atlas-packer" }
 forgia-asset-cdn = { path = "crates/forgia-asset-cdn" }
 forgia-asset-lod-generator = { path = "crates/forgia-asset-lod-generator" }
+forgia-asset-registry = { path = "crates/forgia-asset-registry" }
 forgia-assets = { path = "crates/forgia-assets" }
 forgia-assets-bundle = { path = "crates/forgia-assets-bundle" }
 forgia-audio-biome = { path = "crates/forgia-audio-biome" }
@@ -386,6 +389,7 @@ forgia-level-presets = { path = "crates/forgia-level-presets" }
 forgia-loot-tables = { path = "crates/forgia-loot-tables" }
 forgia-manifest = { path = "crates/forgia-manifest" }
 forgia-marketplace-client = { path = "crates/forgia-marketplace-client" }
+forgia-mesh-fader = { path = "crates/forgia-mesh-fader" }
 forgia-meshy-import = { path = "crates/forgia-meshy-import" }
 forgia-mod-outline = { path = "crates/forgia-mod-outline" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
