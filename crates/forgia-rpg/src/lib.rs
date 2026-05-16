@@ -21,6 +21,7 @@ use forgia_dialogue::{
 };
 use forgia_input::PlayerAction;
 use forgia_player::prelude::Player;
+use forgia_audio_biome::prelude::AudioSampleOffset;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{RpgSampleOffset, VegetationTree};
 use forgia_terrain::{
@@ -190,6 +191,7 @@ fn spawn_world(
     let off = sample_offset();
     commands.insert_resource(RpgSampleOffset { x: off.x, z: off.y });
     commands.insert_resource(LodSampleOffset { x: off.x, z: off.y });
+    commands.insert_resource(AudioSampleOffset { x: off.x, z: off.y });
     // Marque qu'un teleport joueur doit firer ce cycle Rpg (consommé en Update).
     commands.insert_resource(PendingPlayerTeleport);
 
@@ -213,6 +215,19 @@ fn spawn_world(
         &make_terrain_config(),
     );
     commands.insert_resource(path_net);
+
+    // ── Cavernes (KayKit Dungeon entrances) ──────────────────────────────
+    // 3 entrées caverne placées hors anneau de path, légèrement enfoncées
+    // dans le terrain. Visuellement = arche + 2 piliers + escaliers + rubble.
+    // Tag RpgWorldMarker pour cleanup OnExit Rpg.
+    let cave_positions: [Vec2; 3] = [
+        Vec2::new(10.0, 22.0), // SW interior
+        Vec2::new(24.0, 22.0), // SE interior
+        Vec2::new(16.0, 10.0), // N centre
+    ];
+    for pos in cave_positions {
+        spawn_cave_entrance(&mut commands, &asset_server, pos, &make_terrain_config());
+    }
 
     // ── Sun ──────────────────────────────────────────────────────────────
     commands.spawn((
@@ -682,6 +697,91 @@ fn spawn_path_ribbons(
     );
 }
 
+/// Composite cave entrance = 1 arche centrale + 2 piliers latéraux + 1 escalier
+/// descendant légèrement enfoncé + 3 rubble alentour. Orientation : entrée fait
+/// face au centre du chunk (joueur spawn à 16,16).
+fn spawn_cave_entrance(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    pos: Vec2,
+    terrain_cfg: &TerrainConfig,
+) {
+    let h_ground = terrain_height_local(pos.x, pos.y, terrain_cfg);
+    let center = Vec3::new(pos.x, h_ground, pos.y);
+
+    // Oriente l'entrée vers le centre du chunk (16, _, 16).
+    let to_center = (Vec3::new(16.0, h_ground, 16.0) - center).normalize_or_zero();
+    let yaw = to_center.x.atan2(to_center.z);
+    let face = Quat::from_rotation_y(yaw);
+    // Vecteurs locaux : "forward" = vers le centre joueur, "right" = perpendiculaire.
+    let forward = to_center;
+    let right = Vec3::new(-forward.z, 0.0, forward.x);
+
+    let arched: Handle<Scene> =
+        asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/wall_arched.glb"));
+    let pillar: Handle<Scene> =
+        asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/pillar.glb"));
+    let stairs: Handle<Scene> =
+        asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/stairs.glb"));
+    let rubble: Handle<Scene> =
+        asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/rubble.glb"));
+
+    // 1) Arche centrale — entrée, légèrement enfoncée -0.3m pour effet enterré.
+    commands.spawn((
+        RpgWorldMarker,
+        SceneRoot(arched),
+        Transform {
+            translation: center + Vec3::Y * -0.3,
+            rotation: face,
+            scale: Vec3::splat(1.2),
+        },
+        Name::new("CaveArch"),
+    ));
+    // 2) 2 piliers de chaque côté de l'arche (-right et +right, 1.4m écartement).
+    for side in [-1.0f32, 1.0] {
+        commands.spawn((
+            RpgWorldMarker,
+            SceneRoot(pillar.clone()),
+            Transform {
+                translation: center + right * (side * 1.4),
+                rotation: face,
+                scale: Vec3::splat(1.0),
+            },
+            Name::new(format!("CavePillar_{side}")),
+        ));
+    }
+    // 3) Escalier descendant 1.5m devant l'arche, légèrement enfoncé.
+    commands.spawn((
+        RpgWorldMarker,
+        SceneRoot(stairs),
+        Transform {
+            translation: center + forward * 1.5 + Vec3::Y * -0.5,
+            rotation: face,
+            scale: Vec3::splat(1.0),
+        },
+        Name::new("CaveStairs"),
+    ));
+    // 4) 3 rubble dispersés alentour (déco usée).
+    let rubble_offsets = [
+        right * 2.0 + forward * 0.5,
+        -right * 2.2 + forward * 0.3,
+        forward * -0.8 + right * -0.9,
+    ];
+    for (i, off) in rubble_offsets.iter().enumerate() {
+        let h = terrain_height_local(pos.x + off.x, pos.y + off.z, terrain_cfg);
+        commands.spawn((
+            RpgWorldMarker,
+            SceneRoot(rubble.clone()),
+            Transform {
+                translation: Vec3::new(pos.x + off.x, h, pos.y + off.z),
+                rotation: Quat::from_rotation_y(i as f32 * 1.7),
+                scale: Vec3::splat(0.9),
+            },
+            Name::new(format!("CaveRubble_{i}")),
+        ));
+    }
+}
+
 fn cleanup_world(
     mut commands: Commands,
     q: Query<Entity, With<RpgWorldMarker>>,
@@ -701,6 +801,7 @@ fn cleanup_world(
     commands.remove_resource::<TerrainConfig>();
     commands.remove_resource::<RpgSampleOffset>();
     commands.remove_resource::<LodSampleOffset>();
+    commands.remove_resource::<AudioSampleOffset>();
     commands.remove_resource::<PathNetwork>();
     commands.insert_resource(LodStats::default());
     commands.insert_resource(VegetationManager::default());
