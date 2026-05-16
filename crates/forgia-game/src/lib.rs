@@ -58,6 +58,7 @@ pub fn run_game() -> AppExit {
         forgia_terrain::prelude::ForgiaTerrainPlugin,
         forgia_foliage::prelude::ForgiaFoliagePlugin,
         forgia_water::prelude::ForgiaWaterPlugin,
+        forgia_audio_biome::prelude::ForgiaAudioBiomePlugin,
     ));
 
     // ClearColor = skybox sunset/dusk warm — ambiance forge ruines (vs bleu ciel jour)
