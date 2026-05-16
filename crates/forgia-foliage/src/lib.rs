@@ -18,7 +18,9 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
-use forgia_asset_registry::{AssetCategory, AssetQuery, AssetRegistry, AssetSeason};
+use forgia_asset_registry::{
+    target_size_for, AssetCategory, AssetQuery, AssetRegistry, AssetSeason, NeedsAssetCalibrate,
+};
 use forgia_terrain::{
     sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, PathNetwork,
     TerrainConfig, CHUNK_X, CHUNK_Z,
@@ -256,31 +258,49 @@ fn populate_new_chunks(
                 if use_autumn { &trees_autumn } else { &trees_all };
             let entry = pool[(hash as usize) % pool.len()];
 
-            // Scale jitter 0.7-1.3 (GLBs V1 Quaternius/Synty ~3m baseline).
-            let scale = 0.7 + ((hash.wrapping_mul(2_654_435_761) as f32) / u32::MAX as f32) * 0.6;
-            // Yaw aléatoire pour variation visuelle.
+            // Variation visuelle utilisateur (jitter 0.85-1.15) appliqué EN PLUS
+            // du scale de calibration auto-mesuré.
+            let user_scale = 0.85
+                + ((hash.wrapping_mul(2_654_435_761) as f32) / u32::MAX as f32) * 0.3;
             let yaw = (hash.wrapping_mul(0x9E37_79B1) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
 
             let scene_handle: Handle<Scene> = asset_server.load(
                 bevy::asset::AssetPath::from(entry.path.clone()).with_label("Scene0")
             );
 
-            // Collider générique (GLBs dimensions inconnues sans AABB) :
-            // capsule trunk-like ~3m haut × 0.3m radius scalée.
-            let trunk_entity = commands
-                .spawn((
-                    SceneRoot(scene_handle),
-                    Transform {
-                        translation: Vec3::new(wx, h, wz),
-                        rotation: Quat::from_rotation_y(yaw),
-                        scale: Vec3::splat(scale),
-                    },
-                    RigidBody::Fixed,
-                    Collider::cylinder(1.5, 0.3),
-                    VegetationTree,
-                    Name::new(format!("Tree_{}_{}_{}_{i}", entry.species, coord.x, coord.z)),
-                ))
-                .id();
+            // 2 cas selon que le GLB a déjà été mesuré :
+            //   - measured connue → scale immédiat = target / measured × user_scale
+            //   - measured None    → spawn avec scale=1.0 + NeedsAssetCalibrate marker.
+            //     Le système calibrate_assets ajustera + écrira la mesure dans le TOML.
+            let target = target_size_for(entry.category);
+            let (initial_scale, needs_calib) = match entry.measured_size_m {
+                Some(m) if m > 0.0 => (target / m * user_scale, None),
+                _ => (
+                    user_scale,
+                    Some(NeedsAssetCalibrate {
+                        entry_path: entry.path.clone(),
+                        target_size_m: target,
+                        user_scale,
+                    }),
+                ),
+            };
+
+            let mut ec = commands.spawn((
+                SceneRoot(scene_handle),
+                Transform {
+                    translation: Vec3::new(wx, h, wz),
+                    rotation: Quat::from_rotation_y(yaw),
+                    scale: Vec3::splat(initial_scale),
+                },
+                RigidBody::Fixed,
+                // Collider générique trunk-like (~3m × 0.3m). Une amélioration
+                // future : générer le Collider depuis l'AABB après calibration.
+                Collider::cylinder(1.5, 0.3),
+                VegetationTree,
+                Name::new(format!("Tree_{}_{}_{}_{i}", entry.species, coord.x, coord.z)),
+            ));
+            if let Some(n) = needs_calib { ec.insert(n); }
+            let trunk_entity = ec.id();
             spawned.push(trunk_entity);
         }
 

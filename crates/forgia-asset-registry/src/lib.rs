@@ -35,9 +35,24 @@ const REGISTRY_TOML_PATH: &str = "assets/asset_registry.toml";
 
 pub mod prelude {
     pub use crate::{
-        AssetCategory, AssetEntry, AssetQuery, AssetRegistry, AssetSeason, BiomeCompat,
-        ForgiaAssetRegistryPlugin,
+        target_size_for, AssetCategory, AssetEntry, AssetQuery, AssetRegistry, AssetSeason,
+        BiomeCompat, ForgiaAssetRegistryPlugin, NeedsAssetCalibrate,
     };
+}
+
+/// Marker posé par les consommateurs (foliage, rpg cavernes...) au spawn
+/// d'un SceneRoot dont l'entry registry a `measured_size_m = None`. Le
+/// système `calibrate_assets` poll chaque frame jusqu'à ce que l'AABB Bevy
+/// soit dispo, mesure, applique le scale et write back dans registry + TOML.
+#[derive(Component, Debug, Clone)]
+pub struct NeedsAssetCalibrate {
+    /// Path de l'entry registry à mettre à jour après mesure.
+    pub entry_path: String,
+    /// Taille cible visuelle (m) — vient de `target_size_for(category)`.
+    pub target_size_m: f32,
+    /// Scale jitter user-side, appliqué EN PLUS du scale de calibration.
+    /// Default 1.0 = pas de variation. 0.85-1.15 = variation naturelle.
+    pub user_scale: f32,
 }
 
 // ─────────────────────────── Tag enums ───────────────────────────
@@ -90,6 +105,11 @@ pub struct AssetEntry {
     /// le supprimer (ex : tester un visuel sans les arbres morts).
     #[serde(default)]
     pub disabled: bool,
+    /// Dimension max AABB (mètres) mesurée auto au 1er spawn. `None` = jamais
+    /// calibré. Override manuel possible via édition TOML pour fix de mesh
+    /// avec racine bizarre qui fausse l'AABB.
+    #[serde(default)]
+    pub measured_size_m: Option<f32>,
 }
 
 /// Wrapper TOML — array `[[asset]]` au top-level.
@@ -131,10 +151,27 @@ fn biome_to_compat(b: BiomeType) -> BiomeCompat {
 #[derive(Resource, Default)]
 pub struct AssetRegistry {
     entries: Vec<AssetEntry>,
+    /// Dirty flag levé par les calibrations runtime, consommé par le système
+    /// `save_dirty_registry` (débounce 2s).
+    dirty: bool,
 }
 
 impl AssetRegistry {
     pub fn entries(&self) -> &[AssetEntry] { &self.entries }
+
+    /// Lookup par path exact. Retourne `None` si absent.
+    pub fn find(&self, path: &str) -> Option<&AssetEntry> {
+        self.entries.iter().find(|e| e.path == path)
+    }
+
+    /// Met à jour `measured_size_m` pour une entry. Lève le dirty flag pour
+    /// déclencher save_toml différé.
+    pub fn set_measured_size(&mut self, path: &str, size_m: f32) {
+        if let Some(e) = self.entries.iter_mut().find(|e| e.path == path) {
+            e.measured_size_m = Some(size_m);
+            self.dirty = true;
+        }
+    }
 
     pub fn query(&self, q: &AssetQuery) -> Vec<&AssetEntry> {
         let biome_compat = q.biome.map(biome_to_compat);
@@ -216,6 +253,25 @@ fn tag_from_filename(stem: &str) -> AssetEntry {
         is_dead,
         missing: false,
         disabled: false,
+        measured_size_m: None,
+    }
+}
+
+// ─────────────────────────── Target size par catégorie ───────────────────────────
+
+/// Cible visuelle en mètres pour chaque catégorie d'asset. Source de vérité
+/// transitoire (structural visual exception au no-hardcode rule) — à migrer
+/// vers `vegetation_default.toml` quand `forgia-genome-registry` sortira du
+/// stub.
+pub fn target_size_for(category: AssetCategory) -> f32 {
+    match category {
+        AssetCategory::Tree => 4.5,    // arbre adulte mâture (cèdre/birch ~5m)
+        AssetCategory::Bush => 1.0,    // arbuste taille humaine
+        AssetCategory::Ground => 0.4,  // fleurs, touffes herbe
+        AssetCategory::Cactus => 2.0,  // cactus saguaro géant
+        AssetCategory::Stump => 0.7,   // souche basse
+        AssetCategory::Rock => 1.5,    // rocher décor
+        AssetCategory::Other => 1.5,   // fallback safe
     }
 }
 
@@ -257,7 +313,83 @@ impl Plugin for ForgiaAssetRegistryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AssetRegistry>()
             .add_systems(Startup, populate_registry)
-            .add_systems(Update, hot_reload_input);
+            .add_systems(Update, (hot_reload_input, calibrate_assets, save_dirty_registry));
+    }
+}
+
+/// Poll les entités `NeedsAssetCalibrate` chaque frame, attend que Bevy ait
+/// chargé la GLB scene et calculé les `Aabb` sur les Mesh3d children, puis
+/// mesure l'AABB max, calcule scale = target / max_dim, applique au Transform
+/// et persiste dans le registry.
+fn calibrate_assets(
+    mut commands: Commands,
+    mut registry: ResMut<AssetRegistry>,
+    q_needs: Query<(Entity, &NeedsAssetCalibrate)>,
+    q_aabb: Query<&bevy::camera::primitives::Aabb>,
+    q_children: Query<&bevy::ecs::hierarchy::Children>,
+    mut q_transform: Query<&mut Transform>,
+) {
+    for (entity, needs) in &q_needs {
+        let Some(max_dim) = compute_aabb_max_dim(entity, &q_aabb, &q_children) else {
+            continue; // Scene pas encore chargée, retry next frame
+        };
+        if max_dim <= 0.0 || !max_dim.is_finite() {
+            warn!("[asset-registry] {} : AABB invalide ({max_dim}) — skip calibration", needs.entry_path);
+            commands.entity(entity).remove::<NeedsAssetCalibrate>();
+            continue;
+        }
+        let scale = needs.target_size_m / max_dim * needs.user_scale;
+        if let Ok(mut tf) = q_transform.get_mut(entity) {
+            tf.scale = Vec3::splat(scale);
+        }
+        registry.set_measured_size(&needs.entry_path, max_dim);
+        info!(
+            "[asset-registry] Calibrated {} : measured {:.2}m → scale {:.3} (target {:.1}m)",
+            needs.entry_path, max_dim, scale, needs.target_size_m
+        );
+        commands.entity(entity).remove::<NeedsAssetCalibrate>();
+    }
+}
+
+/// Walk récursif des Children pour trouver le premier `Aabb` disponible.
+/// Retourne `max(half_extents) * 2` (dimension max bounding box).
+fn compute_aabb_max_dim(
+    root: Entity,
+    q_aabb: &Query<&bevy::camera::primitives::Aabb>,
+    q_children: &Query<&bevy::ecs::hierarchy::Children>,
+) -> Option<f32> {
+    // Direct sur root
+    if let Ok(a) = q_aabb.get(root) {
+        return Some(a.half_extents.max_element() * 2.0);
+    }
+    // Sinon descend dans les children
+    let children = q_children.get(root).ok()?;
+    let mut max: f32 = 0.0;
+    let mut found = false;
+    for child in children.iter() {
+        if let Some(d) = compute_aabb_max_dim(child, q_aabb, q_children) {
+            max = max.max(d);
+            found = true;
+        }
+    }
+    if found { Some(max) } else { None }
+}
+
+/// Save TOML debounced toutes les 2s si dirty flag levé. Évite N writes par
+/// frame quand plusieurs calibrations terminent en même temps.
+fn save_dirty_registry(
+    time: Res<Time>,
+    mut registry: ResMut<AssetRegistry>,
+    mut last_save: Local<f32>,
+) {
+    if !registry.dirty { return }
+    let now = time.elapsed_secs();
+    if now - *last_save < 2.0 { return }
+    *last_save = now;
+    if let Err(e) = save_toml(&registry.entries) {
+        warn!("[asset-registry] save_dirty failed : {e}");
+    } else {
+        registry.dirty = false;
     }
 }
 
