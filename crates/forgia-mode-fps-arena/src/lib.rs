@@ -99,7 +99,7 @@ fn spawn_arena(
 
     for x in -half..=half {
         for z in -half..=half {
-            let dist = (x.abs().max(z.abs())) as i32;
+            let dist = x.abs().max(z.abs());
             let tile_handle = if dist >= 4 {
                 if (x + z).rem_euclid(3) == 0 {
                     floor_rocks.clone()
@@ -189,19 +189,19 @@ fn spawn_arena(
 
     let cover_props: &[(&str, f32, f32, Handle<Scene>, f32, f32)] = &[
         ("Crates_NE", 8.0, -8.0, crates.clone(), 0.6, 0.6),
-        ("Crates_SW", -8.0, 8.0, crates.clone(), 0.6, 0.6),
+        ("Crates_SW", -8.0, 8.0, crates, 0.6, 0.6),
         ("Rubble_N", 0.0, -14.0, rubble.clone(), 1.0, 0.4),
         ("Rubble_S", 0.0, 14.0, rubble.clone(), 1.0, 0.4),
         ("Rubble_E", 14.0, 0.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_W", -14.0, 0.0, rubble.clone(), 1.0, 0.4),
+        ("Rubble_W", -14.0, 0.0, rubble, 1.0, 0.4),
         ("BarrelStack_NW", -10.0, -10.0, barrels_stack.clone(), 0.7, 0.7),
-        ("BarrelStack_SE", 10.0, 10.0, barrels_stack.clone(), 0.7, 0.7),
+        ("BarrelStack_SE", 10.0, 10.0, barrels_stack, 0.7, 0.7),
         ("Table_E", 6.0, 4.0, table.clone(), 1.5, 0.6),
-        ("Table_W", -6.0, -4.0, table.clone(), 1.5, 0.6),
+        ("Table_W", -6.0, -4.0, table, 1.5, 0.6),
         ("Barrel_1", 3.0, 12.0, barrel.clone(), 0.5, 0.4),
         ("Barrel_2", -3.0, -12.0, barrel.clone(), 0.5, 0.4),
         ("Barrel_3", 12.0, -3.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_4", -12.0, 3.0, barrel.clone(), 0.5, 0.4),
+        ("Barrel_4", -12.0, 3.0, barrel, 0.5, 0.4),
     ];
     for (name, x, z, scene, half_w, half_h) in cover_props {
         commands.spawn((
@@ -220,22 +220,22 @@ fn spawn_arena(
         Transform::from_xyz(16.0, 0.0, 16.0),
         Visibility::default(),
         Name::new("ChestGold_NE"),
-        children![(SceneRoot(chest_gold.clone()), Transform::default())],
+        children![(SceneRoot(chest_gold), Transform::default())],
     ));
     commands.spawn((
         ArenaMarker,
         Transform::from_xyz(-16.0, 0.0, -16.0),
         Visibility::default(),
         Name::new("Chest_SW"),
-        children![(SceneRoot(chest.clone()), Transform::default())],
+        children![(SceneRoot(chest), Transform::default())],
     ));
 
     let banners: &[(&str, f32, f32, Handle<Scene>, f32)] = &[
         ("Banner_N_red", -6.0, edge - 0.3, banner_red.clone(), 0.0),
         ("Banner_N_blue", 6.0, edge - 0.3, banner_blue.clone(), 0.0),
-        ("Banner_S_yellow", 0.0, -edge + 0.3, banner_yellow.clone(), std::f32::consts::PI),
-        ("Banner_E_red", edge - 0.3, -6.0, banner_red.clone(), -std::f32::consts::FRAC_PI_2),
-        ("Banner_W_blue", -edge + 0.3, 6.0, banner_blue.clone(), std::f32::consts::FRAC_PI_2),
+        ("Banner_S_yellow", 0.0, -edge + 0.3, banner_yellow, std::f32::consts::PI),
+        ("Banner_E_red", edge - 0.3, -6.0, banner_red, -std::f32::consts::FRAC_PI_2),
+        ("Banner_W_blue", -edge + 0.3, 6.0, banner_blue, std::f32::consts::FRAC_PI_2),
     ];
     for (name, x, z, scene, yaw) in banners {
         commands.spawn((
@@ -251,11 +251,11 @@ fn spawn_arena(
         ("Torch_NE", 18.0, -18.0, torch.clone()),
         ("Torch_NW", -18.0, -18.0, torch.clone()),
         ("Torch_SE", 18.0, 18.0, torch.clone()),
-        ("Torch_SW", -18.0, 18.0, torch.clone()),
+        ("Torch_SW", -18.0, 18.0, torch),
         ("TorchWall_N", -10.0, edge - 0.5, torch_wall.clone()),
         ("TorchWall_S", 10.0, -edge + 0.5, torch_wall.clone()),
         ("TorchWall_E", edge - 0.5, 10.0, torch_wall.clone()),
-        ("TorchWall_W", -edge + 0.5, -10.0, torch_wall.clone()),
+        ("TorchWall_W", -edge + 0.5, -10.0, torch_wall),
     ];
     for (name, x, z, scene) in torch_positions {
         commands.spawn((
@@ -468,7 +468,7 @@ fn spawn_wall(commands: &mut Commands, wall_scene: &Handle<Scene>, pos: Vec3, ya
 /// Orbit nuages autour du centre Y axis : rotation continue, jamais wrap brusque.
 fn cloud_drift_system(time: Res<Time>, mut q: Query<(&mut Transform, &mut CloudOrbit)>) {
     let dt = time.delta_secs();
-    for (mut tf, mut orbit) in q.iter_mut() {
+    for (mut tf, mut orbit) in &mut q {
         orbit.angle += CLOUD_ORBIT_SPEED * dt;
         if orbit.angle > std::f32::consts::TAU {
             orbit.angle -= std::f32::consts::TAU;
