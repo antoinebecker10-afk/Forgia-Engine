@@ -1,0 +1,517 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 8724,
+      "max": [
+        2.0157623291015625,
+        27.502235412597656,
+        5.635090351104736
+      ],
+      "min": [
+        -2.0157623291015625,
+        -16.229557037353516,
+        -11.891204833984375
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 104688,
+      "componentType": 5126,
+      "count": 8724,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 8724,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 8724,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5123,
+      "count": 8724,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 139584,
+      "componentType": 5126,
+      "count": 8724,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 30402,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 209376,
+      "componentType": 5126,
+      "count": 4592,
+      "max": [
+        2.9408559799194336,
+        3.951481342315674,
+        7.0904436111450195
+      ],
+      "min": [
+        -3.0424931049346924,
+        -16.530803680419922,
+        -5.183250904083252
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 264480,
+      "componentType": 5126,
+      "count": 4592,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 279168,
+      "componentType": 5126,
+      "count": 4592,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 69792,
+      "componentType": 5126,
+      "count": 4592,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 4,
+      "byteOffset": 69792,
+      "componentType": 5123,
+      "count": 4592,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 3,
+      "byteOffset": 352640,
+      "componentType": 5126,
+      "count": 4592,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 121608,
+      "componentType": 5125,
+      "count": 12384,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 4,
+      "type": "MAT4"
+    },
+    {
+      "bufferView": 5,
+      "byteOffset": 256,
+      "componentType": 5126,
+      "count": 5,
+      "type": "MAT4"
+    }
+  ],
+  "asset": {
+    "generator": "fab-model-conversion",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 171144,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 106528,
+      "byteOffset": 171144,
+      "byteStride": 8,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 319584,
+      "byteOffset": 277672,
+      "byteStride": 12,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 426112,
+      "byteOffset": 597256,
+      "byteStride": 16,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 106528,
+      "byteOffset": 1023368,
+      "byteStride": 8,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 576,
+      "byteOffset": 1129896
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 1130472,
+      "uri": "scene.bin"
+    }
+  ],
+  "images": [
+    {
+      "uri": "textures/M_AssaultRifle_02_BaseColor.jpeg"
+    },
+    {
+      "uri": "textures/M_AssaultRifle_02_ORM.jpeg"
+    },
+    {
+      "uri": "textures/M_AssaultRifle_02_Normal.png"
+    },
+    {
+      "uri": "textures/M_AssaultRifle_01_BaseColor.jpeg"
+    },
+    {
+      "uri": "textures/M_AssaultRifle_01_ORM.jpeg"
+    },
+    {
+      "uri": "textures/M_AssaultRifle_01_Normal.png"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "M_AssaultRifle_02",
+      "normalTexture": {
+        "index": 2
+      },
+      "occlusionTexture": {
+        "index": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 1
+        },
+        "roughnessFactor": 0.49000001
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "M_AssaultRifle_01",
+      "normalTexture": {
+        "index": 5
+      },
+      "occlusionTexture": {
+        "index": 4
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 3
+        },
+        "metallicRoughnessTexture": {
+          "index": 4
+        },
+        "roughnessFactor": 0.49000001
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "SK_AssaultRifle_Frame_M_AssaultRifle_01_0",
+      "primitives": [
+        {
+          "attributes": {
+            "JOINTS_0": 4,
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TANGENT": 2,
+            "TEXCOORD_0": 3,
+            "WEIGHTS_0": 5
+          },
+          "indices": 6,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "SK_AssaultRifle_Frame_M_AssaultRifle_02_0",
+      "primitives": [
+        {
+          "attributes": {
+            "JOINTS_0": 11,
+            "NORMAL": 8,
+            "POSITION": 7,
+            "TANGENT": 9,
+            "TEXCOORD_0": 10,
+            "WEIGHTS_0": 12
+          },
+          "indices": 13,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1,
+        6,
+        7
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.220446049250313e-16,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        2.220446049250313e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "FAB converted model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.009999999776482582,
+        0.0,
+        0.0,
+        -0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "SK_AssaultRifle_Frame.fbx"
+    },
+    {
+      "children": [
+        3
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        4
+      ],
+      "matrix": [
+        1.0000001192092896,
+        -2.220446313948109e-16,
+        -2.220446313948109e-16,
+        0.0,
+        -2.220446411006863e-16,
+        -1.6292067939183141e-07,
+        -0.9999999999999868,
+        0.0,
+        2.2204459521914575e-16,
+        1.0000001192092762,
+        -1.6292069881348986e-07,
+        0.0,
+        5.960464477539063e-08,
+        1.4901161193847656e-08,
+        2.384185791015625e-07,
+        1.0
+      ],
+      "name": "Armature"
+    },
+    {
+      "children": [
+        5,
+        8
+      ],
+      "name": "Object_4"
+    },
+    {
+      "matrix": [
+        1.0000001192092896,
+        0.0,
+        -4.440892098500626e-16,
+        0.0,
+        -4.440891569105097e-16,
+        7.16665969755837e-15,
+        -1.0,
+        0.0,
+        3.182636242352985e-30,
+        1.0000001192092896,
+        7.16666055189078e-15,
+        0.0,
+        5.960464477539063e-08,
+        1.4901161193847656e-08,
+        2.3841857910156242e-07,
+        1.0
+      ],
+      "name": "Object_5"
+    },
+    {
+      "mesh": 0,
+      "name": "Object_6",
+      "skin": 0
+    },
+    {
+      "mesh": 1,
+      "name": "Object_7",
+      "skin": 1
+    },
+    {
+      "children": [
+        9
+      ],
+      "name": "Root_00"
+    },
+    {
+      "children": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "name": "Grip_01"
+    },
+    {
+      "name": "Trigger_02"
+    },
+    {
+      "name": "Handguard_03"
+    },
+    {
+      "name": "Bolt_04"
+    },
+    {
+      "name": "Magazine_05"
+    },
+    {
+      "name": "Sight_Rear_06"
+    },
+    {
+      "name": "Eject_Casing_07"
+    },
+    {
+      "name": "Scope_08"
+    },
+    {
+      "name": "Dust_Cover_09"
+    },
+    {
+      "name": "Charging_Handle_010"
+    },
+    {
+      "name": "Magazine_Release_011"
+    },
+    {
+      "name": "Fire_Selector_012"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "FAB converted",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "skins": [
+    {
+      "inverseBindMatrices": 14,
+      "joints": [
+        9,
+        10,
+        20,
+        19
+      ]
+    },
+    {
+      "inverseBindMatrices": 15,
+      "joints": [
+        9,
+        19,
+        18,
+        17,
+        12
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    },
+    {
+      "sampler": 0,
+      "source": 5
+    }
+  ]
+}
