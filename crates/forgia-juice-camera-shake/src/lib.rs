@@ -37,8 +37,8 @@ impl Default for CameraShake {
     fn default() -> Self {
         Self {
             trauma: 0.0,
-            decay: 8.0,            // ~125ms full decay (AAA 80-150ms range)
-            max_rotation: 0.026,   // ~1.5° max amplitude
+            decay: 10.0,           // ~100ms full decay — plus rapide = moins de cumul auto-fire
+            max_rotation: 0.014,   // ~0.8° max amplitude (anti eye-strain, downscaled de 1.5°)
             seed: 0,
         }
     }
@@ -84,6 +84,11 @@ fn consume_impulses(
     }
 }
 
+/// Lerp f32 — utilitaire pour smooth noise interpolation entre 2 samples.
+fn lerp_f(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t.clamp(0.0, 1.0)
+}
+
 /// Hash-based deterministic noise pour offset reproductible.
 fn hash_noise(seed: u32) -> f32 {
     let mut x = seed.wrapping_mul(0x27d4_eb2d).wrapping_add(0x9e37_79b9);
@@ -106,7 +111,13 @@ pub fn apply_shake(
     mut q: Query<(&mut CameraShake, &mut Transform)>,
 ) {
     let dt = time.delta_secs();
-    let t_now = (time.elapsed_secs() * 60.0) as u32;
+    // Sample noise à ~12Hz (toutes ~83ms) + lerp entre samples → smooth shake.
+    // Évite le flicker high-frequency 60Hz qui brûle les yeux en auto-fire.
+    let t_secs = time.elapsed_secs();
+    let sample_rate = 12.0_f32;
+    let t_sample_f = t_secs * sample_rate;
+    let t_sample = t_sample_f as u32;
+    let lerp_t = t_sample_f - t_sample as f32;
     let user_intensity = intensity_res.0.clamp(0.0, 1.0);
 
     for (mut shake, mut xf) in &mut q {
@@ -116,19 +127,31 @@ pub fn apply_shake(
         }
         // intensity = trauma² × user_slider — Squirrel pattern + accessibility.
         let intensity = shake.trauma * shake.trauma * user_intensity;
-        shake.seed = shake.seed.wrapping_add(1);
 
-        let n_pitch = hash_noise(shake.seed.wrapping_add(t_now));
-        let n_yaw = hash_noise(shake.seed.wrapping_add(t_now ^ 0x55));
-        let n_roll = hash_noise(shake.seed.wrapping_add(t_now ^ 0xAA));
+        // Smooth noise : lerp entre 2 samples consécutifs au sample_rate
+        let sample_a = shake.seed.wrapping_add(t_sample);
+        let sample_b = shake.seed.wrapping_add(t_sample.wrapping_add(1));
+        let n_pitch = lerp_f(hash_noise(sample_a), hash_noise(sample_b), lerp_t);
+        let n_yaw = lerp_f(
+            hash_noise(sample_a.wrapping_add(0x55)),
+            hash_noise(sample_b.wrapping_add(0x55)),
+            lerp_t,
+        );
+        let n_roll = lerp_f(
+            hash_noise(sample_a.wrapping_add(0xAA)),
+            hash_noise(sample_b.wrapping_add(0xAA)),
+            lerp_t,
+        );
 
         // Upward bias : pitch toujours skewé négatif (camera look UP) pour
         // effet recoil naturel — pas full random qui donne nausée (Apex anti-pattern).
         let pitch_skewed = -n_pitch.abs() * 0.7 + n_pitch * 0.3;
 
         let pitch_amp = pitch_skewed * shake.max_rotation * intensity;
-        let yaw_amp = n_yaw * shake.max_rotation * 0.4 * intensity; // yaw 40% du pitch
-        let roll_amp = n_roll * shake.max_rotation * 0.3 * intensity; // roll subtil
+        // Yaw 25% du pitch (downscaled 40→25 anti dizziness auto-fire)
+        let yaw_amp = n_yaw * shake.max_rotation * 0.25 * intensity;
+        // Roll 10% du pitch (downscaled 30→10 anti vertige — Apex/Valorant criticism)
+        let roll_amp = n_roll * shake.max_rotation * 0.10 * intensity;
 
         // Multiplicatif : applique en local sur la rotation déjà set par mouse_look.
         xf.rotation = xf.rotation
