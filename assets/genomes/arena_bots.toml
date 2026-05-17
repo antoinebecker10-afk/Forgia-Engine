@@ -40,8 +40,9 @@ tracer_emissive = [4.0, 1.5, 0.5]  # HDR orange-jaune
 # Distribution sur les 5 spawn points. Asset path relative à assets/.
 [[spawn_positions]]
 character_glb = "models/characters/Dorin.glb#Scene0"
-character_scale = 1.0        # auto-calibration AABB future si needed
-character_yaw_deg = 0.0
+character_scale = 1.0           # auto-calibration AABB future si needed
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
 x = -4.0
 z = -7.0
 
