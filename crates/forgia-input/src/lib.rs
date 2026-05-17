@@ -8,7 +8,22 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 pub mod prelude {
-    pub use crate::{ForgiaInputPlugin, InputBlockers, PlayerAction};
+    pub use crate::{ForgiaInputPlugin, InputBlockers, MouseSensitivityMultiplier, PlayerAction};
+}
+
+/// Multiplicateur global de sensibilité souris appliqué par `mouse_look` (forgia-player).
+/// Producteur : forgia-fps en ADS écrit `factor = lerp(1.0, ads_mouse_sensitivity_factor, ads_progress)`.
+/// Consommateur : `mouse_look` multiplie sa sensitivity de base par `factor`.
+/// Default 1.0 = pas de changement (hipfire ou RPG mode).
+#[derive(Resource)]
+pub struct MouseSensitivityMultiplier {
+    pub factor: f32,
+}
+
+impl Default for MouseSensitivityMultiplier {
+    fn default() -> Self {
+        Self { factor: 1.0 }
+    }
 }
 
 /// PlayerAction — actions joueur AZERTY.
@@ -40,7 +55,8 @@ pub struct ForgiaInputPlugin;
 impl Plugin for ForgiaInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InputManagerPlugin::<PlayerAction>::default())
-            .init_resource::<InputBlockers>();
+            .init_resource::<InputBlockers>()
+            .init_resource::<MouseSensitivityMultiplier>();
     }
 }
 

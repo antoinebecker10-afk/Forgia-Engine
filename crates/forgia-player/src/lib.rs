@@ -14,7 +14,18 @@ use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
 
 pub mod prelude {
-    pub use crate::{CameraMode, FpsCamera, ForgiaPlayerPlugin, Player};
+    pub use crate::{CameraMode, FpsCamera, ForgiaPlayerPlugin, MovementSpeedMultiplier, Player};
+}
+
+/// Multiplicateur global sur la vitesse de déplacement player.
+/// 1.0 = normal (hipfire), 0.65 = ADS (style CoD). Written par forgia-fps::ads.
+#[derive(Resource)]
+pub struct MovementSpeedMultiplier(pub f32);
+
+impl Default for MovementSpeedMultiplier {
+    fn default() -> Self {
+        Self(1.0)
+    }
 }
 
 // ── Skybox cubemap (pattern V1 stacked PNG → reinterpret cube → attach Camera) ──
@@ -59,6 +70,7 @@ pub struct ForgiaPlayerPlugin;
 impl Plugin for ForgiaPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraMode>()
+            .init_resource::<MovementSpeedMultiplier>()
             .add_systems(Startup, load_skybox)
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
@@ -129,7 +141,10 @@ fn attach_skybox_to_camera(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     pending: Option<ResMut<SkyboxPending>>,
-    q_cam: Query<Entity, (With<FpsCamera>, Without<Skybox>)>,
+    // Story 2026-05-17 : query relaxée à toute Camera3d sans Skybox (couvre
+    // RpgOrbitCamera RPG en plus de FpsCamera FPS). MenuCamera2d est Camera2d
+    // donc exclue naturellement.
+    q_cam: Query<Entity, (With<Camera3d>, Without<Skybox>)>,
 ) {
     let Some(mut pending) = pending else { return };
 
@@ -160,8 +175,8 @@ fn attach_skybox_to_camera(
         attached += 1;
     }
     if attached > 0 {
-        info!("[forgia-player] Skybox attached to {attached} FpsCamera(s)");
-        // Resource conservée : nouvelle FpsCamera spawn (reload après ESC) sera re-attachée.
+        info!("[forgia-player] Skybox attached to {attached} Camera3d(s)");
+        // Resource conservée : nouvelles cameras (FPS reload / RPG OrbitCamera) re-attachées.
     }
 }
 
@@ -176,11 +191,13 @@ fn mouse_look(
     mut motion: MessageReader<MouseMotion>,
     mut q_player: Query<(&mut Transform, &mut Player), Without<FpsCamera>>,
     mut q_cam: Query<&mut Transform, With<FpsCamera>>,
+    sens_mul: Res<MouseSensitivityMultiplier>,
 ) {
     let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
         return;
     };
-    let sensitivity = 0.002;
+    // Sensibilité base × multiplier global (ADS l'écrase à <1.0 via forgia-fps).
+    let sensitivity = 0.002 * sens_mul.factor;
     let mut delta = Vec2::ZERO;
     for ev in motion.read() {
         delta += ev.delta;
@@ -249,6 +266,7 @@ fn weapon_recoil_apply(
 
 fn player_movement(
     time: Res<Time>,
+    speed_mul: Res<MovementSpeedMultiplier>,
     mut q: Query<(
         &mut KinematicCharacterController,
         Option<&KinematicCharacterControllerOutput>,
@@ -260,7 +278,7 @@ fn player_movement(
     let Ok((mut kcc, output, mut player, action, tf)) = q.single_mut() else {
         return;
     };
-    let speed = 5.0;
+    let speed = 5.0 * speed_mul.0;
     let jump_velocity = 6.5;
     let gravity = 18.0;
     let max_fall_speed = 30.0;

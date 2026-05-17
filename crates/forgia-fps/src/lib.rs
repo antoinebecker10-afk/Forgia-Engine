@@ -166,6 +166,19 @@ pub struct ViewmodelGenomeEntry {
     /// (cercle noir vignette + reticle) + FOV cam très réduit.
     #[serde(default)]
     pub sniper_scope_fullscreen: bool,
+    // ─── Phase E — ADS visibility & feel (genome-driven, 2026-05-18) ──
+    /// Alpha du BODY viewmodel (mesh entier, hors lentille scope) quand ADS full.
+    /// 1.0 = pas de fade (sniper qui a son scope fullscreen overlay).
+    /// 0.4 = semi-transparent (laisse voir à travers le canon vers la cible).
+    /// Lerp via forgia-mesh-fader piloté par AdsState.progress.
+    #[serde(default = "default_ads_viewmodel_fade_alpha")]
+    pub ads_viewmodel_fade_alpha: f32,
+    /// Multiplicateur de sensibilité souris en ADS full. 1.0 = pas de changement.
+    /// Sniper Lenoir = 0.3 (visée lente précise). SMG Bourrasque = 0.7. AR = 0.7.
+    /// Shotgun = 0.85 (pas besoin de précision fine sur cone spread).
+    /// Lerp 1.0 → factor selon AdsState.progress.
+    #[serde(default = "default_ads_mouse_sensitivity_factor")]
+    pub ads_mouse_sensitivity_factor: f32,
     // ─── Phase D — Hit feedback timings (genome-driven) ───────────────
     /// Durée du flash blanc sur la cible touchée (secondes). Default 0.15s.
     #[serde(default = "default_hit_flash_duration")]
@@ -198,6 +211,8 @@ fn default_spread_deg() -> f32 { 0.0 }
 fn default_hit_flash_duration() -> f32 { 0.15 }
 fn default_hit_stop_duration() -> f32 { 0.05 }
 fn default_hit_stop_speed() -> f32 { 0.05 }
+fn default_ads_viewmodel_fade_alpha() -> f32 { 0.4 }
+fn default_ads_mouse_sensitivity_factor() -> f32 { 0.7 }
 
 #[derive(Resource)]
 pub struct ViewmodelGenomeHandle(pub Handle<Genome<ViewmodelGenome>>);

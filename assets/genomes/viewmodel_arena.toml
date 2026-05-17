@@ -1,0 +1,152 @@
+# Forgia V2 — Viewmodel Arena Genome
+# Configuration des 4 armes V1 Arena (hot-reload via Bevy Asset).
+#
+# Mapping :
+#   Digit1 (ModernAR)     → pepin
+#   Digit2 (AssaultRifle) → bourrasque
+#   Digit3 (Shotgun)      → madame_lenoir
+#   Digit4 (RocketLauncher)→ boucherie
+#
+# Assets : assets/models/weapons/forgia/{pepin,bourrasque,madame_lenoir,boucherie}.glb
+
+[weapons.pepin]
+# Slot 1 (Digit1) — Gun (pistolet semi-auto) — Pépin
+target_size = 1.10
+offset_x = 0.22
+offset_y = -0.35
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = -90.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.55
+ads_offset_x = 0.0
+ads_offset_y = -0.20
+ads_offset_z = -0.80
+ads_fov_deg = 30.0
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.40
+ads_move_speed_factor = 0.75  # gun = pénalité légère
+scope_glass_alpha_ads = 0.20
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 0.40   # body semi-transparent → voit cible derrière canon
+ads_mouse_sensitivity_factor = 0.70  # précision moyenne (semi-auto pistolet)
+# Fire behavior
+fire_mode = "semi"
+burst_count = 0
+damage = 30.0
+fire_rate = 6.0      # 6 shots/s click rapide
+range = 80.0
+pellets = 1
+spread_deg = 0.0
+sniper_scope_fullscreen = false
+
+[weapons.bourrasque]
+# Slot 2 (Digit2) — Mitraillette (SMG full-auto cadence rapide) — Bourrasque
+target_size = 1.10
+offset_x = 0.22
+offset_y = -0.35
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = -90.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.55
+ads_offset_x = 0.0
+ads_offset_y = -0.20
+ads_offset_z = -0.80
+ads_fov_deg = 32.0
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.40
+ads_move_speed_factor = 0.70
+scope_glass_alpha_ads = 0.20
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 0.40   # body semi-transparent SMG
+ads_mouse_sensitivity_factor = 0.70  # cadence rapide, précision moyenne
+# Fire behavior — SMG : cadence très rapide, dégât moyen, courte portée
+fire_mode = "auto"
+burst_count = 0
+damage = 14.0
+fire_rate = 16.0     # 16 shots/s ultra rapid
+range = 50.0
+pellets = 1
+spread_deg = 1.5      # léger spread (recul)
+sniper_scope_fullscreen = false
+
+[weapons.madame_lenoir]
+# Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
+# Meshy axis : +X local (vs -X pour Pepin/Bourrasque). R_y(+90)·(+1,0,0)=(0,0,-1) forward.
+target_size = 1.20
+offset_x = 0.25
+offset_y = -0.40
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = 90.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.65   # canon long sniper
+ads_offset_x = 0.0
+ads_offset_y = -0.20
+ads_offset_z = -0.85
+ads_fov_deg = 10.0      # ULTRA zoom sniper (~4-5x)
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.40
+ads_move_speed_factor = 0.35  # sniper très pénalisé en visée
+scope_glass_alpha_ads = 0.10  # scope très see-through (sniper precise)
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 1.00   # ★ pas de body fade (scope fullscreen overlay cache déjà)
+ads_mouse_sensitivity_factor = 0.30  # ★ ultra-lent précision sniper
+# Fire behavior — Sniper : 1-shot kill, cadence lente, range max
+fire_mode = "semi"
+burst_count = 0
+damage = 200.0
+fire_rate = 0.8       # ~1 tir / 1.25s
+range = 300.0
+pellets = 1
+spread_deg = 0.0       # precision absolute
+sniper_scope_fullscreen = true   # ★ active overlay fullscreen ADS
+
+[weapons.boucherie]
+# Slot 4 (Digit4) — Fusil à pompe (pump-action multi-pellets cone) — Boucherie
+# Meshy axis : +Z local (vs -X autres). R_y(180)·(0,0,1)=(0,0,-1) forward.
+target_size = 1.20
+offset_x = 0.28
+offset_y = -0.40
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = 180.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.55
+ads_offset_x = 0.0
+ads_offset_y = -0.25
+ads_offset_z = -0.85
+ads_fov_deg = 35.0      # Shotgun zoom modéré
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.45
+ads_move_speed_factor = 0.65
+scope_glass_alpha_ads = 0.30
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 0.30   # body très transparent (pas d'iron sight précis)
+ads_mouse_sensitivity_factor = 0.85  # cone spread = pas besoin précision fine
+# Fire behavior — Shotgun pump : multi-pellets cone, dégâts cumulés, courte portée
+fire_mode = "pump"      # semi-auto avec pause pump (V1 = simple semi)
+burst_count = 0
+damage = 12.0          # par pellet (8 pellets × 12 = 96 max si tous touchent)
+fire_rate = 1.2        # 1 tir / 0.83s
+range = 30.0
+pellets = 8            # ★ cone 8 pellets
+spread_deg = 8.0       # ★ spread cone large shotgun
+sniper_scope_fullscreen = false
