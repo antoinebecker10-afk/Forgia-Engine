@@ -1,0 +1,12 @@
+[package]
+name = "forgia-anim-debug"
+version = "0.1.0"
+edition = "2021"
+description = "Observability pour la Forgia Anim Layer — sensor JSON unifié + health alert (story-437/438)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
