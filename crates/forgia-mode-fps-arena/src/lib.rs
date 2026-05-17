@@ -447,7 +447,7 @@ fn spawn_arena(
     }
 
     info!(
-        "[forgia-mode-fps-arena] Arena spawned : {}×{}m, KayKit modular + 5 cubes + 18 cloud clusters",
+        "[forgia-mode-fps-arena] Arena spawned : {}×{}m, KayKit modular + 5 training bots (head+body) + 18 cloud clusters",
         (ARENA_SIZE as f32 * TILE_SIZE) as i32,
         (ARENA_SIZE as f32 * TILE_SIZE) as i32
     );
