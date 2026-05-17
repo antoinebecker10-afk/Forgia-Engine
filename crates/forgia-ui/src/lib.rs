@@ -6,16 +6,26 @@
 //! - 1 seul handler ESC
 //! - `MenuCamera2d` isolé OnEnter(Menu)/OnExit(Menu)
 //! - `Time<Real>` pour sensors UI
+//!
+//! Crates atomiques wire-up :
+//! - `forgia-crosshair` : crosshair + sniper scope overlay
+//! - `forgia-hitmarker` : hit confirm visual
 
 use bevy::camera::ClearColorConfig;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
-use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
+// Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
+pub use forgia_crosshair::CrosshairMode;
+pub use forgia_hitmarker::HitmarkerState;
 
 pub mod prelude {
     pub use crate::ForgiaUiPlugin;
+    /// Re-export backward compat — préférer `forgia_crosshair::CrosshairMode` direct.
+    pub use forgia_crosshair::CrosshairMode;
+    /// Re-export backward compat — préférer `forgia_hitmarker::HitmarkerState` direct.
+    pub use forgia_hitmarker::HitmarkerState;
 }
 
 pub struct ForgiaUiPlugin;
@@ -25,15 +35,21 @@ impl Plugin for ForgiaUiPlugin {
         if !app.is_plugin_added::<EguiPlugin>() {
             app.add_plugins(EguiPlugin::default());
         }
+        // Crates atomiques (règle fine-grained-crates) — idempotent.
+        if !app.is_plugin_added::<forgia_crosshair::ForgiaCrosshairPlugin>() {
+            app.add_plugins(forgia_crosshair::ForgiaCrosshairPlugin);
+        }
+        if !app.is_plugin_added::<forgia_hitmarker::ForgiaHitmarkerPlugin>() {
+            app.add_plugins(forgia_hitmarker::ForgiaHitmarkerPlugin);
+        }
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
         // Anti-trap V1 : éviter le frame où aucune caméra n'existe (ESC bug).
-        app.init_resource::<HitmarkerState>()
-            .add_systems(Startup, spawn_menu_camera_permanent)
+        app.add_systems(Startup, spawn_menu_camera_permanent)
             .add_systems(OnEnter(AppMode::Menu), release_cursor)
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
-            .add_systems(EguiPrimaryContextPass, (main_menu_ui, draw_crosshair, draw_hitmarker))
-            .add_systems(Update, (escape_handler, hitmarker_trigger).in_set(GameSet::UI));
+            .add_systems(EguiPrimaryContextPass, main_menu_ui)
+            .add_systems(Update, escape_handler.in_set(GameSet::UI));
     }
 }
 
@@ -41,9 +57,6 @@ impl Plugin for ForgiaUiPlugin {
 struct MenuCamera2d;
 
 /// MenuCamera2d permanente — spawn une fois au Startup, JAMAIS despawn.
-/// Camera order=10 : render PAR-DESSUS la Camera3d gameplay (order default=0).
-/// Egui s'attache à cette Camera2d. Quand AppMode != Menu, main_menu_ui early return,
-/// donc rien ne dessine, mais la caméra existe toujours.
 fn spawn_menu_camera_permanent(
     mut commands: Commands,
     q: Query<Entity, With<MenuCamera2d>>,
@@ -53,8 +66,6 @@ fn spawn_menu_camera_permanent(
             Camera2d,
             Camera {
                 order: 10,
-                // CRITICAL : None sinon Camera2d écrase tout le framebuffer Camera3d/Atmosphere
-                // chaque frame avec ClearColor (Resource brun). Egui render par-dessus en transparent.
                 clear_color: ClearColorConfig::None,
                 ..default()
             },
@@ -116,9 +127,6 @@ fn main_menu_ui(
 }
 
 /// Handler ESC unique — toggle InGame ↔ Menu.
-/// Anti-trap V1 : ce handler est le SEUL qui touche Escape pour le state machine.
-/// Lit `ButtonInput<KeyCode>` directement (pas leafwing) pour fonctionner même sans Player spawn.
-/// Release le curseur IMMÉDIATEMENT (sans attendre OnEnter qui trigger le frame d'après).
 fn escape_handler(
     keys: Res<ButtonInput<KeyCode>>,
     app_state: Res<State<AppMode>>,
@@ -133,7 +141,6 @@ fn escape_handler(
                 info!("[forgia-ui] ESC pressed (InGame → Menu)");
                 next_app.set(AppMode::Menu);
                 next_game.set(GameMode::None);
-                // Release cursor immédiatement (anti-frame-delay)
                 if let Ok(mut opts) = q_cursor.single_mut() {
                     opts.grab_mode = CursorGrabMode::None;
                     opts.visible = true;
@@ -149,104 +156,6 @@ fn escape_handler(
             }
         }
     }
-}
-
-/// HitmarkerState — Resource Local pour fade visual après hit confirmé.
-/// Pattern V1 : 4 segments diagonaux blancs autour crosshair, fade 220ms.
-#[derive(Resource, Default)]
-pub struct HitmarkerState {
-    /// Time remaining (s). >0 = visible, fade linéaire.
-    pub time_left: f32,
-}
-
-const HITMARKER_DURATION: f32 = 0.22; // V1 hud_hitmarker_duration_ms = 220ms
-
-/// Lit `CombatHitEvent` → reset `HitmarkerState.time_left` à HITMARKER_DURATION.
-fn hitmarker_trigger(
-    mut hits: MessageReader<CombatHitEvent>,
-    mut state: ResMut<HitmarkerState>,
-    time: Res<Time>,
-) {
-    if !hits.is_empty() {
-        state.time_left = HITMARKER_DURATION;
-        for _ in hits.read() {} // drain
-    } else if state.time_left > 0.0 {
-        state.time_left = (state.time_left - time.delta_secs()).max(0.0);
-    }
-}
-
-/// Dessine 4 segments diagonaux blancs autour du crosshair quand HitmarkerState actif.
-fn draw_hitmarker(
-    mut contexts: EguiContexts,
-    state: Res<HitmarkerState>,
-    app_state: Res<State<AppMode>>,
-) {
-    if *app_state.get() != AppMode::InGame || state.time_left <= 0.0 {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else { return };
-    let center = ctx.content_rect().center();
-    let alpha_pct = state.time_left / HITMARKER_DURATION;
-    let alpha = (alpha_pct * 220.0) as u8;
-    let color = egui::Color32::from_rgba_unmultiplied(255, 255, 255, alpha);
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Background,
-        egui::Id::new("forgia_hitmarker"),
-    ));
-    let inner = 7.0; // gap autour crosshair
-    let outer = 14.0; // longueur segment
-    let stroke = egui::Stroke::new(2.5, color);
-    // 4 segments diagonaux X
-    for &(dx, dy) in &[(1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)] {
-        painter.line_segment(
-            [
-                egui::pos2(center.x + dx * inner, center.y + dy * inner),
-                egui::pos2(center.x + dx * outer, center.y + dy * outer),
-            ],
-            stroke,
-        );
-    }
-}
-
-/// Crosshair simple — croix blanche 14px au centre de l'écran quand InGame.
-/// Anti-trap V1 (memory `reference_egui_layer_intercept_2026_05_13.md`) :
-/// dessiné via Painter sur layer Background (PAS Foreground qui intercept clics).
-fn draw_crosshair(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-) {
-    if *app_state.get() != AppMode::InGame {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else { return };
-    let screen = ctx.content_rect();
-    let center = screen.center();
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Background,
-        egui::Id::new("forgia_crosshair"),
-    ));
-    let color = egui::Color32::from_rgba_unmultiplied(255, 255, 255, 220);
-    let len = 7.0;
-    let thick = 2.0;
-    let stroke = egui::Stroke::new(thick, color);
-    // Croix horizontale
-    painter.line_segment(
-        [
-            egui::pos2(center.x - len, center.y),
-            egui::pos2(center.x + len, center.y),
-        ],
-        stroke,
-    );
-    // Croix verticale
-    painter.line_segment(
-        [
-            egui::pos2(center.x, center.y - len),
-            egui::pos2(center.x, center.y + len),
-        ],
-        stroke,
-    );
-    // Point central
-    painter.circle_filled(center, 1.5, egui::Color32::WHITE);
 }
 
 /// Lock cursor au centre + invisible quand on entre InGame (pour mouse_look).

@@ -333,7 +333,7 @@ pub struct HitApplyCtx<'w, 's> {
     pub zones: Query<
         'w,
         's,
-        (&'static HitZone, &'static ChildOf, &'static MeshMaterial3d<StandardMaterial>),
+        (&'static HitZone, &'static ChildOf, Option<&'static MeshMaterial3d<StandardMaterial>>),
         Without<TargetCube>,
     >,
     pub health: Query<'w, 's, &'static mut Health, With<TargetCube>>,
@@ -903,7 +903,16 @@ fn fire_weapon_minimal(
         // 3. Apply Health sur le PARENT (TargetCube)
         // 4. Flash material sur l'enfant touché (head OU body, pas les deux)
         if let Some((child_entity, toi)) = hit_result {
-            if let Ok((zone, child_of, mat)) = hit_ctx.zones.get(child_entity) {
+            let zone_lookup = hit_ctx.zones.get(child_entity);
+            if zone_lookup.is_err() {
+                // Diagnostic : raycast a touché un truc mais pas un HitZone enfant.
+                // Cas typique : mur, sol, ou bot dont la query échoue (pré-fix).
+                info!(
+                    "[fire] raycast hit {:?} at toi={:.2}m but no HitZone — likely wall/ground",
+                    child_entity, toi
+                );
+            }
+            if let Ok((zone, child_of, mat)) = zone_lookup {
                 let zone_mul = match zone {
                     HitZone::Head => entry.map(|e| e.head_damage_mul).unwrap_or(1.5),
                     HitZone::Body => 1.0,
@@ -916,17 +925,21 @@ fn fire_weapon_minimal(
                     hp.current = (hp.current - effective_dmg).max(0.0);
                     let dead = hp.is_dead();
                     let new_hp = hp.current;
-                    let mat_handle = mat.0.clone();
 
-                    let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
-                    commands
-                        .entity(child_entity)
-                        .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
-                        .insert(HitFlashTimer {
-                            timer: Timer::from_seconds(flash_dur, TimerMode::Once),
-                            original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
-                            original_handle: Some(mat_handle),
-                        });
+                    // Flash visuel UNIQUEMENT si le collider a un mesh visible
+                    // (show_collider_debug=true). En runtime normal les colliders
+                    // sont invisibles → skip flash, damage s'applique quand même.
+                    if let Some(mat_comp) = mat {
+                        let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
+                        commands
+                            .entity(child_entity)
+                            .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
+                            .insert(HitFlashTimer {
+                                timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                                original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
+                                original_handle: Some(mat_comp.0.clone()),
+                            });
+                    }
 
                     hit_events.write(CombatHitEvent {
                         target: parent,

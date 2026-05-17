@@ -2,12 +2,9 @@
 name = "forgia-rng"
 version = "0.1.0"
 edition = "2021"
-description = "Seeded deterministic RNG resource (bevy_rand wrapper)"
+description = "Forgia V2 — Seeded deterministic RNG (xoshiro256++). Pure data, no Bevy dep."
 
 [lints]
 workspace = true
 
 [dependencies]
-bevy = { workspace = true }
-forgia-core = { workspace = true }
-bevy_rand = "0.14"

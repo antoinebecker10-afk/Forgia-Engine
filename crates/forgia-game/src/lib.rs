@@ -45,6 +45,7 @@ pub fn run_game() -> AppExit {
         forgia_effects::prelude::ForgiaEffectsPlugin,
         forgia_combat::prelude::ForgiaCombatPlugin,
         forgia_ui::prelude::ForgiaUiPlugin,
+        forgia_ui_hud::prelude::ForgiaUiHudPlugin,
         forgia_sensors::prelude::ForgiaSensorsPlugin,
     ));
 
@@ -55,11 +56,25 @@ pub fn run_game() -> AppExit {
     app.add_plugins((
         forgia_asset_registry::prelude::ForgiaAssetRegistryPlugin,
         forgia_fps::prelude::ForgiaFpsPlugin,
+        forgia_viewmodel_calibration::ForgiaViewmodelCalibrationPlugin,
         forgia_rpg::prelude::ForgiaRpgPlugin,
         forgia_terrain::prelude::ForgiaTerrainPlugin,
         forgia_foliage::prelude::ForgiaFoliagePlugin,
         forgia_water::prelude::ForgiaWaterPlugin,
         forgia_audio_biome::prelude::ForgiaAudioBiomePlugin,
+    ));
+
+    // 7b. Anim Layer (story-437) + 3P camera (story-438) — utilisés par forgia-rpg
+    app.add_plugins((
+        forgia_anim_debug::prelude::ForgiaAnimDebugPlugin,
+        forgia_camera_orbit::prelude::ForgiaCameraOrbitPlugin,
+        forgia_secondary_motion::prelude::ForgiaSecondaryMotionPlugin,
+    ));
+
+    // 7c. Village data-driven (story-441) — Prefab + Village Loader.
+    app.add_plugins((
+        forgia_prefab::ForgiaPrefabPlugin,
+        forgia_village_loader::ForgiaVillageLoaderPlugin,
     ));
 
     // ClearColor = skybox sunset/dusk warm — ambiance forge ruines (vs bleu ciel jour)

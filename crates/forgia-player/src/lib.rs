@@ -294,18 +294,29 @@ fn weapon_recoil_apply(
     }
 }
 
+/// Keyboard turn speed when in RPG mode + RMB not held (WoW Q/D pattern).
+/// Rad per second — calibrated for snappy but not jarring turn. Future :
+/// migrate to genome tuning (story-447).
+const RPG_KEYBOARD_TURN_RAD_PER_SEC: f32 = 2.5;
+/// Mouse X → player yaw sensitivity when RMB held in RPG (mouselook steer).
+/// Rad per pixel. Calibrated against forgia-camera-orbit `yaw_sensitivity`.
+const RPG_RMB_STEER_RAD_PER_PX: f32 = 0.005;
+
 fn player_movement(
     time: Res<Time>,
     speed_mul: Res<MovementSpeedMultiplier>,
+    game_mode: Res<State<GameMode>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    mut mouse_motion: MessageReader<MouseMotion>,
     mut q: Query<(
         &mut KinematicCharacterController,
         Option<&KinematicCharacterControllerOutput>,
         &mut Player,
         &ActionState<PlayerAction>,
-        &Transform,
+        &mut Transform,
     )>,
 ) {
-    let Ok((mut kcc, output, mut player, action, tf)) = q.single_mut() else {
+    let Ok((mut kcc, output, mut player, action, mut tf)) = q.single_mut() else {
         return;
     };
     let speed = 5.0 * speed_mul.0;
@@ -314,19 +325,64 @@ fn player_movement(
     let max_fall_speed = 30.0;
     let dt = time.delta_secs();
 
+    // ── Mode-aware input interpretation (WoW pattern for RPG) ─────────
+    // RPG mode :
+    //   - RMB held → mouse X steers player yaw (mouselook). Q/D = strafe (override turn).
+    //   - RMB free → Q/D rotate player yaw in place (turn).
+    //   - LMB+RMB both held → auto-walk forward implicit.
+    // FPS mode : Q/D always strafe, mouse Y handled by mouse_look elsewhere.
+    let is_rpg = *game_mode.get() == GameMode::Rpg;
+    let cam_steer_held = mouse_buttons.pressed(MouseButton::Right);
+    let cam_look_held = mouse_buttons.pressed(MouseButton::Left);
+    let auto_walk = is_rpg && cam_steer_held && cam_look_held;
+
+    // RPG mouselook : consume mouse X to steer player yaw.
+    if is_rpg && cam_steer_held {
+        let mut dx = 0.0_f32;
+        for ev in mouse_motion.read() {
+            dx += ev.delta.x;
+        }
+        if dx.abs() > f32::EPSILON {
+            player.yaw -= dx * RPG_RMB_STEER_RAD_PER_PX;
+            tf.rotation = Quat::from_rotation_y(player.yaw);
+        }
+    } else {
+        // Drain mouse events even when not using them, so other systems
+        // (FPS mouse_look) don't see double events from accumulated buffer.
+        mouse_motion.clear();
+    }
+
+    // RPG turn keys (Q/D AZERTY = KeyA/KeyD) when no mouselook override.
+    let strafe_override = is_rpg && cam_steer_held;
+    if is_rpg && !strafe_override {
+        let turn_speed = RPG_KEYBOARD_TURN_RAD_PER_SEC;
+        if action.pressed(&PlayerAction::MoveLeft) {
+            player.yaw += turn_speed * dt;
+            tf.rotation = Quat::from_rotation_y(player.yaw);
+        }
+        if action.pressed(&PlayerAction::MoveRight) {
+            player.yaw -= turn_speed * dt;
+            tf.rotation = Quat::from_rotation_y(player.yaw);
+        }
+    }
+
     // ── Movement horizontal (relatif au yaw du player) ────────────────
     let mut wishdir = Vec3::ZERO;
-    if action.pressed(&PlayerAction::MoveForward) {
+    if action.pressed(&PlayerAction::MoveForward) || auto_walk {
         wishdir += tf.forward().as_vec3();
     }
     if action.pressed(&PlayerAction::MoveBackward) {
         wishdir -= tf.forward().as_vec3();
     }
-    if action.pressed(&PlayerAction::MoveLeft) {
-        wishdir -= tf.right().as_vec3();
-    }
-    if action.pressed(&PlayerAction::MoveRight) {
-        wishdir += tf.right().as_vec3();
+    // Q/D strafe : seulement en FPS mode OU en RPG quand RMB est tenu.
+    let strafe_active = !is_rpg || strafe_override;
+    if strafe_active {
+        if action.pressed(&PlayerAction::MoveLeft) {
+            wishdir -= tf.right().as_vec3();
+        }
+        if action.pressed(&PlayerAction::MoveRight) {
+            wishdir += tf.right().as_vec3();
+        }
     }
     wishdir.y = 0.0;
     let horizontal = wishdir.normalize_or_zero() * speed;

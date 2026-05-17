@@ -26,7 +26,14 @@ forgia-audio-core = { workspace = true }
 forgia-audio-biome = { workspace = true }
 forgia-asset-registry = { workspace = true }
 forgia-fps = { workspace = true }
+forgia-viewmodel-calibration = { workspace = true }
 forgia-rpg = { workspace = true }
 forgia-dialogue = { workspace = true }
 forgia-ui = { workspace = true }
+forgia-ui-hud = { workspace = true }
 forgia-sensors = { workspace = true }
+forgia-camera-orbit = { workspace = true }
+forgia-secondary-motion = { workspace = true }
+forgia-anim-debug = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-village-loader = { workspace = true }

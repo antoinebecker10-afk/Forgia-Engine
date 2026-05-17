@@ -11,18 +11,28 @@
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use forgia_ai_arena_bot::{ArenaBot, BotShootConfig, ForgiaAiArenaBotPlugin};
-use forgia_combat::prelude::*;
+use forgia_ai_arena_bot::ForgiaAiArenaBotPlugin;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
 
+mod wave;
+
 pub mod prelude {
+    pub use crate::wave::{
+        ArenaWavesGenome, ArenaWavesHandle, ArenaWavesPlugin, WavePhase, WaveState,
+        WaveStartedEvent, WaveCompletedEvent,
+    };
     pub use crate::{
         ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, CloudOrbit,
         ForgiaModeFpsArenaPlugin, HitZone, TargetCube,
     };
 }
+
+pub use wave::{
+    ArenaWavesGenome, ArenaWavesHandle, ArenaWavesPlugin, WavePhase, WaveState,
+    WaveStartedEvent, WaveCompletedEvent,
+};
 
 /// Zone d'impact sur un training bot. Inseré sur chaque collider enfant
 /// (Head/Body) pour permettre damage multiplier en headshot (style Overwatch).
@@ -210,6 +220,10 @@ impl Plugin for ForgiaModeFpsArenaPlugin {
         if !app.is_plugin_added::<ForgiaAiArenaBotPlugin>() {
             app.add_plugins(ForgiaAiArenaBotPlugin);
         }
+        // Waves system — gère spawn de bots par vague (était hardcodé spawn_arena).
+        if !app.is_plugin_added::<wave::ArenaWavesPlugin>() {
+            app.add_plugins(wave::ArenaWavesPlugin);
+        }
         app.init_asset::<Genome<ArenaBotsGenome>>()
             .register_asset_loader(GenomeLoader::<ArenaBotsGenome>::default())
             .add_systems(Startup, load_arena_bots_genome)
@@ -235,8 +249,6 @@ fn spawn_arena(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    bots_handle: Option<Res<ArenaBotsGenomeHandle>>,
-    bots_assets: Res<Assets<Genome<ArenaBotsGenome>>>,
 ) {
     let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
     let floor_dirt: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
@@ -459,169 +471,8 @@ fn spawn_arena(
         Name::new("ArenaSunLight"),
     ));
 
-    // Training bots Overwatch-style — TOUT data-driven depuis arena_bots.toml.
-    // Fallback hardcoded (default_arena_bots) si genome pas encore loaded.
-    //
-    // Hierarchy :
-    //   parent (TargetCube + Health, no mesh/collider)
-    //   ├─ Body (cuboid + collider, Y=body_y, HitZone::Body)
-    //   └─ Head (sphere + collider, Y=head_y, HitZone::Head)
-    //
-    // Raycast hit retourne l'entity enfant → HitZone pour multiplier dmg, ChildOf
-    // → parent pour Health.
-    let bots_owned;
-    let bots_data: &ArenaBotsGenome = match bots_handle
-        .as_deref()
-        .and_then(|h| bots_assets.get(&h.0))
-    {
-        Some(g) => &g.data,
-        None => {
-            warn!("[forgia-mode-fps-arena] arena_bots genome pas chargé — fallback hardcoded defaults");
-            bots_owned = default_arena_bots();
-            &bots_owned
-        }
-    };
-
-    // Visuels debug colliders (cubes opaques) — uniquement si TOML `show_collider_debug = true`.
-    let debug_meshes = if bots_data.show_collider_debug {
-        let body_mesh = meshes.add(Cuboid::new(
-            bots_data.body.width,
-            bots_data.body.height,
-            bots_data.body.depth,
-        ));
-        let head_mesh = meshes.add(Sphere::new(bots_data.head.radius).mesh().ico(3).unwrap());
-        let body_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(
-                bots_data.body.color[0],
-                bots_data.body.color[1],
-                bots_data.body.color[2],
-            ),
-            emissive: LinearRgba::new(
-                bots_data.body.emissive[0],
-                bots_data.body.emissive[1],
-                bots_data.body.emissive[2],
-                1.0,
-            ),
-            ..default()
-        });
-        let head_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(
-                bots_data.head.color[0],
-                bots_data.head.color[1],
-                bots_data.head.color[2],
-            ),
-            emissive: LinearRgba::new(
-                bots_data.head.emissive[0],
-                bots_data.head.emissive[1],
-                bots_data.head.emissive[2],
-                1.0,
-            ),
-            ..default()
-        });
-        Some((body_mesh, head_mesh, body_mat, head_mat))
-    } else {
-        None
-    };
-
-    let body_half = (
-        bots_data.body.width * 0.5,
-        bots_data.body.height * 0.5,
-        bots_data.body.depth * 0.5,
-    );
-    let ai = &bots_data.ai;
-
-    for spawn in &bots_data.spawn_positions {
-        let (x, z) = (spawn.x, spawn.z);
-        let bot_name = spawn
-            .character_glb
-            .rsplit('/')
-            .next()
-            .and_then(|s| s.split('.').next())
-            .unwrap_or("Enemy")
-            .to_string();
-
-        // Parent : Health + ArenaBot AI + position.
-        // Pas de mesh sur le parent ; les enfants ont mesh visuel + colliders.
-        let parent = commands
-            .spawn((
-                ArenaMarker,
-                TargetCube,
-                Transform::from_xyz(x, 0.0, z),
-                Visibility::default(),
-                Health::new(bots_data.hp),
-                ArenaBot {
-                    state: forgia_ai_arena_bot::BotState::Idle,
-                    speed: 0.0, // V1 : bots statiques (rotate to face player only)
-                    detect_range: ai.detect_range,
-                    attack_range: ai.shot_range,
-                    attack_cooldown: ai.shot_cooldown_secs,
-                    attack_left: ai.shot_warmup_secs, // warmup anti spawn-kill
-                },
-                BotShootConfig {
-                    damage: ai.shot_damage,
-                    range: ai.shot_range,
-                    jitter_rad: ai.shot_jitter_deg.to_radians(),
-                    tracer_emissive: LinearRgba::new(
-                        ai.tracer_emissive[0],
-                        ai.tracer_emissive[1],
-                        ai.tracer_emissive[2],
-                        1.0,
-                    ),
-                    shoulder_y: bots_data.head_y - 0.15, // shoulder un peu sous la tête
-                    target_torso_y: 1.0,
-                },
-                Name::new(format!("Enemy_{bot_name}_{x}_{z}")),
-            ))
-            .id();
-
-        let body_y = bots_data.body_y;
-        let head_y = bots_data.head_y;
-        let head_radius = bots_data.head.radius;
-        let character_path = spawn.character_glb.clone();
-        let character_scale = spawn.character_scale;
-        let character_yaw = spawn.character_yaw_deg.to_radians();
-        let character_y = spawn.character_y_offset;
-        let debug = debug_meshes.clone();
-
-        commands.entity(parent).with_children(|p| {
-            // Mesh character (visible). Pas de collider ici — les colliders sont
-            // séparés en head/body pour la hitzone Overwatch.
-            // Y offset compense le pivot Meshy au centre du mesh (vs pieds au sol).
-            if !character_path.is_empty() {
-                p.spawn((
-                    SceneRoot(asset_server.load(&character_path)),
-                    Transform::from_xyz(0.0, character_y, 0.0)
-                        .with_rotation(Quat::from_rotation_y(character_yaw))
-                        .with_scale(Vec3::splat(character_scale)),
-                    Name::new("CharacterMesh"),
-                ));
-            }
-
-            // Body hit zone — collider INVISIBLE (sauf debug). HitZone Component.
-            let mut body_entity = p.spawn((
-                HitZone::Body,
-                Transform::from_xyz(0.0, body_y, 0.0),
-                RigidBody::Fixed,
-                Collider::cuboid(body_half.0, body_half.1, body_half.2),
-                Name::new("Body"),
-            ));
-            if let Some((ref bm, _, ref bmat, _)) = debug {
-                body_entity.insert((Mesh3d(bm.clone()), MeshMaterial3d(bmat.clone())));
-            }
-
-            // Head hit zone — collider INVISIBLE (sauf debug).
-            let mut head_entity = p.spawn((
-                HitZone::Head,
-                Transform::from_xyz(0.0, head_y, 0.0),
-                RigidBody::Fixed,
-                Collider::ball(head_radius),
-                Name::new("Head"),
-            ));
-            if let Some((_, ref hm, _, ref hmat)) = debug {
-                head_entity.insert((Mesh3d(hm.clone()), MeshMaterial3d(hmat.clone())));
-            }
-        });
-    }
+    // Bots = spawned par `wave::wave_orchestrator` (système wave-driven, voir wave.rs).
+    // Cette fonction ne fait QUE le décor statique (sol, walls, lights, clouds).
 
     // ── Cartoon cloud clusters (orbit) ─────────────────────────────────
     let cloud_blob_mesh = meshes.add(Sphere::new(1.0).mesh().ico(3).unwrap());
@@ -719,10 +570,9 @@ fn spawn_arena(
     }
 
     info!(
-        "[forgia-mode-fps-arena] Arena spawned : {}×{}m, KayKit modular + {} training bots (head+body) + 18 cloud clusters",
+        "[forgia-mode-fps-arena] Arena spawned : {}×{}m, KayKit modular + 18 cloud clusters (bots = wave system)",
         (ARENA_SIZE as f32 * TILE_SIZE) as i32,
         (ARENA_SIZE as f32 * TILE_SIZE) as i32,
-        bots_data.spawn_positions.len(),
     );
 }
 

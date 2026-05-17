@@ -111,6 +111,20 @@ impl TreeVariant {
     }
 }
 
+/// Excluded disc (XZ world coords) where no foliage may spawn. Inserted by
+/// gameplay caller (e.g. `forgia-rpg` when a village is generated). Removed
+/// at cleanup OnExit. Buffer is added to the genome bounding radius for
+/// a clean clearing margin around the village edge.
+///
+/// Pattern : exclusion zones décrit dans `docs/audit-procgen-village-2026-05-17.md` §7.
+#[derive(Resource, Clone, Debug)]
+pub struct FoliageExclusionDisc {
+    /// World XZ center of the disc.
+    pub center: Vec2,
+    /// Radius in meters. Foliage skipped when `pos.distance(center) < radius`.
+    pub radius: f32,
+}
+
 #[derive(Resource, Default)]
 pub struct VegetationManager {
     /// Tracking pour despawn ciblé quand un chunk est déchargé.
@@ -163,6 +177,7 @@ fn init_proc_meshes(mut veg: ResMut<VegetationManager>, mut meshes: ResMut<Asset
 ///
 /// Si trunk/canopy meshes pas encore initialisés (cleanup OnExit a remplacé la
 /// Resource par défaut), on les ré-initialise lazily.
+#[allow(clippy::too_many_arguments)]
 fn populate_new_chunks(
     mut commands: Commands,
     mut veg: ResMut<VegetationManager>,
@@ -172,6 +187,7 @@ fn populate_new_chunks(
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
     path_net: Option<Res<PathNetwork>>,
+    excl_disc: Option<Res<FoliageExclusionDisc>>,
     q_chunks: Query<(Entity, &ChunkCoord, Option<&ChunkLod>)>,
 ) {
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
@@ -238,14 +254,24 @@ fn populate_new_chunks(
             if h < terrain_cfg.sea_level + 0.3 { continue; }
 
             // Skip si trop proche d'un PathSample (sentier dégagé). Buffer =
-            // road half_width + 3m extra pour clairière nette autour du chemin.
+            // road half_width + 4m extra pour clairière nette autour du chemin
+            // (user feedback 2026-05-17 PM : "jamais d'asset sur les routes").
             if let Some(ref pn) = path_net {
                 let p = Vec2::new(wx, wz);
                 let too_close = pn.samples_iter().any(|s| {
-                    let buf = s.tier.half_width() + 3.0;
+                    let buf = s.tier.half_width() + 4.0;
                     p.distance_squared(s.pos) < buf * buf
                 });
                 if too_close { continue; }
+            }
+
+            // Skip si à l'intérieur du disque d'exclusion village (gameplay
+            // caller insère `FoliageExclusionDisc` quand un village spawne).
+            if let Some(ref ed) = excl_disc {
+                let p = Vec2::new(wx, wz);
+                if p.distance_squared(ed.center) < ed.radius * ed.radius {
+                    continue;
+                }
             }
 
             // Hash déterministe (i + chunk_coord) — pool autumn ou pool default.

@@ -20,5 +20,13 @@ forgia-foliage = { workspace = true }
 forgia-audio-biome = { workspace = true }
 forgia-ui = { workspace = true }
 forgia-dialogue = { workspace = true }
+forgia-camera-orbit = { workspace = true }
+forgia-secondary-motion = { workspace = true }
+forgia-anim-debug = { workspace = true }
+forgia-rig-topology = { workspace = true }
+forgia-auto-rig = { workspace = true }
+forgia-ik = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-village-loader = { workspace = true }
 noise = { workspace = true }
 leafwing-input-manager = { workspace = true }

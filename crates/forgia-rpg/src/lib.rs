@@ -13,7 +13,6 @@
 //! W2 : streaming N chunks autour joueur. W3 : Voronoi 10 biomes. W4 : preset_island.
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
 use forgia_dialogue::{
     DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueTree,
@@ -23,14 +22,20 @@ use forgia_input::PlayerAction;
 use forgia_player::prelude::Player;
 use forgia_audio_biome::prelude::AudioSampleOffset;
 use forgia_foliage::prelude::VegetationManager;
-use forgia_foliage::{RpgSampleOffset, VegetationTree};
+use forgia_foliage::{FoliageExclusionDisc, RpgSampleOffset, VegetationTree};
 use forgia_terrain::{
-    build_chunk_mesh, build_path_network, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
+    build_chunk_mesh, build_path_segment, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
     Lod2TileManager, LodSampleOffset, LodStats, MapGenConfig, PathNetwork, RoadTier,
-    TerrainConfig, TerrainSharedMaterial,
+    TerrainConfig, TerrainSharedMaterial, CHUNK_X, CHUNK_Z,
+};
+use forgia_village_loader::{
+    cleanup_village, LoadVillageGenomeRequest, LoadVillageRequest, VillageLoadResult,
 };
 use leafwing_input_manager::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
+
+pub mod character;
+pub mod proc_walk;
 
 pub mod prelude {
     pub use crate::{ForgiaRpgPlugin, InteractablePoint, Npc, RpgWorldMarker};
@@ -74,18 +79,43 @@ pub struct ForgiaRpgPlugin;
 
 impl Plugin for ForgiaRpgPlugin {
     fn build(&self, app: &mut App) {
+        // Story-440 R&D 2026-05-17 night : re-enable ForgiaAutoRigPlugin avec
+        // backend PinocchioV1 (voxelize → medial axis → embed template).
+        // Skinning DISABLE en interne du plugin → bones gizmos visibles sans
+        // déformer le mesh visuel. ProcBodyAnim/locomotion restent disable.
+        // Validation visuelle bones d'abord, anim Phase 2+ après.
+        app.add_plugins(forgia_auto_rig::ForgiaAutoRigPlugin);
+        app.init_resource::<character::TestCharacterMode>();
         app.add_systems(Startup, register_sample_dialogues)
             .add_systems(OnEnter(GameMode::Rpg), spawn_world)
-            .add_systems(OnExit(GameMode::Rpg), cleanup_world)
+            .add_systems(
+                OnExit(GameMode::Rpg),
+                (character::cleanup_rex_character, cleanup_world, cleanup_village).chain(),
+            )
             .add_systems(
                 Update,
                 (
+                    spawn_village_paths_when_loaded,
                     teleport_player_to_terrain,
                     stream_chunks_around_player,
                     write_chunks_sensor,
                     interact_system,
+                    rpg_cloud_drift_system,
                 )
                     .chain()
+                    .run_if(in_state(GameMode::Rpg)),
+            )
+            // Rex spawn one-shot (retry-jusqu'à-success : race avec spawn_player
+            // dans un autre plugin OnEnter Rpg). Pas d'animation système — Rex
+            // reste en bind pose (T-pose) jusqu'à réactivation auto-rig.
+            .add_systems(
+                Update,
+                (
+                    character::spawn_rex_character,
+                    character::calibrate_rex_y_one_shot,
+                    character::rex_make_transparent_one_shot,
+                )
+                    .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
             );
     }
@@ -195,110 +225,50 @@ fn spawn_world(
     // Marque qu'un teleport joueur doit firer ce cycle Rpg (consommé en Update).
     commands.insert_resource(PendingPlayerTeleport);
 
-    // ── Path network + visual ribbons ────────────────────────────────────
-    // 4 POIs structurels en anneau autour du spawn (16, _, 16). Coords monde
-    // dans le chunk visible [0, 32] × [0, 32]. Bezier warp 0.25 donne des
-    // courbes naturelles vs lignes droites cartoonesques.
-    let pois = vec![
-        Vec2::new(4.0, 4.0),    // NW corner sentier
-        Vec2::new(28.0, 4.0),   // NE
-        Vec2::new(28.0, 28.0),  // SE
-        Vec2::new(4.0, 28.0),   // SW
-    ];
-    let path_net = build_path_network(&pois, RoadTier::Secondary, 0.25);
-    spawn_path_ribbons(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &asset_server,
-        &path_net,
-        &make_terrain_config(),
-    );
-    commands.insert_resource(path_net);
+    // ── Village procgen (story-442 supersedes 441) ──────────────────────
+    // Le village est généré procéduralement depuis un genome TOML (seed +
+    // density + bounding) plutôt qu'un TOML hardcodant les positions XYZ.
+    // Path network reste vide jusqu'à `spawn_village_paths_when_loaded`.
+    commands.insert_resource(PathNetwork::default());
+    // World center for the spawn village = center of chunk (0,0). Derived from
+    // terrain chunk constants (no magic number).
+    let village_world_center = Vec2::new(CHUNK_X as f32 * 0.5, CHUNK_Z as f32 * 0.5);
+    commands.insert_resource(LoadVillageGenomeRequest {
+        genome_path: "config/genomes/villages/starter_hamlet.toml".into(),
+        terrain_sample_offset: sample_offset(),
+        world_center: village_world_center,
+    });
 
-    // ── Cavernes (KayKit Dungeon entrances) ──────────────────────────────
-    // 3 entrées caverne placées hors anneau de path, légèrement enfoncées
-    // dans le terrain. Visuellement = arche + 2 piliers + escaliers + rubble.
-    // Tag RpgWorldMarker pour cleanup OnExit Rpg.
-    let cave_positions: [Vec2; 3] = [
-        Vec2::new(10.0, 22.0), // SW interior
-        Vec2::new(24.0, 22.0), // SE interior
-        Vec2::new(16.0, 10.0), // N centre
-    ];
-    for pos in cave_positions {
-        spawn_cave_entrance(&mut commands, &asset_server, pos, &make_terrain_config());
-    }
+    // Caves removed 2026-05-17 PM — n'apportaient rien visuellement, le village
+    // procgen est désormais le seul focal du spawn. La fonction `spawn_cave_entrance`
+    // est conservée sous `#[allow(dead_code)]` pour réutilisation future
+    // (donjons, points d'intérêt nature).
 
-    // ── Sun ──────────────────────────────────────────────────────────────
+    // ── Sun (cartoon FPS-arena-style) ────────────────────────────────────
     commands.spawn((
         RpgWorldMarker,
         DirectionalLight {
-            illuminance: 12_000.0,
+            color: Color::srgb(1.0, 0.96, 0.88),
+            illuminance: 22_000.0,
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_xyz(20.0, 30.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.35, -0.78, 0.0)),
         Name::new("RpgSun"),
     ));
 
-    // ── Buildings + NPCs posés via sampler local sur le terrain procédural ──
-    let tcfg = make_terrain_config();
-    let wood_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.55, 0.40, 0.25),
-        perceptual_roughness: 0.85,
-        ..default()
-    });
-    let building_mesh = meshes.add(Cuboid::new(6.0, 4.0, 6.0));
-    for (i, (x, z)) in [(8.0_f32, 6.0_f32), (20.0, 10.0)].iter().enumerate() {
-        let y_ground = terrain_height_local(*x, *z, &tcfg);
-        commands.spawn((
-            RpgWorldMarker,
-            Mesh3d(building_mesh.clone()),
-            MeshMaterial3d(wood_mat.clone()),
-            Transform::from_xyz(*x, y_ground + 2.0, *z),
-            RigidBody::Fixed,
-            Collider::cuboid(3.0, 2.0, 3.0),
-            InteractablePoint {
-                label: format!("Maison #{}", i + 1),
-                radius: 4.0,
-            },
-            Name::new(format!("Building{}", i + 1)),
-        ));
-    }
+    // ── Cartoon cloud clusters (orbit) — mêmes data que FPS arena ────────
+    spawn_rpg_cartoon_clouds(&mut commands, &mut meshes, &mut materials);
 
-    let npc_mesh = meshes.add(Capsule3d::new(0.4, 1.2));
-    let npc_data = [
-        ("Forgeron Aldric",  "Bienvenue voyageur. J'ai besoin d'aide aux mines.", 12.0_f32, 14.0_f32, Color::srgb(0.8, 0.3, 0.2)),
-        ("Marchande Lyra",   "Mes étals sont ouverts. Voulez-vous troquer ?",     16.0,    18.0,    Color::srgb(0.3, 0.5, 0.8)),
-        ("Garde Brennus",    "Halte ! Identifiez-vous, étranger.",                22.0,    16.0,    Color::srgb(0.4, 0.4, 0.4)),
-        ("Sage Eldwyn",      "Les anciens parlent de prophéties...",              10.0,    22.0,    Color::srgb(0.6, 0.4, 0.7)),
-        ("Aubergiste Mira",  "Un lit chaud et une bière fraîche, voyageur ?",     26.0,    20.0,    Color::srgb(0.7, 0.6, 0.3)),
-    ];
-    for (name, greeting, x, z, color) in npc_data {
-        let y_ground = terrain_height_local(x, z, &tcfg);
-        let mat = materials.add(StandardMaterial {
-            base_color: color,
-            perceptual_roughness: 0.8,
-            ..default()
-        });
-        commands.spawn((
-            RpgWorldMarker,
-            Npc { name: name.to_string(), greeting: greeting.to_string() },
-            InteractablePoint {
-                label: format!("Parler à {}", name),
-                radius: 2.5,
-            },
-            Mesh3d(npc_mesh.clone()),
-            MeshMaterial3d(mat),
-            Transform::from_xyz(x, y_ground + 1.0, z),
-            RigidBody::Fixed,
-            Collider::capsule_y(0.6, 0.4),
-            Name::new(name.to_string()),
-        ));
-    }
+    // ── Buildings : spawnés par `forgia-village-loader` (genome procgen). ──
+    // ── NPCs : retirés story-446 (5 Capsule3d hardcodés (12,14)..(26,20))
+    //          ne respectaient pas le layout procgen. Reviendront via
+    //          `forgia-village-npc-spawner` (story-445) qui placera les villagers
+    //          relatif aux building positions du VillageGraph.
+    let _ = make_terrain_config();
 
     info!(
-        "[forgia-rpg] W1 World spawned : 1 chunk (32×32m, heightmap-grid) + sun + 2 buildings + 5 NPCs"
+        "[forgia-rpg] World spawned : 1 chunk (32×32m, heightmap-grid) + sun + village genome request inserted (config/genomes/villages/starter_hamlet.toml)"
     );
 }
 
@@ -424,30 +394,107 @@ fn write_chunks_sensor(
     let _ = std::fs::write("forgia_chunks_snapshot.json", json);
 }
 
-/// Marqueur Resource posée OnEnter(Rpg), consommée par `teleport_player_to_terrain`
-/// dès qu'il a vraiment téléporté le joueur (présence Player + TerrainConfig).
-/// Garantit que la téléportation fire à CHAQUE entrée Rpg (vs Local<bool> qui
-/// persistait à travers les state transitions → joueur restait à (0,2,0) en
-/// dessous du terrain h=15+, fall through).
+/// Marqueur Resource posée OnEnter(Rpg), retirée par `teleport_player_to_terrain`
+/// après téléportation réussie. Garantit que la téléportation fire à CHAQUE
+/// entrée Rpg, mais une seule fois (vs Local<bool> qui persistait à travers les
+/// state transitions → joueur restait sous le terrain au 2e Rpg).
 #[derive(Resource)]
 struct PendingPlayerTeleport;
 
+/// Téléporte le Player à la position définie par le village TOML (story-441) :
+/// `VillageLoadResult.spawn_position` (Y déjà offset au-dessus du terrain).
+/// Gating : attend que le village loader ait fini de charger le TOML.
 fn teleport_player_to_terrain(
     mut commands: Commands,
     pending: Option<Res<PendingPlayerTeleport>>,
-    cfg: Option<Res<TerrainConfig>>,
+    village: Option<Res<VillageLoadResult>>,
     mut q: Query<&mut Transform, With<Player>>,
 ) {
     if pending.is_none() { return; }
-    let Some(cfg) = cfg else { return };
+    let Some(village) = village else { return };
     let Ok(mut tf) = q.single_mut() else { return };
-    // Pose le joueur à world (16, h+2, 16) — milieu du chunk (0,0).
-    let target_x = 16.0_f32;
-    let target_z = 16.0_f32;
-    let h = terrain_height_local(target_x, target_z, &cfg);
-    tf.translation = Vec3::new(target_x, h + 2.0, target_z);
+    tf.translation = village.spawn_position;
+    tf.rotation = Quat::from_rotation_y(village.spawn_yaw_deg.to_radians());
     commands.remove_resource::<PendingPlayerTeleport>();
-    info!("[forgia-rpg] Player teleported to terrain surface (h={:.2})", h);
+    info!(
+        "[forgia-rpg] Player teleported to village '{}' spawn ({:.1},{:.1},{:.1})",
+        village.village_id,
+        village.spawn_position.x, village.spawn_position.y, village.spawn_position.z
+    );
+}
+
+/// Consomme `VillageLoadResult` une fois publié par le village loader : pour
+/// chaque RoadSegment, construit une polyline Bezier (warp 0.0 = droite radiale
+/// par défaut) et remplace le `PathNetwork`. Le système ribbon mesh
+/// `(`spawn_path_ribbons`) est invoqué une seule fois ici puis le marker
+/// `VillagePathsBuilt` empêche la reconstruction.
+#[derive(Resource)]
+struct VillagePathsBuilt;
+
+#[allow(clippy::too_many_arguments)]
+fn spawn_village_paths_when_loaded(
+    mut commands: Commands,
+    village: Option<Res<VillageLoadResult>>,
+    built: Option<Res<VillagePathsBuilt>>,
+    terrain_cfg: Option<Res<TerrainConfig>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+    q_existing_trees: Query<(Entity, &Transform), With<VegetationTree>>,
+) {
+    if built.is_some() { return; }
+    let Some(village) = village else { return };
+    // BUG-441-04 fix : lire Res<TerrainConfig> au lieu de reconstruire via
+    // `make_terrain_config()` — évite la dérive si les constantes changent.
+    let Some(terrain_cfg) = terrain_cfg else { return };
+    let mut polylines = Vec::with_capacity(village.roads.len());
+    for seg in &village.roads {
+        let tier = RoadTier::from_tier_name(&seg.tier);
+        let pl = build_path_segment(seg.start, seg.end, tier, 0.0);
+        if !pl.samples.is_empty() {
+            polylines.push(pl);
+        }
+    }
+    let path_net = PathNetwork { polylines };
+    spawn_path_ribbons(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &asset_server,
+        &path_net,
+        &terrain_cfg,
+    );
+    commands.insert_resource(path_net);
+
+    // Foliage exclusion disc autour du village. Buffer +3m sur le bounding pour
+    // une clairière nette autour des bâtiments les plus en bordure.
+    let excl_radius = village.bounding_radius + 3.0;
+    let excl_center = village.center;
+    commands.insert_resource(FoliageExclusionDisc {
+        center: excl_center,
+        radius: excl_radius,
+    });
+
+    // Despawn rétroactif des arbres déjà spawnés à l'intérieur du disc
+    // (race : foliage a pu populate le chunk avant que la village result soit
+    // émis). One-shot ici car protégé par VillagePathsBuilt marker.
+    let r2 = excl_radius * excl_radius;
+    let mut cleared = 0u32;
+    for (e, tf) in &q_existing_trees {
+        let p = Vec2::new(tf.translation.x, tf.translation.z);
+        if p.distance_squared(excl_center) < r2 {
+            commands.entity(e).despawn();
+            cleared += 1;
+        }
+    }
+    if cleared > 0 {
+        info!(
+            "[forgia-rpg] cleared {} trees inside village exclusion disc r={:.1}m",
+            cleared, excl_radius
+        );
+    }
+
+    commands.insert_resource(VillagePathsBuilt);
 }
 
 /// Register sample DialogueTrees so the E-interact loop has content to show.
@@ -700,6 +747,11 @@ fn spawn_path_ribbons(
 /// Composite cave entrance = 1 arche centrale + 2 piliers latéraux + 1 escalier
 /// descendant légèrement enfoncé + 3 rubble alentour. Orientation : entrée fait
 /// face au centre du chunk (joueur spawn à 16,16).
+///
+/// **Disabled depuis 2026-05-17 PM** : appel retiré de `spawn_world` (user feedback :
+/// "les grottes/cavernes n'apportent rien"). Fonction conservée pour réutilisation
+/// (donjons futurs, POI nature).
+#[allow(dead_code)]
 fn spawn_cave_entrance(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
@@ -782,6 +834,139 @@ fn spawn_cave_entrance(
     }
 }
 
+// ── Cartoon sky (clouds) ────────────────────────────────────────────────────
+// Port direct du pattern forgia-mode-fps-arena → 18 cloud clusters orbital +
+// drift system. Tagged RpgWorldMarker pour cleanup auto OnExit Rpg.
+//
+// Stockage polaire (angle/radius/height) pour éviter wrap brusque sur drift +X
+// linéaire (le bug V1 où nuages disparaissaient à 4 km est exclu).
+
+const RPG_CLOUD_COLOR: Color = Color::srgb(0.95, 0.96, 0.97);
+const RPG_CLOUD_EMISSIVE: LinearRgba = LinearRgba::new(0.05, 0.05, 0.06, 1.0);
+const RPG_CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min
+
+#[derive(Component)]
+pub struct RpgCloudOrbit {
+    pub angle: f32,
+    pub radius: f32,
+    pub height: f32,
+}
+
+fn spawn_rpg_cartoon_clouds(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    let cloud_blob_mesh = meshes.add(Sphere::new(1.0).mesh().ico(3).unwrap());
+    let cloud_mat = materials.add(StandardMaterial {
+        base_color: RPG_CLOUD_COLOR,
+        emissive: RPG_CLOUD_EMISSIVE,
+        perceptual_roughness: 1.0,
+        metallic: 0.0,
+        reflectance: 0.0,
+        ..default()
+    });
+
+    let blobs_popcorn: &[(f32, f32, f32, f32)] = &[
+        (0.0, 0.0, 0.0, 5.0),
+        (4.5, 0.8, 1.2, 3.5),
+        (-4.0, 0.4, -1.8, 3.2),
+        (1.5, 1.5, 4.5, 2.8),
+        (-2.0, -0.6, -4.2, 2.6),
+        (3.5, -0.4, -3.0, 2.2),
+    ];
+    let blobs_stratus: &[(f32, f32, f32, f32)] = &[
+        (-12.0, 0.0, 0.0, 2.5),
+        (-8.0, 0.5, 0.8, 3.0),
+        (-4.0, 0.3, -0.5, 3.5),
+        (0.0, 0.0, 0.5, 4.0),
+        (4.0, 0.4, -0.3, 3.6),
+        (8.0, 0.2, 0.7, 3.0),
+        (12.0, 0.0, -0.4, 2.4),
+        (15.0, -0.3, 0.0, 1.8),
+    ];
+    let blobs_puff: &[(f32, f32, f32, f32)] = &[
+        (0.0, 0.0, 0.0, 3.0),
+        (2.5, 0.5, 0.5, 2.2),
+        (-2.0, 0.3, -0.5, 2.0),
+        (0.5, -0.3, 1.8, 1.8),
+    ];
+
+    let clusters: &[(f32, f32, f32, f32, f32, u8)] = &[
+        (-40.0, 55.0, -55.0, 1.0, 1.0, 0),
+        (55.0, 62.0, -35.0, 1.3, 1.2, 0),
+        (5.0, 68.0, 65.0, 1.6, 0.9, 0),
+        (-60.0, 50.0, 38.0, 1.0, 1.1, 0),
+        (45.0, 58.0, 55.0, 0.85, 1.0, 0),
+        (-25.0, 60.0, -80.0, 1.2, 0.8, 1),
+        (70.0, 55.0, 20.0, 1.0, 0.9, 1),
+        (-80.0, 52.0, -10.0, 1.1, 0.85, 1),
+        (15.0, 48.0, -25.0, 0.7, 1.0, 2),
+        (-15.0, 50.0, 25.0, 0.8, 1.0, 2),
+        (-100.0, 80.0, -60.0, 1.8, 0.7, 1),
+        (90.0, 85.0, -90.0, 1.5, 0.8, 0),
+        (-50.0, 90.0, 100.0, 2.0, 0.7, 1),
+        (100.0, 75.0, 70.0, 1.4, 1.0, 0),
+        (0.0, 95.0, -120.0, 1.6, 0.8, 1),
+        (-110.0, 70.0, 40.0, 1.2, 0.9, 0),
+        (60.0, 88.0, 110.0, 1.7, 0.75, 1),
+        (30.0, 78.0, -70.0, 0.9, 1.1, 2),
+    ];
+
+    for (ci, &(cx, cy, cz, scale, hscale, preset)) in clusters.iter().enumerate() {
+        let blobs: &[(f32, f32, f32, f32)] = match preset {
+            1 => blobs_stratus,
+            2 => blobs_puff,
+            _ => blobs_popcorn,
+        };
+        let preset_name = match preset {
+            1 => "stratus",
+            2 => "puff",
+            _ => "popcorn",
+        };
+
+        let angle = cz.atan2(cx);
+        let radius = (cx * cx + cz * cz).sqrt();
+        let parent_id = commands
+            .spawn((
+                RpgWorldMarker,
+                RpgCloudOrbit { angle, radius, height: cy },
+                Transform::from_xyz(cx, cy, cz)
+                    .with_scale(Vec3::new(scale, hscale * scale, scale)),
+                Visibility::default(),
+                Name::new(format!("RpgCloud_{preset_name}_{ci}")),
+            ))
+            .id();
+
+        for (bi, &(bx, by, bz, br)) in blobs.iter().enumerate() {
+            let child = commands
+                .spawn((
+                    Mesh3d(cloud_blob_mesh.clone()),
+                    MeshMaterial3d(cloud_mat.clone()),
+                    Transform::from_xyz(bx, by, bz).with_scale(Vec3::splat(br)),
+                    bevy::light::NotShadowCaster,
+                    Name::new(format!("RpgBlob_{ci}_{bi}")),
+                ))
+                .id();
+            commands.entity(parent_id).add_child(child);
+        }
+    }
+    info!("[forgia-rpg] Cartoon sky : 18 cloud clusters spawned");
+}
+
+fn rpg_cloud_drift_system(
+    time: Res<Time>,
+    mut q: Query<(&mut Transform, &mut RpgCloudOrbit)>,
+) {
+    let dt = time.delta_secs();
+    for (mut tf, mut orbit) in &mut q {
+        orbit.angle += dt * RPG_CLOUD_ORBIT_SPEED;
+        tf.translation.x = orbit.angle.cos() * orbit.radius;
+        tf.translation.z = orbit.angle.sin() * orbit.radius;
+        tf.translation.y = orbit.height;
+    }
+}
+
 fn cleanup_world(
     mut commands: Commands,
     q: Query<Entity, With<RpgWorldMarker>>,
@@ -803,6 +988,11 @@ fn cleanup_world(
     commands.remove_resource::<LodSampleOffset>();
     commands.remove_resource::<AudioSampleOffset>();
     commands.remove_resource::<PathNetwork>();
+    commands.remove_resource::<VillagePathsBuilt>();
+    commands.remove_resource::<PendingPlayerTeleport>();
+    commands.remove_resource::<LoadVillageRequest>();
+    commands.remove_resource::<LoadVillageGenomeRequest>();
+    commands.remove_resource::<FoliageExclusionDisc>();
     commands.insert_resource(LodStats::default());
     commands.insert_resource(VegetationManager::default());
     info!(
@@ -865,6 +1055,92 @@ mod tests {
         let a = terrain_height_local(5.0, 10.0, &cfg);
         let b = terrain_height_local(5.0, 10.0, &cfg);
         assert_eq!(a, b);
+    }
+
+    // ── spawn_rex_character race-condition fix (story-438 / playtest 2026-05-16) ──
+    // Bug : spawn_rex_character était dans OnEnter(Rpg) → tournait avant spawn Player
+    // (autre plugin, même OnEnter) → warn "no Player found" + Rex jamais spawné.
+    // Fix : déplacé en Update GameSet::Movement + guard idempotent.
+    // Tests : prouver que (a) no-op sans Player, (b) spawn correct, (c) idempotent.
+
+    use crate::character::{spawn_rex_character, RexCharacter};
+    use bevy::asset::AssetPlugin;
+    use bevy::scene::ScenePlugin;
+    use forgia_player::prelude::Player;
+
+    fn make_test_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(AssetPlugin::default())
+            .add_plugins(ScenePlugin)
+            .add_systems(Update, spawn_rex_character);
+        app
+    }
+
+    #[test]
+    fn spawn_rex_noop_when_no_player() {
+        let mut app = make_test_app();
+        app.update();
+        let world = app.world_mut();
+        let mut q = world.query::<&RexCharacter>();
+        assert_eq!(
+            q.iter(world).count(),
+            0,
+            "Rex ne doit PAS spawn si Player absent (anti race-condition)"
+        );
+    }
+
+    #[test]
+    fn spawn_rex_when_player_present() {
+        let mut app = make_test_app();
+        app.world_mut().spawn(Player::default());
+        app.update();
+        let world = app.world_mut();
+        let mut q = world.query::<&RexCharacter>();
+        assert_eq!(
+            q.iter(world).count(),
+            1,
+            "Rex doit spawn UNE fois quand Player présent"
+        );
+    }
+
+    #[test]
+    fn spawn_rex_idempotent_across_frames() {
+        let mut app = make_test_app();
+        app.world_mut().spawn(Player::default());
+        // 5 frames consécutives — Rex doit rester unique (guard q_existing_rex)
+        for _ in 0..5 {
+            app.update();
+        }
+        let world = app.world_mut();
+        let mut q = world.query::<&RexCharacter>();
+        assert_eq!(
+            q.iter(world).count(),
+            1,
+            "Rex doit rester unique (guard idempotent)"
+        );
+    }
+
+    #[test]
+    fn spawn_rex_retry_after_late_player() {
+        // Reproduit la race-condition réelle : 1ère frame sans Player → no-op.
+        // Player apparaît frame 2 → Rex doit spawner.
+        let mut app = make_test_app();
+        app.update(); // T0 : no player, no-op
+        {
+            let world = app.world_mut();
+            let mut q = world.query::<&RexCharacter>();
+            assert_eq!(q.iter(world).count(), 0);
+        }
+        app.world_mut().spawn(Player::default());
+        app.update(); // T1 : player présent, Rex spawn
+        let world = app.world_mut();
+        let mut q = world.query::<&RexCharacter>();
+        assert_eq!(
+            q.iter(world).count(),
+            1,
+            "Rex doit spawn quand Player apparaît à T1 (retry-jusqu'à-success)"
+        );
     }
 
     #[test]

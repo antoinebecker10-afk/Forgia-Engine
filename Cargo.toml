@@ -13,6 +13,8 @@ members = [
     "crates/forgia-ai-state-machine",
     "crates/forgia-ai-utility",
     "crates/forgia-analytics",
+    "crates/forgia-anim-debug",
+    "crates/forgia-rig-topology",
     "crates/forgia-animation-blend",
     "crates/forgia-animation-mixamo",
     "crates/forgia-anticheat",
@@ -22,6 +24,7 @@ members = [
     "crates/forgia-asset-cdn",
     "crates/forgia-asset-lod-generator",
     "crates/forgia-asset-registry",
+    "crates/forgia-auto-rig",
     "crates/forgia-assets",
     "crates/forgia-assets-bundle",
     "crates/forgia-audio-biome",
@@ -98,6 +101,9 @@ members = [
     "crates/forgia-manifest",
     "crates/forgia-marketplace-client",
     "crates/forgia-mesh-fader",
+    "crates/forgia-mesh-voxelizer",
+    "crates/forgia-medial-axis",
+    "crates/forgia-skeleton-embedder",
     "crates/forgia-meshy-import",
     "crates/forgia-mod-outline",
     "crates/forgia-mode-fps-arena",
@@ -201,6 +207,7 @@ members = [
     "crates/forgia-script-sandbox",
     "crates/forgia-script-variables",
     "crates/forgia-scripting-luau",
+    "crates/forgia-secondary-motion",
     "crates/forgia-sensors",
     "crates/forgia-shape-library",
     "crates/forgia-signals",
@@ -233,6 +240,12 @@ members = [
     "crates/forgia-vfx-impact-library",
     "crates/forgia-vfx-tracers",
     "crates/forgia-viewmodel",
+    "crates/forgia-viewmodel-calibration",
+    "crates/forgia-genome-village",
+    "crates/forgia-procgen-graph",
+    "crates/forgia-village-generator",
+    "crates/forgia-village-kit",
+    "crates/forgia-village-loader",
     "crates/forgia-water",
     "crates/forgia-weapon-beam",
     "crates/forgia-weapon-charged",
@@ -283,6 +296,9 @@ voronoice = "0.2"
 rayon = "1"
 zstd = "0.13"
 
+# Procgen — spatial index pour validation building-vs-road (story-446)
+rstar = "0.12"
+
 # Common
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -305,6 +321,8 @@ forgia-ai-perception = { path = "crates/forgia-ai-perception" }
 forgia-ai-state-machine = { path = "crates/forgia-ai-state-machine" }
 forgia-ai-utility = { path = "crates/forgia-ai-utility" }
 forgia-analytics = { path = "crates/forgia-analytics" }
+forgia-anim-debug = { path = "crates/forgia-anim-debug" }
+forgia-rig-topology = { path = "crates/forgia-rig-topology" }
 forgia-animation-blend = { path = "crates/forgia-animation-blend" }
 forgia-animation-mixamo = { path = "crates/forgia-animation-mixamo" }
 forgia-anticheat = { path = "crates/forgia-anticheat" }
@@ -314,6 +332,7 @@ forgia-asset-atlas-packer = { path = "crates/forgia-asset-atlas-packer" }
 forgia-asset-cdn = { path = "crates/forgia-asset-cdn" }
 forgia-asset-lod-generator = { path = "crates/forgia-asset-lod-generator" }
 forgia-asset-registry = { path = "crates/forgia-asset-registry" }
+forgia-auto-rig = { path = "crates/forgia-auto-rig" }
 forgia-assets = { path = "crates/forgia-assets" }
 forgia-assets-bundle = { path = "crates/forgia-assets-bundle" }
 forgia-audio-biome = { path = "crates/forgia-audio-biome" }
@@ -390,6 +409,9 @@ forgia-loot-tables = { path = "crates/forgia-loot-tables" }
 forgia-manifest = { path = "crates/forgia-manifest" }
 forgia-marketplace-client = { path = "crates/forgia-marketplace-client" }
 forgia-mesh-fader = { path = "crates/forgia-mesh-fader" }
+forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
+forgia-medial-axis = { path = "crates/forgia-medial-axis" }
+forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
 forgia-meshy-import = { path = "crates/forgia-meshy-import" }
 forgia-mod-outline = { path = "crates/forgia-mod-outline" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
@@ -493,6 +515,7 @@ forgia-script-hot-reload = { path = "crates/forgia-script-hot-reload" }
 forgia-script-sandbox = { path = "crates/forgia-script-sandbox" }
 forgia-script-variables = { path = "crates/forgia-script-variables" }
 forgia-scripting-luau = { path = "crates/forgia-scripting-luau" }
+forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
 forgia-sensors = { path = "crates/forgia-sensors" }
 forgia-shape-library = { path = "crates/forgia-shape-library" }
 forgia-signals = { path = "crates/forgia-signals" }
@@ -525,6 +548,12 @@ forgia-vfx-hanabi = { path = "crates/forgia-vfx-hanabi" }
 forgia-vfx-impact-library = { path = "crates/forgia-vfx-impact-library" }
 forgia-vfx-tracers = { path = "crates/forgia-vfx-tracers" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
+forgia-viewmodel-calibration = { path = "crates/forgia-viewmodel-calibration" }
+forgia-genome-village = { path = "crates/forgia-genome-village" }
+forgia-procgen-graph = { path = "crates/forgia-procgen-graph" }
+forgia-village-generator = { path = "crates/forgia-village-generator" }
+forgia-village-kit = { path = "crates/forgia-village-kit" }
+forgia-village-loader = { path = "crates/forgia-village-loader" }
 forgia-water = { path = "crates/forgia-water" }
 forgia-weapon-beam = { path = "crates/forgia-weapon-beam" }
 forgia-weapon-charged = { path = "crates/forgia-weapon-charged" }

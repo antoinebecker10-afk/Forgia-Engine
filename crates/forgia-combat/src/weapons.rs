@@ -35,10 +35,11 @@ use bevy::platform::collections::HashMap;
 // Balance values (damage, rate) live in FpsTuning as always.
 // =============================================================================
 
-pub const ARENA_V1_WEAPONS: [WeaponType; 3] = [
-    WeaponType::ModernAR,
-    WeaponType::Shotgun,
-    WeaponType::RocketLauncher,
+pub const ARENA_V1_WEAPONS: [WeaponType; 4] = [
+    WeaponType::ModernAR,      // Digit1 = Pépin
+    WeaponType::AssaultRifle,  // Digit2 = Bourrasque
+    WeaponType::Shotgun,       // Digit3 = Madame Lenoir
+    WeaponType::RocketLauncher,// Digit4 = Boucherie
 ];
 
 // =============================================================================
@@ -97,6 +98,48 @@ impl WeaponType {
     /// Whether this weapon is melee (swing animation instead of recoil)
     pub fn is_melee(&self) -> bool {
         matches!(self, WeaponType::Chainsaw)
+    }
+
+    /// V1 stats hardcoded — TOML genome port = Standard story.
+    /// Only ARENA_V1_WEAPONS variants have differentiated values; others fall back to ModernAR.
+    pub fn stats(self) -> WeaponData {
+        match self {
+            WeaponType::ModernAR => WeaponData {
+                damage: 25.0,
+                pellets: 1,
+                fire_rate: 10.0, // 10 shots/s → cooldown 0.1s
+                max_ammo: 999,
+                range: 100.0,
+                spread_deg: 0.0,
+                projectile_speed: HITSCAN_SPEED,
+                splash_radius: NO_SPLASH,
+                is_auto: true,
+            },
+            WeaponType::Shotgun => WeaponData {
+                damage: 80.0,
+                pellets: 1, // V1 single hitscan, multi-pellet = Standard story
+                fire_rate: 1.25, // 1.25 shots/s → cooldown 0.8s
+                max_ammo: 999,
+                range: 25.0,
+                spread_deg: 0.0,
+                projectile_speed: HITSCAN_SPEED,
+                splash_radius: NO_SPLASH,
+                is_auto: false,
+            },
+            WeaponType::RocketLauncher => WeaponData {
+                damage: 150.0,
+                pellets: 1, // V1 hitscan, projectile + splash = Standard story
+                fire_rate: 0.67, // ~1.5s cooldown
+                max_ammo: 999,
+                range: 80.0,
+                spread_deg: 0.0,
+                projectile_speed: HITSCAN_SPEED,
+                splash_radius: NO_SPLASH,
+                is_auto: false,
+            },
+            // Fallback : non-Arena V1 weapons use ModernAR baseline
+            _ => WeaponType::ModernAR.stats(),
+        }
     }
 }
 

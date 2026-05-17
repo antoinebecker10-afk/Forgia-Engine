@@ -13,21 +13,26 @@ use bevy::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RoadTier {
-    /// Route principale entre POI majeurs : 4 m total.
+    /// Route principale entre POI majeurs : 5 m total.
     Primary,
-    /// Sentier secondaire : 2.5 m total.
+    /// Sentier secondaire : 3.6 m total.
     Secondary,
-    /// Sentier mineur / shortcut : 1.2 m total.
+    /// Sentier mineur / shortcut : 1.6 m total.
     Trail,
+    /// Voie urbaine pavée (sortie de village, place centrale) : 3 m total,
+    /// texture PavingStones PBR. story-441 — vague 3 enrichira la transition
+    /// vertex blend vers terrain.
+    Urban,
 }
 
 impl RoadTier {
     /// Demi-largeur du centre plat (mètres). Échelle médiévale crédible.
     pub fn half_width(self) -> f32 {
         match self {
-            Self::Primary => 2.5,   // 5m total — voie pavée principale
-            Self::Secondary => 1.8, // 3.6m total — chemin village (default V2)
-            Self::Trail => 0.8,     // 1.6m total — sentier forestier
+            Self::Primary => 2.5,
+            Self::Secondary => 1.8,
+            Self::Trail => 0.8,
+            Self::Urban => 1.5,
         }
     }
 
@@ -39,6 +44,19 @@ impl RoadTier {
             Self::Primary => 0.8,
             Self::Secondary => 0.6,
             Self::Trail => 0.4,
+            Self::Urban => 0.5,
+        }
+    }
+
+    /// Parse a TOML string tier name to enum. Returns Secondary as fallback
+    /// for backward compat (called from data-driven TOML).
+    pub fn from_tier_name(s: &str) -> Self {
+        match s {
+            "primary" => Self::Primary,
+            "secondary" => Self::Secondary,
+            "trail" => Self::Trail,
+            "urban" => Self::Urban,
+            _ => Self::Secondary,
         }
     }
 }
@@ -151,6 +169,59 @@ pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> Pa
         }
     }
     PathNetwork { polylines }
+}
+
+/// Build a single Bezier polyline between two POIs (open segment, no ring
+/// closure). Used by village radial roads where each path is start → end
+/// and not a closed loop.
+///
+/// Returns an empty polyline if `start == end`.
+pub fn build_path_segment(start: Vec2, end: Vec2, tier: RoadTier, warp: f32) -> PathPolyline {
+    let dir = (end - start).normalize_or_zero();
+    if dir == Vec2::ZERO {
+        return PathPolyline::default();
+    }
+    let perp = Vec2::new(-dir.y, dir.x);
+    let seg_len = (end - start).length();
+    let mid = (start + end) * 0.5;
+    let control = mid + perp * (seg_len * warp);
+
+    let steps_per_segment = 1 << BEZIER_SUBDIVISIONS;
+    let dt = 1.0 / steps_per_segment as f32;
+    let mut samples: Vec<PathSample> = Vec::new();
+    samples.push(PathSample {
+        pos: start,
+        tangent: bezier_tangent(start, control, end, 0.0),
+        tier,
+    });
+
+    let mut last_pos = start;
+    let mut acc_dist = 0.0_f32;
+    for step in 1..=steps_per_segment {
+        let t = step as f32 / steps_per_segment as f32;
+        let pos = bezier_quadratic(start, control, end, t);
+        let delta = (pos - last_pos).length();
+        if delta < 1e-5 {
+            continue;
+        }
+        acc_dist += delta;
+        while acc_dist >= SAMPLE_INTERVAL_M {
+            let overshoot = acc_dist - SAMPLE_INTERVAL_M;
+            let frac_back = (overshoot / delta).clamp(0.0, 1.0);
+            let t_sample = t - frac_back * dt;
+            let p = bezier_quadratic(start, control, end, t_sample);
+            let tg = bezier_tangent(start, control, end, t_sample);
+            samples.push(PathSample { pos: p, tangent: tg, tier });
+            acc_dist -= SAMPLE_INTERVAL_M;
+        }
+        last_pos = pos;
+    }
+    samples.push(PathSample {
+        pos: end,
+        tangent: bezier_tangent(start, control, end, 1.0),
+        tier,
+    });
+    PathPolyline { samples }
 }
 
 #[cfg(test)]

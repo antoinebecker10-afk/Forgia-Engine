@@ -1323,7 +1323,7 @@ dependencies = [
  "naga",
  "naga_oil",
  "rand 0.9.4",
- "rand_pcg 0.9.0",
+ "rand_pcg",
  "ron 0.8.1",
  "serde",
  "thiserror 2.0.18",
@@ -1950,43 +1950,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_prng"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c7f82969910be95e576a6a5c851d476302890a23274619d918b01c407ce4e94"
-dependencies = [
- "bevy_ecs",
- "bevy_reflect",
- "chacha20 0.10.0",
- "getrandom 0.4.2",
- "rand_core 0.10.1",
- "rand_core 0.9.5",
- "rand_pcg 0.10.2",
- "rand_xoshiro 0.8.0",
- "serde",
- "wyrand",
-]
-
-[[package]]
 name = "bevy_ptr"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7a9329e8dc4e01ced480eeec4902e6d7cb56e56ec37f6fbc4323e5c937290a7"
-
-[[package]]
-name = "bevy_rand"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "526ba09324b96fb64f275a0cb4f6112d36b6c916ce2f14e38d5a8739dd2ac7f9"
-dependencies = [
- "bevy_app",
- "bevy_ecs",
- "bevy_prng",
- "bevy_reflect",
- "getrandom 0.4.2",
- "rand_core 0.10.1",
- "rand_core 0.9.5",
-]
 
 [[package]]
 name = "bevy_rapier3d"
@@ -3944,6 +3911,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-anim-debug"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-core",
+]
+
+[[package]]
 name = "forgia-animation-blend"
 version = "0.1.0"
 dependencies = [
@@ -4008,6 +3983,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-asset-registry"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-core",
+ "forgia-terrain",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "forgia-assets"
 version = "0.1.0"
 dependencies = [
@@ -4030,7 +4016,9 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_kira_audio",
+ "forgia-audio-core",
  "forgia-core",
+ "forgia-terrain",
 ]
 
 [[package]]
@@ -4097,6 +4085,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-auto-rig"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-core",
+ "forgia-genome-core",
+ "forgia-medial-axis",
+ "forgia-mesh-voxelizer",
+ "forgia-rig-topology",
+ "forgia-skeleton-embedder",
+]
+
+[[package]]
 name = "forgia-camera-fps"
 version = "0.1.0"
 dependencies = [
@@ -4136,6 +4137,8 @@ dependencies = [
  "bevy",
  "bevy_rapier3d",
  "forgia-core",
+ "forgia-juice-hit-stop",
+ "forgia-juice-recoil",
  "leafwing-input-manager",
 ]
 
@@ -4161,6 +4164,7 @@ name = "forgia-crosshair"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_egui",
  "forgia-core",
 ]
 
@@ -4359,7 +4363,10 @@ name = "forgia-foliage"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_rapier3d",
+ "forgia-asset-registry",
  "forgia-core",
+ "forgia-terrain",
 ]
 
 [[package]]
@@ -4375,15 +4382,25 @@ name = "forgia-fps"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_egui",
  "bevy_rapier3d",
  "forgia-assets",
  "forgia-combat",
  "forgia-core",
+ "forgia-crosshair",
  "forgia-effects",
+ "forgia-genome-core",
  "forgia-input",
+ "forgia-juice-camera-shake",
+ "forgia-juice-fov-punch",
+ "forgia-juice-hit-stop",
+ "forgia-juice-recoil",
+ "forgia-mesh-fader",
+ "forgia-mode-fps-arena",
  "forgia-player",
  "forgia-ui",
  "leafwing-input-manager",
+ "serde",
 ]
 
 [[package]]
@@ -4395,18 +4412,30 @@ dependencies = [
  "bevy_hanabi",
  "bevy_kira_audio",
  "bevy_rapier3d",
+ "forgia-anim-debug",
+ "forgia-asset-registry",
  "forgia-assets",
+ "forgia-audio-biome",
+ "forgia-audio-core",
+ "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
  "forgia-dialogue",
  "forgia-effects",
+ "forgia-foliage",
  "forgia-fps",
  "forgia-input",
  "forgia-player",
+ "forgia-prefab",
  "forgia-rpg",
+ "forgia-secondary-motion",
  "forgia-sensors",
  "forgia-terrain",
  "forgia-ui",
+ "forgia-ui-hud",
+ "forgia-viewmodel-calibration",
+ "forgia-village-loader",
+ "forgia-water",
 ]
 
 [[package]]
@@ -4497,6 +4526,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-genome-village"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "toml",
+]
+
+[[package]]
 name = "forgia-grid"
 version = "0.1.0"
 dependencies = [
@@ -4509,6 +4547,8 @@ name = "forgia-hitmarker"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_egui",
+ "forgia-combat",
  "forgia-core",
 ]
 
@@ -4630,8 +4670,6 @@ name = "forgia-juice-hit-stop"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_hanabi",
- "forgia-core",
 ]
 
 [[package]]
@@ -4639,8 +4677,6 @@ name = "forgia-juice-recoil"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_hanabi",
- "forgia-core",
 ]
 
 [[package]]
@@ -4689,6 +4725,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-medial-axis"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-mesh-voxelizer",
+]
+
+[[package]]
+name = "forgia-mesh-fader"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
+name = "forgia-mesh-voxelizer"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "forgia-meshy-import"
 version = "0.1.0"
 dependencies = [
@@ -4709,7 +4767,13 @@ name = "forgia-mode-fps-arena"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_rapier3d",
+ "forgia-ai-arena-bot",
+ "forgia-combat",
  "forgia-core",
+ "forgia-damage",
+ "forgia-genome-core",
+ "serde",
 ]
 
 [[package]]
@@ -4873,8 +4937,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_rapier3d",
+ "forgia-ai-arena-bot",
  "forgia-combat",
  "forgia-core",
+ "forgia-damage",
  "forgia-input",
  "leafwing-input-manager",
 ]
@@ -5280,6 +5346,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-procgen-graph"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-rng",
+]
+
+[[package]]
 name = "forgia-qa-autopilot"
 version = "0.1.0"
 dependencies = [
@@ -5483,13 +5557,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-rng"
+name = "forgia-rig-topology"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_rand",
  "forgia-core",
 ]
+
+[[package]]
+name = "forgia-rng"
+version = "0.1.0"
 
 [[package]]
 name = "forgia-rpg"
@@ -5497,14 +5574,24 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_rapier3d",
+ "forgia-anim-debug",
  "forgia-assets",
+ "forgia-audio-biome",
+ "forgia-auto-rig",
+ "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
  "forgia-dialogue",
+ "forgia-foliage",
+ "forgia-ik",
  "forgia-input",
  "forgia-player",
+ "forgia-prefab",
+ "forgia-rig-topology",
+ "forgia-secondary-motion",
  "forgia-terrain",
  "forgia-ui",
+ "forgia-village-loader",
  "leafwing-input-manager",
  "noise",
 ]
@@ -5559,6 +5646,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-secondary-motion"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-anim-debug",
+ "forgia-core",
+]
+
+[[package]]
 name = "forgia-sensors"
 version = "0.1.0"
 dependencies = [
@@ -5589,6 +5685,15 @@ name = "forgia-silk"
 version = "0.1.0"
 dependencies = [
  "bevy",
+]
+
+[[package]]
+name = "forgia-skeleton-embedder"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-medial-axis",
+ "serde",
 ]
 
 [[package]]
@@ -5651,6 +5756,7 @@ dependencies = [
  "forgia-core",
  "ndshape",
  "noise",
+ "proptest",
  "rayon",
  "serde",
  "serde_json",
@@ -5685,6 +5791,8 @@ dependencies = [
  "bevy_egui",
  "forgia-combat",
  "forgia-core",
+ "forgia-crosshair",
+ "forgia-hitmarker",
  "forgia-input",
  "leafwing-input-manager",
 ]
@@ -5723,7 +5831,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "forgia-combat",
  "forgia-core",
+ "forgia-damage",
+ "forgia-mode-fps-arena",
 ]
 
 [[package]]
@@ -5848,6 +5959,53 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+]
+
+[[package]]
+name = "forgia-viewmodel-calibration"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-combat",
+ "forgia-core",
+ "forgia-fps",
+ "forgia-player",
+]
+
+[[package]]
+name = "forgia-village-generator"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-genome-village",
+ "forgia-procgen-graph",
+ "forgia-rng",
+ "forgia-spline",
+ "rstar",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "forgia-village-kit"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "toml",
+]
+
+[[package]]
+name = "forgia-village-loader"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_rapier3d",
+ "forgia-core",
+ "forgia-genome-village",
+ "forgia-prefab",
+ "forgia-terrain",
+ "forgia-village-generator",
+ "forgia-village-kit",
 ]
 
 [[package]]
@@ -6912,7 +7070,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3"
 dependencies = [
  "byteorder-lite",
- "quick-error",
+ "quick-error 2.0.1",
 ]
 
 [[package]]
@@ -8073,7 +8231,7 @@ dependencies = [
  "quanta",
  "radix_trie",
  "rand 0.9.4",
- "rand_xoshiro 0.7.0",
+ "rand_xoshiro",
  "rapidhash",
  "sketches-ddsketch",
 ]
@@ -8329,7 +8487,7 @@ checksum = "6da45c8333f2e152fc665d78a380be060eb84fad8ca4c9f7ac8ca29216cff0cc"
 dependencies = [
  "num-traits",
  "rand 0.8.6",
- "rand_xorshift",
+ "rand_xorshift 0.3.0",
 ]
 
 [[package]]
@@ -9234,6 +9392,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "proptest"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744"
+dependencies = [
+ "bit-set",
+ "bit-vec",
+ "bitflags 2.11.1",
+ "num-traits",
+ "rand 0.9.4",
+ "rand_chacha 0.9.0",
+ "rand_xorshift 0.4.0",
+ "regex-syntax",
+ "rusty-fork",
+ "tempfile",
+ "unarray",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9253,6 +9430,12 @@ dependencies = [
  "web-sys",
  "winapi",
 ]
+
+[[package]]
+name = "quick-error"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quick-error"
@@ -9457,16 +9640,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_pcg"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa0f4137e1c0a72f4c651489402276c8e8e1cf081f3b0ba156d2cbeef09e86a"
-dependencies = [
- "rand_core 0.10.1",
- "serde",
-]
-
-[[package]]
 name = "rand_xorshift"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9476,22 +9649,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_xoshiro"
-version = "0.7.0"
+name = "rand_xorshift"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
+checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
 dependencies = [
  "rand_core 0.9.5",
 ]
 
 [[package]]
 name = "rand_xoshiro"
-version = "0.8.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f0b2cc7bfeef8f0320ca45f88b00157a03c67137022d59393614352d6bf4312"
+checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
 dependencies = [
- "rand_core 0.10.1",
- "serde",
+ "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -9905,6 +10077,18 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "rusty-fork"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc6bf79ff24e648f6da1f8d1f011e9cac26491b619e6b9280f2b47f1774e6ee2"
+dependencies = [
+ "fnv",
+ "quick-error 1.2.3",
+ "tempfile",
+ "wait-timeout",
+]
 
 [[package]]
 name = "ruzstd"
@@ -10524,6 +10708,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tempfile"
+version = "3.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+dependencies = [
+ "fastrand",
+ "getrandom 0.4.2",
+ "once_cell",
+ "rustix 1.1.4",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "termcolor"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10590,7 +10787,7 @@ dependencies = [
  "fax",
  "flate2",
  "half",
- "quick-error",
+ "quick-error 2.0.1",
  "weezl",
  "zune-jpeg",
 ]
@@ -11005,6 +11202,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214ca0b2191785cbc06209b9ca1861e048e39b5ba33574b3cedd58363d5bb5f6"
 
 [[package]]
+name = "unarray"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
+
+[[package]]
 name = "unicode-bidi"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11153,6 +11356,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23acc5e2a7645f62ff9d7d11b46c15819fb1132fc87352a35bb4a9dee3b27d80"
 dependencies = [
  "delaunator",
+]
+
+[[package]]
+name = "wait-timeout"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -12385,16 +12597,6 @@ dependencies = [
  "octets",
  "thiserror 2.0.18",
  "url",
-]
-
-[[package]]
-name = "wyrand"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5484c3d24f0e2e117d30bce6f8792e193be33e2b6e0b3f8945ccf265c56c6da"
-dependencies = [
- "rand_core 0.10.1",
- "serde",
 ]
 
 [[package]]

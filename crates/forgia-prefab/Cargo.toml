@@ -2,7 +2,7 @@
 name = "forgia-prefab"
 version = "0.1.0"
 edition = "2021"
-description = "Blueprint/prefab system for AI assembly"
+description = "Forgia V2 — Data-driven GLTF Scene prefab spawn helpers + sensor."
 
 [lints]
 workspace = true

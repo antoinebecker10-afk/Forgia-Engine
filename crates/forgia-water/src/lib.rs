@@ -27,6 +27,7 @@ impl Plugin for ForgiaWaterPlugin {
             ..default()
         })
         .add_plugins(WaterPlugin)
+        .add_systems(Update, hide_water_on_spawn)
         .add_systems(OnEnter(GameMode::Rpg), show_water)
         .add_systems(OnExit(GameMode::Rpg), hide_water);
     }
@@ -38,4 +39,20 @@ fn show_water(mut q: Query<&mut Visibility, With<WaterTiles>>) {
 
 fn hide_water(mut q: Query<&mut Visibility, With<WaterTiles>>) {
     for mut v in &mut q { *v = Visibility::Hidden; }
+}
+
+/// Anti-trap : `bevy_water::WaterTiles` spawn avec Visibility default = visible.
+/// Si on entre directement Arena (sans passer par OnEnter/Exit Rpg), l'eau couvre
+/// la scène → "mer au-dessus du sol". On force Hidden dès qu'un tile apparaît,
+/// le show_water OnEnter(Rpg) le réactivera uniquement en mode RPG.
+fn hide_water_on_spawn(
+    state: Res<State<GameMode>>,
+    mut q: Query<&mut Visibility, Added<WaterTiles>>,
+) {
+    if *state.get() == GameMode::Rpg {
+        return;
+    }
+    for mut v in &mut q {
+        *v = Visibility::Hidden;
+    }
 }

@@ -27,6 +27,15 @@ impl Default for MouseSensitivityMultiplier {
 }
 
 /// PlayerAction — actions joueur AZERTY.
+///
+/// `MoveLeft`/`MoveRight` sont SÉMANTIQUEMENT polyvalents :
+/// - **FPS mode** : strafe gauche/droite (comportement legacy)
+/// - **RPG mode + RMB libre** : tourner gauche/droite (pattern WoW Q/D)
+/// - **RPG mode + RMB tenu** : strafe gauche/droite (override mouselook WoW)
+///
+/// `CameraLook`/`CameraSteer` co-bind LMB/RMB en plus de `Fire`/`AltFire` :
+/// leafwing supporte le multi-bind sur le même input, chaque consommateur
+/// (combat vs camera) lit son action sans conflit (gate par GameMode).
 #[derive(Actionlike, PartialEq, Eq, Hash, Clone, Copy, Debug, Reflect)]
 pub enum PlayerAction {
     MoveForward,
@@ -40,6 +49,10 @@ pub enum PlayerAction {
     Reload,
     Pause,
     Interact,
+    /// LMB held — camera orbits around player only. WoW "look mode".
+    CameraLook,
+    /// RMB held — camera orbits AND player yaw follows. WoW "mouselook/steer".
+    CameraSteer,
 }
 
 /// InputBlockers — blocage temporaire input (menu ouvert, dialog, console).
@@ -79,6 +92,10 @@ pub fn default_input_map() -> InputMap<PlayerAction> {
     map.insert(PlayerAction::Reload, KeyR);
     map.insert(PlayerAction::Pause, Escape);
     map.insert(PlayerAction::Interact, KeyE);
+    // WoW-style camera controls — LMB orbit-only, RMB orbit+steer player.
+    // Co-bind with Fire/AltFire ; consumers gate by GameMode (no conflict).
+    map.insert(PlayerAction::CameraLook, MouseButton::Left);
+    map.insert(PlayerAction::CameraSteer, MouseButton::Right);
     map
 }
 
