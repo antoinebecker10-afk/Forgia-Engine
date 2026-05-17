@@ -48,27 +48,31 @@ z = -7.0
 [[spawn_positions]]
 character_glb = "models/characters/Kael.glb#Scene0"
 character_scale = 1.0
-character_yaw_deg = 0.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
 x = 0.0
 z = -7.0
 
 [[spawn_positions]]
 character_glb = "models/characters/Mira.glb#Scene0"
 character_scale = 1.0
-character_yaw_deg = 0.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
 x = 4.0
 z = -7.0
 
 [[spawn_positions]]
 character_glb = "models/characters/L'Apprenti .glb#Scene0"
 character_scale = 1.0
-character_yaw_deg = 0.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
 x = 10.0
 z = -14.0
 
 [[spawn_positions]]
 character_glb = "models/characters/Maitre Forgeron Célèste.glb#Scene0"
 character_scale = 1.0
-character_yaw_deg = 0.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
 x = -14.0
 z = 10.0

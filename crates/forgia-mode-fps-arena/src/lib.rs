@@ -78,14 +78,24 @@ pub struct BotSpawn {
     pub character_glb: String,
     #[serde(default = "default_character_scale")]
     pub character_scale: f32,
+    /// Yaw offset local du SceneRoot — corrige le forward axis du mesh (Meshy varie).
+    /// 0 = mesh forward déjà aligné -Z (Bevy convention), 180 = flip si mesh face +Z.
     #[serde(default)]
     pub character_yaw_deg: f32,
+    /// Lift Y local du mesh pour compenser le pivot au centre (vs pieds-au-sol).
+    /// Default 0.9 = lift half ~1.8m character. Tweakable per-character (Meshy variable).
+    #[serde(default = "default_character_y_offset")]
+    pub character_y_offset: f32,
     pub x: f32,
     pub z: f32,
 }
 
 fn default_character_scale() -> f32 {
     1.0
+}
+
+fn default_character_y_offset() -> f32 {
+    0.9
 }
 
 #[derive(Resource)]
@@ -128,6 +138,7 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_glb: String::new(),
                 character_scale: 1.0,
                 character_yaw_deg: 0.0,
+                character_y_offset: 0.9,
                 x: -4.0,
                 z: -7.0,
             },
@@ -135,6 +146,7 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_glb: String::new(),
                 character_scale: 1.0,
                 character_yaw_deg: 0.0,
+                character_y_offset: 0.9,
                 x: 0.0,
                 z: -7.0,
             },
@@ -142,6 +154,7 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_glb: String::new(),
                 character_scale: 1.0,
                 character_yaw_deg: 0.0,
+                character_y_offset: 0.9,
                 x: 4.0,
                 z: -7.0,
             },
@@ -149,6 +162,7 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_glb: String::new(),
                 character_scale: 1.0,
                 character_yaw_deg: 0.0,
+                character_y_offset: 0.9,
                 x: 10.0,
                 z: -14.0,
             },
@@ -156,6 +170,7 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_glb: String::new(),
                 character_scale: 1.0,
                 character_yaw_deg: 0.0,
+                character_y_offset: 0.9,
                 x: -14.0,
                 z: 10.0,
             },
@@ -565,15 +580,17 @@ fn spawn_arena(
         let character_path = spawn.character_glb.clone();
         let character_scale = spawn.character_scale;
         let character_yaw = spawn.character_yaw_deg.to_radians();
+        let character_y = spawn.character_y_offset;
         let debug = debug_meshes.clone();
 
         commands.entity(parent).with_children(|p| {
             // Mesh character (visible). Pas de collider ici — les colliders sont
             // séparés en head/body pour la hitzone Overwatch.
+            // Y offset compense le pivot Meshy au centre du mesh (vs pieds au sol).
             if !character_path.is_empty() {
                 p.spawn((
                     SceneRoot(asset_server.load(&character_path)),
-                    Transform::from_xyz(0.0, 0.0, 0.0)
+                    Transform::from_xyz(0.0, character_y, 0.0)
                         .with_rotation(Quat::from_rotation_y(character_yaw))
                         .with_scale(Vec3::splat(character_scale)),
                     Name::new("CharacterMesh"),
