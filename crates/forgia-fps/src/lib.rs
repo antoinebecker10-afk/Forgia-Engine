@@ -20,7 +20,10 @@ use forgia_effects::prelude::{
     WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_juice_camera_shake::{CameraShake, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
+use forgia_juice_fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse};
 use forgia_juice_hit_stop::HitStopState;
+use forgia_juice_recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
 use forgia_mode_fps_arena::{HitZone, TargetCube};
 use forgia_player::prelude::*;
 use serde::Deserialize;
@@ -166,6 +169,22 @@ pub struct ViewmodelGenomeEntry {
     /// (cercle noir vignette + reticle) + FOV cam très réduit.
     #[serde(default)]
     pub sniper_scope_fullscreen: bool,
+    // ─── Phase G — Juice per-arme (camera shake / recoil / FOV punch) ─
+    /// Trauma ajouté par tir (0..1). 0.04 = SMG léger, 0.22 = Shotgun heavy.
+    /// AAA range : 0.04-0.22 pour rester confortable (anti-nausée).
+    #[serde(default = "default_shake_trauma")]
+    pub shake_trauma: f32,
+    /// Recoil visuel pitch up par tir (degrés). 0.2-0.8° AAA standard.
+    #[serde(default = "default_recoil_pitch_deg")]
+    pub recoil_pitch_deg: f32,
+    /// Recoil yaw random max par tir (degrés). 0 = pas de yaw kick.
+    /// Determine la "wiggle" horizontale. SMG : ±0.15°, Sniper : 0 (precise).
+    #[serde(default = "default_recoil_yaw_random_deg")]
+    pub recoil_yaw_random_deg: f32,
+    /// FOV punch peak en degrés. 0.0 = SKIP (CS2 philosophy — AR/SMG).
+    /// 0.5-1.5° pour Shotgun / Sniper / LMG uniquement.
+    #[serde(default = "default_fov_punch_deg")]
+    pub fov_punch_deg: f32,
     // ─── Phase F — TTK Balance Overwatch-style (2026-05-18) ──────────
     /// Multiplicateur dégâts en headshot. 1.0 = pas de bonus, 2.0 = double.
     /// Sniper Lenoir = 2.0 (one-shot head). Shotgun = 1.2 (pas de bonus marqué).
@@ -232,6 +251,10 @@ fn default_head_damage_mul() -> f32 { 1.5 }
 fn default_damage_falloff_start() -> f32 { 30.0 }
 fn default_damage_falloff_end() -> f32 { 80.0 }
 fn default_damage_falloff_min() -> f32 { 0.6 }
+fn default_shake_trauma() -> f32 { 0.06 }
+fn default_recoil_pitch_deg() -> f32 { 0.4 }
+fn default_recoil_yaw_random_deg() -> f32 { 0.1 }
+fn default_fov_punch_deg() -> f32 { 0.0 }
 
 #[derive(Resource)]
 pub struct ViewmodelGenomeHandle(pub Handle<Genome<ViewmodelGenome>>);
@@ -248,6 +271,46 @@ impl ViewmodelGenomeCtx<'_> {
     pub fn entry(&self, w: WeaponType) -> Option<&ViewmodelGenomeEntry> {
         let h = self.handle.as_deref()?;
         lookup_genome_entry(&self.assets, h, w)
+    }
+}
+
+/// Bundle des resources timing pour fire system (cooldown + burst + time virtuels/réels).
+/// Réduit le param count global de `fire_weapon_minimal` (limite Bevy 16).
+#[derive(SystemParam)]
+pub struct FireTimingCtx<'w> {
+    pub cooldown: Option<Res<'w, WeaponFireCooldown>>,
+    pub burst_state: Option<ResMut<'w, BurstState>>,
+    pub time: Res<'w, Time>,
+    pub virtual_time: ResMut<'w, Time<Virtual>>,
+}
+
+/// Bundle des MessageWriters juice (shake / recoil / fov punch) pour fire system.
+/// Réduit param count (limite Bevy 16) et centralise les déclenchements.
+#[derive(SystemParam)]
+pub struct JuiceWriters<'w> {
+    pub shake: MessageWriter<'w, ShakeImpulse>,
+    pub recoil: MessageWriter<'w, WeaponRecoilImpulse>,
+    pub fov_punch: MessageWriter<'w, FovPunchImpulse>,
+}
+
+impl JuiceWriters<'_> {
+    /// Emit les 3 impulses depuis le genome de l'arme. Yaw random uniforme [-yaw_max..+yaw_max].
+    /// `seed` pour PRNG yaw (pseudo-déterministe par tir).
+    pub fn emit_from_genome(&mut self, e: &ViewmodelGenomeEntry, seed: u32) {
+        if e.shake_trauma > 0.0 {
+            self.shake.write(ShakeImpulse { trauma: e.shake_trauma });
+        }
+        if e.recoil_pitch_deg.abs() > 0.001 || e.recoil_yaw_random_deg.abs() > 0.001 {
+            // PRNG yaw : [-1, 1] depuis pseudo_rand, scale par yaw_random_deg
+            let yaw_signed = (pseudo_rand(seed) - 0.5) * 2.0 * e.recoil_yaw_random_deg;
+            self.recoil.write(WeaponRecoilImpulse {
+                pitch_rad: e.recoil_pitch_deg.to_radians(),
+                yaw_rad: yaw_signed.to_radians(),
+            });
+        }
+        if e.fov_punch_deg.abs() > 0.01 {
+            self.fov_punch.write(FovPunchImpulse { peak_deg: e.fov_punch_deg });
+        }
     }
 }
 
@@ -391,6 +454,16 @@ impl Plugin for ForgiaFpsPlugin {
         if !app.is_plugin_added::<forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin>() {
             app.add_plugins(forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin);
         }
+        // Juice plugins (idempotent — checks anti double-add).
+        if !app.is_plugin_added::<ForgiaJuiceCameraShakePlugin>() {
+            app.add_plugins(ForgiaJuiceCameraShakePlugin);
+        }
+        if !app.is_plugin_added::<ForgiaJuiceFovPunchPlugin>() {
+            app.add_plugins(ForgiaJuiceFovPunchPlugin);
+        }
+        if !app.is_plugin_added::<ForgiaJuiceRecoilPlugin>() {
+            app.add_plugins(ForgiaJuiceRecoilPlugin);
+        }
         app.add_plugins((
                 score::ArenaScorePlugin,
                 ads::AdsPlugin,
@@ -424,6 +497,7 @@ impl Plugin for ForgiaFpsPlugin {
                     attach_viewmodel_to_camera,
                     update_viewmodel_on_switch,
                     auto_scale_viewmodel,
+                    ensure_camera_shake_component,
                 )
                     .run_if(in_state(GameMode::Fps)),
             );
@@ -525,11 +599,9 @@ fn fire_weapon_minimal(
     flash_cache: Res<HitFlashCache>,
     tracer_res: Option<Res<TracerResources>>,
     weapon_vfx: Option<Res<WeaponVfxEffects>>,
-    cooldown: Option<Res<WeaponFireCooldown>>,
-    burst_state: Option<ResMut<BurstState>>,
-    time: Res<Time>,
-    mut virtual_time: ResMut<Time<Virtual>>,
+    mut timing: FireTimingCtx,
     mut hit_events: MessageWriter<CombatHitEvent>,
+    mut juice: JuiceWriters,
     left: Res<LeftMouseState>,
     equipped: Res<EquippedWeapons>,
     genome_ctx: ViewmodelGenomeCtx,
@@ -542,9 +614,9 @@ fn fire_weapon_minimal(
     let mut burst_fires_now = false;
     let mut burst_active = false;
     let mut burst_will_terminate = false;
-    if let Some(mut burst) = burst_state {
+    if let Some(burst) = timing.burst_state.as_mut() {
         burst_active = true;
-        if burst.interval_timer.tick(time.delta()).just_finished() {
+        if burst.interval_timer.tick(timing.time.delta()).just_finished() {
             burst_fires_now = true;
             burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
             if burst.shots_remaining == 0 {
@@ -554,7 +626,7 @@ fn fire_weapon_minimal(
     }
 
     // Pendant un burst actif, on bypass le cooldown standard (pacing géré par BurstState).
-    if cooldown.is_some() && !burst_active {
+    if timing.cooldown.is_some() && !burst_active {
         return;
     }
 
@@ -590,6 +662,13 @@ fn fire_weapon_minimal(
         warn!("[fire] RapierContext not found");
         return;
     };
+
+    // Juice per-arme : shake camera + recoil + FOV punch (conservative AAA values
+    // dans TOML, anti-nausée par design). Seed PRNG basé sur time pour yaw recoil.
+    if let Some(e) = entry {
+        let juice_seed = (timing.time.elapsed_secs() * 1000.0) as u32;
+        juice.emit_from_genome(e, juice_seed);
+    }
 
     let origin = cam_tf.translation();
     let direction = cam_tf.forward().as_vec3();
@@ -744,7 +823,7 @@ fn fire_weapon_minimal(
     if hit_record.is_some() {
         let hs_dur = entry.map(|e| e.hit_stop_duration).unwrap_or(0.05);
         let hs_speed = entry.map(|e| e.hit_stop_speed).unwrap_or(0.05);
-        virtual_time.set_relative_speed(hs_speed);
+        timing.virtual_time.set_relative_speed(hs_speed);
         commands.insert_resource(HitStopState {
             timer: Timer::from_seconds(hs_dur, TimerMode::Once),
             restore_speed: 1.0,
@@ -919,6 +998,19 @@ fn auto_scale_viewmodel(
                 ..*tf
             })
             .insert(Visibility::Inherited);
+    }
+}
+
+/// Insert `CameraShake` Component sur FpsCamera si pas déjà présent.
+/// Single-shot effectif (Without<CameraShake>). Évite ajouter dep forgia-juice-camera-shake
+/// dans forgia-player (upstream).
+fn ensure_camera_shake_component(
+    mut commands: Commands,
+    q: Query<Entity, (With<FpsCamera>, Without<CameraShake>)>,
+) {
+    for e in &q {
+        commands.entity(e).insert(CameraShake::default());
+        info!("[forgia-fps] CameraShake Component attaché à FpsCamera");
     }
 }
 

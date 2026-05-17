@@ -15,6 +15,7 @@ use bevy::input::ButtonState;
 use forgia_combat::weapons::EquippedWeapons;
 use forgia_genome_core::Genome;
 use forgia_input::prelude::MouseSensitivityMultiplier;
+use forgia_juice_fov_punch::FovPunchState;
 use forgia_player::prelude::{FpsCamera, MovementSpeedMultiplier};
 use forgia_ui::prelude::CrosshairMode;
 
@@ -96,11 +97,14 @@ pub fn update_ads_progress(
 }
 
 /// Interpole le FOV camera entre default (45°) et ads_fov_deg du genome.
+/// Ajoute par-dessus l'offset FOV punch courant (forgia-juice-fov-punch) — punch décay
+/// indépendamment, base ADS recalculée chaque frame, somme appliquée au render.
 pub fn apply_ads_camera_fov(
     ads: Res<AdsState>,
     equipped: Res<EquippedWeapons>,
     genome_handle: Option<Res<ViewmodelGenomeHandle>>,
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    fov_punch: Res<FovPunchState>,
     mut q_cam: Query<&mut Projection, With<FpsCamera>>,
 ) {
     let ads_fov = genome_handle
@@ -108,10 +112,13 @@ pub fn apply_ads_camera_fov(
         .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current))
         .map(|e| e.ads_fov_deg)
         .unwrap_or(25.0);
-    let target_fov = DEFAULT_FOV_DEG.lerp(ads_fov, ads.progress);
+    let base_fov = DEFAULT_FOV_DEG.lerp(ads_fov, ads.progress);
+    // Atténue le punch en ADS pour éviter zoom oscillant pendant visée précise.
+    let punch_attenuation = 1.0 - ads.progress * 0.7; // -70% punch en full ADS
+    let final_fov = base_fov + fov_punch.current_deg * punch_attenuation;
     for mut proj in &mut q_cam {
         if let Projection::Perspective(p) = proj.as_mut() {
-            p.fov = target_fov.to_radians();
+            p.fov = final_fov.to_radians();
         }
     }
 }

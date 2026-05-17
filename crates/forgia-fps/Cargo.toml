@@ -22,5 +22,8 @@ forgia-genome-core = { workspace = true }
 forgia-mesh-fader = { workspace = true }
 forgia-mode-fps-arena = { workspace = true }
 forgia-juice-hit-stop = { workspace = true }
+forgia-juice-camera-shake = { workspace = true }
+forgia-juice-fov-punch = { workspace = true }
+forgia-juice-recoil = { workspace = true }
 serde = { workspace = true }
 bevy_egui = { workspace = true }
