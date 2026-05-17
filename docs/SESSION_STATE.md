@@ -1,6 +1,45 @@
-# Forgia Rewrite — Session State 2026-05-14
+# Forgia Rewrite — Session State 2026-05-15
 
 > Snapshot fin de journée pour reprise demain.
+
+## ⏩ Suite session marathon soir 2026-05-14 (mon territoire FPS)
+
+**5 commits master V2 livrés** depuis snapshot du matin :
+
+```
+a0b1c70  feat(sky): port V1 Skybox cubemap (sky_129_stacked.png day variant)
+0adaf82  feat(sky): nuages orbit circulaire continu (jamais wrap brusque)
+ea5b6c7  feat(map): vraie arène FPS 44×44m multi-zones + 25 assets KayKit + 3 weapons
+c83ad7a  feat(phase-2.3): muzzle flash + impact VFX + tracer fix + hitmarker
+32e73f4  feat: V2 bootstrap + Phase 1 Hello World + Phase 2.1 hitscan minimum
+```
+
+**Phase 2 V2 finalisée côté FPS** :
+- Arena KayKit 44×44m (121 floor + 44 walls + 12 piliers + 14 covers + 5 banners + 8 torches + 5 cubes)
+- Skybox cubemap V1 (sky_129) wired via SkyboxPending + reinterpret_stacked_2d_as_array(6)
+- 18 nuages popcorn orbital (CloudOrbit { angle, radius, height }) — jamais wrap brusque
+- Hitscan complet : muzzle 4-layer + tracer 5cm + impact VFX + hitmarker + flash + hit-stop + cooldown
+- Camera recoil DÉSACTIVÉ (design choice Antoine, style Valorant)
+- 3 cubes target → 5 cubes dispersés map entière
+
+**Atmosphere Hillaire 2020 backlog Phase 5** : tentative wired = écran noir (manque Bloom + Exposure + AutoExposure + AtmosphereSettings + ordre init). Fallback Skybox cubemap V1 stable. Voir `feedback_v2_atmosphere_complex_setup_backlog` mémoire.
+
+**Anti-traps Bevy 0.18 documentés** (mémoire `reference_bevy_018_renames_v2`) : Hdr Component marker, CursorOptions séparé, MessageReader<MouseButtonInput> (pas Res<ButtonInput> consumed by egui), ClearColorConfig::None sur MenuCamera2d, exclude Player du raycast Rapier (FpsCamera child).
+
+**Bug majeur fix** : ForgiaDialoguePlugin orphan oublié dans forgia-game/lib.rs → panic Resource manquante. **Wired ligne 41**.
+
+## Suite suggérée demain (FPS Phase 2.5+)
+
+| Option | Effort |
+|---|---|
+| Damage numbers flottants V1 V5-F | 30 min |
+| Viewmodel 1P (ak47.glb dispo dans assets) | 45 min |
+| Multi-armes Digit1/2/3 (3 weapons assets prêts) | 1h |
+| Bot IA arena (1 ennemi qui tire) | 2h |
+| Sensor stack V2 (forgia2_health/perf/lifecycle) | 2h |
+| Atmosphere debug profond (Bloom + Exposure setup complet) | 1-2h |
+
+## Status quo (ne change pas)
 
 ## Ce qui marche
 

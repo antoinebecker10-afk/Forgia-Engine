@@ -1,20 +1,334 @@
-[2m2026-05-14T21:50:22.730271Z[0m [32m INFO[0m [2mforgia_game[0m[2m:[0m [forgia-game] Forgia V2 boot OK
-[2m2026-05-14T21:50:22.739485Z[0m [32m INFO[0m [2mbevy_hanabi::plugin[0m[2m:[0m Initializing Hanabi for GPU adapter NVIDIA GeForce RTX 4070 Ti
-[2m2026-05-14T21:50:22.746291Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Forgia V2 (0v0)
-[2m2026-05-14T21:50:22.770228Z[0m [32m INFO[0m [2mforgia_assets[0m[2m:[0m [forgia-assets] preload_assets — Phase 0 (no assets yet)
-[2m2026-05-14T21:50:22.770255Z[0m [32m INFO[0m [2mforgia_effects[0m[2m:[0m [forgia-effects] prespawn_hanabi_dummies — placeholder (Phase 2 adds 8 dummies)
-[2m2026-05-14T21:50:22.770274Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)
-[2m2026-05-14T21:50:22.770233Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] MenuCamera2d spawned (permanent, order=10, clear=None)
-[2m2026-05-14T21:50:22.770303Z[0m [32m INFO[0m [2mforgia_effects::weapon_vfx[0m[2m:[0m Weapon VFX initialises (5-layer muzzle + 3-layer impact)
-[2m2026-05-14T21:50:22.772876Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
-[2m2026-05-14T21:50:22.777219Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
-[2m2026-05-14T21:50:24.489995Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] Arena spawned : 44×44m, 121 floor + 44 walls + 12 pillars + 14 covers + 5 banners + 8 torches + 5 cubes + cartoon sky dome + sun disk + 18 cloud clusters (3 shapes : popcorn/stratus/puff)
-[2m2026-05-14T21:50:24.490724Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
-[2m2026-05-14T21:50:24.490753Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
-[2m2026-05-14T21:50:24.491321Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
-[2m2026-05-14T21:50:43.875812Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
-[2m2026-05-14T21:50:43.875883Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
-[2m2026-05-14T21:50:43.878360Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
-[2m2026-05-14T21:50:43.878630Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] Arena cleaned : 233 entities despawned
-[2m2026-05-14T21:50:43.879083Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
-[2m2026-05-14T21:50:43.879185Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-17T22:14:13.486143Z[0m [32m INFO[0m [2mforgia_game[0m[2m:[0m [forgia-game] Forgia V2 boot OK
+[2m2026-05-17T22:14:13.495435Z[0m [32m INFO[0m [2mbevy_hanabi::plugin[0m[2m:[0m Initializing Hanabi for GPU adapter NVIDIA GeForce RTX 4070 Ti
+[2m2026-05-17T22:14:13.502292Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window Forgia V2 (0v0)
+[2m2026-05-17T22:14:13.532069Z[0m [32m INFO[0m [2mforgia_effects[0m[2m:[0m [forgia-effects] prespawn_hanabi_dummies — placeholder (Phase 2 adds 8 dummies)
+[2m2026-05-17T22:14:13.532069Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] MenuCamera2d spawned (permanent, order=10, clear=None)
+[2m2026-05-17T22:14:13.532075Z[0m [32m INFO[0m [2mforgia_assets[0m[2m:[0m [forgia-assets] preload_assets — Phase 0 (no assets yet)
+[2m2026-05-17T22:14:13.532152Z[0m [32m INFO[0m [2mforgia_auto_rig::pinocchio_pipeline[0m[2m:[0m [forgia-auto-rig::pinocchio] skeleton templates loading from TOML genomes
+[2m2026-05-17T22:14:13.532201Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)
+[2m2026-05-17T22:14:13.532210Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] fps_tuning genome loading : genomes/fps_tuning.toml
+[2m2026-05-17T22:14:13.532086Z[0m [32m INFO[0m [2mforgia_mode_fps_arena::wave[0m[2m:[0m [arena-waves] loading genomes/arena_waves.toml
+[2m2026-05-17T22:14:13.532138Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel genome loading : genomes/viewmodel_arena.toml
+[2m2026-05-17T22:14:13.532232Z[0m [32m INFO[0m [2mforgia_effects::weapon_vfx[0m[2m:[0m Weapon VFX initialises (5-layer muzzle + 3-layer impact)
+[2m2026-05-17T22:14:13.532334Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] arena_bots genome loading : genomes/arena_bots.toml
+[2m2026-05-17T22:14:13.534534Z[0m [32m INFO[0m [2mforgia_asset_registry[0m[2m:[0m [asset-registry] Loaded 429 entries from assets/asset_registry.toml
+[2m2026-05-17T22:14:13.547448Z[0m [32m INFO[0m [2mforgia_asset_registry[0m[2m:[0m [asset-registry] Active 429/429 : 165 trees (20 autumn, 46 snow, 35 dead) | missing=0 disabled=0
+[2m2026-05-17T22:14:13.551956Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-17T22:14:13.554553Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox reinterpreted as cubemap (6 faces)
+[2m2026-05-17T22:14:13.559708Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-17T22:14:15.171525Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] Arena spawned : 76×76m, KayKit modular + 18 cloud clusters (bots = wave system)
+[2m2026-05-17T22:14:15.172722Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-17T22:14:15.172744Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-17T22:14:15.172897Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] CameraShake attaché (decay=10.0, max_rot=0.0140)
+[2m2026-05-17T22:14:15.172916Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:14:15.172915Z[0m [32m INFO[0m [2mforgia_mode_fps_arena::wave[0m[2m:[0m [arena-waves] WAVE 1 START — 2 enemies
+[2m2026-05-17T22:14:15.172936Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel spawned (ModernAR, target 0.90m, awaiting AABB)
+[2m2026-05-17T22:14:15.173823Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-17T22:14:15.177275Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.35,0.41) max 1.91m → scale 0.4709
+[2m2026-05-17T22:14:15.177278Z[0m [32m INFO[0m [2mforgia_fps::scope_glass[0m[2m:[0m [viewmodel_faders] scan terminé : 0 scope, 0 body (fade_enabled=false, body_alpha=1.00, scope_alpha=0.20, total_named=3)
+[2m2026-05-17T22:14:15.177346Z[0m [32m INFO[0m [2mforgia_fps::scope_glass[0m[2m:[0m [viewmodel_faders] aucun scope match parmi : ["WeaponViewmodel", "Mesh1.0", "Mesh1.0.Material_0.001"]
+[2m2026-05-17T22:14:16.518446Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:16.960141Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:17.151698Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:17.534929Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:17.725193Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:17.937166Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:18.165184Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:18.379636Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:18.593180Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:18.800501Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:19.025938Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:19.405179Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:19.620612Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:19.834154Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:20.192218Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:20.416668Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:20.547704Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit2 → AssaultRifle
+[2m2026-05-17T22:14:20.551968Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.66,0.92) max 1.91m → scale 0.4709
+[2m2026-05-17T22:14:20.808666Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:20.874575Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:20.939308Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.040231Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.105032Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.169756Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.234781Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.300672Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.368117Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.437479Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.503770Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.569730Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.636332Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.702784Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.767527Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.890741Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:21.957268Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.023077Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.088138Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.154723Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.221612Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.286941Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.352463Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.417325Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.483122Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.548355Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.614924Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.680187Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.746664Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.812277Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.879320Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:22.944580Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.011121Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.079347Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.146513Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.213573Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.279457Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.345487Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.410856Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.475866Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:23.542350Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.137300Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.201998Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.267924Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.333077Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.398786Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.464558Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.530150Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:28.594838Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:29.263368Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:29.329086Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:29.395648Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:29.590760Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:29.657123Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:29.722611Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.108186Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.172714Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.389299Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.455390Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.690734Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.755951Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:30.821251Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:31.334626Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit3 → Shotgun
+[2m2026-05-17T22:14:31.339442Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,0.85,0.61) max 1.91m → scale 0.5232
+[2m2026-05-17T22:14:32.345847Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, Shotgun)
+[2m2026-05-17T22:14:32.789791Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-17T22:14:32.789821Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-17T22:14:32.792657Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-17T22:14:32.792853Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] Arena cleaned : 500 entities despawned
+[2m2026-05-17T22:14:32.793593Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-17T22:14:32.793728Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-17T22:14:33.657532Z[0m [32m INFO[0m [2mforgia_terrain::biome_registry[0m[2m:[0m BiomeRegistry: loaded 0 biome specs from TOML
+[2m2026-05-17T22:14:33.657572Z[0m [32m INFO[0m [2mforgia_terrain::biomes[0m[2m:[0m BiomeMap: generated 538 Voronoi seeds (cell=96m) over 4194304m²
+[2m2026-05-17T22:14:33.658060Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Cartoon sky : 18 cloud clusters spawned
+[2m2026-05-17T22:14:33.658064Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World spawned : 1 chunk (32×32m, heightmap-grid) + sun + village genome request inserted (config/genomes/villages/starter_hamlet.toml)
+[2m2026-05-17T22:14:33.658278Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-17T22:14:33.658287Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-17T22:14:33.658407Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:14:33.658481Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex spawned + OrbitCamera active, FpsCamera disabled
+[2m2026-05-17T22:14:33.659076Z[0m [32m INFO[0m [2mforgia_village_loader[0m[2m:[0m [village-genome] generated 'starter_hamlet' (seed=42) — 6 buildings, 4 roads, retries=5, gen_stats="hamlet"
+[2m2026-05-17T22:14:33.659312Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Player teleported to village 'starter_hamlet' spawn (19.0,18.2,19.0)
+[2m2026-05-17T22:14:33.663122Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-17T22:14:33.666687Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:14:33.666732Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Path ribbon spawned : 4 polylines, 88 samples total
+[2m2026-05-17T22:14:33.666757Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] cleared 45 trees inside village exclusion disc r=31.0m
+[2m2026-05-17T22:14:33.726872Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:14:33.726981Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:14:33.727018Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:14:33.727079Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:14:33.727103Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:14:33.727140Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:14:33.734022Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree_Normal.png
+[2m2026-05-17T22:14:33.734042Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaf_Pine_C.png
+[2m2026-05-17T22:14:33.734046Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree.png
+[2m2026-05-17T22:14:33.792942Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex transparency applied on 1 materials (alpha=0.40)
+[2m2026-05-17T22:14:33.792952Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex Y calibrated: aabb_min_y=-0.874 → tf.y -0.850 → -0.126
+[2m2026-05-17T22:14:33.793467Z[0m [33m WARN[0m [2mforgia_auto_rig::pinocchio_pipeline[0m[2m:[0m [forgia-auto-rig::pinocchio] template requested=BipedLizard but landmarks suggest Humanoid (aspect=1.09, hip_y_frac=0.42, has_tail=false) — using suggested
+[2m2026-05-17T22:14:33.969897Z[0m [32m INFO[0m [2mforgia_auto_rig::pinocchio_pipeline[0m[2m:[0m [forgia-auto-rig::pinocchio] mesh 2179v1 : 31982 verts → 2872 voxels (167ms) → 190 medial spheres (8ms) → 18 bones embedded (cost=2.821) (template_source=toml)
+[2m2026-05-17T22:14:34.026237Z[0m [32m INFO[0m [2mforgia_audio_biome[0m[2m:[0m [forgia-audio-biome] Switched ambient → Jungle (audio-v1/ambiance/forest/forest_ambience.mp3)
+[2m2026-05-17T22:14:34.062377Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree_Normal.png
+[2m2026-05-17T22:14:34.062397Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree.png
+[2m2026-05-17T22:14:34.062401Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_TwistedTree_C.png
+[2m2026-05-17T22:14:34.067067Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree_Normal.png
+[2m2026-05-17T22:14:34.067103Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree.png
+[2m2026-05-17T22:14:34.067121Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_TwistedTree_C.png
+[2m2026-05-17T22:14:34.148398Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree_Normal.png
+[2m2026-05-17T22:14:34.148420Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree.png
+[2m2026-05-17T22:14:34.148424Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_NormalTree_C.png
+[2m2026-05-17T22:14:45.640639Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-17T22:14:45.640658Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-17T22:14:45.643683Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-17T22:14:45.643854Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex despawned, FpsCamera re-enabled
+[2m2026-05-17T22:14:45.643927Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World cleaned : 241 entities + 3415 trees + LOD2 tiles despawned
+[2m2026-05-17T22:14:45.650652Z[0m [32m INFO[0m [2mforgia_village_loader[0m[2m:[0m [village] cleanup despawned 6 entities
+[2m2026-05-17T22:14:45.650764Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-17T22:14:45.650979Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-17T22:14:46.320436Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] Arena spawned : 76×76m, KayKit modular + 18 cloud clusters (bots = wave system)
+[2m2026-05-17T22:14:46.320822Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-17T22:14:46.320828Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-17T22:14:46.320963Z[0m [32m INFO[0m [2mforgia_mode_fps_arena::wave[0m[2m:[0m [arena-waves] WAVE 1 START — 2 enemies
+[2m2026-05-17T22:14:46.320975Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel spawned (Shotgun, target 1.00m, awaiting AABB)
+[2m2026-05-17T22:14:46.320985Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:14:46.320985Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] CameraShake attaché (decay=10.0, max_rot=0.0140)
+[2m2026-05-17T22:14:46.321728Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-17T22:14:46.323964Z[0m [32m INFO[0m [2mforgia_fps::scope_glass[0m[2m:[0m [viewmodel_faders] scan terminé : 0 scope, 0 body (fade_enabled=false, body_alpha=1.00, scope_alpha=0.10, total_named=3)
+[2m2026-05-17T22:14:46.323984Z[0m [32m INFO[0m [2mforgia_fps::scope_glass[0m[2m:[0m [viewmodel_faders] aucun scope match parmi : ["WeaponViewmodel", "Mesh1.0", "Mesh1.0.Material_0.001"]
+[2m2026-05-17T22:14:46.323967Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,0.85,0.61) max 1.91m → scale 0.5232
+[2m2026-05-17T22:14:47.403288Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit1 → ModernAR
+[2m2026-05-17T22:14:47.405528Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit2 → AssaultRifle
+[2m2026-05-17T22:14:47.407140Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.35,0.41) max 1.91m → scale 0.4709
+[2m2026-05-17T22:14:48.051376Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.116486Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.182353Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.248696Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.313383Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.378288Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.443258Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.509310Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.576154Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.642489Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.707285Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.772329Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:48.838253Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:49.390258Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:49.456123Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:49.522464Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:49.587470Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:49.653045Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:50.812216Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:50.877391Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.028024Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.092796Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.221036Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.286839Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.352998Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.817970Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:51.885097Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:52.092844Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:52.158875Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:52.311909Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:52.378408Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:52.488086Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:52.553278Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:14:53.685817Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit1 → ModernAR
+[2m2026-05-17T22:14:53.689718Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.35,0.41) max 1.91m → scale 0.4709
+[2m2026-05-17T22:14:56.934946Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:57.145703Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:57.336596Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:57.987852Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:58.183648Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:58.391798Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:59.149834Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:59.329550Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:59.533167Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:59.725948Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:14:59.898213Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:00.144773Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:00.364846Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:01.210085Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:01.418477Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:01.618314Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:01.972381Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit2 → AssaultRifle
+[2m2026-05-17T22:15:01.976537Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.66,0.92) max 1.91m → scale 0.4709
+[2m2026-05-17T22:15:02.915883Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:02.982433Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.083586Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.149647Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.214507Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.280176Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.345614Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.411459Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.478509Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.545750Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.612235Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.676990Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.742348Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.808628Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:03.873548Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, AssaultRifle)
+[2m2026-05-17T22:15:04.205136Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit3 → Shotgun
+[2m2026-05-17T22:15:04.210006Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,0.85,0.61) max 1.91m → scale 0.5232
+[2m2026-05-17T22:15:05.568478Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, Shotgun)
+[2m2026-05-17T22:15:08.670561Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit4 → RocketLauncher
+[2m2026-05-17T22:15:08.674500Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.09,1.28,1.91) max 1.91m → scale 0.5232
+[2m2026-05-17T22:15:10.323162Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (8 pellets, RocketLauncher)
+[2m2026-05-17T22:15:11.196542Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (8 pellets, RocketLauncher)
+[2m2026-05-17T22:15:19.430013Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-17T22:15:19.430045Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-17T22:15:19.432940Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-17T22:15:19.433078Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] Arena cleaned : 500 entities despawned
+[2m2026-05-17T22:15:19.433769Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-17T22:15:19.433913Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-17T22:15:20.050650Z[0m [32m INFO[0m [2mforgia_terrain::biome_registry[0m[2m:[0m BiomeRegistry: loaded 0 biome specs from TOML
+[2m2026-05-17T22:15:20.050683Z[0m [32m INFO[0m [2mforgia_terrain::biomes[0m[2m:[0m BiomeMap: generated 538 Voronoi seeds (cell=96m) over 4194304m²
+[2m2026-05-17T22:15:20.051131Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Cartoon sky : 18 cloud clusters spawned
+[2m2026-05-17T22:15:20.051135Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World spawned : 1 chunk (32×32m, heightmap-grid) + sun + village genome request inserted (config/genomes/villages/starter_hamlet.toml)
+[2m2026-05-17T22:15:20.051235Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-17T22:15:20.051243Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-17T22:15:20.051407Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:15:20.051422Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex spawned + OrbitCamera active, FpsCamera disabled
+[2m2026-05-17T22:15:20.051601Z[0m [32m INFO[0m [2mforgia_village_loader[0m[2m:[0m [village-genome] generated 'starter_hamlet' (seed=42) — 6 buildings, 4 roads, retries=5, gen_stats="hamlet"
+[2m2026-05-17T22:15:20.051758Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Player teleported to village 'starter_hamlet' spawn (19.0,18.2,19.0)
+[2m2026-05-17T22:15:20.054597Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-17T22:15:20.057890Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:15:20.057909Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] Path ribbon spawned : 4 polylines, 88 samples total
+[2m2026-05-17T22:15:20.057946Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] cleared 45 trees inside village exclusion disc r=31.0m
+[2m2026-05-17T22:15:20.114100Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree.png
+[2m2026-05-17T22:15:20.114124Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaf_Pine_C.png
+[2m2026-05-17T22:15:20.114128Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree_Normal.png
+[2m2026-05-17T22:15:20.117305Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree.png
+[2m2026-05-17T22:15:20.117308Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree_Normal.png
+[2m2026-05-17T22:15:20.117333Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaf_Pine_C.png
+[2m2026-05-17T22:15:20.121242Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:15:20.121341Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:15:20.121379Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:15:20.121445Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:15:20.121469Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:15:20.121507Z[0m [33m WARN[0m [2mbevy_gltf::loader[0m[2m:[0m Unknown vertex attribute COLOR_1
+[2m2026-05-17T22:15:20.124385Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree_Normal.png
+[2m2026-05-17T22:15:20.124397Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree.png
+[2m2026-05-17T22:15:20.124418Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaf_Pine_C.png
+[2m2026-05-17T22:15:20.174489Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex transparency applied on 1 materials (alpha=0.40)
+[2m2026-05-17T22:15:20.174490Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex Y calibrated: aabb_min_y=-0.874 → tf.y -0.850 → -0.126
+[2m2026-05-17T22:15:20.174983Z[0m [33m WARN[0m [2mforgia_auto_rig::pinocchio_pipeline[0m[2m:[0m [forgia-auto-rig::pinocchio] template requested=BipedLizard but landmarks suggest Humanoid (aspect=1.09, hip_y_frac=0.42, has_tail=false) — using suggested
+[2m2026-05-17T22:15:20.350345Z[0m [32m INFO[0m [2mforgia_auto_rig::pinocchio_pipeline[0m[2m:[0m [forgia-auto-rig::pinocchio] mesh 19496v2 : 31982 verts → 2872 voxels (166ms) → 190 medial spheres (8ms) → 18 bones embedded (cost=2.821) (template_source=toml)
+[2m2026-05-17T22:15:20.406459Z[0m [32m INFO[0m [2mforgia_audio_biome[0m[2m:[0m [forgia-audio-biome] Switched ambient → Jungle (audio-v1/ambiance/forest/forest_ambience.mp3)
+[2m2026-05-17T22:15:20.429776Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree_Normal.png
+[2m2026-05-17T22:15:20.429799Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree.png
+[2m2026-05-17T22:15:20.429803Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_TwistedTree_C.png
+[2m2026-05-17T22:15:20.435366Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree_Normal.png
+[2m2026-05-17T22:15:20.435386Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree.png
+[2m2026-05-17T22:15:20.435389Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_TwistedTree_C.png
+[2m2026-05-17T22:15:20.444416Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree_Normal.png
+[2m2026-05-17T22:15:20.444416Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_TwistedTree_C.png
+[2m2026-05-17T22:15:20.444420Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_TwistedTree.png
+[2m2026-05-17T22:15:20.536146Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree_Normal.png
+[2m2026-05-17T22:15:20.536166Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Leaves_NormalTree_C.png
+[2m2026-05-17T22:15:20.536214Z[0m [31mERROR[0m [2mbevy_asset::server[0m[2m:[0m Path not found: C:\Users\Antoi\Desktop\Forgia Rewrite\target\release-fast\assets\models-v1\nature\Bark_NormalTree.png
+[2m2026-05-17T22:15:54.478378Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-17T22:15:54.478410Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-17T22:15:54.480614Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-17T22:15:54.480698Z[0m [32m INFO[0m [2mforgia_rpg::character[0m[2m:[0m [forgia-rpg::character] Rex despawned, FpsCamera re-enabled
+[2m2026-05-17T22:15:54.480742Z[0m [32m INFO[0m [2mforgia_rpg[0m[2m:[0m [forgia-rpg] World cleaned : 241 entities + 3415 trees + LOD2 tiles despawned
+[2m2026-05-17T22:15:54.487517Z[0m [32m INFO[0m [2mforgia_village_loader[0m[2m:[0m [village] cleanup despawned 6 entities
+[2m2026-05-17T22:15:54.487658Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-17T22:15:54.487870Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu
+[2m2026-05-17T22:15:56.413397Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] Arena spawned : 76×76m, KayKit modular + 18 cloud clusters (bots = wave system)
+[2m2026-05-17T22:15:56.413732Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor grabbed (Locked + invisible)
+[2m2026-05-17T22:15:56.413745Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player spawned at (0, 2, 0)
+[2m2026-05-17T22:15:56.413836Z[0m [32m INFO[0m [2mforgia_mode_fps_arena::wave[0m[2m:[0m [arena-waves] WAVE 1 START — 2 enemies
+[2m2026-05-17T22:15:56.413846Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] CameraShake attaché (decay=10.0, max_rot=0.0140)
+[2m2026-05-17T22:15:56.413851Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel spawned (RocketLauncher, target 1.00m, awaiting AABB)
+[2m2026-05-17T22:15:56.413855Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Skybox attached to 1 Camera3d(s)
+[2m2026-05-17T22:15:56.414279Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = InGame
+[2m2026-05-17T22:15:56.416642Z[0m [32m INFO[0m [2mforgia_fps::scope_glass[0m[2m:[0m [viewmodel_faders] scan terminé : 0 scope, 1 body (fade_enabled=true, body_alpha=0.30, scope_alpha=0.30, total_named=3)
+[2m2026-05-17T22:15:56.416664Z[0m [32m INFO[0m [2mforgia_fps::scope_glass[0m[2m:[0m [viewmodel_faders] aucun scope match parmi : ["WeaponViewmodel", "Mesh1.0", "Mesh1.0.Material_0.001"]
+[2m2026-05-17T22:15:56.416650Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.09,1.28,1.91) max 1.91m → scale 0.5232
+[2m2026-05-17T22:15:57.744276Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit2 → AssaultRifle
+[2m2026-05-17T22:15:57.748435Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.66,0.92) max 1.91m → scale 0.4709
+[2m2026-05-17T22:15:58.082528Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] weapon_select : Digit1 → ModernAR
+[2m2026-05-17T22:15:58.086801Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [forgia-fps] viewmodel AABB (1.91,1.35,0.41) max 1.91m → scale 0.4709
+[2m2026-05-17T22:15:59.002539Z[0m [32m INFO[0m [2mforgia_fps[0m[2m:[0m [fire] miss (1 pellets, ModernAR)
+[2m2026-05-17T22:15:59.446991Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] ESC pressed (InGame → Menu)
+[2m2026-05-17T22:15:59.447024Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (immediate)
+[2m2026-05-17T22:15:59.450016Z[0m [32m INFO[0m [2mforgia_player[0m[2m:[0m [forgia-player] Player despawned
+[2m2026-05-17T22:15:59.450147Z[0m [32m INFO[0m [2mforgia_mode_fps_arena[0m[2m:[0m [forgia-mode-fps-arena] Arena cleaned : 500 entities despawned
+[2m2026-05-17T22:15:59.450855Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] Cursor released (None + visible)
+[2m2026-05-17T22:15:59.451008Z[0m [32m INFO[0m [2mforgia_ui[0m[2m:[0m [forgia-ui] main_menu_ui state = Menu

@@ -1,0 +1,39 @@
+{
+  "timestamp_secs": 53.2,
+  "rigged_count": 1,
+  "pending_count": 0,
+  "pending_age_s": 0.00,
+  "bones_total": 20,
+  "total_rig_successes": 1,
+  "total_rig_failures_degenerate_aabb": 0,
+  "last_template": "BipedLizard",
+  "last_requested_template": "BipedLizard",
+  "last_auto_switched": false,
+  "last_landmarks": { "vertex_count": 31982, "hip_y_frac": 0.422, "shoulder_y_frac": 0.672, "head_y_frac": 0.984, "aspect_ratio_xy": 1.094, "hip_width_frac": 0.290, "has_tail": false, "looks_humanoid": true },
+  "last_bone_count": 20,
+  "last_mesh_height": 1.745,
+  "last_rigged_at_secs": 17.1,
+  "debug": {
+    "aabb_min": [-0.956, -0.874, -0.606],
+    "aabb_max": [0.954, 0.871, 0.605],
+    "mesh3d_count": 0,
+    "total_mesh_vertices": 31982,
+    "spine_scale": 0.000,
+    "leg_scale": 0.000,
+    "arm_scale": 0.000,
+    "bones_world": {
+      "hip_y": -0.166,
+      "head_y": 0.493,
+      "foot_l_y": -0.824,
+      "forearm_l_x": -0.181
+    },
+    "interpretation": "head Y=0.49 vs aabb.max.y=0.87 (diff 0.38m) — head pas au sommet"
+  },
+  "skinning": {
+    "total_meshes_skinned": 0,
+    "total_meshes_failed": 0,
+    "last_verts_skinned": 0,
+    "last_skinning_at_secs": 0.0
+  },
+  "severity": "ok"
+}

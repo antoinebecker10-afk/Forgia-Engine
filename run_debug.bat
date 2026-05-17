@@ -23,8 +23,9 @@ echo [run_debug] Backtrace : full
 echo [run_debug] ESC pour quitter, Alt+F4 si menu mort
 echo.
 
-REM Lance + redirige stdout + stderr vers log
-target\release-fast\forgia-game.exe > forgia2_run.log 2>&1
+REM Lance forgia.exe (Pattern A workspace root, post-Rewrite).
+REM forgia-game.exe = legacy backward-compat, ne contient pas les fixes recents.
+target\release-fast\forgia.exe > forgia2_run.log 2>&1
 
 echo.
 echo [run_debug] Forgia V2 closed (exit %ERRORLEVEL%)

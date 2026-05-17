@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)",
+      "Read(//d/Forgia/.claude/**)",
+      "PowerShell(Set-Location 'd:\\\\Forgia'; foreach \\($h in @\\('session-start.sh','concept-first-session-reset.sh','session-start-veille.sh'\\)\\) { $sw = [Diagnostics.Stopwatch]::StartNew\\(\\); $out = & bash \"D:/Forgia/.claude/hooks/$h\" 2>&1 | Out-String; $sw.Stop\\(\\); \"$h => $\\($sw.ElapsedMilliseconds\\)ms, output=$\\($out.Length\\) chars\" })",
+      "Read(//d/Forgia/**)",
+      "Bash(time bash D:/Forgia/.claude/hooks/session-start.sh)",
+      "Bash(echo \"EXIT=$?\")",
+      "Read(//tmp/**)",
+      "Bash(awk '/T:[0-9]+/ {match\\($0,/T:[0-9]+/\\); t=substr\\($0,RSTART+2,RLENGTH-2\\); if\\(p\\){d=\\(t-p\\)/1000000; if\\(d>500\\) printf \"%6dms  %s\\\\n\", d, prev} p=t; prev=$0}' /tmp/trace.log)",
+      "Bash(curl.exe -I --max-time 10 https://api.anthropic.com/v1/mcp_servers)",
+      "Bash(tasklist)",
+      "Bash(findstr /I claude)",
+      "Bash(findstr /I \"bash session\")",
+      "PowerShell(Get-Process bash -ErrorAction SilentlyContinue)",
+      "Bash(cp D:/Forgia/.claude/settings.json D:/Forgia/.claude/settings.json.bak-before-hook-fix && echo \"Backup OK\")",
+      "PowerShell(Stop-Process -Force)"
+    ],
+    "additionalDirectories": [
+      "D:\\Forgia\\.claude"
+    ]
+  }
+}
