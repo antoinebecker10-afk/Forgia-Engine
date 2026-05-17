@@ -21,7 +21,7 @@ use forgia_ui::prelude::CrosshairMode;
 
 use crate::{
     lookup_genome_entry, viewmodel_rotation_ads, viewmodel_rotation_hipfire, viewmodel_transform,
-    NeedsAutoScale, ViewmodelGenome, ViewmodelGenomeHandle, WeaponViewmodel,
+    NeedsAutoScale, ViewmodelBaseScale, ViewmodelGenome, ViewmodelGenomeHandle, WeaponViewmodel,
 };
 
 const DEFAULT_FOV_DEG: f32 = 45.0; // Bevy PerspectiveProjection default (~0.785 rad)
@@ -138,7 +138,10 @@ pub fn apply_ads_viewmodel(
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
     // Without<NeedsAutoScale> : ne touche pas visibility tant que auto_scale_viewmodel
     // n'a pas mesuré l'AABB et révélé l'arme. Évite race condition d'affichage prématuré.
-    mut q_vm: Query<(&mut Transform, &mut Visibility), (With<WeaponViewmodel>, Without<NeedsAutoScale>)>,
+    mut q_vm: Query<
+        (&mut Transform, &mut Visibility, Option<&ViewmodelBaseScale>),
+        (With<WeaponViewmodel>, Without<NeedsAutoScale>),
+    >,
 ) {
     let entry = genome_handle
         .as_deref()
@@ -154,7 +157,16 @@ pub fn apply_ads_viewmodel(
     // Sniper scope fullscreen : hide complet viewmodel quand ADS engaged (juste le viseur visible).
     let hide_for_sniper = entry.sniper_scope_fullscreen && ads.progress > 0.5;
 
-    for (mut tf, mut vis) in &mut q_vm {
+    for (mut tf, mut vis, base_scale) in &mut q_vm {
+        // Phase H : scale shrink en ADS — base_scale stocké par auto_scale_viewmodel.
+        // Lerp 1.0 (hipfire taille pleine) → ads_scale_factor (rétréci en ADS).
+        // Sniper Lenoir ads_scale_factor=1.0 → pas de changement (overlay scope cache déjà).
+        if let Some(bs) = base_scale {
+            let scale_mul = 1.0_f32.lerp(entry.ads_scale_factor, ads.progress);
+            let new_scale = bs.0 * scale_mul;
+            tf.scale = Vec3::splat(new_scale);
+        }
+
         let ads_target = if use_sight_align {
             let scale = tf.scale.x;
             let sight_offset = ads_rot * (sight_local * scale); // rotation ADS (droite)

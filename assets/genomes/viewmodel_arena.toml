@@ -21,8 +21,8 @@ rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
 barrel_length = 0.55
-ads_offset_x = 0.0
-ads_offset_y = -0.20
+ads_offset_x = 0.05
+ads_offset_y = -0.40           # ★ abaissé pour que crosshair soit au-dessus du mesh
 ads_offset_z = -0.80
 ads_fov_deg = 30.0
 sight_local_x = 0.0
@@ -54,6 +54,8 @@ shake_trauma = 0.03            # ← 0.06→0.03 (moitié)
 recoil_pitch_deg = 0.25        # ← 0.5→0.25 (moitié)
 recoil_yaw_random_deg = 0.05   # ← 0.12→0.05 (très subtil)
 fov_punch_deg = 0.0            # ★ SKIP (CS2 philosophy — semi-auto)
+# Phase H — ADS scale shrink (gun plus petit en ADS = crosshair visible)
+ads_scale_factor = 0.70        # -30% taille en full ADS
 
 [weapons.bourrasque]
 # Slot 2 (Digit2) — Mitraillette (SMG full-auto cadence rapide) — Bourrasque
@@ -67,8 +69,8 @@ rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
 barrel_length = 0.55
-ads_offset_x = 0.0
-ads_offset_y = -0.20
+ads_offset_x = 0.05
+ads_offset_y = -0.40           # ★ abaissé pour que crosshair soit au-dessus du mesh
 ads_offset_z = -0.80
 ads_fov_deg = 32.0
 sight_local_x = 0.0
@@ -101,6 +103,8 @@ shake_trauma = 0.015           # ★ ULTRA léger (16/s × 0.015 = steady ~0.03 
 recoil_pitch_deg = 0.12        # ← 0.25→0.12 (kick visuel minimal)
 recoil_yaw_random_deg = 0.0    # ★ ZERO yaw : tue le wobble horizontal à 16Hz
 fov_punch_deg = 0.0            # ★ SKIP (CS2 — pas de fov punch en auto-fire)
+# Phase H — ADS scale shrink (SMG cadence rapide = besoin crosshair visible)
+ads_scale_factor = 0.65        # -35% taille en full ADS
 
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
@@ -148,6 +152,8 @@ shake_trauma = 0.12            # ← 0.18→0.12 (~0.8° peak, decay 100ms)
 recoil_pitch_deg = 1.2         # ← 1.8→1.2 (kick puissant mais pas brutal)
 recoil_yaw_random_deg = 0.0    # ★ pas de yaw : sniper = précision absolue
 fov_punch_deg = 0.5            # ← 0.8→0.5 (subtle weight feel, CS2 AWP-lite)
+# Phase H — ADS scale shrink (sniper = PAS de changement, scope overlay cache déjà)
+ads_scale_factor = 1.00        # ★ inchangé (sniper a son scope fullscreen)
 
 [weapons.boucherie]
 # Slot 4 (Digit4) — Fusil à pompe (pump-action multi-pellets cone) — Boucherie
@@ -162,8 +168,8 @@ rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
 barrel_length = 0.55
-ads_offset_x = 0.0
-ads_offset_y = -0.25
+ads_offset_x = 0.05
+ads_offset_y = -0.50           # ★ abaissé encore plus (shotgun large mesh)
 ads_offset_z = -0.85
 ads_fov_deg = 35.0      # Shotgun zoom modéré
 sight_local_x = 0.0
@@ -196,3 +202,5 @@ shake_trauma = 0.15            # ← 0.22→0.15 (~1° peak, decay 100ms)
 recoil_pitch_deg = 1.4         # ← 2.0→1.4 (kick lourd mais pas violent)
 recoil_yaw_random_deg = 0.12   # ← 0.30→0.12 (mini cone visuel)
 fov_punch_deg = 0.8            # ← 1.2→0.8 (Fortnite pump-lite)
+# Phase H — ADS scale shrink (shotgun gros mesh = shrink agressif)
+ads_scale_factor = 0.60        # -40% taille en full ADS (mesh le plus volumineux)

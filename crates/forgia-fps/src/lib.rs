@@ -169,6 +169,12 @@ pub struct ViewmodelGenomeEntry {
     /// (cercle noir vignette + reticle) + FOV cam très réduit.
     #[serde(default)]
     pub sniper_scope_fullscreen: bool,
+    // ─── Phase H — ADS scale shrink (2026-05-18) ─────────────────────
+    /// Multiplier scale viewmodel en ADS full (lerp 1.0 hipfire → factor full ADS).
+    /// Sniper Lenoir = 1.0 (pas de changement, il a son scope overlay).
+    /// Autres = 0.65-0.75 = gun réduit pour ne pas bloquer le crosshair.
+    #[serde(default = "default_ads_scale_factor")]
+    pub ads_scale_factor: f32,
     // ─── Phase G — Juice per-arme (camera shake / recoil / FOV punch) ─
     /// Trauma ajouté par tir (0..1). 0.04 = SMG léger, 0.22 = Shotgun heavy.
     /// AAA range : 0.04-0.22 pour rester confortable (anti-nausée).
@@ -255,6 +261,7 @@ fn default_shake_trauma() -> f32 { 0.06 }
 fn default_recoil_pitch_deg() -> f32 { 0.4 }
 fn default_recoil_yaw_random_deg() -> f32 { 0.1 }
 fn default_fov_punch_deg() -> f32 { 0.0 }
+fn default_ads_scale_factor() -> f32 { 0.7 }
 
 #[derive(Resource)]
 pub struct ViewmodelGenomeHandle(pub Handle<Genome<ViewmodelGenome>>);
@@ -380,6 +387,12 @@ fn scene_for_weapon(a: &WeaponModelAssets, w: WeaponType) -> Handle<Scene> {
 pub struct NeedsAutoScale {
     pub target_size: f32, // taille cible en mètres (largest axis)
 }
+
+/// Scale "de base" du viewmodel après auto-calibration AABB (hipfire).
+/// Lu par `apply_ads_viewmodel` pour lerp scale en ADS sans drift par frame.
+/// Phase H 2026-05-18 : ADS scale shrink genome-driven.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct ViewmodelBaseScale(pub f32);
 
 /// Offset + rotation du viewmodel par arme (le scale vient de auto_scale_viewmodel via AABB).
 /// Valeurs portées de V1 `combat/viewmodel.rs` (fallback genome). Scale 1.0 = sera réécrit.
@@ -997,6 +1010,7 @@ fn auto_scale_viewmodel(
                 scale: Vec3::splat(new_scale),
                 ..*tf
             })
+            .insert(ViewmodelBaseScale(new_scale))
             .insert(Visibility::Inherited);
     }
 }
