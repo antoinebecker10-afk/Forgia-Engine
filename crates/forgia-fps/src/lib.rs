@@ -20,10 +20,14 @@ use forgia_effects::prelude::{
     WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
-use forgia_juice_camera_shake::{CameraShake, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
-use forgia_juice_fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse};
+use forgia_crosshair::CrosshairTuning;
+use forgia_juice_camera_shake::{
+    CameraShake, CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse,
+};
+use forgia_juice_fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
 use forgia_juice_hit_stop::HitStopState;
 use forgia_juice_recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
+use forgia_player::prelude::MouseLookTuning;
 use forgia_mode_fps_arena::{HitZone, TargetCube};
 use forgia_player::prelude::*;
 use serde::Deserialize;
@@ -394,6 +398,110 @@ pub struct NeedsAutoScale {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct ViewmodelBaseScale(pub f32);
 
+// ─── FPS Tuning Genome (anti-hardcode pass 2026-05-18) ────────────────
+//
+// Toutes les constantes "feel" qui étaient hardcodées dans les crates juice /
+// crosshair / player / ads. Loadées au Startup depuis `assets/genomes/fps_tuning.toml`
+// et propagées par `sync_fps_tuning` à chaque downstream Resource Tuning.
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct FpsTuning {
+    pub camera_shake: FtCameraShake,
+    pub fov_punch: FtFovPunch,
+    pub ads: FtAds,
+    pub mouse_look: FtMouseLook,
+    pub crosshair_hipfire: FtCrosshairHipfire,
+    pub crosshair_ads_dot: FtCrosshairAdsDot,
+    pub crosshair_sniper_overlay: FtCrosshairSniper,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCameraShake {
+    pub default_decay: f32,
+    pub default_max_rotation_rad: f32,
+    pub yaw_factor: f32,
+    pub roll_factor: f32,
+    pub pitch_upward_bias: f32,
+    pub sample_rate_hz: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtFovPunch {
+    pub attack_secs: f32,
+    pub decay_secs: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtAds {
+    pub lerp_speed: f32,
+    pub default_fov_deg: f32,
+    pub punch_attenuation: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtMouseLook {
+    pub base_sensitivity: f32,
+    pub recoil_decay_per_sec: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCrosshairHipfire {
+    pub cross_len: f32,
+    pub cross_stroke: f32,
+    pub cross_alpha: u8,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCrosshairAdsDot {
+    pub outer_radius: f32,
+    pub inner_radius: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCrosshairSniper {
+    pub scope_radius_factor: f32,
+    pub dim_alpha: u8,
+    pub dim_color: [u8; 3],
+    pub vignette_rings: u32,
+    pub ring_thickness_factor: f32,
+    pub ring_max_alpha: f32,
+    pub ring_color: [u8; 3],
+    pub ring_outer_extent: f32,
+    pub border_width: f32,
+    pub border_inner_width: f32,
+    pub border_inner_offset: f32,
+    pub reticle_gap: f32,
+    pub reticle_line_factor: f32,
+    pub reticle_color: [u8; 3],
+    pub reticle_line_stroke: f32,
+    pub reticle_tick_stroke: f32,
+    pub reticle_tick_size: f32,
+    pub red_dot_radius: f32,
+    pub red_dot_color: [u8; 3],
+}
+
+#[derive(Resource)]
+pub struct FpsTuningHandle(pub Handle<Genome<FpsTuning>>);
+
+/// Resource locale forgia-fps : constantes ADS (FOV cam, lerp speed, atténuation).
+/// Lu par `update_ads_progress` + `apply_ads_camera_fov`.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct AdsTuning {
+    pub lerp_speed: f32,
+    pub default_fov_deg: f32,
+    pub punch_attenuation: f32,
+}
+
+impl Default for AdsTuning {
+    fn default() -> Self {
+        Self {
+            lerp_speed: 12.0,
+            default_fov_deg: 45.0,
+            punch_attenuation: 0.7,
+        }
+    }
+}
+
 /// Offset + rotation du viewmodel par arme (le scale vient de auto_scale_viewmodel via AABB).
 /// Valeurs portées de V1 `combat/viewmodel.rs` (fallback genome). Scale 1.0 = sera réécrit.
 ///
@@ -484,9 +592,16 @@ impl Plugin for ForgiaFpsPlugin {
             ))
             .init_resource::<EquippedWeapons>()
             .init_resource::<LeftMouseState>()
+            .init_resource::<AdsTuning>()
             .init_asset::<Genome<ViewmodelGenome>>()
+            .init_asset::<Genome<FpsTuning>>()
             .register_asset_loader(GenomeLoader::<ViewmodelGenome>::default())
-            .add_systems(Startup, (load_weapon_models, load_viewmodel_genome))
+            .register_asset_loader(GenomeLoader::<FpsTuning>::default())
+            .add_systems(
+                Startup,
+                (load_weapon_models, load_viewmodel_genome, load_fps_tuning),
+            )
+            .add_systems(Update, sync_fps_tuning)
             .add_systems(OnExit(GameMode::Fps), despawn_viewmodel)
             // Fire system genome-driven : dispatch fire_mode (auto/semi/pump) + multi-pellets
             // + per-weapon damage/fire_rate/range/spread depuis ViewmodelGenomeEntry TOML.
@@ -854,6 +969,74 @@ fn load_viewmodel_genome(mut commands: Commands, asset_server: Res<AssetServer>)
     info!("[forgia-fps] viewmodel genome loading : genomes/viewmodel_arena.toml");
 }
 
+/// Startup : load fps_tuning.toml — toutes constantes "feel" hardcodées avant.
+fn load_fps_tuning(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let handle: Handle<Genome<FpsTuning>> = asset_server.load("genomes/fps_tuning.toml");
+    commands.insert_resource(FpsTuningHandle(handle));
+    info!("[forgia-fps] fps_tuning genome loading : genomes/fps_tuning.toml");
+}
+
+/// Sync system : lit FpsTuning genome et push vers chaque downstream Resource Tuning.
+/// Hot-reload : éditer le TOML → Bevy Asset re-load → ce système push automatiquement.
+#[allow(clippy::too_many_arguments)]
+fn sync_fps_tuning(
+    handle: Option<Res<FpsTuningHandle>>,
+    assets: Res<Assets<Genome<FpsTuning>>>,
+    mut cs_tuning: ResMut<CameraShakeTuning>,
+    mut fp_tuning: ResMut<FovPunchTuning>,
+    mut ml_tuning: ResMut<MouseLookTuning>,
+    mut ch_tuning: ResMut<CrosshairTuning>,
+    mut ads_tuning: ResMut<AdsTuning>,
+) {
+    let Some(g) = handle.as_deref().and_then(|h| assets.get(&h.0)) else {
+        return;
+    };
+    let t = &g.data;
+    // Camera shake
+    cs_tuning.default_decay = t.camera_shake.default_decay;
+    cs_tuning.default_max_rotation = t.camera_shake.default_max_rotation_rad;
+    cs_tuning.yaw_factor = t.camera_shake.yaw_factor;
+    cs_tuning.roll_factor = t.camera_shake.roll_factor;
+    cs_tuning.pitch_upward_bias = t.camera_shake.pitch_upward_bias;
+    cs_tuning.sample_rate_hz = t.camera_shake.sample_rate_hz;
+    // FOV punch
+    fp_tuning.attack_secs = t.fov_punch.attack_secs;
+    fp_tuning.decay_secs = t.fov_punch.decay_secs;
+    // Mouse look
+    ml_tuning.base_sensitivity = t.mouse_look.base_sensitivity;
+    ml_tuning.recoil_decay_per_sec = t.mouse_look.recoil_decay_per_sec;
+    // ADS
+    ads_tuning.lerp_speed = t.ads.lerp_speed;
+    ads_tuning.default_fov_deg = t.ads.default_fov_deg;
+    ads_tuning.punch_attenuation = t.ads.punch_attenuation;
+    // Crosshair
+    ch_tuning.hipfire_cross_len = t.crosshair_hipfire.cross_len;
+    ch_tuning.hipfire_cross_stroke = t.crosshair_hipfire.cross_stroke;
+    ch_tuning.hipfire_cross_alpha = t.crosshair_hipfire.cross_alpha;
+    ch_tuning.ads_dot_outer_radius = t.crosshair_ads_dot.outer_radius;
+    ch_tuning.ads_dot_inner_radius = t.crosshair_ads_dot.inner_radius;
+    let s = &t.crosshair_sniper_overlay;
+    ch_tuning.sniper_scope_radius_factor = s.scope_radius_factor;
+    ch_tuning.sniper_dim_alpha = s.dim_alpha;
+    ch_tuning.sniper_dim_color = s.dim_color;
+    ch_tuning.sniper_vignette_rings = s.vignette_rings;
+    ch_tuning.sniper_ring_thickness_factor = s.ring_thickness_factor;
+    ch_tuning.sniper_ring_max_alpha = s.ring_max_alpha;
+    ch_tuning.sniper_ring_color = s.ring_color;
+    ch_tuning.sniper_ring_outer_extent = s.ring_outer_extent;
+    ch_tuning.sniper_border_width = s.border_width;
+    ch_tuning.sniper_border_inner_width = s.border_inner_width;
+    ch_tuning.sniper_border_inner_offset = s.border_inner_offset;
+    ch_tuning.sniper_reticle_gap = s.reticle_gap;
+    ch_tuning.sniper_reticle_line_factor = s.reticle_line_factor;
+    ch_tuning.sniper_reticle_color = s.reticle_color;
+    ch_tuning.sniper_reticle_line_stroke = s.reticle_line_stroke;
+    ch_tuning.sniper_reticle_tick_stroke = s.reticle_tick_stroke;
+    ch_tuning.sniper_reticle_tick_size = s.reticle_tick_size;
+    ch_tuning.sniper_red_dot_radius = s.red_dot_radius;
+    ch_tuning.sniper_red_dot_color = s.red_dot_color;
+}
+
 /// Startup : pré-charge les 3 GLB viewmodel (handles partagés, 1 load chacun).
 fn load_weapon_models(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(WeaponModelAssets {
@@ -1021,10 +1204,18 @@ fn auto_scale_viewmodel(
 fn ensure_camera_shake_component(
     mut commands: Commands,
     q: Query<Entity, (With<FpsCamera>, Without<CameraShake>)>,
+    cs_tuning: Res<CameraShakeTuning>,
 ) {
     for e in &q {
-        commands.entity(e).insert(CameraShake::default());
-        info!("[forgia-fps] CameraShake Component attaché à FpsCamera");
+        commands.entity(e).insert(CameraShake {
+            decay: cs_tuning.default_decay,
+            max_rotation: cs_tuning.default_max_rotation,
+            ..CameraShake::default()
+        });
+        info!(
+            "[forgia-fps] CameraShake attaché (decay={:.1}, max_rot={:.4})",
+            cs_tuning.default_decay, cs_tuning.default_max_rotation
+        );
     }
 }
 

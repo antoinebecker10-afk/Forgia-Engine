@@ -15,7 +15,72 @@ use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 
 pub mod prelude {
-    pub use crate::{CrosshairMode, ForgiaCrosshairPlugin};
+    pub use crate::{CrosshairMode, CrosshairTuning, ForgiaCrosshairPlugin};
+}
+
+/// Resource Tuning hot-reload pour TOUS les paramètres de rendu crosshair
+/// (hipfire / ADS dot / sniper overlay). Push depuis fps_tuning.toml par forgia-fps.
+/// Defaults = valeurs précédentes hardcodées (rétro-compat).
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct CrosshairTuning {
+    // Hipfire crosshair
+    pub hipfire_cross_len: f32,
+    pub hipfire_cross_stroke: f32,
+    pub hipfire_cross_alpha: u8,
+    // ADS red dot
+    pub ads_dot_outer_radius: f32,
+    pub ads_dot_inner_radius: f32,
+    // Sniper overlay
+    pub sniper_scope_radius_factor: f32,
+    pub sniper_dim_alpha: u8,
+    pub sniper_dim_color: [u8; 3],
+    pub sniper_vignette_rings: u32,
+    pub sniper_ring_thickness_factor: f32,
+    pub sniper_ring_max_alpha: f32,
+    pub sniper_ring_color: [u8; 3],
+    pub sniper_ring_outer_extent: f32,
+    pub sniper_border_width: f32,
+    pub sniper_border_inner_width: f32,
+    pub sniper_border_inner_offset: f32,
+    pub sniper_reticle_gap: f32,
+    pub sniper_reticle_line_factor: f32,
+    pub sniper_reticle_color: [u8; 3],
+    pub sniper_reticle_line_stroke: f32,
+    pub sniper_reticle_tick_stroke: f32,
+    pub sniper_reticle_tick_size: f32,
+    pub sniper_red_dot_radius: f32,
+    pub sniper_red_dot_color: [u8; 3],
+}
+
+impl Default for CrosshairTuning {
+    fn default() -> Self {
+        Self {
+            hipfire_cross_len: 7.0,
+            hipfire_cross_stroke: 2.0,
+            hipfire_cross_alpha: 220,
+            ads_dot_outer_radius: 4.0,
+            ads_dot_inner_radius: 2.0,
+            sniper_scope_radius_factor: 0.42,
+            sniper_dim_alpha: 145,
+            sniper_dim_color: [8, 8, 12],
+            sniper_vignette_rings: 8,
+            sniper_ring_thickness_factor: 0.18,
+            sniper_ring_max_alpha: 90.0,
+            sniper_ring_color: [15, 15, 18],
+            sniper_ring_outer_extent: 1.5,
+            sniper_border_width: 8.0,
+            sniper_border_inner_width: 2.0,
+            sniper_border_inner_offset: 4.0,
+            sniper_reticle_gap: 8.0,
+            sniper_reticle_line_factor: 0.85,
+            sniper_reticle_color: [10, 10, 10],
+            sniper_reticle_line_stroke: 1.5,
+            sniper_reticle_tick_stroke: 1.0,
+            sniper_reticle_tick_size: 4.0,
+            sniper_red_dot_radius: 2.0,
+            sniper_red_dot_color: [255, 30, 30],
+        }
+    }
 }
 
 /// Mode du crosshair : hipfire (croix blanche) ou ADS (red dot précis).
@@ -34,10 +99,12 @@ pub struct ForgiaCrosshairPlugin;
 
 impl Plugin for ForgiaCrosshairPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CrosshairMode>().add_systems(
-            EguiPrimaryContextPass,
-            (draw_crosshair, draw_sniper_scope_overlay),
-        );
+        app.init_resource::<CrosshairMode>()
+            .init_resource::<CrosshairTuning>()
+            .add_systems(
+                EguiPrimaryContextPass,
+                (draw_crosshair, draw_sniper_scope_overlay),
+            );
     }
 }
 
@@ -45,6 +112,7 @@ fn draw_crosshair(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
     mode: Res<CrosshairMode>,
+    tuning: Res<CrosshairTuning>,
 ) {
     if *app_state.get() != AppMode::InGame {
         return;
@@ -64,10 +132,10 @@ fn draw_crosshair(
 
     // Hipfire crosshair : croix blanche, fade out en ADS
     if p < 1.0 {
-        let alpha_hip = ((1.0 - p) * 220.0) as u8;
+        let alpha_hip = ((1.0 - p) * f32::from(tuning.hipfire_cross_alpha)) as u8;
         let color = egui::Color32::from_rgba_unmultiplied(255, 255, 255, alpha_hip);
-        let len = 7.0;
-        let stroke = egui::Stroke::new(2.0, color);
+        let len = tuning.hipfire_cross_len;
+        let stroke = egui::Stroke::new(tuning.hipfire_cross_stroke, color);
         painter.line_segment(
             [
                 egui::pos2(center.x - len, center.y),
@@ -94,12 +162,12 @@ fn draw_crosshair(
         let alpha_ads = (p * 240.0) as u8;
         painter.circle_filled(
             center,
-            4.0,
+            tuning.ads_dot_outer_radius,
             egui::Color32::from_rgba_unmultiplied(255, 60, 40, alpha_ads / 4),
         );
         painter.circle_filled(
             center,
-            2.0,
+            tuning.ads_dot_inner_radius,
             egui::Color32::from_rgba_unmultiplied(255, 30, 30, alpha_ads),
         );
     }
@@ -121,6 +189,7 @@ fn draw_sniper_scope_overlay(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
     mode: Res<CrosshairMode>,
+    tuning: Res<CrosshairTuning>,
 ) {
     if *app_state.get() != AppMode::InGame {
         return;
@@ -138,11 +207,15 @@ fn draw_sniper_scope_overlay(
         egui::Id::new("forgia_sniper_scope"),
     ));
 
-    let scope_radius = screen.width().min(screen.height()) * 0.42;
-    // ★ Semi-transparent (alpha 145/255 ≈ 57%) au lieu de full opaque noir.
-    // User voit la scène dimmée AUTOUR du scope → vision périphérique préservée.
-    let dim_alpha = (p * 145.0) as u8;
-    let dim = egui::Color32::from_rgba_unmultiplied(8, 8, 12, dim_alpha);
+    let scope_radius = screen.width().min(screen.height()) * tuning.sniper_scope_radius_factor;
+    // Semi-transparent (vision périphérique préservée).
+    let dim_alpha = (p * f32::from(tuning.sniper_dim_alpha)) as u8;
+    let dim = egui::Color32::from_rgba_unmultiplied(
+        tuning.sniper_dim_color[0],
+        tuning.sniper_dim_color[1],
+        tuning.sniper_dim_color[2],
+        dim_alpha,
+    );
 
     // 4 rectangles vignette (haut, bas, gauche, droite — laissent passer la scène).
     painter.rect_filled(
@@ -178,76 +251,102 @@ fn draw_sniper_scope_overlay(
         dim,
     );
 
-    // ★ Vignette gradient : 8 anneaux concentriques EXTÉRIEURS au scope.
-    // Chaque anneau progressivement plus opaque vers le scope → effet "frosted
-    // glass" qui simule un blur radial sans shader. Donne l'illusion de blur.
-    let vignette_rings = 8;
-    let ring_thickness = scope_radius * 0.18; // épaisseur cumulée hors scope
+    // Vignette gradient : N anneaux concentriques (Tuning) extérieurs au scope.
+    let vignette_rings = tuning.sniper_vignette_rings.max(1);
+    let ring_thickness = scope_radius * tuning.sniper_ring_thickness_factor;
     for i in 0..vignette_rings {
-        // Distance du scope (i=0 = collé au scope, i=N-1 = loin du scope)
-        let t = i as f32 / (vignette_rings - 1) as f32;
-        // Alpha décroissant vers l'extérieur (max au bord scope, min loin)
-        let ring_alpha = ((1.0 - t) * 90.0 * p) as u8;
-        let ring_color = egui::Color32::from_rgba_unmultiplied(15, 15, 18, ring_alpha);
-        let r = scope_radius + ring_thickness * t * 1.5;
+        let t = if vignette_rings > 1 {
+            i as f32 / (vignette_rings - 1) as f32
+        } else {
+            0.0
+        };
+        let ring_alpha = ((1.0 - t) * tuning.sniper_ring_max_alpha * p) as u8;
+        let ring_color = egui::Color32::from_rgba_unmultiplied(
+            tuning.sniper_ring_color[0],
+            tuning.sniper_ring_color[1],
+            tuning.sniper_ring_color[2],
+            ring_alpha,
+        );
+        let r = scope_radius + ring_thickness * t * tuning.sniper_ring_outer_extent;
         painter.circle_stroke(center, r, egui::Stroke::new(ring_thickness * 0.35, ring_color));
     }
 
-    // Bordure scope métallique (lecture immédiate du contour)
+    // Bordure scope métallique
     let alpha = (p * 255.0) as u8;
     let ring_color = egui::Color32::from_rgba_unmultiplied(20, 20, 20, alpha);
-    painter.circle_stroke(center, scope_radius, egui::Stroke::new(8.0, ring_color));
+    painter.circle_stroke(
+        center,
+        scope_radius,
+        egui::Stroke::new(tuning.sniper_border_width, ring_color),
+    );
     let outer_ring = egui::Color32::from_rgba_unmultiplied(60, 60, 60, alpha);
-    painter.circle_stroke(center, scope_radius - 4.0, egui::Stroke::new(2.0, outer_ring));
+    painter.circle_stroke(
+        center,
+        scope_radius - tuning.sniper_border_inner_offset,
+        egui::Stroke::new(tuning.sniper_border_inner_width, outer_ring),
+    );
 
-    // Reticle
-    let reticle_alpha = ((p * 255.0).min(255.0)) as u8;
-    let reticle_color = egui::Color32::from_rgba_unmultiplied(10, 10, 10, reticle_alpha);
-    let gap = 8.0;
-    let line_len = scope_radius * 0.85;
+    // Reticle (depuis Tuning)
+    let reticle_alpha = (p * 255.0).min(255.0) as u8;
+    let reticle_color = egui::Color32::from_rgba_unmultiplied(
+        tuning.sniper_reticle_color[0],
+        tuning.sniper_reticle_color[1],
+        tuning.sniper_reticle_color[2],
+        reticle_alpha,
+    );
+    let gap = tuning.sniper_reticle_gap;
+    let line_len = scope_radius * tuning.sniper_reticle_line_factor;
+    let line_stroke = egui::Stroke::new(tuning.sniper_reticle_line_stroke, reticle_color);
     painter.line_segment(
         [
             egui::pos2(center.x - line_len, center.y),
             egui::pos2(center.x - gap, center.y),
         ],
-        egui::Stroke::new(1.5, reticle_color),
+        line_stroke,
     );
     painter.line_segment(
         [
             egui::pos2(center.x + gap, center.y),
             egui::pos2(center.x + line_len, center.y),
         ],
-        egui::Stroke::new(1.5, reticle_color),
+        line_stroke,
     );
     painter.line_segment(
         [
             egui::pos2(center.x, center.y - line_len),
             egui::pos2(center.x, center.y - gap),
         ],
-        egui::Stroke::new(1.5, reticle_color),
+        line_stroke,
     );
     painter.line_segment(
         [
             egui::pos2(center.x, center.y + gap),
             egui::pos2(center.x, center.y + line_len),
         ],
-        egui::Stroke::new(1.5, reticle_color),
+        line_stroke,
     );
     painter.circle_filled(
         center,
-        2.0,
-        egui::Color32::from_rgba_unmultiplied(255, 30, 30, reticle_alpha),
+        tuning.sniper_red_dot_radius,
+        egui::Color32::from_rgba_unmultiplied(
+            tuning.sniper_red_dot_color[0],
+            tuning.sniper_red_dot_color[1],
+            tuning.sniper_red_dot_color[2],
+            reticle_alpha,
+        ),
     );
 
-    // Tick marks horizontales (graduations distance)
+    // Tick marks distance (4 offsets, depuis Tuning size)
     let tick_y = center.y;
+    let tick_size = tuning.sniper_reticle_tick_size;
+    let tick_stroke = egui::Stroke::new(tuning.sniper_reticle_tick_stroke, reticle_color);
     for offset in [-line_len * 0.5, -line_len * 0.25, line_len * 0.25, line_len * 0.5] {
         painter.line_segment(
             [
-                egui::pos2(center.x + offset, tick_y - 4.0),
-                egui::pos2(center.x + offset, tick_y + 4.0),
+                egui::pos2(center.x + offset, tick_y - tick_size),
+                egui::pos2(center.x + offset, tick_y + tick_size),
             ],
-            egui::Stroke::new(1.0, reticle_color),
+            tick_stroke,
         );
     }
 }

@@ -18,6 +18,7 @@ forgia-player = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-effects = { workspace = true }
 forgia-ui = { workspace = true }
+forgia-crosshair = { workspace = true }
 forgia-genome-core = { workspace = true }
 forgia-mesh-fader = { workspace = true }
 forgia-mode-fps-arena = { workspace = true }

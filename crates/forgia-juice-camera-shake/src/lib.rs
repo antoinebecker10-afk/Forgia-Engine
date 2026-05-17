@@ -55,6 +55,37 @@ impl Default for CameraShakeIntensity {
     }
 }
 
+/// Resource Tuning live (hot-reload via TOML écrit par le caller).
+/// Forgia-fps push depuis fps_tuning.toml. Defaults conservatives AAA.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct CameraShakeTuning {
+    /// Decay trauma /sec à insérer sur Component CameraShake au spawn.
+    pub default_decay: f32,
+    /// Max rotation rad à insérer sur Component CameraShake au spawn.
+    pub default_max_rotation: f32,
+    /// Multiplicateur amplitude yaw vs pitch (default 0.25 = 25%).
+    pub yaw_factor: f32,
+    /// Multiplicateur amplitude roll vs pitch (default 0.10 = 10%, anti vertige).
+    pub roll_factor: f32,
+    /// Bias upward du pitch (0.7 = recoil naturel, 0 = full random nausée).
+    pub pitch_upward_bias: f32,
+    /// Sample rate noise (Hz). 12Hz = smooth, 60Hz = flicker mal aux yeux.
+    pub sample_rate_hz: f32,
+}
+
+impl Default for CameraShakeTuning {
+    fn default() -> Self {
+        Self {
+            default_decay: 10.0,
+            default_max_rotation: 0.014,
+            yaw_factor: 0.25,
+            roll_factor: 0.10,
+            pitch_upward_bias: 0.7,
+            sample_rate_hz: 12.0,
+        }
+    }
+}
+
 /// Message émis par les systèmes gameplay (fire weapon, explosion, damage...).
 /// Ajoute du trauma à toutes les caméras avec `CameraShake`.
 #[derive(Message, Debug, Clone, Copy)]
@@ -69,6 +100,7 @@ impl Plugin for ForgiaJuiceCameraShakePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<ShakeImpulse>()
             .init_resource::<CameraShakeIntensity>()
+            .init_resource::<CameraShakeTuning>()
             .add_systems(Update, (consume_impulses, apply_shake).chain());
     }
 }
@@ -108,13 +140,14 @@ fn hash_noise(seed: u32) -> f32 {
 pub fn apply_shake(
     time: Res<Time>,
     intensity_res: Res<CameraShakeIntensity>,
+    tuning: Res<CameraShakeTuning>,
     mut q: Query<(&mut CameraShake, &mut Transform)>,
 ) {
     let dt = time.delta_secs();
-    // Sample noise à ~12Hz (toutes ~83ms) + lerp entre samples → smooth shake.
-    // Évite le flicker high-frequency 60Hz qui brûle les yeux en auto-fire.
+    // Sample noise au sample_rate du Tuning (default 12Hz) + lerp entre samples.
+    // 12Hz = smooth, 60Hz = flicker mal aux yeux (eye-strain anti-pattern).
     let t_secs = time.elapsed_secs();
-    let sample_rate = 12.0_f32;
+    let sample_rate = tuning.sample_rate_hz.max(1.0);
     let t_sample_f = t_secs * sample_rate;
     let t_sample = t_sample_f as u32;
     let lerp_t = t_sample_f - t_sample as f32;
@@ -143,15 +176,15 @@ pub fn apply_shake(
             lerp_t,
         );
 
-        // Upward bias : pitch toujours skewé négatif (camera look UP) pour
-        // effet recoil naturel — pas full random qui donne nausée (Apex anti-pattern).
-        let pitch_skewed = -n_pitch.abs() * 0.7 + n_pitch * 0.3;
+        // Upward bias : pitch skewé négatif (camera look UP) pour effet recoil
+        // naturel. Bias depuis Tuning (default 0.7).
+        let bias = tuning.pitch_upward_bias.clamp(0.0, 1.0);
+        let pitch_skewed = -n_pitch.abs() * bias + n_pitch * (1.0 - bias);
 
         let pitch_amp = pitch_skewed * shake.max_rotation * intensity;
-        // Yaw 25% du pitch (downscaled 40→25 anti dizziness auto-fire)
-        let yaw_amp = n_yaw * shake.max_rotation * 0.25 * intensity;
-        // Roll 10% du pitch (downscaled 30→10 anti vertige — Apex/Valorant criticism)
-        let roll_amp = n_roll * shake.max_rotation * 0.10 * intensity;
+        // Yaw / roll factors depuis Tuning (defaults 0.25 / 0.10).
+        let yaw_amp = n_yaw * shake.max_rotation * tuning.yaw_factor * intensity;
+        let roll_amp = n_roll * shake.max_rotation * tuning.roll_factor * intensity;
 
         // Multiplicatif : applique en local sur la rotation déjà set par mouse_look.
         xf.rotation = xf.rotation
@@ -165,7 +198,8 @@ pub fn apply_shake(
 
 pub mod prelude {
     pub use crate::{
-        CameraShake, CameraShakeIntensity, ForgiaJuiceCameraShakePlugin, ShakeImpulse,
+        CameraShake, CameraShakeIntensity, CameraShakeTuning, ForgiaJuiceCameraShakePlugin,
+        ShakeImpulse,
     };
 }
 

@@ -1,0 +1,61 @@
+# Forgia V2 — FPS Tuning Genome
+#
+# Toutes les constantes "feel" du mode FPS Arena qui étaient hardcodées dans
+# les crates. Hot-reload Bevy Asset.
+#
+# Audit anti-hardcode 2026-05-18 (user request "regle le hardcode").
+
+[camera_shake]
+# Default decay/amplitude appliqués au Component CameraShake à l'attach.
+# Modif requiert respawn FpsCamera (Component fields, pas Resource live).
+default_decay = 10.0              # trauma decay /sec (~100ms full recovery)
+default_max_rotation_rad = 0.014  # ~0.8° peak max
+# Multiplicateurs amplitude par axe (live Resource, hot-reload).
+yaw_factor = 0.25                  # 25% du pitch
+roll_factor = 0.10                 # 10% du pitch (anti vertige)
+pitch_upward_bias = 0.7            # 0.7 = upward (recoil), 0 = pure random
+# Smooth noise (anti high-freq flicker à 60Hz).
+sample_rate_hz = 12.0
+
+[fov_punch]
+attack_secs = 0.030    # 30ms ramp peak
+decay_secs = 0.150     # 150ms ease-out
+
+[ads]
+lerp_speed = 12.0       # 1/12s ≈ 80ms hipfire ↔ ADS transition
+default_fov_deg = 45.0  # FOV cam hipfire base
+punch_attenuation = 0.7 # -70% fov_punch en ADS (precise aim protection)
+
+[mouse_look]
+base_sensitivity = 0.002  # rad/pixel
+recoil_decay_per_sec = 8.0
+
+[crosshair_hipfire]
+cross_len = 7.0
+cross_stroke = 2.0
+cross_alpha = 220       # u8 0..255
+
+[crosshair_ads_dot]
+outer_radius = 4.0
+inner_radius = 2.0
+
+[crosshair_sniper_overlay]
+scope_radius_factor = 0.42     # × min(w, h) screen
+dim_alpha = 145                 # u8, opacité du fond hors scope
+dim_color = [8, 8, 12]          # u8 RGB
+vignette_rings = 8              # nb anneaux concentriques fake-blur
+ring_thickness_factor = 0.18    # × scope_radius
+ring_max_alpha = 90.0           # max alpha gradient
+ring_color = [15, 15, 18]
+ring_outer_extent = 1.5         # multiplicateur ring_thickness pour l'étalement
+border_width = 8.0
+border_inner_width = 2.0
+border_inner_offset = 4.0       # px
+reticle_gap = 8.0
+reticle_line_factor = 0.85      # × scope_radius
+reticle_color = [10, 10, 10]
+reticle_line_stroke = 1.5
+reticle_tick_stroke = 1.0
+reticle_tick_size = 4.0
+red_dot_radius = 2.0
+red_dot_color = [255, 30, 30]

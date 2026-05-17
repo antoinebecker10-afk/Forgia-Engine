@@ -14,7 +14,9 @@ use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
 
 pub mod prelude {
-    pub use crate::{CameraMode, FpsCamera, ForgiaPlayerPlugin, MovementSpeedMultiplier, Player};
+    pub use crate::{
+        CameraMode, FpsCamera, ForgiaPlayerPlugin, MouseLookTuning, MovementSpeedMultiplier, Player,
+    };
 }
 
 /// Multiplicateur global sur la vitesse de déplacement player.
@@ -25,6 +27,25 @@ pub struct MovementSpeedMultiplier(pub f32);
 impl Default for MovementSpeedMultiplier {
     fn default() -> Self {
         Self(1.0)
+    }
+}
+
+/// Resource Tuning hot-reload pour mouse_look + weapon_recoil_apply.
+/// Push depuis fps_tuning.toml par forgia-fps. Defaults sains.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct MouseLookTuning {
+    /// Sensibilité base avant le `MouseSensitivityMultiplier` (rad/pixel).
+    pub base_sensitivity: f32,
+    /// Recoil decay exponentiel /sec (recovery auto cam).
+    pub recoil_decay_per_sec: f32,
+}
+
+impl Default for MouseLookTuning {
+    fn default() -> Self {
+        Self {
+            base_sensitivity: 0.002,
+            recoil_decay_per_sec: 8.0,
+        }
     }
 }
 
@@ -71,6 +92,7 @@ impl Plugin for ForgiaPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraMode>()
             .init_resource::<MovementSpeedMultiplier>()
+            .init_resource::<MouseLookTuning>()
             .add_systems(Startup, load_skybox)
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
@@ -192,12 +214,13 @@ fn mouse_look(
     mut q_player: Query<(&mut Transform, &mut Player), Without<FpsCamera>>,
     mut q_cam: Query<&mut Transform, With<FpsCamera>>,
     sens_mul: Res<MouseSensitivityMultiplier>,
+    tuning: Res<MouseLookTuning>,
 ) {
     let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
         return;
     };
     // Sensibilité base × multiplier global (ADS l'écrase à <1.0 via forgia-fps).
-    let sensitivity = 0.002 * sens_mul.factor;
+    let sensitivity = tuning.base_sensitivity * sens_mul.factor;
     let mut delta = Vec2::ZERO;
     for ev in motion.read() {
         delta += ev.delta;
@@ -223,6 +246,7 @@ fn weapon_recoil_apply(
     mut q_player: Query<(&mut Transform, &mut Player), Without<FpsCamera>>,
     mut q_cam: Query<&mut Transform, With<FpsCamera>>,
     mut commands: Commands,
+    tuning: Res<MouseLookTuning>,
 ) {
     let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
         return;
@@ -244,8 +268,8 @@ fn weapon_recoil_apply(
         debt.yaw_rad += ev.yaw_rad;
     }
 
-    // Decay exponentielle 8/s — recenter auto en ~125ms
-    let decay = 8.0 * time.delta_secs();
+    // Decay exponentielle depuis Tuning (default 8/s ≈ 125ms recovery).
+    let decay = tuning.recoil_decay_per_sec * time.delta_secs();
     let pitch_recover = (debt.pitch_rad * decay).min(debt.pitch_rad);
     let yaw_recover = (debt.yaw_rad * decay)
         .abs()

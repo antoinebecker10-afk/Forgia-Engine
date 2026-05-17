@@ -36,6 +36,23 @@ impl Default for FovPunchIntensity {
     }
 }
 
+/// Resource Tuning (hot-reload). Push depuis fps_tuning.toml par forgia-fps.
+/// Defaults : 30ms attack / 150ms decay (AAA range).
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct FovPunchTuning {
+    pub attack_secs: f32,
+    pub decay_secs: f32,
+}
+
+impl Default for FovPunchTuning {
+    fn default() -> Self {
+        Self {
+            attack_secs: 0.030,
+            decay_secs: 0.150,
+        }
+    }
+}
+
 /// État du FOV punch — `current_deg` est l'offset à AJOUTER à la fov de base
 /// par le système d'application (forgia-fps/ads.rs).
 /// Lerp : impulse → peak en `attack_secs`, puis decay en `decay_secs` ease-out.
@@ -71,6 +88,7 @@ impl Plugin for ForgiaJuiceFovPunchPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<FovPunchImpulse>()
             .init_resource::<FovPunchIntensity>()
+            .init_resource::<FovPunchTuning>()
             .init_resource::<FovPunchState>()
             .add_systems(Update, (consume_fov_impulses, tick_fov_state).chain());
     }
@@ -79,6 +97,7 @@ impl Plugin for ForgiaJuiceFovPunchPlugin {
 fn consume_fov_impulses(
     mut events: MessageReader<FovPunchImpulse>,
     intensity: Res<FovPunchIntensity>,
+    tuning: Res<FovPunchTuning>,
     mut state: ResMut<FovPunchState>,
 ) {
     let user_factor = intensity.0.clamp(0.0, 1.0);
@@ -87,6 +106,9 @@ fn consume_fov_impulses(
         if effective_peak.abs() < 0.01 {
             continue; // sub-degree → skip (e.g. AR/SMG = 0.0 dans TOML)
         }
+        // Refresh timings depuis Tuning (hot-reload-friendly).
+        state.attack_secs = tuning.attack_secs;
+        state.decay_secs = tuning.decay_secs;
         // Si une punch est déjà en cours, prend le max (pas d'addition pour éviter cumul).
         let new_target = if state.target_peak_deg.abs() > effective_peak.abs() {
             state.target_peak_deg
@@ -135,6 +157,7 @@ fn tick_fov_state(time: Res<Time>, mut state: ResMut<FovPunchState>) {
 pub mod prelude {
     pub use crate::{
         ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchIntensity, FovPunchState,
+        FovPunchTuning,
     };
 }
 

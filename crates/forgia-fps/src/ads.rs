@@ -21,11 +21,9 @@ use forgia_ui::prelude::CrosshairMode;
 
 use crate::{
     lookup_genome_entry, viewmodel_rotation_ads, viewmodel_rotation_hipfire, viewmodel_transform,
-    NeedsAutoScale, ViewmodelBaseScale, ViewmodelGenome, ViewmodelGenomeHandle, WeaponViewmodel,
+    AdsTuning, NeedsAutoScale, ViewmodelBaseScale, ViewmodelGenome, ViewmodelGenomeHandle,
+    WeaponViewmodel,
 };
-
-const DEFAULT_FOV_DEG: f32 = 45.0; // Bevy PerspectiveProjection default (~0.785 rad)
-const ADS_LERP_SPEED: f32 = 12.0;  // 1/12 sec ≈ 80ms full transition
 
 #[derive(Resource, Default)]
 pub struct RightMouseState {
@@ -64,9 +62,10 @@ pub fn update_ads_progress(
     equipped: Res<EquippedWeapons>,
     genome_handle: Option<Res<ViewmodelGenomeHandle>>,
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    tuning: Res<AdsTuning>,
 ) {
     let target = if right.held { 1.0 } else { 0.0 };
-    let delta = ADS_LERP_SPEED * time.delta_secs();
+    let delta = tuning.lerp_speed * time.delta_secs();
     if (ads.progress - target).abs() < delta {
         ads.progress = target;
     } else if ads.progress < target {
@@ -105,6 +104,7 @@ pub fn apply_ads_camera_fov(
     genome_handle: Option<Res<ViewmodelGenomeHandle>>,
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
     fov_punch: Res<FovPunchState>,
+    tuning: Res<AdsTuning>,
     mut q_cam: Query<&mut Projection, With<FpsCamera>>,
 ) {
     let ads_fov = genome_handle
@@ -112,9 +112,9 @@ pub fn apply_ads_camera_fov(
         .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current))
         .map(|e| e.ads_fov_deg)
         .unwrap_or(25.0);
-    let base_fov = DEFAULT_FOV_DEG.lerp(ads_fov, ads.progress);
-    // Atténue le punch en ADS pour éviter zoom oscillant pendant visée précise.
-    let punch_attenuation = 1.0 - ads.progress * 0.7; // -70% punch en full ADS
+    let base_fov = tuning.default_fov_deg.lerp(ads_fov, ads.progress);
+    // Atténue le punch en ADS (precise aim protection).
+    let punch_attenuation = 1.0 - ads.progress * tuning.punch_attenuation;
     let final_fov = base_fov + fov_punch.current_deg * punch_attenuation;
     for mut proj in &mut q_cam {
         if let Projection::Perspective(p) = proj.as_mut() {
