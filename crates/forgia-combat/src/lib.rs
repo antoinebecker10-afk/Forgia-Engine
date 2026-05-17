@@ -32,7 +32,9 @@ pub mod prelude {
     pub use crate::{ForgiaCombatPlugin, Health};
     pub use crate::weapons::{WeaponType, EquippedWeapons, WeaponFireCooldown, CasingResources, damage_falloff, ARENA_V1_WEAPONS};
     pub use crate::melee::MeleeCooldown;
-    pub use crate::combat_juice::{CameraTrauma, HitFlashCache, HitFlashTimer, HitStopState, WeaponRecoilDebt, WeaponRecoilImpulse, CombatHitEvent};
+    pub use crate::combat_juice::{CameraTrauma, HitFlashCache, HitFlashTimer, WeaponRecoilDebt, WeaponRecoilImpulse, CombatHitEvent};
+    // HitStopState : migré vers forgia-juice-hit-stop (Tier 1D 2026-05-17).
+    // Importer directement : `use forgia_juice_hit_stop::HitStopState;`
 }
 
 // =============================================================================
@@ -107,13 +109,19 @@ pub struct ForgiaCombatPlugin;
 
 impl Plugin for ForgiaCombatPlugin {
     fn build(&self, app: &mut App) {
+        // Hit-stop time pause — crate dédié (règle fine-grained-crates).
+        if !app.is_plugin_added::<forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin>() {
+            app.add_plugins(forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin);
+        }
+        // Recoil data (WeaponRecoilImpulse Message + WeaponRecoilDebt Resource) — crate dédié.
+        if !app.is_plugin_added::<forgia_juice_recoil::ForgiaJuiceRecoilPlugin>() {
+            app.add_plugins(forgia_juice_recoil::ForgiaJuiceRecoilPlugin);
+        }
         app.init_resource::<PlayerScore>()
             .init_resource::<PlayerLevel>()
             .init_resource::<weapons::EquippedWeapons>()
             .init_resource::<combat_juice::CameraTrauma>()
-            .init_resource::<combat_juice::WeaponRecoilDebt>()
             .add_message::<combat_juice::CombatHitEvent>()
-            .add_message::<combat_juice::WeaponRecoilImpulse>()
             .add_systems(Startup, (
                 weapons::setup_casing_resources,
                 combat_juice::setup_hit_flash_cache,
@@ -129,9 +137,7 @@ impl Plugin for ForgiaCombatPlugin {
                     .in_set(GameSet::Effects),
                 combat_juice::hit_flash_tick_system
                     .in_set(GameSet::Effects),
-                combat_juice::hitstop_tick_system
-                    .run_if(resource_exists::<combat_juice::HitStopState>)
-                    .in_set(GameSet::Effects),
+                // hitstop_tick_system : wired par forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
             ));
         // TODO: wire weapon_fire_system, doom_projectile_system, melee_attack_system,
         //       weapon_switch_system, stagger systems, glory_kill_system, pickup systems,

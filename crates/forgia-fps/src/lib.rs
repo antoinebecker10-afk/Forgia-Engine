@@ -20,6 +20,7 @@ use forgia_effects::prelude::{
     WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_juice_hit_stop::HitStopState;
 use forgia_mode_fps_arena::TargetCube;
 use forgia_player::prelude::*;
 use serde::Deserialize;

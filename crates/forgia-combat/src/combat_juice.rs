@@ -36,11 +36,9 @@ pub struct PrevHealth(pub f32);
 
 // â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-#[derive(Resource)]
-pub struct HitStopState {
-    pub timer: Timer,
-    pub restore_speed: f32,
-}
+// HitStopState : migré vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
+// Migration legacy re-export retirée 2026-05-18 — consommateurs DOIVENT importer direct :
+//   use forgia_juice_hit_stop::HitStopState;
 
 #[derive(Resource, Default)]
 pub struct CameraTrauma {
@@ -105,18 +103,8 @@ pub fn setup_hit_flash_cache(
 // TODO: combat_juice_event_system requires FpsTuning + ChromaticAberration (Bevy pp) + HitFlashCache
 // pub fn combat_juice_event_system(...) { ... }
 
-pub fn hitstop_tick_system(
-    mut commands: Commands,
-    real_time: Res<Time<Real>>,
-    mut time: ResMut<Time<Virtual>>,
-    mut state: ResMut<HitStopState>,
-) {
-    state.timer.tick(real_time.delta());
-    if state.timer.is_finished() {
-        time.set_relative_speed(state.restore_speed);
-        commands.remove_resource::<HitStopState>();
-    }
-}
+// hitstop_tick_system : extrait vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
+// Wiring : `forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin` ajouté idempotent dans `ForgiaCombatPlugin`.
 
 pub fn trauma_decay_system(
     time: Res<Time>,
@@ -152,7 +140,7 @@ pub fn hit_flash_tick_system(
     // story-432 V4 : plus de mutation per-frame du material (le shared
     // `HitFlashCache.flash_material` a dÃ©jÃ  emissive=8.0 figÃ©). Tick juste le
     // timer + restore le handle original Ã  expiry.
-    for (entity, mut flash) in query.iter_mut() {
+    for (entity, mut flash) in &mut query {
         flash.timer.tick(time.delta());
         if flash.timer.is_finished() {
             if let Some(orig) = flash.original_handle.take() {
@@ -172,21 +160,9 @@ pub fn hit_flash_tick_system(
 //
 // Event-driven : `weapon_fire_system` Ã©met `WeaponRecoilImpulse`, lu ici.
 
-/// Impulse de recoil Ã©mis par le systÃ¨me de tir (1 par fire confirmÃ©).
-#[derive(Message)]
-pub struct WeaponRecoilImpulse {
-    pub pitch_rad: f32,
-    pub yaw_rad: f32,
-}
-
-/// Dette de recoil en cours de remboursement (decay vers 0).
-/// Sert Ã  compenser l'application initiale au CameraState : decay retire de
-/// la dette ET retire la mÃªme quantitÃ© du pitch/yaw du joueur (auto-recenter).
-#[derive(Resource, Default)]
-pub struct WeaponRecoilDebt {
-    pub pitch_rad: f32,
-    pub yaw_rad: f32,
-}
+// WeaponRecoilImpulse + WeaponRecoilDebt : extraits vers `forgia-juice-recoil` (Tier 1E, 2026-05-17).
+// Re-export backward compat (prelude). Preferer `forgia_juice_recoil::*` direct dans le nouveau code.
+pub use forgia_juice_recoil::{WeaponRecoilDebt, WeaponRecoilImpulse};
 
 // TODO: weapon_recoil_system requires CameraState + FpsCamera (forgia-camera-fps)
 //       + WeaponRecoilImpulse MessageReader (Bevy 0.18 message API)
