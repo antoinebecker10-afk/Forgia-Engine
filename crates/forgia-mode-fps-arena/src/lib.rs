@@ -13,9 +13,14 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
+use forgia_genome_core::{Genome, GenomeLoader};
+use serde::Deserialize;
 
 pub mod prelude {
-    pub use crate::{ArenaMarker, CloudOrbit, ForgiaModeFpsArenaPlugin, HitZone, TargetCube};
+    pub use crate::{
+        ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, CloudOrbit,
+        ForgiaModeFpsArenaPlugin, HitZone, TargetCube,
+    };
 }
 
 /// Zone d'impact sur un training bot. Inseré sur chaque collider enfant
@@ -26,8 +31,71 @@ pub enum HitZone {
     Body,
 }
 
+// ─── Arena Bots Genome (Phase H+ — data-driven training bots) ────────
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct ArenaBotsGenome {
+    pub hp: f32,
+    pub body_y: f32,
+    pub head_y: f32,
+    pub body: BotPart,
+    pub head: BotPart,
+    pub spawn_positions: Vec<[f32; 2]>,
+}
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct BotPart {
+    /// Pour le body : [width, height, depth]. Pour le head : seul `radius` est lu.
+    #[serde(default)]
+    pub width: f32,
+    #[serde(default)]
+    pub height: f32,
+    #[serde(default)]
+    pub depth: f32,
+    #[serde(default)]
+    pub radius: f32,
+    pub color: [f32; 3],
+    pub emissive: [f32; 3],
+}
+
+#[derive(Resource)]
+pub struct ArenaBotsGenomeHandle(pub Handle<Genome<ArenaBotsGenome>>);
+
+/// Fallback hardcoded utilisé si genome pas encore chargé au spawn.
+/// Pattern identique à ViewmodelGenome (graceful degradation).
+fn default_arena_bots() -> ArenaBotsGenome {
+    ArenaBotsGenome {
+        hp: 100.0,
+        body_y: 0.65,
+        head_y: 1.55,
+        body: BotPart {
+            width: 0.7,
+            height: 1.3,
+            depth: 0.4,
+            radius: 0.0,
+            color: [0.85, 0.15, 0.15],
+            emissive: [0.6, 0.0, 0.0],
+        },
+        head: BotPart {
+            width: 0.0,
+            height: 0.0,
+            depth: 0.0,
+            radius: 0.22,
+            color: [1.0, 0.35, 0.20],
+            emissive: [1.2, 0.3, 0.0],
+        },
+        spawn_positions: vec![
+            [-4.0, -7.0],
+            [0.0, -7.0],
+            [4.0, -7.0],
+            [10.0, -14.0],
+            [-14.0, 10.0],
+        ],
+    }
+}
+
 pub const TILE_SIZE: f32 = 4.0;
-pub const ARENA_SIZE: i32 = 11; // 11×11 tiles = 44×44m
+pub const ARENA_SIZE: i32 = 19; // 19×19 tiles = 76×76m (story-441 agrandi 2026-05-17 night, x~3 surface vs 11)
 
 // ── Cloud constants (skybox cubemap V1 wired par forgia-player) ──────
 const CLOUD_COLOR: Color = Color::srgb(0.95, 0.96, 0.97);
@@ -54,7 +122,10 @@ pub struct ForgiaModeFpsArenaPlugin;
 
 impl Plugin for ForgiaModeFpsArenaPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameMode::Fps), spawn_arena)
+        app.init_asset::<Genome<ArenaBotsGenome>>()
+            .register_asset_loader(GenomeLoader::<ArenaBotsGenome>::default())
+            .add_systems(Startup, load_arena_bots_genome)
+            .add_systems(OnEnter(GameMode::Fps), spawn_arena)
             .add_systems(OnExit(GameMode::Fps), cleanup_arena)
             .add_systems(
                 Update,
@@ -65,11 +136,19 @@ impl Plugin for ForgiaModeFpsArenaPlugin {
     }
 }
 
+fn load_arena_bots_genome(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let handle: Handle<Genome<ArenaBotsGenome>> = asset_server.load("genomes/arena_bots.toml");
+    commands.insert_resource(ArenaBotsGenomeHandle(handle));
+    info!("[forgia-mode-fps-arena] arena_bots genome loading : genomes/arena_bots.toml");
+}
+
 fn spawn_arena(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    bots_handle: Option<Res<ArenaBotsGenomeHandle>>,
+    bots_assets: Res<Assets<Genome<ArenaBotsGenome>>>,
 ) {
     let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
     let floor_dirt: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
@@ -292,60 +371,106 @@ fn spawn_arena(
         Name::new("ArenaSunLight"),
     ));
 
-    // Training bots style Overwatch : tall humanoid silhouette avec head + body
-    // distinct → headshot mechanic possible. Hauteur ~1.8m, Y=0 pieds au sol.
+    // Training bots Overwatch-style — TOUT data-driven depuis arena_bots.toml.
+    // Fallback hardcoded (default_arena_bots) si genome pas encore loaded.
     //
     // Hierarchy :
-    //   parent (TargetCube + Health 100hp, no mesh/collider)
-    //   ├─ Body  (cuboid 0.7×1.3×0.4, Y=0.65, HitZone::Body)
-    //   └─ Head  (sphere 0.22, Y=1.55, HitZone::Head)
+    //   parent (TargetCube + Health, no mesh/collider)
+    //   ├─ Body (cuboid + collider, Y=body_y, HitZone::Body)
+    //   └─ Head (sphere + collider, Y=head_y, HitZone::Head)
     //
-    // Raycast hit retourne l'entity enfant → on lit HitZone pour multiplier dmg,
-    // puis on remonte via ChildOf au parent pour appliquer Health.
-    let body_mesh = meshes.add(Cuboid::new(0.7, 1.3, 0.4));
-    let head_mesh = meshes.add(Sphere::new(0.22).mesh().ico(3).unwrap());
-    let body_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.85, 0.15, 0.15),
-        emissive: LinearRgba::new(0.6, 0.0, 0.0, 1.0),
-        ..default()
-    });
-    // Head : tone légèrement différent pour lisibilité immédiate (Overwatch training bot style).
-    let head_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(1.0, 0.35, 0.20),
-        emissive: LinearRgba::new(1.2, 0.3, 0.0, 1.0),
-        ..default()
-    });
+    // Raycast hit retourne l'entity enfant → HitZone pour multiplier dmg, ChildOf
+    // → parent pour Health.
+    let bots_owned;
+    let bots_data: &ArenaBotsGenome = match bots_handle
+        .as_deref()
+        .and_then(|h| bots_assets.get(&h.0))
+    {
+        Some(g) => &g.data,
+        None => {
+            warn!("[forgia-mode-fps-arena] arena_bots genome pas chargé — fallback hardcoded defaults");
+            bots_owned = default_arena_bots();
+            &bots_owned
+        }
+    };
 
-    for &(x, z) in &[(-4.0, -7.0), (0.0, -7.0), (4.0, -7.0), (10.0, -14.0), (-14.0, 10.0)] {
+    let body_mesh = meshes.add(Cuboid::new(
+        bots_data.body.width,
+        bots_data.body.height,
+        bots_data.body.depth,
+    ));
+    let head_mesh = meshes.add(Sphere::new(bots_data.head.radius).mesh().ico(3).unwrap());
+    let body_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(
+            bots_data.body.color[0],
+            bots_data.body.color[1],
+            bots_data.body.color[2],
+        ),
+        emissive: LinearRgba::new(
+            bots_data.body.emissive[0],
+            bots_data.body.emissive[1],
+            bots_data.body.emissive[2],
+            1.0,
+        ),
+        ..default()
+    });
+    let head_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(
+            bots_data.head.color[0],
+            bots_data.head.color[1],
+            bots_data.head.color[2],
+        ),
+        emissive: LinearRgba::new(
+            bots_data.head.emissive[0],
+            bots_data.head.emissive[1],
+            bots_data.head.emissive[2],
+            1.0,
+        ),
+        ..default()
+    });
+    let body_half = (
+        bots_data.body.width * 0.5,
+        bots_data.body.height * 0.5,
+        bots_data.body.depth * 0.5,
+    );
+
+    for pos in &bots_data.spawn_positions {
+        let (x, z) = (pos[0], pos[1]);
         let parent = commands
             .spawn((
                 ArenaMarker,
                 TargetCube,
                 Transform::from_xyz(x, 0.0, z),
                 Visibility::default(),
-                Health::new(100.0),
+                Health::new(bots_data.hp),
                 Name::new(format!("TrainingBot_{x}_{z}")),
             ))
             .id();
 
-        // Body — cuboid central. Collider half-extents = mesh / 2.
+        let body_y = bots_data.body_y;
+        let head_y = bots_data.head_y;
+        let head_radius = bots_data.head.radius;
+        let body_mesh_h = body_mesh.clone();
+        let head_mesh_h = head_mesh.clone();
+        let body_mat_h = body_mat.clone();
+        let head_mat_h = head_mat.clone();
         commands.entity(parent).with_children(|p| {
             p.spawn((
                 HitZone::Body,
-                Mesh3d(body_mesh.clone()),
-                MeshMaterial3d(body_mat.clone()),
-                Transform::from_xyz(0.0, 0.65, 0.0),
+                Mesh3d(body_mesh_h),
+                MeshMaterial3d(body_mat_h),
+                Transform::from_xyz(0.0, body_y, 0.0),
                 RigidBody::Fixed,
-                Collider::cuboid(0.35, 0.65, 0.20),
+                Collider::cuboid(body_half.0, body_half.1, body_half.2),
                 Name::new("Body"),
             ));
             p.spawn((
                 HitZone::Head,
-                Mesh3d(head_mesh.clone()),
-                MeshMaterial3d(head_mat.clone()),
-                Transform::from_xyz(0.0, 1.55, 0.0),
+                Mesh3d(head_mesh_h),
+                MeshMaterial3d(head_mat_h),
+                Transform::from_xyz(0.0, head_y, 0.0),
                 RigidBody::Fixed,
-                Collider::ball(0.22),
+                Collider::ball(head_radius),
                 Name::new("Head"),
             ));
         });
@@ -447,9 +572,10 @@ fn spawn_arena(
     }
 
     info!(
-        "[forgia-mode-fps-arena] Arena spawned : {}×{}m, KayKit modular + 5 training bots (head+body) + 18 cloud clusters",
+        "[forgia-mode-fps-arena] Arena spawned : {}×{}m, KayKit modular + {} training bots (head+body) + 18 cloud clusters",
         (ARENA_SIZE as f32 * TILE_SIZE) as i32,
-        (ARENA_SIZE as f32 * TILE_SIZE) as i32
+        (ARENA_SIZE as f32 * TILE_SIZE) as i32,
+        bots_data.spawn_positions.len(),
     );
 }
 

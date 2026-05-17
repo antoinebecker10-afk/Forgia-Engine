@@ -1,0 +1,35 @@
+# Forgia V2 — Arena Training Bots Genome
+# Configuration des cibles d'entraînement style Overwatch (head + body hitboxes).
+# Hot-reload via Bevy Asset (Shift+F12 ou re-save).
+
+# HP par bot (chaque cible parent)
+hp = 100.0
+
+# Position Y locale du body et head (offset depuis le pivot parent au sol)
+body_y = 0.65
+head_y = 1.55
+
+[body]
+# Dimensions mesh + collider Cuboid (half-extents = dims / 2 pour collider)
+width = 0.7       # X
+height = 1.3      # Y
+depth = 0.4       # Z
+# Material PBR (RGB linear 0..1, valeurs HDR autorisées pour emissive)
+color = [0.85, 0.15, 0.15]
+emissive = [0.6, 0.0, 0.0]
+
+[head]
+radius = 0.22
+# Tone légèrement différent body pour lisibilité immédiate Overwatch-style
+color = [1.0, 0.35, 0.20]
+emissive = [1.2, 0.3, 0.0]
+
+# Positions XZ des bots (Y = 0 = pieds au sol, body_y/head_y appliqués par le code)
+# Tu peux ajouter / retirer / déplacer. Ré-entrer l'arena pour appliquer.
+spawn_positions = [
+  [-4.0, -7.0],
+  [0.0, -7.0],
+  [4.0, -7.0],
+  [10.0, -14.0],
+  [-14.0, 10.0],
+]

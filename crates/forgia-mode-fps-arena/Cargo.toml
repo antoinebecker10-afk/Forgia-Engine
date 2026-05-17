@@ -2,11 +2,15 @@
 name = "forgia-mode-fps-arena"
 version = "0.1.0"
 edition = "2021"
-description = "FPS arena mode plugin (V1)"
+description = "FPS arena mode plugin (V1) — spawn/cleanup arena KayKit + clouds orbit"
 
 [lints]
 workspace = true
 
 [dependencies]
 bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }
