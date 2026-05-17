@@ -1,0 +1,18 @@
+[package]
+name = "forgia-village-loader"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Loads village TOML and spawns buildings + ramparts + roads via prefab system."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-village-kit = { workspace = true }
+forgia-terrain = { workspace = true }
+forgia-genome-village = { workspace = true }
+forgia-village-generator = { workspace = true }
+bevy_rapier3d = { workspace = true }

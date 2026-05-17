@@ -1,0 +1,13 @@
+[package]
+name = "forgia-genome-village"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Typed VillageGenome (TOML data-driven). Pure data, no Bevy dep."
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
