@@ -11,7 +11,7 @@
 
 [weapons.pepin]
 # Slot 1 (Digit1) — Gun (pistolet semi-auto) — Pépin
-target_size = 1.10
+target_size = 0.90              # ★ réduit hipfire 1.10→0.90 (au jugé moins encombrant)
 offset_x = 0.22
 offset_y = -0.35
 offset_z = -1.30
@@ -59,7 +59,7 @@ ads_scale_factor = 0.70        # -30% taille en full ADS
 
 [weapons.bourrasque]
 # Slot 2 (Digit2) — Mitraillette (SMG full-auto cadence rapide) — Bourrasque
-target_size = 1.10
+target_size = 0.90              # ★ réduit hipfire 1.10→0.90
 offset_x = 0.22
 offset_y = -0.35
 offset_z = -1.30
@@ -109,7 +109,7 @@ ads_scale_factor = 0.65        # -35% taille en full ADS
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
 # Meshy axis : +X local (vs -X pour Pepin/Bourrasque). R_y(+90)·(+1,0,0)=(0,0,-1) forward.
-target_size = 1.20
+target_size = 1.00              # ★ réduit hipfire 1.20→1.00 (sniper reste un peu + gros)
 offset_x = 0.25
 offset_y = -0.40
 offset_z = -1.30
@@ -158,7 +158,7 @@ ads_scale_factor = 1.00        # ★ inchangé (sniper a son scope fullscreen)
 [weapons.boucherie]
 # Slot 4 (Digit4) — Fusil à pompe (pump-action multi-pellets cone) — Boucherie
 # Meshy axis : +Z local (vs -X autres). R_y(180)·(0,0,1)=(0,0,-1) forward.
-target_size = 1.20
+target_size = 1.00              # ★ réduit hipfire 1.20→1.00
 offset_x = 0.28
 offset_y = -0.40
 offset_z = -1.30
