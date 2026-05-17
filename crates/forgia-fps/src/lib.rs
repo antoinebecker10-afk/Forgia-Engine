@@ -21,7 +21,7 @@ use forgia_effects::prelude::{
 };
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_juice_hit_stop::HitStopState;
-use forgia_mode_fps_arena::TargetCube;
+use forgia_mode_fps_arena::{HitZone, TargetCube};
 use forgia_player::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -166,6 +166,21 @@ pub struct ViewmodelGenomeEntry {
     /// (cercle noir vignette + reticle) + FOV cam très réduit.
     #[serde(default)]
     pub sniper_scope_fullscreen: bool,
+    // ─── Phase F — TTK Balance Overwatch-style (2026-05-18) ──────────
+    /// Multiplicateur dégâts en headshot. 1.0 = pas de bonus, 2.0 = double.
+    /// Sniper Lenoir = 2.0 (one-shot head). Shotgun = 1.2 (pas de bonus marqué).
+    #[serde(default = "default_head_damage_mul")]
+    pub head_damage_mul: f32,
+    /// Distance à partir de laquelle le damage falloff commence (m). dmg = base avant.
+    #[serde(default = "default_damage_falloff_start")]
+    pub damage_falloff_start: f32,
+    /// Distance où le falloff atteint son minimum (m). dmg = base × falloff_min après.
+    #[serde(default = "default_damage_falloff_end")]
+    pub damage_falloff_end: f32,
+    /// Multiplicateur dmg au-delà de falloff_end. 0.2 = -80% (shotgun très penalty long).
+    /// 1.0 = pas de falloff (sniper).
+    #[serde(default = "default_damage_falloff_min")]
+    pub damage_falloff_min: f32,
     // ─── Phase E — ADS visibility & feel (genome-driven, 2026-05-18) ──
     /// Alpha du BODY viewmodel (mesh entier, hors lentille scope) quand ADS full.
     /// 1.0 = pas de fade (sniper qui a son scope fullscreen overlay).
@@ -213,6 +228,10 @@ fn default_hit_stop_duration() -> f32 { 0.05 }
 fn default_hit_stop_speed() -> f32 { 0.05 }
 fn default_ads_viewmodel_fade_alpha() -> f32 { 0.4 }
 fn default_ads_mouse_sensitivity_factor() -> f32 { 0.7 }
+fn default_head_damage_mul() -> f32 { 1.5 }
+fn default_damage_falloff_start() -> f32 { 30.0 }
+fn default_damage_falloff_end() -> f32 { 80.0 }
+fn default_damage_falloff_min() -> f32 { 0.6 }
 
 #[derive(Resource)]
 pub struct ViewmodelGenomeHandle(pub Handle<Genome<ViewmodelGenome>>);
@@ -230,6 +249,34 @@ impl ViewmodelGenomeCtx<'_> {
         let h = self.handle.as_deref()?;
         lookup_genome_entry(&self.assets, h, w)
     }
+}
+
+/// Bundle des queries pour appliquer dégâts aux training bots (parent Health + child HitZone).
+/// Sépare la query enfant (HitZone + matériau pour flash) de la query parent (Health) car
+/// rapier raycast retourne l'enfant.
+#[derive(SystemParam)]
+pub struct HitApplyCtx<'w, 's> {
+    pub zones: Query<
+        'w,
+        's,
+        (&'static HitZone, &'static ChildOf, &'static MeshMaterial3d<StandardMaterial>),
+        Without<TargetCube>,
+    >,
+    pub health: Query<'w, 's, &'static mut Health, With<TargetCube>>,
+}
+
+/// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
+/// Avant start = 1.0, après end = falloff_min.
+pub fn falloff_multiplier(toi: f32, e: &ViewmodelGenomeEntry) -> f32 {
+    if toi <= e.damage_falloff_start {
+        return 1.0;
+    }
+    if toi >= e.damage_falloff_end {
+        return e.damage_falloff_min;
+    }
+    let span = (e.damage_falloff_end - e.damage_falloff_start).max(0.001);
+    let t = ((toi - e.damage_falloff_start) / span).clamp(0.0, 1.0);
+    1.0_f32.lerp(e.damage_falloff_min, t)
 }
 
 /// Map WeaponType → clé TOML (`[weapons.<key>]`).
@@ -473,7 +520,7 @@ fn fire_weapon_minimal(
     rapier: ReadRapierContext,
     q_cam: Query<&GlobalTransform, With<FpsCamera>>,
     q_player: Query<Entity, With<Player>>,
-    mut q_target: Query<(&MeshMaterial3d<StandardMaterial>, &mut Health), With<TargetCube>>,
+    mut hit_ctx: HitApplyCtx,
     mut commands: Commands,
     flash_cache: Res<HitFlashCache>,
     tracer_res: Option<Res<TracerResources>>,
@@ -643,37 +690,52 @@ fn fire_weapon_minimal(
             }
         }
 
-        // Apply damage par pellet (cumul si shotgun touche même cible plusieurs fois)
-        if let Some((entity, toi)) = hit_result {
-            if let Ok((mat, mut hp)) = q_target.get_mut(entity) {
-                hp.current = (hp.current - damage).max(0.0);
-                let dead = hp.is_dead();
-                let new_hp = hp.current;
-                let mat_handle = mat.0.clone();
+        // Apply damage par pellet : raycast retourne l'enfant (Head/Body collider).
+        // 1. Lookup HitZone + parent via ChildOf sur l'enfant
+        // 2. Compute damage : base × headshot_mul × falloff_mul(distance)
+        // 3. Apply Health sur le PARENT (TargetCube)
+        // 4. Flash material sur l'enfant touché (head OU body, pas les deux)
+        if let Some((child_entity, toi)) = hit_result {
+            if let Ok((zone, child_of, mat)) = hit_ctx.zones.get(child_entity) {
+                let zone_mul = match zone {
+                    HitZone::Head => entry.map(|e| e.head_damage_mul).unwrap_or(1.5),
+                    HitZone::Body => 1.0,
+                };
+                let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
+                let effective_dmg = damage * zone_mul * falloff_mul;
 
-                let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
-                commands
-                    .entity(entity)
-                    .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
-                    .insert(HitFlashTimer {
-                        timer: Timer::from_seconds(flash_dur, TimerMode::Once),
-                        original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
-                        original_handle: Some(mat_handle),
+                let parent = child_of.parent();
+                if let Ok(mut hp) = hit_ctx.health.get_mut(parent) {
+                    hp.current = (hp.current - effective_dmg).max(0.0);
+                    let dead = hp.is_dead();
+                    let new_hp = hp.current;
+                    let mat_handle = mat.0.clone();
+
+                    let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
+                    commands
+                        .entity(child_entity)
+                        .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
+                        .insert(HitFlashTimer {
+                            timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                            original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
+                            original_handle: Some(mat_handle),
+                        });
+
+                    hit_events.write(CombatHitEvent {
+                        target: parent,
+                        damage: effective_dmg,
+                        is_kill: dead,
                     });
 
-                hit_events.write(CombatHitEvent {
-                    target: entity,
-                    damage,
-                    is_kill: dead,
-                });
-
-                if hit_record.is_none() {
-                    hit_record = Some((entity, toi));
+                    if hit_record.is_none() {
+                        hit_record = Some((parent, toi));
+                    }
+                    info!(
+                        "[fire] pellet {}/{} HIT {:?} zone={:?} toi={:.2}m dmg={:.1} (base={} zone×{:.2} falloff×{:.2}) hp={:.1}/100 dead={}",
+                        pellet_idx + 1, pellets, parent, zone, toi, effective_dmg,
+                        damage, zone_mul, falloff_mul, new_hp, dead
+                    );
                 }
-                info!(
-                    "[fire] pellet {}/{} HIT {:?} toi={:.2} dmg={} hp={}/100 dead={}",
-                    pellet_idx + 1, pellets, entity, toi, damage, new_hp, dead
-                );
             }
         }
     }

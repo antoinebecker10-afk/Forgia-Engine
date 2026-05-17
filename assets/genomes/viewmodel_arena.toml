@@ -34,15 +34,21 @@ scope_glass_alpha_ads = 0.20
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 0.40   # body semi-transparent → voit cible derrière canon
 ads_mouse_sensitivity_factor = 0.70  # précision moyenne (semi-auto pistolet)
-# Fire behavior
+# Fire behavior — Pistolet semi-auto Pépin
+# TTK Overwatch : body 4 shots (0.67s) / head 2 shots (0.33s)
 fire_mode = "semi"
 burst_count = 0
-damage = 30.0
+damage = 25.0
 fire_rate = 6.0      # 6 shots/s click rapide
 range = 80.0
 pellets = 1
 spread_deg = 0.0
 sniper_scope_fullscreen = false
+# Phase F — TTK balance Overwatch
+head_damage_mul = 2.0          # ★ 2x headshot
+damage_falloff_start = 30.0    # full damage 0-30m
+damage_falloff_end = 80.0      # min damage 80m+
+damage_falloff_min = 0.60      # -40% au-delà 80m
 
 [weapons.bourrasque]
 # Slot 2 (Digit2) — Mitraillette (SMG full-auto cadence rapide) — Bourrasque
@@ -69,15 +75,21 @@ scope_glass_alpha_ads = 0.20
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 0.40   # body semi-transparent SMG
 ads_mouse_sensitivity_factor = 0.70  # cadence rapide, précision moyenne
-# Fire behavior — SMG : cadence très rapide, dégât moyen, courte portée
+# Fire behavior — SMG full-auto Bourrasque
+# TTK Overwatch : body 9 shots @16/s = 0.56s / head 6 shots = 0.38s
 fire_mode = "auto"
 burst_count = 0
-damage = 14.0
+damage = 12.0
 fire_rate = 16.0     # 16 shots/s ultra rapid
 range = 50.0
 pellets = 1
 spread_deg = 1.5      # léger spread (recul)
 sniper_scope_fullscreen = false
+# Phase F — TTK balance Overwatch (SMG = close-mid range)
+head_damage_mul = 1.5          # ★ 1.5x headshot (moins fort qu'AR, cadence compense)
+damage_falloff_start = 15.0    # full damage 0-15m
+damage_falloff_end = 40.0      # min damage 40m+
+damage_falloff_min = 0.40      # -60% au-delà 40m (SMG punished long range)
 
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
@@ -105,15 +117,21 @@ scope_glass_alpha_ads = 0.10  # scope très see-through (sniper precise)
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 1.00   # ★ pas de body fade (scope fullscreen overlay cache déjà)
 ads_mouse_sensitivity_factor = 0.30  # ★ ultra-lent précision sniper
-# Fire behavior — Sniper : 1-shot kill, cadence lente, range max
+# Fire behavior — Sniper Madame Lenoir
+# TTK Overwatch : head 1-shot (100hp) / body 2 shots (50dmg×2)
 fire_mode = "semi"
 burst_count = 0
-damage = 200.0
-fire_rate = 0.8       # ~1 tir / 1.25s
+damage = 50.0          # ★ base body. ×2 head = 100 = one-shot head
+fire_rate = 0.8        # ~1 tir / 1.25s
 range = 300.0
 pellets = 1
 spread_deg = 0.0       # precision absolute
 sniper_scope_fullscreen = true   # ★ active overlay fullscreen ADS
+# Phase F — TTK balance Overwatch (sniper = no falloff, headshot insta-kill)
+head_damage_mul = 2.0          # ★ head one-shot
+damage_falloff_start = 300.0   # pas de falloff
+damage_falloff_end = 300.0
+damage_falloff_min = 1.00      # 100% damage all range
 
 [weapons.boucherie]
 # Slot 4 (Digit4) — Fusil à pompe (pump-action multi-pellets cone) — Boucherie
@@ -141,12 +159,19 @@ scope_glass_alpha_ads = 0.30
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 0.30   # body très transparent (pas d'iron sight précis)
 ads_mouse_sensitivity_factor = 0.85  # cone spread = pas besoin précision fine
-# Fire behavior — Shotgun pump : multi-pellets cone, dégâts cumulés, courte portée
+# Fire behavior — Shotgun pump Boucherie
+# TTK Overwatch/Fortnite : 1-shot kill close (≤8m) / 3-4 shots à 25m
+# 8 pellets × 18 = 144 dmg close (over-kill 100hp) / × 0.2 falloff = 28.8 dmg long range
 fire_mode = "pump"      # semi-auto avec pause pump (V1 = simple semi)
 burst_count = 0
-damage = 12.0          # par pellet (8 pellets × 12 = 96 max si tous touchent)
+damage = 18.0          # ★ +50% per pellet : 8×18=144 close (one-shot guaranteed)
 fire_rate = 1.2        # 1 tir / 0.83s
-range = 30.0
+range = 40.0           # ★ étendu (pellets continuent en falloff au-delà 8m)
 pellets = 8            # ★ cone 8 pellets
 spread_deg = 8.0       # ★ spread cone large shotgun
 sniper_scope_fullscreen = false
+# Phase F — TTK balance Fortnite (shotgun = devastating close, useless long)
+head_damage_mul = 1.2          # léger bonus head (pas focus shotgun)
+damage_falloff_start = 8.0     # full damage 0-8m (one-shot kill)
+damage_falloff_end = 25.0      # min damage 25m+
+damage_falloff_min = 0.20      # ★ -80% : 8×18×0.2 = 28.8 long range (~4 hits)
