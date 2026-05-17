@@ -8,8 +8,10 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::render_resource::{TextureViewDescriptor, TextureViewDimension};
 use bevy_rapier3d::prelude::*;
+use forgia_ai_arena_bot::BotTarget;
 use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
+use forgia_damage::{Health as DamageHealth, Mortal};
 use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
 
@@ -115,6 +117,10 @@ fn spawn_player(mut commands: Commands) {
         Visibility::default(),
         RigidBody::KinematicPositionBased,
         Collider::capsule_y(0.7, 0.3),
+        // Phase I : Player health + BotTarget marker pour les enemies arena.
+        DamageHealth::new(100.0),
+        Mortal,
+        BotTarget,
         KinematicCharacterController {
             up: Vec3::Y,
             offset: CharacterLength::Absolute(0.01),

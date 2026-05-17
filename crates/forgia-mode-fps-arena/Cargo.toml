@@ -13,4 +13,6 @@ bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-genome-core = { workspace = true }
+forgia-ai-arena-bot = { workspace = true }
+forgia-damage = { workspace = true }
 serde = { workspace = true }

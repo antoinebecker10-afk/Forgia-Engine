@@ -14,3 +14,5 @@ leafwing-input-manager = { workspace = true }
 forgia-core = { workspace = true }
 forgia-input = { workspace = true }
 forgia-combat = { workspace = true }
+forgia-damage = { workspace = true }
+forgia-ai-arena-bot = { workspace = true }

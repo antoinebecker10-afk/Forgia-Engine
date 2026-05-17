@@ -11,6 +11,7 @@
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use forgia_ai_arena_bot::{ArenaBot, BotShootConfig, ForgiaAiArenaBotPlugin};
 use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
@@ -40,7 +41,10 @@ pub struct ArenaBotsGenome {
     pub head_y: f32,
     pub body: BotPart,
     pub head: BotPart,
-    pub spawn_positions: Vec<[f32; 2]>,
+    #[serde(default)]
+    pub show_collider_debug: bool,
+    pub ai: BotAi,
+    pub spawn_positions: Vec<BotSpawn>,
 }
 
 #[derive(Deserialize, TypePath, Clone)]
@@ -58,11 +62,36 @@ pub struct BotPart {
     pub emissive: [f32; 3],
 }
 
+#[derive(Deserialize, TypePath, Clone)]
+pub struct BotAi {
+    pub shot_range: f32,
+    pub shot_cooldown_secs: f32,
+    pub shot_damage: f32,
+    pub shot_warmup_secs: f32,
+    pub detect_range: f32,
+    pub shot_jitter_deg: f32,
+    pub tracer_emissive: [f32; 3],
+}
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct BotSpawn {
+    pub character_glb: String,
+    #[serde(default = "default_character_scale")]
+    pub character_scale: f32,
+    #[serde(default)]
+    pub character_yaw_deg: f32,
+    pub x: f32,
+    pub z: f32,
+}
+
+fn default_character_scale() -> f32 {
+    1.0
+}
+
 #[derive(Resource)]
 pub struct ArenaBotsGenomeHandle(pub Handle<Genome<ArenaBotsGenome>>);
 
 /// Fallback hardcoded utilisé si genome pas encore chargé au spawn.
-/// Pattern identique à ViewmodelGenome (graceful degradation).
 fn default_arena_bots() -> ArenaBotsGenome {
     ArenaBotsGenome {
         hp: 100.0,
@@ -84,12 +113,52 @@ fn default_arena_bots() -> ArenaBotsGenome {
             color: [1.0, 0.35, 0.20],
             emissive: [1.2, 0.3, 0.0],
         },
+        show_collider_debug: true, // fallback = montre cubes (lisible si TOML pas loaded)
+        ai: BotAi {
+            shot_range: 35.0,
+            shot_cooldown_secs: 1.5,
+            shot_damage: 12.0,
+            shot_warmup_secs: 0.8,
+            detect_range: 50.0,
+            shot_jitter_deg: 4.0,
+            tracer_emissive: [4.0, 1.5, 0.5],
+        },
         spawn_positions: vec![
-            [-4.0, -7.0],
-            [0.0, -7.0],
-            [4.0, -7.0],
-            [10.0, -14.0],
-            [-14.0, 10.0],
+            BotSpawn {
+                character_glb: String::new(),
+                character_scale: 1.0,
+                character_yaw_deg: 0.0,
+                x: -4.0,
+                z: -7.0,
+            },
+            BotSpawn {
+                character_glb: String::new(),
+                character_scale: 1.0,
+                character_yaw_deg: 0.0,
+                x: 0.0,
+                z: -7.0,
+            },
+            BotSpawn {
+                character_glb: String::new(),
+                character_scale: 1.0,
+                character_yaw_deg: 0.0,
+                x: 4.0,
+                z: -7.0,
+            },
+            BotSpawn {
+                character_glb: String::new(),
+                character_scale: 1.0,
+                character_yaw_deg: 0.0,
+                x: 10.0,
+                z: -14.0,
+            },
+            BotSpawn {
+                character_glb: String::new(),
+                character_scale: 1.0,
+                character_yaw_deg: 0.0,
+                x: -14.0,
+                z: 10.0,
+            },
         ],
     }
 }
@@ -122,6 +191,10 @@ pub struct ForgiaModeFpsArenaPlugin;
 
 impl Plugin for ForgiaModeFpsArenaPlugin {
     fn build(&self, app: &mut App) {
+        // ForgiaAiArenaBotPlugin idempotent — owne shooting AI + respawn logic.
+        if !app.is_plugin_added::<ForgiaAiArenaBotPlugin>() {
+            app.add_plugins(ForgiaAiArenaBotPlugin);
+        }
         app.init_asset::<Genome<ArenaBotsGenome>>()
             .register_asset_loader(GenomeLoader::<ArenaBotsGenome>::default())
             .add_systems(Startup, load_arena_bots_genome)
@@ -394,48 +467,66 @@ fn spawn_arena(
         }
     };
 
-    let body_mesh = meshes.add(Cuboid::new(
-        bots_data.body.width,
-        bots_data.body.height,
-        bots_data.body.depth,
-    ));
-    let head_mesh = meshes.add(Sphere::new(bots_data.head.radius).mesh().ico(3).unwrap());
-    let body_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(
-            bots_data.body.color[0],
-            bots_data.body.color[1],
-            bots_data.body.color[2],
-        ),
-        emissive: LinearRgba::new(
-            bots_data.body.emissive[0],
-            bots_data.body.emissive[1],
-            bots_data.body.emissive[2],
-            1.0,
-        ),
-        ..default()
-    });
-    let head_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(
-            bots_data.head.color[0],
-            bots_data.head.color[1],
-            bots_data.head.color[2],
-        ),
-        emissive: LinearRgba::new(
-            bots_data.head.emissive[0],
-            bots_data.head.emissive[1],
-            bots_data.head.emissive[2],
-            1.0,
-        ),
-        ..default()
-    });
+    // Visuels debug colliders (cubes opaques) — uniquement si TOML `show_collider_debug = true`.
+    let debug_meshes = if bots_data.show_collider_debug {
+        let body_mesh = meshes.add(Cuboid::new(
+            bots_data.body.width,
+            bots_data.body.height,
+            bots_data.body.depth,
+        ));
+        let head_mesh = meshes.add(Sphere::new(bots_data.head.radius).mesh().ico(3).unwrap());
+        let body_mat = materials.add(StandardMaterial {
+            base_color: Color::srgb(
+                bots_data.body.color[0],
+                bots_data.body.color[1],
+                bots_data.body.color[2],
+            ),
+            emissive: LinearRgba::new(
+                bots_data.body.emissive[0],
+                bots_data.body.emissive[1],
+                bots_data.body.emissive[2],
+                1.0,
+            ),
+            ..default()
+        });
+        let head_mat = materials.add(StandardMaterial {
+            base_color: Color::srgb(
+                bots_data.head.color[0],
+                bots_data.head.color[1],
+                bots_data.head.color[2],
+            ),
+            emissive: LinearRgba::new(
+                bots_data.head.emissive[0],
+                bots_data.head.emissive[1],
+                bots_data.head.emissive[2],
+                1.0,
+            ),
+            ..default()
+        });
+        Some((body_mesh, head_mesh, body_mat, head_mat))
+    } else {
+        None
+    };
+
     let body_half = (
         bots_data.body.width * 0.5,
         bots_data.body.height * 0.5,
         bots_data.body.depth * 0.5,
     );
+    let ai = &bots_data.ai;
 
-    for pos in &bots_data.spawn_positions {
-        let (x, z) = (pos[0], pos[1]);
+    for spawn in &bots_data.spawn_positions {
+        let (x, z) = (spawn.x, spawn.z);
+        let bot_name = spawn
+            .character_glb
+            .rsplit('/')
+            .next()
+            .and_then(|s| s.split('.').next())
+            .unwrap_or("Enemy")
+            .to_string();
+
+        // Parent : Health + ArenaBot AI + position.
+        // Pas de mesh sur le parent ; les enfants ont mesh visuel + colliders.
         let parent = commands
             .spawn((
                 ArenaMarker,
@@ -443,36 +534,75 @@ fn spawn_arena(
                 Transform::from_xyz(x, 0.0, z),
                 Visibility::default(),
                 Health::new(bots_data.hp),
-                Name::new(format!("TrainingBot_{x}_{z}")),
+                ArenaBot {
+                    state: forgia_ai_arena_bot::BotState::Idle,
+                    speed: 0.0, // V1 : bots statiques (rotate to face player only)
+                    detect_range: ai.detect_range,
+                    attack_range: ai.shot_range,
+                    attack_cooldown: ai.shot_cooldown_secs,
+                    attack_left: ai.shot_warmup_secs, // warmup anti spawn-kill
+                },
+                BotShootConfig {
+                    damage: ai.shot_damage,
+                    range: ai.shot_range,
+                    jitter_rad: ai.shot_jitter_deg.to_radians(),
+                    tracer_emissive: LinearRgba::new(
+                        ai.tracer_emissive[0],
+                        ai.tracer_emissive[1],
+                        ai.tracer_emissive[2],
+                        1.0,
+                    ),
+                    shoulder_y: bots_data.head_y - 0.15, // shoulder un peu sous la tête
+                    target_torso_y: 1.0,
+                },
+                Name::new(format!("Enemy_{bot_name}_{x}_{z}")),
             ))
             .id();
 
         let body_y = bots_data.body_y;
         let head_y = bots_data.head_y;
         let head_radius = bots_data.head.radius;
-        let body_mesh_h = body_mesh.clone();
-        let head_mesh_h = head_mesh.clone();
-        let body_mat_h = body_mat.clone();
-        let head_mat_h = head_mat.clone();
+        let character_path = spawn.character_glb.clone();
+        let character_scale = spawn.character_scale;
+        let character_yaw = spawn.character_yaw_deg.to_radians();
+        let debug = debug_meshes.clone();
+
         commands.entity(parent).with_children(|p| {
-            p.spawn((
+            // Mesh character (visible). Pas de collider ici — les colliders sont
+            // séparés en head/body pour la hitzone Overwatch.
+            if !character_path.is_empty() {
+                p.spawn((
+                    SceneRoot(asset_server.load(&character_path)),
+                    Transform::from_xyz(0.0, 0.0, 0.0)
+                        .with_rotation(Quat::from_rotation_y(character_yaw))
+                        .with_scale(Vec3::splat(character_scale)),
+                    Name::new("CharacterMesh"),
+                ));
+            }
+
+            // Body hit zone — collider INVISIBLE (sauf debug). HitZone Component.
+            let mut body_entity = p.spawn((
                 HitZone::Body,
-                Mesh3d(body_mesh_h),
-                MeshMaterial3d(body_mat_h),
                 Transform::from_xyz(0.0, body_y, 0.0),
                 RigidBody::Fixed,
                 Collider::cuboid(body_half.0, body_half.1, body_half.2),
                 Name::new("Body"),
             ));
-            p.spawn((
+            if let Some((ref bm, _, ref bmat, _)) = debug {
+                body_entity.insert((Mesh3d(bm.clone()), MeshMaterial3d(bmat.clone())));
+            }
+
+            // Head hit zone — collider INVISIBLE (sauf debug).
+            let mut head_entity = p.spawn((
                 HitZone::Head,
-                Mesh3d(head_mesh_h),
-                MeshMaterial3d(head_mat_h),
                 Transform::from_xyz(0.0, head_y, 0.0),
                 RigidBody::Fixed,
                 Collider::ball(head_radius),
                 Name::new("Head"),
             ));
+            if let Some((_, ref hm, _, ref hmat)) = debug {
+                head_entity.insert((Mesh3d(hm.clone()), MeshMaterial3d(hmat.clone())));
+            }
         });
     }
 

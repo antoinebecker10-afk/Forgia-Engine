@@ -1,35 +1,74 @@
-# Forgia V2 — Arena Training Bots Genome
-# Configuration des cibles d'entraînement style Overwatch (head + body hitboxes).
-# Hot-reload via Bevy Asset (Shift+F12 ou re-save).
+# Forgia V2 — Arena Enemies Genome
+# Training bots Overwatch-style (head + body hitboxes) avec mesh character
+# Meshy AI au lieu de cubes primitifs. Hot-reload Bevy Asset.
 
-# HP par bot (chaque cible parent)
+# HP par bot (parent Health)
 hp = 100.0
 
-# Position Y locale du body et head (offset depuis le pivot parent au sol)
+# Position Y locale du collider body et head (visible mesh character au pivot Y=0)
 body_y = 0.65
 head_y = 1.55
 
 [body]
-# Dimensions mesh + collider Cuboid (half-extents = dims / 2 pour collider)
+# Collider invisible Cuboid (le mesh visible vient du character GLB)
 width = 0.7       # X
 height = 1.3      # Y
 depth = 0.4       # Z
-# Material PBR (RGB linear 0..1, valeurs HDR autorisées pour emissive)
-color = [0.85, 0.15, 0.15]
-emissive = [0.6, 0.0, 0.0]
+color = [0.0, 0.0, 0.0]      # ignoré (pas de mesh body)
+emissive = [0.0, 0.0, 0.0]   # ignoré
 
 [head]
 radius = 0.22
-# Tone légèrement différent body pour lisibilité immédiate Overwatch-style
-color = [1.0, 0.35, 0.20]
-emissive = [1.2, 0.3, 0.0]
+color = [0.0, 0.0, 0.0]      # ignoré
+emissive = [0.0, 0.0, 0.0]   # ignoré
 
-# Positions XZ des bots (Y = 0 = pieds au sol, body_y/head_y appliqués par le code)
-# Tu peux ajouter / retirer / déplacer. Ré-entrer l'arena pour appliquer.
-spawn_positions = [
-  [-4.0, -7.0],
-  [0.0, -7.0],
-  [4.0, -7.0],
-  [10.0, -14.0],
-  [-14.0, 10.0],
-]
+# Si `show_collider_debug = true`, dessine cuboid+sphere par-dessus le character
+# (debug visuel pour ajuster les hit zones). Par défaut false en runtime.
+show_collider_debug = false
+
+# AI behavior (forgia-ai-arena-bot)
+[ai]
+shot_range = 35.0           # max range raycast vers player
+shot_cooldown_secs = 1.5    # 1 tir / 1.5s
+shot_damage = 12.0          # dmg par tir
+shot_warmup_secs = 0.8      # délai initial avant le 1er tir (anti-spawn-kill)
+detect_range = 50.0
+shot_jitter_deg = 4.0       # ★ spread imprécision IA (anti-perfect-aim)
+tracer_emissive = [4.0, 1.5, 0.5]  # HDR orange-jaune
+
+# Enemies — 4 personnages Forgia (pas Rex = player RPG)
+# Distribution sur les 5 spawn points. Asset path relative à assets/.
+[[spawn_positions]]
+character_glb = "models/characters/Dorin.glb#Scene0"
+character_scale = 1.0        # auto-calibration AABB future si needed
+character_yaw_deg = 0.0
+x = -4.0
+z = -7.0
+
+[[spawn_positions]]
+character_glb = "models/characters/Kael.glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 0.0
+x = 0.0
+z = -7.0
+
+[[spawn_positions]]
+character_glb = "models/characters/Mira.glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 0.0
+x = 4.0
+z = -7.0
+
+[[spawn_positions]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 0.0
+x = 10.0
+z = -14.0
+
+[[spawn_positions]]
+character_glb = "models/characters/Maitre Forgeron Célèste.glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 0.0
+x = -14.0
+z = 10.0
