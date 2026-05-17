@@ -1,0 +1,102 @@
+# Template skeleton BipedLizard (Rex) — 16 bones body + 4 tail = 20 bones
+# Source de vérité pour `forgia-skeleton-embedder::SkeletonTemplate`.
+# Hot-reloadable via Bevy AssetServer (Shift+F12).
+
+[[bones]]
+name = "hip"
+pos = [0.0, 0.45, 0.0]
+
+[[bones]]
+name = "spine_lower"
+parent = 0
+pos = [0.0, 0.53, 0.04]
+
+[[bones]]
+name = "spine_mid"
+parent = 1
+pos = [0.0, 0.63, 0.10]
+
+[[bones]]
+name = "chest"
+parent = 2
+pos = [0.0, 0.71, 0.16]
+
+[[bones]]
+name = "neck"
+parent = 3
+pos = [0.0, 0.76, 0.24]
+
+[[bones]]
+name = "head"
+parent = 4
+pos = [0.0, 0.82, 0.29]
+
+[[bones]]
+name = "arm_L"
+parent = 3
+pos = [-0.12, 0.71, 0.18]
+
+[[bones]]
+name = "forearm_L"
+parent = 6
+pos = [-0.16, 0.59, 0.22]
+
+[[bones]]
+name = "arm_R"
+parent = 3
+pos = [0.12, 0.71, 0.18]
+
+[[bones]]
+name = "forearm_R"
+parent = 8
+pos = [0.16, 0.59, 0.22]
+
+[[bones]]
+name = "thigh_L"
+parent = 0
+pos = [-0.10, 0.37, 0.0]
+
+[[bones]]
+name = "shin_L"
+parent = 10
+pos = [-0.10, 0.19, 0.0]
+
+[[bones]]
+name = "foot_L"
+parent = 11
+pos = [-0.10, 0.04, 0.06]
+
+[[bones]]
+name = "thigh_R"
+parent = 0
+pos = [0.10, 0.37, 0.0]
+
+[[bones]]
+name = "shin_R"
+parent = 13
+pos = [0.10, 0.19, 0.0]
+
+[[bones]]
+name = "foot_R"
+parent = 14
+pos = [0.10, 0.04, 0.06]
+
+[[bones]]
+name = "tail_01"
+parent = 0
+pos = [0.0, 0.41, -0.12]
+
+[[bones]]
+name = "tail_02"
+parent = 16
+pos = [0.0, 0.39, -0.22]
+
+[[bones]]
+name = "tail_03"
+parent = 17
+pos = [0.0, 0.37, -0.32]
+
+[[bones]]
+name = "tail_04"
+parent = 18
+pos = [0.0, 0.35, -0.42]

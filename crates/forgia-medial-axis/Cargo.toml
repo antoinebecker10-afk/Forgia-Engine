@@ -1,0 +1,12 @@
+[package]
+name = "forgia-medial-axis"
+version = "0.1.0"
+edition = "2021"
+description = "Distance field + sphere packing → medial axis graph (Pinocchio Phase 1, story-440)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-mesh-voxelizer = { workspace = true }

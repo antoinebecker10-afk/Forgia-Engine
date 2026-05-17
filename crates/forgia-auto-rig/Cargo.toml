@@ -1,0 +1,17 @@
+[package]
+name = "forgia-auto-rig"
+version = "0.1.0"
+edition = "2021"
+description = "Runtime skeleton synthesis — template-fit auto-rig for static meshes (story-440 Phase 1A)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+forgia-rig-topology = { workspace = true }
+forgia-mesh-voxelizer = { workspace = true }
+forgia-medial-axis = { workspace = true }
+forgia-skeleton-embedder = { workspace = true }
+forgia-genome-core = { workspace = true }

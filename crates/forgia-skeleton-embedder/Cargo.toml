@@ -1,0 +1,13 @@
+[package]
+name = "forgia-skeleton-embedder"
+version = "0.1.0"
+edition = "2021"
+description = "Template skeleton embedding sur medial axis graph (Pinocchio Phase 1 final, story-440)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-medial-axis = { workspace = true }
+serde = { workspace = true }
