@@ -7,631 +7,375 @@
 //! - `TILE_SIZE = 4.0` (KayKit dungeon convention)
 //! - Forgia scaled scene pattern : parent scale=1 + child SceneRoot scale (rapier3d 0.33 quirk)
 
+use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_combat::prelude::*;
-use forgia_combat::weapons::WeaponType;
+use forgia_combat::weapons::{EquippedWeapons, WeaponFireCooldown, WeaponType};
 use forgia_core::prelude::*;
 use forgia_effects::prelude::{
     spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources,
     WeaponVfxEffects,
 };
+use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_mode_fps_arena::TargetCube;
 use forgia_player::prelude::*;
+use serde::Deserialize;
+use std::collections::HashMap;
+
+mod ads;
+mod score;
+mod scope_glass;
 
 pub mod prelude {
     pub use crate::ForgiaFpsPlugin;
+    pub use crate::score::{ArenaScore, ArenaScorePlugin, ScoreboardVisible};
 }
 
-const TILE_SIZE: f32 = 4.0;
-const ARENA_SIZE: i32 = 11; // 11×11 tiles = 44×44m (vrai map FPS multi-zones)
+/// État du clic gauche pour dispatch fire_mode (V2 : ButtonInput consommé par egui →
+/// tracking via MessageReader<MouseButtonInput>).
+/// `just_pressed` = transition Released→Pressed cette frame (mode semi/pump/burst).
+/// `held` = bouton actuellement enfoncé (mode auto).
+#[derive(Resource, Default)]
+pub struct LeftMouseState {
+    pub just_pressed: bool,
+    pub held: bool,
+}
 
-// ── Cloud constants (skybox cubemap V1 wired par forgia-player) ──────
-const CLOUD_COLOR: Color = Color::srgb(0.95, 0.96, 0.97);
-const CLOUD_EMISSIVE: LinearRgba = LinearRgba::new(0.05, 0.05, 0.06, 1.0);
-const CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min
+/// État d'une rafale en cours (fire_mode = "burst").
+/// Inséré au just_pressed initial, retiré quand `shots_remaining == 0`.
+/// Pendant qu'il existe, le cooldown standard est bypassé — le timer interne pilote la cadence.
+#[derive(Resource)]
+pub struct BurstState {
+    /// Nombre de shots restants à tirer dans la rafale (le 1er tir est immédiat au just_pressed).
+    pub shots_remaining: u8,
+    /// Timer entre shots (1/fire_rate).
+    pub interval_timer: Timer,
+}
 
+/// Viewmodel 1P enfant de FpsCamera. Stocke l'arme actuellement rendue
+/// pour détecter les changements et swap le SceneRoot.
 #[derive(Component)]
-pub struct ArenaMarker;
+pub struct WeaponViewmodel {
+    pub current: WeaponType,
+}
 
-/// Marker pour les cubes-cibles (testables via fire_weapon_minimal).
-#[derive(Component)]
-pub struct TargetCube;
+/// Scene handles pré-chargés pour les 4 armes V1 Arena (load_weapon_models au Startup).
+/// Slot 1 (ModernAR)     = Pépin         (~17MB)
+/// Slot 2 (AssaultRifle) = Bourrasque    (~18MB)
+/// Slot 3 (Shotgun)      = Madame Lenoir (~18MB)
+/// Slot 4 (Rocket)       = Boucherie     (~17MB)
+/// Tous dans `assets/models/weapons/forgia/`.
+#[derive(Resource)]
+pub struct WeaponModelAssets {
+    pub pepin: Handle<Scene>,
+    pub bourrasque: Handle<Scene>,
+    pub madame_lenoir: Handle<Scene>,
+    pub boucherie: Handle<Scene>,
+}
 
-/// Cluster nuage en orbit circulaire autour du centre arène (Y axis).
-/// Stocke angle/radius/height pour calcul polaire continu (pas de wrap brusque).
+// ============================================================================
+// Genome viewmodel — config TOML hot-reloadable (assets/genomes/viewmodel_arena.toml)
+// ============================================================================
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct ViewmodelGenome {
+    pub weapons: HashMap<String, ViewmodelGenomeEntry>,
+}
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct ViewmodelGenomeEntry {
+    pub target_size: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub offset_z: f32,
+    pub rotation_y_deg: f32,
+    pub fallback_scale: f32,
+    // Axes rotation supplémentaires (défaut 0 si absent dans TOML — option = backward compat).
+    #[serde(default)]
+    pub rotation_x_deg: f32,
+    #[serde(default)]
+    pub rotation_z_deg: f32,
+    /// Distance du pivot viewmodel jusqu'au bout du canon (m).
+    /// Utilisé pour spawn muzzle flash + tracer à la bonne position monde.
+    #[serde(default = "default_barrel_length")]
+    pub barrel_length: f32,
+    /// Position viewmodel en ADS (Aim Down Sight, clic droit).
+    /// Sight aligné centre écran → souvent X≈0, Y un peu plus haut, Z plus proche cam.
+    #[serde(default = "default_ads_offset_x")]
+    pub ads_offset_x: f32,
+    #[serde(default = "default_ads_offset_y")]
+    pub ads_offset_y: f32,
+    #[serde(default = "default_ads_offset_z")]
+    pub ads_offset_z: f32,
+    /// FOV en degrés quand ADS actif (smaller = more zoom).
+    #[serde(default = "default_ads_fov")]
+    pub ads_fov_deg: f32,
+    /// Position du SIGHT/scope dans le mesh LOCAL space (avant rotation/scale auto).
+    /// Quand ADS, on calcule la translation viewmodel pour que ce point se projette
+    /// pile sur l'axe de vision cam → red dot aligné au viseur de l'arme (style CoD).
+    /// Si laissé à 0 → fallback ads_offset_* manuel.
+    #[serde(default)]
+    pub sight_local_x: f32,
+    #[serde(default)]
+    pub sight_local_y: f32,
+    #[serde(default)]
+    pub sight_local_z: f32,
+    /// Distance cam → sight en world units (m). Default 0.35m typique FPS.
+    #[serde(default = "default_sight_distance")]
+    pub sight_distance: f32,
+    /// Facteur vitesse de déplacement en ADS. 1.0 = pas de ralenti, 0.65 = -35% (style CoD).
+    #[serde(default = "default_ads_move_speed_factor")]
+    pub ads_move_speed_factor: f32,
+    /// Alpha de la lentille du scope en full ADS (0.0 totalement transparent, 1.0 opaque).
+    /// Default 0.25 = visible mais see-through. Forgia-mesh-fader gère le lerp.
+    #[serde(default = "default_scope_glass_alpha_ads")]
+    pub scope_glass_alpha_ads: f32,
+    /// Tilt additionnel sur Y appliqué UNIQUEMENT en hipfire (style CoD "carry angle").
+    /// En ADS, l'arme se redresse (pas de tilt) pour être centrée dans le viseur.
+    /// Slerp Quat lerp progress 0→1 entre hipfire (rotation_y + tilt) et ADS (rotation_y).
+    #[serde(default = "default_hipfire_tilt_y_deg")]
+    pub hipfire_tilt_y_deg: f32,
+    // ─── Phase B — Fire behavior (genome-driven gameplay) ─────────────
+    /// "semi" | "auto" | "burst" | "pump". Default "auto".
+    #[serde(default = "default_fire_mode")]
+    pub fire_mode: String,
+    /// Nombre de tirs par rafale en mode "burst". Default 3.
+    #[serde(default = "default_burst_count")]
+    pub burst_count: u8,
+    /// Dégâts par projectile (single ray ou par pellet pour shotgun cone).
+    #[serde(default = "default_damage")]
+    pub damage: f32,
+    /// Cadence de tir (shots/seconde). Cooldown = 1/fire_rate.
+    #[serde(default = "default_fire_rate")]
+    pub fire_rate: f32,
+    /// Portée max raycast (m).
+    #[serde(default = "default_range")]
+    pub range: f32,
+    /// Nombre de pellets par tir. 1 = single ray. >1 = cone spread (shotgun/pump).
+    #[serde(default = "default_pellets")]
+    pub pellets: u8,
+    /// Angle cone spread (degrés) pour multi-pellets. 0 = perfect accuracy.
+    #[serde(default = "default_spread_deg")]
+    pub spread_deg: f32,
+    // ─── Phase C — Sniper scope fullscreen ────────────────────────────
+    /// Si true, en ADS affiche un overlay fullscreen style sniper CoD
+    /// (cercle noir vignette + reticle) + FOV cam très réduit.
+    #[serde(default)]
+    pub sniper_scope_fullscreen: bool,
+    // ─── Phase D — Hit feedback timings (genome-driven) ───────────────
+    /// Durée du flash blanc sur la cible touchée (secondes). Default 0.15s.
+    #[serde(default = "default_hit_flash_duration")]
+    pub hit_flash_duration: f32,
+    /// Durée du hit-stop (ralenti time scale) après un hit (secondes). Default 0.05s.
+    /// Snipers : 0.10s (sensation lourde). SMG : 0.03s (rapide).
+    #[serde(default = "default_hit_stop_duration")]
+    pub hit_stop_duration: f32,
+    /// Vitesse relative du temps pendant hit-stop (0.05 = 5% = très lent). Default 0.05.
+    #[serde(default = "default_hit_stop_speed")]
+    pub hit_stop_speed: f32,
+}
+
+fn default_barrel_length() -> f32 { 0.55 }
+fn default_ads_offset_x() -> f32 { 0.0 }
+fn default_ads_offset_y() -> f32 { -0.10 }
+fn default_ads_offset_z() -> f32 { -0.30 }
+fn default_ads_fov() -> f32 { 25.0 }
+fn default_sight_distance() -> f32 { 0.35 }
+fn default_ads_move_speed_factor() -> f32 { 0.65 }
+fn default_scope_glass_alpha_ads() -> f32 { 0.25 }
+fn default_hipfire_tilt_y_deg() -> f32 { 5.0 }
+fn default_fire_mode() -> String { "auto".to_string() }
+fn default_burst_count() -> u8 { 3 }
+fn default_damage() -> f32 { 25.0 }
+fn default_fire_rate() -> f32 { 10.0 }
+fn default_range() -> f32 { 100.0 }
+fn default_pellets() -> u8 { 1 }
+fn default_spread_deg() -> f32 { 0.0 }
+fn default_hit_flash_duration() -> f32 { 0.15 }
+fn default_hit_stop_duration() -> f32 { 0.05 }
+fn default_hit_stop_speed() -> f32 { 0.05 }
+
+#[derive(Resource)]
+pub struct ViewmodelGenomeHandle(pub Handle<Genome<ViewmodelGenome>>);
+
+/// Bundle SystemParam pour lookup genome viewmodel (réduit le param count des systèmes
+/// hot-path comme `fire_weapon_minimal` qui frôlent la limite Bevy 16).
+#[derive(SystemParam)]
+pub struct ViewmodelGenomeCtx<'w> {
+    pub handle: Option<Res<'w, ViewmodelGenomeHandle>>,
+    pub assets: Res<'w, Assets<Genome<ViewmodelGenome>>>,
+}
+
+impl ViewmodelGenomeCtx<'_> {
+    pub fn entry(&self, w: WeaponType) -> Option<&ViewmodelGenomeEntry> {
+        let h = self.handle.as_deref()?;
+        lookup_genome_entry(&self.assets, h, w)
+    }
+}
+
+/// Map WeaponType → clé TOML (`[weapons.<key>]`).
+fn weapon_genome_key(w: WeaponType) -> &'static str {
+    match w {
+        WeaponType::ModernAR => "pepin",
+        WeaponType::AssaultRifle => "bourrasque",
+        WeaponType::Shotgun => "madame_lenoir",
+        WeaponType::RocketLauncher => "boucherie",
+        _ => "pepin",
+    }
+}
+
+/// Lit l'entrée genome pour `w`. Si genome pas encore chargé OU clé absente, retourne None
+/// → fallback hardcodé `viewmodel_transform` / `viewmodel_target_size` / `viewmodel_fallback_scale`.
+fn lookup_genome_entry<'a>(
+    genome_assets: &'a Assets<Genome<ViewmodelGenome>>,
+    handle: &ViewmodelGenomeHandle,
+    w: WeaponType,
+) -> Option<&'a ViewmodelGenomeEntry> {
+    let g = genome_assets.get(&handle.0)?;
+    g.data.weapons.get(weapon_genome_key(w))
+}
+
+fn scene_for_weapon(a: &WeaponModelAssets, w: WeaponType) -> Handle<Scene> {
+    match w {
+        WeaponType::ModernAR => a.pepin.clone(),
+        WeaponType::AssaultRifle => a.bourrasque.clone(),
+        WeaponType::Shotgun => a.madame_lenoir.clone(),
+        WeaponType::RocketLauncher => a.boucherie.clone(),
+        _ => a.pepin.clone(),
+    }
+}
+
+/// Marker : viewmodel attend la mesure AABB pour calculer son scale réel.
+/// Pattern porté de V1 `combat/viewmodel.rs:603` (auto_scale_system).
 #[derive(Component)]
-pub struct CloudOrbit {
-    pub angle: f32,  // radians, current
-    pub radius: f32, // distance horizontale du centre arène
-    pub height: f32, // Y position (constant)
+pub struct NeedsAutoScale {
+    pub target_size: f32, // taille cible en mètres (largest axis)
+}
+
+/// Offset + rotation du viewmodel par arme (le scale vient de auto_scale_viewmodel via AABB).
+/// Valeurs portées de V1 `combat/viewmodel.rs` (fallback genome). Scale 1.0 = sera réécrit.
+///
+/// Note rotation : GLB face -X par défaut → rotation Y +90° pour aligner canon vers -Z (forward).
+/// Transform local du viewmodel. Si `genome` fourni, ses valeurs ont priorité.
+/// Sinon fallback hardcodé (boot avant chargement TOML, ou clé absente).
+/// Rotation hipfire = rotation base + tilt Y additionnel ("carry angle" CoD).
+pub fn viewmodel_rotation_hipfire(g: &ViewmodelGenomeEntry) -> Quat {
+    Quat::from_rotation_x(g.rotation_x_deg.to_radians())
+        * Quat::from_rotation_y((g.rotation_y_deg + g.hipfire_tilt_y_deg).to_radians())
+        * Quat::from_rotation_z(g.rotation_z_deg.to_radians())
+}
+
+/// Rotation ADS = rotation base (sans tilt, arme droite centrée viseur).
+pub fn viewmodel_rotation_ads(g: &ViewmodelGenomeEntry) -> Quat {
+    Quat::from_rotation_x(g.rotation_x_deg.to_radians())
+        * Quat::from_rotation_y(g.rotation_y_deg.to_radians())
+        * Quat::from_rotation_z(g.rotation_z_deg.to_radians())
+}
+
+fn viewmodel_transform(w: WeaponType, genome: Option<&ViewmodelGenomeEntry>) -> Transform {
+    if let Some(g) = genome {
+        return Transform {
+            translation: Vec3::new(g.offset_x, g.offset_y, g.offset_z),
+            rotation: viewmodel_rotation_hipfire(g), // hipfire avec tilt par défaut
+            scale: Vec3::splat(1.0),
+        };
+    }
+    // Fallback hardcodé (boot précoce, genome TOML pas encore loaded).
+    let base_rot = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+    let offset = match w {
+        WeaponType::ModernAR => Vec3::new(0.25, -0.30, -0.65),
+        WeaponType::Shotgun => Vec3::new(0.30, -0.35, -0.60),
+        WeaponType::RocketLauncher => Vec3::new(0.35, -0.40, -0.70),
+        WeaponType::AK47 => Vec3::new(0.32, -0.38, -0.70),
+        WeaponType::AssaultRifle => Vec3::new(0.35, -0.35, -0.65),
+        WeaponType::PlasmaRifle => Vec3::new(0.35, -0.35, -0.65),
+        WeaponType::Chainsaw => Vec3::new(0.30, -0.30, -0.65),
+    };
+    Transform {
+        translation: offset,
+        rotation: base_rot,
+        scale: Vec3::splat(1.0),
+    }
+}
+
+fn viewmodel_target_size(w: WeaponType, genome: Option<&ViewmodelGenomeEntry>) -> f32 {
+    if let Some(g) = genome {
+        return g.target_size;
+    }
+    match w {
+        WeaponType::Shotgun => 0.8,
+        WeaponType::Chainsaw => 0.6,
+        _ => 0.75,
+    }
+}
+
+fn viewmodel_fallback_scale(_w: WeaponType, genome: Option<&ViewmodelGenomeEntry>) -> f32 {
+    genome.map(|g| g.fallback_scale).unwrap_or(1.0)
 }
 
 pub struct ForgiaFpsPlugin;
 
 impl Plugin for ForgiaFpsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameMode::Fps), spawn_arena)
-            .add_systems(OnExit(GameMode::Fps), cleanup_arena)
+        // Add MeshFaderPlugin si pas déjà ajouté (idempotent — plusieurs crates peuvent l'utiliser)
+        if !app.is_plugin_added::<forgia_mesh_fader::MeshFaderPlugin>() {
+            app.add_plugins(forgia_mesh_fader::MeshFaderPlugin);
+        }
+        // Arena spawn/cleanup + clouds — crate dédié (règle fine-grained-crates).
+        if !app.is_plugin_added::<forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin>() {
+            app.add_plugins(forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin);
+        }
+        app.add_plugins((
+                score::ArenaScorePlugin,
+                ads::AdsPlugin,
+                scope_glass::ScopeGlassPlugin,
+            ))
+            .init_resource::<EquippedWeapons>()
+            .init_resource::<LeftMouseState>()
+            .init_asset::<Genome<ViewmodelGenome>>()
+            .register_asset_loader(GenomeLoader::<ViewmodelGenome>::default())
+            .add_systems(Startup, (load_weapon_models, load_viewmodel_genome))
+            .add_systems(OnExit(GameMode::Fps), despawn_viewmodel)
+            // Fire system genome-driven : dispatch fire_mode (auto/semi/pump) + multi-pellets
+            // + per-weapon damage/fire_rate/range/spread depuis ViewmodelGenomeEntry TOML.
+            // Reconstruit 2026-05-17 depuis memories après perte WIP 2026-05-16 PM.
+            // Limitations : fire_mode "burst" NON implémenté (fallback semi + warn).
             .add_systems(
                 Update,
-                (fire_weapon_minimal, despawn_dead_cubes)
+                (
+                    track_left_mouse_state,
+                    weapon_select_system,
+                    fire_weapon_minimal,
+                    despawn_dead_cubes,
+                )
                     .chain()
                     .in_set(GameSet::Combat)
                     .run_if(in_state(GameMode::Fps)),
             )
             .add_systems(
                 Update,
-                cloud_drift_system
-                    .in_set(GameSet::Effects)
+                (
+                    attach_viewmodel_to_camera,
+                    update_viewmodel_on_switch,
+                    auto_scale_viewmodel,
+                )
                     .run_if(in_state(GameMode::Fps)),
             );
     }
 }
 
-fn spawn_arena(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // ── Asset handles (1 load chacun, clone Arc partout) ────────────────
-    let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
-    let floor_dirt: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
-    let floor_rocks: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_rocks.glb#Scene0");
-    let wall: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall.glb#Scene0");
-    let wall_arched: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_arched.glb#Scene0");
-    let wall_window: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_window.glb#Scene0");
-    let wall_broken: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_broken.glb#Scene0");
-    let column: Handle<Scene> = asset_server.load("models/kaykit/dungeon/column.glb#Scene0");
-    let pillar: Handle<Scene> = asset_server.load("models/kaykit/dungeon/pillar.glb#Scene0");
-    let pillar_deco: Handle<Scene> = asset_server.load("models/kaykit/dungeon/pillar_deco.glb#Scene0");
-    let torch: Handle<Scene> = asset_server.load("models/kaykit/dungeon/torch.glb#Scene0");
-    let torch_wall: Handle<Scene> = asset_server.load("models/kaykit/dungeon/torch_wall.glb#Scene0");
-    let banner_red: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_red.glb#Scene0");
-    let banner_blue: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_blue.glb#Scene0");
-    let banner_yellow: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_yellow.glb#Scene0");
-    let chest: Handle<Scene> = asset_server.load("models/kaykit/dungeon/chest.glb#Scene0");
-    let chest_gold: Handle<Scene> = asset_server.load("models/kaykit/dungeon/chest_gold.glb#Scene0");
-    let crates: Handle<Scene> = asset_server.load("models/kaykit/dungeon/crates.glb#Scene0");
-    let rubble: Handle<Scene> = asset_server.load("models/kaykit/dungeon/rubble.glb#Scene0");
-    let table: Handle<Scene> = asset_server.load("models/kaykit/dungeon/table.glb#Scene0");
-    let barrel: Handle<Scene> = asset_server.load("models/kaykit/dungeon/barrel.glb#Scene0");
-    let barrels_stack: Handle<Scene> = asset_server.load("models/kaykit/dungeon/barrels_stack.glb#Scene0");
-
-    let half = ARENA_SIZE / 2;
-    let arena_extent = (ARENA_SIZE as f32 * TILE_SIZE) / 2.0;
-
-    // ── Sol : grille 11×11 = 121 tiles, mix variations selon zone ────────
-    // Centre = floor classique, périphérie = dirt/rocks pour ambiance ruines
-    for x in -half..=half {
-        for z in -half..=half {
-            let dist = (x.abs().max(z.abs())) as i32;
-            let tile_handle = if dist >= 4 {
-                // Zone périphérique : mix dirt/rocks
-                if (x + z).rem_euclid(3) == 0 {
-                    floor_rocks.clone()
-                } else {
-                    floor_dirt.clone()
-                }
-            } else {
-                floor.clone()
-            };
-            let pos = Vec3::new(x as f32 * TILE_SIZE, 0.0, z as f32 * TILE_SIZE);
-            commands.spawn((
-                ArenaMarker,
-                Transform::from_translation(pos),
-                Visibility::default(),
-                Name::new(format!("Floor_{x}_{z}")),
-                children![(SceneRoot(tile_handle), Transform::default())],
-            ));
-        }
-    }
-
-    // ── Sol Collider 1m épais anti-tunneling ─────────────────────────────
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_xyz(0.0, -0.5, 0.0),
-        RigidBody::Fixed,
-        Collider::cuboid(arena_extent + 5.0, 0.5, arena_extent + 5.0),
-        Name::new("ArenaGroundCollider"),
-    ));
-
-    // ── Murs périphérie : MIX wall classique + arched (passages) + broken (ruines) + window
-    let edge = (half as f32 + 0.5) * TILE_SIZE;
-    for i in -half..=half {
-        let offset = i as f32 * TILE_SIZE;
-        // Choix du wall variant selon position (pour casser la monotonie)
-        let pick_wall = |idx: i32| -> Handle<Scene> {
-            match idx.rem_euclid(7) {
-                0 => wall_window.clone(),
-                3 => wall_broken.clone(),
-                _ => wall.clone(),
-            }
-        };
-        // Passages arched aux 4 cardinales (i==0)
-        let nord = if i == 0 { wall_arched.clone() } else { pick_wall(i) };
-        let sud = if i == 0 { wall_arched.clone() } else { pick_wall(i + 1) };
-        let est = if i == 0 { wall_arched.clone() } else { pick_wall(i + 2) };
-        let ouest = if i == 0 { wall_arched.clone() } else { pick_wall(i + 3) };
-
-        spawn_wall(&mut commands, &nord, Vec3::new(offset, 0.0, edge), 0.0);
-        spawn_wall(&mut commands, &sud, Vec3::new(offset, 0.0, -edge), std::f32::consts::PI);
-        spawn_wall(&mut commands, &est, Vec3::new(edge, 0.0, offset), -std::f32::consts::FRAC_PI_2);
-        spawn_wall(&mut commands, &ouest, Vec3::new(-edge, 0.0, offset), std::f32::consts::FRAC_PI_2);
-    }
-
-    // ── Centre arena : 4 piliers décorés en carré (zone tactique) ───────
-    let col_d = TILE_SIZE * 2.5;
-    for &(x, z) in &[(col_d, col_d), (-col_d, col_d), (col_d, -col_d), (-col_d, -col_d)] {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(x, 0.0, z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cylinder(2.0, 0.5),
-            Name::new(format!("CenterPillar_{x}_{z}")),
-            children![(SceneRoot(pillar_deco.clone()), Transform::default())],
-        ));
-    }
-
-    // ── 4 colonnes outer ring (cover supplémentaire) ────────────────────
-    let outer_d = TILE_SIZE * 4.5;
-    for &(x, z) in &[(outer_d, 0.0), (-outer_d, 0.0), (0.0, outer_d), (0.0, -outer_d)] {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(x, 0.0, z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cylinder(2.0, 0.5),
-            Name::new(format!("OuterPillar_{x}_{z}")),
-            children![(SceneRoot(pillar.clone()), Transform::default())],
-        ));
-    }
-
-    // ── 4 colonnes décor intermédiaires (sans collider, juste visuel) ───
-    for &(x, z) in &[(col_d, 0.0), (-col_d, 0.0), (0.0, col_d), (0.0, -col_d)] {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(x, 0.0, z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cylinder(2.0, 0.4),
-            Name::new(format!("MidColumn_{x}_{z}")),
-            children![(SceneRoot(column.clone()), Transform::default())],
-        ));
-    }
-
-    // ── Cover tactique : crates, rubble, barrels stack, table dispersés ─
-    let cover_props: &[(&str, f32, f32, Handle<Scene>, f32, f32)] = &[
-        ("Crates_NE", 8.0, -8.0, crates.clone(), 0.6, 0.6),
-        ("Crates_SW", -8.0, 8.0, crates.clone(), 0.6, 0.6),
-        ("Rubble_N", 0.0, -14.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_S", 0.0, 14.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_E", 14.0, 0.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_W", -14.0, 0.0, rubble.clone(), 1.0, 0.4),
-        ("BarrelStack_NW", -10.0, -10.0, barrels_stack.clone(), 0.7, 0.7),
-        ("BarrelStack_SE", 10.0, 10.0, barrels_stack.clone(), 0.7, 0.7),
-        ("Table_E", 6.0, 4.0, table.clone(), 1.5, 0.6),
-        ("Table_W", -6.0, -4.0, table.clone(), 1.5, 0.6),
-        ("Barrel_1", 3.0, 12.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_2", -3.0, -12.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_3", 12.0, -3.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_4", -12.0, 3.0, barrel.clone(), 0.5, 0.4),
-    ];
-    for (name, x, z, scene, half_w, half_h) in cover_props {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(*x, 0.0, *z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cuboid(*half_w, *half_h, *half_w),
-            Name::new(name.to_string()),
-            children![(SceneRoot(scene.clone()), Transform::default())],
-        ));
-    }
-
-    // ── Chests précieux dans coins (objectifs visuels) ──────────────────
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_xyz(16.0, 0.0, 16.0),
-        Visibility::default(),
-        Name::new("ChestGold_NE"),
-        children![(SceneRoot(chest_gold.clone()), Transform::default())],
-    ));
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_xyz(-16.0, 0.0, -16.0),
-        Visibility::default(),
-        Name::new("Chest_SW"),
-        children![(SceneRoot(chest.clone()), Transform::default())],
-    ));
-
-    // ── Banners colorés sur murs (décor faction) ────────────────────────
-    let banners: &[(&str, f32, f32, Handle<Scene>, f32)] = &[
-        ("Banner_N_red", -6.0, edge - 0.3, banner_red.clone(), 0.0),
-        ("Banner_N_blue", 6.0, edge - 0.3, banner_blue.clone(), 0.0),
-        ("Banner_S_yellow", 0.0, -edge + 0.3, banner_yellow.clone(), std::f32::consts::PI),
-        ("Banner_E_red", edge - 0.3, -6.0, banner_red.clone(), -std::f32::consts::FRAC_PI_2),
-        ("Banner_W_blue", -edge + 0.3, 6.0, banner_blue.clone(), std::f32::consts::FRAC_PI_2),
-    ];
-    for (name, x, z, scene, yaw) in banners {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(*x, 3.0, *z).with_rotation(Quat::from_rotation_y(*yaw)),
-            Visibility::default(),
-            Name::new(name.to_string()),
-            children![(SceneRoot(scene.clone()), Transform::default())],
-        ));
-    }
-
-    // ── Torches lit (avec PointLight orange) — ambiance forge ──────────
-    let torch_positions: &[(&str, f32, f32, Handle<Scene>)] = &[
-        ("Torch_NE", 18.0, -18.0, torch.clone()),
-        ("Torch_NW", -18.0, -18.0, torch.clone()),
-        ("Torch_SE", 18.0, 18.0, torch.clone()),
-        ("Torch_SW", -18.0, 18.0, torch.clone()),
-        ("TorchWall_N", -10.0, edge - 0.5, torch_wall.clone()),
-        ("TorchWall_S", 10.0, -edge + 0.5, torch_wall.clone()),
-        ("TorchWall_E", edge - 0.5, 10.0, torch_wall.clone()),
-        ("TorchWall_W", -edge + 0.5, -10.0, torch_wall.clone()),
-    ];
-    for (name, x, z, scene) in torch_positions {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(*x, 0.0, *z),
-            Visibility::default(),
-            Name::new(name.to_string()),
-            children![
-                (SceneRoot(scene.clone()), Transform::default()),
-                (
-                    PointLight {
-                        intensity: 50_000.0,
-                        color: Color::srgb(1.0, 0.55, 0.2),
-                        radius: 0.3,
-                        range: 12.0,
-                        shadows_enabled: false,
-                        ..default()
-                    },
-                    Transform::from_xyz(0.0, 1.8, 0.0),
-                )
-            ],
-        ));
-    }
-
-    // ── Sun DirectionalLight (pattern V1 — direction via euler pour Atmosphere) ──
-    // Atmosphere Hillaire utilise la rotation du DirectionalLight comme position du soleil.
-    // Quat::from_euler XYZ (-0.35, -0.78, 0) = soleil mi-haut SE (V1 pattern terrain_systems.rs:282)
-    commands.spawn((
-        ArenaMarker,
-        DirectionalLight {
-            color: Color::srgb(1.0, 0.96, 0.88), // golden warm
-            illuminance: 22_000.0, // V1 default (was 8K = trop sombre pour Atmosphere)
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.35, -0.78, 0.0)),
-        Name::new("ArenaSunLight"),
-    ));
-
-    // ── Target cubes (5 maintenant, dispersés dans la map plus grande) ──
-    let cube_mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-    let cube_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.85, 0.15, 0.15),
-        emissive: LinearRgba::new(0.8, 0.0, 0.0, 1.0),
-        ..default()
-    });
-    for &(x, z) in &[(-4.0, -7.0), (0.0, -7.0), (4.0, -7.0), (10.0, -14.0), (-14.0, 10.0)] {
-        commands.spawn((
-            ArenaMarker,
-            TargetCube,
-            Mesh3d(cube_mesh.clone()),
-            MeshMaterial3d(cube_mat.clone()),
-            Transform::from_xyz(x, 1.0, z),
-            RigidBody::Fixed,
-            Collider::cuboid(0.5, 0.5, 0.5),
-            Health::new(100.0),
-            Name::new(format!("TargetCube_{x}_{z}")),
-        ));
-    }
-
-    // Sky dome retiré : Skybox cubemap V1 (sky_129_stacked.png) wired sur FpsCamera
-    // par forgia-player::attach_skybox_to_camera. Sun disk retiré aussi (le HDRI a son sun peint).
-
-    // ── Nuages cartoon volumétriques : clusters de sphères "popcorn" ──────
-    // Pattern Mario Galaxy / Studio Ghibli : chaque nuage = 6 blobs sphériques
-    // de tailles variées agglomérés (cumulus stylisé). 3D vrai, pas plat.
-    let cloud_blob_mesh = meshes.add(Sphere::new(1.0).mesh().ico(3).unwrap());
-    // Pattern V1 (sky/clouds.rs) : blanc pur quasi neutre, lit par DirectionalLight.
-    let cloud_mat = materials.add(StandardMaterial {
-        base_color: CLOUD_COLOR,
-        emissive: CLOUD_EMISSIVE,
-        perceptual_roughness: 1.0,
-        metallic: 0.0,
-        reflectance: 0.0,
-        ..default()
-    });
-
-    // 3 PRESETS de formes nuage (offset XYZ + radius local par blob)
-    // Popcorn : cluster compact 6 blobs jitter (cumulus classique stylisé)
-    let blobs_popcorn: &[(f32, f32, f32, f32)] = &[
-        (0.0, 0.0, 0.0, 5.0),
-        (4.5, 0.8, 1.2, 3.5),
-        (-4.0, 0.4, -1.8, 3.2),
-        (1.5, 1.5, 4.5, 2.8),
-        (-2.0, -0.6, -4.2, 2.6),
-        (3.5, -0.4, -3.0, 2.2),
-    ];
-    // Stratus : nuage allongé horizontal 8 blobs en ligne avec variations
-    let blobs_stratus: &[(f32, f32, f32, f32)] = &[
-        (-12.0, 0.0, 0.0, 2.5),
-        (-8.0, 0.5, 0.8, 3.0),
-        (-4.0, 0.3, -0.5, 3.5),
-        (0.0, 0.0, 0.5, 4.0),
-        (4.0, 0.4, -0.3, 3.6),
-        (8.0, 0.2, 0.7, 3.0),
-        (12.0, 0.0, -0.4, 2.4),
-        (15.0, -0.3, 0.0, 1.8),
-    ];
-    // Puff : petit nuage compact dense 4 blobs (cumulus mini)
-    let blobs_puff: &[(f32, f32, f32, f32)] = &[
-        (0.0, 0.0, 0.0, 3.0),
-        (2.5, 0.5, 0.5, 2.2),
-        (-2.0, 0.3, -0.5, 2.0),
-        (0.5, -0.3, 1.8, 1.8),
-    ];
-
-    // 18 clusters dispersés autour arène : (x, y, z, scale_xz, scale_y, blobs_preset_idx)
-    // preset 0 = popcorn, 1 = stratus, 2 = puff
-    let clusters: &[(f32, f32, f32, f32, f32, u8)] = &[
-        // === Anneau intérieur (45-65m hauteur, plus proches) ===
-        (-40.0, 55.0, -55.0, 1.0, 1.0, 0),   // popcorn NO
-        (55.0, 62.0, -35.0, 1.3, 1.2, 0),    // popcorn NE big
-        (5.0, 68.0, 65.0, 1.6, 0.9, 0),      // popcorn S overhead
-        (-60.0, 50.0, 38.0, 1.0, 1.1, 0),    // popcorn SW
-        (45.0, 58.0, 55.0, 0.85, 1.0, 0),    // popcorn SE
-        (-25.0, 60.0, -80.0, 1.2, 0.8, 1),   // stratus N
-        (70.0, 55.0, 20.0, 1.0, 0.9, 1),     // stratus E allongé
-        (-80.0, 52.0, -10.0, 1.1, 0.85, 1),  // stratus W
-        (15.0, 48.0, -25.0, 0.7, 1.0, 2),    // puff petit central
-        (-15.0, 50.0, 25.0, 0.8, 1.0, 2),    // puff petit
-        // === Anneau extérieur (75-95m hauteur, lointain horizon) ===
-        (-100.0, 80.0, -60.0, 1.8, 0.7, 1),  // stratus far NW big
-        (90.0, 85.0, -90.0, 1.5, 0.8, 0),    // popcorn far NE
-        (-50.0, 90.0, 100.0, 2.0, 0.7, 1),   // stratus far S big
-        (100.0, 75.0, 70.0, 1.4, 1.0, 0),    // popcorn far SE
-        (0.0, 95.0, -120.0, 1.6, 0.8, 1),    // stratus far N horizon
-        (-110.0, 70.0, 40.0, 1.2, 0.9, 0),   // popcorn far W
-        (60.0, 88.0, 110.0, 1.7, 0.75, 1),   // stratus far SE
-        (30.0, 78.0, -70.0, 0.9, 1.1, 2),    // puff mid-distance
-    ];
-
-    for (ci, &(cx, cy, cz, scale, hscale, preset)) in clusters.iter().enumerate() {
-        let blobs: &[(f32, f32, f32, f32)] = match preset {
-            1 => blobs_stratus,
-            2 => blobs_puff,
-            _ => blobs_popcorn,
-        };
-        let preset_name = match preset {
-            1 => "stratus",
-            2 => "puff",
-            _ => "popcorn",
-        };
-
-        // Polar coords pour orbit : angle initial depuis (cx, cz), radius = distance horizontale
-        let angle = cz.atan2(cx);
-        let radius = (cx * cx + cz * cz).sqrt();
-        let parent_id = commands
-            .spawn((
-                ArenaMarker,
-                CloudOrbit { angle, radius, height: cy },
-                Transform::from_xyz(cx, cy, cz).with_scale(Vec3::new(scale, hscale * scale, scale)),
-                Visibility::default(),
-                Name::new(format!("Cloud_{preset_name}_{ci}")),
-            ))
-            .id();
-
-        for (bi, &(bx, by, bz, br)) in blobs.iter().enumerate() {
-            let child = commands
-                .spawn((
-                    Mesh3d(cloud_blob_mesh.clone()),
-                    MeshMaterial3d(cloud_mat.clone()),
-                    Transform::from_xyz(bx, by, bz).with_scale(Vec3::splat(br)),
-                    bevy::light::NotShadowCaster,
-                    Name::new(format!("Blob_{ci}_{bi}")),
-                ))
-                .id();
-            commands.entity(parent_id).add_child(child);
-        }
-    }
-
-    info!(
-        "[forgia-fps] Arena spawned : {}×{}m, 121 floor + 44 walls + 12 pillars + 14 covers + 5 banners + 8 torches + 5 cubes + cartoon sky dome + sun disk + 18 cloud clusters (3 shapes : popcorn/stratus/puff)",
-        (ARENA_SIZE as f32 * TILE_SIZE) as i32,
-        (ARENA_SIZE as f32 * TILE_SIZE) as i32
-    );
-}
-
-fn spawn_wall(
-    commands: &mut Commands,
-    wall_scene: &Handle<Scene>,
-    pos: Vec3,
-    yaw: f32,
-) {
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
-        Visibility::default(),
-        RigidBody::Fixed,
-        // Collider mur : ~4m large × 3m haut × 0.3m épaisseur
-        Collider::cuboid(TILE_SIZE / 2.0, 1.5, 0.15),
-        Name::new("Wall"),
-        children![(
-            SceneRoot(wall_scene.clone()),
-            Transform::default(),
-        )],
-    ));
-}
-
-/// Tire un raycast depuis la FpsCamera quand le joueur clique gauche.
-/// Si touche un TargetCube → applique damage + flash blanc + emit CombatHitEvent.
-/// Phase 2.1 minimum (sans tracer/muzzle, sans cooldown réel).
-fn fire_weapon_minimal(
-    // MouseButtonInput events (NOT consumed by egui, contrairement à ButtonInput Resource)
-    mut mouse_evs: MessageReader<MouseButtonInput>,
-    rapier: ReadRapierContext,
-    q_cam: Query<&GlobalTransform, With<FpsCamera>>,
-    q_player: Query<Entity, With<Player>>,
-    // Fusionné en 1 query mut pour éviter B0001 (anti-trap V1 CLAUDE.md §6)
-    mut q_target: Query<(&MeshMaterial3d<StandardMaterial>, &mut Health), With<TargetCube>>,
-    mut commands: Commands,
-    flash_cache: Res<HitFlashCache>,
-    tracer_res: Option<Res<TracerResources>>,
-    weapon_vfx: Option<Res<WeaponVfxEffects>>,
-    cooldown: Option<Res<WeaponFireCooldown>>,
-    mut virtual_time: ResMut<Time<Virtual>>,
-    mut hit_events: MessageWriter<CombatHitEvent>,
-    mut recoil_events: MessageWriter<WeaponRecoilImpulse>,
-) {
-    // Cooldown anti-spam : ModernAR ~0.1s entre tirs
-    if cooldown.is_some() {
-        // Drain les events pour ne pas fire au prochain frame
-        for _ in mouse_evs.read() {}
-        return;
-    }
-    let mut left_pressed = false;
-    for ev in mouse_evs.read() {
-        if ev.button == MouseButton::Left && ev.state == ButtonState::Pressed {
-            left_pressed = true;
-        }
-    }
-    if !left_pressed {
-        return;
-    }
-    let Ok(cam_tf) = q_cam.single() else {
-        warn!("[fire] FpsCamera not found");
-        return;
-    };
-    let Ok(ctx) = rapier.single() else {
-        warn!("[fire] RapierContext not found");
-        return;
-    };
-
-    let origin = cam_tf.translation();
-    let direction = cam_tf.forward().as_vec3();
-
-    // Insert cooldown 100ms (10 shots/sec ModernAR)
-    commands.insert_resource(WeaponFireCooldown {
-        timer: Timer::from_seconds(0.1, TimerMode::Once),
-    });
-
-    // Camera recoil DÉSACTIVÉ — choix design Antoine 2026-05-14 : pas de visual recoil
-    // (style Valorant skill-ceiling pur). Le système weapon_recoil_apply reste wired
-    // dans forgia-player mais ne reçoit jamais d'event = no-op.
-    // Pour réactiver : décommenter le write ci-dessous.
-    // let yaw_jitter = ((origin.x * 1000.0).sin() * 0.012).clamp(-0.012, 0.012);
-    // recoil_events.write(WeaponRecoilImpulse { pitch_rad: 0.045, yaw_rad: yaw_jitter });
-    let _ = &mut recoil_events; // suppress unused warning
-
-    // Muzzle flash au barrel tip (0.3m devant cam, 0.1m sous = position canon)
-    let barrel_tip = origin + direction * 0.3 + Vec3::new(0.0, -0.1, 0.0);
-    if let Some(vfx) = weapon_vfx.as_deref() {
-        spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, ());
-    }
-
-    // Exclure le Player du raycast (sinon hit immédiat le collider capsule du player
-    // car FpsCamera est enfant de Player → origin ray DANS le collider, toi=0).
-    let player_entity = q_player.single().ok();
-    let predicate = |e: Entity| Some(e) != player_entity;
-    let filter = QueryFilter::default().predicate(&predicate);
-    let hit_result = ctx.cast_ray(origin, direction, 100.0, true, filter);
-    let hit_dist = hit_result.map(|(_, t)| t).unwrap_or(50.0);
-
-    // Tracer visuel (toujours, même sur miss — fly to max range)
-    if let Some(tres) = tracer_res.as_deref() {
-        spawn_hitscan_tracer(
-            &mut commands,
-            tres,
-            origin,
-            direction,
-            hit_dist,
-            &WeaponType::ModernAR,
-            120.0, // tracer_max_length (V1 wfx_tracer_max_length)
-            0.30,  // tracer_fade — 300ms (V1=80ms trop court à 60fps = 5 frames invisible)
-        );
-    }
-
-    // Impact VFX au point d'impact (cube, mur, colonne — pas miss)
-    if let Some((_, toi)) = hit_result {
-        let impact_pos = origin + direction * toi;
-        if let Some(vfx) = weapon_vfx.as_deref() {
-            spawn_impact_vfx(&mut commands, vfx, impact_pos, ());
-        }
-    }
-
-    if let Some((entity, toi)) = hit_result {
-        if let Ok((mat, mut hp)) = q_target.get_mut(entity) {
-            let damage = 25.0;
-            hp.current = (hp.current - damage).max(0.0);
-            let dead = hp.is_dead();
-            let new_hp = hp.current;
-            let mat_handle = mat.0.clone();
-
-            // Swap material vers flash blanc + insert HitFlashTimer
-            commands
-                .entity(entity)
-                .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
-                .insert(HitFlashTimer {
-                    timer: Timer::from_seconds(0.15, TimerMode::Once),
-                    original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
-                    original_handle: Some(mat_handle),
-                });
-
-            // Hit-stop pattern Apex : 50ms de pause Time<Virtual> sur hit confirmé
-            virtual_time.set_relative_speed(0.05);
-            commands.insert_resource(HitStopState {
-                timer: Timer::from_seconds(0.05, TimerMode::Once),
-                restore_speed: 1.0,
-            });
-
-            hit_events.write(CombatHitEvent {
-                target: entity,
-                damage,
-                is_kill: dead,
-            });
-
-            info!(
-                "[fire] HIT cube {:?} toi={:.2} dmg={} hp={}/100 dead={}",
-                entity, toi, damage, new_hp, dead
-            );
-        } else {
-            info!("[fire] hit non-target entity {:?} toi={:.2}", entity, toi);
-        }
-    } else {
-        info!("[fire] miss");
-    }
-}
-
-/// Drift wind lent des nuages vers +X (pattern V1 sky/clouds.rs).
-/// Wrap autour de ±150m pour cycle continu sans pop.
-/// Orbit nuages autour du centre Y axis : rotation continue, jamais wrap brusque.
-/// Pattern : angle += speed * dt, position recalculée polaire (radius, angle, height).
-fn cloud_drift_system(
-    time: Res<Time>,
-    mut q: Query<(&mut Transform, &mut CloudOrbit)>,
-) {
-    let dt = time.delta_secs();
-    for (mut tf, mut orbit) in q.iter_mut() {
-        orbit.angle += CLOUD_ORBIT_SPEED * dt;
-        // Wrap angle dans [0, 2π) pour éviter accumulation float (peu critique mais propre)
-        if orbit.angle > std::f32::consts::TAU {
-            orbit.angle -= std::f32::consts::TAU;
-        }
-        tf.translation.x = orbit.angle.cos() * orbit.radius;
-        tf.translation.z = orbit.angle.sin() * orbit.radius;
-        tf.translation.y = orbit.height;
-    }
+/// PRNG pseudo-déterministe ultra-léger (xorshift32). Out [0, 1).
+/// Helper de fire_weapon_minimal multi-pellets (stubbed — voir TODO plugin).
+#[allow(dead_code)]
+fn pseudo_rand(seed: u32) -> f32 {
+    let mut x = seed.max(1);
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    (x as f32) / (u32::MAX as f32)
 }
 
 /// Despawn les cubes morts (HP=0). Système séparé chained après fire.
@@ -647,13 +391,466 @@ fn despawn_dead_cubes(
     }
 }
 
-fn cleanup_arena(mut commands: Commands, q: Query<Entity, With<ArenaMarker>>) {
-    let count = q.iter().count();
+/// Switch arme via Digit1-4 (Pépin / Bourrasque / Madame Lenoir / Boucherie).
+/// Reconstruction minimale 2026-05-17 après perte du WIP fire system (session 2026-05-16 PM).
+/// Mapping : `forgia_combat::weapons::ARENA_V1_WEAPONS[idx]` (ModernAR/AssaultRifle/Shotgun/RocketLauncher).
+fn weapon_select_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut equipped: ResMut<EquippedWeapons>,
+) {
+    let new_idx: Option<usize> = if keys.just_pressed(KeyCode::Digit1) {
+        Some(0)
+    } else if keys.just_pressed(KeyCode::Digit2) {
+        Some(1)
+    } else if keys.just_pressed(KeyCode::Digit3) {
+        Some(2)
+    } else if keys.just_pressed(KeyCode::Digit4) {
+        Some(3)
+    } else {
+        None
+    };
+    if let Some(i) = new_idx {
+        let target = forgia_combat::weapons::ARENA_V1_WEAPONS[i];
+        if equipped.current != target {
+            equipped.current = target;
+            info!("[forgia-fps] weapon_select : Digit{} → {:?}", i + 1, target);
+        }
+    }
+}
+
+/// Maintien `LeftMouseState` (held + just_pressed) via MessageReader<MouseButtonInput>.
+/// Doit run AVANT `fire_weapon_minimal` dans le chain.
+fn track_left_mouse_state(
+    mut evs: MessageReader<MouseButtonInput>,
+    mut state: ResMut<LeftMouseState>,
+) {
+    state.just_pressed = false; // reset chaque frame
+    for ev in evs.read() {
+        if ev.button == MouseButton::Left {
+            match ev.state {
+                ButtonState::Pressed => {
+                    state.held = true;
+                    state.just_pressed = true;
+                }
+                ButtonState::Released => {
+                    state.held = false;
+                }
+            }
+        }
+    }
+}
+
+/// Fire system genome-driven (Forgia V2 — reconstruit 2026-05-17 depuis memories
+/// `reference_v2_fire_modes_genome_driven` après perte WIP 2026-05-16 PM).
+///
+/// Dispatch via `ViewmodelGenomeEntry.fire_mode` :
+/// - `"auto"` : tire tant que held (Bourrasque SMG)
+/// - `"semi"` : tire UNIQUEMENT sur just_pressed (Pépin, Madame Lenoir sniper)
+/// - `"pump"` : just_pressed + multi-pellets cone spread (Boucherie shotgun)
+/// - `"burst"` : ⚠ NON IMPLÉMENTÉ — fallback semi + log warn (dette tech identifiée)
+///
+/// Cooldown = `1.0 / entry.fire_rate` secondes. Damage/range/pellets/spread depuis genome.
+/// Muzzle flash spawn à `origin + direction * entry.barrel_length`.
+/// Multi-pellets : xorshift32 PRNG déterministe seed=position+pellet_idx pour reproducibility.
+#[allow(clippy::too_many_arguments)]
+fn fire_weapon_minimal(
+    rapier: ReadRapierContext,
+    q_cam: Query<&GlobalTransform, With<FpsCamera>>,
+    q_player: Query<Entity, With<Player>>,
+    mut q_target: Query<(&MeshMaterial3d<StandardMaterial>, &mut Health), With<TargetCube>>,
+    mut commands: Commands,
+    flash_cache: Res<HitFlashCache>,
+    tracer_res: Option<Res<TracerResources>>,
+    weapon_vfx: Option<Res<WeaponVfxEffects>>,
+    cooldown: Option<Res<WeaponFireCooldown>>,
+    burst_state: Option<ResMut<BurstState>>,
+    time: Res<Time>,
+    mut virtual_time: ResMut<Time<Virtual>>,
+    mut hit_events: MessageWriter<CombatHitEvent>,
+    left: Res<LeftMouseState>,
+    equipped: Res<EquippedWeapons>,
+    genome_ctx: ViewmodelGenomeCtx,
+) {
+    let entry = genome_ctx.entry(equipped.current);
+    let fire_mode = entry.map(|e| e.fire_mode.as_str()).unwrap_or("auto");
+    let is_burst_mode = fire_mode == "burst";
+
+    // Tick burst state (fait avancer le timer interne). just_finished cette frame = fire.
+    let mut burst_fires_now = false;
+    let mut burst_active = false;
+    let mut burst_will_terminate = false;
+    if let Some(mut burst) = burst_state {
+        burst_active = true;
+        if burst.interval_timer.tick(time.delta()).just_finished() {
+            burst_fires_now = true;
+            burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
+            if burst.shots_remaining == 0 {
+                burst_will_terminate = true;
+            }
+        }
+    }
+
+    // Pendant un burst actif, on bypass le cooldown standard (pacing géré par BurstState).
+    if cooldown.is_some() && !burst_active {
+        return;
+    }
+
+    // Dispatch trigger selon fire_mode
+    let mut starts_burst = false;
+    let trigger = match fire_mode {
+        "auto" => left.held,
+        "semi" | "pump" => left.just_pressed,
+        "burst" => {
+            if burst_active {
+                burst_fires_now
+            } else if left.just_pressed {
+                starts_burst = true;
+                true // 1er tir immédiat, BurstState inséré en fin de fonction
+            } else {
+                false
+            }
+        }
+        other => {
+            warn!("[fire] fire_mode inconnu '{}' — fallback semi", other);
+            left.just_pressed
+        }
+    };
+    if !trigger {
+        return;
+    }
+
+    let Ok(cam_tf) = q_cam.single() else {
+        warn!("[fire] FpsCamera not found");
+        return;
+    };
+    let Ok(ctx) = rapier.single() else {
+        warn!("[fire] RapierContext not found");
+        return;
+    };
+
+    let origin = cam_tf.translation();
+    let direction = cam_tf.forward().as_vec3();
+
+    // Cooldown depuis genome (fallback 0.1s = ModernAR 10 shots/s)
+    let cooldown_s = entry.map(|e| 1.0 / e.fire_rate.max(0.1)).unwrap_or(0.1);
+    // Burst : pas de cooldown standard entre les shots de la rafale (interval géré par BurstState).
+    // Insertion du cooldown UNIQUEMENT à la fin de la rafale (post-burst recovery 3x interval).
+    if !is_burst_mode {
+        commands.insert_resource(WeaponFireCooldown {
+            timer: Timer::from_seconds(cooldown_s, TimerMode::Once),
+        });
+    } else if starts_burst {
+        // Démarre la rafale : insère BurstState. Le 1er tir est ce tir-ci.
+        let burst_count = entry.map(|e| e.burst_count.max(1)).unwrap_or(3);
+        commands.insert_resource(BurstState {
+            shots_remaining: burst_count.saturating_sub(1), // 1er shot consommé
+            interval_timer: Timer::from_seconds(cooldown_s, TimerMode::Repeating),
+        });
+    } else if burst_will_terminate {
+        // Rafale finie : cooldown long avant pouvoir re-trigger.
+        commands.remove_resource::<BurstState>();
+        commands.insert_resource(WeaponFireCooldown {
+            timer: Timer::from_seconds(cooldown_s * 3.0, TimerMode::Once),
+        });
+    }
+    // Cas restant : burst en cours (intermediate shot) → pas de cooldown, rien à faire.
+
+    // Muzzle flash : recoil visuel désactivé V2 (choix design Valorant-like).
+    // Position depuis barrel_length genome.
+    let barrel_len = entry.map(|e| e.barrel_length).unwrap_or(0.55);
+    let barrel_tip = origin + direction * barrel_len + Vec3::new(0.0, -0.1, 0.0);
+    if let Some(vfx) = weapon_vfx.as_deref() {
+        spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, &equipped.current);
+    }
+
+    // Params raycast
+    let range = entry.map(|e| e.range).unwrap_or(100.0);
+    let damage = entry.map(|e| e.damage).unwrap_or(25.0);
+    let pellets = entry.map(|e| e.pellets.max(1)).unwrap_or(1);
+    let spread_rad = entry.map(|e| e.spread_deg.to_radians()).unwrap_or(0.0);
+
+    // Exclure Player du raycast (capsule capture origine — FpsCamera enfant de Player).
+    let player_entity = q_player.single().ok();
+    let predicate = |e: Entity| Some(e) != player_entity;
+
+    let right = cam_tf.right().as_vec3();
+    let up = cam_tf.up().as_vec3();
+
+    // Seed PRNG basé sur position cam + ms hash — reproductibilité par tir.
+    let seed_base = (origin.x.abs() * 1000.0) as u32
+        ^ (origin.z.abs() * 1000.0) as u32
+        ^ (origin.y.abs() * 1000.0) as u32;
+
+    let mut any_hit_dist = 50.0_f32;
+    let mut hit_record: Option<(Entity, f32)> = None;
+
+    for pellet_idx in 0..pellets {
+        let pellet_dir = if pellets > 1 && spread_rad > 0.0 {
+            let seed = seed_base
+                .wrapping_add(u32::from(pellet_idx))
+                .wrapping_mul(2654435761);
+            let r1 = pseudo_rand(seed) - 0.5;
+            let r2 = pseudo_rand(seed.wrapping_mul(0x9E3779B1)) - 0.5;
+            let dev = right * (r1 * spread_rad) + up * (r2 * spread_rad);
+            (direction + dev).normalize()
+        } else {
+            direction
+        };
+
+        let filter = QueryFilter::default().predicate(&predicate);
+        let hit_result = ctx.cast_ray(origin, pellet_dir, range, true, filter);
+
+        if let Some((_, toi)) = hit_result {
+            if toi < any_hit_dist {
+                any_hit_dist = toi;
+            }
+        }
+
+        // Tracer + impact par pellet (tous visuels pour shotgun cone visible)
+        let hit_dist = hit_result.map(|(_, t)| t).unwrap_or(range);
+        if let Some(tres) = tracer_res.as_deref() {
+            spawn_hitscan_tracer(
+                &mut commands,
+                tres,
+                origin,
+                pellet_dir,
+                hit_dist,
+                &equipped.current,
+                range.min(120.0),
+                0.30,
+            );
+        }
+        if let Some((_, toi)) = hit_result {
+            let impact_pos = origin + pellet_dir * toi;
+            if let Some(vfx) = weapon_vfx.as_deref() {
+                spawn_impact_vfx(&mut commands, vfx, impact_pos, &equipped.current);
+            }
+        }
+
+        // Apply damage par pellet (cumul si shotgun touche même cible plusieurs fois)
+        if let Some((entity, toi)) = hit_result {
+            if let Ok((mat, mut hp)) = q_target.get_mut(entity) {
+                hp.current = (hp.current - damage).max(0.0);
+                let dead = hp.is_dead();
+                let new_hp = hp.current;
+                let mat_handle = mat.0.clone();
+
+                let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
+                commands
+                    .entity(entity)
+                    .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
+                    .insert(HitFlashTimer {
+                        timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                        original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
+                        original_handle: Some(mat_handle),
+                    });
+
+                hit_events.write(CombatHitEvent {
+                    target: entity,
+                    damage,
+                    is_kill: dead,
+                });
+
+                if hit_record.is_none() {
+                    hit_record = Some((entity, toi));
+                }
+                info!(
+                    "[fire] pellet {}/{} HIT {:?} toi={:.2} dmg={} hp={}/100 dead={}",
+                    pellet_idx + 1, pellets, entity, toi, damage, new_hp, dead
+                );
+            }
+        }
+    }
+
+    // Hit-stop UNE FOIS par tir (pas par pellet) si au moins une cible touchée
+    if hit_record.is_some() {
+        let hs_dur = entry.map(|e| e.hit_stop_duration).unwrap_or(0.05);
+        let hs_speed = entry.map(|e| e.hit_stop_speed).unwrap_or(0.05);
+        virtual_time.set_relative_speed(hs_speed);
+        commands.insert_resource(HitStopState {
+            timer: Timer::from_seconds(hs_dur, TimerMode::Once),
+            restore_speed: 1.0,
+        });
+    } else {
+        info!("[fire] miss ({} pellets, {:?})", pellets, equipped.current);
+    }
+}
+
+/// Startup : load le genome viewmodel TOML (hot-reload Bevy via Shift+F12 ou save TOML).
+fn load_viewmodel_genome(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let handle: Handle<Genome<ViewmodelGenome>> =
+        asset_server.load("genomes/viewmodel_arena.toml");
+    commands.insert_resource(ViewmodelGenomeHandle(handle));
+    info!("[forgia-fps] viewmodel genome loading : genomes/viewmodel_arena.toml");
+}
+
+/// Startup : pré-charge les 3 GLB viewmodel (handles partagés, 1 load chacun).
+fn load_weapon_models(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(WeaponModelAssets {
+        pepin: asset_server.load("models/weapons/forgia/pepin.glb#Scene0"),
+        bourrasque: asset_server.load("models/weapons/forgia/bourrasque.glb#Scene0"),
+        madame_lenoir: asset_server.load("models/weapons/forgia/madame_lenoir.glb#Scene0"),
+        boucherie: asset_server.load("models/weapons/forgia/boucherie.glb#Scene0"),
+    });
+}
+
+/// Attache un viewmodel enfant de FpsCamera s'il n'en a pas encore.
+/// Offset (0.3, -0.25, -0.5) = bras droit-bas-devant, scale 0.3 pour ne pas
+/// remplir l'écran (ajustable). Pattern Valorant style fixed viewmodel.
+fn attach_viewmodel_to_camera(
+    mut commands: Commands,
+    q_cam: Query<(Entity, Option<&Children>), With<FpsCamera>>,
+    q_viewmodel: Query<&WeaponViewmodel>,
+    assets: Option<Res<WeaponModelAssets>>,
+    equipped: Res<EquippedWeapons>,
+    genome_handle: Option<Res<ViewmodelGenomeHandle>>,
+    genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+) {
+    let Some(assets) = assets else { return };
+    for (cam, children) in &q_cam {
+        let has_vm = children
+            .map(|c| c.iter().any(|child| q_viewmodel.get(child).is_ok()))
+            .unwrap_or(false);
+        if has_vm {
+            continue;
+        }
+        let entry = genome_handle
+            .as_deref()
+            .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
+        let scene = scene_for_weapon(&assets, equipped.current);
+        let tf = viewmodel_transform(equipped.current, entry);
+        let target = viewmodel_target_size(equipped.current, entry);
+        // Pattern V1 : spawn flat + add_child (vs with_children, ne change rien fonctionnellement
+        // mais aligne avec V1). Hidden tant qu'AABB pas mesurée pour ne pas voir 1 frame d'arme géante.
+        let vm = commands
+            .spawn((
+                WeaponViewmodel {
+                    current: equipped.current,
+                },
+                SceneRoot(scene),
+                tf,
+                Visibility::Hidden,
+                NeedsAutoScale { target_size: target },
+                Name::new("WeaponViewmodel"),
+            ))
+            .id();
+        commands.entity(cam).add_child(vm);
+        info!(
+            "[forgia-fps] viewmodel spawned ({:?}, target {:.2}m, awaiting AABB)",
+            equipped.current, target
+        );
+    }
+}
+
+/// Swap SceneRoot du viewmodel quand EquippedWeapons.current change.
+fn update_viewmodel_on_switch(
+    mut commands: Commands,
+    assets: Option<Res<WeaponModelAssets>>,
+    equipped: Res<EquippedWeapons>,
+    genome_handle: Option<Res<ViewmodelGenomeHandle>>,
+    genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    mut q: Query<(Entity, &mut SceneRoot, &mut Transform, &mut Visibility, &mut WeaponViewmodel)>,
+) {
+    if !equipped.is_changed() {
+        return;
+    }
+    let Some(assets) = assets else { return };
+    let entry = genome_handle
+        .as_deref()
+        .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
+    for (entity, mut scene, mut tf, mut vis, mut vm) in &mut q {
+        if vm.current == equipped.current {
+            continue;
+        }
+        scene.0 = scene_for_weapon(&assets, equipped.current);
+        *tf = viewmodel_transform(equipped.current, entry);
+        *vis = Visibility::Hidden;
+        commands.entity(entity).insert(NeedsAutoScale {
+            target_size: viewmodel_target_size(equipped.current, entry),
+        });
+        vm.current = equipped.current;
+    }
+}
+
+/// Auto-scale BFS pattern V1 (`combat/viewmodel.rs:603`).
+/// Combine les Aabb de tous les descendants Mesh3d, calcule scale = target / max_extent,
+/// puis applique au Transform + retire NeedsAutoScale + révèle (Visibility::Inherited).
+fn auto_scale_viewmodel(
+    mut commands: Commands,
+    q_needs: Query<(Entity, &NeedsAutoScale, &Transform, &WeaponViewmodel)>,
+    q_children: Query<&Children>,
+    genome_handle: Option<Res<ViewmodelGenomeHandle>>,
+    genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    q_aabb: Query<&bevy::camera::primitives::Aabb>,
+) {
+    for (entity, auto, tf, vm) in q_needs.iter() {
+        let mut g_min = Vec3::splat(f32::MAX);
+        let mut g_max = Vec3::splat(f32::MIN);
+        let mut found = false;
+
+        let mut stack = vec![entity];
+        while let Some(e) = stack.pop() {
+            if let Ok(aabb) = q_aabb.get(e) {
+                let c: Vec3 = aabb.center.into();
+                let h: Vec3 = aabb.half_extents.into();
+                g_min = g_min.min(c - h);
+                g_max = g_max.max(c + h);
+                found = true;
+            }
+            if let Ok(children) = q_children.get(e) {
+                for child in children.iter() {
+                    stack.push(child);
+                }
+            }
+        }
+
+        if !found {
+            // Scene encore en load — Aabb pas calculé. Retry next frame.
+            continue;
+        }
+
+        let size = g_max - g_min;
+        let max_extent = size.x.max(size.y).max(size.z);
+        if max_extent < 0.001 {
+            continue;
+        }
+        // AABB corrompu (e.g. ak47.glb max 16383m = i16 quantization mal décodée) :
+        // utiliser fallback scale au lieu de target/max_extent qui donne ~0.
+        let new_scale = if max_extent > 100.0 {
+            let entry = genome_handle
+                .as_deref()
+                .and_then(|h| lookup_genome_entry(&genome_assets, h, vm.current));
+            let fallback = viewmodel_fallback_scale(vm.current, entry);
+            warn!(
+                "[forgia-fps] viewmodel AABB CORROMPU ({:.0}m) {:?} → fallback scale {:.4}",
+                max_extent, vm.current, fallback
+            );
+            fallback
+        } else {
+            auto.target_size / max_extent
+        };
+        info!(
+            "[forgia-fps] viewmodel AABB ({:.2},{:.2},{:.2}) max {:.2}m → scale {:.4}",
+            size.x, size.y, size.z, max_extent, new_scale
+        );
+        commands
+            .entity(entity)
+            .remove::<NeedsAutoScale>()
+            .insert(Transform {
+                scale: Vec3::splat(new_scale),
+                ..*tf
+            })
+            .insert(Visibility::Inherited);
+    }
+}
+
+/// OnExit(Fps) : despawn le viewmodel pour ne pas l'avoir en mode RPG.
+fn despawn_viewmodel(mut commands: Commands, q: Query<Entity, With<WeaponViewmodel>>) {
     for e in &q {
         commands.entity(e).despawn();
     }
-    info!("[forgia-fps] Arena cleaned : {count} entities despawned");
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -664,9 +861,152 @@ mod tests {
         let _p = ForgiaFpsPlugin;
     }
 
+    // ─── Phase 2 (dette tech 2026-05-18) — headless fire tests ──────────
+
     #[test]
-    fn arena_size_is_odd() {
-        // ARENA_SIZE doit être impair pour avoir un centre exact (0,0)
-        assert_eq!(ARENA_SIZE % 2, 1, "ARENA_SIZE must be odd for centered grid");
+    fn left_mouse_state_default_idle() {
+        let s = LeftMouseState::default();
+        assert!(!s.held, "default held doit être false");
+        assert!(!s.just_pressed, "default just_pressed doit être false");
+    }
+
+    #[test]
+    fn pseudo_rand_in_unit_range() {
+        for seed in [1u32, 42, 12345, u32::MAX / 2] {
+            let v = pseudo_rand(seed);
+            assert!((0.0..1.0).contains(&v), "pseudo_rand({}) = {} hors [0,1)", seed, v);
+        }
+    }
+
+    #[test]
+    fn pseudo_rand_deterministic_same_seed() {
+        // Reproducibilité critique pour shotgun cone : même seed = même pattern.
+        assert_eq!(pseudo_rand(12345), pseudo_rand(12345));
+        assert_ne!(pseudo_rand(12345), pseudo_rand(12346));
+    }
+
+    #[test]
+    fn viewmodel_genome_defaults_are_safe() {
+        // Si TOML omet un field, les defaults doivent permettre un arme jouable.
+        assert_eq!(default_fire_mode(), "auto");
+        assert_eq!(default_burst_count(), 3);
+        assert!(default_damage() > 0.0);
+        assert!(default_fire_rate() > 0.0);
+        assert!(default_range() > 0.0);
+        assert_eq!(default_pellets(), 1);
+        assert_eq!(default_spread_deg(), 0.0);
+        assert!(default_hit_flash_duration() > 0.0);
+        assert!(default_hit_stop_duration() > 0.0);
+        assert!(default_hit_stop_speed() > 0.0 && default_hit_stop_speed() < 1.0);
+    }
+
+    #[test]
+    fn burst_state_decrement_via_timer() {
+        // Simule la boucle interne sans App : tick timer just_finished + decrement.
+        let mut burst = BurstState {
+            shots_remaining: 3,
+            interval_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
+        };
+        // Avant tick : pas encore fini
+        assert!(!burst.interval_timer.just_finished());
+        // Tick > duration → just_finished
+        burst.interval_timer.tick(std::time::Duration::from_millis(60));
+        assert!(burst.interval_timer.just_finished());
+        burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
+        assert_eq!(burst.shots_remaining, 2);
+    }
+
+    #[test]
+    fn burst_state_terminates_at_zero() {
+        let mut burst = BurstState {
+            shots_remaining: 1,
+            interval_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
+        };
+        burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
+        assert_eq!(burst.shots_remaining, 0, "doit atteindre 0 → trigger remove_resource côté system");
+    }
+
+    #[test]
+    fn track_left_mouse_pressed_sets_both() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(Update, track_left_mouse_state);
+
+        // Envoyer Pressed event puis update
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(s.held, "Pressed doit set held=true");
+        assert!(s.just_pressed, "Pressed doit set just_pressed=true");
+    }
+
+    #[test]
+    fn track_left_mouse_just_pressed_resets_each_frame() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(Update, track_left_mouse_state);
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+        // Pas de nouvel event : just_pressed doit retomber, held reste
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(s.held, "held doit persister sans Released");
+        assert!(!s.just_pressed, "just_pressed doit reset à frame N+1");
+    }
+
+    #[test]
+    fn track_left_mouse_released_clears_held() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(Update, track_left_mouse_state);
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Released,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(!s.held, "Released doit clear held");
+    }
+
+    #[test]
+    fn track_left_mouse_ignores_other_buttons() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(Update, track_left_mouse_state);
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Right,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(!s.held, "Right mouse ne doit pas affecter LeftMouseState");
+        assert!(!s.just_pressed);
     }
 }

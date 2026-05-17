@@ -58,7 +58,7 @@ fn lifetime_tick(
     mut commands: Commands,
     mut q: Query<(Entity, &mut weapon_vfx::Lifetime)>,
 ) {
-    for (entity, mut life) in q.iter_mut() {
+    for (entity, mut life) in &mut q {
         life.0.tick(time.delta());
         if life.0.is_finished() {
             commands.entity(entity).despawn();
@@ -73,7 +73,7 @@ fn emissive_fade_tick(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut q: Query<(Entity, &mut weapon_vfx::tracer::EmissiveFade, &MeshMaterial3d<StandardMaterial>)>,
 ) {
-    for (entity, mut fade, mat) in q.iter_mut() {
+    for (entity, mut fade, mat) in &mut q {
         fade.timer.tick(time.delta());
         let pct = 1.0 - fade.timer.fraction();
         if let Some(material) = materials.get_mut(&mat.0) {
