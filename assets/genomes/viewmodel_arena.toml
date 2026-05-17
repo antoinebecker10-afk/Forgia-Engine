@@ -21,7 +21,7 @@ rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
 barrel_length = 0.55
-ads_offset_x = 0.05
+ads_offset_x = 0.0             # ★ centré horizontal user request 2026-05-18
 ads_offset_y = -0.40           # ★ abaissé pour que crosshair soit au-dessus du mesh
 ads_offset_z = -0.80
 ads_fov_deg = 30.0
@@ -32,7 +32,7 @@ sight_distance = 0.40
 ads_move_speed_factor = 0.75  # gun = pénalité légère
 scope_glass_alpha_ads = 0.20
 # ADS visibility & feel (Phase E 2026-05-18)
-ads_viewmodel_fade_alpha = 0.40   # body semi-transparent → voit cible derrière canon
+ads_viewmodel_fade_alpha = 1.00   # ★ pas de transparence user request 2026-05-18
 ads_mouse_sensitivity_factor = 0.70  # précision moyenne (semi-auto pistolet)
 # Fire behavior — Pistolet semi-auto Pépin
 # TTK Overwatch : body 4 shots (0.57s) / head 2 shots (0.29s) — DPS 168 polyvalent
@@ -69,7 +69,7 @@ rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
 barrel_length = 0.55
-ads_offset_x = 0.05
+ads_offset_x = 0.0             # ★ centré horizontal
 ads_offset_y = -0.40           # ★ abaissé pour que crosshair soit au-dessus du mesh
 ads_offset_z = -0.80
 ads_fov_deg = 32.0
@@ -168,7 +168,7 @@ rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
 barrel_length = 0.55
-ads_offset_x = 0.05
+ads_offset_x = 0.0             # ★ centré horizontal
 ads_offset_y = -0.50           # ★ abaissé encore plus (shotgun large mesh)
 ads_offset_z = -0.85
 ads_fov_deg = 35.0      # Shotgun zoom modéré
