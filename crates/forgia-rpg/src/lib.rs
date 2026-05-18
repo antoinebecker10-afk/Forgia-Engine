@@ -105,6 +105,7 @@ impl Plugin for ForgiaRpgPlugin {
                     spawn_village_paths_when_loaded,
                     teleport_player_to_terrain,
                     stream_chunks_around_player,
+                    enforce_chunk_memory_budget, // wave 3a — runs AFTER stream
                     write_chunks_sensor,
                     interact_system,
                     rpg_cloud_drift_system,
@@ -337,7 +338,12 @@ fn spawn_world(
 /// Pattern UE5 Level Streaming Volumes default 2.0s.
 #[derive(Resource, Default)]
 pub struct ChunkResidence {
+    /// elapsed_secs au moment du spawn — gate `min_residence_secs` (UE5 hysteresis).
     pub loaded_at_secs: HashMap<ChunkCoord, f32>,
+    /// Story-450 wave 3a — LRU tracking : elapsed_secs du dernier frame où le
+    /// chunk était dans le view ring (≤ view_m). Pattern Unity Addressables
+    /// memoryBudgetKB : LRU eviction triée par (distance_desc, last_seen_asc).
+    pub last_seen_secs: HashMap<ChunkCoord, f32>,
 }
 
 /// W2 — Stream les chunks autour du joueur via `StreamingConfig` (story-450).
@@ -436,6 +442,7 @@ fn stream_chunks_around_player(
                     ec.try_despawn();
                 }
                 residence.loaded_at_secs.remove(&coord);
+                residence.last_seen_secs.remove(&coord);
                 let dist_m = (manhattan as f32) * CHUNK_X as f32;
                 stats.record_eviction(EvictionEvent {
                     reason: EvictionReason::Distance,
@@ -484,6 +491,15 @@ fn stream_chunks_around_player(
         commands.entity(entity).insert(RpgWorldMarker);
         chunk_mgr.loaded_entities.insert(coord, entity);
         residence.loaded_at_secs.insert(coord, now);
+        residence.last_seen_secs.insert(coord, now);
+    }
+
+    // 2b. LRU touch — refresh last_seen pour tous les chunks dans le view ring
+    // (Manhattan ≤ view_chunks). Pattern Unity Addressables refcount/LRU.
+    for coord in chunk_mgr.loaded_entities.keys().copied().collect::<Vec<_>>() {
+        if coord.distance(&player_chunk) <= view_chunks {
+            residence.last_seen_secs.insert(coord, now);
+        }
     }
 
     // 3. Update stats observability (lus par sensor 1Hz).
@@ -496,8 +512,109 @@ fn stream_chunks_around_player(
         stats.lod2_count = lod.lod2_count;
     }
     // Memory estimation : ~5 MB per loaded chunk (mesh + collider + textures).
-    // Wave 3 raffinera (asset_server.get_memory + GPU buffer tracking).
+    // Wave 3c raffinera (asset_server.get_memory + GPU buffer tracking).
     stats.loaded_mb_est = stats.loaded_count as f32 * 5.0;
+}
+
+/// Memory budget LRU eviction (story-450 wave 3a).
+///
+/// Pattern industrie : Unity Addressables `memoryBudgetKB` + GTA 5-style
+/// per-pool LRU. Si `loaded_mb_est > cfg.budget.max_mb` OU
+/// `loaded_count > cfg.budget.max_chunks`, évince les chunks dans cet ordre :
+/// 1. Distance Manhattan **décroissante** (le plus loin évincé en premier)
+/// 2. Tie-break : `last_seen_secs` **croissant** (le moins récemment vu)
+///
+/// Eviction respecte la hysteresis temporelle (chunks dans
+/// `min_residence_secs` sont protégés — pattern UE5 LSV).
+///
+/// Run AFTER `stream_chunks_around_player` dans la chain Update.
+#[allow(clippy::too_many_arguments)]
+fn enforce_chunk_memory_budget(
+    mut commands: Commands,
+    time: Res<Time>,
+    streaming_cfg: Option<Res<StreamingConfig>>,
+    mut stats: ResMut<StreamingStats>,
+    mut residence: ResMut<ChunkResidence>,
+    mut chunk_mgr: ResMut<ChunkManager>,
+    player_q: Query<&Transform, With<Player>>,
+) {
+    let Some(cfg) = streaming_cfg else { return };
+    let Ok(player_tf) = player_q.single() else { return };
+    let player_chunk = ChunkCoord::from_world(player_tf.translation);
+    let now = time.elapsed_secs();
+    let min_residence = cfg.hysteresis.min_residence_secs;
+
+    let loaded_count = chunk_mgr.loaded_entities.len() as u32;
+    let loaded_mb_est = loaded_count as f32 * 5.0;
+    let over_mb = loaded_mb_est > cfg.budget.max_mb;
+    let over_count = loaded_count > cfg.budget.max_chunks;
+    if !over_mb && !over_count {
+        return;
+    }
+
+    // Build candidates : chunks éligibles à eviction (résidence expirée),
+    // triés par priorité d'eviction (le plus loin + plus ancien d'abord).
+    let mut candidates: Vec<(ChunkCoord, i32, f32)> = chunk_mgr
+        .loaded_entities
+        .keys()
+        .filter_map(|c| {
+            let resident_since = residence.loaded_at_secs.get(c).copied().unwrap_or(now);
+            if now - resident_since < min_residence {
+                return None; // protégé par hysteresis temporelle
+            }
+            let last_seen = residence.last_seen_secs.get(c).copied().unwrap_or(now);
+            Some((*c, c.distance(&player_chunk), last_seen))
+        })
+        .collect();
+
+    // Tri industrie LRU + distance : distance desc, last_seen asc.
+    candidates.sort_by(|a, b| {
+        b.1.cmp(&a.1)
+            .then_with(|| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal))
+    });
+
+    // Évince jusqu'à retomber sous les deux caps.
+    let target_count = cfg.budget.max_chunks.saturating_sub(1).min(loaded_count) as usize;
+    let target_mb = cfg.budget.max_mb;
+    let mut remaining_count = loaded_count as usize;
+    let mut remaining_mb = loaded_mb_est;
+    let mut evicted: u32 = 0;
+
+    for (coord, dist_chunks, _last_seen) in candidates {
+        if remaining_count <= target_count && remaining_mb <= target_mb {
+            break;
+        }
+        if let Some(entity) = chunk_mgr.loaded_entities.remove(&coord) {
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
+            residence.loaded_at_secs.remove(&coord);
+            residence.last_seen_secs.remove(&coord);
+            let dist_m = (dist_chunks as f32) * CHUNK_X as f32;
+            stats.record_eviction(EvictionEvent {
+                reason: EvictionReason::Budget,
+                coord: [coord.x, coord.z],
+                timestamp_secs: now,
+                distance_m: dist_m,
+            });
+            remaining_count = remaining_count.saturating_sub(1);
+            remaining_mb -= 5.0;
+            evicted += 1;
+        }
+    }
+
+    if evicted > 0 {
+        info!(
+            "[forgia-rpg::streaming] budget eviction : {} chunks (was {:.0}MB/{} chunks, now ~{:.0}MB/{}) over caps mb={} count={}",
+            evicted,
+            loaded_mb_est,
+            loaded_count,
+            remaining_mb,
+            remaining_count,
+            over_mb,
+            over_count,
+        );
+    }
 }
 
 /// W2 — Sensor `forgia_chunks_snapshot.json` (observability-required.md).
