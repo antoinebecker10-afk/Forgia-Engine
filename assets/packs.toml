@@ -104,3 +104,98 @@ download_url = "https://kaylousberg.itch.io/space-base"
 install_dir = "kaykit-space"
 license = "CC0-1.0"
 kit_type = "space"
+
+# ── Wave 2 — village enrichment 2026-05-18 ──────────────────────────────────
+
+[[pack]]
+name = "kaykit-adventurers"
+version = "2.0"
+source_page = "https://kaylousberg.itch.io/kaykit-adventurers"
+download_url = "https://kaylousberg.itch.io/kaykit-adventurers"
+install_dir = "kaykit-adventurers"
+license = "CC0-1.0"
+kit_type = "characters"
+# 8 GLB rigged+animated : Barbarian, Knight, Mage, Ranger, Rogue, Rogue_Hooded,
+# Knight_Golden, Skeleton (Characters/gltf/*.glb)
+
+[[pack]]
+name = "kaykit-animations"
+version = "1.2"
+source_page = "https://kaylousberg.itch.io/kaykit-animations"
+download_url = "https://kaylousberg.itch.io/kaykit-animations"
+install_dir = "kaykit-animations"
+license = "CC0-1.0"
+kit_type = "animations"
+# Animation library reusable on Adventurers + skeletons
+
+[[pack]]
+name = "kaykit-dungeon-remastered"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/kaykit-dungeon"
+download_url = "https://kaylousberg.itch.io/kaykit-dungeon"
+install_dir = "kaykit-dungeon-remastered"
+license = "CC0-1.0"
+kit_type = "dungeon"
+# 192 GLB : walls, doors, barrels, crates, torches (Models/*.glb)
+
+[[pack]]
+name = "kaykit-forest"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/kaykit-forest"
+download_url = "https://kaylousberg.itch.io/kaykit-forest"
+install_dir = "kaykit-forest"
+license = "CC0-1.0"
+kit_type = "nature"
+# Trees/rocks/grass/mushrooms (Assets/gltf/*.gltf)
+
+[[pack]]
+name = "kaykit-furniture-bits"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/furniture-bits"
+download_url = "https://kaylousberg.itch.io/furniture-bits"
+install_dir = "kaykit-furniture-bits"
+license = "CC0-1.0"
+kit_type = "props"
+# Chairs/beds/chests interior props (Assets/gltf/*.gltf)
+
+[[pack]]
+name = "kaykit-rpg-tools"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/rpg-tools-bits"
+download_url = "https://kaylousberg.itch.io/rpg-tools-bits"
+install_dir = "kaykit-rpg-tools"
+license = "CC0-1.0"
+kit_type = "props"
+# Anvil/axe/blueprint/blacksmith tools (Assets/gltf/*.gltf)
+
+[[pack]]
+name = "quaternius-medieval-village"
+version = "1.0"
+source_page = "https://quaternius.itch.io/medieval-village-megakit"
+download_url = "https://quaternius.itch.io/medieval-village-megakit"
+install_dir = "quaternius-medieval-village"
+license = "CC0-1.0"
+kit_type = "medieval"
+# Buildings + modular pieces (glTF/*.gltf). Palette plus cyan/cream vs KayKit warm reds.
+
+[[pack]]
+name = "quaternius-farm-animals"
+version = "1.0"
+source_page = "https://quaternius.com/packs/farmanimal.html"
+download_url = "https://quaternius.com/packs/farmanimal.html"
+install_dir = "quaternius-farm-animals"
+license = "CC0-1.0"
+kit_type = "characters"
+# WARNING : .obj static only Phase 1 (no rig, no anims). Re-download GLB version
+# from quaternius.com to enable animations. Files : Cow/Horse/Llama/Pig/Pug/Sheep/Zebra.
+
+[[pack]]
+name = "kenney-fantasy-town"
+version = "2.0"
+source_page = "https://kenney.nl/assets/fantasy-town-kit"
+download_url = "https://kenney.nl/assets/fantasy-town-kit"
+install_dir = "kenney-fantasy-town"
+license = "CC0-1.0"
+kit_type = "medieval"
+# 167 GLB : banners, carts, chimneys, fountain, market stalls
+# (Models/GLB format/*.glb)
