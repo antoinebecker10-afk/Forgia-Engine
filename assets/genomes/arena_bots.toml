@@ -1,40 +1,56 @@
 # Forgia V2 — Arena Enemies Genome
-# Training bots Overwatch-style (head + body hitboxes) avec mesh character
-# Meshy AI au lieu de cubes primitifs. Hot-reload Bevy Asset.
+# Story-453 (2026-05-18) BASELINE RESET — 1 capsule par bot, pas de Head/Body split.
+# Hot-reload Bevy Asset (Shift+F12).
 
-# HP par bot (parent Health)
-hp = 100.0
+# HP par bot. Story-456 balance fix 2026-05-18 :
+# 30→200 (sensor 0 damage_flashes_session post-Phase 4 → bots meurent avant tirer).
+# AR 256 DPS → TTK bot 0.12s → bot impossible to fire. Avec 200hp = 0.78s.
+# Source AAA : Halo Brutes 200hp (Bungie design intent — survivor against burst).
+hp = 200.0
 
-# Position Y locale du collider body et head (visible mesh character au pivot Y=0)
-body_y = 0.65
-head_y = 1.55
+# Capsule dimensions :
+#  - body_half_h = demi-hauteur cylindrique (sans hemispheres)
+#  - body_radius = rayon (X et Z)
+#  - Total height = 2 * (body_half_h + body_radius)
+#  - 0.65 + 0.40 → capsule 2.10m de haut, 0.80m de diamètre
+body_half_h = 0.65
+body_radius = 0.40
 
-[body]
-# Collider invisible Cuboid (le mesh visible vient du character GLB)
-width = 0.7       # X
-height = 1.3      # Y
-depth = 0.4       # Z
-color = [0.0, 0.0, 0.0]      # ignoré (pas de mesh body)
-emissive = [0.0, 0.0, 0.0]   # ignoré
+# Couleur RGB du mesh debug viz (rouge translucide overlay sur la capsule).
+debug_color = [1.0, 0.0, 0.0]
 
-[head]
-radius = 0.22
-color = [0.0, 0.0, 0.0]      # ignoré
-emissive = [0.0, 0.0, 0.0]   # ignoré
-
-# Si `show_collider_debug = true`, dessine cuboid+sphere par-dessus le character
-# (debug visuel pour ajuster les hit zones). Par défaut false en runtime.
-show_collider_debug = false
+# Affiche la capsule rouge translucide sur les bots pour voir la hitbox.
+# Désactiver pour rendu propre (le character mesh GLB reste visible).
+show_collider_debug = true
 
 # AI behavior (forgia-ai-arena-bot)
 [ai]
 shot_range = 35.0           # max range raycast vers player
 shot_cooldown_secs = 1.5    # 1 tir / 1.5s
 shot_damage = 12.0          # dmg par tir
-shot_warmup_secs = 0.8      # délai initial avant le 1er tir (anti-spawn-kill)
+shot_warmup_secs = 0.35     # ★ Story-456 (était 0.8) — AAA reaction time humain 200-300ms
+                             # Source : research story-456 (gaming reaction time consensus)
 detect_range = 50.0
 shot_jitter_deg = 4.0       # ★ spread imprécision IA (anti-perfect-aim)
 tracer_emissive = [4.0, 1.5, 0.5]  # HDR orange-jaune
+# Story-456 Phase 1 — Movement runtime
+speed = 3.5                  # m/s en Chase. Tactical AAA 3-4.5.
+stop_distance = 6.0          # distance d'arrêt avant player (m). Doit être < shot_range.
+
+# Story-456 Phase 2-4 — Tactical AI (research sourcé)
+# Sources : Halo 2 (Damian Isla GDC 2005), Doom 2016 (80.lv), F.E.A.R. (Orkin GDC 2006),
+# Context Steering (Andrew Fray Game AI Pro 2 §18), reaction time humain 200-300ms.
+los_check_hz = 8.0                  # raycast 8/s = 7.5 frames @60fps (anti CPU spam)
+los_grace_secs = 0.20               # ★ Story-456 balance fix : 0.35→0.20 (sensor 0 hits subi
+                                     # malgré 10 alerts → bots meurent avant grace expire).
+                                     # 200ms = reaction humain limite hard (FPS comp). Plus tendu.
+strafe_amplitude_m = 1.8            # latéral peak (Doom imp dodge style)
+strafe_freq_hz = 0.9                # sin period ~1.1s
+strafe_noise_weight = 0.35          # 0=pure sin (prévisible) / 1=full noise. 0.35 = Doom mid
+local_avoid_dist_m = 2.5            # ray length context steering 3-ray
+gunshot_alert_radius_m = 25.0       # bots dans 25m alerted on player fire
+gunshot_alert_los_grace_secs = 0.6  # +600ms warmup si alerted-not-yet-seen (look around feel)
+alert_duration_secs = 4.0           # durée flag alerted post-tir player
 
 # Enemies — 4 personnages Forgia (pas Rex = player RPG)
 # Distribution sur les 5 spawn points. Asset path relative à assets/.

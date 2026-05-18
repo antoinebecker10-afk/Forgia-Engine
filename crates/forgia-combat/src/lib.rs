@@ -18,6 +18,7 @@ use forgia_core::prelude::*;
 pub mod weapons;
 pub mod melee;
 pub mod combat_juice;
+pub mod ammo;
 
 // TODO: port from V1 — viewmodel, reload, health, rpg_systems, targeting, boss, gcd
 // pub mod viewmodel;
@@ -33,6 +34,7 @@ pub mod prelude {
     pub use crate::weapons::{WeaponType, EquippedWeapons, WeaponFireCooldown, CasingResources, damage_falloff, ARENA_V1_WEAPONS};
     pub use crate::melee::MeleeCooldown;
     pub use crate::combat_juice::{CameraTrauma, HitFlashCache, HitFlashTimer, WeaponRecoilDebt, WeaponRecoilImpulse, CombatHitEvent};
+    pub use crate::ammo::{AmmoChanged, AmmoChangeKind, AmmoConfig, AmmoSlot, ReloadKind, ReloadState, sync_ammo_slot_from_config};
     // HitStopState : migré vers forgia-juice-hit-stop (Tier 1D 2026-05-17).
     // Importer directement : `use forgia_juice_hit_stop::HitStopState;`
 }
@@ -122,6 +124,7 @@ impl Plugin for ForgiaCombatPlugin {
             .init_resource::<weapons::EquippedWeapons>()
             .init_resource::<combat_juice::CameraTrauma>()
             .add_message::<combat_juice::CombatHitEvent>()
+            .add_message::<ammo::AmmoChanged>()
             .add_systems(Startup, (
                 weapons::setup_casing_resources,
                 combat_juice::setup_hit_flash_cache,

@@ -24,8 +24,8 @@ pub mod prelude {
         WaveStartedEvent, WaveCompletedEvent,
     };
     pub use crate::{
-        ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, CloudOrbit,
-        ForgiaModeFpsArenaPlugin, HitZone, TargetCube,
+        ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, CloudOrbit, ForgiaModeFpsArenaPlugin,
+        TargetCube,
     };
 }
 
@@ -34,42 +34,66 @@ pub use wave::{
     WaveStartedEvent, WaveCompletedEvent,
 };
 
-/// Zone d'impact sur un training bot. Inseré sur chaque collider enfant
-/// (Head/Body) pour permettre damage multiplier en headshot (style Overwatch).
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HitZone {
-    Head,
-    Body,
+// Story-453 v2 (2026-05-18) — mesh-exact hitbox via `AsyncSceneCollider` ConvexHull.
+// Pas de Component custom : rapier walk le SceneRoot child et génère 1 collider
+// ConvexHull par Mesh3d, attaché au RigidBody du parent bot.
+// Le ray hit le collider généré → ChildOf walk dans damage path → parent Health.
+
+/// Sync HP des bots **existants** quand le genome `arena_bots.toml` est hot-reload.
+/// Pattern : track last_hp dans Local, applique nouveau hp.max + preserve ratio current/max.
+fn sync_existing_bot_hp(
+    bots_handle: Option<Res<ArenaBotsGenomeHandle>>,
+    bots_assets: Res<Assets<Genome<ArenaBotsGenome>>>,
+    mut q: Query<&mut forgia_combat::Health, With<TargetCube>>,
+    mut last_hp: Local<f32>,
+) {
+    let Some(handle) = bots_handle else { return };
+    let Some(genome) = bots_assets.get(&handle.0) else { return };
+    let new_hp = genome.data.hp;
+    if (new_hp - *last_hp).abs() < 0.01 {
+        return;
+    }
+    let was_zero = *last_hp == 0.0;
+    *last_hp = new_hp;
+    if was_zero {
+        return;
+    }
+    for mut hp in &mut q {
+        let ratio = if hp.max > 0.01 {
+            (hp.current / hp.max).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        hp.max = new_hp;
+        hp.current = new_hp * ratio;
+    }
+    info!("[arena-bots] hot-reload HP : new max = {new_hp}");
 }
 
 // ─── Arena Bots Genome (Phase H+ — data-driven training bots) ────────
 
+/// Story-453 baseline (2026-05-18) — schema simplifié :
+/// hp + capsule dims + show_collider_debug + ai + spawn_positions.
+/// Plus de Head/Body split, plus de body_y/head_y, plus de BotPart.
 #[derive(Deserialize, TypePath, Clone)]
 pub struct ArenaBotsGenome {
     pub hp: f32,
-    pub body_y: f32,
-    pub head_y: f32,
-    pub body: BotPart,
-    pub head: BotPart,
+    /// Demi-hauteur cylindrique de la capsule (sans les hemispheres).
+    /// Total height = 2 * (body_half_h + body_radius).
+    pub body_half_h: f32,
+    /// Rayon capsule (X et Z).
+    pub body_radius: f32,
+    /// Couleur RGB du mesh debug viz (rouge typique).
+    #[serde(default = "default_debug_color")]
+    pub debug_color: [f32; 3],
     #[serde(default)]
     pub show_collider_debug: bool,
     pub ai: BotAi,
     pub spawn_positions: Vec<BotSpawn>,
 }
 
-#[derive(Deserialize, TypePath, Clone)]
-pub struct BotPart {
-    /// Pour le body : [width, height, depth]. Pour le head : seul `radius` est lu.
-    #[serde(default)]
-    pub width: f32,
-    #[serde(default)]
-    pub height: f32,
-    #[serde(default)]
-    pub depth: f32,
-    #[serde(default)]
-    pub radius: f32,
-    pub color: [f32; 3],
-    pub emissive: [f32; 3],
+fn default_debug_color() -> [f32; 3] {
+    [1.0, 0.0, 0.0]
 }
 
 #[derive(Deserialize, TypePath, Clone)]
@@ -81,7 +105,47 @@ pub struct BotAi {
     pub detect_range: f32,
     pub shot_jitter_deg: f32,
     pub tracer_emissive: [f32; 3],
+    // Story-456 Phase 1 — Activation runtime mouvement
+    /// Vitesse de déplacement m/s en Chase (state machine ArenaBot.speed).
+    /// 0.0 = bot statique (V2 baseline reset). 3.0-4.5 = tactical AAA standard.
+    #[serde(default = "default_bot_speed")]
+    pub speed: f32,
+    /// Distance d'arrêt avant le player (m). Bot s'arrête pour tirer au lieu de coller.
+    /// Doit être > collider player radius (~0.5m). AAA standard 4-8m.
+    #[serde(default = "default_bot_stop_distance")]
+    pub stop_distance: f32,
+    // Story-456 Phase 2-4 — Tactical AI tuning (genome-driven, hot-reload)
+    #[serde(default = "default_los_check_hz")]
+    pub los_check_hz: f32,
+    #[serde(default = "default_los_grace_secs")]
+    pub los_grace_secs: f32,
+    #[serde(default = "default_strafe_amplitude_m")]
+    pub strafe_amplitude_m: f32,
+    #[serde(default = "default_strafe_freq_hz")]
+    pub strafe_freq_hz: f32,
+    #[serde(default = "default_strafe_noise_weight")]
+    pub strafe_noise_weight: f32,
+    #[serde(default = "default_local_avoid_dist_m")]
+    pub local_avoid_dist_m: f32,
+    #[serde(default = "default_gunshot_alert_radius_m")]
+    pub gunshot_alert_radius_m: f32,
+    #[serde(default = "default_gunshot_alert_los_grace_secs")]
+    pub gunshot_alert_los_grace_secs: f32,
+    #[serde(default = "default_alert_duration_secs")]
+    pub alert_duration_secs: f32,
 }
+
+fn default_bot_speed() -> f32 { 3.5 }
+fn default_bot_stop_distance() -> f32 { 6.0 }
+fn default_los_check_hz() -> f32 { 8.0 }
+fn default_los_grace_secs() -> f32 { 0.35 }
+fn default_strafe_amplitude_m() -> f32 { 1.8 }
+fn default_strafe_freq_hz() -> f32 { 0.9 }
+fn default_strafe_noise_weight() -> f32 { 0.35 }
+fn default_local_avoid_dist_m() -> f32 { 2.5 }
+fn default_gunshot_alert_radius_m() -> f32 { 25.0 }
+fn default_gunshot_alert_los_grace_secs() -> f32 { 0.6 }
+fn default_alert_duration_secs() -> f32 { 4.0 }
 
 #[derive(Deserialize, TypePath, Clone)]
 pub struct BotSpawn {
@@ -114,34 +178,30 @@ pub struct ArenaBotsGenomeHandle(pub Handle<Genome<ArenaBotsGenome>>);
 /// Fallback hardcoded utilisé si genome pas encore chargé au spawn.
 fn default_arena_bots() -> ArenaBotsGenome {
     ArenaBotsGenome {
-        hp: 100.0,
-        body_y: 0.65,
-        head_y: 1.55,
-        body: BotPart {
-            width: 0.7,
-            height: 1.3,
-            depth: 0.4,
-            radius: 0.0,
-            color: [0.85, 0.15, 0.15],
-            emissive: [0.6, 0.0, 0.0],
-        },
-        head: BotPart {
-            width: 0.0,
-            height: 0.0,
-            depth: 0.0,
-            radius: 0.22,
-            color: [1.0, 0.35, 0.20],
-            emissive: [1.2, 0.3, 0.0],
-        },
-        show_collider_debug: true, // fallback = montre cubes (lisible si TOML pas loaded)
+        hp: 30.0,
+        body_half_h: 0.65,
+        body_radius: 0.40,
+        debug_color: [1.0, 0.0, 0.0],
+        show_collider_debug: true,
         ai: BotAi {
             shot_range: 35.0,
             shot_cooldown_secs: 1.5,
             shot_damage: 12.0,
-            shot_warmup_secs: 0.8,
+            shot_warmup_secs: 0.35,
             detect_range: 50.0,
             shot_jitter_deg: 4.0,
             tracer_emissive: [4.0, 1.5, 0.5],
+            speed: 3.5,
+            stop_distance: 6.0,
+            los_check_hz: 8.0,
+            los_grace_secs: 0.35,
+            strafe_amplitude_m: 1.8,
+            strafe_freq_hz: 0.9,
+            strafe_noise_weight: 0.35,
+            local_avoid_dist_m: 2.5,
+            gunshot_alert_radius_m: 25.0,
+            gunshot_alert_los_grace_secs: 0.6,
+            alert_duration_secs: 4.0,
         },
         spawn_positions: vec![
             BotSpawn {
@@ -224,6 +284,9 @@ impl Plugin for ForgiaModeFpsArenaPlugin {
         if !app.is_plugin_added::<wave::ArenaWavesPlugin>() {
             app.add_plugins(wave::ArenaWavesPlugin);
         }
+        // Story-453 v2 (2026-05-18) — debug render rapier désactivé après validation.
+        // Pour ré-activer (wireframes verts sur tous les colliders) :
+        //     app.add_plugins(bevy_rapier3d::render::RapierDebugRenderPlugin::default());
         app.init_asset::<Genome<ArenaBotsGenome>>()
             .register_asset_loader(GenomeLoader::<ArenaBotsGenome>::default())
             .add_systems(Startup, load_arena_bots_genome)
@@ -234,8 +297,58 @@ impl Plugin for ForgiaModeFpsArenaPlugin {
                 cloud_drift_system
                     .in_set(GameSet::Effects)
                     .run_if(in_state(GameMode::Fps)),
-            );
+            )
+            .add_systems(
+                Update,
+                sync_existing_bot_hp.run_if(in_state(GameMode::Fps)),
+            )
+            // Story-456 — sync TacticalTuning Resource depuis ArenaBotsGenome.[ai] block.
+            // Hot-reload : modifier `genomes/arena_bots.toml` → ré-applique tuning runtime.
+            .add_systems(Update, sync_tactical_tuning_from_genome);
     }
+}
+
+/// Story-456 — pousse les fields tactical du genome [ai] block dans la Resource
+/// `TacticalTuning` consommée par `forgia-ai-arena-bot::tactical`. Run sur
+/// AssetEvent::Added/Modified (hot-reload).
+fn sync_tactical_tuning_from_genome(
+    mut events: MessageReader<AssetEvent<Genome<ArenaBotsGenome>>>,
+    handle: Option<Res<ArenaBotsGenomeHandle>>,
+    assets: Res<Assets<Genome<ArenaBotsGenome>>>,
+    mut tuning: ResMut<forgia_ai_arena_bot::TacticalTuning>,
+) {
+    let Some(handle) = handle else { return };
+    let mut should = false;
+    for ev in events.read() {
+        match ev {
+            AssetEvent::Added { id }
+            | AssetEvent::Modified { id }
+            | AssetEvent::LoadedWithDependencies { id } => {
+                if *id == handle.0.id() {
+                    should = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    if !should {
+        return;
+    }
+    let Some(g) = assets.get(&handle.0) else { return };
+    let ai = &g.data.ai;
+    tuning.los_check_hz = ai.los_check_hz;
+    tuning.los_grace_secs = ai.los_grace_secs;
+    tuning.strafe_amplitude_m = ai.strafe_amplitude_m;
+    tuning.strafe_freq_hz = ai.strafe_freq_hz;
+    tuning.strafe_noise_weight = ai.strafe_noise_weight;
+    tuning.local_avoid_dist_m = ai.local_avoid_dist_m;
+    tuning.gunshot_alert_radius_m = ai.gunshot_alert_radius_m;
+    tuning.gunshot_alert_los_grace_secs = ai.gunshot_alert_los_grace_secs;
+    tuning.alert_duration_secs = ai.alert_duration_secs;
+    info!(
+        "[arena-tactical] tuning synced (los_hz {:.1}, strafe_amp {:.2}m, alert_radius {:.1}m)",
+        tuning.los_check_hz, tuning.strafe_amplitude_m, tuning.gunshot_alert_radius_m,
+    );
 }
 
 fn load_arena_bots_genome(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -299,6 +412,9 @@ fn spawn_arena(
         }
     }
 
+    // LOCK : ne pas supprimer — les floor tiles (SceneRoot pur) n'ont PAS de collider individuel.
+    // Ce cuboid global est l'unique sol physique de l'arena. Garder Cuboid primitif (vs AsyncSceneCollider)
+    // car aucun mesh sol n'a besoin de précision — un grand plan plat suffit.
     commands.spawn((
         ArenaMarker,
         Transform::from_xyz(0.0, -0.5, 0.0),
@@ -328,86 +444,127 @@ fn spawn_arena(
         spawn_wall(&mut commands, &ouest, Vec3::new(-edge, 0.0, offset), std::f32::consts::FRAC_PI_2);
     }
 
+    // Story-453 — Cylinder primitives simples (vs TriMesh). Bottom = Y=0.
+    let pillar_half_h = 2.0;
+    let pillar_radius = 0.5;
     let col_d = TILE_SIZE * 2.5;
     for &(x, z) in &[(col_d, col_d), (-col_d, col_d), (col_d, -col_d), (-col_d, -col_d)] {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(x, 0.0, z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cylinder(2.0, 0.5),
-            Name::new(format!("CenterPillar_{x}_{z}")),
-            children![(SceneRoot(pillar_deco.clone()), Transform::default())],
-        ));
+        commands
+            .spawn((
+                ArenaMarker,
+                Transform::from_xyz(x, pillar_half_h, z),
+                Visibility::default(),
+                RigidBody::Fixed,
+                Collider::cylinder(pillar_half_h, pillar_radius),
+                Name::new(format!("CenterPillar_{x}_{z}")),
+            ))
+            .with_children(|p| {
+                p.spawn((
+                    SceneRoot(pillar_deco.clone()),
+                    Transform::from_xyz(0.0, -pillar_half_h, 0.0),
+                ));
+            });
     }
 
     let outer_d = TILE_SIZE * 4.5;
     for &(x, z) in &[(outer_d, 0.0), (-outer_d, 0.0), (0.0, outer_d), (0.0, -outer_d)] {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(x, 0.0, z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cylinder(2.0, 0.5),
-            Name::new(format!("OuterPillar_{x}_{z}")),
-            children![(SceneRoot(pillar.clone()), Transform::default())],
-        ));
+        commands
+            .spawn((
+                ArenaMarker,
+                Transform::from_xyz(x, pillar_half_h, z),
+                Visibility::default(),
+                RigidBody::Fixed,
+                Collider::cylinder(pillar_half_h, pillar_radius),
+                Name::new(format!("OuterPillar_{x}_{z}")),
+            ))
+            .with_children(|p| {
+                p.spawn((
+                    SceneRoot(pillar.clone()),
+                    Transform::from_xyz(0.0, -pillar_half_h, 0.0),
+                ));
+            });
     }
 
+    let col_radius = 0.4;
     for &(x, z) in &[(col_d, 0.0), (-col_d, 0.0), (0.0, col_d), (0.0, -col_d)] {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(x, 0.0, z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cylinder(2.0, 0.4),
-            Name::new(format!("MidColumn_{x}_{z}")),
-            children![(SceneRoot(column.clone()), Transform::default())],
-        ));
+        commands
+            .spawn((
+                ArenaMarker,
+                Transform::from_xyz(x, pillar_half_h, z),
+                Visibility::default(),
+                RigidBody::Fixed,
+                Collider::cylinder(pillar_half_h, col_radius),
+                Name::new(format!("MidColumn_{x}_{z}")),
+            ))
+            .with_children(|p| {
+                p.spawn((
+                    SceneRoot(column.clone()),
+                    Transform::from_xyz(0.0, -pillar_half_h, 0.0),
+                ));
+            });
     }
 
-    let cover_props: &[(&str, f32, f32, Handle<Scene>, f32, f32)] = &[
-        ("Crates_NE", 8.0, -8.0, crates.clone(), 0.6, 0.6),
-        ("Crates_SW", -8.0, 8.0, crates, 0.6, 0.6),
-        ("Rubble_N", 0.0, -14.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_S", 0.0, 14.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_E", 14.0, 0.0, rubble.clone(), 1.0, 0.4),
-        ("Rubble_W", -14.0, 0.0, rubble, 1.0, 0.4),
-        ("BarrelStack_NW", -10.0, -10.0, barrels_stack.clone(), 0.7, 0.7),
-        ("BarrelStack_SE", 10.0, 10.0, barrels_stack, 0.7, 0.7),
-        ("Table_E", 6.0, 4.0, table.clone(), 1.5, 0.6),
-        ("Table_W", -6.0, -4.0, table, 1.5, 0.6),
-        ("Barrel_1", 3.0, 12.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_2", -3.0, -12.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_3", 12.0, -3.0, barrel.clone(), 0.5, 0.4),
-        ("Barrel_4", -12.0, 3.0, barrel, 0.5, 0.4),
+    // Story-453 — cover props : Cuboid primitives, half_h adapté par type.
+    // Format : (name, x, z, scene, half_x, half_y, half_z)
+    let cover_props: &[(&str, f32, f32, &Handle<Scene>, f32, f32, f32)] = &[
+        ("Crates_NE", 8.0, -8.0, &crates, 0.75, 0.75, 0.75),
+        ("Crates_SW", -8.0, 8.0, &crates, 0.75, 0.75, 0.75),
+        ("Rubble_N", 0.0, -14.0, &rubble, 1.0, 0.3, 1.0),
+        ("Rubble_S", 0.0, 14.0, &rubble, 1.0, 0.3, 1.0),
+        ("Rubble_E", 14.0, 0.0, &rubble, 1.0, 0.3, 1.0),
+        ("Rubble_W", -14.0, 0.0, &rubble, 1.0, 0.3, 1.0),
+        ("BarrelStack_NW", -10.0, -10.0, &barrels_stack, 0.7, 1.0, 0.7),
+        ("BarrelStack_SE", 10.0, 10.0, &barrels_stack, 0.7, 1.0, 0.7),
+        ("Table_E", 6.0, 4.0, &table, 0.8, 0.5, 0.4),
+        ("Table_W", -6.0, -4.0, &table, 0.8, 0.5, 0.4),
+        ("Barrel_1", 3.0, 12.0, &barrel, 0.4, 0.5, 0.4),
+        ("Barrel_2", -3.0, -12.0, &barrel, 0.4, 0.5, 0.4),
+        ("Barrel_3", 12.0, -3.0, &barrel, 0.4, 0.5, 0.4),
+        ("Barrel_4", -12.0, 3.0, &barrel, 0.4, 0.5, 0.4),
     ];
-    for (name, x, z, scene, half_w, half_h) in cover_props {
-        commands.spawn((
-            ArenaMarker,
-            Transform::from_xyz(*x, 0.0, *z),
-            Visibility::default(),
-            RigidBody::Fixed,
-            Collider::cuboid(*half_w, *half_h, *half_w),
-            Name::new(name.to_string()),
-            children![(SceneRoot(scene.clone()), Transform::default())],
-        ));
+    for (name, x, z, scene, half_x, half_y, half_z) in cover_props {
+        commands
+            .spawn((
+                ArenaMarker,
+                Transform::from_xyz(*x, *half_y, *z),
+                Visibility::default(),
+                RigidBody::Fixed,
+                Collider::cuboid(*half_x, *half_y, *half_z),
+                Name::new(name.to_string()),
+            ))
+            .with_children(|p| {
+                p.spawn((
+                    SceneRoot((*scene).clone()),
+                    Transform::from_xyz(0.0, -half_y, 0.0),
+                ));
+            });
     }
 
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_xyz(16.0, 0.0, 16.0),
-        Visibility::default(),
-        Name::new("ChestGold_NE"),
-        children![(SceneRoot(chest_gold), Transform::default())],
-    ));
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_xyz(-16.0, 0.0, -16.0),
-        Visibility::default(),
-        Name::new("Chest_SW"),
-        children![(SceneRoot(chest), Transform::default())],
-    ));
+    let chest_half = (0.6, 0.4, 0.4);
+    commands
+        .spawn((
+            ArenaMarker,
+            Transform::from_xyz(16.0, chest_half.1, 16.0),
+            Visibility::default(),
+            RigidBody::Fixed,
+            Collider::cuboid(chest_half.0, chest_half.1, chest_half.2),
+            Name::new("ChestGold_NE"),
+        ))
+        .with_children(|p| {
+            p.spawn((SceneRoot(chest_gold), Transform::from_xyz(0.0, -chest_half.1, 0.0)));
+        });
+    commands
+        .spawn((
+            ArenaMarker,
+            Transform::from_xyz(-16.0, chest_half.1, -16.0),
+            Visibility::default(),
+            RigidBody::Fixed,
+            Collider::cuboid(chest_half.0, chest_half.1, chest_half.2),
+            Name::new("Chest_SW"),
+        ))
+        .with_children(|p| {
+            p.spawn((SceneRoot(chest), Transform::from_xyz(0.0, -chest_half.1, 0.0)));
+        });
 
     let banners: &[(&str, f32, f32, Handle<Scene>, f32)] = &[
         ("Banner_N_red", -6.0, edge - 0.3, banner_red.clone(), 0.0),
@@ -576,16 +733,29 @@ fn spawn_arena(
     );
 }
 
+/// Story-453 floor sink fix (2026-05-18) — revert TriMesh à Cuboid simple.
+/// TriMesh KayKit avait des vertices sous Y=0 → player kinematic sink.
+/// Cuboid posé avec center_y = 1.5 → bottom Y=0, top Y=3.0 (couvre mesh visuel).
+/// Mesh visuel reste rendu correctement à pos.y (généralement 0).
 fn spawn_wall(commands: &mut Commands, wall_scene: &Handle<Scene>, pos: Vec3, yaw: f32) {
-    commands.spawn((
-        ArenaMarker,
-        Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
-        Visibility::default(),
-        RigidBody::Fixed,
-        Collider::cuboid(TILE_SIZE / 2.0, 1.5, 0.15),
-        Name::new("Wall"),
-        children![(SceneRoot(wall_scene.clone()), Transform::default())],
-    ));
+    let wall_half_h = 1.5;
+    let collider_pos = Vec3::new(pos.x, pos.y + wall_half_h, pos.z);
+    commands
+        .spawn((
+            ArenaMarker,
+            Transform::from_translation(collider_pos).with_rotation(Quat::from_rotation_y(yaw)),
+            Visibility::default(),
+            RigidBody::Fixed,
+            Collider::cuboid(TILE_SIZE / 2.0, wall_half_h, 0.15),
+            Name::new(format!("Wall_{:.0}_{:.0}", pos.x, pos.z)),
+        ))
+        .with_children(|p| {
+            // Mesh visuel : enfant, offset Y négatif pour compenser la position parent.
+            p.spawn((
+                SceneRoot(wall_scene.clone()),
+                Transform::from_xyz(0.0, -wall_half_h, 0.0),
+            ));
+        });
 }
 
 /// Orbit nuages autour du centre Y axis : rotation continue, jamais wrap brusque.

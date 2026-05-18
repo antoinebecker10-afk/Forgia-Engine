@@ -48,6 +48,10 @@ impl Plugin for ForgiaUiPlugin {
         app.add_systems(Startup, spawn_menu_camera_permanent)
             .add_systems(OnEnter(AppMode::Menu), release_cursor)
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
+            .add_systems(OnEnter(AppMode::Paused), (release_cursor, pause_time))
+            .add_systems(OnExit(AppMode::Paused), resume_time)
+            // Story-455 Phase G — paused_overlay_ui retiré (remplacé par forgia-ui-pause-menu
+            // cliquable Resume / Settings / Quit). Le handler ESC/Q reste ici (escape_handler).
             .add_systems(EguiPrimaryContextPass, main_menu_ui)
             .add_systems(Update, escape_handler.in_set(GameSet::UI));
     }
@@ -126,7 +130,55 @@ fn main_menu_ui(
         });
 }
 
-/// Handler ESC unique — toggle InGame ↔ Menu.
+/// Overlay PAUSED legacy (remplacé story-455 Phase G par forgia-ui-pause-menu cliquable).
+/// Conservé en `#[allow(dead_code)]` pour référence courte ; à supprimer story-457.
+#[allow(dead_code)]
+fn paused_overlay_ui(
+    app_state: Res<State<AppMode>>,
+    mut ctx: EguiContexts,
+) {
+    if !matches!(app_state.get(), AppMode::Paused) {
+        return;
+    }
+    let Ok(ctx) = ctx.ctx_mut() else { return };
+    egui::Area::new(egui::Id::new("paused_overlay"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(egui::Color32::from_black_alpha(180))
+                .inner_margin(egui::Margin::symmetric(48, 32))
+                .corner_radius(egui::CornerRadius::same(8))
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(4.0);
+                        ui.heading(
+                            egui::RichText::new("PAUSED")
+                                .size(56.0)
+                                .color(egui::Color32::from_rgb(255, 230, 100))
+                                .strong(),
+                        );
+                        ui.add_space(18.0);
+                        ui.label(
+                            egui::RichText::new("ESC — Resume")
+                                .size(20.0)
+                                .color(egui::Color32::WHITE),
+                        );
+                        ui.add_space(4.0);
+                        ui.label(
+                            egui::RichText::new("Q   — Quit to Menu")
+                                .size(20.0)
+                                .color(egui::Color32::from_gray(200)),
+                        );
+                        ui.add_space(4.0);
+                    });
+                });
+        });
+}
+
+/// Handler ESC unique :
+///  - InGame  → Paused (pause gameplay, libère curseur)
+///  - Paused  → InGame (resume)
+///  - Paused + Q → Menu (quit to menu)
 fn escape_handler(
     keys: Res<ButtonInput<KeyCode>>,
     app_state: Res<State<AppMode>>,
@@ -134,28 +186,58 @@ fn escape_handler(
     mut next_game: ResMut<NextState<GameMode>>,
     mut q_cursor: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
+    let from = app_state.get().clone();
+
+    // Q during Paused = quit to Menu
+    if matches!(from, AppMode::Paused) && keys.just_pressed(KeyCode::KeyQ) {
+        info!("[forgia-ui] Q pressed (Paused → Menu)");
+        next_app.set(AppMode::Menu);
+        next_game.set(GameMode::None);
+        return;
+    }
+
     if keys.just_pressed(KeyCode::Escape) {
-        let from = app_state.get().clone();
         match &from {
             AppMode::InGame => {
-                info!("[forgia-ui] ESC pressed (InGame → Menu)");
-                next_app.set(AppMode::Menu);
-                next_game.set(GameMode::None);
+                info!("[forgia-ui] ESC pressed (InGame → Paused)");
+                next_app.set(AppMode::Paused);
                 if let Ok(mut opts) = q_cursor.single_mut() {
                     opts.grab_mode = CursorGrabMode::None;
                     opts.visible = true;
-                    info!("[forgia-ui] Cursor released (immediate)");
                 }
             }
             AppMode::Paused => {
                 info!("[forgia-ui] ESC pressed (Paused → InGame)");
                 next_app.set(AppMode::InGame);
+                if let Ok(mut opts) = q_cursor.single_mut() {
+                    opts.grab_mode = CursorGrabMode::Locked;
+                    opts.visible = false;
+                }
             }
             other => {
                 info!("[forgia-ui] ESC pressed in {other:?} — no transition");
             }
         }
     }
+    // Q en Paused → quitte au Menu.
+    if keys.just_pressed(KeyCode::KeyQ) && matches!(from, AppMode::Paused) {
+        info!("[forgia-ui] Q pressed (Paused → Menu)");
+        next_app.set(AppMode::Menu);
+        next_game.set(GameMode::None);
+    }
+}
+
+/// Freeze `Time<Virtual>` quand on entre en Paused (animations + locomotion
+/// + physics gated par Time<Virtual> stoppent). Pattern Bevy standard.
+fn pause_time(mut virtual_time: ResMut<Time<Virtual>>) {
+    virtual_time.pause();
+    info!("[forgia-ui] Time<Virtual> paused");
+}
+
+/// Reprend le temps virtuel quand on sort de Paused.
+fn resume_time(mut virtual_time: ResMut<Time<Virtual>>) {
+    virtual_time.unpause();
+    info!("[forgia-ui] Time<Virtual> resumed");
 }
 
 /// Lock cursor au centre + invisible quand on entre InGame (pour mouse_look).

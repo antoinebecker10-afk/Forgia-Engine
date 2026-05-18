@@ -2,12 +2,17 @@
 name = "forgia-juice-screen-flash"
 version = "0.1.0"
 edition = "2021"
-description = "Screen flash on dmg/heal"
+description = "Screen flash on damage/heal/kill — egui fullscreen overlay (story-455 Phase F)"
 
 [lints]
 workspace = true
 
 [dependencies]
 bevy = { workspace = true }
+bevy_egui = { workspace = true }
 forgia-core = { workspace = true }
-bevy_hanabi = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-player = { workspace = true }
+forgia-genome-core = { workspace = true }
+forgia-ui-style = { workspace = true }
+serde = { workspace = true }

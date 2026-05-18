@@ -56,6 +56,13 @@ recoil_yaw_random_deg = 0.05   # ← 0.12→0.05 (très subtil)
 fov_punch_deg = 0.0            # ★ SKIP (CS2 philosophy — semi-auto)
 # Phase H — ADS scale shrink (gun plus petit en ADS = crosshair visible)
 ads_scale_factor = 0.70        # -30% taille en full ADS
+# Story-455 Phase A — Ammo Pépin (pistolet semi, clip pistolet AAA standard)
+mag_size = 12                  # CoD Modern Warfare M1911 / Glock pattern
+reserve_max = 84               # 7 mags total
+reload_time_secs = 1.2         # pistolet rapide
+reload_kind = "mag"
+infinite_ammo = false
+low_ammo_threshold = 0.25      # flash <= 3 bullets
 
 [weapons.bourrasque]
 # Slot 2 (Digit2) — Mitraillette (SMG full-auto cadence rapide) — Bourrasque
@@ -105,6 +112,13 @@ recoil_yaw_random_deg = 0.0    # ★ ZERO yaw : tue le wobble horizontal à 16Hz
 fov_punch_deg = 0.0            # ★ SKIP (CS2 — pas de fov punch en auto-fire)
 # Phase H — ADS scale shrink (SMG cadence rapide = besoin crosshair visible)
 ads_scale_factor = 0.65        # -35% taille en full ADS
+# Story-455 Phase A — Ammo Bourrasque (SMG full-auto, gros mag Apex Volt/CoD MP5)
+mag_size = 35
+reserve_max = 175              # 5 mags total
+reload_time_secs = 2.0         # SMG mag long à recharger
+reload_kind = "mag"
+infinite_ammo = false
+low_ammo_threshold = 0.25      # flash <= 8 bullets
 
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
@@ -154,6 +168,13 @@ recoil_yaw_random_deg = 0.0    # ★ pas de yaw : sniper = précision absolue
 fov_punch_deg = 0.5            # ← 0.8→0.5 (subtle weight feel, CS2 AWP-lite)
 # Phase H — ADS scale shrink (sniper = PAS de changement, scope overlay cache déjà)
 ads_scale_factor = 1.00        # ★ inchangé (sniper a son scope fullscreen)
+# Story-455 Phase A — Ammo Madame Lenoir (sniper bolt-style mag 5, AWP/Kraber)
+mag_size = 5
+reserve_max = 25               # 5 mags total
+reload_time_secs = 2.5         # bolt-action lent
+reload_kind = "mag"
+infinite_ammo = false
+low_ammo_threshold = 0.40      # flash <= 2 (mag petit, seuil plus haut)
 
 [weapons.boucherie]
 # Slot 4 (Digit4) — Fusil à pompe (pump-action multi-pellets cone) — Boucherie
@@ -204,3 +225,10 @@ recoil_yaw_random_deg = 0.12   # ← 0.30→0.12 (mini cone visuel)
 fov_punch_deg = 0.8            # ← 1.2→0.8 (Fortnite pump-lite)
 # Phase H — ADS scale shrink (shotgun gros mesh = shrink agressif)
 ads_scale_factor = 0.60        # -40% taille en full ADS (mesh le plus volumineux)
+# Story-455 Phase A — Ammo Boucherie (pump shotgun shell-per-shell CoD MW Origin12)
+mag_size = 6
+reserve_max = 30               # 5 mags total
+reload_time_secs = 0.55        # durée 1 shell (boucle jusqu'à mag full ou interrupt)
+reload_kind = "shell_per_shell"
+infinite_ammo = false
+low_ammo_threshold = 0.34      # flash <= 2 shells (~33%)

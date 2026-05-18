@@ -1,0 +1,31 @@
+# Forgia V2 — Screen Flash Tuning (story-455 Phase F, 2026-05-18)
+#
+# Hot-reload via Bevy Asset.
+#
+# Stack de layers fullscreen overlay :
+# - Damage : red pulse à chaque hit reçu joueur
+# - Kill : white brief pulse quand player kill
+# - LowHp : sustained red vignette quand HP < threshold (genome)
+#
+# Migré depuis forgia-ui-hud/player_hp.rs (red-vignette inline, viol fine-grained-crates).
+
+# ─── On-damage red pulse ──────────────────────────────────────────────
+damage_flash_duration_secs = 0.18
+damage_flash_alpha_max = 0.55
+damage_color_r = 200
+damage_color_g = 40
+damage_color_b = 40
+
+# ─── Sustained low-HP vignette ────────────────────────────────────────
+low_hp_threshold = 0.30        # vignette visible si HP < 30%
+low_hp_alpha_max = 0.45        # alpha max au HP = 0 (intensité full)
+
+# ─── On-kill white brief pulse ────────────────────────────────────────
+kill_flash_duration_secs = 0.08
+kill_flash_alpha_max = 0.20
+
+# Cap simultané layers (anti-spam burst / lag spike) — story-455 BUG-455-06 fix
+max_flash_layers = 8
+
+# ─── Sensor ───────────────────────────────────────────────────────────
+sensor_period_secs = 1.0

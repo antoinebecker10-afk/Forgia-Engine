@@ -8,6 +8,9 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_damage::{DamageEvent, DamageKind, DeathEvent, ForgiaDamagePlugin, Health, Mortal};
 
+pub mod tactical;
+pub use tactical::{BotAiSensor, TacticalTuning};
+
 #[derive(Component, Debug, Clone, Copy)]
 pub struct ArenaBot {
     pub state: BotState,
@@ -17,6 +20,27 @@ pub struct ArenaBot {
     pub attack_cooldown: f32,
     /// Cooldown restant avant prochain tir. Init = warmup (anti spawn-kill).
     pub attack_left: f32,
+    /// Story-456 Phase 1 — distance d'arrêt en Chase (m). Bot s'arrête à `stop_distance`
+    /// pour tirer au lieu de coller le player. Doit être < attack_range pour que le bot
+    /// approche puis stagne en zone de tir. AAA standard 4-8m.
+    pub stop_distance: f32,
+    // ── Story-456 Phase 2 — LOS check ─────────────────────────────
+    /// Ligne de vue claire vers player ? Recheck via `bot_los_check` à `los_check_hz`.
+    pub has_los: bool,
+    /// Timer décrémenté ; recheck LOS quand <= 0.
+    pub los_check_left: f32,
+    /// Grace window après acquisition LOS avant 1er tir (AAA reaction time ~350ms).
+    pub los_grace_left: f32,
+    // ── Story-456 Phase 3 — Strafing ──────────────────────────────
+    /// Phase oscillation strafe sin (offset par-bot pour désync entre bots).
+    pub strafe_phase_rad: f32,
+    /// Random noise seed accumulé (xorshift32) pour bias strafe.
+    pub strafe_noise_seed: u32,
+    // ── Story-456 Phase 4 — Perception alert ──────────────────────
+    /// True si player a tiré récemment dans rayon perception.
+    pub alerted: bool,
+    /// Timer décompte alerted (transition Idle→Chase forced pendant cette durée).
+    pub alert_left: f32,
 }
 
 impl Default for ArenaBot {
@@ -28,6 +52,14 @@ impl Default for ArenaBot {
             attack_range: 1.8,
             attack_cooldown: 1.0,
             attack_left: 0.0,
+            stop_distance: 1.5,
+            has_los: false,
+            los_check_left: 0.0,
+            los_grace_left: 0.0,
+            strafe_phase_rad: 0.0,
+            strafe_noise_seed: 0xDEADBEEF,
+            alerted: false,
+            alert_left: 0.0,
         }
     }
 }
@@ -127,16 +159,27 @@ impl Plugin for ForgiaAiArenaBotPlugin {
         }
         app.init_resource::<PendingRespawns>()
             .init_resource::<BotShootRng>()
+            .init_resource::<TacticalTuning>()
+            .init_resource::<BotAiSensor>()
             .add_systems(
                 Update,
                 (
+                    // Phase 2 LOS check + Phase 4 perception alert run AVANT
+                    // state_machine pour que la state transition voie has_los/alerted à jour.
+                    tactical::bot_los_check,
+                    tactical::bot_perception_alert,
                     bot_state_machine,
+                    // Phase 3 tactical_movement run APRÈS state_machine pour override le
+                    // mouvement basique chase forward avec strafe + obstacle avoidance.
+                    tactical::bot_tactical_movement,
                     bot_attack_cooldown,
                     bot_shoot_at_target,
                     bot_tracer_lifetime,
                     handle_bot_deaths,
                     tick_respawns,
-                ),
+                    tactical::write_bot_ai_sensor,
+                )
+                    .chain(),
             );
     }
 }
@@ -157,7 +200,12 @@ fn bot_state_machine(
         let to_target = target_pos - xf.translation;
         let dist = to_target.length();
 
-        bot.state = if dist <= bot.attack_range {
+        // Story-456 Phase 1 — state machine 3-tier :
+        // - dist <= stop_distance : Attack (à portée tir, ne bouge plus)
+        // - stop_distance < dist <= detect_range : Chase (s'approche)
+        // - dist > detect_range : Idle (hors perception)
+        // attack_range = shot_range >> stop_distance pour que le bot tire pendant Chase aussi.
+        bot.state = if dist <= bot.stop_distance {
             BotState::Attack
         } else if dist <= bot.detect_range {
             BotState::Chase
@@ -165,11 +213,10 @@ fn bot_state_machine(
             BotState::Idle
         };
 
-        if matches!(bot.state, BotState::Chase) && bot.speed > 0.01 && dist > 0.01 {
-            let dir = to_target / dist;
-            let step = dir * bot.speed * dt;
-            xf.translation += Vec3::new(step.x, 0.0, step.z);
-        }
+        // Story-456 Phase 3 — mouvement Chase délégué à `tactical::bot_tactical_movement`
+        // (strafe + obstacle avoidance). Ce système ne gère plus que la state transition
+        // + l'orientation visuelle ci-dessous. Le `let _ = dt` évite l'unused warning.
+        let _ = dt;
 
         // Toujours faire face au target (même statique) pour orientation tracer + visuel.
         if dist > 0.01 {
@@ -214,6 +261,11 @@ fn bot_shoot_at_target(
             continue;
         }
         if !matches!(bot.state, BotState::Chase | BotState::Attack) {
+            continue;
+        }
+        // Story-456 Phase 2 — gate tir sur LOS + grace window (AAA reaction time).
+        // Sans LOS = pas de tir (player derrière mur). Pendant grace = vu mais "réfléchit".
+        if !bot.has_los || bot.los_grace_left > 0.0 {
             continue;
         }
 

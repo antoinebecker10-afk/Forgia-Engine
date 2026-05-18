@@ -20,11 +20,28 @@ use bevy::prelude::*;
 // use forgia_core::resources::{FpsTuning, WeaponFireFlash};
 
 /// Message emitted when damage is detected on an enemy.
+///
+/// Story-455 Phase C (2026-05-18) — étendu pour alimenter kill feed (Phase D) et
+/// damage direction indicator (Phase E) sans pull-based queries.
+///
+/// Fields :
+/// - `target` : entité qui a reçu le coup (porte `Health`).
+/// - `attacker` : entité qui a tiré (Player ou Bot ; None pour world damage futur).
+/// - `damage` : dégâts effectifs appliqués (après falloff/headshot mul).
+/// - `is_kill` : true si HP atteint 0 après ce coup.
+/// - `is_headshot` : true si le ray a touché une `HitZoneHead`. ⚠ Story-455 Phase C
+///   reste à `false` jusqu'à hitzone Head/Body split (story-456 deferred).
+/// - `hit_world_pos` : position monde du point d'impact (pour DDI angle + popup spawn).
+/// - `weapon` : arme utilisée (pour kill feed icon mapping). None = world/melee.
 #[derive(Message)]
 pub struct CombatHitEvent {
     pub target: Entity,
+    pub attacker: Option<Entity>,
     pub damage: f32,
     pub is_kill: bool,
+    pub is_headshot: bool,
+    pub hit_world_pos: Vec3,
+    pub weapon: Option<crate::weapons::WeaponType>,
 }
 
 /// Tracks previous health to detect damage via change detection.

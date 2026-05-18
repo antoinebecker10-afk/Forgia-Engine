@@ -26,6 +26,8 @@ use bevy_rapier3d::prelude::*;
 
 use bevy::platform::collections::HashMap;
 
+use crate::ammo::AmmoSlot;
+
 // Weapon VFX constants migrated to FpsTuning (wfx_fire_shake, wfx_impact_*, wfx_muzzle_*, wfx_tracer_*, wfx_sfx_volume)
 
 // =============================================================================
@@ -156,39 +158,41 @@ pub struct WeaponData {
 }
 
 // =============================================================================
-// Equipped Weapons Resource
+// Equipped Weapons Resource (story-455 Phase A — replaces V1 infinite-ammo stub)
 // =============================================================================
+//
+// `slots` est populated lazy par `forgia-fps::sync_ammo_slots_from_genome` quand
+// le genome `viewmodel_arena.toml` arrive (Asset Created/Modified). Tant qu'un
+// slot n'est pas présent, `slot_or_default()` retourne un slot par défaut
+// (mag=30, reserve=120, infinite=false) pour éviter les panics dans le UI.
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct EquippedWeapons {
     pub current: WeaponType,
-    pub ammo_rifle: u32,
-}
-
-impl Default for EquippedWeapons {
-    fn default() -> Self {
-        Self {
-            current: WeaponType::ModernAR,
-            ammo_rifle: 999,
-        }
-    }
+    /// Ammo state par arme. Populated par genome sync system.
+    pub slots: HashMap<WeaponType, AmmoSlot>,
 }
 
 impl EquippedWeapons {
-    pub fn current_ammo(&self) -> u32 {
-        self.ammo_rifle
+    /// Slot de l'arme actuelle (immutable). None si pas encore initialisé par genome.
+    pub fn current_slot(&self) -> Option<&AmmoSlot> {
+        self.slots.get(&self.current)
     }
 
-    pub fn max_ammo(&self) -> u32 {
-        999 // infinite ammo for all weapon types
+    /// Slot mutable de l'arme actuelle. None si pas encore initialisé.
+    pub fn current_slot_mut(&mut self) -> Option<&mut AmmoSlot> {
+        self.slots.get_mut(&self.current)
     }
 
-    pub fn consume_ammo(&mut self) -> bool {
-        true // infinite ammo
+    /// Slot d'une arme spécifique, fallback default si absent. **Lecture seule** —
+    /// utile pour HUD qui doit afficher quelque chose avant init.
+    pub fn slot_or_default(&self, w: WeaponType) -> AmmoSlot {
+        self.slots.get(&w).copied().unwrap_or_default()
     }
 
-    pub fn add_ammo(&mut self, _weapon: WeaponType, _amount: u32) {
-        // infinite ammo, no-op
+    /// Iter slots existants (pour HUD slot strip).
+    pub fn iter_slots(&self) -> impl Iterator<Item = (WeaponType, &AmmoSlot)> {
+        self.slots.iter().map(|(w, s)| (*w, s))
     }
 }
 

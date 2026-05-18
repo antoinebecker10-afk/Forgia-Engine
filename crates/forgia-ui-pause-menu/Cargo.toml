@@ -1,8 +1,8 @@
 [package]
-name = "forgia-ui-hud"
+name = "forgia-ui-pause-menu"
 version = "0.1.0"
 edition = "2021"
-description = "HP/ammo/crosshair/score HUD"
+description = "FPS pause menu with cliquable Resume / Settings / Quit + sliders + TOML persistence"
 
 [lints]
 workspace = true
@@ -11,7 +11,7 @@ workspace = true
 bevy = { workspace = true }
 bevy_egui = { workspace = true }
 forgia-core = { workspace = true }
-forgia-combat = { workspace = true }
-forgia-damage = { workspace = true }
-forgia-mode-fps-arena = { workspace = true }
+forgia-player = { workspace = true }
 forgia-ui-style = { workspace = true }
+serde = { workspace = true }
+toml = "0.8"

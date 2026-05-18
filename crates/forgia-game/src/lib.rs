@@ -46,6 +46,11 @@ pub fn run_game() -> AppExit {
         forgia_combat::prelude::ForgiaCombatPlugin,
         forgia_ui::prelude::ForgiaUiPlugin,
         forgia_ui_hud::prelude::ForgiaUiHudPlugin,
+        forgia_ui_hud_ammo::prelude::ForgiaUiHudAmmoPlugin,
+        forgia_killfeed::prelude::ForgiaKillfeedPlugin,
+        forgia_ui_damage_direction::prelude::ForgiaUiDamageDirectionPlugin,
+        forgia_juice_screen_flash::prelude::ForgiaJuiceScreenFlashPlugin,
+        forgia_ui_pause_menu::prelude::ForgiaUiPauseMenuPlugin,
         forgia_sensors::prelude::ForgiaSensorsPlugin,
     ));
 

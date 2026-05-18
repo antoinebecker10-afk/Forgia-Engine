@@ -31,17 +31,10 @@ pub(crate) fn draw_player_hp(
         egui::Id::new("forgia_player_hp"),
     ));
 
-    // Vignette rouge fullscreen low-HP.
+    // Story-455 Phase F : low-HP red vignette migré vers `forgia-juice-screen-flash`
+    // (rule fine-grained-crates, ScreenFlashTuning genome-driven). Ici on garde
+    // uniquement la HP bar UI, la vignette overlay vient d'un autre crate.
     let frac = health.fraction();
-    if frac < 0.3 {
-        let intensity = ((0.3 - frac) / 0.3).clamp(0.0, 1.0);
-        let alpha = (intensity * 110.0) as u8;
-        painter.rect_filled(
-            screen,
-            0.0,
-            egui::Color32::from_rgba_unmultiplied(180, 30, 30, alpha),
-        );
-    }
 
     // HP bar dimensions — chunky cartoon
     let bar_w = 380.0;

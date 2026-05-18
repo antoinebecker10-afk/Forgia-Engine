@@ -1,0 +1,11 @@
+[package]
+name = "forgia-ui-style"
+version = "0.1.0"
+edition = "2021"
+description = "Shared HUD palette + egui helpers (chunky cartoon Forgia)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy_egui = { workspace = true }

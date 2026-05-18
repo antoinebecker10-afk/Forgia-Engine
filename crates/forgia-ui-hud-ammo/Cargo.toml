@@ -1,8 +1,8 @@
 [package]
-name = "forgia-ui-hud"
+name = "forgia-ui-hud-ammo"
 version = "0.1.0"
 edition = "2021"
-description = "HP/ammo/crosshair/score HUD"
+description = "FPS Ammo HUD — counter bottom-right + vertical slot strip + reload arc + low-flash (genome-driven)"
 
 [lints]
 workspace = true
@@ -12,6 +12,6 @@ bevy = { workspace = true }
 bevy_egui = { workspace = true }
 forgia-core = { workspace = true }
 forgia-combat = { workspace = true }
-forgia-damage = { workspace = true }
-forgia-mode-fps-arena = { workspace = true }
 forgia-ui-style = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }

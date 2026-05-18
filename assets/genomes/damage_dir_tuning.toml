@@ -1,0 +1,19 @@
+# Forgia V2 — Damage Direction Indicator Tuning (story-455 Phase E, 2026-05-18)
+#
+# Hot-reload via Bevy Asset. Pattern AAA :
+# - 2D arcs autour crosshair (CoD / L4D — research Jasper Stephenson UX analysis)
+# - Multi-attackers arcs distincts, anti-pattern Apex stacking
+# - Intensity alpha lerp 0.5-1.0 selon damage / max_hp
+# - Fade ease-out (1-t)² duration 1.2s
+
+radius_px = 90.0           # rayon outer depuis crosshair
+thickness = 7.0            # épaisseur trait
+segments = 16              # résolution arc
+arc_span_deg = 60.0        # angle span (CoD AAA standard)
+max_arcs = 4               # cap simultané anti-clutter
+
+duration_secs = 1.2        # fade ease-out
+intensity_min = 0.5        # alpha damage min
+intensity_max = 1.0        # alpha damage = max_hp
+
+sensor_period_secs = 1.0

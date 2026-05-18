@@ -1,8 +1,8 @@
 [package]
-name = "forgia-ui-hud"
+name = "forgia-killfeed"
 version = "0.1.0"
 edition = "2021"
-description = "HP/ammo/crosshair/score HUD"
+description = "FPS kill feed top-right + multi-kill sweeping banner (Overwatch/CS2/Halo pattern)"
 
 [lints]
 workspace = true
@@ -12,6 +12,7 @@ bevy = { workspace = true }
 bevy_egui = { workspace = true }
 forgia-core = { workspace = true }
 forgia-combat = { workspace = true }
-forgia-damage = { workspace = true }
-forgia-mode-fps-arena = { workspace = true }
+forgia-player = { workspace = true }
 forgia-ui-style = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }

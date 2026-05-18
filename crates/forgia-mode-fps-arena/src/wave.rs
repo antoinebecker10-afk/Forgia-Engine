@@ -18,7 +18,7 @@ use serde::Deserialize;
 use std::fs;
 
 use crate::{
-    ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, HitZone, TargetCube, default_arena_bots,
+    ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, TargetCube, default_arena_bots,
 };
 
 // ─── Wave config genome ──────────────────────────────────────────────
@@ -281,6 +281,9 @@ fn wave_orchestrator(
 }
 
 /// Spawn les bots d'une wave : extrait de l'ancien `spawn_arena`.
+/// Story-453 baseline reset (2026-05-18) — bot = 1 entité avec capsule unique.
+/// Plus de Head/Body children, plus de calibration AABB.
+/// Le ray hit le parent direct → Health appliqué. Simple. Prévisible.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_wave_bots(
     mut commands: Commands,
@@ -301,45 +304,11 @@ pub fn spawn_wave_bots(
         }
     };
 
-    let debug_meshes = if bots_data.show_collider_debug {
-        let body_mesh = meshes.add(Cuboid::new(
-            bots_data.body.width,
-            bots_data.body.height,
-            bots_data.body.depth,
-        ));
-        let head_mesh = meshes.add(Sphere::new(bots_data.head.radius).mesh().ico(3).unwrap());
-        let body_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(
-                bots_data.body.color[0],
-                bots_data.body.color[1],
-                bots_data.body.color[2],
-            ),
-            ..default()
-        });
-        let head_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(
-                bots_data.head.color[0],
-                bots_data.head.color[1],
-                bots_data.head.color[2],
-            ),
-            ..default()
-        });
-        Some((body_mesh, head_mesh, body_mat, head_mat))
-    } else {
-        None
-    };
-
-    let body_half = (
-        bots_data.body.width * 0.5,
-        bots_data.body.height * 0.5,
-        bots_data.body.depth * 0.5,
-    );
     let ai = &bots_data.ai;
-
-    // Apply wave modifiers
     let hp = bots_data.hp * wave.hp_mult;
     let shot_cd = ai.shot_cooldown_secs * wave.ai_cooldown_mult;
     let shot_dmg = ai.shot_damage * wave.ai_damage_mult;
+    let _ = (&mut meshes, &mut materials); // unused (no more debug capsule mesh)
 
     for spawn in &wave.spawns {
         let (x, z) = (spawn.x, spawn.z);
@@ -351,7 +320,16 @@ pub fn spawn_wave_bots(
             .unwrap_or("Enemy")
             .to_string();
 
-        let parent = commands
+        let character_path = spawn.character_glb.clone();
+        let character_scale = spawn.character_scale;
+        let character_yaw = spawn.character_yaw_deg.to_radians();
+        let character_y_offset = spawn.character_y_offset;
+
+        // Story-453 v2 (2026-05-18) — mesh-exact hitbox.
+        // Parent = anchor world position + Health + RigidBody (PAS de Collider).
+        // Le ConvexHull mesh-driven est généré par `AsyncSceneCollider` sur le SceneRoot child.
+        // Ray hit le collider généré → ChildOf walk dans damage path → trouve parent Health.
+        let parent_id = commands
             .spawn((
                 ArenaMarker,
                 TargetCube,
@@ -360,11 +338,26 @@ pub fn spawn_wave_bots(
                 Health::new(hp),
                 ArenaBot {
                     state: forgia_ai_arena_bot::BotState::Idle,
-                    speed: 0.0,
+                    // Story-456 Phase 1 — speed depuis genome (était 0.0 hardcoded V2 baseline).
+                    speed: ai.speed,
                     detect_range: ai.detect_range,
                     attack_range: ai.shot_range,
                     attack_cooldown: shot_cd,
                     attack_left: ai.shot_warmup_secs,
+                    // stop_distance = distance d'arrêt en Chase. Bot s'approche jusqu'à
+                    // cette distance puis stagne pour tirer. Doit être < shot_range.
+                    stop_distance: ai.stop_distance,
+                    // Story-456 Phase 2-4 — tactical state (init défaut, populated runtime
+                    // par tactical::bot_los_check / bot_perception_alert / bot_tactical_movement).
+                    has_los: false,
+                    los_check_left: 0.0,
+                    los_grace_left: 0.0,
+                    // strafe_phase_rad offset par-bot pour désync (sinon tous bougent en sync).
+                    // Hash basé sur position spawn = déterministe + diversifié.
+                    strafe_phase_rad: ((x.to_bits() ^ z.to_bits()) as f32 * 0.0001) % std::f32::consts::TAU,
+                    strafe_noise_seed: (x.to_bits() ^ z.to_bits()).wrapping_mul(2654435761),
+                    alerted: false,
+                    alert_left: 0.0,
                 },
                 BotShootConfig {
                     damage: shot_dmg,
@@ -376,55 +369,36 @@ pub fn spawn_wave_bots(
                         ai.tracer_emissive[2],
                         1.0,
                     ),
-                    shoulder_y: bots_data.head_y - 0.15,
+                    shoulder_y: 1.4,
                     target_torso_y: 1.0,
                 },
+                // Story-456 Phase 1 — KinematicPositionBased au lieu de Fixed.
+                // Rapier 0.33 : Kinematic suit le Transform mutation directe par le state
+                // machine ArenaBot. Pas de simulation physique, pas de collision auto
+                // (raycast obstacle avoidance phase 3 gère ça).
+                RigidBody::KinematicPositionBased,
                 Name::new(format!("Enemy_{bot_name}_W{}_{x}_{z}", wave.index)),
             ))
             .id();
 
-        let body_y = bots_data.body_y;
-        let head_y = bots_data.head_y;
-        let head_radius = bots_data.head.radius;
-        let character_path = spawn.character_glb.clone();
-        let character_scale = spawn.character_scale;
-        let character_yaw = spawn.character_yaw_deg.to_radians();
-        let character_y = spawn.character_y_offset;
-        let debug = debug_meshes.clone();
-
-        commands.entity(parent).with_children(|p| {
-            if !character_path.is_empty() {
+        // Character mesh = enfant SceneRoot. AsyncSceneCollider walk les meshes
+        // et génère un collider ConvexHull par mesh (épouse silhouette exacte).
+        // Rapier attache automatiquement ces colliders au RigidBody du parent.
+        if !character_path.is_empty() {
+            commands.entity(parent_id).with_children(|p| {
                 p.spawn((
                     SceneRoot(asset_server.load(&character_path)),
-                    Transform::from_xyz(0.0, character_y, 0.0)
+                    Transform::from_xyz(0.0, character_y_offset, 0.0)
                         .with_rotation(Quat::from_rotation_y(character_yaw))
                         .with_scale(Vec3::splat(character_scale)),
                     Name::new("CharacterMesh"),
+                    AsyncSceneCollider {
+                        shape: Some(ComputedColliderShape::ConvexHull),
+                        ..default()
+                    },
                 ));
-            }
-
-            let mut body_entity = p.spawn((
-                HitZone::Body,
-                Transform::from_xyz(0.0, body_y, 0.0),
-                RigidBody::Fixed,
-                Collider::cuboid(body_half.0, body_half.1, body_half.2),
-                Name::new("Body"),
-            ));
-            if let Some((ref bm, _, ref bmat, _)) = debug {
-                body_entity.insert((Mesh3d(bm.clone()), MeshMaterial3d(bmat.clone())));
-            }
-
-            let mut head_entity = p.spawn((
-                HitZone::Head,
-                Transform::from_xyz(0.0, head_y, 0.0),
-                RigidBody::Fixed,
-                Collider::ball(head_radius),
-                Name::new("Head"),
-            ));
-            if let Some((_, ref hm, _, ref hmat)) = debug {
-                head_entity.insert((Mesh3d(hm.clone()), MeshMaterial3d(hmat.clone())));
-            }
-        });
+            });
+        }
     }
 }
 

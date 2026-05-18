@@ -11,4 +11,5 @@ workspace = true
 bevy = { workspace = true }
 forgia-core = { workspace = true }
 forgia-damage = { path = "../forgia-damage" }
+forgia-combat = { workspace = true }
 bevy_rapier3d = { workspace = true }

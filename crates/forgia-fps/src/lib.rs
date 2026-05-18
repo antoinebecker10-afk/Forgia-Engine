@@ -34,6 +34,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 mod ads;
+mod ammo_systems;
 mod hitscan_sensor;
 pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
 mod score;
@@ -236,6 +237,28 @@ pub struct ViewmodelGenomeEntry {
     /// Vitesse relative du temps pendant hit-stop (0.05 = 5% = très lent). Default 0.05.
     #[serde(default = "default_hit_stop_speed")]
     pub hit_stop_speed: f32,
+    // ─── Story-455 Phase A — Ammo / Reload (2026-05-18) ──────────────────
+    /// Taille du chargeur (1 mag). Default 30 (rifle classique).
+    /// Sniper Lenoir = 5, Shotgun Boucherie = 6, SMG Bourrasque = 35, Pistolet Pépin = 12.
+    #[serde(default = "default_mag_size")]
+    pub mag_size: u32,
+    /// Munitions en réserve (hors mag). Default 120.
+    /// Pickup loot world peut augmenter, capé à reserve_max.
+    #[serde(default = "default_reserve_max")]
+    pub reserve_max: u32,
+    /// Durée totale d'un reload (secondes). Pour ShellPerShell = durée 1 shell.
+    /// Rifle ~1.8s, SMG ~1.5s, Sniper ~2.5s, Shotgun pump per-shell ~0.4s.
+    #[serde(default = "default_reload_time_secs")]
+    pub reload_time_secs: f32,
+    /// "mag" (batch transfer) ou "shell_per_shell" (pump shotgun). Default "mag".
+    #[serde(default = "default_reload_kind")]
+    pub reload_kind: String,
+    /// Toggle dev/playtest : true = munitions infinies. Default false.
+    #[serde(default)]
+    pub infinite_ammo: bool,
+    /// Seuil low-ammo (fraction mag) déclenchant flash rouge HUD. Default 0.25 (= 25%).
+    #[serde(default = "default_low_ammo_threshold")]
+    pub low_ammo_threshold: f32,
 }
 
 fn default_barrel_length() -> f32 { 0.55 }
@@ -268,6 +291,11 @@ fn default_recoil_pitch_deg() -> f32 { 0.4 }
 fn default_recoil_yaw_random_deg() -> f32 { 0.1 }
 fn default_fov_punch_deg() -> f32 { 0.0 }
 fn default_ads_scale_factor() -> f32 { 0.7 }
+fn default_mag_size() -> u32 { 30 }
+fn default_reserve_max() -> u32 { 120 }
+fn default_reload_time_secs() -> f32 { 1.8 }
+fn default_reload_kind() -> String { "mag".to_string() }
+fn default_low_ammo_threshold() -> f32 { 0.25 }
 
 #[derive(Resource)]
 pub struct ViewmodelGenomeHandle(pub Handle<Genome<ViewmodelGenome>>);
@@ -348,6 +376,7 @@ pub struct HitApplyCtx<'w, 's> {
 #[derive(SystemParam)]
 pub struct HitscanCtx<'w, 's> {
     pub q_children: Query<'w, 's, &'static Children>,
+    pub q_child_of: Query<'w, 's, &'static ChildOf>,
     pub q_name: Query<'w, 's, &'static Name>,
     pub sensor: ResMut<'w, HitscanSensorState>,
 }
@@ -622,11 +651,23 @@ impl Plugin for ForgiaFpsPlugin {
             // + per-weapon damage/fire_rate/range/spread depuis ViewmodelGenomeEntry TOML.
             // Reconstruit 2026-05-17 depuis memories après perte WIP 2026-05-16 PM.
             // Limitations : fire_mode "burst" NON implémenté (fallback semi + warn).
+            // Story-455 Phase A — sync_ammo_slots_from_genome NE DOIT PAS être gated Fps.
+            // Le genome ViewmodelGenome se charge au Startup → AssetEvent::Added arrive
+            // ~50-200ms après boot, alors que GameMode = None (menu). Si gated Fps, l'event
+            // expire du buffer Bevy avant que le user entre Arena → slots jamais peuplés
+            // (sensor `forgia_hud_ammo.json: slots: []` observé runtime 2026-05-18).
+            //
+            // Fix : sync system tourne en permanence (idempotent, no-op si handle absent).
+            // Les autres 3 ammo systems restent gated Fps (input/state runtime gameplay).
+            .add_systems(Update, ammo_systems::sync_ammo_slots_from_genome)
             .add_systems(
                 Update,
                 (
                     track_left_mouse_state,
                     weapon_select_system,
+                    ammo_systems::cancel_reload_on_weapon_switch,
+                    ammo_systems::reload_key_input,
+                    ammo_systems::tick_ammo_reload,
                     fire_weapon_minimal,
                     despawn_dead_cubes,
                 )
@@ -656,6 +697,37 @@ fn pseudo_rand(seed: u32) -> f32 {
     x ^= x >> 17;
     x ^= x << 5;
     (x as f32) / (u32::MAX as f32)
+}
+
+/// Walk ChildOf ancestors max `max_depth` niveaux pour trouver l'entité qui porte
+/// `Health` (typiquement le parent TargetCube d'un bot — story-453 architecture
+/// `AsyncSceneCollider ConvexHull` : ray hit child mesh, parent porte Health).
+///
+/// Utilisé par :
+/// - `fire_weapon_minimal` damage path (applique dégâts au parent)
+/// - `fire_weapon_minimal` sensor categorization (BUG-RUN-1 fix story-455)
+///
+/// Return : Some(parent_entity) si trouvé ; None si la chaîne se termine sans Health.
+fn find_health_ancestor(
+    hit_entity: Entity,
+    q_child_of: &Query<&ChildOf>,
+    health_query: &Query<
+        (&mut Health, Option<&MeshMaterial3d<StandardMaterial>>),
+        With<TargetCube>,
+    >,
+    max_depth: u32,
+) -> Option<Entity> {
+    let mut current = hit_entity;
+    for _ in 0..max_depth {
+        if health_query.get(current).is_ok() {
+            return Some(current);
+        }
+        match q_child_of.get(current) {
+            Ok(co) => current = co.parent(),
+            Err(_) => return None,
+        }
+    }
+    None
 }
 
 /// Despawn les cubes morts (HP=0). Système séparé chained après fire.
@@ -751,12 +823,12 @@ fn fire_weapon_minimal(
     mut hit_events: MessageWriter<CombatHitEvent>,
     mut juice: JuiceWriters,
     left: Res<LeftMouseState>,
-    equipped: Res<EquippedWeapons>,
+    mut ammo: ammo_systems::AmmoCtx,
     genome_ctx: ViewmodelGenomeCtx,
     ads: Res<ads::AdsState>,
     mut hitscan_ctx: HitscanCtx,
 ) {
-    let entry = genome_ctx.entry(equipped.current);
+    let entry = genome_ctx.entry(ammo.equipped.current);
     let fire_mode = entry.map(|e| e.fire_mode.as_str()).unwrap_or("auto");
     let is_burst_mode = fire_mode == "burst";
 
@@ -801,6 +873,13 @@ fn fire_weapon_minimal(
         }
     };
     if !trigger {
+        return;
+    }
+
+    // Story-455 Phase A — Ammo gate. Tente de consommer 1 shot AVANT toute action coûteuse
+    // (juice/raycast/vfx). Si mag vide : auto-start reload (si reserve > 0) + early return.
+    // Si reload en cours et user tire : cancel reload (AAA feel, CoD/Apex parity).
+    if !ammo.try_fire() {
         return;
     }
 
@@ -875,7 +954,7 @@ fn fire_weapon_minimal(
         + cam_right_v * gun_off_x
         + cam_up_v * gun_off_y;
     if let Some(vfx) = weapon_vfx.as_deref() {
-        spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, &equipped.current);
+        spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, &ammo.equipped.current);
     }
 
     // Params raycast
@@ -950,7 +1029,7 @@ fn fire_weapon_minimal(
                 origin,
                 pellet_dir,
                 hit_dist,
-                &equipped.current,
+                &ammo.equipped.current,
                 range.min(120.0),
                 0.30,
             );
@@ -958,24 +1037,37 @@ fn fire_weapon_minimal(
         if let Some((_, toi)) = hit_result {
             let impact_pos = origin + pellet_dir * toi;
             if let Some(vfx) = weapon_vfx.as_deref() {
-                spawn_impact_vfx(&mut commands, vfx, impact_pos, &equipped.current);
+                spawn_impact_vfx(&mut commands, vfx, impact_pos, &ammo.equipped.current);
             }
         }
 
-        // Sensor log : on tente direct Health lookup. Si c'est un TargetCube → damage,
-        // sinon c'est du décor (Wall/Ground/Cover).
+        // Sensor log : BUG-RUN-1 fix (story-455 audit runtime 2026-05-18).
+        // Le ray hit un child Mesh3d (collider ConvexHull AsyncSceneCollider), pas le
+        // parent TargetCube. Sans walk ChildOf, le sensor classait 100% des hits sur
+        // bot mesh comme "blocker" → faux négatif (34 kills réels mais hits_with_damage=0
+        // dans forgia_hitscan.json). Walk identique au damage path pour cohérence.
+        let target_ancestor = match hit_result {
+            None => None,
+            Some((entity, _)) => find_health_ancestor(
+                entity,
+                &hitscan_ctx.q_child_of,
+                &hit_ctx.health,
+                8,
+            ),
+        };
         let (sensor_category, sensor_hit_idx, sensor_name, sensor_toi) = match hit_result {
             None => (HitscanCategory::Miss, None, None, None),
             Some((entity, toi)) => {
-                let is_target = hit_ctx.health.get(entity).is_ok();
-                let cat = if is_target {
+                let cat = if target_ancestor.is_some() {
                     HitscanCategory::HitZoneBody
                 } else {
                     HitscanCategory::BlockerNonZone
                 };
+                // Nom = ancestor TargetCube si trouvé (lisible "Bot_3"), sinon entity raw.
+                let display_entity = target_ancestor.unwrap_or(entity);
                 let name = hitscan_ctx
                     .q_name
-                    .get(entity)
+                    .get(display_entity)
                     .ok()
                     .map(|n| n.as_str().to_string());
                 (cat, Some(entity.to_bits()), name, Some(toi))
@@ -983,7 +1075,7 @@ fn fire_weapon_minimal(
         };
         hitscan_ctx.sensor.push(HitscanLogEntry {
             t: timing.time.elapsed_secs(),
-            weapon: equipped.current,
+            weapon: ammo.equipped.current,
             origin,
             dir: pellet_dir,
             hit_entity_idx: sensor_hit_idx,
@@ -992,41 +1084,53 @@ fn fire_weapon_minimal(
             category: sensor_category,
         });
 
-        // Apply damage : direct sur le bot parent (1 entité = 1 capsule, pas de ChildOf walk).
-        if let Some((entity, toi)) = hit_result {
-            if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
-                let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
-                let effective_dmg = damage * falloff_mul;
-                hp.current = (hp.current - effective_dmg).max(0.0);
-                let dead = hp.is_dead();
-                let new_hp = hp.current;
+        // Apply damage : ray hit le collider ConvexHull généré par AsyncSceneCollider.
+        // Le collider est plusieurs niveaux sous le bot parent (SceneRoot child →
+        // Mesh3d nodes → rapier collider entities). `target_ancestor` calculé plus haut
+        // pour le sensor — réutilisé ici (DRY, fix BUG-RUN-1 cohérent).
+        if let Some((_, toi)) = hit_result {
+            if let Some(entity) = target_ancestor {
+                if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
+                    let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
+                    let effective_dmg = damage * falloff_mul;
+                    hp.current = (hp.current - effective_dmg).max(0.0);
+                    let dead = hp.is_dead();
+                    let new_hp = hp.current;
 
-                // Flash visuel si le bot a un mesh debug (show_collider_debug=true).
-                if let Some(mat_comp) = mat_opt {
-                    let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
-                    commands
-                        .entity(entity)
-                        .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
-                        .insert(HitFlashTimer {
-                            timer: Timer::from_seconds(flash_dur, TimerMode::Once),
-                            original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
-                            original_handle: Some(mat_comp.0.clone()),
-                        });
+                    if let Some(mat_comp) = mat_opt {
+                        let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
+                        commands
+                            .entity(entity)
+                            .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
+                            .insert(HitFlashTimer {
+                                timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                                original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
+                                original_handle: Some(mat_comp.0.clone()),
+                            });
+                    }
+
+                    // Story-455 Phase C — étendu attacker/headshot/world_pos/weapon.
+                    // Headshot toujours `false` en attendant hitzone Head/Body split (story-456).
+                    let attacker_entity = q_player.single().ok();
+                    let hit_world = origin + pellet_dir * toi;
+                    hit_events.write(CombatHitEvent {
+                        target: entity,
+                        attacker: attacker_entity,
+                        damage: effective_dmg,
+                        is_kill: dead,
+                        is_headshot: false,
+                        hit_world_pos: hit_world,
+                        weapon: Some(ammo.equipped.current),
+                    });
+
+                    if hit_record.is_none() {
+                        hit_record = Some((entity, toi));
+                    }
+                    info!(
+                        "[fire] pellet {}/{} HIT {entity:?} toi={toi:.2}m dmg={effective_dmg:.1} hp={new_hp:.1} dead={dead}",
+                        pellet_idx + 1, pellets
+                    );
                 }
-
-                hit_events.write(CombatHitEvent {
-                    target: entity,
-                    damage: effective_dmg,
-                    is_kill: dead,
-                });
-
-                if hit_record.is_none() {
-                    hit_record = Some((entity, toi));
-                }
-                info!(
-                    "[fire] pellet {}/{} HIT {entity:?} toi={toi:.2}m dmg={effective_dmg:.1} hp={new_hp:.1} dead={dead}",
-                    pellet_idx + 1, pellets
-                );
             }
         }
     }
@@ -1041,7 +1145,7 @@ fn fire_weapon_minimal(
             restore_speed: 1.0,
         });
     } else {
-        info!("[fire] miss ({} pellets, {:?})", pellets, equipped.current);
+        info!("[fire] miss ({} pellets, {:?})", pellets, ammo.equipped.current);
     }
 }
 

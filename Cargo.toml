@@ -234,6 +234,11 @@ members = [
     "crates/forgia-ui-notifications",
     "crates/forgia-ui-objectives",
     "crates/forgia-ui-settings-panel",
+    "crates/forgia-ui-style",
+    "crates/forgia-ui-hud-ammo",
+    "crates/forgia-killfeed",
+    "crates/forgia-ui-damage-direction",
+    "crates/forgia-ui-pause-menu",
     "crates/forgia-ui-tooltip",
     "crates/forgia-underwater",
     "crates/forgia-vfx-decals",
@@ -283,7 +288,7 @@ unused_variables = "warn"
 [workspace.dependencies]
 # Pin Bevy 0.18.1 stable until V1 ship. Migration 0.19+ post-ship V1.1.
 bevy = { version = "0.18.1", features = ["wav", "mp3", "vorbis", "jpeg", "bevy_dev_tools", "ktx2", "webp", "file_watcher"] }
-bevy_rapier3d = "0.33"
+bevy_rapier3d = { version = "0.33", features = ["debug-render-3d"] }
 bevy_egui = "0.39.1"
 bevy_hanabi = { version = "0.18", default-features = false, features = ["3d"] }
 bevy_kira_audio = "0.25"
@@ -543,6 +548,11 @@ forgia-ui-minimap = { path = "crates/forgia-ui-minimap" }
 forgia-ui-notifications = { path = "crates/forgia-ui-notifications" }
 forgia-ui-objectives = { path = "crates/forgia-ui-objectives" }
 forgia-ui-settings-panel = { path = "crates/forgia-ui-settings-panel" }
+forgia-ui-style = { path = "crates/forgia-ui-style" }
+forgia-ui-hud-ammo = { path = "crates/forgia-ui-hud-ammo" }
+forgia-killfeed = { path = "crates/forgia-killfeed" }
+forgia-ui-damage-direction = { path = "crates/forgia-ui-damage-direction" }
+forgia-ui-pause-menu = { path = "crates/forgia-ui-pause-menu" }
 forgia-ui-tooltip = { path = "crates/forgia-ui-tooltip" }
 forgia-underwater = { path = "crates/forgia-underwater" }
 forgia-vfx-decals = { path = "crates/forgia-vfx-decals" }
