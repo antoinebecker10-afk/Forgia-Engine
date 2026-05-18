@@ -83,15 +83,24 @@ pub struct Lod2TileManager {
     #[allow(dead_code)]
     mesh: Option<Handle<Mesh>>,
     material_cache: HashMap<u8, Handle<StandardMaterial>>,
-    /// Wave 5 phase 2c : mesh imposter shared (cone simple) pour tree silhouettes
-    /// au loin. 1 mesh handle global, instancié per-tree as cluster children.
+    /// Wave 5 phase 2c+2e : OBSOLETE — remplacé par SceneRoot kaykit-forest GLBs.
+    #[allow(dead_code)]
     tree_imposter_mesh: Option<Handle<Mesh>>,
-    /// Materials per biome pour tree silhouette darken (~0.4× biome color).
+    /// Wave 5 phase 2c+2e : OBSOLETE — kaykit-forest materials baked dans GLB.
+    #[allow(dead_code)]
     tree_material_cache: HashMap<u8, Handle<StandardMaterial>>,
-    /// Wave 5 phase 2d : sphere mesh shared pour rock silhouettes.
+    /// Wave 5 phase 2d+2e : OBSOLETE — remplacé par SceneRoot kaykit-forest rocks.
+    #[allow(dead_code)]
     rock_imposter_mesh: Option<Handle<Mesh>>,
-    /// Material shared rock gris foncé (1 handle global).
+    /// Wave 5 phase 2d+2e : OBSOLETE — kaykit-forest rocks ont leur material.
+    #[allow(dead_code)]
     rock_material: Option<Handle<StandardMaterial>>,
+    /// Wave 5 phase 2e : Scene handles kaykit-forest trees (3 variants).
+    /// Loaded une fois, instanciés N × per tile via SceneRoot — auto-instancing
+    /// Bevy si même Handle<Scene> partagé.
+    tree_scenes: Vec<Handle<Scene>>,
+    /// Wave 5 phase 2e : Scene handles kaykit-forest rocks (3 variants).
+    rock_scenes: Vec<Handle<Scene>>,
 }
 
 impl Lod2TileManager {
@@ -339,6 +348,7 @@ fn cluster_tree_hash(key: (i32, i32), idx: u32) -> u32 {
 #[allow(clippy::too_many_arguments)]
 pub fn build_lod2_tiles_system(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut tile_mgr: ResMut<Lod2TileManager>,
     mut lod_stats: ResMut<LodStats>,
     biome_map: Option<Res<BiomeMap>>,
@@ -400,30 +410,37 @@ pub fn build_lod2_tiles_system(
         h
     };
 
-    // Wave 5 phase 2c : tree imposter mesh shared (cone bas-poly).
-    // 1 cone primitive instancié N fois par tile, child du tile entity.
-    let tree_mesh = tile_mgr
-        .tree_imposter_mesh
-        .get_or_insert_with(|| meshes.add(Cone::new(1.5, 5.0)))
-        .clone();
-
-    // Wave 5 phase 2d : rock imposter (sphere écrasée). Shared mesh + material.
-    let rock_mesh = tile_mgr
-        .rock_imposter_mesh
-        .get_or_insert_with(|| meshes.add(Sphere::new(1.2).mesh().ico(1).unwrap()))
-        .clone();
-    let rock_mat = tile_mgr
-        .rock_material
-        .get_or_insert_with(|| {
-            materials.add(StandardMaterial {
-                base_color: Color::srgb(0.35, 0.32, 0.30), // gris foncé rocky
-                perceptual_roughness: 0.95,
-                metallic: 0.0,
-                unlit: true,
-                ..default()
-            })
-        })
-        .clone();
+    // Wave 5 phase 2e : LOAD vrais GLBs kaykit-forest une fois et cache.
+    // Variants pour diversité visuelle (hash bits choisit lequel).
+    // Paths relatifs assets/ — kebab-case stable post-rename story-449 wave 5.
+    if tile_mgr.tree_scenes.is_empty() {
+        const TREE_PATHS: &[&str] = &[
+            "models-v1/packs/kaykit-forest/Assets/gltf/Tree_1_A_Color1.gltf",
+            "models-v1/packs/kaykit-forest/Assets/gltf/Tree_2_B_Color1.gltf",
+            "models-v1/packs/kaykit-forest/Assets/gltf/Tree_1_C_Color1.gltf",
+        ];
+        for p in TREE_PATHS {
+            let h: Handle<Scene> = asset_server.load(
+                bevy::asset::AssetPath::from(*p).with_label("Scene0"),
+            );
+            tile_mgr.tree_scenes.push(h);
+        }
+    }
+    if tile_mgr.rock_scenes.is_empty() {
+        const ROCK_PATHS: &[&str] = &[
+            "models-v1/packs/kaykit-forest/Assets/gltf/Rock_1_A_Color1.gltf",
+            "models-v1/packs/kaykit-forest/Assets/gltf/Rock_1_D_Color1.gltf",
+            "models-v1/packs/kaykit-forest/Assets/gltf/Rock_1_G_Color1.gltf",
+        ];
+        for p in ROCK_PATHS {
+            let h: Handle<Scene> = asset_server.load(
+                bevy::asset::AssetPath::from(*p).with_label("Scene0"),
+            );
+            tile_mgr.rock_scenes.push(h);
+        }
+    }
+    // Note : `materials` + `meshes` ResMut conservés pour build_lod2_terrain_mesh.
+    let _ = (&materials, &meshes);
 
     for &key in desired.keys() {
         if tile_mgr.tiles.contains_key(&key) { continue; }
@@ -465,32 +482,21 @@ pub fn build_lod2_tiles_system(
             if !biome_supports_distant_trees(biome) {
                 continue;
             }
-            // Material per biome avec foliage color darken pour silhouette tree.
-            let biome_id = biome as u8;
-            let tree_mat = if let Some(h) = tile_mgr.tree_material_cache.get(&biome_id) {
-                h.clone()
-            } else {
-                // Darken biome color × 0.4 pour effet "foliage shadowed"
-                let c = biome.color().to_linear();
-                let darken = LinearRgba::new(c.red * 0.4, c.green * 0.5, c.blue * 0.4, 1.0);
-                let h = materials.add(StandardMaterial {
-                    base_color: Color::from(darken),
-                    perceptual_roughness: 0.95,
-                    metallic: 0.0,
-                    unlit: true,
-                    ..default()
-                });
-                tile_mgr.tree_material_cache.insert(biome_id, h.clone());
-                h
-            };
-            // Spawn tree comme child du tile (despawn cascade auto).
+            // Wave 5 phase 2e : pick tree variant via hash bits (3 variants
+            // kaykit-forest). Auto-instancing Bevy = même draw call par variant.
+            let variant_idx = ((hash >> 24) as usize) % tile_mgr.tree_scenes.len();
+            let scene = tile_mgr.tree_scenes[variant_idx].clone();
+            // Scale jitter 0.85-1.4 — varieté naturelle de la forêt.
+            let scale = 0.85 + ((hash >> 12) & 0xFF) as f32 / 255.0 * 0.55;
+            let yaw = ((hash >> 4) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
             commands.entity(tile_entity).with_children(|c| {
                 c.spawn((
-                    Mesh3d(tree_mesh.clone()),
-                    MeshMaterial3d(tree_mat),
-                    // Local position relative au tile center (déjà translated
-                    // par parent Transform).
-                    Transform::from_xyz(lx, world_y + 2.5, lz),
+                    SceneRoot(scene),
+                    Transform {
+                        translation: Vec3::new(lx, world_y, lz),
+                        rotation: Quat::from_rotation_y(yaw),
+                        scale: Vec3::splat(scale),
+                    },
                 ));
             });
         }
@@ -513,14 +519,20 @@ pub fn build_lod2_tiles_system(
             if matches!(biome, Volcanic | Swamp) {
                 continue;
             }
-            // Scale variation via hash bits — petit/moyen rocher.
+            // Wave 5 phase 2e : pick rock variant via hash bits (3 variants
+            // kaykit-forest). Scale jitter pour silhouette diversifiée.
+            let variant_idx = ((hash >> 24) as usize) % tile_mgr.rock_scenes.len();
+            let scene = tile_mgr.rock_scenes[variant_idx].clone();
             let scale = 0.6 + ((hash >> 16) & 0xFF) as f32 / 255.0 * 1.5;
+            let yaw = ((hash >> 4) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
             commands.entity(tile_entity).with_children(|c| {
                 c.spawn((
-                    Mesh3d(rock_mesh.clone()),
-                    MeshMaterial3d(rock_mat.clone()),
-                    Transform::from_xyz(lx, world_y + 0.5, lz)
-                        .with_scale(Vec3::splat(scale)),
+                    SceneRoot(scene),
+                    Transform {
+                        translation: Vec3::new(lx, world_y, lz),
+                        rotation: Quat::from_rotation_y(yaw),
+                        scale: Vec3::splat(scale),
+                    },
                 ));
             });
         }
