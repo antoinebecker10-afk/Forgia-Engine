@@ -83,6 +83,11 @@ pub struct Lod2TileManager {
     #[allow(dead_code)]
     mesh: Option<Handle<Mesh>>,
     material_cache: HashMap<u8, Handle<StandardMaterial>>,
+    /// Wave 5 phase 2c : mesh imposter shared (cone simple) pour tree silhouettes
+    /// au loin. 1 mesh handle global, instancié per-tree as cluster children.
+    tree_imposter_mesh: Option<Handle<Mesh>>,
+    /// Materials per biome pour tree silhouette darken (~0.4× biome color).
+    tree_material_cache: HashMap<u8, Handle<StandardMaterial>>,
 }
 
 impl Lod2TileManager {
@@ -279,6 +284,28 @@ fn build_lod2_terrain_mesh(
     mesh
 }
 
+/// Wave 5 phase 2c — biomes supportant des arbres silhouette au loin.
+/// Pattern Skyrim distant trees : silhouette présente mais simplifiée.
+fn biome_supports_distant_trees(b: crate::biomes::BiomeType) -> bool {
+    use crate::biomes::BiomeType::*;
+    matches!(b, Forest | Plains | Jungle | Tundra | Savanna | Swamp)
+}
+
+/// Densité d'arbres par cluster LOD2 (128×128m). Bas pour silhouette only.
+const LOD2_TREES_PER_CLUSTER: u32 = 8;
+
+/// Hash déterministe (cluster_x, cluster_z, seed_offset) → u32 pour
+/// scatter positions reproductible per seed.
+fn cluster_tree_hash(key: (i32, i32), idx: u32) -> u32 {
+    let x = key.0 as u32;
+    let z = key.1 as u32;
+    let mut h = x.wrapping_mul(0x9E37_79B1);
+    h = h.wrapping_add(z.wrapping_mul(0x85EB_CA6B));
+    h = h.wrapping_add(idx.wrapping_mul(0xC2B2_AE3D));
+    h ^= h >> 16;
+    h.wrapping_mul(0x27D4_EB2F)
+}
+
 /// Spawn/despawn LOD2 mega-tile planes pour le ring 320–1500m. 1 plane par
 /// cluster (4×4 chunks = 128×128m), material per biome (cache shared, 10 max).
 ///
@@ -348,6 +375,13 @@ pub fn build_lod2_tiles_system(
         h
     };
 
+    // Wave 5 phase 2c : tree imposter mesh shared (cone bas-poly).
+    // 1 cone primitive instancié N fois par tile, child du tile entity.
+    let tree_mesh = tile_mgr
+        .tree_imposter_mesh
+        .get_or_insert_with(|| meshes.add(Cone::new(1.5, 5.0)))
+        .clone();
+
     for &key in desired.keys() {
         if tile_mgr.tiles.contains_key(&key) { continue; }
 
@@ -369,7 +403,54 @@ pub fn build_lod2_tiles_system(
             ))
             .id();
 
-        tile_mgr.tiles.insert(key, tile_entity);
+        // Wave 5 phase 2c : scatter N tree imposters per tile selon biome.
+        // Pattern Skyrim distant trees — silhouette présente au loin sans
+        // payer le coût des vrais GLB trees du forgia-foliage system.
+        for tree_idx in 0..LOD2_TREES_PER_CLUSTER {
+            let hash = cluster_tree_hash(key, tree_idx);
+            // Position locale dans la tile [-HALF..HALF] avec hash bits.
+            let lx = ((hash & 0xFF) as f32 / 255.0 - 0.5) * (CLUSTER_SIZE_M * 0.85);
+            let lz = (((hash >> 8) & 0xFF) as f32 / 255.0 - 0.5) * (CLUSTER_SIZE_M * 0.85);
+            let world_x = center.x + lx;
+            let world_z = center.y + lz;
+            let world_y = heightmap_at(world_x + off.0, world_z + off.1, &terrain_cfg);
+            // Skip si sous sea_level (pas d'arbres dans l'eau).
+            if world_y < terrain_cfg.sea_level + 0.5 {
+                continue;
+            }
+            let biome = biome_map.biome_at(world_x + off.0, world_z + off.1);
+            if !biome_supports_distant_trees(biome) {
+                continue;
+            }
+            // Material per biome avec foliage color darken pour silhouette tree.
+            let biome_id = biome as u8;
+            let tree_mat = if let Some(h) = tile_mgr.tree_material_cache.get(&biome_id) {
+                h.clone()
+            } else {
+                // Darken biome color × 0.4 pour effet "foliage shadowed"
+                let c = biome.color().to_linear();
+                let darken = LinearRgba::new(c.red * 0.4, c.green * 0.5, c.blue * 0.4, 1.0);
+                let h = materials.add(StandardMaterial {
+                    base_color: Color::from(darken),
+                    perceptual_roughness: 0.95,
+                    metallic: 0.0,
+                    unlit: true,
+                    ..default()
+                });
+                tile_mgr.tree_material_cache.insert(biome_id, h.clone());
+                h
+            };
+            // Spawn tree comme child du tile (despawn cascade auto).
+            commands.entity(tile_entity).with_children(|c| {
+                c.spawn((
+                    Mesh3d(tree_mesh.clone()),
+                    MeshMaterial3d(tree_mat),
+                    // Local position relative au tile center (déjà translated
+                    // par parent Transform).
+                    Transform::from_xyz(lx, world_y + 2.5, lz),
+                ));
+            });
+        }
     }
 
     let to_remove: Vec<(i32, i32)> = tile_mgr

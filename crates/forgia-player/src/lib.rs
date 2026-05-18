@@ -101,7 +101,7 @@ impl Plugin for ForgiaPlayerPlugin {
             .add_systems(OnExit(AppMode::InGame), despawn_player)
             .add_systems(
                 Update,
-                (mouse_look, weapon_recoil_apply, player_movement)
+                (mouse_look, weapon_recoil_apply, player_movement, player_floor_safety_net)
                     .chain()
                     .run_if(in_state(AppMode::InGame)),
             );
@@ -142,6 +142,14 @@ fn spawn_player(mut commands: Commands) {
         children![(
             FpsCamera,
             Camera3d::default(),
+            // Story-450 wave 5 phase 2c : étendre far plane à 2000m pour
+            // couvrir LOD2_MAX_M=1500m + marge. Bevy default = 1000m
+            // → LOD2 tiles 1000-1500m étaient clippées (gap horizon visible).
+            Projection::from(PerspectiveProjection {
+                far: 2000.0,
+                near: 0.05,
+                ..Default::default()
+            }),
             Transform::from_xyz(0.0, 0.7, 0.0),
         )],
     ));
@@ -419,6 +427,21 @@ fn player_movement(
     );
 
     kcc.translation = Some(move_vec);
+}
+
+/// Story-453 floor safety net (2026-05-18) — si le player KinematicCharacterController
+/// rate son snap_to_ground et tombe sous Y=-1.0 (largement sous le sol Y=0), on
+/// teleporte à Y=2.0 sur le même XZ pour récupérer. Cosmétique-debug — vise à
+/// révéler le bug sous-jacent via logs sans crasher la session.
+fn player_floor_safety_net(mut q: Query<&mut Transform, With<Player>>) {
+    let Ok(mut tf) = q.single_mut() else { return };
+    if tf.translation.y < -1.0 {
+        warn!(
+            "[player-safety-net] Player sous le sol (Y={:.2}) — teleport Y=2.0",
+            tf.translation.y
+        );
+        tf.translation.y = 2.0;
+    }
 }
 
 #[cfg(test)]
