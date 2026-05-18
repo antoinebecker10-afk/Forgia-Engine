@@ -188,6 +188,7 @@ fn populate_new_chunks(
     rpg_offset: Option<Res<RpgSampleOffset>>,
     path_net: Option<Res<PathNetwork>>,
     excl_disc: Option<Res<FoliageExclusionDisc>>,
+    flatten_zones: Option<Res<forgia_terrain::FlattenZones>>,
     q_chunks: Query<(Entity, &ChunkCoord, Option<&ChunkLod>)>,
 ) {
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
@@ -248,7 +249,14 @@ fn populate_new_chunks(
             let wx = origin.x + lx;
             let wz = origin.z + lz;
             // Échantillon altitude via pipeline V1 (avec offset RPG identique au mesh).
-            let h = forgia_terrain::heightmap_at(wx + rpg_offset.x, wz + rpg_offset.z, &terrain_cfg);
+            // Story-447 fix lévitation : foliage Y doit utiliser FlattenZones aussi,
+            // sinon les arbres en bordure village (zone falloff) flottent au-dessus
+            // du mesh leveled. Pure post-process raw → flatten-sampled.
+            let raw_h = forgia_terrain::heightmap_at(wx + rpg_offset.x, wz + rpg_offset.z, &terrain_cfg);
+            let h = match flatten_zones.as_deref() {
+                Some(zones) => zones.sample(wx, wz, raw_h),
+                None => raw_h,
+            };
 
             // Skip si sous le sea_level (un poil de marge cosmétique).
             if h < terrain_cfg.sea_level + 0.3 { continue; }

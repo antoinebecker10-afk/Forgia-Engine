@@ -25,9 +25,10 @@ use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{FoliageExclusionDisc, RpgSampleOffset, VegetationTree};
 use forgia_terrain::{
     build_chunk_mesh, build_path_segment, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
-    Lod2TileManager, LodSampleOffset, LodStats, MapGenConfig, PathNetwork, RoadTier,
-    TerrainConfig, TerrainSharedMaterial, CHUNK_X, CHUNK_Z,
+    FlattenZones, Lod2TileManager, LodSampleOffset, LodStats, MapGenConfig, PathNetwork, RoadTier,
+    TerrainConfig, TerrainSharedMaterial, VillageFlattenZone, CHUNK_X, CHUNK_Z,
 };
+use forgia_genome_village::VillageGenome;
 use forgia_village_loader::{
     cleanup_village, LoadVillageGenomeRequest, LoadVillageRequest, VillageLoadResult,
 };
@@ -161,6 +162,23 @@ fn terrain_height_local(x: f32, z: f32, config: &TerrainConfig) -> f32 {
     forgia_terrain::heightmap_at(x + off.x, z + off.y, config)
 }
 
+/// Story-447 Niveau A.5 — variante qui applique [`FlattenZones`] sur le Y du
+/// terrain. Utilisée par le path ribbon mesh pour que les routes restent au
+/// niveau du plateau dans le inner_radius, et descendent smoothement dans le
+/// falloff. Sinon les routes traversent le plateau (rampe boueuse).
+fn terrain_height_local_with_flatten(
+    x: f32,
+    z: f32,
+    config: &TerrainConfig,
+    flatten_zones: Option<&FlattenZones>,
+) -> f32 {
+    let raw = terrain_height_local(x, z, config);
+    match flatten_zones {
+        Some(z_def) => z_def.sample(x, z, raw),
+        None => raw,
+    }
+}
+
 /// W1 — Spawn 1 terrain chunk via forgia-terrain (heightmap-grid + Voronoi biomes).
 /// W2 étendra à streaming N chunks autour du joueur.
 fn spawn_world(
@@ -196,9 +214,42 @@ fn spawn_world(
         }
     };
 
+    // ── Story-447 — village terrain leveling (calc AVANT chunk mesh) ────
+    // Load le village genome maintenant pour piloter le flatten zone, et le
+    // village-loader le re-lira plus tard pour spawner les buildings. Coût
+    // négligeable (TOML ~1KB) ; alternative serait de partager une Resource
+    // mais la double-lecture est plus simple et hot-reload-friendly.
+    const VILLAGE_GENOME_PATH: &str = "config/genomes/villages/starter_hamlet.toml";
+    let village_world_center = Vec2::new(CHUNK_X as f32 * 0.5, CHUNK_Z as f32 * 0.5);
+    let mut flatten_zones = FlattenZones::new();
+    match VillageGenome::load_from_path(VILLAGE_GENOME_PATH) {
+        Ok(genome) if genome.terrain_leveling.enabled => {
+            let off = sample_offset();
+            let target_y = forgia_terrain::heightmap_at(
+                village_world_center.x + off.x,
+                village_world_center.y + off.y,
+                &terrain_cfg,
+            );
+            flatten_zones.push(VillageFlattenZone {
+                center: village_world_center,
+                target_y,
+                inner_radius: genome.terrain_leveling.radius_m,
+                falloff_radius: genome.terrain_leveling.falloff_m,
+            });
+            info!(
+                "[forgia-rpg] terrain_leveling : target_y={:.2}m, inner={}m, falloff={}m",
+                target_y, genome.terrain_leveling.radius_m, genome.terrain_leveling.falloff_m
+            );
+        }
+        Ok(_) => info!("[forgia-rpg] terrain_leveling disabled (genome.terrain_leveling.enabled=false)"),
+        Err(e) => warn!(
+            "[forgia-rpg] terrain_leveling : genome load failed ({e}) — terrain restera brut"
+        ),
+    }
+
     // ── 1 chunk static à l'origine (W1 vertical slice) ───────────────────
     let coord = ChunkCoord::new(0, 0);
-    let mesh_data = build_chunk_mesh(coord, sample_offset(), &terrain_cfg, &biome_map);
+    let mesh_data = build_chunk_mesh(coord, sample_offset(), &terrain_cfg, &biome_map, Some(&flatten_zones));
     let mesh_handle = meshes.add(mesh_data.mesh.clone());
     let chunk_entity = spawn_chunk_entity(
         &mut commands,
@@ -216,6 +267,10 @@ fn spawn_world(
     commands.insert_resource(map_cfg);
     commands.insert_resource(biome_map);
     commands.insert_resource(chunk_mgr);
+    // Story-447 — FlattenZones partagée : stream_chunks_around_player (W2) +
+    // forgia-village-loader (Y des buildings) la consultent pour sampler le
+    // heightmap leveled. Cleanup OnExit avec les autres ressources.
+    commands.insert_resource(flatten_zones);
     // forgia-foliage + forgia-terrain LOD : aligne les samples (heightmap + biome)
     // avec notre décalage RPG (sample_offset = map_size/2).
     let off = sample_offset();
@@ -230,11 +285,9 @@ fn spawn_world(
     // density + bounding) plutôt qu'un TOML hardcodant les positions XYZ.
     // Path network reste vide jusqu'à `spawn_village_paths_when_loaded`.
     commands.insert_resource(PathNetwork::default());
-    // World center for the spawn village = center of chunk (0,0). Derived from
-    // terrain chunk constants (no magic number).
-    let village_world_center = Vec2::new(CHUNK_X as f32 * 0.5, CHUNK_Z as f32 * 0.5);
+    // World center déjà calculé plus haut pour terrain leveling (story-447).
     commands.insert_resource(LoadVillageGenomeRequest {
-        genome_path: "config/genomes/villages/starter_hamlet.toml".into(),
+        genome_path: VILLAGE_GENOME_PATH.into(),
         terrain_sample_offset: sample_offset(),
         world_center: village_world_center,
     });
@@ -282,6 +335,7 @@ fn stream_chunks_around_player(
     terrain_cfg: Option<Res<TerrainConfig>>,
     biome_map: Option<Res<BiomeMap>>,
     shared_mat: Option<Res<TerrainSharedMaterial>>,
+    flatten_zones: Option<Res<FlattenZones>>,
     mut meshes: ResMut<Assets<Mesh>>,
     player_q: Query<&Transform, With<Player>>,
     mut pending: Local<VecDeque<ChunkCoord>>,
@@ -336,7 +390,7 @@ fn stream_chunks_around_player(
     for _ in 0..CHUNKS_PER_FRAME {
         let Some(coord) = pending.pop_front() else { break };
         if chunk_mgr.loaded_entities.contains_key(&coord) { continue; }
-        let mesh_data = build_chunk_mesh(coord, off, &terrain_cfg, &biome_map);
+        let mesh_data = build_chunk_mesh(coord, off, &terrain_cfg, &biome_map, flatten_zones.as_deref());
         let mesh_handle = meshes.add(mesh_data.mesh.clone());
         let entity = spawn_chunk_entity(
             &mut commands,
@@ -437,6 +491,7 @@ fn spawn_village_paths_when_loaded(
     village: Option<Res<VillageLoadResult>>,
     built: Option<Res<VillagePathsBuilt>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
+    flatten_zones: Option<Res<FlattenZones>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
@@ -463,37 +518,51 @@ fn spawn_village_paths_when_loaded(
         &asset_server,
         &path_net,
         &terrain_cfg,
+        flatten_zones.as_deref(),
     );
-    commands.insert_resource(path_net);
 
     // Foliage exclusion disc autour du village. Buffer +3m sur le bounding pour
     // une clairière nette autour des bâtiments les plus en bordure.
     let excl_radius = village.bounding_radius + 3.0;
     let excl_center = village.center;
-    commands.insert_resource(FoliageExclusionDisc {
-        center: excl_center,
-        radius: excl_radius,
-    });
 
-    // Despawn rétroactif des arbres déjà spawnés à l'intérieur du disc
-    // (race : foliage a pu populate le chunk avant que la village result soit
-    // émis). One-shot ici car protégé par VillagePathsBuilt marker.
+    // Despawn rétroactif des arbres déjà spawnés à l'intérieur du disc OU sur
+    // les routes (race : foliage a pu populate le chunk avant que les Resources
+    // PathNetwork / FoliageExclusionDisc ne soient insérées). One-shot ici car
+    // protégé par VillagePathsBuilt marker. Le sweep utilise path_net local
+    // AVANT son move dans insert_resource.
     let r2 = excl_radius * excl_radius;
+    let path_buffer_base = 4.0_f32;
     let mut cleared = 0u32;
+    let mut cleared_paths = 0u32;
     for (e, tf) in &q_existing_trees {
         let p = Vec2::new(tf.translation.x, tf.translation.z);
         if p.distance_squared(excl_center) < r2 {
             commands.entity(e).despawn();
             cleared += 1;
+            continue;
+        }
+        let too_close_path = path_net.samples_iter().any(|s| {
+            let buf = s.tier.half_width() + path_buffer_base;
+            p.distance_squared(s.pos) < buf * buf
+        });
+        if too_close_path {
+            commands.entity(e).despawn();
+            cleared_paths += 1;
         }
     }
-    if cleared > 0 {
+    if cleared > 0 || cleared_paths > 0 {
         info!(
-            "[forgia-rpg] cleared {} trees inside village exclusion disc r={:.1}m",
-            cleared, excl_radius
+            "[forgia-rpg] cleared {} trees inside village exclusion disc r={:.1}m + {} trees on paths",
+            cleared, excl_radius, cleared_paths
         );
     }
 
+    commands.insert_resource(FoliageExclusionDisc {
+        center: excl_center,
+        radius: excl_radius,
+    });
+    commands.insert_resource(path_net);
     commands.insert_resource(VillagePathsBuilt);
 }
 
@@ -590,7 +659,11 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
 /// vertices fondent vers la couleur herbe pour une transition douce 1m vs ligne
 /// nette. Y per-vertex via `heightmap_at` + léger bruit (-0.06..+0.02m) →
 /// ornières usées. compute_normals() pour éclairage correct sur les pentes.
-fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -> Mesh {
+fn build_path_ribbon_mesh(
+    path_net: &PathNetwork,
+    terrain_cfg: &TerrainConfig,
+    flatten_zones: Option<&FlattenZones>,
+) -> Mesh {
     use bevy::asset::RenderAssetUsages;
     use bevy::mesh::{Indices, PrimitiveTopology};
 
@@ -624,10 +697,15 @@ fn build_path_ribbon_mesh(path_net: &PathNetwork, terrain_cfg: &TerrainConfig) -
             // Y par vertex → tilt slope. + 0.03m anti-z-fight. Centre légèrement
             // creusé (-0.05) pour faux effet ornière. Outer level = terrain
             // exact pour fondre dans l'herbe (pas de step visible).
-            let h_or_outer = |p: Vec2| terrain_height_local(p.x, p.y, terrain_cfg) + 0.005;
+            // Story-447 A.5 — Y leveled via FlattenZones quand path ribbon
+            // traverse la zone plate du village (sinon le ruban descend du
+            // plateau vers le terrain naturel → rampe boueuse).
+            let h_or_outer = |p: Vec2| {
+                terrain_height_local_with_flatten(p.x, p.y, terrain_cfg, flatten_zones) + 0.005
+            };
             let h_or_inner = |p: Vec2, i: usize| {
                 let n = ((i as u32).wrapping_mul(2_246_822_507) as f32 / u32::MAX as f32) - 0.5;
-                terrain_height_local(p.x, p.y, terrain_cfg) + 0.03 + n * 0.06
+                terrain_height_local_with_flatten(p.x, p.y, terrain_cfg, flatten_zones) + 0.03 + n * 0.06
             };
             let y_ol = h_or_outer(p_ol);
             let y_il = h_or_inner(p_il, i);
@@ -705,10 +783,11 @@ fn spawn_path_ribbons(
     asset_server: &Res<AssetServer>,
     path_net: &PathNetwork,
     terrain_cfg: &TerrainConfig,
+    flatten_zones: Option<&FlattenZones>,
 ) {
     if path_net.polylines.is_empty() { return; }
 
-    let mesh = build_path_ribbon_mesh(path_net, terrain_cfg);
+    let mesh = build_path_ribbon_mesh(path_net, terrain_cfg, flatten_zones);
     let mesh_handle = meshes.add(mesh);
 
     // V1 path PBR pack via junction textures-v1/. Diff (albedo) + normal +

@@ -24,7 +24,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::{AsyncSceneCollider, ComputedColliderShape, RigidBody};
 use forgia_genome_village::VillageGenome;
 use forgia_prefab::{reset_prefab_stats, spawn_gltf_prefab, PrefabSpawn, PrefabStats};
-use forgia_terrain::{heightmap_at, TerrainConfig};
+use forgia_terrain::{heightmap_at, FlattenZones, TerrainConfig};
 use forgia_village_generator::generate as generate_village;
 use forgia_village_kit::{
     compute_rampart_pieces, rampart_wall_stretch, KitResolver, RampartPieceKind, VillageDef,
@@ -46,6 +46,8 @@ impl Plugin for ForgiaVillageLoaderPlugin {
                 process_village_genome_request,
                 process_village_request,
                 write_village_sensor,
+                write_village_debug_sensor,
+                village_debug_gizmos,
             )
                 .chain(),
         );
@@ -95,6 +97,12 @@ pub struct VillageLoadResult {
     /// Bounding radius (m) from the genome — used by callers to set up
     /// foliage exclusion zones around the village.
     pub bounding_radius: f32,
+    /// Story-447 — building footprints (world XZ + half-extent) for debug gizmos
+    /// and sensor `forgia_village_debug.json`. Half-extent comes from
+    /// `genome.scale.footprint_half_m` (single value pour V1 — Niveau C aura
+    /// variants par building).
+    pub buildings: Vec<BuildingFootprint>,
+    pub footprint_half_m: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -102,6 +110,14 @@ pub struct RoadSegment {
     pub start: Vec2,
     pub end: Vec2,
     pub tier: String,
+}
+
+/// Story-447 — building footprint pour debug gizmos + sensor JSON.
+#[derive(Clone, Debug)]
+pub struct BuildingFootprint {
+    pub piece: String,
+    pub world_xz: Vec2,
+    pub y: f32,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,11 +160,29 @@ const PLAYER_SPAWN_HEIGHT_OFFSET: f32 = 2.0;
 const BUILDING_Y_OFFSET: f32 = 0.0; // KayKit pivots at floor — no fudge.
 const RAMPART_Y_OFFSET: f32 = 0.0;
 
+/// Story-447 — sample Y du terrain à un point monde, en appliquant les zones
+/// de leveling si fournies. Centralise les 5 call-sites précédents qui
+/// dupliquaient `heightmap_at(...)`. Si `flatten_zones` est `None`, équivalent
+/// à `heightmap_at` brut (backward compat).
+fn sample_terrain_y(
+    world_xz: Vec2,
+    sample_offset: Vec2,
+    cfg: &TerrainConfig,
+    flatten_zones: Option<&FlattenZones>,
+) -> f32 {
+    let raw_y = heightmap_at(world_xz.x + sample_offset.x, world_xz.y + sample_offset.y, cfg);
+    match flatten_zones {
+        Some(z) => z.sample(world_xz.x, world_xz.y, raw_y),
+        None => raw_y,
+    }
+}
+
 fn process_village_request(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     request: Option<Res<LoadVillageRequest>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
+    flatten_zones: Option<Res<FlattenZones>>,
     stats: Res<VillageStats>,
     prefab_stats: Res<PrefabStats>,
     mut warned_no_terrain: Local<bool>,
@@ -220,10 +254,11 @@ fn process_village_request(
         };
         let local = Vec2::from(piece.position);
         let world_xz = center + local;
-        let y_terrain = heightmap_at(
-            world_xz.x + request.terrain_sample_offset.x,
-            world_xz.y + request.terrain_sample_offset.y,
+        let y_terrain = sample_terrain_y(
+            world_xz,
+            request.terrain_sample_offset,
             &terrain_cfg,
+            flatten_zones.as_deref(),
         );
         let e = spawn_gltf_prefab(
             &mut commands,
@@ -263,10 +298,11 @@ fn process_village_request(
             }
         };
         let world_xz = center + Vec2::from(b.position);
-        let y_terrain = heightmap_at(
-            world_xz.x + request.terrain_sample_offset.x,
-            world_xz.y + request.terrain_sample_offset.y,
+        let y_terrain = sample_terrain_y(
+            world_xz,
+            request.terrain_sample_offset,
             &terrain_cfg,
+            flatten_zones.as_deref(),
         );
         let e = spawn_gltf_prefab(
             &mut commands,
@@ -316,10 +352,11 @@ fn process_village_request(
     // ── Spawn world position ─────────────────────────────────────────────
     let spawn_local = Vec2::from(def.spawn.player_position);
     let spawn_world_xz = center + spawn_local;
-    let spawn_y_terrain = heightmap_at(
-        spawn_world_xz.x + request.terrain_sample_offset.x,
-        spawn_world_xz.y + request.terrain_sample_offset.y,
+    let spawn_y_terrain = sample_terrain_y(
+        spawn_world_xz,
+        request.terrain_sample_offset,
         &terrain_cfg,
+        flatten_zones.as_deref(),
     );
     let spawn_position = Vec3::new(
         spawn_world_xz.x,
@@ -357,6 +394,9 @@ fn process_village_request(
         ramparts_pieces: ramparts_count,
         // Legacy TOML path : ramparts radius approximate, fallback 18m.
         bounding_radius: def.ramparts.radius.max(18.0),
+        // Legacy path : building footprints non collectés (utilisé par path genome only).
+        buildings: Vec::new(),
+        footprint_half_m: 2.5,
     });
     commands.remove_resource::<LoadVillageRequest>();
 }
@@ -420,6 +460,7 @@ fn process_village_genome_request(
     asset_server: Res<AssetServer>,
     request: Option<Res<LoadVillageGenomeRequest>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
+    flatten_zones: Option<Res<FlattenZones>>,
     stats: Res<VillageStats>,
     prefab_stats: Res<PrefabStats>,
     mut warned_no_terrain: Local<bool>,
@@ -485,6 +526,8 @@ fn process_village_genome_request(
     let world_center = request.world_center;
 
     let mut buildings_count = 0u32;
+    // Story-447 — collect footprints pour debug gizmos + sensor JSON.
+    let mut footprints: Vec<BuildingFootprint> = Vec::new();
     for (node, b) in graph.buildings() {
         let path = match resolver.building_path(&genome.kit_mix.kit, &b.piece, b.color.as_deref()) {
             Ok(p) => p,
@@ -500,11 +543,17 @@ fn process_village_genome_request(
             }
         };
         let world_xz = world_center + node.position;
-        let y = heightmap_at(
-            world_xz.x + request.terrain_sample_offset.x,
-            world_xz.y + request.terrain_sample_offset.y,
+        let y = sample_terrain_y(
+            world_xz,
+            request.terrain_sample_offset,
             &terrain_cfg,
+            flatten_zones.as_deref(),
         );
+        footprints.push(BuildingFootprint {
+            piece: b.piece.clone(),
+            world_xz,
+            y,
+        });
         let scale = b.scale.unwrap_or(1.0) * genome.scale.unit_scale;
         let e = spawn_gltf_prefab(
             &mut commands,
@@ -548,10 +597,11 @@ fn process_village_genome_request(
     // genome's chosen world_center happens to land on low terrain).
     let spawn_local = Vec2::from(genome.spawn.local_offset);
     let spawn_world_xz = world_center + spawn_local;
-    let spawn_y_terrain = heightmap_at(
-        spawn_world_xz.x + request.terrain_sample_offset.x,
-        spawn_world_xz.y + request.terrain_sample_offset.y,
+    let spawn_y_terrain = sample_terrain_y(
+        spawn_world_xz,
+        request.terrain_sample_offset,
         &terrain_cfg,
+        flatten_zones.as_deref(),
     );
     let safe_y = spawn_y_terrain.max(terrain_cfg.sea_level + 1.0);
     let spawn_position = Vec3::new(spawn_world_xz.x, safe_y + 2.0, spawn_world_xz.y);
@@ -581,6 +631,7 @@ fn process_village_genome_request(
         genome.meta.id, genome.meta.seed, buildings_count, roads_count, gen_stats.poisson_retries, gen_stats.layout_type
     );
 
+    let footprint_half_m = genome.scale.footprint_half_m;
     commands.insert_resource(VillageLoadResult {
         village_id: genome.meta.id,
         center: world_center,
@@ -590,6 +641,8 @@ fn process_village_genome_request(
         buildings_loaded: buildings_count,
         ramparts_pieces: 0,
         bounding_radius: genome.scale.bounding_radius,
+        buildings: footprints,
+        footprint_half_m,
     });
     commands.remove_resource::<LoadVillageGenomeRequest>();
 
@@ -631,4 +684,167 @@ pub fn cleanup_village(
     if n > 0 {
         info!(target: "forgia_village_loader", "[village] cleanup despawned {n} entities");
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story-447 — Debug gizmos & sensor `forgia_village_debug.json`
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Story-447 — debug gizmos every frame en mode RPG : bounding radius, flatten
+/// zones (inner + outer falloff), road segments, building footprints (AABB
+/// half_m × half_m squares), spawn position.
+///
+/// Convention couleurs :
+/// - GREEN = bounding_radius (limite logique village)
+/// - YELLOW = flatten inner (plateau plat)
+/// - ORANGE = flatten outer (limite falloff smoothstep)
+/// - WHITE = road segments (centerlines)
+/// - BLUE = building footprints
+/// - MAGENTA = spawn position (player landing point)
+fn village_debug_gizmos(
+    mut gizmos: Gizmos,
+    village: Option<Res<VillageLoadResult>>,
+    flatten_zones: Option<Res<FlattenZones>>,
+) {
+    let Some(v) = village else { return };
+
+    // Bounding radius — limite logique du village.
+    gizmos.circle(
+        Isometry3d::new(
+            Vec3::new(v.center.x, v.spawn_position.y + 0.05, v.center.y),
+            Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+        ),
+        v.bounding_radius,
+        Color::srgb(0.2, 1.0, 0.3),
+    );
+
+    // Flatten zones — inner (plateau plat) + outer (limite falloff).
+    if let Some(zones) = flatten_zones.as_deref() {
+        for z in &zones.zones {
+            let y = z.target_y + 0.10;
+            gizmos.circle(
+                Isometry3d::new(
+                    Vec3::new(z.center.x, y, z.center.y),
+                    Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+                ),
+                z.inner_radius,
+                Color::srgb(1.0, 0.95, 0.2),
+            );
+            gizmos.circle(
+                Isometry3d::new(
+                    Vec3::new(z.center.x, y, z.center.y),
+                    Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+                ),
+                z.outer_radius(),
+                Color::srgb(1.0, 0.55, 0.1),
+            );
+        }
+    }
+
+    // Road segments — centerlines.
+    for road in &v.roads {
+        gizmos.line(
+            Vec3::new(road.start.x, v.spawn_position.y + 0.10, road.start.y),
+            Vec3::new(road.end.x, v.spawn_position.y + 0.10, road.end.y),
+            Color::WHITE,
+        );
+    }
+
+    // Building footprints — squares centrés sur world_xz, half-extent half_m.
+    let half = v.footprint_half_m;
+    for b in &v.buildings {
+        let corners = [
+            Vec3::new(b.world_xz.x - half, b.y + 0.05, b.world_xz.y - half),
+            Vec3::new(b.world_xz.x + half, b.y + 0.05, b.world_xz.y - half),
+            Vec3::new(b.world_xz.x + half, b.y + 0.05, b.world_xz.y + half),
+            Vec3::new(b.world_xz.x - half, b.y + 0.05, b.world_xz.y + half),
+        ];
+        let blue = Color::srgb(0.2, 0.5, 1.0);
+        gizmos.line(corners[0], corners[1], blue);
+        gizmos.line(corners[1], corners[2], blue);
+        gizmos.line(corners[2], corners[3], blue);
+        gizmos.line(corners[3], corners[0], blue);
+    }
+
+    // Spawn position — small cross + label position.
+    let sp = v.spawn_position;
+    let magenta = Color::srgb(1.0, 0.2, 1.0);
+    gizmos.line(sp + Vec3::new(-0.5, 0.0, 0.0), sp + Vec3::new(0.5, 0.0, 0.0), magenta);
+    gizmos.line(sp + Vec3::new(0.0, 0.0, -0.5), sp + Vec3::new(0.0, 0.0, 0.5), magenta);
+    gizmos.line(sp, sp + Vec3::new(0.0, 1.5, 0.0), magenta);
+}
+
+/// Story-447 — sensor `forgia_village_debug.json` 1Hz : footprints + leveling
+/// zones + roads. Permet à l'IA de diagnostiquer placement sans relancer le
+/// binaire.
+fn write_village_debug_sensor(
+    time: Res<Time>,
+    village: Option<Res<VillageLoadResult>>,
+    flatten_zones: Option<Res<FlattenZones>>,
+    mut last_write: Local<f32>,
+) {
+    let now = time.elapsed_secs();
+    if now - *last_write < 1.0 {
+        return;
+    }
+    *last_write = now;
+
+    let Some(v) = village else {
+        // Pas de village = sensor minimal, status only (cohérent post-cleanup).
+        let json = format!(
+            "{{\"timestamp_secs\":{:.1},\"village\":null}}",
+            now
+        );
+        let _ = std::fs::write("forgia_village_debug.json", json);
+        return;
+    };
+
+    let buildings_json = v
+        .buildings
+        .iter()
+        .map(|b| {
+            format!(
+                "{{\"piece\":\"{}\",\"world_xz\":[{:.2},{:.2}],\"y\":{:.2}}}",
+                b.piece, b.world_xz.x, b.world_xz.y, b.y
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let roads_json = v
+        .roads
+        .iter()
+        .map(|r| {
+            format!(
+                "{{\"start\":[{:.2},{:.2}],\"end\":[{:.2},{:.2}],\"tier\":\"{}\"}}",
+                r.start.x, r.start.y, r.end.x, r.end.y, r.tier
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let flatten_json = match flatten_zones.as_deref() {
+        Some(z) if !z.zones.is_empty() => {
+            let first = &z.zones[0];
+            format!(
+                "{{\"enabled\":true,\"center\":[{:.2},{:.2}],\"target_y\":{:.2},\"inner_radius\":{:.2},\"falloff_radius\":{:.2}}}",
+                first.center.x, first.center.y, first.target_y, first.inner_radius, first.falloff_radius
+            )
+        }
+        _ => "{\"enabled\":false}".to_string(),
+    };
+
+    let json = format!(
+        "{{\"timestamp_secs\":{:.1},\"village_id\":\"{}\",\"bounding_radius\":{:.2},\"footprint_half_m\":{:.2},\"spawn_position\":[{:.2},{:.2},{:.2}],\"leveling\":{},\"buildings\":[{}],\"roads\":[{}]}}",
+        now,
+        v.village_id,
+        v.bounding_radius,
+        v.footprint_half_m,
+        v.spawn_position.x, v.spawn_position.y, v.spawn_position.z,
+        flatten_json,
+        buildings_json,
+        roads_json
+    );
+
+    let _ = std::fs::write("forgia_village_debug.json", json);
 }

@@ -39,6 +39,7 @@ pub fn build_chunk_mesh(
     sample_offset: Vec2,
     config: &TerrainConfig,
     biome_map: &BiomeMap,
+    flatten_zones: Option<&crate::flatten::FlattenZones>,
 ) -> ChunkMeshData {
     let verts_axis = VERTS_PER_AXIS;
     let n_verts = (verts_axis * verts_axis) as usize;
@@ -67,7 +68,14 @@ pub fn build_chunk_mesh(
             // World coord = chunk center + local + (sample shift vers intérieur monde)
             let wx = origin.x + half_x + lx;
             let wz = origin.z + half_z + lz;
-            let h = crate::generation::heightmap_at(wx + sample_offset.x, wz + sample_offset.y, config);
+            let raw_h = crate::generation::heightmap_at(wx + sample_offset.x, wz + sample_offset.y, config);
+            // Story-447 — apply village flatten zones post-process. World-space XZ
+            // = chunk origin + local (not offset by sample_offset, since FlattenZones
+            // are inserted in world-RPG-space matching village_world_center).
+            let h = match flatten_zones {
+                Some(z) => z.sample(wx, wz, raw_h),
+                None => raw_h,
+            };
             positions.push([lx, h, lz]);
             uvs.push([
                 (ix as f32) / CHUNK_X as f32,
@@ -192,7 +200,7 @@ mod tests {
     fn mesh_has_expected_vertex_count() {
         let cfg = TerrainConfig::default();
         let bm = BiomeMap { seeds: vec![] };
-        let data = build_chunk_mesh(ChunkCoord::new(0, 0), Vec2::ZERO, &cfg, &bm);
+        let data = build_chunk_mesh(ChunkCoord::new(0, 0), Vec2::ZERO, &cfg, &bm, None);
         let expected = (VERTS_PER_AXIS * VERTS_PER_AXIS) as usize;
         assert_eq!(data.heights.len(), expected);
         let positions = data.mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
@@ -203,7 +211,7 @@ mod tests {
     fn min_max_consistent_with_heights() {
         let cfg = TerrainConfig::default();
         let bm = BiomeMap { seeds: vec![] };
-        let data = build_chunk_mesh(ChunkCoord::new(1, 1), Vec2::ZERO, &cfg, &bm);
+        let data = build_chunk_mesh(ChunkCoord::new(1, 1), Vec2::ZERO, &cfg, &bm, None);
         assert!(data.min_y <= data.max_y);
         let observed_min = data.heights.iter().cloned().fold(f32::INFINITY, f32::min);
         let observed_max = data.heights.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -219,7 +227,7 @@ mod tests {
     fn heights_column_major_matches_mesh_y() {
         let cfg = TerrainConfig::default();
         let bm = BiomeMap { seeds: vec![] };
-        let data = build_chunk_mesh(ChunkCoord::new(2, -3), Vec2::splat(1024.0), &cfg, &bm);
+        let data = build_chunk_mesh(ChunkCoord::new(2, -3), Vec2::splat(1024.0), &cfg, &bm, None);
 
         let stride = VERTS_PER_AXIS as usize;
         let positions = data

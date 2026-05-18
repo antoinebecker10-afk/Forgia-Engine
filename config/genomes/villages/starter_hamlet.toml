@@ -94,3 +94,24 @@ roles = ["villager", "merchant", "guard"]
 [spawn]
 local_offset = [3.0, 3.0]     # XZ offset (m) du village center où apparaît le player
 yaw_deg = 0.0                  # face +Z (vers le fond du village)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Terrain leveling — story-447 (Niveau A Quick Win)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Flatten le heightmap dans un disc autour du village center AVANT chunk meshing.
+# Falloff smoothstep en bordure pour transition douce vers le terrain naturel.
+# Pattern AAA Skyrim (Burgess GDC 2013) — local flattening disc autour POI.
+#
+# `radius_m` < `scale.bounding_radius` (28) → laisse de la marge pour foliage
+# exclusion disc (~31m) qui reste sur terrain naturel.
+
+[terrain_leveling]
+enabled = true
+# Tuning 2026-05-18 (story-447 niveau A.5) : sensor sur seed=42 montre 3 buildings
+# (tavern, church, home_B outer) à 22-27m du center → ils étaient dans le falloff.
+# Élargi radius_m=27 (>26.8m max building distance) + falloff_m=5 (transition rapide
+# au-delà). Total influence = 32m > bounding_radius (28). Buildings restent plats,
+# roads (gates ~25m) aussi.
+radius_m = 27.0      # rayon plateau plat — couvre tous les buildings outer-ring
+falloff_m = 5.0      # transition smoothstep rapide vers terrain naturel

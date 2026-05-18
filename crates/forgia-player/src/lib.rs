@@ -221,10 +221,24 @@ fn mouse_look(
     mut q_cam: Query<&mut Transform, With<FpsCamera>>,
     sens_mul: Res<MouseSensitivityMultiplier>,
     tuning: Res<MouseLookTuning>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    game_mode: Res<State<GameMode>>,
 ) {
     let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
         return;
     };
+    // WoW pattern (RPG) : mouse_look ne tourne le player QUE si RMB est tenu
+    // (mouselook steer). Sans bouton tenu, la souris bouge librement à l'écran,
+    // le perso reste fixe — comme dans WoW. En FPS mode : comportement standard
+    // toujours actif (cursor locked + cam orientée par mouse motion).
+    let is_rpg = *game_mode.get() == GameMode::Rpg;
+    let rmb_held = mouse_buttons.pressed(MouseButton::Right);
+    if is_rpg && !rmb_held {
+        // Drain le buffer MouseMotion pour éviter qu'un mouvement accumulé pendant
+        // la phase mouse-libre ne snape le perso au moment où l'user re-press RMB.
+        for _ in motion.read() {}
+        return;
+    }
     // Sensibilité base × multiplier global (ADS l'écrase à <1.0 via forgia-fps).
     let sensitivity = tuning.base_sensitivity * sens_mul.factor;
     let mut delta = Vec2::ZERO;

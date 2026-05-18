@@ -67,7 +67,42 @@ pub struct VillageGenome {
     pub npcs: NpcsGenome,
     #[serde(default)]
     pub spawn: SpawnDef,
+    #[serde(default)]
+    pub terrain_leveling: TerrainLevelingDef,
 }
+
+/// Story-447 — Local terrain flattening config. Used by `forgia-rpg` to insert
+/// a `FlattenZones` Resource before chunk meshing, so buildings spawn on a
+/// crédible plateau plat avec falloff smoothstep en bordure.
+///
+/// Pattern AAA Skyrim (Burgess GDC 2013) : local flattening disc autour POI.
+///
+/// - `enabled=false` désactive complètement (heightmap brut, retour legacy V1).
+/// - `radius_m` = rayon du plateau plat (Y = `target_y` au village center).
+/// - `falloff_m` = largeur de la transition smoothstep vers le terrain naturel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainLevelingDef {
+    #[serde(default = "default_terrain_leveling_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_terrain_leveling_radius")]
+    pub radius_m: f32,
+    #[serde(default = "default_terrain_leveling_falloff")]
+    pub falloff_m: f32,
+}
+
+impl Default for TerrainLevelingDef {
+    fn default() -> Self {
+        Self {
+            enabled: default_terrain_leveling_enabled(),
+            radius_m: default_terrain_leveling_radius(),
+            falloff_m: default_terrain_leveling_falloff(),
+        }
+    }
+}
+
+fn default_terrain_leveling_enabled() -> bool { true }
+fn default_terrain_leveling_radius() -> f32 { 18.0 }
+fn default_terrain_leveling_falloff() -> f32 { 10.0 }
 
 /// Player spawn point — local XZ offset from village center.
 ///

@@ -42,6 +42,7 @@ pub use lod::{
     ChunkLod, Lod2TileManager, LodSampleOffset, LodStats, LOD0_MAX_M, LOD1_MAX_M, LOD2_MAX_M,
 };
 pub use paths::{build_path_network, build_path_segment, PathNetwork, PathPolyline, PathSample, RoadTier};
+pub use flatten::{FlattenZones, VillageFlattenZone};
 
 pub mod biome_registry;
 pub mod biome_spec;
@@ -61,6 +62,8 @@ pub mod worldmap;
 // W1 — heightmap-grid mesher (industry-standard RPG) + minimal PBR material.
 pub mod meshing_heightmap;
 pub mod terrain_material;
+// Story-447 — local flattening discs autour villages (post-process heightmap).
+pub mod flatten;
 // W5 — LOD 3-niveaux GTA5 style (chunks + mega-tiles).
 pub mod lod;
 
