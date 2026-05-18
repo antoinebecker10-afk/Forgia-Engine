@@ -288,23 +288,36 @@ fn spawn_tracer(
     length: f32,
     emissive: LinearRgba,
 ) {
-    let core_width = 0.04;
+    // Story-452 (2026-05-18 PM) — fix screenshot user : bot tracers étaient des laser
+    // beams de 30m × 4cm bouchant l'écran. Solution : segment court (max 4m) au lieu
+    // de full hit_dist, mesh fin (1cm), HDR /3, lifetime court.
+    let core_width = 0.01;
     let mesh = meshes.add(Cuboid::new(core_width, core_width, 1.0));
+    let dimmed = LinearRgba::new(
+        emissive.red * 0.35,
+        emissive.green * 0.35,
+        emissive.blue * 0.35,
+        emissive.alpha,
+    );
     let mat = materials.add(StandardMaterial {
-        emissive,
+        emissive: dimmed,
         alpha_mode: AlphaMode::Add,
         unlit: true,
         ..default()
     });
-    let mid = origin + dir * (length * 0.5);
+    // Tracer segment court (4m max) partant du canon, pas tout le ray.
+    let seg_len = length.min(4.0);
+    let mid = origin + dir * (seg_len * 0.5);
     let tf = Transform::from_translation(mid)
         .looking_to(dir, Vec3::Y)
-        .with_scale(Vec3::new(1.0, 1.0, length));
+        .with_scale(Vec3::new(1.0, 1.0, seg_len));
     commands.spawn((
         Mesh3d(mesh),
         MeshMaterial3d(mat),
         tf,
-        BotTracer { life_remaining: 0.12 }, // 120ms tracer (court, visible mais pas distrayant)
+        BotTracer {
+            life_remaining: 0.08, // 80ms (était 120ms)
+        },
     ));
 }
 
@@ -317,7 +330,9 @@ fn bot_tracer_lifetime(
     for (e, mut tracer) in &mut q {
         tracer.life_remaining -= dt;
         if tracer.life_remaining <= 0.0 {
-            commands.entity(e).despawn();
+            if let Ok(mut ec) = commands.get_entity(e) {
+                ec.try_despawn();
+            }
         }
     }
 }
@@ -335,7 +350,9 @@ fn handle_bot_deaths(
         let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
         let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
         pending.queue.push((delay, pos));
-        commands.entity(ev.target).despawn();
+        if let Ok(mut ec) = commands.get_entity(ev.target) {
+            ec.try_despawn();
+        }
     }
 }
 

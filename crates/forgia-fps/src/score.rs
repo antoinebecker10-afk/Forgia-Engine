@@ -83,7 +83,9 @@ pub fn tick_kill_popups(
     for (entity, mut popup, mut tf, mut color) in &mut q {
         popup.timer.tick(time.delta());
         if popup.timer.is_finished() {
-            commands.entity(entity).despawn();
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
             continue;
         }
         // Monte vers le haut

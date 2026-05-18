@@ -28,12 +28,14 @@ use forgia_juice_fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunc
 use forgia_juice_hit_stop::HitStopState;
 use forgia_juice_recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
 use forgia_player::prelude::MouseLookTuning;
-use forgia_mode_fps_arena::{HitZone, TargetCube};
+use forgia_mode_fps_arena::TargetCube;
 use forgia_player::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 mod ads;
+mod hitscan_sensor;
+pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
 mod score;
 mod scope_glass;
 
@@ -325,18 +327,29 @@ impl JuiceWriters<'_> {
     }
 }
 
-/// Bundle des queries pour appliquer dégâts aux training bots (parent Health + child HitZone).
-/// Sépare la query enfant (HitZone + matériau pour flash) de la query parent (Health) car
-/// rapier raycast retourne l'enfant.
+/// Story-453 baseline reset (2026-05-18) — query simplifiée : ray hit le PARENT
+/// directement (bot = 1 entité unique avec capsule + Health + TargetCube),
+/// plus de Head/Body split, plus de ChildOf walk.
 #[derive(SystemParam)]
 pub struct HitApplyCtx<'w, 's> {
-    pub zones: Query<
+    pub health: Query<
         'w,
         's,
-        (&'static HitZone, &'static ChildOf, Option<&'static MeshMaterial3d<StandardMaterial>>),
-        Without<TargetCube>,
+        (
+            &'static mut Health,
+            Option<&'static MeshMaterial3d<StandardMaterial>>,
+        ),
+        With<TargetCube>,
     >,
-    pub health: Query<'w, 's, &'static mut Health, With<TargetCube>>,
+}
+
+/// Bundle hitscan diagnostic — q_children pour predicate récursif + sensor state.
+/// Évite de dépasser la limite Bevy 16 params dans `fire_weapon_minimal`.
+#[derive(SystemParam)]
+pub struct HitscanCtx<'w, 's> {
+    pub q_children: Query<'w, 's, &'static Children>,
+    pub q_name: Query<'w, 's, &'static Name>,
+    pub sensor: ResMut<'w, HitscanSensorState>,
 }
 
 /// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
@@ -593,6 +606,8 @@ impl Plugin for ForgiaFpsPlugin {
             .init_resource::<EquippedWeapons>()
             .init_resource::<LeftMouseState>()
             .init_resource::<AdsTuning>()
+            .init_resource::<HitscanSensorState>()
+            .add_systems(Update, hitscan_sensor::write_hitscan_sensor)
             .init_asset::<Genome<ViewmodelGenome>>()
             .init_asset::<Genome<FpsTuning>>()
             .register_asset_loader(GenomeLoader::<ViewmodelGenome>::default())
@@ -650,7 +665,12 @@ fn despawn_dead_cubes(
 ) {
     for (entity, hp) in &q {
         if hp.is_dead() {
-            commands.entity(entity).despawn();
+            // try_despawn (Bevy 0.18) idempotent — silent si entity déjà
+            // queued for despawn par un autre system (cf race conditions
+            // bot death + hp floater UI + damage numbers).
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
             info!("[death] cube {:?} despawned (HP=0)", entity);
         }
     }
@@ -733,6 +753,8 @@ fn fire_weapon_minimal(
     left: Res<LeftMouseState>,
     equipped: Res<EquippedWeapons>,
     genome_ctx: ViewmodelGenomeCtx,
+    ads: Res<ads::AdsState>,
+    mut hitscan_ctx: HitscanCtx,
 ) {
     let entry = genome_ctx.entry(equipped.current);
     let fire_mode = entry.map(|e| e.fire_mode.as_str()).unwrap_or("auto");
@@ -825,10 +847,33 @@ fn fire_weapon_minimal(
     }
     // Cas restant : burst en cours (intermediate shot) → pas de cooldown, rien à faire.
 
-    // Muzzle flash : recoil visuel désactivé V2 (choix design Valorant-like).
-    // Position depuis barrel_length genome.
-    let barrel_len = entry.map(|e| e.barrel_length).unwrap_or(0.55);
-    let barrel_tip = origin + direction * barrel_len + Vec3::new(0.0, -0.1, 0.0);
+    // Muzzle flash : position au BOUT DU CANON, lerp hipfire ↔ ADS via AdsState.progress.
+    // story-450 v5 (2026-05-18 PM) — fix user "projectiles pas sur canon en visant".
+    // En ADS l'arme se recentre (ads_offset_x=0) ET rétrécit (ads_scale_factor=0.60-0.70),
+    // donc le canon visible est plus court. Le VFX doit lerp les 3 axes ET le scale.
+    let barrel_len_base = entry.map(|e| e.barrel_length).unwrap_or(0.55);
+    let p = ads.progress.clamp(0.0, 1.0);
+    let lerp = |a: f32, b: f32| a + (b - a) * p;
+    let gun_off_x = entry
+        .map(|e| lerp(e.offset_x, e.ads_offset_x))
+        .unwrap_or(0.22);
+    let gun_off_y = entry
+        .map(|e| lerp(e.offset_y, e.ads_offset_y))
+        .unwrap_or(-0.35);
+    let gun_off_z = entry
+        .map(|e| lerp(e.offset_z, e.ads_offset_z))
+        .unwrap_or(-1.30);
+    let viewmodel_scale = entry
+        .map(|e| lerp(1.0, e.ads_scale_factor))
+        .unwrap_or(1.0);
+    let barrel_len = barrel_len_base * viewmodel_scale;
+    let forward_dist = (-gun_off_z) + barrel_len;
+    let cam_right_v = cam_tf.right().as_vec3();
+    let cam_up_v = cam_tf.up().as_vec3();
+    let barrel_tip = origin
+        + direction * forward_dist
+        + cam_right_v * gun_off_x
+        + cam_up_v * gun_off_y;
     if let Some(vfx) = weapon_vfx.as_deref() {
         spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, &equipped.current);
     }
@@ -839,9 +884,27 @@ fn fire_weapon_minimal(
     let pellets = entry.map(|e| e.pellets.max(1)).unwrap_or(1);
     let spread_rad = entry.map(|e| e.spread_deg.to_radians()).unwrap_or(0.0);
 
-    // Exclure Player du raycast (capsule capture origine — FpsCamera enfant de Player).
-    let player_entity = q_player.single().ok();
-    let predicate = |e: Entity| Some(e) != player_entity;
+    // Exclure Player ET TOUS ses descendants (FpsCamera, viewmodel mesh, weapon child
+    // colliders) du raycast. Sans ça, le ray peut hit le viewmodel ou un Mesh3d enfant
+    // → first-hit early-out, dommages jamais appliqués ("aiming on target, no damage").
+    //
+    // Research industry pattern : Overwatch Architecture Tim Ford GDC 2017 — exclure
+    // récursivement le shooter. Pre-build le HashSet une fois par fire pour O(1) lookup.
+    let mut excluded: std::collections::HashSet<Entity> = std::collections::HashSet::default();
+    if let Ok(player_entity) = q_player.single() {
+        excluded.insert(player_entity);
+        let mut stack = vec![player_entity];
+        while let Some(e) = stack.pop() {
+            if let Ok(children) = hitscan_ctx.q_children.get(e) {
+                for c in children.iter() {
+                    if excluded.insert(c) {
+                        stack.push(c);
+                    }
+                }
+            }
+        }
+    }
+    let predicate = |e: Entity| !excluded.contains(&e);
 
     let right = cam_tf.right().as_vec3();
     let up = cam_tf.up().as_vec3();
@@ -867,6 +930,8 @@ fn fire_weapon_minimal(
             direction
         };
 
+        // Story-453 baseline reset (2026-05-18) — ray cast simple, first hit only.
+        // Plus de wallbang, plus de sphere cast forgiveness. Tu vises = tu hit.
         let filter = QueryFilter::default().predicate(&predicate);
         let hit_result = ctx.cast_ray(origin, pellet_dir, range, true, filter);
 
@@ -897,65 +962,71 @@ fn fire_weapon_minimal(
             }
         }
 
-        // Apply damage par pellet : raycast retourne l'enfant (Head/Body collider).
-        // 1. Lookup HitZone + parent via ChildOf sur l'enfant
-        // 2. Compute damage : base × headshot_mul × falloff_mul(distance)
-        // 3. Apply Health sur le PARENT (TargetCube)
-        // 4. Flash material sur l'enfant touché (head OU body, pas les deux)
-        if let Some((child_entity, toi)) = hit_result {
-            let zone_lookup = hit_ctx.zones.get(child_entity);
-            if zone_lookup.is_err() {
-                // Diagnostic : raycast a touché un truc mais pas un HitZone enfant.
-                // Cas typique : mur, sol, ou bot dont la query échoue (pré-fix).
-                info!(
-                    "[fire] raycast hit {:?} at toi={:.2}m but no HitZone — likely wall/ground",
-                    child_entity, toi
-                );
-            }
-            if let Ok((zone, child_of, mat)) = zone_lookup {
-                let zone_mul = match zone {
-                    HitZone::Head => entry.map(|e| e.head_damage_mul).unwrap_or(1.5),
-                    HitZone::Body => 1.0,
+        // Sensor log : on tente direct Health lookup. Si c'est un TargetCube → damage,
+        // sinon c'est du décor (Wall/Ground/Cover).
+        let (sensor_category, sensor_hit_idx, sensor_name, sensor_toi) = match hit_result {
+            None => (HitscanCategory::Miss, None, None, None),
+            Some((entity, toi)) => {
+                let is_target = hit_ctx.health.get(entity).is_ok();
+                let cat = if is_target {
+                    HitscanCategory::HitZoneBody
+                } else {
+                    HitscanCategory::BlockerNonZone
                 };
+                let name = hitscan_ctx
+                    .q_name
+                    .get(entity)
+                    .ok()
+                    .map(|n| n.as_str().to_string());
+                (cat, Some(entity.to_bits()), name, Some(toi))
+            }
+        };
+        hitscan_ctx.sensor.push(HitscanLogEntry {
+            t: timing.time.elapsed_secs(),
+            weapon: equipped.current,
+            origin,
+            dir: pellet_dir,
+            hit_entity_idx: sensor_hit_idx,
+            hit_name: sensor_name,
+            toi: sensor_toi,
+            category: sensor_category,
+        });
+
+        // Apply damage : direct sur le bot parent (1 entité = 1 capsule, pas de ChildOf walk).
+        if let Some((entity, toi)) = hit_result {
+            if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
                 let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
-                let effective_dmg = damage * zone_mul * falloff_mul;
+                let effective_dmg = damage * falloff_mul;
+                hp.current = (hp.current - effective_dmg).max(0.0);
+                let dead = hp.is_dead();
+                let new_hp = hp.current;
 
-                let parent = child_of.parent();
-                if let Ok(mut hp) = hit_ctx.health.get_mut(parent) {
-                    hp.current = (hp.current - effective_dmg).max(0.0);
-                    let dead = hp.is_dead();
-                    let new_hp = hp.current;
-
-                    // Flash visuel UNIQUEMENT si le collider a un mesh visible
-                    // (show_collider_debug=true). En runtime normal les colliders
-                    // sont invisibles → skip flash, damage s'applique quand même.
-                    if let Some(mat_comp) = mat {
-                        let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
-                        commands
-                            .entity(child_entity)
-                            .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
-                            .insert(HitFlashTimer {
-                                timer: Timer::from_seconds(flash_dur, TimerMode::Once),
-                                original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
-                                original_handle: Some(mat_comp.0.clone()),
-                            });
-                    }
-
-                    hit_events.write(CombatHitEvent {
-                        target: parent,
-                        damage: effective_dmg,
-                        is_kill: dead,
-                    });
-
-                    if hit_record.is_none() {
-                        hit_record = Some((parent, toi));
-                    }
-                    info!(
-                        "[fire] pellet {}/{} HIT {:?} zone={:?} toi={:.2}m dmg={:.1} (base={} zone×{:.2} falloff×{:.2}) hp={:.1}/100 dead={}",
-                        pellet_idx + 1, pellets, parent, zone, toi, effective_dmg,
-                        damage, zone_mul, falloff_mul, new_hp, dead
-                    );
+                // Flash visuel si le bot a un mesh debug (show_collider_debug=true).
+                if let Some(mat_comp) = mat_opt {
+                    let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
+                    commands
+                        .entity(entity)
+                        .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
+                        .insert(HitFlashTimer {
+                            timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                            original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
+                            original_handle: Some(mat_comp.0.clone()),
+                        });
                 }
+
+                hit_events.write(CombatHitEvent {
+                    target: entity,
+                    damage: effective_dmg,
+                    is_kill: dead,
+                });
+
+                if hit_record.is_none() {
+                    hit_record = Some((entity, toi));
+                }
+                info!(
+                    "[fire] pellet {}/{} HIT {entity:?} toi={toi:.2}m dmg={effective_dmg:.1} hp={new_hp:.1} dead={dead}",
+                    pellet_idx + 1, pellets
+                );
             }
         }
     }

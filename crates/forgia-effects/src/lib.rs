@@ -48,7 +48,7 @@ impl Plugin for ForgiaEffectsPlugin {
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
             .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
             .add_plugins(arena_feedback::ArenaFeedbackPlugin)
-            .add_systems(Update, (effects_tick, emissive_fade_tick, lifetime_tick).in_set(GameSet::Effects));
+            .add_systems(Update, (effects_tick, emissive_fade_tick, lifetime_tick, weapon_vfx::tracer::tick_bullets_in_flight).in_set(GameSet::Effects));
     }
 }
 
@@ -61,7 +61,9 @@ fn lifetime_tick(
     for (entity, mut life) in &mut q {
         life.0.tick(time.delta());
         if life.0.is_finished() {
-            commands.entity(entity).despawn();
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
         }
     }
 }
@@ -85,7 +87,9 @@ fn emissive_fade_tick(
             );
         }
         if fade.timer.is_finished() {
-            commands.entity(entity).despawn();
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
         }
     }
 }

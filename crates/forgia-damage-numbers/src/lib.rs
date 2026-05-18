@@ -65,7 +65,9 @@ fn tick_numbers(
         let c = color.0.to_linear();
         color.0 = Color::linear_rgba(c.red, c.green, c.blue, alpha);
         if fn_.ttl <= 0.0 {
-            commands.entity(e).despawn();
+            if let Ok(mut ec) = commands.get_entity(e) {
+                ec.try_despawn();
+            }
         }
     }
 }
