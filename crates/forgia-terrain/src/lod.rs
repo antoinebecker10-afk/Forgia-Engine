@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use crate::biomes::BiomeMap;
 use crate::chunk::{ChunkManager, TerrainConfig, CHUNK_X};
 use crate::generation::heightmap_at;
+use crate::terrain_material::TerrainSharedMaterial;
 
 // ─────────────────────────── Constantes ───────────────────────────
 
@@ -40,6 +41,10 @@ pub const LOD_HYSTERESIS_M: f32 = 16.0;
 const CLUSTER_CHUNKS: i32 = 4;
 const CHUNK_SIZE_M: f32 = CHUNK_X as f32;
 const CLUSTER_SIZE_M: f32 = CLUSTER_CHUNKS as f32 * CHUNK_SIZE_M;
+/// Wave 5 phase 2g : UV tile reps pour LOD2 textured mesh. Matche la densité
+/// chunks LOD0/LOD1 où 1 tile texture = 1 chunk de 32m. LOD2 = 128m donc
+/// 4 reps de texture pour visual continuity.
+const UV_TILE_REPS: f32 = CLUSTER_CHUNKS as f32;
 /// Wave 5 phase 1 (story-450) : OBSOLETE depuis HLOD per-vertex heightmap.
 /// Le mesh contient maintenant les Y absolus baked → Transform Y = 0.
 /// Gardé pour référence historique (V1 = -2.0 sea_level=20, V2 wave 0 = 8.0).
@@ -270,8 +275,13 @@ fn build_lod2_terrain_mesh(
                 ([local_x, raw_y, local_z], c)
             };
             positions.push(world_y);
-            normals.push([0.0, 1.0, 0.0]); // approx — unlit donc OK
-            uvs.push([i as f32 / SUBDIVS as f32, j as f32 / SUBDIVS as f32]);
+            normals.push([0.0, 1.0, 0.0]); // approx — PBR lit accepte
+            // Wave 5 phase 2g : UV × UV_TILE_REPS pour densité texture cohérente
+            // avec chunks (chunks 32m = 1 rep, LOD2 128m = 4 reps).
+            uvs.push([
+                (i as f32 / SUBDIVS as f32) * UV_TILE_REPS,
+                (j as f32 / SUBDIVS as f32) * UV_TILE_REPS,
+            ]);
             colors.push([
                 vertex_color.red,
                 vertex_color.green,
@@ -353,6 +363,7 @@ pub fn build_lod2_tiles_system(
     mut lod_stats: ResMut<LodStats>,
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
+    terrain_shared_mat: Option<Res<TerrainSharedMaterial>>,
     player_q: Query<&Transform>,
     offset: Option<Res<LodSampleOffset>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -364,6 +375,7 @@ pub fn build_lod2_tiles_system(
 
     let Some(biome_map) = biome_map else { return };
     let Some(terrain_cfg) = terrain_cfg else { return };
+    let Some(terrain_shared_mat) = terrain_shared_mat else { return };
     let Some(player_tf) = player_q.iter().next() else { return };
     let off = offset.map(|r| (r.x, r.z)).unwrap_or((0.0, 0.0));
     let player_pos = player_tf.translation;
@@ -392,23 +404,15 @@ pub fn build_lod2_tiles_system(
         }
     }
 
-    // Wave 5 phase 1+2a : mesh per-cluster (Y heightmap baked + per-vertex
-    // biome color). 1 seul material shared (white + vertex_colors enabled) —
-    // remplace l'ancien cache par-biome 10 materials.
-    const SHARED_MAT_KEY: u8 = 255; // sentinel unique pour shared mat
-    let shared_mat = if let Some(h) = tile_mgr.material_cache.get(&SHARED_MAT_KEY) {
-        h.clone()
-    } else {
-        let h = materials.add(StandardMaterial {
-            base_color: Color::WHITE, // multiplié par ATTRIBUTE_COLOR per-vertex
-            perceptual_roughness: 0.95,
-            metallic: 0.0,
-            unlit: true,
-            ..default()
-        });
-        tile_mgr.material_cache.insert(SHARED_MAT_KEY, h.clone());
-        h
-    };
+    // Wave 5 phase 2g : RÉUTILISE TerrainSharedMaterial (PBR + grass diff/normal/
+    // roughness textures). Continuité texture LOD0/LOD1/LOD2 — finis les "step"
+    // visibles entre foreground textured chunks et LOD2 unlit colored.
+    // Vertex colors (biome blend) ×= texture × base_color (white) → texture
+    // tinted par biome. Water clamp (vertex=blue) → texture tinted bleu.
+    let shared_mat = terrain_shared_mat.0.clone();
+    // Ancien cache unlit retiré : materials Res<…> conservé pour build_lod2_terrain_mesh
+    // côté tree/rock cache si besoin futur.
+    let _ = &mut materials;
 
     // Wave 5 phase 2e : LOAD vrais GLBs kaykit-forest une fois et cache.
     // Variants pour diversité visuelle (hash bits choisit lequel).
