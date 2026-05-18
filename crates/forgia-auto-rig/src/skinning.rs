@@ -163,16 +163,16 @@ pub fn inject_skinning_for_rigged_meshes(
 
         // 5. Pour chaque Mesh3d : process vertices.
         //
-        // BUG FIX 2026-05-17 NUIT (Cause A documentée par bg agent +
-        // Bevy custom_skinned_mesh.rs convention) : `inverse_bindpose` doit
-        // être calculé PER mesh3d_entity comme `bone_global.inverse() *
-        // mesh3d_global_at_bind`. Sans le `* mesh3d_global`, le mesh apparaît
-        // à la position des bones (pas du mesh3d) → mesh aplati/translaté.
+        // Convention bindpose Forgia (2026-05-17 + revert validation 2026-05-18) :
+        // `inverse_bindpose[i] = bone_global_at_bind.inverse() * mesh3d_world`.
         //
-        // Référence : Bevy custom_skinned_mesh.rs utilise des `Mat4::from_translation(...)`
-        // qui sont l'inverse_bindpose = bone_world.inverse() * mesh_pivot_world.
-        // Pour une hiérarchie SceneRoot → Armature → Mesh3d (cas GLB Meshy),
-        // mesh3d_global ≠ mesh_root_global → la formule complète est obligatoire.
+        // Cf voir détail formule + revert log juste avant le calcul lignes
+        // ~225-240 ci-dessous. Note : story-454 sensor `forgia_bone_trace.json`
+        // signalait mesh_aabb_world.half_extents stable, mais c'était un faux
+        // signal côté sensor (half_extents local lu sans application GlobalTransform).
+        // Le vrai diagnostic du symptôme "T-pose figée" reste à investiguer
+        // ailleurs (joints[] ordre vs ATTRIBUTE_JOINT_INDEX, skinning weights,
+        // bone pivot positions, etc.). PAS dans la formule bindpose elle-même.
         let mut total_verts_processed: u32 = 0;
         let mut meshes_processed = 0usize;
 
@@ -216,9 +216,24 @@ pub fn inject_skinning_for_rigged_meshes(
                 .to_matrix();
             let mesh3d_to_root_local = mesh_root_inv * mesh3d_world;
 
-            // ── inverse_bindposes per-mesh3d (FIX cause A) ────────────────
-            // Formule correcte : inverse_bindpose[i] = bone_global.inverse() * mesh3d_global
-            // Cf Bevy custom_skinned_mesh.rs convention.
+            // ── inverse_bindposes per-mesh3d ──────────────────────────────
+            // Formule : `bone_global.inverse() * mesh3d_world`.
+            //
+            // Pourquoi `* mesh3d_world` est nécessaire : Bevy `SkinnedMesh`
+            // ignore la `GlobalTransform` du Mesh3d entity (cf doc Bevy +
+            // custom_skinned_mesh.rs note "its transform doesn't affect the
+            // position of the mesh"). Le vertex shader calcule
+            // `world_pos = bone_global * inverse_bindpose * vertex_local`.
+            // Pour que `world_pos == mesh3d_world * vertex_local` au bind :
+            //   bone_bind * inv_bp = mesh3d_world
+            //   donc inv_bp = bone_bind.inverse() * mesh3d_world.
+            //
+            // Story-454 audit 2026-05-18 : bevy-specialist proposed retirer
+            // `* mesh3d_world` ; REVERTED après test runtime → mesh devient
+            // invisible (vertices rendus à world origin (0,0,0), loin player).
+            // L'analyse specialist était valide pour cas Mesh3d à origin
+            // mais pas pour notre hiérarchie GLB Meshy où Mesh3d a transform
+            // non-identité ((19, 18, 19) pour Rex). Formule originale OK.
             let bindposes_for_this_mesh: Vec<Mat4> = bone_globals
                 .iter()
                 .map(|&bone_global| bone_global.inverse() * mesh3d_world)
@@ -379,6 +394,36 @@ mod tests {
 
     fn cfg() -> SkinningConfig {
         SkinningConfig::default()
+    }
+
+    /// Story-454 — propriété Bevy SkinnedMesh : le vertex shader applique
+    /// `world_pos = bone_global * inverse_bindpose * vertex_local`. Pour qu'au
+    /// bind pose le mesh apparaisse à `mesh3d_world.transform_point(vertex_local)`
+    /// (la transform standard d'un Mesh3d non-skinned), la formule doit être :
+    ///   `inverse_bindpose = bone_global_bind.inverse() * mesh3d_world`
+    /// car `SkinnedMesh` shader **ignore** le GlobalTransform de l'entité
+    /// Mesh3d. Le test valide cette invariance numériquement.
+    #[test]
+    fn bindpose_yields_mesh3d_world_at_bind() {
+        let bone_bind = Mat4::from_translation(Vec3::new(2.92, 16.86, 15.86));
+        let mesh3d_world = Mat4::from_translation(Vec3::new(0.0, -0.85, 0.0))
+            * Mat4::from_rotation_y(std::f32::consts::PI);
+        let inv_bp = bone_bind.inverse() * mesh3d_world;
+        // Au bind, bone_current = bone_bind, donc joint_matrix = mesh3d_world.
+        let joint_matrix = bone_bind * inv_bp;
+        let id = Mat4::IDENTITY;
+        for r in 0..4 {
+            for c in 0..4 {
+                let want = mesh3d_world.row(r)[c];
+                let got = joint_matrix.row(r)[c];
+                let diff = (got - want).abs();
+                let id_diff = (got - id.row(r)[c]).abs();
+                assert!(
+                    diff < 1e-5,
+                    "joint_matrix({r},{c}) = {got}, want {want} (mesh3d_world). id_diff={id_diff}"
+                );
+            }
+        }
     }
 
     #[test]

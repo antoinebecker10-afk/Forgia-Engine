@@ -130,6 +130,8 @@ impl Plugin for ForgiaRpgPlugin {
                     character::calibrate_lineup_y_and_height,
                     character::attach_rex_bone_systems,
                     character::procedural_locomotion,
+                    // debug_thigh_swing retiré 2026-05-18 : skinning validé OK
+                    // (test ±60° sin sur thigh confirme mesh suit bones).
                     character::procedural_whole_body_anim,
                     character::write_walk_pose_sensor,
                 )

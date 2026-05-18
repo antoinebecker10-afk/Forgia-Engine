@@ -198,7 +198,19 @@ pub(crate) fn spawn_rex_character(
                     SceneRoot(asset_server.load("models/characters/Rex.glb#Scene0")),
                     Transform::from_xyz(0.0, -0.85, 0.0)
                         .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-                    NeedsAutoRig::Template(AutoRigTemplate::BipedLizard),
+                    // Story-454 fix template mismatch : Rex.glb est en réalité
+                    // humanoide (Meshy export sans tail). Landmarks détectés
+                    // `looks_humanoid: true, has_tail: false`. BipedLizard
+                    // plaçait les bones arm sur axe Z (avant-arrière) au lieu
+                    // de X (latéral T-pose) → vertices bras assignés à
+                    // chest/spine, mesh ne suit pas la rotation des bones arm.
+                    NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
+                    // Story-451 Phase 2 fix : insérer LocomotionBoneCache +
+                    // ProcBodyAnim ici aussi (mode RexGlb default), sinon la
+                    // query `With<RexCharacter>` du attach_rex_bone_systems
+                    // ne matche jamais → cache.ready reste false → aucune anim.
+                    LocomotionBoneCache::default(),
+                    ProcBodyAnim::default(),
                 ));
             });
         }
@@ -224,6 +236,269 @@ pub(crate) fn spawn_rex_character(
     ));
 
     info!("[forgia-rpg::character] Rex spawned + OrbitCamera active, FpsCamera disabled");
+}
+
+// ─── Character lineup (auto-rig tuning playground) ──────────────────────────
+//
+// 2026-05-18 : spawn les 5 personnages humanoïdes (Dorin, Kael, Mira, Apprenti,
+// Maitre Forgeron) côte à côte derrière le spawn Rex pour démarrer le même
+// process de tuning template auto-rig (cf `reference_auto_rig_template_creation_process.md`).
+//
+// Tous démarrent avec template `Humanoid`. Quand on aura tuné chacun, on
+// pourra créer des templates dédiés (Goblin/Orc/Dwarf/Celestial/Human) en
+// dupliquant skeleton_humanoid.toml + tweak Y/Z par anatomie.
+
+/// Marker pour les characters du lineup tuning (despawn en cleanup RPG).
+#[derive(Component)]
+pub struct LineupCharacter;
+
+/// Nom affiché au-dessus du character lineup (render egui world→viewport).
+#[derive(Component)]
+pub struct LineupName(pub String);
+
+/// État d'attente du spawn lineup. On attend que le Player se stabilise (village
+/// teleport peut décaler de 20m+ après spawn), sinon le lineup spawn trop loin.
+#[derive(Resource, Default)]
+pub struct LineupSpawned {
+    pub done: bool,
+    /// Position Player observée frame précédente, pour détecter stabilité.
+    pub last_player_pos: Vec3,
+    /// Frames consécutives où la position du Player n'a pas bougé > 0.05m.
+    pub stable_frames: u32,
+}
+
+/// Définitions des 5 personnages humanoïdes du lineup auto-rig.
+/// (name_display, glb_path, future_dedicated_template_hint).
+const LINEUP_CHARACTERS: &[(&str, &str)] = &[
+    ("Dorin", "models/characters/Dorin.glb#Scene0"),
+    ("Kael", "models/characters/Kael.glb#Scene0"),
+    ("Mira", "models/characters/Mira.glb#Scene0"),
+    ("Apprenti", "models/characters/L'Apprenti .glb#Scene0"),
+    ("MaitreForgeron", "models/characters/Maitre Forgeron Célèste.glb#Scene0"),
+];
+
+/// Spawn 5 personnages côte à côte (1.6m d'écart en X) à 4m derrière le spawn
+/// player. Chaque character a `NeedsAutoRig::Template(Humanoid)` → bones gizmos
+/// visibles → tune template Y/Z dans `skeleton_humanoid.toml` ou créer template
+/// dédié quand nécessaire.
+///
+/// Standalone entities (pas enfants de Player) → ils restent en place quand le
+/// player bouge, pour les comparer side-by-side pendant le tuning.
+pub(crate) fn spawn_character_lineup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut spawned: ResMut<LineupSpawned>,
+    q_player: Query<&Transform, With<Player>>,
+) {
+    if spawned.done {
+        return;
+    }
+    let Ok(player_tf) = q_player.single() else {
+        return; // wait for player spawn
+    };
+
+    // Attendre stabilisation du player (village teleport peut le déplacer après
+    // spawn). On considère stable après 30 frames consécutives sans mouvement > 5cm.
+    let pos = player_tf.translation;
+    if (pos - spawned.last_player_pos).length() < 0.05 {
+        spawned.stable_frames += 1;
+    } else {
+        spawned.stable_frames = 0;
+    }
+    spawned.last_player_pos = pos;
+    if spawned.stable_frames < 30 {
+        return;
+    }
+
+    // Positionnement : 4m derrière le spawn (côté +Z = camera-facing), espacés
+    // de 1.6m en X. Y au niveau du spawn pour cohérence avec le terrain.
+    let base = pos;
+    let spawn_z = base.z + 4.0;
+    let spawn_y = base.y - 0.85; // même offset que Rex (mesh.bottom au sol)
+
+    let n = LINEUP_CHARACTERS.len() as f32;
+    let total_width = (n - 1.0) * 1.6;
+    let start_x = base.x - total_width * 0.5;
+
+    for (i, (name, glb_path)) in LINEUP_CHARACTERS.iter().enumerate() {
+        let x = start_x + i as f32 * 1.6;
+        commands.spawn((
+            LineupCharacter,
+            LineupName(name.to_string()),
+            SceneRoot(asset_server.load(*glb_path)),
+            Transform::from_xyz(x, spawn_y, spawn_z)
+                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+            // Tous Humanoid pour l'instant ; créer template dédié per-character au besoin.
+            NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
+            Name::new(format!("LineupChar_{name}")),
+        ));
+    }
+
+    spawned.done = true;
+    info!(
+        "[forgia-rpg::character] Lineup spawned : {} characters at x=[{:.1}..{:.1}] z={:.1} (Humanoid template, around player pos {:?})",
+        LINEUP_CHARACTERS.len(),
+        start_x,
+        start_x + total_width,
+        spawn_z,
+        base
+    );
+}
+
+/// Marker + métriques après calibration AABB du lineup.
+/// `height` = hauteur réelle du mesh (AABB.max.y - min.y, en repère mesh-local).
+#[derive(Component)]
+pub struct LineupCalibrated {
+    pub height: f32,
+}
+
+/// Calibration Y du lineup : aligne `mesh.bottom_y` avec le sol (= player.y - 1.0
+/// pour un Player capsule centré). Mesure aussi la hauteur totale du mesh pour
+/// que les noms s'affichent proportionnellement à la taille du personnage.
+///
+/// Retry chaque frame tant que pas calibré (mesh GLB async). Idempotent via
+/// marker `LineupCalibrated`.
+pub(crate) fn calibrate_lineup_y_and_height(
+    mut commands: Commands,
+    mut q_lineup: Query<
+        (Entity, &mut Transform),
+        (With<LineupCharacter>, Without<LineupCalibrated>),
+    >,
+    children_q: Query<&Children>,
+    transforms_q: Query<&Transform, Without<LineupCharacter>>,
+    aabbs_q: Query<&Aabb>,
+    q_player: Query<&Transform, (With<Player>, Without<LineupCharacter>)>,
+) {
+    let Ok(player_tf) = q_player.single() else {
+        return;
+    };
+    // Sol = bottom du capsule Player (half_height 0.7 + radius 0.3 = 1.0m).
+    let ground_y = player_tf.translation.y - 1.0;
+
+    for (entity, mut char_tf) in &mut q_lineup {
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+        let mut found = false;
+        let mut stack: Vec<(Entity, Vec3)> = vec![(entity, Vec3::ZERO)];
+        while let Some((e, parent_local)) = stack.pop() {
+            let local_pos = if e == entity {
+                Vec3::ZERO
+            } else {
+                transforms_q.get(e).map(|t| t.translation).unwrap_or(Vec3::ZERO)
+            };
+            let mesh_local_pos = parent_local + local_pos;
+            if let Ok(aabb) = aabbs_q.get(e) {
+                let c: Vec3 = aabb.center.into();
+                let h: Vec3 = aabb.half_extents.into();
+                min_y = min_y.min(mesh_local_pos.y + c.y - h.y);
+                max_y = max_y.max(mesh_local_pos.y + c.y + h.y);
+                found = true;
+            }
+            if let Ok(children) = children_q.get(e) {
+                for ch in children.iter() {
+                    stack.push((ch, mesh_local_pos));
+                }
+            }
+        }
+        if found && min_y.is_finite() && max_y.is_finite() {
+            let height = max_y - min_y;
+            // Aligne mesh.bottom_y monde avec ground_y :
+            //   char_tf.translation.y + min_y = ground_y
+            //   ⇒ char_tf.translation.y = ground_y - min_y
+            let old_y = char_tf.translation.y;
+            char_tf.translation.y = ground_y - min_y;
+            commands.entity(entity).insert(LineupCalibrated { height });
+            info!(
+                "[forgia-rpg::character] Lineup calibrated entity {:?}: min_y={:.3} height={:.3} tf.y {:.3} → {:.3}",
+                entity, min_y, height, old_y, char_tf.translation.y
+            );
+        }
+    }
+}
+
+/// Rend les noms des characters du lineup au-dessus de leur tête via egui
+/// world→viewport. Style chunky outline cartoon, lisible sur tous fonds.
+/// Hauteur du texte = `Y character + height + marge` (utilise la hauteur réelle
+/// mesurée par `calibrate_lineup_y_and_height`).
+pub(crate) fn draw_lineup_names(
+    mut contexts: bevy_egui::EguiContexts,
+    q_chars: Query<(&Transform, &LineupName, Option<&LineupCalibrated>), With<LineupCharacter>>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<OrbitCamera>>,
+) {
+    use bevy_egui::egui;
+    let Ok((cam, cam_tf)) = q_cam.single() else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_lineup_names"),
+    ));
+
+    for (tf, name, calib) in &q_chars {
+        // Position monde au-dessus de la tête : tf.y + height + petite marge.
+        // Fallback 2.0m si pas encore calibré (mesh GLB pas loaded).
+        let height = calib.map(|c| c.height).unwrap_or(2.0);
+        let world_pos = tf.translation + Vec3::Y * (height + 0.05);
+        let Ok(screen_pos) = cam.world_to_viewport(cam_tf, world_pos) else {
+            continue;
+        };
+
+        // Distance-based scale (lisible de loin mais pas envahissant de près).
+        let dist = (cam_tf.translation() - world_pos).length();
+        let scale = (12.0 / dist.max(2.0)).clamp(0.6, 2.5);
+        let font = egui::FontId::proportional(18.0 * scale);
+
+        let pos = egui::pos2(screen_pos.x, screen_pos.y);
+        // Outline noir 8 passes pour lisibilité sur tout fond.
+        let outline_thickness = (1.5 * scale).max(1.0);
+        for (dx, dy) in &[
+            (-1.0_f32, -1.0_f32), (0.0, -1.0), (1.0, -1.0),
+            (-1.0,  0.0),                       (1.0,  0.0),
+            (-1.0,  1.0),         (0.0,  1.0),  (1.0,  1.0),
+        ] {
+            painter.text(
+                egui::pos2(
+                    pos.x + dx * outline_thickness,
+                    pos.y + dy * outline_thickness,
+                ),
+                egui::Align2::CENTER_CENTER,
+                &name.0,
+                font.clone(),
+                egui::Color32::from_rgb(8, 8, 12),
+            );
+        }
+        // Texte central — orange Forgia.
+        painter.text(
+            pos,
+            egui::Align2::CENTER_CENTER,
+            &name.0,
+            font,
+            egui::Color32::from_rgb(255, 200, 80),
+        );
+    }
+}
+
+/// Cleanup du lineup OnExit Rpg (despawn entities + reset Resource marker pour
+/// le prochain enter).
+pub(crate) fn cleanup_character_lineup(
+    mut commands: Commands,
+    mut spawned: ResMut<LineupSpawned>,
+    q: Query<Entity, With<LineupCharacter>>,
+) {
+    let count = q.iter().count();
+    for e in &q {
+        commands.entity(e).despawn();
+    }
+    spawned.done = false;
+    spawned.last_player_pos = Vec3::ZERO;
+    spawned.stable_frames = 0;
+    if count > 0 {
+        info!(
+            "[forgia-rpg::character] Lineup cleaned : {} characters despawned",
+            count
+        );
+    }
 }
 
 /// Marker idempotence pour `calibrate_rex_y_one_shot`.
@@ -617,6 +892,36 @@ pub(crate) fn attach_rex_bone_systems(
 /// - Bugs #1-8 du rapport recherche corrigés : knee/elbow séparés, stance/swing
 ///   60/40 + cloche knee, pelvic yaw+roll+bob 2× freq, spine counter-rot Y
 ///   (pas Z), tail Rex counter-balance, walk→run transitions via `GaitTunables`.
+/// Story-454 — système de **debug isolé** : rotate thigh_L et thigh_R avec un
+/// sinus large (±60°) pour confirmer visuellement si le mesh suit le bone.
+/// Test diagnostique : si Rex bouge les jambes en sinus → skinning OK, bug
+/// dans le walk cycle. Si T-pose figé malgré sinus → bug skinning Bevy.
+/// Tourne APRÈS procedural_locomotion pour overrider le walk cycle.
+pub(crate) fn debug_thigh_swing(
+    time: Res<Time>,
+    q_cache: Query<&LocomotionBoneCache, With<RexCharacter>>,
+    mut bones: Query<&mut Transform, Without<Player>>,
+) {
+    let Ok(cache) = q_cache.single() else { return };
+    if !cache.ready {
+        return;
+    }
+    let t = time.elapsed_secs();
+    // ±60° (1.05 rad), freq 0.7 Hz — lent et large, très visible
+    let swing = (t * std::f32::consts::TAU * 0.7).sin() * 1.05;
+    if let Some(e) = cache.topology.left_leg {
+        if let Ok(mut tf) = bones.get_mut(e) {
+            tf.rotation = Quat::from_rotation_x(swing);
+        }
+    }
+    if let Some(e) = cache.topology.right_leg {
+        if let Ok(mut tf) = bones.get_mut(e) {
+            // Phase opposée
+            tf.rotation = Quat::from_rotation_x(-swing);
+        }
+    }
+}
+
 /// - Fonctions pures dans `proc_walk` (12 tests headless anatomiques).
 /// - Bones secondaires (shin, foot, forearm, tail) résolus via Children
 ///   queries depuis la topology (cohérent avec hiérarchie BipedLizard template).
@@ -667,7 +972,7 @@ pub(crate) fn procedural_locomotion(
     }
 
     if !is_moving {
-        // Idle breathing — léger sin sur X du spine + reset slerp jambes/bras
+        // Idle breathing — léger sin sur X du spine + reset slerp jambes
         let t_secs = time.elapsed_secs();
         let breath = (t_secs * IDLE_BREATH_FREQ).sin() * IDLE_BREATH_AMP;
         if let Some(e) = cache.topology.spine {
@@ -675,17 +980,29 @@ pub(crate) fn procedural_locomotion(
                 tf.rotation = Quat::from_rotation_x(breath);
             }
         }
-        for e in [
-            cache.topology.left_leg,
-            cache.topology.right_leg,
-            cache.topology.left_arm,
-            cache.topology.right_arm,
-        ]
-        .into_iter()
-        .flatten()
+        // Jambes : slerp vers bind pose (IDENTITY = T-pose pour les jambes,
+        // qui sont déjà verticales).
+        for e in [cache.topology.left_leg, cache.topology.right_leg]
+            .into_iter()
+            .flatten()
         {
             if let Ok(mut tf) = bones.get_mut(e) {
                 tf.rotation = tf.rotation.slerp(Quat::IDENTITY, 0.15);
+            }
+        }
+        // Bras : story-451 Phase 2.1 — au lieu de slerp Identity (T-pose
+        // horizontale), slerp vers le rest_z offset (bras le long du corps).
+        const ARM_REST_Z_RAD: f32 = std::f32::consts::FRAC_PI_2;
+        if let Some(e) = cache.topology.left_arm {
+            if let Ok(mut tf) = bones.get_mut(e) {
+                let target = Quat::from_rotation_z(ARM_REST_Z_RAD);
+                tf.rotation = tf.rotation.slerp(target, 0.15);
+            }
+        }
+        if let Some(e) = cache.topology.right_arm {
+            if let Ok(mut tf) = bones.get_mut(e) {
+                let target = Quat::from_rotation_z(-ARM_REST_Z_RAD);
+                tf.rotation = tf.rotation.slerp(target, 0.15);
             }
         }
         stats.locomotion_gait_phase = state.gait_phase;
@@ -732,8 +1049,13 @@ pub(crate) fn procedural_locomotion(
     let (arm_l_pitch, elbow_l) =
         crate::proc_walk::arm_pose((gait + 0.5).rem_euclid(1.0), &tunables);
     let (arm_r_pitch, elbow_r) = crate::proc_walk::arm_pose(gait, &tunables);
-    apply_pitch(&mut bones, topo.left_arm, arm_l_pitch * speed_factor);
-    apply_pitch(&mut bones, topo.right_arm, arm_r_pitch * speed_factor);
+    // Story-451 Phase 2.1 — bras le long du corps : offset Z bind-pose
+    // (~90°) qui passe le bone arm de horizontal T-pose à vertical descendant.
+    // Signe opposé gauche/droite pour symétrie. Si bras pointent vers l'avant
+    // au lieu du sol, inverser ARM_REST_Z_RAD (essayer ±π/2 ou ±π).
+    const ARM_REST_Z_RAD: f32 = std::f32::consts::FRAC_PI_2;
+    apply_arm_pose(&mut bones, topo.left_arm, ARM_REST_Z_RAD, arm_l_pitch * speed_factor);
+    apply_arm_pose(&mut bones, topo.right_arm, -ARM_REST_Z_RAD, arm_r_pitch * speed_factor);
     apply_pitch(&mut bones, forearm_l, elbow_l * speed_factor);
     apply_pitch(&mut bones, forearm_r, elbow_r * speed_factor);
 
@@ -776,6 +1098,23 @@ fn apply_pitch(bones: &mut Query<&mut Transform, Without<Player>>, e: Option<Ent
     if let Some(e) = e {
         if let Ok(mut tf) = bones.get_mut(e) {
             tf.rotation = Quat::from_rotation_x(pitch);
+        }
+    }
+}
+
+/// Story-451 Phase 2.1 — bras le long du corps : rotation Z bind-pose offset
+/// (depuis T-pose horizontal vers vertical descendant) composée avec swing X
+/// du walk cycle (par-dessus). Le sens du Z (signe) doit être inversé entre
+/// bras gauche et droit pour que les deux descendent symétriquement.
+fn apply_arm_pose(
+    bones: &mut Query<&mut Transform, Without<Player>>,
+    e: Option<Entity>,
+    rest_z: f32,
+    pitch: f32,
+) {
+    if let Some(e) = e {
+        if let Ok(mut tf) = bones.get_mut(e) {
+            tf.rotation = Quat::from_rotation_z(rest_z) * Quat::from_rotation_x(pitch);
         }
     }
 }

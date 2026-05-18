@@ -1,0 +1,35 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# debug_anim — Forgia V2 Anim Debug System (story-454 Niveau A)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Configuration data-driven du système de diagnostic anim layer. Hot-reloadable
+# via Bevy file_watcher (Shift+F12 ou détection auto). Pour désactiver
+# entièrement : `dbg_bone_trace_enabled = 0`.
+#
+# Pattern AAA :
+# - UE5 Animation Insights trace channels (rolling buffer time-series)
+# - Houdini Skinning Converter error visualisation (diff bind vs current)
+#
+# Sortie : `forgia_bone_trace.json` à la racine workspace, refresh à
+# `dbg_bone_trace_hz` Hz. Health alert side-file si désync mesh↔bones détectée.
+
+[debug_anim]
+# Active le sensor `forgia_bone_trace.json`. 0 = désactivé (zéro coût runtime).
+dbg_bone_trace_enabled = 1
+
+# Fréquence d'écriture sensor (Hz). 2.0 = 1 snapshot toutes les 500ms.
+# Recommandé 2-5 Hz pour diagnostic. Plus haut = plus de bruit JSON.
+dbg_bone_trace_hz = 2.0
+
+# Nombre maximum de bones loggés par character. Au-delà, troncature.
+# 24 = couvre BipedLizard (20 bones) + Humanoid (18 bones) + marge.
+dbg_bone_trace_max_bones = 24
+
+# Nombre maximum de characters tracés simultanément (Rex + lineup 5 = 6).
+dbg_bone_trace_max_characters = 8
+
+# Seuil de détection désync (mètres). Si delta entre bone_globals[0]
+# .translation et mesh_aabb_world.center > N mètres pendant 2 samples
+# consécutifs alors que le character est immobile → health alert "warning".
+# 0.05m = 5cm de tolérance jitter physique.
+dbg_bone_trace_desync_threshold_m = 0.05

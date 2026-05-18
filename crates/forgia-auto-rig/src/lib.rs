@@ -989,9 +989,10 @@ pub fn write_auto_rig_sensor(
         .unwrap_or_else(|| "null".into());
     let landmarks_json = match stats.last_landmarks {
         Some(l) => format!(
-            "{{ \"vertex_count\": {}, \"hip_y_frac\": {:.3}, \"shoulder_y_frac\": {:.3}, \"head_y_frac\": {:.3}, \"aspect_ratio_xy\": {:.3}, \"hip_width_frac\": {:.3}, \"has_tail\": {}, \"looks_humanoid\": {} }}",
+            "{{ \"vertex_count\": {}, \"hip_y_frac\": {:.3}, \"shoulder_y_frac\": {:.3}, \"head_y_frac\": {:.3}, \"aspect_ratio_xy\": {:.3}, \"hip_width_frac\": {:.3}, \"has_tail\": {}, \"tail_in_positive_z\": {}, \"torso_x_off\": {:.3}, \"torso_z_off\": {:.3}, \"looks_humanoid\": {} }}",
             l.vertex_count, l.hip_y_frac, l.shoulder_y_frac, l.head_y_frac,
-            l.aspect_ratio_xy, l.hip_width_frac, l.has_tail, l.looks_humanoid()
+            l.aspect_ratio_xy, l.hip_width_frac, l.has_tail, l.tail_in_positive_z,
+            l.torso_center_x_offset_frac, l.torso_center_z_offset_frac, l.looks_humanoid()
         ),
         None => "null".into(),
     };
@@ -1118,10 +1119,12 @@ impl Plugin for ForgiaAutoRigPlugin {
                 (auto_rig_pending_meshes, auto_rig_pinocchio_v1)
                     .in_set(GameSet::Movement),
             )
-            // Skinning injection : DISABLED story-440 R&D 2026-05-17 night.
-            // Cause : mesh aplati (bug inverse_bindposes pas encore validé).
-            // Validation visuelle bones gizmos d'abord, skinning Phase 2 après.
-            // .add_systems(PostUpdate, inject_skinning_for_rigged_meshes)
+            // Skinning injection : ACTIVÉ 2026-05-18 (story-451 Phase 1).
+            // Pinocchio Phase 1B validé (20 bones BipedLizard Rex OK depuis
+            // story-440). Le skinning per-vertex nearest-bone applique les
+            // bone transforms au mesh → Rex peut être animé par bone rotation.
+            // Si mesh aplati au retour : revert via re-commenter cette ligne.
+            .add_systems(PostUpdate, inject_skinning_for_rigged_meshes)
             // Sensor dans Sensors set (après Effects, avant UI) — pattern V2.
             .add_systems(
                 Update,
@@ -1240,6 +1243,9 @@ mod tests {
             hip_width_frac: 0.20,
             arm_span_half_frac: 0.50,
             has_tail: false,
+            tail_in_positive_z: false,
+            torso_center_x_offset_frac: 0.0,
+            torso_center_z_offset_frac: 0.0,
             vertex_count: 5000,
         };
         let placed = place_template_with_landmarks(AutoRigTemplate::Humanoid, &aabb, &landmarks);
@@ -1348,6 +1354,9 @@ mod tests {
             hip_width_frac: 0.20,
             arm_span_half_frac: 0.50,
             has_tail: false,
+            tail_in_positive_z: false,
+            torso_center_x_offset_frac: 0.0,
+            torso_center_z_offset_frac: 0.0,
             vertex_count: 5000,
         };
         let placed = place_template_with_landmarks(AutoRigTemplate::Humanoid, &aabb, &landmarks);
@@ -1386,6 +1395,9 @@ mod tests {
             hip_width_frac: 0.20,
             arm_span_half_frac: 0.45, // T-pose : bras atteignent 45% mesh height
             has_tail: false,
+            tail_in_positive_z: false,
+            torso_center_x_offset_frac: 0.0,
+            torso_center_z_offset_frac: 0.0,
             vertex_count: 5000,
         };
         let placed = place_template_with_landmarks(AutoRigTemplate::Humanoid, &aabb, &landmarks);

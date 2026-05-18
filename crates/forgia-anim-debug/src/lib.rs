@@ -27,7 +27,10 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 use std::time::Instant;
 
+pub mod bone_trace;
+
 pub mod prelude {
+    pub use crate::bone_trace::{BoneTraceConfig, BoneTracePlugin};
     pub use crate::{AnimLayerStats, ForgiaAnimDebugPlugin};
 }
 
@@ -110,6 +113,7 @@ impl Plugin for ForgiaAnimDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AnimLayerStats>()
             .init_resource::<SensorTimer>()
+            .add_plugins(bone_trace::BoneTracePlugin)
             .add_systems(
                 Update,
                 (reset_stats_each_frame, write_sensor_and_health)
