@@ -216,6 +216,7 @@ members = [
     "crates/forgia-spline",
     "crates/forgia-status-effects",
     "crates/forgia-steam",
+    "crates/forgia-streaming",
     "crates/forgia-system-sets",
     "crates/forgia-telemetry-funnel",
     "crates/forgia-terrain",
@@ -524,6 +525,7 @@ forgia-skill-tree = { path = "crates/forgia-skill-tree" }
 forgia-spline = { path = "crates/forgia-spline" }
 forgia-status-effects = { path = "crates/forgia-status-effects" }
 forgia-steam = { path = "crates/forgia-steam" }
+forgia-streaming = { path = "crates/forgia-streaming" }
 forgia-system-sets = { path = "crates/forgia-system-sets" }
 forgia-telemetry-funnel = { path = "crates/forgia-telemetry-funnel" }
 forgia-terrain = { path = "crates/forgia-terrain" }

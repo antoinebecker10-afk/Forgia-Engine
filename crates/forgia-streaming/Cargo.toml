@@ -1,0 +1,14 @@
+[package]
+name = "forgia-streaming"
+version = "0.1.0"
+edition = "2021"
+description = "Chunk streaming foundation : dual radii (sim/view/unload), memory budget LRU, hysteresis, async pipeline metrics, sensor + health. Industry-grade pattern (Minecraft + UE5 World Partition + Roblox StreamingEnabled + Unity Addressables)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }

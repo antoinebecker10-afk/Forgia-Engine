@@ -55,6 +55,7 @@ pub fn run_game() -> AppExit {
     // 7. Mode-specific plugins (run_if interne par GameMode)
     app.add_plugins((
         forgia_asset_registry::prelude::ForgiaAssetRegistryPlugin,
+        forgia_streaming::ForgiaStreamingPlugin, // story-450 chunk streaming foundation
         forgia_fps::prelude::ForgiaFpsPlugin,
         forgia_viewmodel_calibration::ForgiaViewmodelCalibrationPlugin,
         forgia_rpg::prelude::ForgiaRpgPlugin,

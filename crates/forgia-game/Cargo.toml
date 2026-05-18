@@ -25,6 +25,7 @@ forgia-water = { workspace = true }
 forgia-audio-core = { workspace = true }
 forgia-audio-biome = { workspace = true }
 forgia-asset-registry = { workspace = true }
+forgia-streaming = { workspace = true }
 forgia-fps = { workspace = true }
 forgia-viewmodel-calibration = { workspace = true }
 forgia-rpg = { workspace = true }
