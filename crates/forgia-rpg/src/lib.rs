@@ -429,7 +429,12 @@ fn stream_chunks_around_player(
             }
             // Eviction autorisée.
             if let Some(entity) = chunk_mgr.loaded_entities.remove(&coord) {
-                commands.entity(entity).despawn();
+                // try_despawn (Bevy 0.18) idempotent au flush — silent si
+                // entity déjà queued for despawn par un autre system (cf
+                // forgia-foliage::despawn_unloaded_chunks race conditions).
+                if let Ok(mut ec) = commands.get_entity(entity) {
+                    ec.try_despawn();
+                }
                 residence.loaded_at_secs.remove(&coord);
                 let dist_m = (manhattan as f32) * CHUNK_X as f32;
                 stats.record_eviction(EvictionEvent {

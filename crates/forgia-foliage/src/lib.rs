@@ -365,7 +365,11 @@ fn despawn_far_lod_vegetation(
         if let Some(entities) = veg.chunk_entities.remove(coord) {
             let count = entities.len();
             for e in entities {
-                if let Ok(mut ec) = commands.get_entity(e) { ec.despawn(); }
+                // story-450 wave 2.5 : try_despawn (Bevy 0.18) idempotent au
+                // flush — pas d'erreur "entity invalid" si command queue
+                // contient déjà un despawn de la même entité (concurrent path
+                // via despawn_unloaded_chunks ou recursive cascade chunk).
+                if let Ok(mut ec) = commands.get_entity(e) { ec.try_despawn(); }
             }
             veg.total_trees = veg.total_trees.saturating_sub(count);
         }
@@ -393,8 +397,12 @@ fn despawn_unloaded_chunks(
         if let Some(entities) = veg.chunk_entities.remove(&coord) {
             let count = entities.len();
             for e in entities {
+                // story-450 wave 2.5 : try_despawn idempotent — voir commentaire
+                // dans despawn_far_lod_vegetation. Race possible quand
+                // streaming.toml view_m réduit drastiquement le ring loaded
+                // → mass eviction concurrent (38 warns observés t≈09:58:04-23).
                 if let Ok(mut ec) = commands.get_entity(e) {
-                    ec.despawn();
+                    ec.try_despawn();
                 }
             }
             veg.total_trees = veg.total_trees.saturating_sub(count);
