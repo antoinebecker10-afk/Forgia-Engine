@@ -30,10 +30,15 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub mod pack_registry;
+
 /// Chemin du manifest TOML versionnable. Généré au 1er boot, lu ensuite.
 const REGISTRY_TOML_PATH: &str = "assets/asset_registry.toml";
 
 pub mod prelude {
+    pub use crate::pack_registry::{
+        ForgiaPackRegistryPlugin, PackRegistry, PackRuntimeEntry,
+    };
     pub use crate::{
         target_size_for, AssetCategory, AssetEntry, AssetQuery, AssetRegistry, AssetSeason,
         BiomeCompat, ForgiaAssetRegistryPlugin, NeedsAssetCalibrate,
