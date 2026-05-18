@@ -24,7 +24,7 @@ use forgia_audio_biome::prelude::AudioSampleOffset;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{FoliageExclusionDisc, RpgSampleOffset, VegetationTree};
 use forgia_streaming::{
-    EvictionEvent, EvictionReason, StreamingConfig, StreamingStats,
+    EvictionEvent, EvictionReason, StreamingConfig, StreamingPause, StreamingStats,
 };
 use forgia_terrain::{
     build_chunk_mesh, build_path_segment, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
@@ -93,6 +93,8 @@ impl Plugin for ForgiaRpgPlugin {
         app.init_resource::<character::TestCharacterMode>();
         // Story-450 wave 2 : residence tracking pour hystérèse unload UE5-style.
         app.init_resource::<ChunkResidence>();
+        // Story-450 wave 4c : debug overlay toggle (F3).
+        app.init_resource::<StreamingDebugOverlay>();
         app.add_systems(Startup, register_sample_dialogues)
             .add_systems(OnEnter(GameMode::Rpg), spawn_world)
             .add_systems(
@@ -106,6 +108,8 @@ impl Plugin for ForgiaRpgPlugin {
                     teleport_player_to_terrain,
                     stream_chunks_around_player,
                     enforce_chunk_memory_budget, // wave 3a — runs AFTER stream
+                    toggle_streaming_overlay,    // wave 4c — F3 toggle
+                    draw_streaming_debug_overlay, // wave 4c — gizmos
                     write_chunks_sensor,
                     interact_system,
                     rpg_cloud_drift_system,
@@ -286,6 +290,14 @@ fn spawn_world(
     commands.insert_resource(AudioSampleOffset { x: off.x, z: off.y });
     // Marque qu'un teleport joueur doit firer ce cycle Rpg (consommé en Update).
     commands.insert_resource(PendingPlayerTeleport);
+    // Story-450 wave 4a : active StreamingPause au boot RPG. Teleport gate
+    // sur pause.active=false → garantit que le sim ring est chargé avant
+    // que le joueur arrive sur place (pattern Roblox StreamingPauseMode).
+    commands.insert_resource(StreamingPause {
+        active: true,
+        reason: "rpg_world_spawn".into(),
+        waiting_chunks: 0, // mis à jour frame suivante par stream_chunks_around_player
+    });
 
     // ── Village procgen (story-442 supersedes 441) ──────────────────────
     // Le village est généré procéduralement depuis un genome TOML (seed +
@@ -365,6 +377,7 @@ fn stream_chunks_around_player(
     time: Res<Time>,
     streaming_cfg: Option<Res<StreamingConfig>>,
     mut stats: ResMut<StreamingStats>,
+    mut pause: ResMut<StreamingPause>,
     mut residence: ResMut<ChunkResidence>,
     mut chunk_mgr: ResMut<ChunkManager>,
     terrain_cfg: Option<Res<TerrainConfig>>,
@@ -506,6 +519,38 @@ fn stream_chunks_around_player(
     stats.loaded_count = chunk_mgr.loaded_entities.len() as u32;
     stats.pending_load_count = pending.len() as u32;
     stats.pending_gen_count = gen_count_this_frame;
+
+    // 3b. Wave 4a — StreamingPause auto-track (Roblox pattern).
+    // Compute pending chunks dans le simulation ring (inner radius critique).
+    // Pause active tant qu'il reste des chunks à charger dans la zone de
+    // simulation player. Évite spawn-in-water / pop-in catastrophique.
+    let sim_chunks = if let Some(cfg) = streaming_cfg.as_deref() {
+        (cfg.radii.simulation_m / CHUNK_X as f32).ceil() as i32
+    } else {
+        view_chunks / 2 // fallback
+    };
+    let pending_in_sim = pending
+        .iter()
+        .filter(|c| c.distance(&player_chunk) <= sim_chunks)
+        .count() as u32;
+
+    // Auto-track pause : active si chunks pending dans le sim ring.
+    if pending_in_sim > 0 {
+        if !pause.active {
+            pause.active = true;
+            pause.reason = "loading_sim_ring".into();
+        }
+        pause.waiting_chunks = pending_in_sim;
+    } else if pause.active {
+        // Sim ring fully loaded → release pause.
+        info!(
+            "[forgia-rpg::streaming] StreamingPause released (reason={}, sim_chunks={})",
+            pause.reason, sim_chunks
+        );
+        pause.active = false;
+        pause.reason.clear();
+        pause.waiting_chunks = 0;
+    }
     if let Some(lod) = lod_stats {
         stats.lod0_count = lod.lod0_count;
         stats.lod1_count = lod.lod1_count;
@@ -514,6 +559,117 @@ fn stream_chunks_around_player(
     // Memory estimation : ~5 MB per loaded chunk (mesh + collider + textures).
     // Wave 3c raffinera (asset_server.get_memory + GPU buffer tracking).
     stats.loaded_mb_est = stats.loaded_count as f32 * 5.0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wave 4c — Debug streaming overlay (F3 toggle)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Toggle visibility du debug overlay streaming. F3 cycle off → on → off.
+/// Bevy `Gizmos` API : pas de ressources persistantes, draws chaque frame.
+#[derive(Resource, Default)]
+pub struct StreamingDebugOverlay {
+    pub enabled: bool,
+}
+
+/// Toggle handler — F3 cycle visibility. Pattern UE5 `stat streaming` toggle.
+fn toggle_streaming_overlay(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut overlay: ResMut<StreamingDebugOverlay>,
+) {
+    if keys.just_pressed(KeyCode::F3) {
+        overlay.enabled = !overlay.enabled;
+        info!(
+            "[forgia-rpg::streaming] F3 overlay = {}",
+            if overlay.enabled { "ON" } else { "OFF" }
+        );
+    }
+}
+
+/// Wave 4c — Draws chunk grid + LOD colors + load state via Bevy Gizmos.
+///
+/// Pattern UE5 World Partition Editor viewer + Roblox MicroProfiler streaming :
+/// - Cube outline par chunk loaded (color per LOD : LOD0 green, LOD1 yellow, LOD2 red)
+/// - Anneau view_m (cyan) + unload_m (orange) + simulation_m (magenta) au sol
+/// - Pause indicator : sphère rouge au player si pause active
+#[allow(clippy::too_many_arguments)]
+fn draw_streaming_debug_overlay(
+    overlay: Res<StreamingDebugOverlay>,
+    streaming_cfg: Option<Res<StreamingConfig>>,
+    pause: Res<StreamingPause>,
+    chunk_mgr: Option<Res<ChunkManager>>,
+    q_chunk_lod: Query<&forgia_terrain::ChunkLod>,
+    player_q: Query<&Transform, With<Player>>,
+    mut gizmos: Gizmos,
+) {
+    if !overlay.enabled {
+        return;
+    }
+    let Some(cfg) = streaming_cfg else { return };
+    let Some(chunk_mgr) = chunk_mgr else { return };
+    let Ok(player_tf) = player_q.single() else { return };
+    let player_pos = player_tf.translation;
+    let chunk_m = CHUNK_X as f32;
+    let half = chunk_m * 0.5;
+    let y_overlay = player_pos.y + 0.2; // léger offset sol
+
+    // 1. Anneaux radii — circles XZ au sol.
+    let center = Vec3::new(player_pos.x, y_overlay, player_pos.z);
+    gizmos
+        .circle(
+            bevy::math::Isometry3d::new(center, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+            cfg.radii.simulation_m,
+            Color::srgb(1.0, 0.0, 1.0), // magenta
+        )
+        .resolution(64);
+    gizmos
+        .circle(
+            bevy::math::Isometry3d::new(center, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+            cfg.radii.view_m,
+            Color::srgb(0.0, 1.0, 1.0), // cyan
+        )
+        .resolution(64);
+    gizmos
+        .circle(
+            bevy::math::Isometry3d::new(center, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+            cfg.radii.unload_m,
+            Color::srgb(1.0, 0.6, 0.0), // orange
+        )
+        .resolution(64);
+
+    // 2. Cubes par chunk loaded — couleur per LOD.
+    for (coord, entity) in &chunk_mgr.loaded_entities {
+        let origin = coord.world_origin();
+        let cube_center = Vec3::new(origin.x + half, y_overlay, origin.z + half);
+        let lod = q_chunk_lod.get(*entity).copied().unwrap_or(forgia_terrain::ChunkLod::Lod0);
+        let color = match lod {
+            forgia_terrain::ChunkLod::Lod0 => Color::srgb(0.0, 1.0, 0.0), // green
+            forgia_terrain::ChunkLod::Lod1 => Color::srgb(1.0, 1.0, 0.0), // yellow
+            forgia_terrain::ChunkLod::Lod2 => Color::srgb(1.0, 0.3, 0.3), // red
+        };
+        // Carré XZ via 4 lignes (cube outline complet trop coûteux à 33 chunks).
+        let corners = [
+            Vec3::new(origin.x, y_overlay, origin.z),
+            Vec3::new(origin.x + chunk_m, y_overlay, origin.z),
+            Vec3::new(origin.x + chunk_m, y_overlay, origin.z + chunk_m),
+            Vec3::new(origin.x, y_overlay, origin.z + chunk_m),
+        ];
+        gizmos.line(corners[0], corners[1], color);
+        gizmos.line(corners[1], corners[2], color);
+        gizmos.line(corners[2], corners[3], color);
+        gizmos.line(corners[3], corners[0], color);
+        // Point central pour repérage chunk coord (cf. recent_evictions dans sensor).
+        let _ = cube_center;
+    }
+
+    // 3. Pause indicator — sphère rouge au-dessus player si pause active.
+    if pause.active {
+        gizmos.sphere(
+            bevy::math::Isometry3d::from_translation(player_pos + Vec3::Y * 2.5),
+            0.5,
+            Color::srgb(1.0, 0.2, 0.2),
+        );
+    }
 }
 
 /// Memory budget LRU eviction (story-450 wave 3a).
@@ -675,16 +831,24 @@ fn teleport_player_to_terrain(
     mut commands: Commands,
     pending: Option<Res<PendingPlayerTeleport>>,
     village: Option<Res<VillageLoadResult>>,
+    pause: Option<Res<StreamingPause>>,
     mut q: Query<&mut Transform, With<Player>>,
 ) {
     if pending.is_none() { return; }
     let Some(village) = village else { return };
+    // Wave 4a — block teleport tant que le sim ring n'est pas loaded.
+    // Pattern Roblox StreamingPauseMode : "min-radius is a correctness contract".
+    if let Some(pause) = pause {
+        if pause.active {
+            return; // retry frame suivante
+        }
+    }
     let Ok(mut tf) = q.single_mut() else { return };
     tf.translation = village.spawn_position;
     tf.rotation = Quat::from_rotation_y(village.spawn_yaw_deg.to_radians());
     commands.remove_resource::<PendingPlayerTeleport>();
     info!(
-        "[forgia-rpg] Player teleported to village '{}' spawn ({:.1},{:.1},{:.1})",
+        "[forgia-rpg] Player teleported to village '{}' spawn ({:.1},{:.1},{:.1}) — sim ring loaded",
         village.village_id,
         village.spawn_position.x, village.spawn_position.y, village.spawn_position.z
     );
