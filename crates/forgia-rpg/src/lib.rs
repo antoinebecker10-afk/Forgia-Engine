@@ -23,6 +23,9 @@ use forgia_player::prelude::Player;
 use forgia_audio_biome::prelude::AudioSampleOffset;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{FoliageExclusionDisc, RpgSampleOffset, VegetationTree};
+use forgia_streaming::{
+    EvictionEvent, EvictionReason, StreamingConfig, StreamingStats,
+};
 use forgia_terrain::{
     build_chunk_mesh, build_path_segment, spawn_chunk_entity, BiomeMap, ChunkCoord, ChunkManager,
     FlattenZones, Lod2TileManager, LodSampleOffset, LodStats, MapGenConfig, PathNetwork, RoadTier,
@@ -67,12 +70,13 @@ const RPG_SEED: u32 = 1337;
 const RPG_SEA_LEVEL: f32 = 4.0;
 const RPG_MAX_HEIGHT: f32 = 28.0;
 
-/// Rayon Manhattan de streaming chunks. Cible la couverture LOD1 (320m) :
-/// ceil(LOD1_MAX_M / CHUNK_X) = 10. Au-delà : LOD2 mega-tiles, pas de chunk.
-const RENDER_DIST: i32 = 10;
-/// Chunks max meshés par frame (anti-freeze démarrage). 4 pour atteindre la
-/// pleine ring LOD1 en ~1s (221 chunks Manhattan disk).
-const CHUNKS_PER_FRAME: usize = 4;
+/// Fallback Manhattan radius si `StreamingConfig` indisponible (boot frame 0,
+/// avant que load_streaming_genome ait inséré la Resource). Cible la couverture
+/// LOD1 (320m) : ceil(LOD1_MAX_M / CHUNK_X) = 10. Au-delà : LOD2 mega-tiles.
+/// Story-450 Wave 2 : la vraie source est `Res<StreamingConfig>`.
+const FALLBACK_RENDER_DIST: i32 = 10;
+/// Fallback chunks/frame si config absente. Override par `StreamingConfig.async_pipeline`.
+const FALLBACK_CHUNKS_PER_FRAME: usize = 4;
 /// W2 — intervalle d'export sensor JSON (secondes).
 const SENSOR_INTERVAL_S: f32 = 1.0;
 
@@ -87,6 +91,8 @@ impl Plugin for ForgiaRpgPlugin {
         // Validation visuelle bones d'abord, anim Phase 2+ après.
         app.add_plugins(forgia_auto_rig::ForgiaAutoRigPlugin);
         app.init_resource::<character::TestCharacterMode>();
+        // Story-450 wave 2 : residence tracking pour hystérèse unload UE5-style.
+        app.init_resource::<ChunkResidence>();
         app.add_systems(Startup, register_sample_dialogues)
             .add_systems(OnEnter(GameMode::Rpg), spawn_world)
             .add_systems(
@@ -325,17 +331,41 @@ fn spawn_world(
     );
 }
 
-/// W2 — Stream les chunks dans un rayon Manhattan `RENDER_DIST` autour du joueur.
-/// - Si le joueur n'a pas changé de chunk : skip total (early return).
-/// - Spawn `CHUNKS_PER_FRAME` max par frame depuis la queue de pending (anti-freeze).
-/// - Despawn les chunks hors rayon (entité + retire de `loaded_entities`).
+/// Per-chunk residence tracking for unload hysteresis (story-450 wave 2).
+/// `loaded_at_secs[coord]` = elapsed_secs au moment du spawn. Un chunk n'est
+/// éligible à eviction par distance que si `now - loaded_at >= min_residence_secs`.
+/// Pattern UE5 Level Streaming Volumes default 2.0s.
+#[derive(Resource, Default)]
+pub struct ChunkResidence {
+    pub loaded_at_secs: HashMap<ChunkCoord, f32>,
+}
+
+/// W2 — Stream les chunks autour du joueur via `StreamingConfig` (story-450).
+///
+/// Industry pattern composite :
+/// - **Triple radius** Minecraft + UE5 + Roblox : `view_chunks` (load ring) vs
+///   `unload_chunks` (eviction ring, > view → hysteresis spatiale).
+/// - **Temporal hysteresis** UE5 : chunk doit avoir résidé `min_residence_secs`
+///   avant d'être éligible à eviction par distance.
+/// - **Async pipeline budget** : `chunks_per_frame` configurable.
+/// - **StreamingStats observability** : record load timing, eviction reasons,
+///   queue depth, lod counts → sensor `forgia_chunk_stream.json`.
+///
+/// Fallback graceful : si `StreamingConfig` Resource absente (boot frame 0),
+/// utilise `FALLBACK_RENDER_DIST` + `FALLBACK_CHUNKS_PER_FRAME`.
+#[allow(clippy::too_many_arguments)]
 fn stream_chunks_around_player(
     mut commands: Commands,
+    time: Res<Time>,
+    streaming_cfg: Option<Res<StreamingConfig>>,
+    mut stats: ResMut<StreamingStats>,
+    mut residence: ResMut<ChunkResidence>,
     mut chunk_mgr: ResMut<ChunkManager>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     biome_map: Option<Res<BiomeMap>>,
     shared_mat: Option<Res<TerrainSharedMaterial>>,
     flatten_zones: Option<Res<FlattenZones>>,
+    lod_stats: Option<Res<LodStats>>,
     mut meshes: ResMut<Assets<Mesh>>,
     player_q: Query<&Transform, With<Player>>,
     mut pending: Local<VecDeque<ChunkCoord>>,
@@ -344,34 +374,74 @@ fn stream_chunks_around_player(
         (terrain_cfg, biome_map, shared_mat) else { return };
     let Ok(player_tf) = player_q.single() else { return };
 
+    // Resolve runtime radii + chunks_per_frame depuis StreamingConfig (genome)
+    // ou fallback hardcoded si config pas encore chargée.
+    let (view_chunks, unload_chunks, chunks_per_frame, min_residence_secs) =
+        if let Some(cfg) = streaming_cfg.as_deref() {
+            let chunk_m = CHUNK_X as f32;
+            let view = (cfg.radii.view_m / chunk_m).ceil() as i32;
+            let unload = (cfg.radii.unload_m / chunk_m).ceil() as i32;
+            (
+                view,
+                unload.max(view + 1), // garantit hystérèse spatiale ≥ 1 chunk
+                cfg.async_pipeline.chunks_per_frame as usize,
+                cfg.hysteresis.min_residence_secs,
+            )
+        } else {
+            (
+                FALLBACK_RENDER_DIST,
+                FALLBACK_RENDER_DIST + 2,
+                FALLBACK_CHUNKS_PER_FRAME,
+                2.0,
+            )
+        };
+
+    let now = time.elapsed_secs();
     let player_chunk = ChunkCoord::from_world(player_tf.translation);
     let need_recompute_set = chunk_mgr.last_player_chunk != Some(player_chunk);
 
     // 1. Si traversée de frontière chunk : recalculer desired set + diff load/unload.
     if need_recompute_set {
+        // Desired set = view_chunks ring Manhattan.
         let mut desired: HashSet<ChunkCoord> = HashSet::new();
-        for dx in -RENDER_DIST..=RENDER_DIST {
-            for dz in -RENDER_DIST..=RENDER_DIST {
-                if dx.abs() + dz.abs() <= RENDER_DIST {
+        for dx in -view_chunks..=view_chunks {
+            for dz in -view_chunks..=view_chunks {
+                if dx.abs() + dz.abs() <= view_chunks {
                     desired.insert(ChunkCoord::new(player_chunk.x + dx, player_chunk.z + dz));
                 }
             }
         }
 
-        // Unload chunks hors rayon
-        let to_remove: Vec<ChunkCoord> = chunk_mgr
-            .loaded_entities
-            .keys()
-            .filter(|c| !desired.contains(c))
-            .copied()
-            .collect();
-        for coord in to_remove {
+        // Unload candidates = chunks hors unload_chunks ring ET résidence
+        // expirée. Pattern hystérèse UE5 + spatiale Minecraft.
+        let loaded_coords: Vec<ChunkCoord> = chunk_mgr.loaded_entities.keys().copied().collect();
+        for coord in loaded_coords {
+            let manhattan = coord.distance(&player_chunk);
+            if manhattan <= unload_chunks {
+                continue; // Dans la zone de garde, on ne touche pas.
+            }
+            // Au-delà du unload ring : check residence hysteresis.
+            let resident_since = residence.loaded_at_secs.get(&coord).copied().unwrap_or(now);
+            let residence_secs = now - resident_since;
+            if residence_secs < min_residence_secs {
+                stats.hysteresis_blocked_unloads = stats.hysteresis_blocked_unloads.saturating_add(1);
+                continue;
+            }
+            // Eviction autorisée.
             if let Some(entity) = chunk_mgr.loaded_entities.remove(&coord) {
                 commands.entity(entity).despawn();
+                residence.loaded_at_secs.remove(&coord);
+                let dist_m = (manhattan as f32) * CHUNK_X as f32;
+                stats.record_eviction(EvictionEvent {
+                    reason: EvictionReason::Distance,
+                    coord: [coord.x, coord.z],
+                    timestamp_secs: now,
+                    distance_m: dist_m,
+                });
             }
         }
 
-        // Queue les chunks manquants (proche d'abord pour visu prioritaire)
+        // Queue les chunks manquants (proche d'abord pour visu prioritaire).
         pending.clear();
         let mut sorted: Vec<ChunkCoord> = desired
             .into_iter()
@@ -385,12 +455,19 @@ fn stream_chunks_around_player(
         chunk_mgr.last_player_chunk = Some(player_chunk);
     }
 
-    // 2. Mesh+spawn ≤ CHUNKS_PER_FRAME pour amortir le coût.
+    // 2. Mesh+spawn ≤ chunks_per_frame pour amortir le coût + instrument gen_ms.
     let off = sample_offset();
-    for _ in 0..CHUNKS_PER_FRAME {
+    let mut gen_count_this_frame = 0u32;
+    for _ in 0..chunks_per_frame {
         let Some(coord) = pending.pop_front() else { break };
         if chunk_mgr.loaded_entities.contains_key(&coord) { continue; }
+
+        let t0 = std::time::Instant::now();
         let mesh_data = build_chunk_mesh(coord, off, &terrain_cfg, &biome_map, flatten_zones.as_deref());
+        let gen_ms = t0.elapsed().as_secs_f32() * 1000.0;
+        stats.record_gen_ms(gen_ms);
+        gen_count_this_frame += 1;
+
         let mesh_handle = meshes.add(mesh_data.mesh.clone());
         let entity = spawn_chunk_entity(
             &mut commands,
@@ -401,7 +478,21 @@ fn stream_chunks_around_player(
         );
         commands.entity(entity).insert(RpgWorldMarker);
         chunk_mgr.loaded_entities.insert(coord, entity);
+        residence.loaded_at_secs.insert(coord, now);
     }
+
+    // 3. Update stats observability (lus par sensor 1Hz).
+    stats.loaded_count = chunk_mgr.loaded_entities.len() as u32;
+    stats.pending_load_count = pending.len() as u32;
+    stats.pending_gen_count = gen_count_this_frame;
+    if let Some(lod) = lod_stats {
+        stats.lod0_count = lod.lod0_count;
+        stats.lod1_count = lod.lod1_count;
+        stats.lod2_count = lod.lod2_count;
+    }
+    // Memory estimation : ~5 MB per loaded chunk (mesh + collider + textures).
+    // Wave 3 raffinera (asset_server.get_memory + GPU buffer tracking).
+    stats.loaded_mb_est = stats.loaded_count as f32 * 5.0;
 }
 
 /// W2 — Sensor `forgia_chunks_snapshot.json` (observability-required.md).
@@ -439,7 +530,7 @@ fn write_chunks_sensor(
         chunk_mgr.loaded_entities.len(),
         chunk_mgr.last_player_chunk.map(|c| c.x).unwrap_or(0),
         chunk_mgr.last_player_chunk.map(|c| c.z).unwrap_or(0),
-        RENDER_DIST,
+        FALLBACK_RENDER_DIST,
         terrain_cfg.map_size,
         terrain_cfg.sea_level,
         terrain_cfg.max_height,
