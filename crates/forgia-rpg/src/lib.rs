@@ -118,8 +118,8 @@ impl Plugin for ForgiaRpgPlugin {
                     .run_if(in_state(GameMode::Rpg)),
             )
             // Rex spawn one-shot (retry-jusqu'à-success : race avec spawn_player
-            // dans un autre plugin OnEnter Rpg). Pas d'animation système — Rex
-            // reste en bind pose (T-pose) jusqu'à réactivation auto-rig.
+            // dans un autre plugin OnEnter Rpg). Story-451 Phase 2 (2026-05-18) :
+            // animation par-bone activée — Pinocchio skinning + proc walk cycle.
             .add_systems(
                 Update,
                 (
@@ -127,11 +127,22 @@ impl Plugin for ForgiaRpgPlugin {
                     character::calibrate_rex_y_one_shot,
                     character::rex_make_transparent_one_shot,
                     character::spawn_character_lineup,
+                    character::calibrate_lineup_y_and_height,
+                    character::attach_rex_bone_systems,
+                    character::procedural_locomotion,
+                    character::procedural_whole_body_anim,
+                    character::write_walk_pose_sensor,
                 )
+                    .chain()
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
             )
             .init_resource::<character::LineupSpawned>()
+            .init_resource::<character::WalkPoseSensorTimer>()
+            .add_systems(
+                bevy_egui::EguiPrimaryContextPass,
+                character::draw_lineup_names.run_if(in_state(GameMode::Rpg)),
+            )
             .add_systems(OnExit(GameMode::Rpg), character::cleanup_character_lineup);
     }
 }
@@ -424,22 +435,35 @@ fn stream_chunks_around_player(
 
     // 1. Si traversée de frontière chunk : recalculer desired set + diff load/unload.
     if need_recompute_set {
-        // Desired set = view_chunks ring Manhattan.
+        // Wave 5 phase 3 (story-450) : EUCLIDEAN distance au lieu de
+        // MANHATTAN. Le Manhattan diamond créait des trous diagonaux visibles
+        // (chunk (2,2) Manhattan=4 NOT loaded malgré Euclidean=90m < view=96m).
+        // Pattern industrie : UE5 World Partition + Unity Addressables utilisent
+        // cercles Euclidean. Minecraft utilise Chebyshev (square). Le Manhattan
+        // n'est utilisé que pour économiser RAM en voxel hardcore (Vintage Story).
+        //
+        // Forgia choix Euclidean : matche les anneaux F3 overlay (cercles),
+        // patch les trous diamantaires.
+        let view_r_sq = (view_chunks as f32).powi(2);
         let mut desired: HashSet<ChunkCoord> = HashSet::new();
         for dx in -view_chunks..=view_chunks {
             for dz in -view_chunks..=view_chunks {
-                if dx.abs() + dz.abs() <= view_chunks {
+                let dist_sq = (dx * dx + dz * dz) as f32;
+                if dist_sq <= view_r_sq {
                     desired.insert(ChunkCoord::new(player_chunk.x + dx, player_chunk.z + dz));
                 }
             }
         }
 
-        // Unload candidates = chunks hors unload_chunks ring ET résidence
-        // expirée. Pattern hystérèse UE5 + spatiale Minecraft.
+        // Unload candidates = chunks hors unload_chunks ring (Euclidean aussi
+        // pour cohérence) ET résidence expirée. Hystérèse UE5 + spatiale.
+        let unload_r_sq = (unload_chunks as f32).powi(2);
         let loaded_coords: Vec<ChunkCoord> = chunk_mgr.loaded_entities.keys().copied().collect();
         for coord in loaded_coords {
-            let manhattan = coord.distance(&player_chunk);
-            if manhattan <= unload_chunks {
+            let dx = coord.x - player_chunk.x;
+            let dz = coord.z - player_chunk.z;
+            let dist_sq = (dx * dx + dz * dz) as f32;
+            if dist_sq <= unload_r_sq {
                 continue; // Dans la zone de garde, on ne touche pas.
             }
             // Au-delà du unload ring : check residence hysteresis.
@@ -459,7 +483,7 @@ fn stream_chunks_around_player(
                 }
                 residence.loaded_at_secs.remove(&coord);
                 residence.last_seen_secs.remove(&coord);
-                let dist_m = (manhattan as f32) * CHUNK_X as f32;
+                let dist_m = dist_sq.sqrt() * CHUNK_X as f32;
                 stats.record_eviction(EvictionEvent {
                     reason: EvictionReason::Distance,
                     coord: [coord.x, coord.z],
@@ -489,8 +513,12 @@ fn stream_chunks_around_player(
             // Dot product XZ : > 0 = devant, ≤ 0 = derrière.
             let dot = fwd_xz.x * dx + fwd_xz.y * dz;
             let in_front: i32 = if dot > 0.0 { 0 } else { 1 };
-            let dist = c.distance(&player_chunk);
-            (in_front, dist)
+            // Wave 5 phase 3 : tie-break Euclidean (squared, integer) au lieu
+            // de Manhattan pour cohérence avec desired set + LRU touch.
+            let cdx = c.x - player_chunk.x;
+            let cdz = c.z - player_chunk.z;
+            let dist_sq = cdx * cdx + cdz * cdz;
+            (in_front, dist_sq)
         });
         for c in sorted {
             pending.push_back(c);
@@ -527,9 +555,15 @@ fn stream_chunks_around_player(
     }
 
     // 2b. LRU touch — refresh last_seen pour tous les chunks dans le view ring
-    // (Manhattan ≤ view_chunks). Pattern Unity Addressables refcount/LRU.
+    // (Euclidean ≤ view_chunks). Pattern Unity Addressables refcount/LRU.
+    // Wave 5 phase 3 : Euclidean cohérent avec desired set (vs Manhattan
+    // qui sous-comptait les chunks diagonaux pourtant proches).
+    let view_r_sq_touch = (view_chunks as f32).powi(2);
     for coord in chunk_mgr.loaded_entities.keys().copied() {
-        if coord.distance(&player_chunk) <= view_chunks {
+        let dx = coord.x - player_chunk.x;
+        let dz = coord.z - player_chunk.z;
+        let dist_sq = (dx * dx + dz * dz) as f32;
+        if dist_sq <= view_r_sq_touch {
             residence.last_seen_secs.insert(coord, now);
         }
     }
@@ -548,9 +582,15 @@ fn stream_chunks_around_player(
     } else {
         view_chunks / 2 // fallback
     };
+    // Wave 5 phase 3 : Euclidean check pour matcher desired set logic.
+    let sim_r_sq = (sim_chunks as f32).powi(2);
     let pending_in_sim = pending
         .iter()
-        .filter(|c| c.distance(&player_chunk) <= sim_chunks)
+        .filter(|c| {
+            let dx = c.x - player_chunk.x;
+            let dz = c.z - player_chunk.z;
+            (dx * dx + dz * dz) as f32 <= sim_r_sq
+        })
         .count() as u32;
 
     // Auto-track pause : active si chunks pending dans le sim ring.
@@ -689,6 +729,56 @@ fn draw_streaming_debug_overlay(
             Color::srgb(1.0, 0.2, 0.2),
         );
     }
+
+    // 4. Wave 5 phase 3 — MISSING chunks debug : pour chaque chunk du view
+    // ring qui devrait être loaded mais ne l'est pas, draw un X ROUGE. Permet
+    // diagnostic instant du "Manhattan diamond bug" ou tout autre trou.
+    // Pattern UE5 World Partition Editor : missing cells highlighted.
+    let player_chunk = forgia_terrain::ChunkCoord::from_world(player_pos);
+    let view_chunks = (cfg.radii.view_m / chunk_m).ceil() as i32;
+    let view_r_sq = (view_chunks as f32).powi(2);
+    for dx in -view_chunks..=view_chunks {
+        for dz in -view_chunks..=view_chunks {
+            let dist_sq = (dx * dx + dz * dz) as f32;
+            if dist_sq > view_r_sq {
+                continue;
+            }
+            let coord = forgia_terrain::ChunkCoord::new(
+                player_chunk.x + dx,
+                player_chunk.z + dz,
+            );
+            if chunk_mgr.loaded_entities.contains_key(&coord) {
+                continue; // OK loaded
+            }
+            // MISSING : draw red X in chunk center
+            let origin = coord.world_origin();
+            let cx = origin.x + half;
+            let cz = origin.z + half;
+            let h = chunk_m * 0.4;
+            let red = Color::srgb(1.0, 0.0, 0.0);
+            gizmos.line(
+                Vec3::new(cx - h, y_overlay + 1.0, cz - h),
+                Vec3::new(cx + h, y_overlay + 1.0, cz + h),
+                red,
+            );
+            gizmos.line(
+                Vec3::new(cx - h, y_overlay + 1.0, cz + h),
+                Vec3::new(cx + h, y_overlay + 1.0, cz - h),
+                red,
+            );
+            // Encadré rouge complet pour visibilité
+            let corners = [
+                Vec3::new(origin.x, y_overlay + 0.5, origin.z),
+                Vec3::new(origin.x + chunk_m, y_overlay + 0.5, origin.z),
+                Vec3::new(origin.x + chunk_m, y_overlay + 0.5, origin.z + chunk_m),
+                Vec3::new(origin.x, y_overlay + 0.5, origin.z + chunk_m),
+            ];
+            gizmos.line(corners[0], corners[1], red);
+            gizmos.line(corners[1], corners[2], red);
+            gizmos.line(corners[2], corners[3], red);
+            gizmos.line(corners[3], corners[0], red);
+        }
+    }
 }
 
 /// Memory budget LRU eviction (story-450 wave 3a).
@@ -738,7 +828,12 @@ fn enforce_chunk_memory_budget(
                 return None; // protégé par hysteresis temporelle
             }
             let last_seen = residence.last_seen_secs.get(c).copied().unwrap_or(now);
-            Some((*c, c.distance(&player_chunk), last_seen))
+            // Wave 5 phase 3 : distance squared Euclidean (cohérent avec
+            // desired/unload/touch/sim filters), evite Manhattan diamant.
+            let cdx = c.x - player_chunk.x;
+            let cdz = c.z - player_chunk.z;
+            let dist_sq = cdx * cdx + cdz * cdz;
+            Some((*c, dist_sq, last_seen))
         })
         .collect();
 
@@ -755,7 +850,7 @@ fn enforce_chunk_memory_budget(
     let mut remaining_mb = loaded_mb_est;
     let mut evicted: u32 = 0;
 
-    for (coord, dist_chunks, _last_seen) in candidates {
+    for (coord, dist_sq_chunks, _last_seen) in candidates {
         if remaining_count <= target_count && remaining_mb <= target_mb {
             break;
         }
@@ -765,7 +860,8 @@ fn enforce_chunk_memory_budget(
             }
             residence.loaded_at_secs.remove(&coord);
             residence.last_seen_secs.remove(&coord);
-            let dist_m = (dist_chunks as f32) * CHUNK_X as f32;
+            // dist_sq_chunks est en chunks² Euclidean. dist_m = sqrt(dist_sq) * CHUNK_X
+            let dist_m = (dist_sq_chunks as f32).sqrt() * CHUNK_X as f32;
             stats.record_eviction(EvictionEvent {
                 reason: EvictionReason::Budget,
                 coord: [coord.x, coord.z],
