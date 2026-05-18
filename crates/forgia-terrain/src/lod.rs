@@ -24,7 +24,14 @@ use crate::generation::heightmap_at;
 // ─────────────────────────── Constantes ───────────────────────────
 
 pub const LOD0_MAX_M: f32 = 96.0;
-pub const LOD1_MAX_M: f32 = 320.0;
+/// Wave 5 phase 2b (story-450) — réduit de 320 → 128m pour matcher
+/// `streaming.toml::unload_m` (128). Avant ce fix il y avait un GAP visible
+/// entre 128m (fin des chunks loaded) et 320m (début LOD2 tiles) : aucune
+/// surface rendue, le skybox/water apparaissait à la place.
+/// Maintenant LOD2 mega-tiles démarrent dès 128m → continuité visuelle.
+/// Acceptable overdraw 64-128m où LOD2 + chunks loaded coexistent (depth
+/// buffer handle Z-fighting, même Y heightmap → pas de flicker).
+pub const LOD1_MAX_M: f32 = 128.0;
 /// Vision lointaine. V1 = 700m (sea_level=20). V2 étendu à 1500m vu que les
 /// mega-tiles sont quasi-gratuites (1 plane unlit par cluster 128m).
 pub const LOD2_MAX_M: f32 = 1500.0;
