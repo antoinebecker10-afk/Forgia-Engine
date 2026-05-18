@@ -30,6 +30,11 @@ forgia2_run.log
 # Sensors runtime — checked-in baselines OK, runtime exports non
 forgia2_*.json
 !forgia2_*.baseline.json
+# V1 sensors (legacy naming kept during V1→V2 migration)
+forgia_*.json
+!forgia_*.baseline.json
+# Run log .previous backup (binary-ish, regenerated each run)
+forgia2_run.log.previous
 
 # Save data (joueur)
 saves/
