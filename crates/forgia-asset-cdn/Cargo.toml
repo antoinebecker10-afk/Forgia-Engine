@@ -2,11 +2,29 @@
 name = "forgia-asset-cdn"
 version = "0.1.0"
 edition = "2021"
-description = "CDN-fetched asset registry (V2 marketplace)"
+description = "Asset pack fetcher: download + SHA256 verify + zip extract. Pairs with forgia-assets-bundle for industry-grade external CC0 pack pipeline (Cargo.lock pattern)."
 
 [lints]
 workspace = true
 
+[lib]
+name = "forgia_asset_cdn"
+path = "src/lib.rs"
+
+[[bin]]
+name = "forgia-pack-cdn"
+path = "src/bin/cdn.rs"
+
 [dependencies]
-bevy = { workspace = true }
-forgia-core = { workspace = true }
+forgia-assets-bundle = { path = "../forgia-assets-bundle" }
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+sha2 = "0.10"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+# Sync HTTP (ureq) au lieu de async reqwest pour éviter le runtime tokio dans
+# le CLI one-shot. Trade-off : pas de parallel download Phase 1, mais binaire
+# léger, deps réduites. Phase 2 ajoutera reqwest+tokio si parallèle nécessaire.
+ureq = { version = "2.10", default-features = false, features = ["tls"] }
+clap = { version = "4.5", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
