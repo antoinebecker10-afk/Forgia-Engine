@@ -36,6 +36,15 @@ forgia_*.json
 # Run log .previous backup (binary-ish, regenerated each run)
 forgia2_run.log.previous
 
+# Asset packs (CC0 externes) — Cargo.lock pattern story-449.
+# Manifest assets/packs.toml + lockfile assets/packs.lock sont committed.
+# Contenu installé par `cargo run -p forgia-asset-cdn --bin forgia-pack-cdn install`.
+# Cache des .zip téléchargés sous target/forgia-pack-cache/ (ignoré via target/).
+assets/models-v1/packs/kaykit-*/
+# Note : autres sous-dossiers de packs/ (cc0-registry, desert, dungeon, kenney-*,
+# medieval) restent tracked — ils sont soit des registries Forgia, soit des
+# packs trop petits pour mériter le pipeline.
+
 # Save data (joueur)
 saves/
 *.save

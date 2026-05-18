@@ -1,0 +1,106 @@
+# Forgia — Asset Pack Manifest
+#
+# Pattern : Cargo.lock adapté aux packs CC0 externes. Voir story-449.
+# Le contenu (assets/models-v1/packs/<install_dir>/) est gitignored.
+# Le lockfile assets/packs.lock pinne les SHA256 réels (committed).
+#
+# Pour installer un pack :
+#   cargo run -p forgia-asset-cdn --bin forgia-pack-cdn install <name>
+#
+# Pour vérifier l'intégrité après install :
+#   cargo run -p forgia-asset-cdn --bin forgia-pack-cdn verify <name>
+#
+# Phase 1 note : download_url + sha256 doivent être renseignés AVANT install.
+# KayKit packs nécessitent itch.io login → télécharger manuellement, puis :
+#   cargo run -p forgia-asset-cdn --bin forgia-pack-cdn hash <chemin/vers/pack.zip>
+# Copier la sortie SHA256 dans le champ sha256 ci-dessous + remplacer
+# download_url par l'URL directe du .zip (visible dans devtools réseau itch).
+
+[meta]
+schema_version = 1
+default_install_root = "assets/models-v1/packs"
+
+# ── KayKit (kaylousberg.itch.io) ────────────────────────────────────────────
+# 9 packs CC0 distribués via itch.io. download_url à compléter manuellement
+# (itch.io ne donne pas d'URL stable publique sans butler).
+
+[[pack]]
+name = "kaykit-characters"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/kaykit-adventurers"
+download_url = "https://kaylousberg.itch.io/kaykit-adventurers"
+install_dir = "kaykit-characters"
+license = "CC0-1.0"
+kit_type = "characters"
+
+[[pack]]
+name = "kaykit-city"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/city-builder-bits"
+download_url = "https://kaylousberg.itch.io/city-builder-bits"
+install_dir = "kaykit-city"
+license = "CC0-1.0"
+kit_type = "buildings"
+
+[[pack]]
+name = "kaykit-dungeon"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/kaykit-dungeon"
+download_url = "https://kaylousberg.itch.io/kaykit-dungeon"
+install_dir = "kaykit-dungeon"
+license = "CC0-1.0"
+kit_type = "dungeon"
+
+[[pack]]
+name = "kaykit-furniture"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/furniturebits"
+download_url = "https://kaylousberg.itch.io/furniturebits"
+install_dir = "kaykit-furniture"
+license = "CC0-1.0"
+kit_type = "props"
+
+[[pack]]
+name = "kaykit-halloween"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/halloween-bits"
+download_url = "https://kaylousberg.itch.io/halloween-bits"
+install_dir = "kaykit-halloween"
+license = "CC0-1.0"
+kit_type = "seasonal"
+
+[[pack]]
+name = "kaykit-medieval"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/kit-medieval-hexagon"
+download_url = "https://kaylousberg.itch.io/kit-medieval-hexagon"
+install_dir = "kaykit-medieval"
+license = "CC0-1.0"
+kit_type = "medieval"
+
+[[pack]]
+name = "kaykit-prototype"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/prototype-bits"
+download_url = "https://kaylousberg.itch.io/prototype-bits"
+install_dir = "kaykit-prototype"
+license = "CC0-1.0"
+kit_type = "prototype"
+
+[[pack]]
+name = "kaykit-skeletons"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/skeletons"
+download_url = "https://kaylousberg.itch.io/skeletons"
+install_dir = "kaykit-skeletons"
+license = "CC0-1.0"
+kit_type = "characters"
+
+[[pack]]
+name = "kaykit-space"
+version = "1.0"
+source_page = "https://kaylousberg.itch.io/space-base"
+download_url = "https://kaylousberg.itch.io/space-base"
+install_dir = "kaykit-space"
+license = "CC0-1.0"
+kit_type = "space"
