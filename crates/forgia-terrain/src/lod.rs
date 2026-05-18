@@ -88,6 +88,10 @@ pub struct Lod2TileManager {
     tree_imposter_mesh: Option<Handle<Mesh>>,
     /// Materials per biome pour tree silhouette darken (~0.4× biome color).
     tree_material_cache: HashMap<u8, Handle<StandardMaterial>>,
+    /// Wave 5 phase 2d : sphere mesh shared pour rock silhouettes.
+    rock_imposter_mesh: Option<Handle<Mesh>>,
+    /// Material shared rock gris foncé (1 handle global).
+    rock_material: Option<Handle<StandardMaterial>>,
 }
 
 impl Lod2TileManager {
@@ -230,6 +234,13 @@ fn build_lod2_terrain_mesh(
     // Vertex colors sont multipliés par base_color = white du material partagé.
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_verts);
 
+    // Wave 5 phase 2d : water continuity (bevy_water plane limité au foreground).
+    // Si world_y < sea_level → clamp à sea_level + vertex color bleu eau pour
+    // surface eau visible au LOD2 ring aussi. Évite "deux eaux différentes"
+    // bug visuel (water plane foreground vs LOD2 terrain submergé biome-coloré).
+    let water_color_lin = LinearRgba::new(0.28, 0.45, 0.65, 1.0); // bleu marine
+    let sea = terrain_cfg.sea_level;
+
     for j in 0..VERTS_PER_SIDE {
         for i in 0..VERTS_PER_SIDE {
             let local_x = (i as f32) * STEP - HALF;
@@ -238,16 +249,26 @@ fn build_lod2_terrain_mesh(
             let world_z = cluster_center_xz.y + local_z;
             let sample_x = world_x + sample_offset.0;
             let sample_z = world_z + sample_offset.1;
-            let world_y = heightmap_at(sample_x, sample_z, terrain_cfg);
-            positions.push([local_x, world_y, local_z]);
+            let raw_y = heightmap_at(sample_x, sample_z, terrain_cfg);
+
+            let (world_y, vertex_color) = if raw_y < sea {
+                // Submergé : clamp à sea_level + bleu marine.
+                ([local_x, sea, local_z], water_color_lin)
+            } else {
+                // Sur terre : Y heightmap + biome color.
+                let biome = biome_map.biome_at(sample_x, sample_z);
+                let c = biome.color().to_linear();
+                ([local_x, raw_y, local_z], c)
+            };
+            positions.push(world_y);
             normals.push([0.0, 1.0, 0.0]); // approx — unlit donc OK
             uvs.push([i as f32 / SUBDIVS as f32, j as f32 / SUBDIVS as f32]);
-
-            // Sample biome au point vertex (pas au centre cluster) → texture
-            // diversity au loin entre biomes adjacents dans un même cluster.
-            let biome = biome_map.biome_at(sample_x, sample_z);
-            let c = biome.color().to_linear();
-            colors.push([c.red, c.green, c.blue, c.alpha]);
+            colors.push([
+                vertex_color.red,
+                vertex_color.green,
+                vertex_color.blue,
+                vertex_color.alpha,
+            ]);
         }
     }
 
@@ -291,8 +312,12 @@ fn biome_supports_distant_trees(b: crate::biomes::BiomeType) -> bool {
     matches!(b, Forest | Plains | Jungle | Tundra | Savanna | Swamp)
 }
 
-/// Densité d'arbres par cluster LOD2 (128×128m). Bas pour silhouette only.
-const LOD2_TREES_PER_CLUSTER: u32 = 8;
+/// Densité d'arbres par cluster LOD2 (128×128m). Bumped 8→24 phase 2d : user
+/// feedback "horizon trop vide en assets". Skyrim distant trees ~30/tile.
+const LOD2_TREES_PER_CLUSTER: u32 = 24;
+/// Densité de rochers par cluster LOD2 (silhouettes complémentaires). Skip
+/// si biome ne supporte pas (océan, lava). Pattern Witcher 3 distant rocks.
+const LOD2_ROCKS_PER_CLUSTER: u32 = 8;
 
 /// Hash déterministe (cluster_x, cluster_z, seed_offset) → u32 pour
 /// scatter positions reproductible per seed.
@@ -382,6 +407,24 @@ pub fn build_lod2_tiles_system(
         .get_or_insert_with(|| meshes.add(Cone::new(1.5, 5.0)))
         .clone();
 
+    // Wave 5 phase 2d : rock imposter (sphere écrasée). Shared mesh + material.
+    let rock_mesh = tile_mgr
+        .rock_imposter_mesh
+        .get_or_insert_with(|| meshes.add(Sphere::new(1.2).mesh().ico(1).unwrap()))
+        .clone();
+    let rock_mat = tile_mgr
+        .rock_material
+        .get_or_insert_with(|| {
+            materials.add(StandardMaterial {
+                base_color: Color::srgb(0.35, 0.32, 0.30), // gris foncé rocky
+                perceptual_roughness: 0.95,
+                metallic: 0.0,
+                unlit: true,
+                ..default()
+            })
+        })
+        .clone();
+
     for &key in desired.keys() {
         if tile_mgr.tiles.contains_key(&key) { continue; }
 
@@ -448,6 +491,36 @@ pub fn build_lod2_tiles_system(
                     // Local position relative au tile center (déjà translated
                     // par parent Transform).
                     Transform::from_xyz(lx, world_y + 2.5, lz),
+                ));
+            });
+        }
+
+        // Wave 5 phase 2d : rock imposters scatter, hash offset shifté.
+        for rock_idx in 0..LOD2_ROCKS_PER_CLUSTER {
+            // Offset 100k pour décorréler du tree hash → distribution indép.
+            let hash = cluster_tree_hash(key, rock_idx + 100_000);
+            let lx = ((hash & 0xFF) as f32 / 255.0 - 0.5) * (CLUSTER_SIZE_M * 0.9);
+            let lz = (((hash >> 8) & 0xFF) as f32 / 255.0 - 0.5) * (CLUSTER_SIZE_M * 0.9);
+            let world_x = center.x + lx;
+            let world_z = center.y + lz;
+            let world_y = heightmap_at(world_x + off.0, world_z + off.1, &terrain_cfg);
+            if world_y < terrain_cfg.sea_level + 0.5 {
+                continue; // pas de rocher sous l'eau
+            }
+            let biome = biome_map.biome_at(world_x + off.0, world_z + off.1);
+            // Rocks scatter sur tous biomes terrestres (no Volcanic = lava, no Swamp)
+            use crate::biomes::BiomeType::*;
+            if matches!(biome, Volcanic | Swamp) {
+                continue;
+            }
+            // Scale variation via hash bits — petit/moyen rocher.
+            let scale = 0.6 + ((hash >> 16) & 0xFF) as f32 / 255.0 * 1.5;
+            commands.entity(tile_entity).with_children(|c| {
+                c.spawn((
+                    Mesh3d(rock_mesh.clone()),
+                    MeshMaterial3d(rock_mat.clone()),
+                    Transform::from_xyz(lx, world_y + 0.5, lz)
+                        .with_scale(Vec3::splat(scale)),
                 ));
             });
         }
