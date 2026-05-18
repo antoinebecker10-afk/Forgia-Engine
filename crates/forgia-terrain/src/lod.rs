@@ -202,6 +202,7 @@ fn build_lod2_terrain_mesh(
     cluster_center_xz: Vec2,
     sample_offset: (f32, f32),
     terrain_cfg: &TerrainConfig,
+    biome_map: &BiomeMap,
 ) -> Mesh {
     const SUBDIVS: usize = 16; // 16 quads = 17 verts par côté
     const VERTS_PER_SIDE: usize = SUBDIVS + 1;
@@ -212,6 +213,10 @@ fn build_lod2_terrain_mesh(
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_verts);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(total_verts);
     let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_verts);
+    // Wave 5 phase 2a — per-vertex biome color (Skyrim/Witcher 3 pattern :
+    // baked terrain color blend au lieu de material splat per chunk).
+    // Vertex colors sont multipliés par base_color = white du material partagé.
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_verts);
 
     for j in 0..VERTS_PER_SIDE {
         for i in 0..VERTS_PER_SIDE {
@@ -219,14 +224,18 @@ fn build_lod2_terrain_mesh(
             let local_z = (j as f32) * STEP - HALF;
             let world_x = cluster_center_xz.x + local_x;
             let world_z = cluster_center_xz.y + local_z;
-            let world_y = heightmap_at(
-                world_x + sample_offset.0,
-                world_z + sample_offset.1,
-                terrain_cfg,
-            );
+            let sample_x = world_x + sample_offset.0;
+            let sample_z = world_z + sample_offset.1;
+            let world_y = heightmap_at(sample_x, sample_z, terrain_cfg);
             positions.push([local_x, world_y, local_z]);
             normals.push([0.0, 1.0, 0.0]); // approx — unlit donc OK
             uvs.push([i as f32 / SUBDIVS as f32, j as f32 / SUBDIVS as f32]);
+
+            // Sample biome au point vertex (pas au centre cluster) → texture
+            // diversity au loin entre biomes adjacents dans un même cluster.
+            let biome = biome_map.biome_at(sample_x, sample_z);
+            let c = biome.color().to_linear();
+            colors.push([c.red, c.green, c.blue, c.alpha]);
         }
     }
 
@@ -258,6 +267,7 @@ fn build_lod2_terrain_mesh(
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(indices));
     mesh
 }
@@ -313,38 +323,38 @@ pub fn build_lod2_tiles_system(
         }
     }
 
-    // Wave 5 phase 1 : mesh per-cluster (vs shared flat plane wave 0).
-    // Y baked dans les vertices via heightmap_at — silhouette réelle.
+    // Wave 5 phase 1+2a : mesh per-cluster (Y heightmap baked + per-vertex
+    // biome color). 1 seul material shared (white + vertex_colors enabled) —
+    // remplace l'ancien cache par-biome 10 materials.
+    const SHARED_MAT_KEY: u8 = 255; // sentinel unique pour shared mat
+    let shared_mat = if let Some(h) = tile_mgr.material_cache.get(&SHARED_MAT_KEY) {
+        h.clone()
+    } else {
+        let h = materials.add(StandardMaterial {
+            base_color: Color::WHITE, // multiplié par ATTRIBUTE_COLOR per-vertex
+            perceptual_roughness: 0.95,
+            metallic: 0.0,
+            unlit: true,
+            ..default()
+        });
+        tile_mgr.material_cache.insert(SHARED_MAT_KEY, h.clone());
+        h
+    };
+
     for &key in desired.keys() {
         if tile_mgr.tiles.contains_key(&key) { continue; }
 
         let center = cluster_world_center(key);
-        let biome = biome_map.biome_at(center.x + off.0, center.y + off.1);
-        let biome_id = biome as u8;
 
-        // Material cache shared par biome (10 max), unlit (cheap au loin).
-        let mat_handle = if let Some(h) = tile_mgr.material_cache.get(&biome_id) {
-            h.clone()
-        } else {
-            let h = materials.add(StandardMaterial {
-                base_color: biome.color(),
-                perceptual_roughness: 0.95,
-                metallic: 0.0,
-                unlit: true,
-                ..default()
-            });
-            tile_mgr.material_cache.insert(biome_id, h.clone());
-            h
-        };
-
-        // Per-cluster mesh : Y per-vertex heightmap. Local-XZ space centered.
-        let cluster_mesh = build_lod2_terrain_mesh(center, off, &terrain_cfg);
+        // Per-cluster mesh : Y per-vertex heightmap + color per-vertex biome.
+        let cluster_mesh =
+            build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map);
         let mesh_handle = meshes.add(cluster_mesh);
 
         let tile_entity = commands
             .spawn((
                 Mesh3d(mesh_handle),
-                MeshMaterial3d(mat_handle),
+                MeshMaterial3d(shared_mat.clone()),
                 // Transform Y=0 — le mesh contient déjà les Y absolus heightmap.
                 Transform::from_xyz(center.x, 0.0, center.y),
                 Lod2Tile { cluster_key: key },
