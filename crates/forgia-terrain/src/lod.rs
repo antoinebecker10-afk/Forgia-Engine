@@ -13,10 +13,13 @@
 //! intégrée pour éviter LOD flip-flop aux frontières.
 
 use bevy::prelude::*;
+use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::asset::RenderAssetUsages;
 use std::collections::HashMap;
 
 use crate::biomes::BiomeMap;
-use crate::chunk::{ChunkManager, CHUNK_X};
+use crate::chunk::{ChunkManager, TerrainConfig, CHUNK_X};
+use crate::generation::heightmap_at;
 
 // ─────────────────────────── Constantes ───────────────────────────
 
@@ -30,11 +33,11 @@ pub const LOD_HYSTERESIS_M: f32 = 16.0;
 const CLUSTER_CHUNKS: i32 = 4;
 const CHUNK_SIZE_M: f32 = CHUNK_X as f32;
 const CLUSTER_SIZE_M: f32 = CLUSTER_CHUNKS as f32 * CHUNK_SIZE_M;
-/// V1 = -2.0 (sea_level=20, tiles sunk sous le terrain low). V2 sea_level=4
-/// avec heights 2-28 → tile à -2 cachée. Y=8 = entre sea_level et mid-range,
-/// couvre les plats, sommets ressortent, pas de z-fight (LOD1 termine 320m
-/// loin de la tile à 320-1500m).
-const LOD2_Y_OFFSET: f32 = 8.0;
+/// Wave 5 phase 1 (story-450) : OBSOLETE depuis HLOD per-vertex heightmap.
+/// Le mesh contient maintenant les Y absolus baked → Transform Y = 0.
+/// Gardé pour référence historique (V1 = -2.0 sea_level=20, V2 wave 0 = 8.0).
+#[allow(dead_code)]
+const LOD2_Y_OFFSET_LEGACY: f32 = 8.0;
 
 // ─────────────────────────── ChunkLod (Component) ───────────────────────────
 
@@ -67,6 +70,10 @@ pub struct Lod2Tile {
 #[derive(Resource, Default)]
 pub struct Lod2TileManager {
     pub tiles: HashMap<(i32, i32), Entity>,
+    /// Wave 5 phase 1 : ce field n'est plus utilisé (mesh per-cluster avec
+    /// Y heightmap baked). Gardé pour backward compat — wave 5 phase 2
+    /// pourra l'utiliser pour cache des meshes baked offline (HLOD UE5 pattern).
+    #[allow(dead_code)]
     mesh: Option<Handle<Mesh>>,
     material_cache: HashMap<u8, Handle<StandardMaterial>>,
 }
@@ -75,7 +82,7 @@ impl Lod2TileManager {
     pub fn despawn_all(&mut self, commands: &mut Commands) {
         for (_, entity) in self.tiles.drain() {
             if let Ok(mut ec) = commands.get_entity(entity) {
-                ec.despawn();
+                ec.try_despawn(); // wave 2.5 pattern
             }
         }
         self.mesh = None;
@@ -179,14 +186,94 @@ pub fn update_chunk_lod(
     }
 }
 
-/// Spawn/despawn LOD2 mega-tile planes pour le ring 320–700m. 1 plane par cluster
-/// (4×4 chunks = 128×128m), material per biome (cache shared, 10 max).
+/// Story-450 wave 5 phase 1 — HLOD baked imposters (UE5 World Partition pattern).
+///
+/// Génère un mesh subdivisé 16×16 quads (17×17 verts) avec Y per-vertex sampled
+/// du heightmap. Remplace le plan plat `Plane3d` Y=8 hardcoded par une vraie
+/// silhouette terrain au loin.
+///
+/// Coût : 289 samples heightmap_at par cluster (~30µs sur CPU moderne) × ~420
+/// clusters total = ~12ms one-shot, spread sur multiple frames (frame_counter
+/// modulo 30 throttle le spawn à 0.5Hz, donc 1-3 tiles/frame).
+///
+/// Local-space : vertices en (-64..+64, world_y, -64..+64). Transform du tile
+/// au (center.x, 0, center.z) → Y absolu vient du mesh, pas du Transform.
+fn build_lod2_terrain_mesh(
+    cluster_center_xz: Vec2,
+    sample_offset: (f32, f32),
+    terrain_cfg: &TerrainConfig,
+) -> Mesh {
+    const SUBDIVS: usize = 16; // 16 quads = 17 verts par côté
+    const VERTS_PER_SIDE: usize = SUBDIVS + 1;
+    const HALF: f32 = CLUSTER_SIZE_M * 0.5;
+    const STEP: f32 = CLUSTER_SIZE_M / SUBDIVS as f32;
+
+    let total_verts = VERTS_PER_SIDE * VERTS_PER_SIDE;
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_verts);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(total_verts);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_verts);
+
+    for j in 0..VERTS_PER_SIDE {
+        for i in 0..VERTS_PER_SIDE {
+            let local_x = (i as f32) * STEP - HALF;
+            let local_z = (j as f32) * STEP - HALF;
+            let world_x = cluster_center_xz.x + local_x;
+            let world_z = cluster_center_xz.y + local_z;
+            let world_y = heightmap_at(
+                world_x + sample_offset.0,
+                world_z + sample_offset.1,
+                terrain_cfg,
+            );
+            positions.push([local_x, world_y, local_z]);
+            normals.push([0.0, 1.0, 0.0]); // approx — unlit donc OK
+            uvs.push([i as f32 / SUBDIVS as f32, j as f32 / SUBDIVS as f32]);
+        }
+    }
+
+    // Indices triangles : 2 triangles par quad. Winding CCW vu de +Y (top).
+    let mut indices: Vec<u32> = Vec::with_capacity(SUBDIVS * SUBDIVS * 6);
+    for j in 0..SUBDIVS {
+        for i in 0..SUBDIVS {
+            let row = VERTS_PER_SIDE as u32;
+            let i32_ = i as u32;
+            let j32 = j as u32;
+            let a = j32 * row + i32_;
+            let b = a + 1;
+            let c = a + row;
+            let d = c + 1;
+            // Top-view CCW : a-c-b et b-c-d
+            indices.push(a);
+            indices.push(c);
+            indices.push(b);
+            indices.push(b);
+            indices.push(c);
+            indices.push(d);
+        }
+    }
+
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_indices(Indices::U32(indices));
+    mesh
+}
+
+/// Spawn/despawn LOD2 mega-tile planes pour le ring 320–1500m. 1 plane par
+/// cluster (4×4 chunks = 128×128m), material per biome (cache shared, 10 max).
+///
+/// Wave 5 Phase 1 : mesh per-cluster avec Y per-vertex heightmap (silhouette
+/// terrain), au lieu du plan plat Y=8 partagé.
 #[allow(clippy::too_many_arguments)]
 pub fn build_lod2_tiles_system(
     mut commands: Commands,
     mut tile_mgr: ResMut<Lod2TileManager>,
     mut lod_stats: ResMut<LodStats>,
     biome_map: Option<Res<BiomeMap>>,
+    terrain_cfg: Option<Res<TerrainConfig>>,
     player_q: Query<&Transform>,
     offset: Option<Res<LodSampleOffset>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -197,6 +284,7 @@ pub fn build_lod2_tiles_system(
     if !frame_counter.is_multiple_of(30) { return; }
 
     let Some(biome_map) = biome_map else { return };
+    let Some(terrain_cfg) = terrain_cfg else { return };
     let Some(player_tf) = player_q.iter().next() else { return };
     let off = offset.map(|r| (r.x, r.z)).unwrap_or((0.0, 0.0));
     let player_pos = player_tf.translation;
@@ -225,11 +313,8 @@ pub fn build_lod2_tiles_system(
         }
     }
 
-    let mesh_handle = tile_mgr
-        .mesh
-        .get_or_insert_with(|| meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(CLUSTER_SIZE_M * 0.5))))
-        .clone();
-
+    // Wave 5 phase 1 : mesh per-cluster (vs shared flat plane wave 0).
+    // Y baked dans les vertices via heightmap_at — silhouette réelle.
     for &key in desired.keys() {
         if tile_mgr.tiles.contains_key(&key) { continue; }
 
@@ -237,6 +322,7 @@ pub fn build_lod2_tiles_system(
         let biome = biome_map.biome_at(center.x + off.0, center.y + off.1);
         let biome_id = biome as u8;
 
+        // Material cache shared par biome (10 max), unlit (cheap au loin).
         let mat_handle = if let Some(h) = tile_mgr.material_cache.get(&biome_id) {
             h.clone()
         } else {
@@ -251,11 +337,16 @@ pub fn build_lod2_tiles_system(
             h
         };
 
+        // Per-cluster mesh : Y per-vertex heightmap. Local-XZ space centered.
+        let cluster_mesh = build_lod2_terrain_mesh(center, off, &terrain_cfg);
+        let mesh_handle = meshes.add(cluster_mesh);
+
         let tile_entity = commands
             .spawn((
-                Mesh3d(mesh_handle.clone()),
+                Mesh3d(mesh_handle),
                 MeshMaterial3d(mat_handle),
-                Transform::from_xyz(center.x, LOD2_Y_OFFSET, center.y),
+                // Transform Y=0 — le mesh contient déjà les Y absolus heightmap.
+                Transform::from_xyz(center.x, 0.0, center.y),
                 Lod2Tile { cluster_key: key },
                 Name::new(format!("Lod2Tile({},{})", key.0, key.1)),
             ))
@@ -272,7 +363,7 @@ pub fn build_lod2_tiles_system(
         .collect();
     for key in to_remove {
         if let Some(entity) = tile_mgr.tiles.remove(&key) {
-            if let Ok(mut ec) = commands.get_entity(entity) { ec.despawn(); }
+            if let Ok(mut ec) = commands.get_entity(entity) { ec.try_despawn(); }
         }
     }
 
