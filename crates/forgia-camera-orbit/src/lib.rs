@@ -82,7 +82,12 @@ impl Plugin for ForgiaCameraOrbitPlugin {
         // BUG-ANIMQA-06 fix : in_set(GameSet::Camera) pour ordering canonique V2
         app.add_systems(
             Update,
-            (orbit_input, orbit_follow, orbit_cursor_grab)
+            (
+                orbit_input,
+                orbit_auto_recenter_on_move,
+                orbit_follow,
+                orbit_cursor_grab,
+            )
                 .chain()
                 .in_set(GameSet::Camera)
                 .run_if(any_with_component::<OrbitCamera>),
@@ -168,12 +173,101 @@ fn orbit_input(
             }
         } else if lmb_held && delta_x.abs() > f32::EPSILON {
             // LMB only : orbit cam-only (player yaw inchangé).
-            cam.yaw_offset = (cam.yaw_offset - delta_x * cam.yaw_sensitivity)
-                .rem_euclid(std::f32::consts::TAU);
+            // ⚠️ Pas de rem_euclid (range [0, TAU]) — sinon le shortest-path
+            // decay de l'auto-recenter ne peut pas raccourcir un offset > π en
+            // partant via -π. Laisser flotter, cos/sin wrap naturellement.
+            cam.yaw_offset -= delta_x * cam.yaw_sensitivity;
         }
         if delta_wheel.abs() > f32::EPSILON {
             cam.distance = (cam.distance - delta_wheel * cam.zoom_sensitivity)
                 .clamp(cam.min_distance, cam.max_distance);
+        }
+    }
+}
+
+/// WoW pattern — auto-recenter caméra derrière le perso quand il se déplace
+/// ET qu'aucun bouton souris n'est tenu. Decay smooth de `yaw_offset` vers 0
+/// (~0.5s à 60fps). Si l'utilisateur tient LMB/RMB, son intent override (pas
+/// d'auto-recenter). Pattern Blizzard wowpedia `cameraDistanceMoveSpeed`.
+/// Durée totale d'une transition de recenter (ease-out quad).
+/// 1.2s = WoW cam follow snappy. Ease-out = vitesse rapide visible au début
+/// puis ralentissement doux à l'arrivée (ressort sous-amorti, pattern AAA).
+/// Tuning user 2026-05-18 : 2.0s trop lent → 1.2s.
+const RECENTER_DURATION_SEC: f32 = 1.2;
+
+/// État interne du recenter (tracked entre frames). Reset au touch souris ou
+/// quand la transition est terminée. `initial_yaw` est l'offset au moment où
+/// le user a commencé à bouger (snapshot).
+#[derive(Default)]
+struct RecenterState {
+    initial_yaw: f32,
+    elapsed: f32,
+    active: bool,
+}
+
+fn orbit_auto_recenter_on_move(
+    time: Res<Time>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    mut q_cam: Query<&mut OrbitCamera>,
+    targets: Query<&GlobalTransform, Without<OrbitCamera>>,
+    mut last_pos: Local<Option<Vec3>>,
+    mut state: Local<RecenterState>,
+) {
+    // Si user tient un bouton, il steer la cam — annule la transition courante
+    // et save la position pour calculer le delta au release suivant.
+    let any_held = mouse_buttons.pressed(MouseButton::Left)
+        || mouse_buttons.pressed(MouseButton::Right);
+    if any_held {
+        state.active = false;
+        if let Some(orbit) = q_cam.iter().next() {
+            if let Ok(t) = targets.get(orbit.target) {
+                *last_pos = Some(t.translation());
+            }
+        }
+        return;
+    }
+    for mut orbit in &mut q_cam {
+        if orbit.yaw_offset.abs() < 0.001 {
+            orbit.yaw_offset = 0.0;
+            state.active = false;
+            continue;
+        }
+        let Ok(target_gt) = targets.get(orbit.target) else { continue };
+        let pos = target_gt.translation();
+        let moved = match *last_pos {
+            // Seuil 1e-4 m² (~10mm) : ignore les micro-jitters de la physique.
+            Some(prev) => (pos - prev).length_squared() > 1.0e-4,
+            None => false,
+        };
+        *last_pos = Some(pos);
+
+        // Shortest-path normalize sur le yaw_offset COURANT pour qu'à chaque
+        // (re)trigger on parte du chemin le plus court vers 0.
+        use std::f32::consts::{PI, TAU};
+        let mut a = orbit.yaw_offset.rem_euclid(TAU);
+        if a > PI {
+            a -= TAU;
+        }
+
+        // Trigger : la transition démarre au premier mouvement. Une fois
+        // active, elle continue à recentrer MÊME SI le player s'arrête (pas
+        // de pause-on-stop : sinon le cam reste figée à mi-chemin, frustrant).
+        if !state.active {
+            if !moved {
+                continue;
+            }
+            state.initial_yaw = a;
+            state.elapsed = 0.0;
+            state.active = true;
+        }
+        state.elapsed += time.delta_secs();
+        let t = (state.elapsed / RECENTER_DURATION_SEC).clamp(0.0, 1.0);
+        // Ease-out quad : t * (2 - t) → visible début + doux fin (WoW-like).
+        let smooth_t = t * (2.0 - t);
+        orbit.yaw_offset = state.initial_yaw * (1.0 - smooth_t);
+        if t >= 1.0 {
+            orbit.yaw_offset = 0.0;
+            state.active = false;
         }
     }
 }
