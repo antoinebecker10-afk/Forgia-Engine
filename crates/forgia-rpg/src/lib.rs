@@ -126,10 +126,13 @@ impl Plugin for ForgiaRpgPlugin {
                     character::spawn_rex_character,
                     character::calibrate_rex_y_one_shot,
                     character::rex_make_transparent_one_shot,
+                    character::spawn_character_lineup,
                 )
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
-            );
+            )
+            .init_resource::<character::LineupSpawned>()
+            .add_systems(OnExit(GameMode::Rpg), character::cleanup_character_lineup);
     }
 }
 
@@ -466,13 +469,29 @@ fn stream_chunks_around_player(
             }
         }
 
-        // Queue les chunks manquants (proche d'abord pour visu prioritaire).
+        // Queue les chunks manquants — wave 4b frustum-aware priority :
+        // pattern Witcher 3 (Umbra) + UE5 World Partition. Chunks **devant le
+        // player** (dot(forward_xz, chunk_dir) > 0) chargés EN PREMIER, puis
+        // tie-break par distance Manhattan ascendante. Player tourne la
+        // caméra → ce qu'il regarde apparaît avant ce qui est derrière lui.
         pending.clear();
         let mut sorted: Vec<ChunkCoord> = desired
             .into_iter()
             .filter(|c| !chunk_mgr.loaded_entities.contains_key(c))
             .collect();
-        sorted.sort_by_key(|c| c.distance(&player_chunk));
+        // Forward XZ du player (Bevy convention : -Z = forward, projeté sur XZ).
+        let forward = player_tf.forward();
+        let fwd_xz = Vec2::new(forward.x, forward.z).normalize_or_zero();
+        sorted.sort_by_key(|c| {
+            let center = c.world_center();
+            let dx = center.x - player_tf.translation.x;
+            let dz = center.z - player_tf.translation.z;
+            // Dot product XZ : > 0 = devant, ≤ 0 = derrière.
+            let dot = fwd_xz.x * dx + fwd_xz.y * dz;
+            let in_front: i32 = if dot > 0.0 { 0 } else { 1 };
+            let dist = c.distance(&player_chunk);
+            (in_front, dist)
+        });
         for c in sorted {
             pending.push_back(c);
         }
@@ -509,7 +528,7 @@ fn stream_chunks_around_player(
 
     // 2b. LRU touch — refresh last_seen pour tous les chunks dans le view ring
     // (Manhattan ≤ view_chunks). Pattern Unity Addressables refcount/LRU.
-    for coord in chunk_mgr.loaded_entities.keys().copied().collect::<Vec<_>>() {
+    for coord in chunk_mgr.loaded_entities.keys().copied() {
         if coord.distance(&player_chunk) <= view_chunks {
             residence.last_seen_secs.insert(coord, now);
         }
