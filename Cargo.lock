@@ -4262,6 +4262,7 @@ dependencies = [
  "bevy",
  "bevy_rapier3d",
  "forgia-core",
+ "forgia-damage",
  "forgia-juice-hit-stop",
  "forgia-juice-recoil",
  "leafwing-input-manager",
@@ -4299,6 +4300,8 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+ "forgia-genome-core",
+ "serde",
 ]
 
 [[package]]
@@ -4306,6 +4309,7 @@ name = "forgia-damage-numbers"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-combat",
  "forgia-core",
  "forgia-damage",
 ]
@@ -4467,6 +4471,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-enemy-nameplate"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-combat",
+ "forgia-core",
+ "forgia-damage",
+ "forgia-genome-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "forgia-equipment"
 version = "0.1.0"
 dependencies = [
@@ -4513,6 +4530,7 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-crosshair",
+ "forgia-damage",
  "forgia-effects",
  "forgia-genome-core",
  "forgia-input",
@@ -4545,13 +4563,17 @@ dependencies = [
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
+ "forgia-damage",
+ "forgia-damage-numbers",
  "forgia-dialogue",
  "forgia-effects",
+ "forgia-enemy-nameplate",
  "forgia-foliage",
  "forgia-fps",
  "forgia-input",
  "forgia-juice-screen-flash",
  "forgia-killfeed",
+ "forgia-observability",
  "forgia-player",
  "forgia-prefab",
  "forgia-rpg",
@@ -5060,8 +5082,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+ "forgia-terrain",
  "serde",
  "serde_json",
+ "toml",
 ]
 
 [[package]]
