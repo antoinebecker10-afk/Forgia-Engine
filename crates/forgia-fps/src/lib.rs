@@ -66,6 +66,36 @@ pub struct BurstState {
     pub interval_timer: Timer,
 }
 
+/// Décision pure du dispatch fire_mode → (doit tirer cette frame, démarre une rafale).
+/// Extrait de `fire_weapon_minimal` pour testabilité headless.
+///
+/// - `auto` : tire tant que `held`.
+/// - `semi` / `pump` : tire uniquement sur `just_pressed`.
+/// - `burst` : si rafale active, suit `burst_fires_now` ; sinon démarre sur `just_pressed`.
+/// - inconnu : fallback `semi` (warn loggé par l'appelant).
+pub fn dispatch_fire_trigger(
+    fire_mode: &str,
+    held: bool,
+    just_pressed: bool,
+    burst_active: bool,
+    burst_fires_now: bool,
+) -> (bool, bool) {
+    match fire_mode {
+        "auto" => (held, false),
+        "semi" | "pump" => (just_pressed, false),
+        "burst" => {
+            if burst_active {
+                (burst_fires_now, false)
+            } else if just_pressed {
+                (true, true)
+            } else {
+                (false, false)
+            }
+        }
+        _ => (just_pressed, false),
+    }
+}
+
 /// Viewmodel 1P enfant de FpsCamera. Stocke l'arme actuellement rendue
 /// pour détecter les changements et swap le SceneRoot.
 #[derive(Component)]
@@ -654,7 +684,7 @@ impl Plugin for ForgiaFpsPlugin {
             // Fire system genome-driven : dispatch fire_mode (auto/semi/pump) + multi-pellets
             // + per-weapon damage/fire_rate/range/spread depuis ViewmodelGenomeEntry TOML.
             // Reconstruit 2026-05-17 depuis memories après perte WIP 2026-05-16 PM.
-            // Limitations : fire_mode "burst" NON implémenté (fallback semi + warn).
+            // fire_mode "burst" implémenté via BurstState resource (cf L62 + dispatch L860+).
             // Story-455 Phase A — sync_ammo_slots_from_genome NE DOIT PAS être gated Fps.
             // Le genome ViewmodelGenome se charge au Startup → AssetEvent::Added arrive
             // ~50-200ms après boot, alors que GameMode = None (menu). Si gated Fps, l'event
@@ -808,7 +838,7 @@ fn track_left_mouse_state(
 /// - `"auto"` : tire tant que held (Bourrasque SMG)
 /// - `"semi"` : tire UNIQUEMENT sur just_pressed (Pépin, Madame Lenoir sniper)
 /// - `"pump"` : just_pressed + multi-pellets cone spread (Boucherie shotgun)
-/// - `"burst"` : ⚠ NON IMPLÉMENTÉ — fallback semi + log warn (dette tech identifiée)
+/// - `"burst"` : rafale `burst_count` tirs à cadence `fire_rate`, puis cooldown long (3× interval). Halo BR / Apex Hemlok pattern.
 ///
 /// Cooldown = `1.0 / entry.fire_rate` secondes. Damage/range/pellets/spread depuis genome.
 /// Muzzle flash spawn à `origin + direction * entry.barrel_length`.
@@ -856,26 +886,17 @@ fn fire_weapon_minimal(
         return;
     }
 
-    // Dispatch trigger selon fire_mode
-    let mut starts_burst = false;
-    let trigger = match fire_mode {
-        "auto" => left.held,
-        "semi" | "pump" => left.just_pressed,
-        "burst" => {
-            if burst_active {
-                burst_fires_now
-            } else if left.just_pressed {
-                starts_burst = true;
-                true // 1er tir immédiat, BurstState inséré en fin de fonction
-            } else {
-                false
-            }
-        }
-        other => {
-            warn!("[fire] fire_mode inconnu '{}' — fallback semi", other);
-            left.just_pressed
-        }
-    };
+    // Dispatch trigger selon fire_mode (logique pure extraite cf dispatch_fire_trigger)
+    if !matches!(fire_mode, "auto" | "semi" | "pump" | "burst") {
+        warn!("[fire] fire_mode inconnu '{}' — fallback semi", fire_mode);
+    }
+    let (trigger, starts_burst) = dispatch_fire_trigger(
+        fire_mode,
+        left.held,
+        left.just_pressed,
+        burst_active,
+        burst_fires_now,
+    );
     if !trigger {
         return;
     }
@@ -1567,6 +1588,50 @@ mod tests {
 
         let s = app.world().resource::<LeftMouseState>();
         assert!(!s.held, "Released doit clear held");
+    }
+
+    #[test]
+    fn dispatch_auto_uses_held_only() {
+        // held=true, just_pressed=false → tire (sustained fire SMG)
+        assert_eq!(dispatch_fire_trigger("auto", true, false, false, false), (true, false));
+        // held=false → ne tire pas même si just_pressed=true (cohérence : on a déjà relâché)
+        assert_eq!(dispatch_fire_trigger("auto", false, true, false, false), (false, false));
+    }
+
+    #[test]
+    fn dispatch_semi_uses_just_pressed_only() {
+        // semi : doit tirer UNIQUEMENT sur edge press, pas en held continu
+        assert_eq!(dispatch_fire_trigger("semi", false, true, false, false), (true, false));
+        assert_eq!(dispatch_fire_trigger("semi", true, false, false, false), (false, false));
+    }
+
+    #[test]
+    fn dispatch_pump_behaves_like_semi() {
+        // pump = semi côté trigger (multi-pellets géré ailleurs dans fire_weapon_minimal)
+        assert_eq!(dispatch_fire_trigger("pump", false, true, false, false), (true, false));
+        assert_eq!(dispatch_fire_trigger("pump", true, false, false, false), (false, false));
+    }
+
+    #[test]
+    fn dispatch_burst_starts_on_just_pressed() {
+        // Première frame : just_pressed sans burst actif → trigger + starts_burst
+        assert_eq!(dispatch_fire_trigger("burst", false, true, false, false), (true, true));
+    }
+
+    #[test]
+    fn dispatch_burst_follows_timer_when_active() {
+        // Rafale en cours : trigger pilote par burst_fires_now (interval_timer just_finished)
+        assert_eq!(dispatch_fire_trigger("burst", false, false, true, true), (true, false));
+        assert_eq!(dispatch_fire_trigger("burst", false, false, true, false), (false, false));
+        // just_pressed pendant burst actif : pas de re-trigger (la rafale poursuit son cours)
+        assert_eq!(dispatch_fire_trigger("burst", false, true, true, false), (false, false));
+    }
+
+    #[test]
+    fn dispatch_unknown_mode_fallbacks_semi() {
+        // Mode inconnu : doit se comporter comme semi (warn loggé par l'appelant)
+        assert_eq!(dispatch_fire_trigger("railgun", false, true, false, false), (true, false));
+        assert_eq!(dispatch_fire_trigger("railgun", true, false, false, false), (false, false));
     }
 
     #[test]

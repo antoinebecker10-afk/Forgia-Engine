@@ -9,14 +9,15 @@
 
 ## Ordre d'exécution recommandé (par dépendance + ROI)
 
-| Phase | Tâche | Effort | Risque | BMAD scale | Bloque |
+| Phase | Tâche | Effort | Risque | BMAD scale | Statut |
 |---|---|---|---|---|---|
-| **1** | Fix `forgia-rpg/src/character.rs` 38 erreurs LocomotionBoneCache | 30-60 min | Low | quick | tout workspace check |
-| **2** | Tests headless `fire_weapon_minimal` (semi/auto/pump/burst) | 45 min | Low | quick | ratchet régression |
-| **3** | Implémenter `fire_mode = "burst"` (burst_count rafale) | 30 min | Low | quick | — |
-| **4** | Hardcode hit-stop/hit-flash durations → genome | 30 min | Low | quick | — |
-| **5** | VFX colors per-arme (audit + dispatch) | 1h | Medium | quick | — |
-| **6** | Nettoyer `_suppress_unused` scope_glass.rs:137 | 5 min | Low | trivial | — |
+| **1** | Fix `forgia-rpg/src/character.rs` 38 erreurs LocomotionBoneCache | 30-60 min | Low | quick | ✅ DONE |
+| **2** | Tests headless `fire_weapon_minimal` (semi/auto/pump/burst) | 45 min | Low | quick | ✅ DONE 2026-05-19 (6 tests dispatch + helper pur) |
+| **3** | Implémenter `fire_mode = "burst"` (burst_count rafale) | 30 min | Low | quick | ✅ DONE (BurstState L62 + dispatch) |
+| **4** | Hardcode hit-stop/hit-flash durations → genome | 30 min | Low | quick | ✅ DONE (hit_flash_duration/hit_stop_duration genome) |
+| **5** | VFX colors per-arme (audit + dispatch) | 1h | Medium | quick | ⏳ TODO |
+| **6** | Nettoyer `_suppress_unused` scope_glass.rs:137 | 5 min | Low | trivial | ✅ DONE (déjà absent du code) |
+| **B1** | Weapon balance hardcoded → viewmodel_arena.toml | 30 min | Low | quick | ✅ DONE (Vague 2 forensic 2026-05-19) |
 | **7** | (Optionnel) Tier 2A `forgia-weapon-hitscan` extraction | 1h30 | HIGH | standard | reuse bot IA / RPG |
 | **8** | (Optionnel) Tier 2B `forgia-weapon-viewmodel` extraction | 1h | HIGH | standard | reuse |
 
