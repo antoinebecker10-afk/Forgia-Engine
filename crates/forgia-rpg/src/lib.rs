@@ -62,9 +62,14 @@ pub struct InteractablePoint {
 }
 
 // ── W1/W2 — World layout constants ──────────────────────────────────────
-// `sample_offset = map_size/2` : on échantillonne au centre du monde virtuel
-// pour éviter le `edge_falloff` qui aplatit les bords [0, map_size].
-// Player visuel reste autour de l'origine.
+// `sample_offset` = ZERO depuis 2026-05-19. La fn `heightmap_at` a été
+// migrée vers la convention "world centré sur (0,0), bords à ±half" (cf
+// heightmap.rs:276 doc). L'ancien offset map_size/2 servait à compenser la
+// convention [0, map_size] obsolète ; combiné à la nouvelle fn, il plaçait
+// world (0,0) PILE au coin du noise valide → spawn sur edge_factor=0 →
+// terrain flat à sea_level côté +X/+Z (visible sous bevy_water = "lac
+// asymétrique"). Voir test heightmap.rs:425 edge_falloff(19,19,...) qui
+// confirme la nouvelle convention.
 const RPG_MAP_SIZE: f32 = 2048.0;
 const RPG_SEED: u32 = 1337;
 const RPG_SEA_LEVEL: f32 = 4.0;
@@ -153,7 +158,10 @@ impl Plugin for ForgiaRpgPlugin {
 /// so that the visual origin (0,0,0) sees the interior of the procedural
 /// world instead of `edge_falloff`-flattened borders.
 fn sample_offset() -> Vec2 {
-    Vec2::splat(RPG_MAP_SIZE * 0.5)
+    // ZERO depuis migration heightmap centrée. Voir bloc de constantes
+    // RPG_MAP_SIZE pour le raisonnement complet. Les 9 call-sites internes
+    // restent compilants car ils additionnent juste Vec2::ZERO (no-op).
+    Vec2::ZERO
 }
 
 fn make_terrain_config() -> TerrainConfig {
@@ -172,6 +180,14 @@ fn make_map_gen_config() -> MapGenConfig {
     // `preset_forgia_showcase` (default) utilise `BiomeMode::Directional` →
     // 5 zones cardinales rigides. On force `Voronoi` pour avoir 10 biomes
     // hexagonaux distribués naturellement (W3 ready).
+    //
+    // 2026-05-19 fix : `..MapGenConfig::default()` héritait TOUTES les
+    // features du preset_forgia_showcase (6 Lakes depth 3-8, Craters depth 70,
+    // Plateaus height 42, etc.) calibrées pour map_size=4096 / max_height=180
+    // / sea_level=18. En RPG mode (max=28, sea=4), ces features créent des
+    // cuvettes énormes (Lake depth=8 sur max=28 = 29% dip → terrain à
+    // Y=-4 < sea=4 → bandes d'eau parasites mid-distance autour du spawn).
+    // Fix : features RPG-adaptées light (à étoffer plus tard si besoin lacs).
     MapGenConfig {
         seed: RPG_SEED,
         map_size: RPG_MAP_SIZE,
@@ -180,6 +196,7 @@ fn make_map_gen_config() -> MapGenConfig {
         island_mode: false, // pas d'île pour le vertical slice 1 chunk
         biome_mode: forgia_terrain::BiomeMode::Voronoi,
         biome_cell_size: 96.0, // cellules + petites → biomes visibles au W1 (32m chunk)
+        features: vec![], // preset features non-adaptées RPG max=28 → bandes d'eau parasites
         ..MapGenConfig::default()
     }
 }
@@ -1148,11 +1165,14 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
     info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
 }
 
-/// Construit 1 mesh contenant N polylines ribbon distinctes avec **4 vertex par
-/// sample** : outer_left / inner_left / inner_right / outer_right. Les outer
-/// vertices fondent vers la couleur herbe pour une transition douce 1m vs ligne
-/// nette. Y per-vertex via `heightmap_at` + léger bruit (-0.06..+0.02m) →
-/// ornières usées. compute_normals() pour éclairage correct sur les pentes.
+/// Construit 1 mesh contenant N polylines ribbon distinctes avec **7 vertex par
+/// sample** : 5 top (outer_L, inner_L, center, inner_R, outer_R) + 2 bottom
+/// (outer_L_bot, outer_R_bot). Le path est un **slab épais posé sur le terrain** :
+/// top surface profil Roman road (bombement +8cm + ornières), parois latérales
+/// visibles, épaisseur 4-12cm hashée par sample → silhouette irrégulière style
+/// pavés. Le slab coule de 2cm dans le terrain → pas de gap aux bords + le
+/// terrain ne peut plus traverser la route même sur noise local. Bonus :
+/// compute_normals() lisse l'arête top/wall → look "worn cobble" pas pavé neuf.
 fn build_path_ribbon_mesh(
     path_net: &PathNetwork,
     terrain_cfg: &TerrainConfig,
@@ -1162,14 +1182,26 @@ fn build_path_ribbon_mesh(
     use bevy::mesh::{Indices, PrimitiveTopology};
 
     // Couleurs cibles : dirt foncé (centre) vs herbe (bord) pour le blend edge.
+    // CENTER_DIRT légèrement plus clair que inner = compaction passage répété.
     const DIRT_BASE: [f32; 3] = [0.13, 0.09, 0.05];
+    const CENTER_DIRT: [f32; 3] = [0.18, 0.13, 0.08];
     const GRASS_BASE: [f32; 3] = [0.22, 0.32, 0.12];
 
+    // Profil transversal — exception `no-hardcode.md` "structural visual".
+    const BOMB_CENTER_M: f32 = 0.08; // +8cm bombement central (Roman road)
+    const RUT_INNER_M: f32 = -0.02; // -2cm ornières roues côté inner
+    const RUT_NOISE_M: f32 = 0.04; // amplitude bruit ornière (±2cm)
+    const THICKNESS_MIN_M: f32 = 0.04; // épaisseur slab min (4cm)
+    const THICKNESS_RANGE_M: f32 = 0.08; // amplitude hash → max 12cm
+    const SINK_INTO_TERRAIN_M: f32 = 0.02; // 2cm sous terrain → pas de gap visible
+
     let total_samples: usize = path_net.polylines.iter().map(|p| p.samples.len()).sum();
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_samples * 4);
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_samples * 4);
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_samples * 4);
-    let mut indices: Vec<u32> = Vec::with_capacity(total_samples * 18);
+    let verts_per_sample: usize = 7;
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_samples * verts_per_sample);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_samples * verts_per_sample);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_samples * verts_per_sample);
+    // 6 bandes (4 top + 2 walls) × 6 indices = 36 indices par paire de samples.
+    let mut indices: Vec<u32> = Vec::with_capacity(total_samples * 36);
 
     let mut base_vertex: u32 = 0;
     for polyline in &path_net.polylines {
@@ -1182,29 +1214,44 @@ fn build_path_ribbon_mesh(
             let perp = Vec2::new(-s.tangent.y, s.tangent.x);
             let hw = s.tier.half_width();
             let ef = s.tier.edge_fade();
-            // 4 positions XZ : outer_l, inner_l, inner_r, outer_r.
+            // 5 positions XZ : outer_l, inner_l, center, inner_r, outer_r.
+            // inner_l/r placés à 60% du half_width pour laisser place au bombement.
             let p_ol = s.pos - perp * (hw + ef);
-            let p_il = s.pos - perp * hw;
-            let p_ir = s.pos + perp * hw;
+            let p_il = s.pos - perp * (hw * 0.6);
+            let p_c = s.pos;
+            let p_ir = s.pos + perp * (hw * 0.6);
             let p_or = s.pos + perp * (hw + ef);
 
-            // Y par vertex → tilt slope. + 0.03m anti-z-fight. Centre légèrement
-            // creusé (-0.05) pour faux effet ornière. Outer level = terrain
-            // exact pour fondre dans l'herbe (pas de step visible).
-            // Story-447 A.5 — Y leveled via FlattenZones quand path ribbon
-            // traverse la zone plate du village (sinon le ruban descend du
-            // plateau vers le terrain naturel → rampe boueuse).
-            let h_or_outer = |p: Vec2| {
-                terrain_height_local_with_flatten(p.x, p.y, terrain_cfg, flatten_zones) + 0.005
+            // Épaisseur slab variable par sample — hash déterministe.
+            // 4-12cm donne une silhouette irrégulière "pavés posés", pas planche plate.
+            let thickness_h =
+                (i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32;
+            let thickness = THICKNESS_MIN_M + thickness_h * THICKNESS_RANGE_M;
+
+            // Y per vertex — profil bombé Roman road sur slab épais :
+            //   outer_top  = terrain + thickness (base haute du pavé)
+            //   inner_top  = terrain + thickness + ornière (-2cm + bruit)
+            //   center_top = terrain + thickness + bombement (+8cm)
+            //   outer_bot  = terrain - 2cm (sous le sol → pas de gap)
+            // Story-447 A.5 — FlattenZones leveled quand path traverse village.
+            let terrain_y = |p: Vec2| -> f32 {
+                terrain_height_local_with_flatten(p.x, p.y, terrain_cfg, flatten_zones)
             };
-            let h_or_inner = |p: Vec2, i: usize| {
-                let n = ((i as u32).wrapping_mul(2_246_822_507) as f32 / u32::MAX as f32) - 0.5;
-                terrain_height_local_with_flatten(p.x, p.y, terrain_cfg, flatten_zones) + 0.03 + n * 0.06
+            let h_inner = |p: Vec2, seed: usize| {
+                let n = ((seed as u32).wrapping_mul(2_246_822_507) as f32 / u32::MAX as f32) - 0.5;
+                terrain_y(p) + thickness + RUT_INNER_M + n * RUT_NOISE_M
             };
-            let y_ol = h_or_outer(p_ol);
-            let y_il = h_or_inner(p_il, i);
-            let y_ir = h_or_inner(p_ir, i.wrapping_add(7));
-            let y_or = h_or_outer(p_or);
+            let h_center = |p: Vec2, seed: usize| {
+                let n = ((seed as u32).wrapping_mul(1_597_334_677) as f32 / u32::MAX as f32) - 0.5;
+                terrain_y(p) + thickness + BOMB_CENTER_M + n * 0.02
+            };
+            let y_ol_top = terrain_y(p_ol) + thickness;
+            let y_il_top = h_inner(p_il, i);
+            let y_c_top = h_center(p_c, i);
+            let y_ir_top = h_inner(p_ir, i.wrapping_add(7));
+            let y_or_top = terrain_y(p_or) + thickness;
+            let y_ol_bot = terrain_y(p_ol) - SINK_INTO_TERRAIN_M;
+            let y_or_bot = terrain_y(p_or) - SINK_INTO_TERRAIN_M;
 
             let center = s.pos;
             if let Some(pc) = prev_center {
@@ -1212,15 +1259,24 @@ fn build_path_ribbon_mesh(
             }
             prev_center = Some(center);
 
-            positions.push([p_ol.x, y_ol, p_ol.y]);
-            positions.push([p_il.x, y_il, p_il.y]);
-            positions.push([p_ir.x, y_ir, p_ir.y]);
-            positions.push([p_or.x, y_or, p_or.y]);
+            // 5 verts top (indices 0..4) puis 2 verts bottom (5,6).
+            positions.push([p_ol.x, y_ol_top, p_ol.y]);
+            positions.push([p_il.x, y_il_top, p_il.y]);
+            positions.push([p_c.x, y_c_top, p_c.y]);
+            positions.push([p_ir.x, y_ir_top, p_ir.y]);
+            positions.push([p_or.x, y_or_top, p_or.y]);
+            positions.push([p_ol.x, y_ol_bot, p_ol.y]);
+            positions.push([p_or.x, y_or_bot, p_or.y]);
 
             uvs.push([0.0, v_dist * 0.5]);
-            uvs.push([0.35, v_dist * 0.5]);
-            uvs.push([0.65, v_dist * 0.5]);
+            uvs.push([0.30, v_dist * 0.5]);
+            uvs.push([0.50, v_dist * 0.5]);
+            uvs.push([0.70, v_dist * 0.5]);
             uvs.push([1.0, v_dist * 0.5]);
+            // Bottom verts : u = 0 / 1 (= outer u), v décalé pour que la texture
+            // continue côté wall (effet "même pavé continue sur la tranche").
+            uvs.push([0.0, v_dist * 0.5 - thickness * 0.5]);
+            uvs.push([1.0, v_dist * 0.5 - thickness * 0.5]);
 
             // Variation dirt déterministe (i hashé) — texture procédurale.
             let h = ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 0.20;
@@ -1230,34 +1286,66 @@ fn build_path_ribbon_mesh(
                 (DIRT_BASE[2] + h * 0.5).min(0.3),
                 1.0,
             ];
-            // Outer = blend vers herbe (couleur fondue, vertex_color éclaire le
-            // material WHITE → c'est notre seul moyen sans 2e material).
+            let center_dirt = [
+                (CENTER_DIRT[0] + h * 0.5).min(0.55),
+                (CENTER_DIRT[1] + h * 0.4).min(0.45),
+                (CENTER_DIRT[2] + h * 0.3).min(0.35),
+                1.0,
+            ];
             let outer = [
                 GRASS_BASE[0] * 0.7 + dirt[0] * 0.3,
                 GRASS_BASE[1] * 0.7 + dirt[1] * 0.3,
                 GRASS_BASE[2] * 0.7 + dirt[2] * 0.3,
                 1.0,
             ];
+            // Wall verts = dirt sombre (l'ombre sous le pavé) → contraste avec top.
+            let wall = [
+                DIRT_BASE[0] * 0.6,
+                DIRT_BASE[1] * 0.6,
+                DIRT_BASE[2] * 0.6,
+                1.0,
+            ];
             colors.push(outer);
             colors.push(dirt);
+            colors.push(center_dirt);
             colors.push(dirt);
             colors.push(outer);
+            colors.push(wall);
+            colors.push(wall);
 
             if i > 0 {
-                // 3 bandes : outer-L→inner-L, inner-L→inner-R, inner-R→outer-R.
-                // Chacune = 2 tri (6 indices). Winding CCW vu d'en haut.
-                let base0 = base_vertex + ((i - 1) * 4) as u32;
-                let base1 = base_vertex + (i * 4) as u32;
-                for band in 0..3 {
-                    let a0 = base0 + band as u32;
+                let stride = verts_per_sample as u32;
+                let base0 = base_vertex + (i as u32 - 1) * stride;
+                let base1 = base_vertex + (i as u32) * stride;
+                // 4 bandes top : outer_L→inner_L, inner_L→center, center→inner_R, inner_R→outer_R.
+                // Winding CCW vu d'en haut (normale vers +Y).
+                for band in 0..4u32 {
+                    let a0 = base0 + band;
                     let b0 = a0 + 1;
-                    let a1 = base1 + band as u32;
+                    let a1 = base1 + band;
                     let b1 = a1 + 1;
                     indices.extend_from_slice(&[a0, b0, a1, b0, b1, a1]);
                 }
+                // Wall gauche : outer_L_top (idx 0) ↓ outer_L_bot (idx 5).
+                // Convention code : outer_L = pos - perp, mais perp pointe -X
+                // pour tangent +Z → outer_L est en réalité côté +X. Normale wall
+                // doit pointer +X (extérieur du path côté outer_L). Winding fix.
+                let lw_a0 = base0;       // outer_L_top i-1
+                let lw_b0 = base0 + 5;   // outer_L_bot i-1
+                let lw_a1 = base1;       // outer_L_top i
+                let lw_b1 = base1 + 5;   // outer_L_bot i
+                indices.extend_from_slice(&[lw_a0, lw_a1, lw_b0, lw_a1, lw_b1, lw_b0]);
+                // Wall droite : outer_R_top (idx 4) ↓ outer_R_bot (idx 6).
+                // outer_R = pos + perp → côté -X. Normale wall doit pointer -X.
+                // Winding inverse de wall gauche.
+                let rw_a0 = base0 + 4;   // outer_R_top i-1
+                let rw_b0 = base0 + 6;   // outer_R_bot i-1
+                let rw_a1 = base1 + 4;   // outer_R_top i
+                let rw_b1 = base1 + 6;   // outer_R_bot i
+                indices.extend_from_slice(&[rw_a0, rw_b0, rw_a1, rw_b0, rw_b1, rw_a1]);
             }
         }
-        base_vertex += (n * 4) as u32;
+        base_vertex += (n * verts_per_sample) as u32;
     }
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
@@ -1288,17 +1376,30 @@ fn spawn_path_ribbons(
     // roughness JPG → vrai dirt path crédible (vs vertex colors aplats).
     // vertex_color reste actif comme MULTIPLICATEUR (full dirt au centre,
     // blend grass tint sur les outer pour fade naturel bord/herbe).
-    let diff: Handle<Image> = asset_server.load("textures-v1/terrain/path/diff.jpg");
-    let normal: Handle<Image> = asset_server.load("textures-v1/terrain/path/normal.jpg");
-    let rough: Handle<Image> = asset_server.load("textures-v1/terrain/path/roughness.jpg");
+    // Sampler en Repeat (cf. terrain_material::repeat_sampler) car les UV
+    // ribbon utilisent `v = v_dist * 0.5` cumulatif → sans Repeat le sampler
+    // clamp à v=1.0 et étire un seul texel sur toute la longueur du path.
+    let diff: Handle<Image> = asset_server
+        .load_with_settings("textures-v1/terrain/path/diff.jpg", forgia_terrain::repeat_sampler());
+    let normal: Handle<Image> = asset_server.load_with_settings(
+        "textures-v1/terrain/path/normal.jpg",
+        forgia_terrain::repeat_sampler(),
+    );
+    let rough: Handle<Image> = asset_server.load_with_settings(
+        "textures-v1/terrain/path/roughness.jpg",
+        forgia_terrain::repeat_sampler(),
+    );
 
+    // Profil Roman road + ornières + bombement central → la géométrie 5-vert
+    // catch la lumière sur le sommet. Roughness baissée légèrement (0.85)
+    // pour spec-highlight diffus sur cailloux humides. Reflectance 0.04 = dirt.
     let road_mat = materials.add(StandardMaterial {
         base_color: Color::WHITE,
         base_color_texture: Some(diff),
         normal_map_texture: Some(normal),
         metallic_roughness_texture: Some(rough),
-        perceptual_roughness: 0.95,
-        reflectance: 0.02,
+        perceptual_roughness: 0.85,
+        reflectance: 0.04,
         ..default()
     });
     commands.spawn((

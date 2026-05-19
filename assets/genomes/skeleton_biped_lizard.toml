@@ -4,52 +4,52 @@
 
 [[bones]]
 name = "hip"
-pos = [0.0, 0.45, 0.0]
+pos = [0.0, 0.45, 0.02]
 
 [[bones]]
 name = "spine_lower"
 parent = 0
-pos = [0.0, 0.53, 0.04]
+pos = [0.0, 0.53, 0.08]    # curvature back (matche le dos courbé Rex)
 
 [[bones]]
 name = "spine_mid"
 parent = 1
-pos = [0.0, 0.63, 0.10]
+pos = [0.0, 0.63, 0.10]    # apex de la courbure
 
 [[bones]]
 name = "chest"
 parent = 2
-pos = [0.0, 0.71, 0.16]
+pos = [0.0, 0.71, 0.08]
 
 [[bones]]
 name = "neck"
 parent = 3
-pos = [0.0, 0.76, 0.24]
+pos = [0.0, 0.76, 0.06]
 
 [[bones]]
 name = "head"
 parent = 4
-pos = [0.0, 0.82, 0.29]
+pos = [0.0, 0.82, 0.10]    # head +Z (même côté que spine = DANS le mesh tête, pas dehors)
 
 [[bones]]
 name = "arm_L"
 parent = 3
-pos = [-0.12, 0.71, 0.18]
+pos = [-0.18, 0.71, 0.0]   # T-pose : épaule → coude latéral, même Y que chest
 
 [[bones]]
 name = "forearm_L"
 parent = 6
-pos = [-0.16, 0.59, 0.22]
+pos = [-0.36, 0.71, 0.0]   # T-pose : coude → poignet latéral, double X depuis arm
 
 [[bones]]
 name = "arm_R"
 parent = 3
-pos = [0.12, 0.71, 0.18]
+pos = [0.18, 0.71, 0.0]
 
 [[bones]]
 name = "forearm_R"
 parent = 8
-pos = [0.16, 0.59, 0.22]
+pos = [0.36, 0.71, 0.0]
 
 [[bones]]
 name = "thigh_L"
@@ -59,7 +59,7 @@ pos = [-0.10, 0.37, 0.0]
 [[bones]]
 name = "shin_L"
 parent = 10
-pos = [-0.10, 0.19, 0.0]
+pos = [-0.10, 0.20, 0.12]  # knee digitigrade Rex : bas + forward (articulation T-rex)
 
 [[bones]]
 name = "foot_L"
@@ -74,7 +74,7 @@ pos = [0.10, 0.37, 0.0]
 [[bones]]
 name = "shin_R"
 parent = 13
-pos = [0.10, 0.19, 0.0]
+pos = [0.10, 0.20, 0.12]   # knee digitigrade Rex : bas + forward (articulation T-rex)
 
 [[bones]]
 name = "foot_R"

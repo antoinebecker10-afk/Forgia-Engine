@@ -63,8 +63,13 @@ pub fn heightmap_at(x: f32, z: f32, config: &TerrainConfig) -> f32 {
     h = (h + 1.0) * 0.5;
     h = config.sea_level + h * (config.max_height - config.sea_level);
 
+    // Fix : interpolation vers sea_level au lieu de multiplication vers 0.
+    // L'ancienne formule `h *= edge_factor` faisait descendre h sous sea_level
+    // partout où edge_factor < 1 → cuvettes systématiques avec floor à 2.0
+    // masquant le bug. Pattern industrie : terrain descend vers la mer aux
+    // bords, pas vers l'abysse.
     let edge_factor = edge_falloff(x, z, half, 80.0);
-    h *= edge_factor;
+    h = config.sea_level + (h - config.sea_level) * edge_factor;
 
     h.max(2.0)
 }
@@ -269,9 +274,12 @@ pub fn procedural_sdf_at(
 
 /// Smooth falloff near map edges (0 at edge, 1 in interior).
 fn edge_falloff(x: f32, z: f32, half: f32, fade_dist: f32) -> f32 {
-    let map_size = half * 2.0;
-    let dx = x.min(map_size - x).max(0.0);
-    let dz = z.min(map_size - z).max(0.0);
+    // Forgia convention : world centré sur (0,0), bords à ±half (cf ChunkCoord
+    // dans chunk.rs:33). Le code initial assumait [0, map_size] ce qui
+    // faisait croire que le spawn world (19,19) était au coin (edge_factor
+    // ≈ 0.14 → terrain écrasé sous sea_level partout autour du spawn).
+    let dx = (half - x.abs()).max(0.0);
+    let dz = (half - z.abs()).max(0.0);
     let d = dx.min(dz);
     if d < fade_dist {
         let t = d / fade_dist;
@@ -403,11 +411,19 @@ mod tests {
 
     #[test]
     fn edge_falloff_zero_at_edge_one_far_inside() {
+        // Convention centrée (0,0) avec bords à ±half (cf chunk.rs).
         let half = 2048.0;
-        let v0 = edge_falloff(0.0, 2048.0, half, 80.0);
+        // Au bord : z = ±half → dz = 0 → falloff = 0
+        let v0 = edge_falloff(0.0, half, half, 80.0);
         assert!(v0 <= 1e-5, "edge should be ~0, got {v0}");
-        let v1 = edge_falloff(half, half, half, 80.0);
+        let v_neg = edge_falloff(0.0, -half, half, 80.0);
+        assert!(v_neg <= 1e-5, "negative edge should also be ~0, got {v_neg}");
+        // Au centre (0,0) : dx = dz = half → loin du fade → 1.0
+        let v1 = edge_falloff(0.0, 0.0, half, 80.0);
         assert!((v1 - 1.0).abs() < 1e-5, "center should be ~1, got {v1}");
+        // Spawn typique world (19, 19) doit être > 0.99 (presque centre)
+        let v_spawn = edge_falloff(19.0, 19.0, half, 80.0);
+        assert!(v_spawn > 0.99, "spawn (19,19) should be near-1, got {v_spawn}");
     }
 
     #[test]

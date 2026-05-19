@@ -35,17 +35,17 @@ pub const STRIDE_PER_M_RUN: f32 = 0.40;
 pub const STANCE_FRAC_WALK: f32 = 0.60;
 pub const STANCE_FRAC_RUN: f32 = 0.40;
 
-/// Amplitude thigh swing (rad). Walk ~23°, run ~35°.
-pub const AMP_THIGH_WALK: f32 = 0.40;
-pub const AMP_THIGH_RUN: f32 = 0.60;
+/// Amplitude thigh swing (rad). Walk ~46°, run ~57° (cartoon-readable cam 3P 7m).
+pub const AMP_THIGH_WALK: f32 = 0.80;
+pub const AMP_THIGH_RUN: f32 = 1.00;
 
-/// Amplitude arm swing (rad, pitch épaule). Walk ~17°, run ~30°.
-pub const AMP_ARM_WALK: f32 = 0.30;
-pub const AMP_ARM_RUN: f32 = 0.55;
+/// Amplitude arm swing (rad, pitch épaule). Walk ~32°, run ~49°.
+pub const AMP_ARM_WALK: f32 = 0.55;
+pub const AMP_ARM_RUN: f32 = 0.85;
 
-/// Knee max flexion en swing peak (rad). Humain typique ~60° walk, ~90° run.
-pub const KNEE_FLEX_PEAK_WALK: f32 = 1.05; // ~60°
-pub const KNEE_FLEX_PEAK_RUN: f32 = 1.50; // ~86°
+/// Knee max flexion en swing peak (rad). Exagéré pour lecture cam 3P.
+pub const KNEE_FLEX_PEAK_WALK: f32 = 1.60; // ~92°
+pub const KNEE_FLEX_PEAK_RUN: f32 = 1.80; // ~103°
 
 /// Ankle dorsi-flex peak en mid-swing (rad). ~15°.
 pub const ANKLE_FLEX_PEAK: f32 = 0.26;

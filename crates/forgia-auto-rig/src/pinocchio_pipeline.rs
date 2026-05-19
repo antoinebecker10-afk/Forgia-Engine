@@ -189,12 +189,58 @@ pub fn auto_rig_pinocchio_v1(
         }
 
         // 4. Embed template skeleton — load depuis TOML genome avec fallback hardcoded.
-        let (skel_template, genome_used) = load_skeleton_template(
+        let (skel_template_raw, genome_used) = load_skeleton_template(
             template,
             &humanoid_handle,
             &lizard_handle,
             &skeleton_genomes,
         );
+
+        // Orientation fix (2026-05-18 AM) : si le mesh Meshy a sa queue en +Z
+        // (orientation glb variable), flipper Z du template pour matcher.
+        // Sinon les tail bones s'embeddent dans la mauvaise direction (collapse
+        // sur le front du mesh) et head/shoulders/spine sont shiftés.
+        let skel_template_z_fixed = if landmarks.has_tail && landmarks.tail_in_positive_z {
+            info!(
+                "[forgia-auto-rig::pinocchio] template Z flipped (tail in +Z) — Meshy orientation"
+            );
+            skel_template_raw.flipped_z()
+        } else {
+            skel_template_raw.clone()
+        };
+
+        // Précision anatomique (2026-05-18 AM) : rescale les positions Y du
+        // template AVANT embedding pour matcher les vrais landmarks détectés
+        // sur le mesh (hip/shoulder/head/arm_span). Sinon, le template hardcode
+        // hip à 0.45 (lizard) ou 0.55 (humanoid) mais le mesh réel a son hip à
+        // 0.42 (Rex), résultat : tête flotte dans le ventre, épaules décalées,
+        // coudes en dehors des coudes du mesh.
+        //
+        // Le medial axis fait ensuite le refinement précis (snap to medial
+        // sphere), mais part déjà du bon voisinage anatomique.
+        let skel_template = if landmarks.vertex_count >= 100 {
+            let rescaled = skel_template_z_fixed.rescaled_for_landmarks_with_torso(
+                landmarks.hip_y_frac,
+                landmarks.shoulder_y_frac,
+                landmarks.head_y_frac,
+                landmarks.arm_span_half_frac,
+                landmarks.torso_center_x_offset_frac,
+                landmarks.torso_center_z_offset_frac,
+            );
+            info!(
+                "[forgia-auto-rig::pinocchio] template rescaled to landmarks (hip={:.2}, shoulder={:.2}, head={:.2}, arm_span_half={:.2}, torso_off=[{:.3}, {:.3}])",
+                landmarks.hip_y_frac,
+                landmarks.shoulder_y_frac,
+                landmarks.head_y_frac,
+                landmarks.arm_span_half_frac,
+                landmarks.torso_center_x_offset_frac,
+                landmarks.torso_center_z_offset_frac,
+            );
+            rescaled
+        } else {
+            skel_template_z_fixed
+        };
+
         let embedded = embed_template_skeleton(&skel_template, &graph, (bounds_min, bounds_max));
 
         // 5. Spawn bones aux positions embedded (en repère mesh-root-local).

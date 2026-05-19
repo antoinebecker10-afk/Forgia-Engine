@@ -37,6 +37,10 @@ pub const LOD1_MAX_M: f32 = 128.0;
 /// mega-tiles sont quasi-gratuites (1 plane unlit par cluster 128m).
 pub const LOD2_MAX_M: f32 = 1500.0;
 pub const LOD_HYSTERESIS_M: f32 = 16.0;
+/// Story-454 : hystérèse de despawn sur le LOD2 inner ring (128m).
+/// Un cluster déjà spawn ne se despawn que si player approche à dist < 128 - 16 = 112m.
+/// Évite le flicker 2 Hz quand player marche le long de la frontière LOD2.
+pub const LOD2_INNER_HYSTERESIS_M: f32 = 16.0;
 
 const CLUSTER_CHUNKS: i32 = 4;
 const CHUNK_SIZE_M: f32 = CHUNK_X as f32;
@@ -70,7 +74,41 @@ pub struct LodStats {
     pub lod2_count: u32,
     pub lod2_tile_count: u32,
     pub transitions_last_frame: u32,
+    /// Story-453 : points d'échantillonnage LOD0 vs LOD2 pour CHK-3 asymmetry.
+    /// 12 points fixes en ring autour de (0,0). Mis à jour 1Hz par
+    /// `sys_update_lod_sample_points`. Exporté dans `forgia_terrain_lod.json`.
+    pub sample_points: Vec<LodSamplePoint>,
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct LodSamplePoint {
+    pub x: f32,
+    pub z: f32,
+    pub lod0_y: f32,
+    pub lod2_y: f32,
+    pub sea_level: f32,
+}
+
+/// Simule la Y produite par `build_lod2_terrain_mesh` à un point (x, z).
+/// Doit rester en sync avec le mesh builder : si une logique de clamp / offset
+/// est réintroduite côté LOD2, mettre à jour cette fonction → CHK-3 détectera
+/// instantanément l'asymétrie.
+///
+/// Actuellement (post-story-450 phase 2g + fix water clamp removal) : raw heightmap.
+pub fn simulate_lod2_y_at(x: f32, z: f32, terrain_cfg: &TerrainConfig) -> f32 {
+    heightmap_at(x, z, terrain_cfg)
+}
+
+/// 12 positions cardinales fixes à 3 rings (64m, 128m, 256m) autour de (0,0).
+/// Permet un échantillonnage déterministe indépendant de la position joueur.
+const SAMPLE_POINTS_XZ: [(f32, f32); 12] = [
+    // Ring 64m
+    (64.0, 0.0), (-64.0, 0.0), (0.0, 64.0), (0.0, -64.0),
+    // Ring 128m (LOD0/LOD2 transition)
+    (128.0, 0.0), (-128.0, 0.0), (0.0, 128.0), (0.0, -128.0),
+    // Ring 256m
+    (181.0, 181.0), (-181.0, -181.0), (181.0, -181.0), (-181.0, 181.0),
+];
 
 // ─────────────────────────── Lod2 Mega-Tiles ───────────────────────────
 
@@ -248,12 +286,16 @@ fn build_lod2_terrain_mesh(
     // Vertex colors sont multipliés par base_color = white du material partagé.
     let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_verts);
 
-    // Wave 5 phase 2d : water continuity (bevy_water plane limité au foreground).
-    // Si world_y < sea_level → clamp à sea_level + vertex color bleu eau pour
-    // surface eau visible au LOD2 ring aussi. Évite "deux eaux différentes"
-    // bug visuel (water plane foreground vs LOD2 terrain submergé biome-coloré).
-    let water_color_lin = LinearRgba::new(0.28, 0.45, 0.65, 1.0); // bleu marine
-    let sea = terrain_cfg.sea_level;
+    // Wave 5 phase 2d retiré 2026-05-18 : le clamp Y=sea_level + bleu marine
+    // créait des "phantom water patches" au LOD2 ring là où le heightmap dip
+    // légèrement sous sea_level mais que LOD0 (vrai chunk mesh) montre du sol
+    // sec (heightmap ondulé). Quand le joueur s'approche < 128m → LOD2
+    // despawn → patch d'eau disparaît, sol sec apparaît = bug visuel évident.
+    // LOD0 (`meshing_heightmap.rs`) n'a JAMAIS clampé sea_level → asymétrie.
+    // Fix : LOD2 utilise raw_y + biome color partout, comme LOD0/LOD1.
+    // Trade-off accepté : bevy_water plane peut être coupé en bout de mega-
+    // tiles 1500m (cohérent avec V1). Story-451 Phase 2h pour water mesh
+    // séparé si besoin futur d'horizon water > 1500m.
 
     for j in 0..VERTS_PER_SIDE {
         for i in 0..VERTS_PER_SIDE {
@@ -265,15 +307,9 @@ fn build_lod2_terrain_mesh(
             let sample_z = world_z + sample_offset.1;
             let raw_y = heightmap_at(sample_x, sample_z, terrain_cfg);
 
-            let (world_y, vertex_color) = if raw_y < sea {
-                // Submergé : clamp à sea_level + bleu marine.
-                ([local_x, sea, local_z], water_color_lin)
-            } else {
-                // Sur terre : Y heightmap + biome color.
-                let biome = biome_map.biome_at(sample_x, sample_z);
-                let c = biome.color().to_linear();
-                ([local_x, raw_y, local_z], c)
-            };
+            let biome = biome_map.biome_at(sample_x, sample_z);
+            let vertex_color = biome.color().to_linear();
+            let world_y = [local_x, raw_y, local_z];
             positions.push(world_y);
             normals.push([0.0, 1.0, 0.0]); // approx — PBR lit accepte
             // Wave 5 phase 2g : UV × UV_TILE_REPS pour densité texture cohérente
@@ -466,6 +502,7 @@ pub fn build_lod2_tiles_system(
                 Name::new(format!("Lod2Tile({},{})", key.0, key.1)),
             ))
             .id();
+        tile_mgr.tiles.insert(key, tile_entity);
 
         // Wave 5 phase 2c : scatter N tree imposters per tile selon biome.
         // Pattern Skyrim distant trees — silhouette présente au loin sans
@@ -542,10 +579,24 @@ pub fn build_lod2_tiles_system(
         }
     }
 
+    // Story-454 fix : hystérèse inner ring (anti-flicker à la frontière 128m).
+    // Sans cette marge, un cluster à dist ~128m oscillait spawn/despawn 2×/sec
+    // quand le joueur marchait perpendiculairement (tick 30 frames). Pattern
+    // UE5 World Partition : asymétrie load/unload thresholds.
+    // - Spawn :   dist >= inner_m            (déjà géré dans desired)
+    // - Despawn : dist <  inner_m - LOD2_INNER_HYSTERESIS_M  OU dist > outer_m
+    let inner_despawn_sq = (inner_m - LOD2_INNER_HYSTERESIS_M).max(0.0).powi(2);
     let to_remove: Vec<(i32, i32)> = tile_mgr
         .tiles
         .keys()
-        .filter(|k| !desired.contains_key(k))
+        .filter(|k| {
+            let center = cluster_world_center(**k);
+            let dx = center.x - player_pos.x;
+            let dz = center.y - player_pos.z;
+            let dist_sq = dx * dx + dz * dz;
+            // Despawn UNIQUEMENT si bien sous l'inner (avec marge) ou hors outer.
+            dist_sq < inner_despawn_sq || dist_sq >= outer_sq
+        })
         .copied()
         .collect();
     for key in to_remove {
@@ -568,8 +619,19 @@ pub fn export_lod_sensor_system(
     if now - *last_write < 1.0 { return; }
     *last_write = now;
 
+    // Story-453 : serialize sample_points (LOD0 vs LOD2 dual reading).
+    let sp_json = if lod_stats.sample_points.is_empty() {
+        "[]".to_string()
+    } else {
+        let parts: Vec<String> = lod_stats.sample_points.iter().map(|p| format!(
+            "{{\"x\":{:.1},\"z\":{:.1},\"lod0_y\":{:.3},\"lod2_y\":{:.3},\"sea_level\":{:.2}}}",
+            p.x, p.z, p.lod0_y, p.lod2_y, p.sea_level
+        )).collect();
+        format!("[{}]", parts.join(","))
+    };
+
     let json = format!(
-        "{{\"timestamp_secs\":{:.1},\"lod0_count\":{},\"lod1_count\":{},\"lod2_count\":{},\"lod2_tile_count\":{},\"transitions_last_frame\":{},\"lod0_max_m\":{:.0},\"lod1_max_m\":{:.0},\"lod2_max_m\":{:.0}}}",
+        "{{\"timestamp_secs\":{:.1},\"lod0_count\":{},\"lod1_count\":{},\"lod2_count\":{},\"lod2_tile_count\":{},\"transitions_last_frame\":{},\"lod0_max_m\":{:.0},\"lod1_max_m\":{:.0},\"lod2_max_m\":{:.0},\"sample_points\":{}}}",
         now,
         lod_stats.lod0_count,
         lod_stats.lod1_count,
@@ -579,8 +641,39 @@ pub fn export_lod_sensor_system(
         LOD0_MAX_M,
         LOD1_MAX_M,
         LOD2_MAX_M,
+        sp_json,
     );
     let _ = std::fs::write("forgia_terrain_lod.json", json);
+}
+
+/// Story-453 : remplit `LodStats.sample_points` à 1Hz pour CHK-3 LOD asymmetry.
+/// Compare lod0_y (heightmap canonique) vs lod2_y (simulation mesh LOD2).
+/// Si la fonction `simulate_lod2_y_at` diverge de `heightmap_at` (ex: futur
+/// re-introduction d'un clamp sea_level), CHK-3 alertera.
+pub fn sys_update_lod_sample_points(
+    terrain_cfg: Option<Res<TerrainConfig>>,
+    mut lod_stats: ResMut<LodStats>,
+    time: Res<Time>,
+    mut last_write: Local<f32>,
+) {
+    let now = time.elapsed_secs();
+    if now - *last_write < 1.0 { return; }
+    *last_write = now;
+
+    let Some(cfg) = terrain_cfg else { return };
+    let sea = cfg.sea_level;
+
+    if lod_stats.sample_points.len() != SAMPLE_POINTS_XZ.len() {
+        lod_stats.sample_points.clear();
+        lod_stats.sample_points.resize(SAMPLE_POINTS_XZ.len(), LodSamplePoint {
+            x: 0.0, z: 0.0, lod0_y: 0.0, lod2_y: 0.0, sea_level: sea,
+        });
+    }
+    for (i, &(x, z)) in SAMPLE_POINTS_XZ.iter().enumerate() {
+        let lod0_y = heightmap_at(x, z, &cfg);
+        let lod2_y = simulate_lod2_y_at(x, z, &cfg);
+        lod_stats.sample_points[i] = LodSamplePoint { x, z, lod0_y, lod2_y, sea_level: sea };
+    }
 }
 
 #[cfg(test)]

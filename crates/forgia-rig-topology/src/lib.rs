@@ -160,10 +160,24 @@ pub fn analyze_rig_topology(
         }
 
         // Arm : au-dessus root (+Y), latéralisé fort, depth modérée.
+        // On veut l'**upper arm (shoulder)** — pas le forearm. forearm partage les
+        // mêmes propriétés Y/X mais est plus latéral (gagne sur x_norm). Penalty
+        // explicite sur les noms forearm/lower_arm/hand pour faire gagner l'upper.
+        // Bonus enfants (upper arm a forearm + (chain), forearm a juste hand).
         if y_norm > 0.1 && x_norm.abs() > 0.1 && b.depth <= 6 {
+            let is_forearm_name = lower.contains("forearm")
+                || lower.contains("lower_arm")
+                || lower.contains("lowerarm")
+                || lower.contains("hand")
+                || lower.contains("wrist");
+            let forearm_penalty = if is_forearm_name { -4.0 } else { 0.0 };
+            let upper_boost = name_boost(&lower, &["shoulder", "clavicle", "upper_arm", "upperarm"]);
+            let arm_match = name_boost(&lower, &["arm"]);
             let score = y_norm + x_norm.abs() * 4.0
-                - (b.depth as f32) * 0.05
-                + name_boost(&lower, &["arm", "shoulder", "clavicle", "upper_arm"]);
+                - (b.depth as f32) * 0.1
+                + arm_match
+                + upper_boost
+                + forearm_penalty;
             if x_norm > 0.0 {
                 update_best(&mut right_arm_best, b.entity, score);
             } else {
@@ -448,6 +462,41 @@ mod tests {
         assert!(!topo.tail_chain.is_empty(), "tail chain must be detected");
         assert_eq!(topo.tail_chain[0], b.by_name["tail_01"]);
         assert!(topo.tail_chain.len() >= 3);
+    }
+
+    #[test]
+    fn distinguishes_upper_arm_from_forearm() {
+        // Régression bug Rex 2026-05-18 : topology retournait `forearm_L`
+        // au lieu de `arm_L` parce que forearm est plus latéral et match "arm".
+        // Le fix doit pénaliser les noms contenant "forearm" / "hand".
+        let b = build(vec![
+            ("scene", None, Vec3::ZERO),
+            ("armature", Some("scene"), Vec3::ZERO),
+            ("hip", Some("armature"), Vec3::ZERO),
+            ("spine_lower", Some("hip"), Vec3::new(0.0, 0.15, 0.0)),
+            ("chest", Some("spine_lower"), Vec3::new(0.0, 0.3, 0.0)),
+            ("clavicle_L", Some("chest"), Vec3::new(-0.05, 0.0, 0.0)),
+            ("arm_L", Some("clavicle_L"), Vec3::new(-0.15, 0.0, 0.0)),
+            ("forearm_L", Some("arm_L"), Vec3::new(-0.3, 0.0, 0.0)),
+            ("hand_L", Some("forearm_L"), Vec3::new(-0.2, 0.0, 0.0)),
+            ("clavicle_R", Some("chest"), Vec3::new(0.05, 0.0, 0.0)),
+            ("arm_R", Some("clavicle_R"), Vec3::new(0.15, 0.0, 0.0)),
+            ("forearm_R", Some("arm_R"), Vec3::new(0.3, 0.0, 0.0)),
+            ("hand_R", Some("forearm_R"), Vec3::new(0.2, 0.0, 0.0)),
+            ("thigh_L", Some("hip"), Vec3::new(-0.1, -0.4, 0.0)),
+            ("thigh_R", Some("hip"), Vec3::new(0.1, -0.4, 0.0)),
+        ]);
+        let topo = analyze(&b);
+        assert_eq!(
+            topo.left_arm,
+            Some(b.by_name["arm_L"]),
+            "left_arm must point to upper arm (shoulder), not forearm"
+        );
+        assert_eq!(
+            topo.right_arm,
+            Some(b.by_name["arm_R"]),
+            "right_arm must point to upper arm (shoulder), not forearm"
+        );
     }
 
     #[test]

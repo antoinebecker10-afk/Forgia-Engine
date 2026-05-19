@@ -82,7 +82,220 @@ pub struct SkeletonTemplate {
     pub bones: Vec<TemplateBone>,
 }
 
+/// Classification anatomique d'un bone par son nom — utilisé par
+/// `SkeletonTemplate::rescaled_for_landmarks`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoneClass {
+    Spine,
+    Leg,
+    Arm,
+    Tail,
+    Other,
+}
+
 impl SkeletonTemplate {
+    /// Clone le template en inversant Z de toutes les positions. Utilisé quand
+    /// la détection anatomy (anatomy_detect.tail_in_positive_z) indique que le
+    /// mesh Meshy est orienté avec sa queue en +Z (vs convention template
+    /// `+Z = forward`).
+    pub fn flipped_z(&self) -> Self {
+        Self {
+            bones: self
+                .bones
+                .iter()
+                .map(|b| TemplateBone {
+                    name: b.name.clone(),
+                    parent: b.parent,
+                    pos: [b.pos[0], b.pos[1], -b.pos[2]],
+                })
+                .collect(),
+        }
+    }
+
+    /// Rescale les positions Y des bones pour matcher les vrais landmarks du
+    /// mesh (hip/shoulder/head/arm_span). Garde la HIÉRARCHIE intacte mais
+    /// déplace chaque bone à sa position anatomique réelle :
+    ///
+    /// - Spine chain (spine/chest/neck/head) : interpole entre `hip_y_frac` et
+    ///   `head_y_frac` selon position relative dans le template.
+    /// - Leg chain (thigh/shin/foot) : interpole entre `hip_y_frac` et `0`
+    ///   (sol). Foot atteint le sol pile.
+    /// - Arm chain (arm/forearm/clavicle/hand) : Y rescale au shoulder_y_frac
+    ///   réel ; X scale selon `arm_span_half_frac` réel.
+    /// - Tail chain (tail_*) : Y conservé proche du hip, X/Z préservés.
+    ///
+    /// Tout autre bone (other) : Y rescale linéaire vs template head height.
+    ///
+    /// Use case : `pinocchio_pipeline` appelle ça AVANT `embed_template_skeleton`
+    /// pour pré-positionner les targets aux landmarks détectés. Le medial axis
+    /// fait le refinement précis (snap to medial sphere) mais part déjà du bon
+    /// voisinage anatomique.
+    pub fn rescaled_for_landmarks(
+        &self,
+        hip_y_frac: f32,
+        shoulder_y_frac: f32,
+        head_y_frac: f32,
+        arm_span_half_frac: f32,
+    ) -> Self {
+        self.rescaled_for_landmarks_with_torso(
+            hip_y_frac,
+            shoulder_y_frac,
+            head_y_frac,
+            arm_span_half_frac,
+            0.0,
+            0.0,
+        )
+    }
+
+    /// Variante de `rescaled_for_landmarks` avec offset torse explicite.
+    /// `torso_x_offset_frac` / `torso_z_offset_frac` : offset du centre torse
+    /// réel vs AABB.center, en fraction de la hauteur. Shift les os spine/arm
+    /// vers ce vrai centre pour matcher l'asymétrie visuelle du mesh.
+    #[allow(clippy::too_many_arguments)]
+    pub fn rescaled_for_landmarks_with_torso(
+        &self,
+        hip_y_frac: f32,
+        shoulder_y_frac: f32,
+        head_y_frac: f32,
+        arm_span_half_frac: f32,
+        torso_x_offset_frac: f32,
+        _torso_z_offset_frac: f32, // disabled : double-counterait forward lean lizard
+    ) -> Self {
+        // Détecte les Y de référence du template (hip / shoulder / head dans le repère normalisé).
+        // Heuristique : trouve les bones par nom (hip / shoulder|chest / head), fallback proportions
+        // Vitruvian si nom absent.
+        let find_y = |needle: &str| -> Option<f32> {
+            self.bones
+                .iter()
+                .find(|b| b.name.contains(needle))
+                .map(|b| b.pos[1])
+        };
+        let template_hip_y = find_y("hip").unwrap_or(0.50);
+        let template_head_y = find_y("head").unwrap_or(0.95);
+        // shoulder = chest (humanoid) ou neck (lizard) — premier match.
+        let template_shoulder_y = find_y("chest")
+            .or_else(|| find_y("shoulder"))
+            .or_else(|| find_y("neck"))
+            .unwrap_or(0.80);
+
+        // arm_tip_x_abs template : max |x| sur les bones arm chain.
+        let template_arm_tip_x_abs = self
+            .bones
+            .iter()
+            .filter(|b| {
+                let n = b.name.to_lowercase();
+                n.contains("arm") || n.contains("hand") || n.contains("forearm")
+            })
+            .map(|b| b.pos[0].abs())
+            .fold(0.10_f32, f32::max);
+
+        // Scales par chaîne anatomique.
+        // Anchor anatomique : chest PILE à shoulder_y_frac (= branch point des
+        // bras). Comme ça les bones arm_L/R/clavicle qui dérivent du chest
+        // démarrent au niveau shoulder, alignant épaules → coudes → poignets
+        // sur l'horizontale en T-pose. User feedback 2026-05-18 PM.
+        let real_chest_y = shoulder_y_frac.clamp(hip_y_frac + 0.05, head_y_frac - 0.05);
+        let template_chest_y = template_shoulder_y;
+
+        let leg_scale = (hip_y_frac / template_hip_y.max(0.001)).clamp(0.3, 3.0);
+
+        let arm_scale = (arm_span_half_frac / template_arm_tip_x_abs.max(0.01)).clamp(0.3, 5.0);
+
+        // Mapping Y piecewise pour spine/arm : hip→chest puis chest→head.
+        // Garantit que chest est à la vraie poitrine (pas à l'épaule), donc neck
+        // reste visible entre chest et tête.
+        let map_y_spine = |template_y: f32| -> f32 {
+            if template_y <= template_chest_y {
+                let span = (template_chest_y - template_hip_y).max(0.001);
+                let t = ((template_y - template_hip_y) / span).clamp(-0.5, 1.5);
+                hip_y_frac + t * (real_chest_y - hip_y_frac)
+            } else {
+                let span = (template_head_y - template_chest_y).max(0.001);
+                let t = ((template_y - template_chest_y) / span).clamp(-0.5, 1.5);
+                real_chest_y + t * (head_y_frac - real_chest_y)
+            }
+        };
+
+        let classify = |name: &str| -> BoneClass {
+            let n = name.to_lowercase();
+            if n.contains("tail") {
+                BoneClass::Tail
+            } else if n.starts_with("thigh") || n.starts_with("shin") || n.starts_with("foot")
+                || n.starts_with("calf") || n.starts_with("knee") || n.starts_with("ankle")
+            {
+                BoneClass::Leg
+            } else if n.contains("arm") || n.contains("hand") || n.contains("forearm")
+                || n.contains("clavicle") || n.contains("shoulder_") || n.contains("wrist")
+                || n.contains("elbow")
+            {
+                BoneClass::Arm
+            } else if n.contains("spine") || n.contains("chest") || n.contains("neck")
+                || n.contains("head") || n.contains("hip") || n.contains("pelvis")
+                || n.contains("torso") || n.contains("back")
+            {
+                BoneClass::Spine
+            } else {
+                BoneClass::Other
+            }
+        };
+
+        let new_bones: Vec<TemplateBone> = self
+            .bones
+            .iter()
+            .map(|b| {
+                let class = classify(&b.name);
+                let (x, mut y, z) = (b.pos[0], b.pos[1], b.pos[2]);
+                y = match class {
+                    BoneClass::Spine => map_y_spine(y),
+                    BoneClass::Leg => {
+                        // Map [0..template_hip] → [0..hip_y_frac]
+                        (y * leg_scale).clamp(0.0, hip_y_frac + 0.05)
+                    }
+                    BoneClass::Arm => {
+                        // Arms suivent le mapping spine (clavicle/épaule au bon niveau).
+                        map_y_spine(y)
+                    }
+                    BoneClass::Tail => {
+                        // Tail Y reste autour du hip (légère pente vers le bas)
+                        let template_span_total = (template_head_y - template_hip_y).max(0.001);
+                        let real_span_total = (head_y_frac - hip_y_frac).max(0.001);
+                        let t = ((y - template_hip_y) / template_span_total).clamp(-1.5, 0.5);
+                        hip_y_frac + t * real_span_total * 0.6
+                    }
+                    BoneClass::Other => y,
+                };
+                let x_scaled = if matches!(class, BoneClass::Arm) {
+                    x * arm_scale
+                } else {
+                    x
+                };
+                // Shift X spine/arm/tail vers le vrai centre torse SI offset > 1cm
+                // (asymétrie mesh significative). Sinon ignore (X bruité par
+                // outliers comme bras T-pose, queue qui penche).
+                //
+                // Z offset N'EST PAS appliqué : les templates spine ont déjà un
+                // forward lean baked in (chest forward de hip). Double-counter
+                // le bias Z du mesh provoque un décalage visible "spine pas
+                // centré de face" (user feedback 2026-05-18 PM).
+                let apply_x_offset = torso_x_offset_frac.abs() > 0.006; // ~1cm de mesh height
+                let x_offset = if apply_x_offset { torso_x_offset_frac } else { 0.0 };
+                let (x_final, z_final) = match class {
+                    BoneClass::Spine | BoneClass::Arm | BoneClass::Tail => {
+                        (x_scaled + x_offset, z)
+                    }
+                    BoneClass::Leg | BoneClass::Other => (x_scaled, z),
+                };
+                TemplateBone {
+                    name: b.name.clone(),
+                    parent: b.parent,
+                    pos: [x_final, y, z_final],
+                }
+            })
+            .collect();
+
+        Self { bones: new_bones }
+    }
+
     /// Template humanoid Vitruvian 18 bones. Compatible avec
     /// `forgia-rig-topology` classification.
     pub fn humanoid() -> Self {
@@ -100,10 +313,10 @@ impl SkeletonTemplate {
             ("arm_R",       Some(9),  [0.20,  0.78,  0.0]),
             ("forearm_R",   Some(10), [0.38,  0.78,  0.0]),
             ("thigh_L",     Some(0),  [-0.10, 0.40,  0.0]),
-            ("shin_L",      Some(12), [-0.10, 0.20,  0.0]),
+            ("shin_L",      Some(12), [-0.10, 0.27,  0.03]),  // knee forward bias
             ("foot_L",      Some(13), [-0.10, 0.02,  0.05]),
             ("thigh_R",     Some(0),  [0.10,  0.40,  0.0]),
-            ("shin_R",      Some(15), [0.10,  0.20,  0.0]),
+            ("shin_R",      Some(15), [0.10,  0.27,  0.03]),  // knee forward bias
             ("foot_R",      Some(16), [0.10,  0.02,  0.05]),
         ])
     }
@@ -111,21 +324,21 @@ impl SkeletonTemplate {
     /// Template biped lézard (Rex). 14+4 tail = 18 bones.
     pub fn biped_lizard() -> Self {
         Self::from_data(&[
-            ("hip",         None,     [0.0,   0.45,  0.0]),
-            ("spine_lower", Some(0),  [0.0,   0.53,  0.04]),
+            ("hip",         None,     [0.0,   0.45,  0.02]),
+            ("spine_lower", Some(0),  [0.0,   0.53,  0.08]),  // back curve
             ("spine_mid",   Some(1),  [0.0,   0.63,  0.10]),
-            ("chest",       Some(2),  [0.0,   0.71,  0.16]),
-            ("neck",        Some(3),  [0.0,   0.76,  0.24]),
-            ("head",        Some(4),  [0.0,   0.82,  0.29]),
-            ("arm_L",       Some(3),  [-0.12, 0.71,  0.18]),
-            ("forearm_L",   Some(6),  [-0.16, 0.59,  0.22]),
-            ("arm_R",       Some(3),  [0.12,  0.71,  0.18]),
-            ("forearm_R",   Some(8),  [0.16,  0.59,  0.22]),
+            ("chest",       Some(2),  [0.0,   0.71,  0.08]),
+            ("neck",        Some(3),  [0.0,   0.76,  0.06]),
+            ("head",        Some(4),  [0.0,   0.82,  0.10]),  // head dans mesh tête
+            ("arm_L",       Some(3),  [-0.18, 0.71,  0.0]),   // T-pose lateral
+            ("forearm_L",   Some(6),  [-0.36, 0.71,  0.0]),
+            ("arm_R",       Some(3),  [0.18,  0.71,  0.0]),
+            ("forearm_R",   Some(8),  [0.36,  0.71,  0.0]),
             ("thigh_L",     Some(0),  [-0.10, 0.37,  0.0]),
-            ("shin_L",      Some(10), [-0.10, 0.19,  0.0]),
+            ("shin_L",      Some(10), [-0.10, 0.28,  0.05]),  // knee mi-jambe + forward
             ("foot_L",      Some(11), [-0.10, 0.04,  0.06]),
             ("thigh_R",     Some(0),  [0.10,  0.37,  0.0]),
-            ("shin_R",      Some(13), [0.10,  0.19,  0.0]),
+            ("shin_R",      Some(13), [0.10,  0.28,  0.05]),  // knee mi-jambe + forward
             ("foot_R",      Some(14), [0.10,  0.04,  0.06]),
             ("tail_01",     Some(0),  [0.0,   0.41, -0.12]),
             ("tail_02",     Some(16), [0.0,   0.39, -0.22]),
@@ -349,6 +562,76 @@ pub fn embed_template_skeleton(
     }
 }
 
+/// Walk le graphe medial axis depuis le sphère index `start` vers `end` via BFS
+/// shortest path. Retourne la séquence d'index sphères (incluant start et end).
+/// `None` si pas de path (graphe disconnected).
+fn shortest_path_indices(
+    spheres_count: usize,
+    edges: &[(usize, usize)],
+    start: usize,
+    end: usize,
+) -> Option<Vec<usize>> {
+    if start == end {
+        return Some(vec![start]);
+    }
+    if start >= spheres_count || end >= spheres_count {
+        return None;
+    }
+    // Build adjacency list (undirected).
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); spheres_count];
+    for &(a, b) in edges {
+        if a < spheres_count && b < spheres_count {
+            adj[a].push(b);
+            adj[b].push(a);
+        }
+    }
+    // BFS.
+    let mut prev: Vec<Option<usize>> = vec![None; spheres_count];
+    let mut visited = vec![false; spheres_count];
+    let mut queue: std::collections::VecDeque<usize> = std::collections::VecDeque::new();
+    visited[start] = true;
+    queue.push_back(start);
+    let mut found = false;
+    while let Some(u) = queue.pop_front() {
+        if u == end {
+            found = true;
+            break;
+        }
+        for &v in &adj[u] {
+            if !visited[v] {
+                visited[v] = true;
+                prev[v] = Some(u);
+                queue.push_back(v);
+            }
+        }
+    }
+    if !found {
+        return None;
+    }
+    // Reconstruct.
+    let mut path = vec![end];
+    let mut cur = end;
+    while let Some(p) = prev[cur] {
+        path.push(p);
+        cur = p;
+        if cur == start {
+            break;
+        }
+    }
+    path.reverse();
+    Some(path)
+}
+
+/// Trouve le sphère index le plus proche d'une position monde.
+fn nearest_sphere_index(spheres: &[MedialSphere], target: Vec3) -> Option<usize> {
+    spheres
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (i, s.center.distance_squared(target)))
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(i, _)| i)
+}
+
 /// Embed une chaîne : place terminal via medial axis (alignement direction +
 /// longueur), interpole les intermédiaires linéairement.
 fn embed_one_chain(
@@ -442,20 +725,196 @@ fn embed_one_chain(
         chain_direction
     };
 
+    // PATH WALKING (2026-05-18 PM) : suit le graphe medial axis depuis la
+    // sphère attach jusqu'à la sphère terminale via BFS shortest path. Permet
+    // de placer les bones intermédiaires SUR la courbure réelle du membre
+    // (queue qui se courbe, jambe pliée, spine penchée) au lieu d'une ligne
+    // droite qui sort du mesh.
+    //
+    // Fallback : si pas de path (graph disconnect), ou path trop court, on
+    // revient à l'interpolation linéaire avec snap contraint.
+    let attach_sphere_idx = nearest_sphere_index(&graph.spheres, attach_world);
+    let terminal_sphere_idx = nearest_sphere_index(&graph.spheres, terminal_sphere.center);
+    let path_info: Option<(Vec<Vec3>, Vec<f32>, Vec<f32>, f32)> =
+        match (attach_sphere_idx, terminal_sphere_idx) {
+            (Some(a), Some(t)) if a != t => {
+                shortest_path_indices(graph.spheres.len(), &graph.edges, a, t).and_then(|path_idx| {
+                    if path_idx.len() < 2 {
+                        return None;
+                    }
+                    let centers: Vec<Vec3> = path_idx
+                        .iter()
+                        .map(|&i| graph.spheres[i].center)
+                        .collect();
+                    let radii: Vec<f32> =
+                        path_idx.iter().map(|&i| graph.spheres[i].radius).collect();
+                    // Cumul arc length along the path.
+                    let mut arc: Vec<f32> = vec![0.0; centers.len()];
+                    for i in 1..centers.len() {
+                        arc[i] = arc[i - 1] + centers[i - 1].distance(centers[i]);
+                    }
+                    let total = arc[arc.len() - 1];
+                    if total < 1e-6 {
+                        return None;
+                    }
+                    Some((centers, radii, arc, total))
+                })
+            }
+            _ => None,
+        };
+
+    // Helper : sample la path à la fraction t ∈ [0,1] → (position, radius).
+    let sample_path = |t: f32| -> Option<(Vec3, f32)> {
+        let (centers, radii, arc, total) = path_info.as_ref()?;
+        let target = t.clamp(0.0, 1.0) * total;
+        // Find segment that contains target.
+        for i in 1..arc.len() {
+            if arc[i] >= target {
+                let seg_len = arc[i] - arc[i - 1];
+                if seg_len < 1e-6 {
+                    return Some((centers[i], radii[i]));
+                }
+                let local_t = (target - arc[i - 1]) / seg_len;
+                let pos = centers[i - 1].lerp(centers[i], local_t);
+                let r = radii[i - 1] * (1.0 - local_t) + radii[i] * local_t;
+                return Some((pos, r));
+            }
+        }
+        // Past end : return last.
+        Some((centers[centers.len() - 1], radii[radii.len() - 1]))
+    };
+
     for (i, &bone_idx) in chain.bones.iter().enumerate() {
         let t = cumul_lengths[i + 1] / total_template_length;
-        let bone_world_pos = attach_world + chain_direction_actual * (t * actual_chain_length);
+        let linear_pos = attach_world + chain_direction_actual * (t * actual_chain_length);
+
+        // Refinement medial axis CONTRAINT (2026-05-18 PM) : pour les bones
+        // INTERMÉDIAIRES, snap à une sphère médiale qui reste SUR L'AXE de la
+        // chaîne. Contraintes :
+        // - Perpendiculaire à la ligne attach→terminal : < 15% chain length
+        //   (sinon on saute sur un membre voisin).
+        // - Along-chain offset depuis t_target : < 20% chain length
+        //   (sinon on snap sur un autre segment de la chaîne).
+        //
+        // Évite que le coude/genou saute sur des sphères médiales d'autres
+        // membres (problème observé runtime quand snap_radius était isotrope 25%).
+        //
+        // Le bone terminal garde la position terminal_sphere (déjà snappée).
+        // Identifie l'axe centerline du bone :
+        // - is_spine_xz : lock X ET Z au template (centrage strict spine)
+        // - is_spine_x_only : lock X seul, Z libre (= head, doit entrer dans le mesh tête)
+        // - is_leg_y_lock : lock Y au template (knee/shin précis à la fraction
+        //   anatomique correcte), X/Z depuis path pour suivre la centerline.
+        //   Évite que la distribution de sphères medial axis biaise shin vers le mollet.
+        // Tail/Arm gardent le path complet (XYZ) pour suivre la courbure naturelle.
+        let bone_name_lc = template.bones[bone_idx].name.to_lowercase();
+        let is_head = bone_name_lc.contains("head");
+        let is_spine_xz = (bone_name_lc.contains("spine")
+            || bone_name_lc.contains("chest")
+            || bone_name_lc.contains("neck")
+            || bone_name_lc.contains("hip")
+            || bone_name_lc.contains("pelvis"))
+            && !is_head;
+        let is_spine_x_only = is_head;
+        let is_leg_y_lock = bone_name_lc.starts_with("thigh")
+            || bone_name_lc.starts_with("shin")
+            || bone_name_lc.starts_with("calf")
+            || bone_name_lc.starts_with("knee");
+
+        let (bone_world_pos, radius) = if i == n - 1 {
+            // Terminal bone : prend la sphère terminale, mais si c'est un spine
+            // bone override X/Z (ou X seul pour head) au template pour garder
+            // l'alignement vertical strict du dos.
+            if is_spine_xz {
+                let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+                (
+                    Vec3::new(template_pos.x, terminal_sphere.center.y, template_pos.z),
+                    terminal_sphere.radius,
+                )
+            } else if is_spine_x_only {
+                // Head : X centré, Y et Z depuis la sphère terminale (entre dans le mesh tête).
+                let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+                (
+                    Vec3::new(template_pos.x, terminal_sphere.center.y, terminal_sphere.center.z),
+                    terminal_sphere.radius,
+                )
+            } else {
+                (terminal_sphere.center, terminal_sphere.radius)
+            }
+        } else if let Some((path_pos, path_r)) = sample_path(t) {
+            // Walk le medial axis : bone à la fraction t le long du graphe réel.
+            // Beaucoup plus précis que la ligne droite pour membres courbés.
+            if is_spine_xz {
+                // Spine : Y depuis path (curvature anatomique), X/Z depuis
+                // template rescalé (centrage strict, pas de dérive latérale).
+                let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+                (Vec3::new(template_pos.x, path_pos.y, template_pos.z), path_r)
+            } else if is_spine_x_only {
+                // Head intermediate (rare) : X centré, Y/Z depuis path.
+                let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+                (Vec3::new(template_pos.x, path_pos.y, path_pos.z), path_r)
+            } else if is_leg_y_lock {
+                // Leg : Y ET Z depuis template (knee placé pile à fraction et
+                // forward bias contrôlé pour digitigrade Rex). X depuis path
+                // pour suivre la centerline lateral si bow leg.
+                let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+                (
+                    Vec3::new(path_pos.x, template_pos.y, template_pos.z),
+                    path_r,
+                )
+            } else {
+                (path_pos, path_r)
+            }
+        } else if actual_chain_length > 1e-3 {
+            // Spacing entre bones intermédiaires : 1/n. Pour empêcher un bone
+            // de sauter sur le segment voisin, on limite l'offset à la MOITIÉ
+            // du spacing. Ex: chaîne de 5 bones → spacing 0.2 → max_offset = 0.1.
+            let segment_spacing = 1.0_f32 / n as f32;
+            let max_along_offset = actual_chain_length * (segment_spacing * 0.5);
+            let max_perp = actual_chain_length * 0.12;
+            let target_along = t * actual_chain_length;
+
+            let mut best: Option<(Vec3, f32, f32)> = None; // (center, radius, score)
+            for s in &graph.spheres {
+                // Exclude terminal sphere du snap intermédiaire : sinon le
+                // cou/genou colle à la tête/pied.
+                let to_terminal = (s.center - terminal_sphere.center).length_squared();
+                if to_terminal < 1e-6 {
+                    continue;
+                }
+                let rel = s.center - attach_world;
+                let along = rel.dot(chain_direction_actual);
+                let along_offset = (along - target_along).abs();
+                if along_offset > max_along_offset {
+                    continue;
+                }
+                let perp_vec = rel - chain_direction_actual * along;
+                let perp = perp_vec.length();
+                if perp > max_perp {
+                    continue;
+                }
+                // Score : combine perp (priorité centrage) + along_offset (priorité bonne position).
+                let score = perp + along_offset * 0.5;
+                if best.is_none_or(|(_, _, s_old)| score < s_old) {
+                    best = Some((s.center, s.radius, score));
+                }
+            }
+            match best {
+                Some((c, r, _)) => (c, r),
+                None => {
+                    // Pas de sphère propre : garde la position linéaire (sur axe chaîne).
+                    let (nearest, _) = find_nearest_sphere(&graph.spheres, linear_pos);
+                    (linear_pos, nearest.radius)
+                }
+            }
+        } else {
+            // Chain dégénérée : on garde la position linéaire.
+            let (nearest, _) = find_nearest_sphere(&graph.spheres, linear_pos);
+            (linear_pos, nearest.radius)
+        };
 
         let tb = &template.bones[bone_idx];
         let snap_dist = bone_world_pos.distance(center_xz + tb.pos_vec3() * mesh_height);
-
-        // Radius : use terminal sphere radius pour le bone terminal, sinon estim.
-        let radius = if i == n - 1 {
-            terminal_sphere.radius
-        } else {
-            // Find nearest sphere just for radius estimation (no position snap).
-            find_nearest_sphere(&graph.spheres, bone_world_pos).0.radius
-        };
 
         embedded[bone_idx] = Some(EmbeddedBone {
             name: tb.name.clone(),
@@ -583,6 +1042,52 @@ mod tests {
             ],
             edges: vec![(0, 1), (1, 2)],
         }
+    }
+
+    #[test]
+    fn rescale_humanoid_matches_landmarks() {
+        // Vérifie que `rescaled_for_landmarks` repositionne le head et le hip
+        // exactement aux fractions demandées (précision anatomique).
+        let t = SkeletonTemplate::humanoid();
+        let rescaled = t.rescaled_for_landmarks(0.42, 0.67, 0.95, 0.50);
+
+        let hip = rescaled.bones.iter().find(|b| b.name == "hip").unwrap();
+        assert!(
+            (hip.pos[1] - 0.42).abs() < 0.01,
+            "hip y should be 0.42, got {}", hip.pos[1]
+        );
+
+        let head = rescaled.bones.iter().find(|b| b.name == "head").unwrap();
+        assert!(
+            (head.pos[1] - 0.95).abs() < 0.01,
+            "head y should be 0.95, got {}", head.pos[1]
+        );
+
+        // Arm tip étendu : forearm_L pos.x devrait être négatif et plus large
+        // (templat humanoid forearm_L x = -0.20 + 0.20 = mais en cumul depuis hip).
+        // Le test direct : la valeur absolue max sur les bones arm doit s'approcher de arm_span_half_frac.
+        let max_arm_x: f32 = rescaled
+            .bones
+            .iter()
+            .filter(|b| b.name.contains("arm") || b.name.contains("hand"))
+            .map(|b| b.pos[0].abs())
+            .fold(0.0, f32::max);
+        assert!(
+            max_arm_x > 0.20,
+            "arm scale should extend arm bones (got max |x|={})", max_arm_x
+        );
+    }
+
+    #[test]
+    fn rescale_lizard_keeps_tail_offset() {
+        let t = SkeletonTemplate::biped_lizard();
+        let rescaled = t.rescaled_for_landmarks(0.42, 0.67, 0.95, 0.40);
+        // Tail bones doivent garder leur Z négatif (template) — pas écrasé en 0.
+        let tail4 = rescaled.bones.iter().find(|b| b.name == "tail_04").unwrap();
+        assert!(
+            tail4.pos[2] < -0.30,
+            "tail_04 z must stay extended back (got {})", tail4.pos[2]
+        );
     }
 
     #[test]

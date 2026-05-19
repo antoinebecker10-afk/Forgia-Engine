@@ -37,7 +37,7 @@ pub use biomes::{BiomeMap, BiomeType};
 pub use map_gen_config::{BiomeMode, MapGenConfig, preset_island, preset_forgia_showcase};
 pub use generation::heightmap_at;
 pub use meshing_heightmap::{build_chunk_mesh, spawn_chunk_entity, ChunkMeshData, VERTS_PER_AXIS};
-pub use terrain_material::{init_terrain_material, TerrainSharedMaterial};
+pub use terrain_material::{init_terrain_material, repeat_sampler, TerrainSharedMaterial};
 pub use lod::{
     ChunkLod, Lod2TileManager, LodSampleOffset, LodStats, LOD0_MAX_M, LOD1_MAX_M, LOD2_MAX_M,
 };
@@ -87,6 +87,7 @@ impl Plugin for ForgiaTerrainPlugin {
                 (
                     lod::update_chunk_lod,
                     lod::build_lod2_tiles_system,
+                    lod::sys_update_lod_sample_points,
                     lod::export_lod_sensor_system,
                 )
                     .in_set(GameSet::Movement)

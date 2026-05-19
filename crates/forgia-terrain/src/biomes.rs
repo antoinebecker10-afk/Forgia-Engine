@@ -53,7 +53,7 @@ impl BiomeType {
             Self::Tundra   => Color::srgb(0.68, 0.74, 0.78),
             Self::Savanna  => Color::srgb(0.78, 0.68, 0.32),
             Self::Jungle   => Color::srgb(0.12, 0.32, 0.10),
-            Self::Volcanic => Color::srgb(0.22, 0.15, 0.12),
+            Self::Volcanic => Color::srgb(0.35, 0.27, 0.22),
             Self::Canyon   => Color::srgb(0.72, 0.40, 0.22),
         }
     }

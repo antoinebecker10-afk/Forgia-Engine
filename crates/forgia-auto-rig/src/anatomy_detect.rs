@@ -56,6 +56,18 @@ pub struct MeshLandmarks {
     /// True si le mesh a des vertices significatifs derrière son centre Z
     /// dans la zone bassin/torse — caractéristique tail lézard.
     pub has_tail: bool,
+    /// True si la queue est dans la direction +Z (orientation Meshy flippée vs
+    /// convention template `+Z = forward, -Z = tail`). Permet à
+    /// `pinocchio_pipeline` de flipper le template Z pour matcher le mesh.
+    /// Significatif uniquement si `has_tail == true`.
+    pub tail_in_positive_z: bool,
+    /// Offset du centre médian X du torse (médiane des vertices dans la bande
+    /// hip→shoulder) vs AABB.center.x, exprimé en **fraction de la hauteur**.
+    /// Permet d'aligner les os spine sur la vraie médiane visuelle du torse
+    /// même si le mesh est asymétrique (pose, accessoires Meshy).
+    pub torso_center_x_offset_frac: f32,
+    /// Idem pour Z (offset médian Z du torse vs AABB.center.z, fraction hauteur).
+    pub torso_center_z_offset_frac: f32,
     /// Nombre de vertices analysés (diagnostic). 0 = fallback proportions fixes.
     pub vertex_count: usize,
 }
@@ -72,6 +84,9 @@ impl Default for MeshLandmarks {
             hip_width_frac: 0.10,
             arm_span_half_frac: 0.20,
             has_tail: false,
+            tail_in_positive_z: false,
+            torso_center_x_offset_frac: 0.0,
+            torso_center_z_offset_frac: 0.0,
             vertex_count: 0,
         }
     }
@@ -218,34 +233,72 @@ pub fn detect_landmarks_from_vertices(positions: &[Vec3], aabb: &Aabb) -> MeshLa
     let head_y_frac = ((head_slice as f32 + 0.5) / SLICE_COUNT as f32).min(1.0);
     let neck_y_frac = (shoulder_y_frac + head_y_frac) * 0.5;
 
-    // ── Has tail : critères MULTIPLES (runtime-fix 2026-05-17 PM, faux
-    //    positif sur humanoid Meshy avec jupe rouge trainante).
+    // ── Has tail : agnostique à l'orientation Meshy ±Z (fix 2026-05-18 AM).
     //
-    //    Un vrai tail (Rex/raptor) :
-    //    - depth_bottom > 30% de la hauteur (vrai saillant arrière)
-    //    - depth_ratio bas/haut > 4 (très asymétrique vs torso symétrique)
-    //    - tail concentrée dans une bande étroite Y (vs jupe diffuse)
+    //    Avant : ne regardait que min_z (direction -Z) → faux négatif sur
+    //    meshes Meshy qui ont leur tail en +Z (orientation glb variable).
     //
-    //    Une jupe Meshy :
-    //    - depth_bottom ~10-25% de la hauteur (modéré)
-    //    - depth_ratio peut > 2 mais < 4 (asymétrie modérée)
-    //    - étalée largement en X (jupe enveloppe les jambes)
+    //    Maintenant : pour chaque bande Y (bas torso vs haut torso), calcule
+    //    la profondeur saillante dans **les deux directions** (depth_neg + depth_pos)
+    //    et prend le **max** des deux. Tail = whichever Z direction is farthest.
+    //
+    //    Critères stricts (anti faux-positif jupe Meshy) :
+    //    - depth_bottom > 30% hauteur (saillant absolu)
+    //    - ratio bas/haut > 4 (très asymétrique torso symétrique)
     let mut min_z_bottom = f32::INFINITY;
+    let mut max_z_bottom = f32::NEG_INFINITY;
     let mut min_z_top = f32::INFINITY;
+    let mut max_z_top = f32::NEG_INFINITY;
     for v in positions {
         let y_rel = (v.y - bottom_y) / height;
         if (0.20..0.50).contains(&y_rel) {
             min_z_bottom = min_z_bottom.min(v.z);
+            max_z_bottom = max_z_bottom.max(v.z);
         } else if y_rel > 0.65 {
             min_z_top = min_z_top.min(v.z);
+            max_z_top = max_z_top.max(v.z);
         }
     }
-    let depth_bottom = (center.z - min_z_bottom).max(0.0);
-    let depth_top = (center.z - min_z_top).max(0.01); // anti div-by-0
-    let depth_ratio = depth_bottom / depth_top;
-    // Critères STRICTS : ratio>4 ET profondeur absolue>30% hauteur.
-    // Humanoid jupe : ratio peut être 2-3 mais profondeur reste modérée.
-    let has_tail = depth_ratio > 4.0 && depth_bottom > height * 0.30;
+    // Saillance dans chaque direction Z (positive = max forward extent)
+    let depth_bottom_neg = (center.z - min_z_bottom).max(0.0);
+    let depth_bottom_pos = (max_z_bottom - center.z).max(0.0);
+    let depth_top_neg = (center.z - min_z_top).max(0.0);
+    let depth_top_pos = (max_z_top - center.z).max(0.0);
+    // Pour chaque side, ratio bas/haut. Tail = côté avec ratio le plus élevé.
+    let ratio_neg = depth_bottom_neg / depth_top_neg.max(0.01);
+    let ratio_pos = depth_bottom_pos / depth_top_pos.max(0.01);
+    let (depth_bottom_max, depth_ratio, tail_in_positive_z) = if ratio_pos > ratio_neg {
+        (depth_bottom_pos, ratio_pos, true)
+    } else {
+        (depth_bottom_neg, ratio_neg, false)
+    };
+    let has_tail = depth_ratio > 4.0 && depth_bottom_max > height * 0.30;
+
+    // ── Torso center (médiane X/Z des vertices entre hip et shoulder) ────
+    // Détecte si le mesh a son torse offset vs AABB.center (asymétrie pose
+    // Meshy, accessoires, sac à dos). Le bone spine devrait être centré sur
+    // le VRAI milieu visuel du torse, pas sur le milieu géométrique AABB.
+    let torso_y_lo = bottom_y + hip_y_frac * height;
+    let torso_y_hi = bottom_y + shoulder_y_frac * height;
+    let mut torso_xs: Vec<f32> = Vec::new();
+    let mut torso_zs: Vec<f32> = Vec::new();
+    for v in positions {
+        if v.y >= torso_y_lo && v.y <= torso_y_hi {
+            torso_xs.push(v.x);
+            torso_zs.push(v.z);
+        }
+    }
+    let median = |mut vs: Vec<f32>| -> f32 {
+        if vs.is_empty() {
+            return 0.0;
+        }
+        vs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        vs[vs.len() / 2]
+    };
+    let torso_med_x = median(torso_xs);
+    let torso_med_z = median(torso_zs);
+    let torso_center_x_offset_frac = ((torso_med_x - center.x) / height).clamp(-0.5, 0.5);
+    let torso_center_z_offset_frac = ((torso_med_z - center.z) / height).clamp(-0.5, 0.5);
 
     MeshLandmarks {
         hip_y_frac: hip_y_frac.clamp(0.30, 0.70),
@@ -256,6 +309,9 @@ pub fn detect_landmarks_from_vertices(positions: &[Vec3], aabb: &Aabb) -> MeshLa
         hip_width_frac,
         arm_span_half_frac,
         has_tail,
+        tail_in_positive_z,
+        torso_center_x_offset_frac,
+        torso_center_z_offset_frac,
         vertex_count: positions.len(),
     }
 }
@@ -407,6 +463,46 @@ mod tests {
     }
 
     #[test]
+    fn lizard_mock_detects_tail_positive_z() {
+        // Régression 2026-05-18 AM (sensor forgia_auto_rig.json) : Meshy Rex
+        // a sa queue en direction +Z (orientation glb variable) alors que
+        // l'ancien code ne scannait que min_z (-Z direction). Faux négatif
+        // has_tail=false sur un mesh ayant clairement une queue.
+        // Fix : tester les deux directions ±Z, prendre le max.
+        let mut v = Vec::new();
+        // Jambes (Y 0 à 0.5)
+        for i in 0..30 {
+            let y = i as f32 * 0.5 / 30.0;
+            for x in [-0.10_f32, 0.10] {
+                v.push(Vec3::new(x, y, 0.0));
+                v.push(Vec3::new(x, y, 0.05));
+            }
+        }
+        // Torse cylindre (Y 0.5 à 1.0)
+        for i in 0..30 {
+            let y = 0.5 + i as f32 * 0.5 / 30.0;
+            for angle_deg in (0..360).step_by(30) {
+                let a = (angle_deg as f32).to_radians();
+                v.push(Vec3::new(0.12 * a.cos(), y, 0.10 * a.sin()));
+            }
+        }
+        // Tail DEVANT en +Z (orientation Meshy flippée).
+        for i in 0..40 {
+            let t = i as f32 / 40.0;
+            v.push(Vec3::new(0.0, 0.45 - t * 0.15, 0.3 + t * 0.6));
+        }
+        let aabb = Aabb {
+            center: Vec3::new(0.0, 0.5, 0.3).into(),
+            half_extents: Vec3::new(0.15, 0.5, 0.6).into(),
+        };
+        let landmarks = detect_landmarks_from_vertices(&v, &aabb);
+        assert!(
+            landmarks.has_tail,
+            "tail en +Z direction doit aussi être détecté (Meshy orientation flippée)"
+        );
+    }
+
+    #[test]
     fn looks_humanoid_rejects_tail_meshes() {
         let landmarks = MeshLandmarks {
             has_tail: true,
@@ -430,6 +526,9 @@ mod tests {
             hip_width_frac: 0.12,
             arm_span_half_frac: 0.50,
             has_tail: false,
+            tail_in_positive_z: false,
+            torso_center_x_offset_frac: 0.0,
+            torso_center_z_offset_frac: 0.0,
             vertex_count: 5000,
         };
         assert!(

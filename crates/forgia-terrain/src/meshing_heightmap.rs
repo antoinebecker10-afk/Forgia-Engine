@@ -20,6 +20,11 @@ use crate::chunk::{ChunkCoord, TerrainConfig, CHUNK_X, CHUNK_Z};
 /// Vertices per chunk axis (33×33 = 32 quads = 1m resolution).
 pub const VERTS_PER_AXIS: u32 = CHUNK_X + 1;
 
+/// UV tiles per chunk. 1 tile = 2m monde (CHUNK_X = 32m / 16). Sans tiling,
+/// la grass.jpg serait étirée sur 32×32m → motif de stries continues.
+/// Le sampler du material doit être en `AddressMode::Repeat` pour matcher.
+pub const TEXTURE_TILES_PER_CHUNK: f32 = 4.0;
+
 /// Output : Mesh GPU + heights row-major (nrows = ncols = VERTS_PER_AXIS) pour Collider.
 pub struct ChunkMeshData {
     pub mesh: Mesh,
@@ -78,8 +83,8 @@ pub fn build_chunk_mesh(
             };
             positions.push([lx, h, lz]);
             uvs.push([
-                (ix as f32) / CHUNK_X as f32,
-                (iz as f32) / CHUNK_Z as f32,
+                (ix as f32) / CHUNK_X as f32 * TEXTURE_TILES_PER_CHUNK,
+                (iz as f32) / CHUNK_Z as f32 * TEXTURE_TILES_PER_CHUNK,
             ]);
             // Column-major : col=ix (X), row=iz (Z) → index = row + col*nrows.
             heights[(ix as usize) * stride + (iz as usize)] = h;
