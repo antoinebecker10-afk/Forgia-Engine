@@ -344,6 +344,7 @@ pub fn spawn_wave_bots(
             .spawn((
                 ArenaMarker,
                 TargetCube,
+                forgia_enemy_nameplate::NameplateTarget,
                 Transform::from_xyz(x, 0.0, z),
                 // Visibility::default() supprimé — fourni par #[require(Visibility)] sur TargetCube.
                 Health::new(hp),

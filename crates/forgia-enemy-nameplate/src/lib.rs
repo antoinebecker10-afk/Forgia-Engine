@@ -49,6 +49,15 @@ pub struct NameplateRoot {
     pub lifetime_left: f32,
 }
 
+/// Marker (sur le bot) qui demande un nameplate permanent visible tant que
+/// l'entité existe. Sans ce marker, l'ancien comportement spawn-on-hit reste.
+///
+/// Pattern AAA (Overwatch/Apex/CSGO) : nameplate enemy toujours visible
+/// au-dessus de la cible quand celle-ci est dans le frustum. Le fade-on-damage
+/// V1 était une approximation cartoon, remplacée ici par presence-permanent.
+#[derive(Component)]
+pub struct NameplateTarget;
+
 /// Marker du quad fill HP (scale.x = hp_fraction).
 #[derive(Component)]
 pub struct NameplateFill;
@@ -72,7 +81,9 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
             .add_systems(
                 Update,
                 (
+                    spawn_nameplate_for_targets,
                     spawn_or_refresh_on_hit,
+                    keep_permanent_nameplates_alive,
                     update_hp_fill,
                     billboard_to_camera,
                     tick_lifetime_and_despawn,
@@ -83,7 +94,86 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
     }
 }
 
+/// Helper interne — spawn un nameplate enfant de `target`. Idempotent via registry.
+fn build_nameplate_for(
+    target: Entity,
+    commands: &mut Commands,
+    registry: &mut NameplateRegistry,
+    tuning: &EnemyNameplate,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+) -> Option<Entity> {
+    if registry.map.contains_key(&target) {
+        return None;
+    }
+    let t = &tuning.0;
+    let bg_mesh = meshes.add(Rectangle::new(t.width, t.height));
+    let fill_mesh = meshes.add(Rectangle::new(
+        t.width - t.border_thickness * 2.0,
+        t.height - t.border_thickness * 2.0,
+    ));
+
+    let bg_mat = materials.add(StandardMaterial {
+        base_color: Color::linear_rgb(t.bg_color[0], t.bg_color[1], t.bg_color[2]),
+        unlit: true,
+        ..default()
+    });
+    let fill_mat = materials.add(StandardMaterial {
+        base_color: Color::linear_rgb(t.fill_color[0], t.fill_color[1], t.fill_color[2]),
+        unlit: true,
+        ..default()
+    });
+
+    let root_id = commands
+        .spawn((
+            NameplateRoot {
+                target,
+                lifetime_left: t.lifetime,
+            },
+            Transform::from_xyz(0.0, t.y_offset, 0.0),
+            Name::new("EnemyNameplate"),
+            ChildOf(target),
+        ))
+        .id();
+
+    commands.entity(root_id).with_children(|p| {
+        p.spawn((
+            NameplateBg,
+            Mesh3d(bg_mesh),
+            MeshMaterial3d(bg_mat),
+            Transform::from_xyz(0.0, 0.0, -0.005),
+            Name::new("NameplateBg"),
+        ));
+        p.spawn((
+            NameplateFill,
+            Mesh3d(fill_mesh),
+            MeshMaterial3d(fill_mat),
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            Name::new("NameplateFill"),
+        ));
+    });
+
+    registry.map.insert(target, root_id);
+    Some(root_id)
+}
+
+/// Spawn permanent — pour toute entité `With<NameplateTarget>` sans nameplate.
+/// Idempotent : check registry.
+fn spawn_nameplate_for_targets(
+    mut commands: Commands,
+    mut registry: ResMut<NameplateRegistry>,
+    q_targets: Query<Entity, With<NameplateTarget>>,
+    tuning: Res<EnemyNameplate>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for target in &q_targets {
+        let _ = build_nameplate_for(target, &mut commands, &mut registry, &tuning, &mut meshes, &mut materials);
+    }
+}
+
 /// Spawn nameplate enfant du bot au premier hit, ou refresh lifetime/HP au hit suivant.
+/// Conservé pour entités SANS marker `NameplateTarget` (mode legacy spawn-on-damage).
 fn spawn_or_refresh_on_hit(
     mut events: MessageReader<CombatHitEvent>,
     mut commands: Commands,
@@ -101,55 +191,21 @@ fn spawn_or_refresh_on_hit(
                 continue;
             }
         }
+        let _ = build_nameplate_for(ev.target, &mut commands, &mut registry, &tuning, &mut meshes, &mut materials);
+    }
+}
 
-        // Spawn nouveau nameplate.
-        let t = &tuning.0;
-        let bg_mesh = meshes.add(Rectangle::new(t.width, t.height));
-        let fill_mesh = meshes.add(Rectangle::new(t.width - t.border_thickness * 2.0, t.height - t.border_thickness * 2.0));
-
-        let bg_mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(t.bg_color[0], t.bg_color[1], t.bg_color[2]),
-            unlit: true,
-            ..default()
-        });
-        let fill_mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(t.fill_color[0], t.fill_color[1], t.fill_color[2]),
-            unlit: true,
-            ..default()
-        });
-
-        let root_id = commands
-            .spawn((
-                NameplateRoot {
-                    target: ev.target,
-                    lifetime_left: t.lifetime,
-                },
-                Transform::from_xyz(0.0, t.y_offset, 0.0),
-                // Visibility::default() supprimé — fourni par #[require(Visibility)] sur NameplateRoot.
-                Name::new("EnemyNameplate"),
-                ChildOf(ev.target),
-            ))
-            .id();
-
-        commands.entity(root_id).with_children(|p| {
-            p.spawn((
-                NameplateBg,
-                Mesh3d(bg_mesh),
-                MeshMaterial3d(bg_mat),
-                Transform::from_xyz(0.0, 0.0, -0.005),
-                Name::new("NameplateBg"),
-            ));
-            p.spawn((
-                NameplateFill,
-                Mesh3d(fill_mesh),
-                MeshMaterial3d(fill_mat),
-                // Pivot left : on translate de -width/2 et scale.x s'ancre au left edge.
-                Transform::from_xyz(0.0, 0.0, 0.0),
-                Name::new("NameplateFill"),
-            ));
-        });
-
-        registry.map.insert(ev.target, root_id);
+/// Refresh lifetime continu pour les nameplates dont la cible est `NameplateTarget`.
+/// Empêche le fade/despawn tant que la cible existe (permanent presence-driven).
+fn keep_permanent_nameplates_alive(
+    mut q_np: Query<&mut NameplateRoot>,
+    q_target: Query<Entity, With<NameplateTarget>>,
+    tuning: Res<EnemyNameplate>,
+) {
+    for mut np in &mut q_np {
+        if q_target.contains(np.target) {
+            np.lifetime_left = tuning.0.lifetime;
+        }
     }
 }
 
@@ -181,22 +237,31 @@ fn update_hp_fill(
 
 /// Billboard cylindrique — yaw vers caméra, pitch = 0. Évite tilt vertical
 /// désagréable quand le joueur regarde en haut/bas.
+///
+/// Le nameplate root est `ChildOf(bot)`. Le bot rotate en permanence vers le
+/// player (`bot_state_machine` set `Quat::from_rotation_y(yaw)`), donc la
+/// rotation parente n'est PAS négligeable. On extrait le yaw parent et on le
+/// soustrait du yaw cible cam → la rotation locale compense exactement pour
+/// que la face mesh pointe la caméra peu importe où le bot regarde.
+/// Sans cette soustraction, la face quad pouvait pointer dans le mauvais
+/// sens et le back-face culling masquait le nameplate selon l'angle.
 fn billboard_to_camera(
     q_cam: Query<&GlobalTransform, With<Camera3d>>,
-    mut q_np: Query<(&GlobalTransform, &mut Transform), With<NameplateRoot>>,
+    q_parent: Query<&GlobalTransform, Without<NameplateRoot>>,
+    mut q_np: Query<(&GlobalTransform, &mut Transform, &ChildOf), With<NameplateRoot>>,
 ) {
     let Ok(cam_xf) = q_cam.single() else { return };
     let cam_pos = cam_xf.translation();
-    for (np_global, mut np_local) in &mut q_np {
+    for (np_global, mut np_local, child_of) in &mut q_np {
         let np_world = np_global.translation();
         let dx = cam_pos.x - np_world.x;
         let dz = cam_pos.z - np_world.z;
-        let yaw = dx.atan2(dz);
-        // Le nameplate root est ChildOf(bot). Sa rotation locale est aussi
-        // affectée par la rotation parent. Pour billboard absolu, il faudrait
-        // soustraire la rotation parent. Bot KinematicPositionBased rotate
-        // peu (face vers player via yaw aim) → approximation acceptable.
-        np_local.rotation = Quat::from_rotation_y(yaw);
+        let target_world_yaw = dx.atan2(dz);
+        let parent_yaw = q_parent
+            .get(child_of.parent())
+            .map(|gt| gt.rotation().to_euler(EulerRot::YXZ).0)
+            .unwrap_or(0.0);
+        np_local.rotation = Quat::from_rotation_y(target_world_yaw - parent_yaw);
     }
 }
 

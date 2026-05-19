@@ -15,4 +15,5 @@ forgia-combat = { workspace = true }
 forgia-genome-core = { workspace = true }
 forgia-ai-arena-bot = { workspace = true }
 forgia-damage = { workspace = true }
+forgia-enemy-nameplate = { workspace = true }
 serde = { workspace = true }

@@ -7,9 +7,10 @@ y_offset = 2.4           # au-dessus du bot parent
 lifetime = 2.5           # durée visible (s)
 fade_out_secs = 0.6      # début du fade en fin de lifetime
 
-# Couleurs linear RGB
-fill_color = [0.95, 0.15, 0.15]    # red HP
-bg_color = [0.05, 0.05, 0.08]      # near-black
+# Couleurs linear RGB — style cartoon AAA (Overwatch/Fortnite/Hytale outline)
+fill_color = [1.0, 0.18, 0.12]     # red HP saturé cartoon
+bg_color = [0.0, 0.0, 0.0]         # noir pur pour outline marquée
 border_color = [0.0, 0.0, 0.0]
 
-border_thickness = 0.06  # en fraction de width pour visual outline
+# Bord fin cartoon — 1% du width = ~1.5cm trait net (vs 8.5% lourd v1)
+border_thickness = 0.015
