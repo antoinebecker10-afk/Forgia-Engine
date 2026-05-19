@@ -13,13 +13,13 @@ tick_interval_secs = 1.0
 [liveness]
 # Liste des sensors attendus (chemins relatifs à la racine workspace).
 # Si un sensor est absent ou non mis à jour depuis stale_secs → Warn CHK-5.
-# CHK-6 nécessite forgia_combat.json + forgia_health.json (BUG-452-10).
+# CHK-6 nécessite forgia_combat.json + forgia2_health.json (BUG-452-10, Vague 5 rename).
 expected_sensors = [
     "forgia_terrain_lod.json",
     "forgia_chunks_snapshot.json",
     "forgia_anim_layer.json",
     "forgia_combat.json",
-    "forgia_health.json",
+    "forgia2_health.json",
 ]
 stale_secs = 30.0
 

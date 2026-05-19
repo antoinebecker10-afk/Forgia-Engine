@@ -55,7 +55,9 @@ pub fn sys_write_health_sensor(
         checks_count,
     );
 
-    if let Err(e) = std::fs::write("forgia_health.json", &json) {
+    // Vague 5 Phase 5b Session A — Renamé forgia_health.json → forgia2_health.json
+    // (sensor canonique Phase 5 ARCHITECTURE.md §9).
+    if let Err(e) = std::fs::write("forgia2_health.json", &json) {
         warn!("[forgia-observability] health sensor write failed: {e}");
     }
 }

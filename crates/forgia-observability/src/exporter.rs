@@ -1,7 +1,10 @@
-//! exporter.rs — Écrit forgia_rpg_health.json à 1Hz.
+//! exporter.rs — Écrit forgia2_rpg_health.json à 1Hz.
 //!
 //! sys_write_rpg_health_json : throttlé par Local<f32>.
 //! sys_sensor_liveness_watchdog : log warn si stale, 1 fois/minute.
+//!
+//! Vague 5 Phase 5b Session A — Renamé forgia_rpg_health.json → forgia2_rpg_health.json
+//! (sensor canonique Phase 5 ARCHITECTURE.md §9, format {id, severity, next_step}).
 
 use bevy::prelude::*;
 use serde::Serialize;
@@ -10,7 +13,7 @@ use std::collections::HashMap;
 use crate::config::RpgMonitorConfig;
 use crate::state::{CheckResult, RpgHealthState, Severity};
 
-const OUTPUT_PATH: &str = "forgia_rpg_health.json";
+const OUTPUT_PATH: &str = "forgia2_rpg_health.json";
 
 // ─────────────────────────── Structures de sérialisation ───────────────────────────
 
