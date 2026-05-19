@@ -14,8 +14,10 @@ use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_core::prelude::*;
-use forgia_damage::{Health, Mortal};
+use forgia_damage::{DeathEvent, Health, Mortal};
+use forgia_loot_tables::{Pickup, PickupCollector};
 use forgia_mode_fps_arena::TargetCube;
+use forgia_player::Player;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 
@@ -339,6 +341,64 @@ pub fn sys_spawn_roguelite_scene(
     info!(
         "[roguelite] Scene spawned : floor 300m + 4 walls + 5 platforms + {spawned} cover + 3 landmarks + {enemy_total} enemies (3 Tank @12m / 3 Runner @25m / 2 Sniper @50m) seed={SCENE_SEED:#x}"
     );
+}
+
+/// Observer Bevy 0.18 — sur DeathEvent d'un ennemi Roguelite, spawn un Pickup
+/// glowing à sa position. Value selon archetype (Tank > Sniper > Runner).
+///
+/// Pattern miroir : `forgia-ai-arena-bot::on_bot_death` (story-466).
+pub fn obs_roguelite_enemy_death(
+    event: On<DeathEvent>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    enemies_q: Query<(&Transform, &crate::EnemyArchetype)>,
+) {
+    let target = event.target;
+    let Ok((xf, archetype)) = enemies_q.get(target) else {
+        return; // pas un ennemi Roguelite (probablement bot Arena → ignore)
+    };
+
+    let value = match *archetype {
+        crate::EnemyArchetype::Tank => 5,
+        crate::EnemyArchetype::Runner => 2,
+        crate::EnemyArchetype::Sniper => 3,
+    };
+
+    let pos = xf.translation.with_y(0.6);
+    commands.spawn((
+        Name::new(format!("RoguelitePickup_{value}souls")),
+        RogueliteRunMarker,
+        DespawnOnExit(GameMode::Roguelite),
+        Pickup {
+            value,
+            lifetime_secs: 30.0,
+            collect_radius: 2.5,
+        },
+        Mesh3d(meshes.add(Sphere::new(0.35))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(1.0, 0.85, 0.30),
+            emissive: LinearRgba::new(0.80, 0.55, 0.10, 1.0),
+            metallic: 0.7,
+            perceptual_roughness: 0.25,
+            ..default()
+        })),
+        Transform::from_translation(pos),
+    ));
+}
+
+/// OnEnter(GameMode::Roguelite) — tag le Player avec PickupCollector pour que
+/// `forgia_loot_tables::sys_collect_pickups` puisse trigger sur sa position.
+/// Player est spawn par forgia-player::OnEnter(AppMode::InGame) (cross-mode).
+pub fn sys_tag_player_as_collector(
+    mut commands: Commands,
+    q_player: Query<Entity, (With<Player>, Without<PickupCollector>)>,
+) {
+    for e in &q_player {
+        if let Ok(mut ec) = commands.get_entity(e) {
+            ec.insert(PickupCollector);
+        }
+    }
 }
 
 pub fn sys_start_run(

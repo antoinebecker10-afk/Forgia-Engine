@@ -10,6 +10,7 @@
 
 use crate::run::{RunSeed, RunState};
 use bevy::prelude::*;
+use forgia_loot_tables::Souls;
 
 /// Telemetry runtime — incrémentée chaque frame par `sys_update_roguelite_telemetry`.
 #[derive(Resource, Default, Debug, Clone)]
@@ -71,6 +72,7 @@ pub fn sys_write_roguelite_state(
     run_state: Option<Res<State<RunState>>>,
     run_seed: Option<Res<RunSeed>>,
     tel: Res<RogueliteTelemetry>,
+    souls: Option<Res<Souls>>,
 ) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -82,9 +84,11 @@ pub fn sys_write_roguelite_state(
     let seed = run_seed.as_ref().map(|s| s.seed).unwrap_or(0);
     let stage_count = run_seed.as_ref().map(|s| s.stage_count).unwrap_or(0);
     let (severity, next_step) = severity_for_roguelite(tel.time_in_state_secs, state_str);
+    let souls_current = souls.as_ref().map(|s| s.current).unwrap_or(0);
+    let souls_total = souls.as_ref().map(|s| s.total_collected).unwrap_or(0);
 
     let json = format!(
-        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1}}}"#,
+        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"souls_current":{souls_current},"souls_total":{souls_total}}}"#,
         time.elapsed_secs(),
         tel.tick_count,
         tel.time_in_state_secs,

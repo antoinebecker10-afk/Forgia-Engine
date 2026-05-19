@@ -43,6 +43,18 @@ pub struct ForgiaModeRoguelitePlugin;
 
 impl Plugin for ForgiaModeRoguelitePlugin {
     fn build(&self, app: &mut App) {
+        // M2 step 3 — Souls Resource + Pickup collection systems.
+        if !app.is_plugin_added::<forgia_loot_tables::ForgiaLootTablesPlugin>() {
+            app.add_plugins(forgia_loot_tables::ForgiaLootTablesPlugin);
+        }
+        // Observer drop pickup on enemy death (filtré par EnemyArchetype).
+        app.add_observer(run::obs_roguelite_enemy_death);
+        // Marker PickupCollector ajouté au Player OnEnter Roguelite (sys ci-dessous).
+        app.add_systems(
+            OnEnter(GameMode::Roguelite),
+            run::sys_tag_player_as_collector,
+        );
+
         app.init_resource::<sensor::RogueliteTelemetry>()
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()

@@ -4200,6 +4200,8 @@ dependencies = [
  "bevy",
  "bevy_kira_audio",
  "forgia-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4227,6 +4229,8 @@ dependencies = [
  "bevy",
  "bevy_kira_audio",
  "forgia-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4531,6 +4535,7 @@ dependencies = [
  "bevy",
  "forgia-core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4918,6 +4923,8 @@ dependencies = [
  "bevy",
  "forgia-core",
  "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -5025,7 +5032,9 @@ dependencies = [
  "forgia-ai-arena-bot",
  "forgia-core",
  "forgia-damage",
+ "forgia-loot-tables",
  "forgia-mode-fps-arena",
+ "forgia-player",
  "rand_xoshiro",
 ]
 
@@ -5965,6 +5974,8 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
