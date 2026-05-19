@@ -44,6 +44,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
+            .add_systems(OnEnter(GameMode::Roguelite), run::sys_spawn_roguelite_scene)
             .add_systems(
                 Update,
                 (run::sys_start_run, run::sys_end_run)

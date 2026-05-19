@@ -10,6 +10,7 @@
 //! n'inclut PAS le system `sys_cleanup_run_markers` pour éviter conflit merge.
 
 use bevy::prelude::*;
+use bevy::state::state_scoped::DespawnOnExit;
 use forgia_core::prelude::*;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
@@ -78,8 +79,62 @@ impl RunSeed {
 /// Marker stub — placé sur toutes les entités à cleaner OnExit GameMode::Roguelite.
 /// La logique de cleanup (`sys_cleanup_run_markers`) est gérée par un terminal
 /// parallèle dédié — ne PAS dupliquer ici.
+///
+/// En attendant, les entités spawn par `sys_spawn_roguelite_scene` utilisent
+/// `DespawnOnExit(GameMode::Roguelite)` Bevy 0.18 natif pour safety cleanup.
 #[derive(Component, Default)]
 pub struct RogueliteRunMarker;
+
+/// Story-470 M1.5 — scène minimale jouable : floor 50x50m + sun + landmark cube.
+/// Despawn auto OnExit(GameMode::Roguelite) via Bevy 0.18 `DespawnOnExit`.
+pub fn sys_spawn_roguelite_scene(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Floor 50×50m, gris foncé (placeholder biome Roguelite).
+    commands.spawn((
+        Name::new("RogueliteFloor"),
+        RogueliteRunMarker,
+        DespawnOnExit(GameMode::Roguelite),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(50.0, 50.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.25, 0.22, 0.20),
+            perceptual_roughness: 0.95,
+            ..default()
+        })),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+    ));
+
+    // Sun (directional light).
+    commands.spawn((
+        Name::new("RogueliteSun"),
+        RogueliteRunMarker,
+        DespawnOnExit(GameMode::Roguelite),
+        DirectionalLight {
+            illuminance: 10_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(10.0, 20.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    // Landmark cube — confirme visuellement "tu es dans Roguelite".
+    commands.spawn((
+        Name::new("RogueliteLandmarkCube"),
+        RogueliteRunMarker,
+        DespawnOnExit(GameMode::Roguelite),
+        Mesh3d(meshes.add(Cuboid::from_size(Vec3::splat(2.0)))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.9, 0.3, 0.5),
+            emissive: LinearRgba::new(0.4, 0.1, 0.2, 1.0),
+            ..default()
+        })),
+        Transform::from_xyz(5.0, 1.0, 5.0),
+    ));
+
+    info!("[roguelite] Scene minimale spawned (floor 50m + sun + landmark cube)");
+}
 
 pub fn sys_start_run(
     mut events: MessageReader<StartRunEvent>,
