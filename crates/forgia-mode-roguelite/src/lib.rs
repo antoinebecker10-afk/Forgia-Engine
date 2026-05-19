@@ -27,6 +27,7 @@ pub mod sensor;
 pub use run::{
     EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent,
 };
+pub use sensor::RogueliteTelemetry;
 
 pub mod prelude {
     pub use crate::{
@@ -39,7 +40,8 @@ pub struct ForgiaModeRoguelitePlugin;
 
 impl Plugin for ForgiaModeRoguelitePlugin {
     fn build(&self, app: &mut App) {
-        app.add_sub_state::<RunState>()
+        app.init_resource::<sensor::RogueliteTelemetry>()
+            .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
             .add_systems(
@@ -50,7 +52,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                     .run_if(in_state(GameMode::Roguelite)),
             )
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").
-            // Permet xtask verify-sensors-format 13/13 sans entrer dans le mode.
+            // Telemetry tick counter en First pour capturer chaque frame.
+            .add_systems(First, sensor::sys_update_roguelite_telemetry)
             .add_systems(
                 Update,
                 sensor::sys_write_roguelite_state.in_set(GameSet::Sensors),

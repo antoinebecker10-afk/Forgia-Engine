@@ -116,13 +116,17 @@ impl Plugin for ForgiaObservabilityPlugin {
             )
                 .in_set(GameSet::Sensors),
         );
-        // Story-465 — forgia2 aggregator Tier 1 : combat + arena. Gate Fps car
-        // les 7 sensors legacy agrégés sont tous FPS-spécifiques.
+        // Story-465 — forgia2 aggregator Tier 1 : combat + arena.
+        // V7 M1 (story-470) : gate étendu Fps OU Roguelite — V7 réutilise le firing
+        // path FPS (forgia-fps emit hitscan/ammo/screen_flash/etc. en mode Roguelite
+        // aussi). Visibilité combat obligatoire dans le 3e jeu.
         app.add_systems(
             Update,
             sys_write_forgia2_aggregates
                 .in_set(GameSet::Sensors)
-                .run_if(in_state(GameMode::Fps)),
+                .run_if(
+                    in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
+                ),
         );
         app.add_systems(
                 Update,
