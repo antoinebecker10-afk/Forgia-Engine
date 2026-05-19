@@ -1052,7 +1052,7 @@ dependencies = [
  "const-fnv1a-hash",
  "log",
  "serde",
- "sysinfo",
+ "sysinfo 0.37.2",
 ]
 
 [[package]]
@@ -5082,10 +5082,14 @@ name = "forgia-observability"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-ai-arena-bot",
  "forgia-core",
+ "forgia-enemy-nameplate",
+ "forgia-player",
  "forgia-terrain",
  "serde",
  "serde_json",
+ "sysinfo 0.32.1",
  "toml",
 ]
 
@@ -6194,7 +6198,16 @@ name = "forgia-viewmodel"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-combat",
  "forgia-core",
+ "forgia-genome-core",
+ "forgia-input",
+ "forgia-juice-camera-shake",
+ "forgia-juice-fov-punch",
+ "forgia-mesh-fader",
+ "forgia-player",
+ "forgia-ui",
+ "serde",
 ]
 
 [[package]]
@@ -10933,6 +10946,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c33cd241af0f2e9e3b5c32163b873b29956890b5342e6745b917ce9d490f4af"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+ "memchr",
+ "ntapi",
+ "windows 0.54.0",
 ]
 
 [[package]]

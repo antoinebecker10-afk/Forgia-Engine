@@ -11,6 +11,11 @@ workspace = true
 bevy = { workspace = true }
 forgia-core = { workspace = true }
 forgia-terrain = { workspace = true }
+# Story-467 V5 Session B — markers per-archetype counts (entities sensor)
+forgia-player = { workspace = true }
+forgia-ai-arena-bot = { workspace = true }
+forgia-enemy-nameplate = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 toml = { workspace = true }

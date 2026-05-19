@@ -70,11 +70,12 @@ const CANONICAL_SENSORS: &[&str] = &[
     "forgia2_combat.json",
     // Tier 1bis (Session A étape 3 — futur) :
     // "forgia2_chunks.json",
-    // Tier 2 (Session B-C) :
-    // "forgia2_perf.json",
+    // Tier 2 (Session B — story-467 DONE)
+    "forgia2_perf.json",
+    "forgia2_entities.json",
+    "forgia2_memory.json",
+    // Tier 2 (Session C) :
     // "forgia2_lifecycle.json",
-    // "forgia2_entities.json",
-    // "forgia2_memory.json",
     // "forgia2_watchdog.json",
     // "forgia2_audio.json",
     // "forgia2_input.json",

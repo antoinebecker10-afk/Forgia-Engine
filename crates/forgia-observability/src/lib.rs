@@ -27,11 +27,16 @@ pub mod exporter;
 pub mod asset_handles;
 pub mod health_sensor;
 pub mod forgia2_aggregator;
+// Story-467 V5 Session B — perf / entities / memory producers
+pub mod perf_sensor;
+pub mod entities_sensor;
+pub mod memory_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
 }
 
+use bevy::diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
@@ -48,6 +53,15 @@ pub struct ForgiaObservabilityPlugin;
 
 impl Plugin for ForgiaObservabilityPlugin {
     fn build(&self, app: &mut App) {
+        // Story-467 — Diagnostics plugins required by perf_sensor + entities_sensor.
+        // Bevy 0.18 ignore double-add silencieusement, idempotent.
+        if !app.is_plugin_added::<FrameTimeDiagnosticsPlugin>() {
+            app.add_plugins(FrameTimeDiagnosticsPlugin::default());
+        }
+        if !app.is_plugin_added::<EntityCountDiagnosticsPlugin>() {
+            app.add_plugins(EntityCountDiagnosticsPlugin::default());
+        }
+
         app.init_resource::<RpgHealthState>()
             .init_resource::<SensorSnapshots>()
             .init_resource::<LastWriteTimestamps>()
@@ -59,6 +73,16 @@ impl Plugin for ForgiaObservabilityPlugin {
         app.add_systems(
             Update,
             sys_write_health_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-467 V5 Session B — perf / entities / memory producers cross-mode.
+        app.add_systems(
+            Update,
+            (
+                perf_sensor::sys_write_perf_sensor,
+                entities_sensor::sys_write_entities_sensor,
+                memory_sensor::sys_write_memory_sensor,
+            )
+                .in_set(GameSet::Sensors),
         );
         // Story-465 — forgia2 aggregator Tier 1 : combat + arena. Gate Fps car
         // les 7 sensors legacy agrégés sont tous FPS-spécifiques.

@@ -3,8 +3,8 @@
 > **Source de vérité unique** pour l'état des vagues V2 et la priorisation BMAD.
 > Mise à jour à chaque livraison story ou à la commande "Memorise" (CLAUDE.md §11).
 >
-> **Dernière révision** : 2026-05-19 fin session audit forensic + Vague 5 Session A (8 commits livrés cette session).
-> **HEAD courant** : `67c20855f`.
+> **Dernière révision** : 2026-05-19 — V5 Session B DONE (story-467) : 3 sensors perf/entities/memory livrés, 7/13 canoniques validés xtask. Cleanup hygiène (E) idem.
+> **HEAD courant** : `063a58999` (Session B + cleanup non commités, prêts à commit).
 
 ---
 
@@ -20,14 +20,14 @@ Plan original : `docs/audit/audit-2026-05-19.md` §7. Cette table est le statut 
 | `forgia_combat.json` producer | ✅ | session 2026-05-19 (story-457 commit `50444ba41`) |
 | `forgia_health.json` producer | ✅ | session 2026-05-19 (story-457 commit `50444ba41`) |
 
-### V2 — Discipline & traçabilité (P1) ⚠️ 75 %
+### V2 — Discipline & traçabilité (P1) ✅ DONE
 
-| Item | Effort | Statut | Livré par / reste à faire |
+| Item | Effort | Statut | Livré par |
 |---|---|---|---|
 | ARCHITECTURE.md actualisé | 1h | ✅ | session 2026-05-19 (commit `1b3301b37`) |
 | Sensor fusion Tier 1 (`forgia2_combat` + `forgia2_arena`) | 2h | ✅ | story-465 (commit `aae934198`) — file-based aggregator 5+2 sources |
 | Code mort `WeaponData` supprimé | 30 min | ✅ | commit `1b3301b37` (Vague 2 hardcode → confirmé code mort) |
-| Story-458 concept-mapping doc | 30 min | ⏳ | **B2 — à faire** (`locomotion-bone-cache` ligne §6 concept-first.md) |
+| Story-458 concept-mapping doc | 30 min | ✅ | cleanup 2026-05-19 — `docs/stories/story-458-locomotion-bone-cache-concept-mapping.md` |
 
 **Note** : "Migration weapon balance → genome TOML" du plan original a été RÉSOLU par suppression du code mort `WeaponData` (audit 0 call-site externe), pas par migration. Cohérent avec `.claude/rules/no-speculative-fix.md`.
 
@@ -48,7 +48,7 @@ Audit doc : `docs/audit/vague-3-bevy-018-idioms-2026-05-19.md` (commit `6d183630
 |---|---|---|
 | Fix tests melee TimePlugin advance_by trap | ✅ | commit `50444ba41` (helper `app_with_manual_time()`) |
 | Fix test weapons cycle off-by-one | ✅ | commit `50444ba41` (`cycles_full` + `ARENA_V1_WEAPONS.len()`) |
-| `tech-debt-plan-2026-05-18.md` obsolète à 80 % | ✅ | (à archiver — Phases 2/3/4/6 déjà DONE silently) |
+| `tech-debt-plan-2026-05-18.md` obsolète à 80 % | ✅ | cleanup 2026-05-19 — déplacé vers `docs/archive/` avec note ARCHIVÉ |
 
 ### V5 — Phase 5 sensors complet (P2) ⚠️ Session A DONE, B+C pending
 
@@ -68,14 +68,22 @@ Plan Phase 5a livré : `docs/audit/vague-5-sensors-fusion-plan-2026-05-19.md` (c
 
 `cargo run -p xtask -- verify-sensors-format` → **OK (4/4 canonical sensors validated)**.
 
-#### Session B (Tier 2 aggregators perf/entities/memory) ⏸️ Pending
+#### Session B (Tier 2 producers perf/entities/memory) ✅ DONE 2026-05-19
 
-Effort estimé ~6h. Pré-requis :
-- Research `bevy::diagnostics::FrameTimeDiagnosticsPlugin` API Bevy 0.18
-- Valider présence `MemoryBreakdown` Resource (grep workspace)
-- Bench `Query<Entity>::iter().count()` perf sur RPG world 10k entities
+Story-467. Effort réel ~3 h (vs 6 h estimé — research a écarté 2 pièges).
 
-Cibles : `forgia2_perf.json`, `forgia2_entities.json`, `forgia2_memory.json`.
+| Sensor | Source | Status runtime |
+|---|---|---|
+| `forgia2_perf.json` | `FrameTimeDiagnosticsPlugin` avg/min/max + FPS smoothed | ✅ avg=3.4ms FPS=414 samples=120 |
+| `forgia2_entities.json` | `EntityCountDiagnosticsPlugin` + 4 Query markers | ✅ total=2646 (player=1, bots=3, nameplates=4) |
+| `forgia2_memory.json` | `sysinfo` RAM (cooldown 5s), VRAM stub `"N/A"` | ✅ 1414 MB RAM, severity=ok |
+
+- 12 tests purs `severity_for_*` verts
+- 3 nouveaux fichiers sources `crates/forgia-observability/src/{perf,entities,memory}_sensor.rs`
+- 3 Cargo deps ajoutées (`forgia-player`, `forgia-ai-arena-bot`, `forgia-enemy-nameplate`) + `sysinfo = "0.32"`
+- xtask `verify-sensors-format` → **OK (7/7 canonical sensors validated)**
+- `default_expected_sensors` étendu (CHK-5 ne flood pas)
+- VRAM = stub honnête `"N/A — wgpu adapter telemetry custom needed"` (assumé)
 
 #### Session C (lifecycle/watchdog/audio/input + cleanup) ⏸️ Pending
 
@@ -135,12 +143,9 @@ Tier 2A/B : `forgia-weapon-hitscan`, `forgia-weapon-viewmodel`. Bloqué par reco
 
 ## 🔥 Prochaine session — priorités par ROI
 
-### Option A — V5 Session B (Tier 2 aggregators, ~6h, Enterprise)
+### Option A — V5 Session B ✅ DONE 2026-05-19 (story-467)
 
-Cibles : `forgia2_perf.json` (Bevy Diagnostics) + `forgia2_entities.json` (Query count) + `forgia2_memory.json` (MemoryBreakdown ou fallback).
-
-Bénéfice : 3 sensors gameplay → 7/13 canonical atteints. Continuité directe Session A.
-Risque : MOYEN — research Bevy 0.18 Diagnostics API + perf Query 10k entities à valider.
+3 sensors perf/entities/memory livrés, 7/13 canonical atteints. Effort réel 3h.
 
 ### Option B — V5 Session C (lifecycle/watchdog/audio/input, ~6h, Enterprise)
 
@@ -158,9 +163,9 @@ Layered shield/armor (Apex tiers) + headshot/bodyshot routing + audio cue distin
 
 2.9 GB packs binaires tracked → `git lfs migrate import --include="*.glb"`. 0 risque code, hygiène repo. Indépendant.
 
-### Option E — Cleanup ROADMAP + archives tech-debt-plan (Quick 30min)
+### Option E — Cleanup ROADMAP + archives tech-debt-plan (Quick 30min) ✅ DONE 2026-05-19
 
-Archive `docs/tech-debt-plan-2026-05-18.md` (obsolète 80%). Mettre à jour audit-2026-05-19.md avec liens vers vague-5 plan. Hygiène doc seule.
+Tech-debt-plan archivé dans `docs/archive/` avec note ARCHIVÉ. Story-458 livrée. ROADMAP V2 → 100 %.
 
 ---
 
@@ -170,7 +175,6 @@ Archive `docs/tech-debt-plan-2026-05-18.md` (obsolète 80%). Mettre à jour audi
 - **Race ChildOf orphelin** : ~1 warn par kill (spawn nameplate ~4ms après despawn bot). Bevy auto-corrige. Fix futur = check `target.exists()` avant spawn dans `forgia-enemy-nameplate::spawn_or_refresh_on_hit`.
 - **Nameplate HP fill anchor center** : `forgia-enemy-nameplate/src/lib.rs:175` — commentaire code dit anchor left mais code fait scale.x = frac sans translation décalage. Visible quand HP descend.
 - **WIP story-456** layered hit feedback : option C ci-dessus.
-- **Tech-debt-plan-2026-05-18.md obsolète** : à archiver dans `docs/archive/` ou supprimer.
 - **6 hardcodes weapons.rs:110-141** : SUPPRIMÉS comme code mort (commit `1b3301b37`), pas migrés. À retraiter quand Tier 2A `forgia-weapon-hitscan` extraction reprise (V6).
 
 ---

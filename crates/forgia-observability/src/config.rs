@@ -54,12 +54,17 @@ fn default_expected_sensors() -> Vec<String> {
     // BUG-452-10 fix : combat + health ajoutés pour que CHK-6 fonctionne par défaut.
     // Vague 5 Phase 5b Session A : forgia_health.json → forgia2_health.json
     // (rename canonique sensor Phase 5).
+    // Vague 5 Phase 5b Session B (story-467) : perf + entities + memory ajoutés
+    // (Tier 2 cross-mode producers).
     vec![
         "forgia_terrain_lod.json".to_string(),
         "forgia_chunks_snapshot.json".to_string(),
         "forgia_anim_layer.json".to_string(),
         "forgia_combat.json".to_string(),
         "forgia2_health.json".to_string(),
+        "forgia2_perf.json".to_string(),
+        "forgia2_entities.json".to_string(),
+        "forgia2_memory.json".to_string(),
     ]
 }
 fn default_stale_secs() -> f32 { 30.0 }
