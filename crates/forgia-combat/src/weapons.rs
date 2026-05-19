@@ -102,59 +102,13 @@ impl WeaponType {
         matches!(self, WeaponType::Chainsaw)
     }
 
-    /// V1 stats hardcoded — TOML genome port = Standard story.
-    /// Only ARENA_V1_WEAPONS variants have differentiated values; others fall back to ModernAR.
-    pub fn stats(self) -> WeaponData {
-        match self {
-            WeaponType::ModernAR => WeaponData {
-                damage: 25.0,
-                pellets: 1,
-                fire_rate: 10.0, // 10 shots/s → cooldown 0.1s
-                max_ammo: 999,
-                range: 100.0,
-                spread_deg: 0.0,
-                projectile_speed: HITSCAN_SPEED,
-                splash_radius: NO_SPLASH,
-                is_auto: true,
-            },
-            WeaponType::Shotgun => WeaponData {
-                damage: 80.0,
-                pellets: 1, // V1 single hitscan, multi-pellet = Standard story
-                fire_rate: 1.25, // 1.25 shots/s → cooldown 0.8s
-                max_ammo: 999,
-                range: 25.0,
-                spread_deg: 0.0,
-                projectile_speed: HITSCAN_SPEED,
-                splash_radius: NO_SPLASH,
-                is_auto: false,
-            },
-            WeaponType::RocketLauncher => WeaponData {
-                damage: 150.0,
-                pellets: 1, // V1 hitscan, projectile + splash = Standard story
-                fire_rate: 0.67, // ~1.5s cooldown
-                max_ammo: 999,
-                range: 80.0,
-                spread_deg: 0.0,
-                projectile_speed: HITSCAN_SPEED,
-                splash_radius: NO_SPLASH,
-                is_auto: false,
-            },
-            // Fallback : non-Arena V1 weapons use ModernAR baseline
-            _ => WeaponType::ModernAR.stats(),
-        }
-    }
-}
-
-pub struct WeaponData {
-    pub damage: f32,
-    pub pellets: u8,
-    pub fire_rate: f32,
-    pub max_ammo: u32,
-    pub range: f32,
-    pub spread_deg: f32,
-    pub projectile_speed: f32,
-    pub splash_radius: f32,
-    pub is_auto: bool,
+    // `stats()` + `WeaponData` retirés 2026-05-19 (Vague 2 audit forensic).
+    // Code mort confirmé : 0 call-site externe, 0 UFCS, struct non préludée.
+    // Le firing path V2 lit damage/fire_rate/range/pellets/spread_deg via
+    // `forgia-fps::ViewmodelGenomeEntry` chargé depuis `viewmodel_arena.toml`.
+    // La vraie migration TOML weapons (avec splash/projectile speed/falloff
+    // unifiés) reviendra avec l'extraction Tier 2A `forgia-weapon-hitscan`
+    // (memory `reference_v2_tier1_refacto_status_2026_05_17.md`).
 }
 
 // =============================================================================
@@ -218,12 +172,10 @@ pub struct DoomProjectile {
 }
 
 // =============================================================================
-// Tuning-driven weapon data (reads from FpsTuning for real-time calibration)
+// Damage falloff (story-432 V5-D)
 // =============================================================================
-
-/// Hitscan weapons: no projectile travel, no splash
-const HITSCAN_SPEED: f32 = 0.0;
-const NO_SPLASH: f32 = 0.0;
+//
+// `HITSCAN_SPEED` / `NO_SPLASH` retirés avec `WeaponData` (Vague 2, code mort).
 
 /// Damage falloff distance-based (story-432 V5-D).
 ///
@@ -241,9 +193,6 @@ pub fn damage_falloff(dist: f32, range: f32, start_pct: f32, floor_mult: f32) ->
         1.0 + (floor_mult - 1.0) * t
     }
 }
-
-// TODO: port from V1 — weapon_data_from_tuning requires FpsTuning
-// pub fn weapon_data_from_tuning(tuning: &FpsTuning, weapon: WeaponType) -> WeaponData { ... }
 
 // =============================================================================
 // Pre-built casing resources (audit-2026-05-02 #43 cache)
