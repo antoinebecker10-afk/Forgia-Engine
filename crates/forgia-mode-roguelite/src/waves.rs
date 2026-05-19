@@ -105,20 +105,37 @@ pub fn spawn_wave_enemies(
             let x = ring_radius * theta.cos();
             let z = ring_radius * theta.sin();
             let y = stats.capsule_half_height + stats.capsule_radius + 0.05;
+
+            // Pattern miroir forgia-mode-fps-arena::wave::spawn_wave_bots:343 :
+            // PARENT = Health + TargetCube + RigidBody + ArenaBot (PAS de Collider).
+            // CHILD  = Collider + Mesh + Material + ChildOf(parent).
+            //
+            // Raison : le ray hitscan retourne l'Entity avec le Collider. Si Collider
+            // est sur PARENT (même entité que Health+TargetCube), find_health_ancestor
+            // devrait matcher immediatement — MAIS bug rapier 0.33 observé runtime :
+            // `Query<&mut Health, With<TargetCube>>.get(parent)` retourne Err quand le
+            // Collider est sur la même entité. Workaround : split parent/child.
+            let parent = commands
+                .spawn((
+                    Name::new(format!("RogueliteEnemy_W{wave}_{}_{i}", archetype.label())),
+                    RogueliteRunMarker,
+                    DespawnOnExit(GameMode::Roguelite),
+                    *archetype,
+                    TargetCube,
+                    Transform::from_xyz(x, y, z),
+                    RigidBody::KinematicPositionBased,
+                    Health::new(stats.hp),
+                    Mortal,
+                    enemies::arena_bot_for(*archetype),
+                ))
+                .id();
             commands.spawn((
-                Name::new(format!("RogueliteEnemy_W{wave}_{}_{i}", archetype.label())),
-                RogueliteRunMarker,
-                DespawnOnExit(GameMode::Roguelite),
-                *archetype,
-                TargetCube,
+                Name::new(format!("RogueliteEnemy_W{wave}_{}_{i}_collider", archetype.label())),
+                ChildOf(parent),
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(mat.clone()),
-                Transform::from_xyz(x, y, z),
-                RigidBody::KinematicPositionBased,
+                Transform::default(),
                 Collider::capsule_y(stats.capsule_half_height, stats.capsule_radius),
-                Health::new(stats.hp),
-                Mortal,
-                enemies::arena_bot_for(*archetype),
             ));
             total += 1;
         }
