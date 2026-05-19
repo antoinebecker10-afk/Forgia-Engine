@@ -395,20 +395,24 @@ pub fn spawn_wave_bots(
         // Character mesh = enfant SceneRoot. AsyncSceneCollider walk les meshes
         // et génère un collider ConvexHull par mesh (épouse silhouette exacte).
         // Rapier attache automatiquement ces colliders au RigidBody du parent.
+        //
+        // Story-463 (Vague 3 Bevy 0.18 idioms) : `ChildOf(parent_id)` first-class
+        // dans le tuple spawn remplace l'ancien `.with_children(|p| p.spawn(...))`
+        // closure builder. Économie d'une allocation de closure par spawn bot
+        // (hot path wave spawn) et lisibilité.
         if !character_path.is_empty() {
-            commands.entity(parent_id).with_children(|p| {
-                p.spawn((
-                    SceneRoot(asset_server.load(&character_path)),
-                    Transform::from_xyz(0.0, character_y_offset, 0.0)
-                        .with_rotation(Quat::from_rotation_y(character_yaw))
-                        .with_scale(Vec3::splat(character_scale)),
-                    Name::new("CharacterMesh"),
-                    AsyncSceneCollider {
-                        shape: Some(ComputedColliderShape::ConvexHull),
-                        ..default()
-                    },
-                ));
-            });
+            commands.spawn((
+                ChildOf(parent_id),
+                SceneRoot(asset_server.load(&character_path)),
+                Transform::from_xyz(0.0, character_y_offset, 0.0)
+                    .with_rotation(Quat::from_rotation_y(character_yaw))
+                    .with_scale(Vec3::splat(character_scale)),
+                Name::new("CharacterMesh"),
+                AsyncSceneCollider {
+                    shape: Some(ComputedColliderShape::ConvexHull),
+                    ..default()
+                },
+            ));
         }
 
         // Story-457 — Head proxy : sphere Sensor collider enfant du bot, tagué
@@ -416,15 +420,14 @@ pub fn spawn_wave_bots(
         // si visée tête (sphère légèrement saillante du contour body convex
         // hull). Sensor = pas de collision physique solide (le bot reste
         // KinematicPositionBased), juste détecté en raycast.
-        commands.entity(parent_id).with_children(|p| {
-            p.spawn((
-                Transform::from_xyz(0.0, head_y_offset, 0.0),
-                Collider::ball(head_radius),
-                Sensor,
-                forgia_damage::HitZoneTag(forgia_damage::HitZone::Head),
-                Name::new("HeadProxy"),
-            ));
-        });
+        commands.spawn((
+            ChildOf(parent_id),
+            Transform::from_xyz(0.0, head_y_offset, 0.0),
+            Collider::ball(head_radius),
+            Sensor,
+            forgia_damage::HitZoneTag(forgia_damage::HitZone::Head),
+            Name::new("HeadProxy"),
+        ));
     }
 }
 
