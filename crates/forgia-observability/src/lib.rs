@@ -26,6 +26,7 @@ pub mod checks;
 pub mod exporter;
 pub mod asset_handles;
 pub mod health_sensor;
+pub mod forgia2_aggregator;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -39,6 +40,7 @@ use sensor_reader::sys_read_sensors_1hz;
 use checks::sys_run_crosschecks;
 use exporter::{sys_write_rpg_health_json, sys_sensor_liveness_watchdog};
 use health_sensor::sys_write_health_sensor;
+use forgia2_aggregator::{Forgia2AggregatorState, sys_write_forgia2_aggregates};
 use state::{RpgHealthState, SensorSnapshots, LastWriteTimestamps};
 
 /// Plugin Bevy. Ajouter à l'App via app.add_plugins(ForgiaObservabilityPlugin).
@@ -49,6 +51,7 @@ impl Plugin for ForgiaObservabilityPlugin {
         app.init_resource::<RpgHealthState>()
             .init_resource::<SensorSnapshots>()
             .init_resource::<LastWriteTimestamps>()
+            .init_resource::<Forgia2AggregatorState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
         // Story-453 : préchargement critical assets handles OnEnter/OnExit Rpg.
         asset_handles::register(app);
@@ -56,6 +59,14 @@ impl Plugin for ForgiaObservabilityPlugin {
         app.add_systems(
             Update,
             sys_write_health_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-465 — forgia2 aggregator Tier 1 : combat + arena. Gate Fps car
+        // les 7 sensors legacy agrégés sont tous FPS-spécifiques.
+        app.add_systems(
+            Update,
+            sys_write_forgia2_aggregates
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Fps)),
         );
         app.add_systems(
                 Update,
