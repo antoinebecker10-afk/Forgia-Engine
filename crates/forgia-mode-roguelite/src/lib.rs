@@ -21,8 +21,11 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
+pub mod enemies;
 pub mod run;
 pub mod sensor;
+
+pub use enemies::{EnemyArchetype, EnemyStats};
 
 pub use run::{
     EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent,

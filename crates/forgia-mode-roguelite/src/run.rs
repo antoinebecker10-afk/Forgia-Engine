@@ -9,10 +9,10 @@
 //! gérée par un terminal parallèle (V7 dédié cleanup orchestration). Ce fichier
 //! n'inclut PAS le system `sys_cleanup_run_markers` pour éviter conflit merge.
 
+use crate::enemies::{self, EnemyArchetype};
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody};
-use forgia_ai_arena_bot::{ArenaBot, BotState};
 use forgia_core::prelude::*;
 use forgia_damage::{Health, Mortal};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -280,55 +280,60 @@ pub fn sys_spawn_roguelite_scene(
         Transform::from_xyz(50.0, 100.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    // ─────── 8 ennemis basiques (M2 step 1) ───────────────────────────────
-    // Capsule + ArenaBot::default() + Health 50hp + Mortal. Réutilise pleinement
-    // l'AI de forgia-ai-arena-bot (Idle/Chase/Attack via TacticalTuning Resource).
-    // Variantes M2 step 2+ → 3 archetypes (Runner/Tank/Sniper) via TOML genome.
-    let enemy_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.85, 0.20, 0.20),
-        emissive: LinearRgba::new(0.30, 0.05, 0.05, 1.0),
-        perceptual_roughness: 0.55,
-        ..default()
-    });
-    let enemy_mesh = meshes.add(Capsule3d::new(0.4, 1.2));
-    let enemy_positions: &[Vec3] = &[
-        Vec3::new(30.0, 1.0, 0.0),
-        Vec3::new(-30.0, 1.0, 0.0),
-        Vec3::new(0.0, 1.0, 30.0),
-        Vec3::new(0.0, 1.0, -30.0),
-        Vec3::new(45.0, 1.0, 45.0),
-        Vec3::new(-45.0, 1.0, 45.0),
-        Vec3::new(45.0, 1.0, -45.0),
-        Vec3::new(-45.0, 1.0, -45.0),
+    // ─────── 8 ennemis 3 archetypes (M2 step 2) ──────────────────────────
+    // Tank ×3 / Runner ×3 / Sniper ×2 — placements en cercles concentriques
+    // (Tank ring 12m, Runner ring 25m, Sniper ring 50m) → naturellement
+    // dispersés par stop_distance variés (cf enemies.rs §stop_distances_distinct).
+    // Yaw offsets xoshiro-seeded pour désync angulaire (pas de symmetric stack).
+    let composition: &[(EnemyArchetype, u32, f32)] = &[
+        (EnemyArchetype::Tank, 3, 12.0),
+        (EnemyArchetype::Runner, 3, 25.0),
+        (EnemyArchetype::Sniper, 2, 50.0),
     ];
-    for (idx, pos) in enemy_positions.iter().enumerate() {
-        commands.spawn((
-            Name::new(format!("RogueliteEnemy_{idx}")),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Mesh3d(enemy_mesh.clone()),
-            MeshMaterial3d(enemy_mat.clone()),
-            Transform::from_translation(*pos),
-            RigidBody::KinematicPositionBased,
-            Collider::capsule_y(0.6, 0.4),
-            Health::new(50.0),
-            Mortal,
-            ArenaBot {
-                state: BotState::Idle,
-                speed: 4.5,
-                detect_range: 35.0,
-                attack_range: 20.0,
-                attack_cooldown: 1.2,
-                attack_left: 1.5,
-                stop_distance: 6.0,
-                ..ArenaBot::default()
-            },
-        ));
+    let mut enemy_total = 0u32;
+    let mut yaw_rng = Xoshiro256StarStar::seed_from_u64(SCENE_SEED ^ 0xE17EE3);
+    for (archetype, count, ring_radius) in composition {
+        let stats = enemies::stats_for(*archetype);
+        let mesh = meshes.add(Capsule3d::new(stats.capsule_radius, stats.capsule_half_height * 2.0));
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::srgb(stats.color_rgb[0], stats.color_rgb[1], stats.color_rgb[2]),
+            emissive: LinearRgba::new(
+                stats.emissive_rgb[0],
+                stats.emissive_rgb[1],
+                stats.emissive_rgb[2],
+                1.0,
+            ),
+            perceptual_roughness: 0.55,
+            ..default()
+        });
+        // Yaw initial offset (random) + N positions équi-espacées sur le cercle.
+        let yaw0 = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32
+            * std::f32::consts::TAU;
+        for i in 0..*count {
+            let theta = yaw0 + (i as f32 / *count as f32) * std::f32::consts::TAU;
+            let x = ring_radius * theta.cos();
+            let z = ring_radius * theta.sin();
+            let y = stats.capsule_half_height + stats.capsule_radius + 0.05;
+            commands.spawn((
+                Name::new(format!("RogueliteEnemy_{}_{i}", archetype.label())),
+                RogueliteRunMarker,
+                DespawnOnExit(GameMode::Roguelite),
+                *archetype,
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(mat.clone()),
+                Transform::from_xyz(x, y, z),
+                RigidBody::KinematicPositionBased,
+                Collider::capsule_y(stats.capsule_half_height, stats.capsule_radius),
+                Health::new(stats.hp),
+                Mortal,
+                enemies::arena_bot_for(*archetype),
+            ));
+            enemy_total += 1;
+        }
     }
 
     info!(
-        "[roguelite] Scene spawned : floor 300m + 4 walls + 5 platforms + {spawned} cover + 3 landmarks + {} enemies (seed={SCENE_SEED:#x})",
-        enemy_positions.len()
+        "[roguelite] Scene spawned : floor 300m + 4 walls + 5 platforms + {spawned} cover + 3 landmarks + {enemy_total} enemies (3 Tank @12m / 3 Runner @25m / 2 Sniper @50m) seed={SCENE_SEED:#x}"
     );
 }
 
