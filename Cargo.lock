@@ -4542,6 +4542,7 @@ dependencies = [
  "forgia-mode-fps-arena",
  "forgia-player",
  "forgia-ui",
+ "forgia-viewmodel",
  "leafwing-input-manager",
  "serde",
 ]
@@ -6217,8 +6218,8 @@ dependencies = [
  "bevy",
  "forgia-combat",
  "forgia-core",
- "forgia-fps",
  "forgia-player",
+ "forgia-viewmodel",
 ]
 
 [[package]]

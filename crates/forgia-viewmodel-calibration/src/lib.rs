@@ -21,7 +21,7 @@
 use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
-use forgia_fps::WeaponViewmodel;
+use forgia_viewmodel::WeaponViewmodel;
 use forgia_player::prelude::FpsCamera;
 use std::collections::HashMap;
 use std::fs;

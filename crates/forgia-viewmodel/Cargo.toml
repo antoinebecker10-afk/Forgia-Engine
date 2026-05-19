@@ -2,11 +2,20 @@
 name = "forgia-viewmodel"
 version = "0.1.0"
 edition = "2021"
-description = "FPS arms viewmodel (1P weapon render)"
+description = "FPS arms viewmodel (1P weapon render). Decoupled from firing — équivalent CBaseViewModel Source SDK."
 
 [lints]
 workspace = true
 
 [dependencies]
 bevy = { workspace = true }
+serde = { workspace = true }
 forgia-core = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-genome-core = { workspace = true }
+forgia-player = { workspace = true }
+forgia-mesh-fader = { workspace = true }
+forgia-juice-camera-shake = { workspace = true }
+forgia-juice-fov-punch = { workspace = true }
+forgia-input = { workspace = true }
+forgia-ui = { workspace = true }

@@ -16,7 +16,10 @@ use forgia_combat::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType, ARENA_V1_WEAPONS};
 use forgia_genome_core::Genome;
 
-use crate::{lookup_genome_entry, weapon_genome_key, ViewmodelGenome, ViewmodelGenomeEntry, ViewmodelGenomeHandle};
+use forgia_viewmodel::{
+    lookup_genome_entry, weapon_genome_key, ViewmodelGenome, ViewmodelGenomeEntry,
+    ViewmodelGenomeHandle,
+};
 
 // ─── SystemParam bundle pour fire_weapon_minimal ───────────────────────────
 

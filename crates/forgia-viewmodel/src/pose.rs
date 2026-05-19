@@ -1,29 +1,31 @@
-//! ADS (Aim Down Sight) — clic droit maintenu = zoom FOV + viewmodel rapproché.
+//! Couche **pose** — Aim Down Sight (ADS), interpolation FOV / transform / rotation
+//! viewmodel + propagation de la sensibilité souris et vitesse mouvement en ADS.
 //!
-//! Pipeline :
-//! 1. `track_right_mouse_state` : MessageReader<MouseButtonInput> → RightMouseState.held
-//! 2. `update_ads_progress` : lerp progress vers 1.0 (held) ou 0.0 (relâché) à ads_lerp_speed
+//! Pipeline canonique (cf Source SDK `cl_ads*` family, CoD style sight align) :
+//! 1. `track_right_mouse_state` : `MessageReader<MouseButtonInput>` → `RightMouseState.held`
+//! 2. `update_ads_progress` : lerp progress vers 1.0 (held) ou 0.0 (relâché) à `ads_lerp_speed`
 //! 3. `apply_ads_camera_fov` : interpole `Projection::Perspective.fov` entre default et ads_fov
 //! 4. `apply_ads_viewmodel` : interpole Transform.translation viewmodel entre hipfire et ADS offset
 //!
-//! Pas de hardcode : tout vient du `ViewmodelGenome` per-weapon.
+//! Pas de hardcode : tout vient du `ViewmodelGenome` per-weapon. Lerp speed,
+//! default FOV et atténuation FOV punch viennent de `AdsTuning` (genome
+//! `fps_tuning.toml`).
 
-use bevy::prelude::*;
 use bevy::camera::Projection;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
+use bevy::prelude::*;
 use forgia_combat::weapons::EquippedWeapons;
+use forgia_core::prelude::GameMode;
 use forgia_genome_core::Genome;
 use forgia_input::prelude::MouseSensitivityMultiplier;
 use forgia_juice_fov_punch::FovPunchState;
 use forgia_player::prelude::{FpsCamera, MovementSpeedMultiplier};
 use forgia_ui::prelude::CrosshairMode;
 
-use crate::{
-    lookup_genome_entry, viewmodel_rotation_ads, viewmodel_rotation_hipfire, viewmodel_transform,
-    AdsTuning, NeedsAutoScale, ViewmodelBaseScale, ViewmodelGenome, ViewmodelGenomeHandle,
-    WeaponViewmodel,
-};
+use crate::attach::{NeedsAutoScale, ViewmodelBaseScale, WeaponViewmodel};
+use crate::calibration::{viewmodel_rotation_ads, viewmodel_rotation_hipfire, viewmodel_transform};
+use crate::genome::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle};
 
 #[derive(Resource, Default)]
 pub struct RightMouseState {
@@ -34,6 +36,25 @@ pub struct RightMouseState {
 pub struct AdsState {
     /// 0.0 = hipfire (normal), 1.0 = full ADS. Lerp continu.
     pub progress: f32,
+}
+
+/// Tuning ADS (lerp speed, default FOV, atténuation FOV punch en ADS).
+/// Synced depuis `fps_tuning.toml` côté `forgia-fps::sync_fps_tuning`.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct AdsTuning {
+    pub lerp_speed: f32,
+    pub default_fov_deg: f32,
+    pub punch_attenuation: f32,
+}
+
+impl Default for AdsTuning {
+    fn default() -> Self {
+        Self {
+            lerp_speed: 12.0,
+            default_fov_deg: 45.0,
+            punch_attenuation: 0.7,
+        }
+    }
 }
 
 /// Update RightMouseState depuis MessageReader (anti-trap egui-consume).
@@ -52,6 +73,8 @@ pub fn track_right_mouse_state(
 /// Pousse aussi :
 /// - CrosshairMode : pour que forgia-ui switche croix blanche → red dot
 /// - MovementSpeedMultiplier : ralentit le déplacement en ADS (style CoD)
+/// - MouseSensitivityMultiplier : ralentit la souris en ADS (precision)
+#[allow(clippy::too_many_arguments)]
 pub fn update_ads_progress(
     time: Res<Time>,
     right: Res<RightMouseState>,
@@ -79,7 +102,6 @@ pub fn update_ads_progress(
         .as_deref()
         .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
 
-    // Lerp vitesse player + sensibilité souris + propagation flag sniper scope fullscreen
     let (ads_speed_f, ads_sens_f, sniper_fullscreen) = match entry_opt {
         Some(e) => (
             e.ads_move_speed_factor,
@@ -89,15 +111,13 @@ pub fn update_ads_progress(
         None => (0.65, 0.7, false),
     };
     speed_mul.0 = 1.0_f32.lerp(ads_speed_f, ads.progress);
-    // Sensibilité souris : 1.0 hipfire → ads_mouse_sensitivity_factor en full ADS.
     // Reset à 1.0 garanti quand progress=0 → pas de drift hipfire après ADS.
     sens_mul.factor = 1.0_f32.lerp(ads_sens_f, ads.progress);
     crosshair.sniper_fullscreen = sniper_fullscreen;
 }
 
-/// Interpole le FOV camera entre default (45°) et ads_fov_deg du genome.
-/// Ajoute par-dessus l'offset FOV punch courant (forgia-juice-fov-punch) — punch décay
-/// indépendamment, base ADS recalculée chaque frame, somme appliquée au render.
+/// Interpole le FOV camera entre default et ads_fov_deg du genome.
+/// Ajoute par-dessus l'offset FOV punch courant (forgia-juice-fov-punch).
 pub fn apply_ads_camera_fov(
     ads: Res<AdsState>,
     equipped: Res<EquippedWeapons>,
@@ -113,7 +133,6 @@ pub fn apply_ads_camera_fov(
         .map(|e| e.ads_fov_deg)
         .unwrap_or(25.0);
     let base_fov = tuning.default_fov_deg.lerp(ads_fov, ads.progress);
-    // Atténue le punch en ADS (precise aim protection).
     let punch_attenuation = 1.0 - ads.progress * tuning.punch_attenuation;
     let final_fov = base_fov + fov_punch.current_deg * punch_attenuation;
     for mut proj in &mut q_cam {
@@ -126,9 +145,9 @@ pub fn apply_ads_camera_fov(
 /// Interpole le Transform.translation viewmodel entre hipfire et ADS.
 ///
 /// Si `sight_local_*` non-nul dans le genome → mode **sight-align** (style CoD) :
-/// formule `ads_translation = (0, 0, -sight_distance) - rotation × scale × sight_local`
-/// → garantit que le point `sight_local` du mesh se projette pile sur l'axe cam à
-///   `sight_distance` devant → red dot aligné au viseur de l'arme.
+/// `ads_translation = (0, 0, -sight_distance) - rotation × scale × sight_local`
+/// → garantit que le point `sight_local` du mesh se projette pile sur l'axe cam
+/// à `sight_distance` devant → red dot aligné au viseur de l'arme.
 ///
 /// Sinon → fallback manuel `ads_offset_*` (V1 simple).
 pub fn apply_ads_viewmodel(
@@ -136,8 +155,7 @@ pub fn apply_ads_viewmodel(
     equipped: Res<EquippedWeapons>,
     genome_handle: Option<Res<ViewmodelGenomeHandle>>,
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
-    // Without<NeedsAutoScale> : ne touche pas visibility tant que auto_scale_viewmodel
-    // n'a pas mesuré l'AABB et révélé l'arme. Évite race condition d'affichage prématuré.
+    // Without<NeedsAutoScale> : on n'écrase pas la phase init `auto_scale_viewmodel`.
     mut q_vm: Query<
         (&mut Transform, &mut Visibility, Option<&ViewmodelBaseScale>),
         (With<WeaponViewmodel>, Without<NeedsAutoScale>),
@@ -154,13 +172,10 @@ pub fn apply_ads_viewmodel(
 
     let sight_local = Vec3::new(entry.sight_local_x, entry.sight_local_y, entry.sight_local_z);
     let use_sight_align = sight_local.length_squared() > 0.0001;
-    // Sniper scope fullscreen : hide complet viewmodel quand ADS engaged (juste le viseur visible).
     let hide_for_sniper = entry.sniper_scope_fullscreen && ads.progress > 0.5;
 
     for (mut tf, mut vis, base_scale) in &mut q_vm {
-        // Phase H : scale shrink en ADS — base_scale stocké par auto_scale_viewmodel.
-        // Lerp 1.0 (hipfire taille pleine) → ads_scale_factor (rétréci en ADS).
-        // Sniper Lenoir ads_scale_factor=1.0 → pas de changement (overlay scope cache déjà).
+        // ADS scale shrink — base_scale stocké par auto_scale_viewmodel.
         if let Some(bs) = base_scale {
             let scale_mul = 1.0_f32.lerp(entry.ads_scale_factor, ads.progress);
             let new_scale = bs.0 * scale_mul;
@@ -169,27 +184,27 @@ pub fn apply_ads_viewmodel(
 
         let ads_target = if use_sight_align {
             let scale = tf.scale.x;
-            let sight_offset = ads_rot * (sight_local * scale); // rotation ADS (droite)
+            let sight_offset = ads_rot * (sight_local * scale);
             Vec3::new(0.0, 0.0, -entry.sight_distance) - sight_offset
         } else {
             Vec3::new(entry.ads_offset_x, entry.ads_offset_y, entry.ads_offset_z)
         };
         tf.translation = hipfire.translation.lerp(ads_target, ads.progress);
-        // Slerp rotation hipfire (avec tilt) → ADS (droite) selon progress
         tf.rotation = hipfire_rot.slerp(ads_rot, ads.progress);
 
-        // Hide viewmodel en scope sniper fullscreen — sinon Inherited.
-        // Query filtre Without<NeedsAutoScale> → on n'écrase pas la phase init.
         *vis = if hide_for_sniper { Visibility::Hidden } else { Visibility::Inherited };
     }
 }
 
-pub struct AdsPlugin;
+/// Plugin pose : ADS state + lerp FOV/transform/rotation/speed/sensitivity.
+/// Gated `run_if(in_state(GameMode::Fps))` — la pose n'a aucun sens hors FPS.
+pub struct ForgiaViewmodelPosePlugin;
 
-impl Plugin for AdsPlugin {
+impl Plugin for ForgiaViewmodelPosePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RightMouseState>()
             .init_resource::<AdsState>()
+            .init_resource::<AdsTuning>()
             .add_systems(
                 Update,
                 (
@@ -199,7 +214,7 @@ impl Plugin for AdsPlugin {
                     apply_ads_viewmodel,
                 )
                     .chain()
-                    .run_if(in_state(forgia_core::prelude::GameMode::Fps)),
+                    .run_if(in_state(GameMode::Fps)),
             );
     }
 }

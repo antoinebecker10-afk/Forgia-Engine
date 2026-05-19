@@ -1,50 +1,48 @@
-//! Adapter forgia-fps → forgia-mesh-fader pour la visibilité du viewmodel en ADS.
+//! Couche **fade** — semi-transparence du viewmodel en ADS via `forgia-mesh-fader`.
 //!
-//! Stratégie 2-en-1 (Phase E 2026-05-18) :
+//! Stratégie 2-en-1 :
 //! 1. `identify_viewmodel_faders` : au spawn viewmodel, BFS descendants. Tag chaque
 //!    entity selon son rôle :
-//!    - Name match `lens|scope|glass|optic|sight|dot` → ScopeGlassFader (lentille,
-//!      alpha = `scope_glass_alpha_ads`)
-//!    - Autre entity material-bearing → ViewmodelBodyFader (body, alpha =
+//!    - Name match `lens|scope|glass|optic|sight|dot` → `ScopeGlassFader` (lentille,
+//!      alpha = `scope_glass_alpha_ads`).
+//!    - Autre entity material-bearing → `ViewmodelBodyFader` (body, alpha =
 //!      `ads_viewmodel_fade_alpha`). Skippé si alpha >= 0.99 (sniper qui a son
 //!      overlay fullscreen).
-//! 2. `sync_fader_progress` : copie `AdsState.progress` dans tous les MaterialFader
-//!    taggés (scope + body). forgia-mesh-fader handle le clone + alpha lerp.
+//! 2. `sync_fader_progress` : copie `AdsState.progress` dans tous les `MaterialFader`
+//!    taggés (scope + body). `forgia-mesh-fader` handle le clone + alpha lerp.
 //!
-//! Rationale Phase E : en ADS sur armes non-sniper, le mesh du gun masque la cible
-//! derrière le crosshair. Le body fader rend le gun semi-transparent (alpha 0.4
-//! default) pour laisser voir à travers. Sniper Lenoir = exclu (ads_viewmodel_fade_alpha
-//! = 1.0 dans TOML) car il a déjà son scope_fullscreen overlay.
+//! Rationale : en ADS sur armes non-sniper, le mesh du gun masque la cible derrière
+//! le crosshair. Le body fader rend le gun semi-transparent (alpha 0.4 default)
+//! pour laisser voir à travers. Sniper Lenoir exclu (`ads_viewmodel_fade_alpha = 1.0`
+//! dans TOML) car il a son scope_fullscreen overlay.
 
 use bevy::prelude::*;
 use forgia_combat::weapons::EquippedWeapons;
+use forgia_core::prelude::GameMode;
 use forgia_genome_core::Genome;
 use forgia_mesh_fader::MaterialFader;
 
-use crate::ads::AdsState;
-use crate::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle, WeaponViewmodel};
+use crate::attach::WeaponViewmodel;
+use crate::genome::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle};
+use crate::pose::AdsState;
 
 /// Marker : viewmodel déjà scanné pour scope/body faders.
 #[derive(Component)]
 pub struct ScopeGlassScanned;
 
 /// Marker : ce MaterialFader appartient à un scope (lentille / sight / red dot).
-/// Permet à `sync_fader_progress` de l'identifier (alpha distinct du body).
 #[derive(Component)]
 pub struct ScopeGlassFader;
 
 /// Marker : ce MaterialFader appartient au BODY du viewmodel (mesh principal,
-/// hors lentille). En ADS, fade vers `ads_viewmodel_fade_alpha` pour voir à
-/// travers le gun vers la cible.
+/// hors lentille). En ADS, fade vers `ads_viewmodel_fade_alpha`.
 #[derive(Component)]
 pub struct ViewmodelBodyFader;
 
 /// Patterns Name nodes considérés comme "scope / viseur" (case-insensitive).
 const SCOPE_GLASS_PATTERNS: &[&str] = &[
     "lens", "glass", "optic", "reticle",
-    "scope",   // catch "*_scope*" ou "scope_*"
-    "sight",   // catch "iron_sight", "front_sight", "sight_dot"
-    "dot",     // red dot patterns
+    "scope", "sight", "dot",
 ];
 
 /// Sockets / placeholders à EXCLURE (faux positifs : SOCKET_Sight_Front_Default).
@@ -62,6 +60,7 @@ fn is_scope_glass_name(name: &str) -> bool {
 
 /// Update : pour chaque viewmodel sans tag scanned, BFS descendants. Tag scope
 /// (Name match) + body (entity material-bearing non-scope si fade activé).
+#[allow(clippy::too_many_arguments)]
 pub fn identify_viewmodel_faders(
     mut commands: Commands,
     q_vm: Query<Entity, (With<WeaponViewmodel>, Without<ScopeGlassScanned>)>,
@@ -118,11 +117,11 @@ pub fn identify_viewmodel_faders(
         commands.entity(vm).insert(ScopeGlassScanned);
 
         info!(
-            "[viewmodel_faders] scan terminé : {} scope, {} body (fade_enabled={}, body_alpha={:.2}, scope_alpha={:.2}, total_named={})",
+            "[forgia-viewmodel/fade] scan terminé : {} scope, {} body (fade_enabled={}, body_alpha={:.2}, scope_alpha={:.2}, total_named={})",
             scope_count, body_count, body_fade_enabled, body_alpha, scope_alpha, all_names.len()
         );
         if scope_count == 0 {
-            info!("[viewmodel_faders] aucun scope match parmi : {:?}", all_names);
+            info!("[forgia-viewmodel/fade] aucun scope match parmi : {:?}", all_names);
         }
     }
 }
@@ -143,15 +142,47 @@ pub fn sync_fader_progress(
     }
 }
 
-pub struct ScopeGlassPlugin;
+/// Plugin fade : scan + sync. Gated `run_if(in_state(GameMode::Fps))`.
+/// `MeshFaderPlugin` doit être ajouté séparément (1× global) — typiquement par
+/// `ForgiaViewmodelPlugin` qui le check idempotent.
+pub struct ForgiaViewmodelFadePlugin;
 
-impl Plugin for ScopeGlassPlugin {
+impl Plugin for ForgiaViewmodelFadePlugin {
     fn build(&self, app: &mut App) {
-        // forgia-mesh-fader::MeshFaderPlugin doit être ajouté séparément (1× global).
         app.add_systems(
             Update,
             (identify_viewmodel_faders, sync_fader_progress)
-                .run_if(in_state(forgia_core::prelude::GameMode::Fps)),
+                .run_if(in_state(GameMode::Fps)),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_scope_glass_name_basic_patterns() {
+        assert!(is_scope_glass_name("scope_lens_01"));
+        assert!(is_scope_glass_name("Lens"));
+        assert!(is_scope_glass_name("red_dot"));
+        assert!(is_scope_glass_name("sight_front"));
+        assert!(is_scope_glass_name("optical_sight"));
+    }
+
+    #[test]
+    fn is_scope_glass_name_excludes_sockets() {
+        // SOCKET_Sight_Front_Default doit retourner false malgré "sight" inside.
+        assert!(!is_scope_glass_name("SOCKET_Sight_Front_Default"));
+        assert!(!is_scope_glass_name("muzzle_flash_socket"));
+        assert!(!is_scope_glass_name("barrel_long"));
+        assert!(!is_scope_glass_name("grip_handle"));
+    }
+
+    #[test]
+    fn is_scope_glass_name_negatives() {
+        assert!(!is_scope_glass_name("body_main"));
+        assert!(!is_scope_glass_name(""));
+        assert!(!is_scope_glass_name("trigger"));
     }
 }
