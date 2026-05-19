@@ -32,6 +32,7 @@ forgia-streaming = { workspace = true }
 forgia-fps = { workspace = true }
 forgia-viewmodel-calibration = { workspace = true }
 forgia-rpg = { workspace = true }
+forgia-mode-roguelite = { workspace = true }
 forgia-dialogue = { workspace = true }
 forgia-ui = { workspace = true }
 forgia-ui-hud = { workspace = true }

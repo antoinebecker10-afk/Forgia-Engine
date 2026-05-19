@@ -73,6 +73,7 @@ pub fn run_game() -> AppExit {
         forgia_fps::prelude::ForgiaFpsPlugin,
         forgia_viewmodel_calibration::ForgiaViewmodelCalibrationPlugin,
         forgia_rpg::prelude::ForgiaRpgPlugin,
+        forgia_mode_roguelite::prelude::ForgiaModeRoguelitePlugin,
         forgia_terrain::prelude::ForgiaTerrainPlugin,
         forgia_foliage::prelude::ForgiaFoliagePlugin,
         forgia_water::prelude::ForgiaWaterPlugin,

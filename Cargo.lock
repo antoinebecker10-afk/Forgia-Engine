@@ -4574,6 +4574,7 @@ dependencies = [
  "forgia-input",
  "forgia-juice-screen-flash",
  "forgia-killfeed",
+ "forgia-mode-roguelite",
  "forgia-observability",
  "forgia-player",
  "forgia-prefab",
@@ -4980,6 +4981,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+ "rand_xoshiro",
 ]
 
 [[package]]
@@ -5992,6 +5994,7 @@ dependencies = [
  "forgia-crosshair",
  "forgia-hitmarker",
  "forgia-input",
+ "forgia-mode-roguelite",
  "leafwing-input-manager",
 ]
 

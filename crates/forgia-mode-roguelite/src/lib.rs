@@ -1,16 +1,71 @@
-//! forgia-mode-roguelite
+//! # forgia-mode-roguelite
 //!
-//! Roguelite mode plugin (procedural)
+//! 3e jeu Forgia V2 — roguelite FPS coop 1-3 joueurs (cible Steam Next Fest).
+//! Story-468 (plan global) / Story-470 (M1 fondations).
 //!
-//! Category : mode
+//! ## Scope M1 (cette release)
+//!
+//! - `RunState` SubStates de `GameMode::Roguelite` : Lobby / InRun / Boss / Defeat / Victory
+//! - `StartRunEvent` / `EndRunEvent` (Bevy 0.18 `Message` derive)
+//! - `RunSeed` Resource déterministe (xoshiro256**)
+//! - Sensor `forgia2_roguelite_state.json` 1Hz
+//!
+//! Combat / loot / biome / coop / méta-progression : M2+ (voir story-468).
+//!
+//! ## Cleanup OnExit
+//!
+//! `RogueliteRunMarker` Component est exposé. Le système `sys_cleanup_run_markers`
+//! qui despawne ces entités est géré par un **terminal parallèle dédié** — ce crate
+//! ne contient PAS la logique de despawn pour éviter conflit merge.
 
 use bevy::prelude::*;
+use forgia_core::prelude::*;
 
-/// Plugin Bevy. Add to App via pp.add_plugins(ForgiaModeRoguelitePlugin).
+pub mod run;
+pub mod sensor;
+
+pub use run::{
+    EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent,
+};
+
+pub mod prelude {
+    pub use crate::{
+        EndRunEvent, ForgiaModeRoguelitePlugin, RogueliteRunMarker, RunResult, RunSeed,
+        RunState, StartRunEvent,
+    };
+}
+
 pub struct ForgiaModeRoguelitePlugin;
 
 impl Plugin for ForgiaModeRoguelitePlugin {
-    fn build(&self, _app: &mut App) {
-        // TODO: implement
+    fn build(&self, app: &mut App) {
+        app.add_sub_state::<RunState>()
+            .add_message::<StartRunEvent>()
+            .add_message::<EndRunEvent>()
+            .add_systems(
+                Update,
+                (run::sys_start_run, run::sys_end_run)
+                    .chain()
+                    .in_set(GameSet::Movement)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            // Sensor cross-mode : tourne en tout état (menu = run_state "none").
+            // Permet xtask verify-sensors-format 13/13 sans entrer dans le mode.
+            .add_systems(
+                Update,
+                sensor::sys_write_roguelite_state.in_set(GameSet::Sensors),
+            );
+        // Cleanup OnExit(GameMode::Roguelite) géré par terminal parallèle (V7 cleanup
+        // orchestration). Ne PAS dupliquer ici.
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plugin_constructible() {
+        let _p = ForgiaModeRoguelitePlugin;
     }
 }

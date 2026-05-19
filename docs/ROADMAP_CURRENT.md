@@ -120,7 +120,24 @@ Effort réel ~3 h (vs 6 h estimé — research bevy-specialist a écarté piège
 
 Zéro breaking change FPS Arena. V7 roguelite peut consommer `forgia-weapon-hitscan` (firing déclaratif) + `forgia-viewmodel` (1P render) directement.
 
-### V7 — 3e jeu : Roguelite FPS Coop 🟡 PLAN AJUSTÉ POST-AUDIT (2026-05-19)
+### V7 — 3e jeu : Roguelite FPS Coop 🟢 M1 FONDATIONS DONE 2026-05-19 (story-470)
+
+**M1 livré** (commit pending) — scaffold MVP 3-4 h :
+- `GameMode::Roguelite` variant ajouté
+- `RunState` SubStates `#[source(GameMode = GameMode::Roguelite)]` (Lobby/InRun{stage}/Boss{stage}/Defeat/Victory)
+- `StartRunEvent` + `EndRunEvent` (`#[derive(Message)]` Bevy 0.18)
+- `RunSeed` Resource déterministe `Xoshiro256StarStar` (`stage_seed(stage)` + `encounter_seed(stage, idx)`)
+- `forgia2_roguelite_state.json` sensor 1Hz cross-mode
+- Bouton menu 🎲 Roguelite Run → `StartRunEvent { seed: None }`
+- `RogueliteRunMarker` Component stub (cleanup OnExit géré par terminal // dédié)
+
+**Validation** : `cargo check --workspace` ✅ • clippy `-D warnings` ✅ 0 • 6 tests verts (run_seed déterministe + variants distincts + default Lobby) • smoke test runtime forgia2_roguelite_state.json écrit • **`xtask verify-sensors-format` → OK 13/13** (cible V5+V7 finale atteinte).
+
+Combat solo viable (M2) = scope future session : 1 biome roguelite + 3 ennemis + 4 armes parlantes + loot/equipment + 3 vagues end-to-end.
+
+---
+
+#### Plan original V7 (legacy avant M1)
 
 **Audit deep 5 agents** : [docs/audit/Story-469-deep-audit-2026-05-19.md](audit/Story-469-deep-audit-2026-05-19.md) — 3 BLOQUANTS + 8 AJUSTER identifiés, corrigés ci-dessous.
 

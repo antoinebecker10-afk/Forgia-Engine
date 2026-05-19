@@ -10,3 +10,5 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 forgia-core = { workspace = true }
+# Story-470 V7 M1 — RunSeed déterministe (host-authoritative, choix audit §0.2)
+rand_xoshiro = "0.7"

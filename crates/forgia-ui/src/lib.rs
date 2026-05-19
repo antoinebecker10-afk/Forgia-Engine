@@ -86,6 +86,7 @@ fn main_menu_ui(
     mut next_app: ResMut<NextState<AppMode>>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut exit: MessageWriter<AppExit>,
+    mut start_run: MessageWriter<forgia_mode_roguelite::StartRunEvent>,
     mut last_state: Local<Option<AppMode>>,
 ) {
     let current = app_state.get().clone();
@@ -118,6 +119,12 @@ fn main_menu_ui(
                 if ui.add(egui::Button::new(egui::RichText::new("🗺  RPG OpenWorld").size(28.0)).min_size(egui::vec2(280.0, 60.0))).clicked() {
                     next_game.set(GameMode::Rpg);
                     next_app.set(AppMode::InGame);
+                }
+                ui.add_space(20.0);
+                if ui.add(egui::Button::new(egui::RichText::new("🎲  Roguelite Run").size(28.0)).min_size(egui::vec2(280.0, 60.0))).clicked() {
+                    next_game.set(GameMode::Roguelite);
+                    next_app.set(AppMode::InGame);
+                    start_run.write(forgia_mode_roguelite::StartRunEvent { seed: None });
                 }
                 ui.add_space(40.0);
                 if ui.add(egui::Button::new(egui::RichText::new("Quitter").size(20.0)).min_size(egui::vec2(180.0, 40.0))).clicked() {

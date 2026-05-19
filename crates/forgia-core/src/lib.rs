@@ -35,6 +35,8 @@ pub mod states {
         None,
         Fps,
         Rpg,
+        // Story-470 V7 M1 — 3e jeu Forgia : roguelite FPS coop 1-3j (cible Next Fest)
+        Roguelite,
     }
 
     /// WorldMode — gate la simulation (Editor désactive AI/physics).
