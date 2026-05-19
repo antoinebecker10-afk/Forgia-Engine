@@ -51,6 +51,12 @@ local_avoid_dist_m = 2.5            # ray length context steering 3-ray
 gunshot_alert_radius_m = 25.0       # bots dans 25m alerted on player fire
 gunshot_alert_los_grace_secs = 0.6  # +600ms warmup si alerted-not-yet-seen (look around feel)
 alert_duration_secs = 4.0           # durée flag alerted post-tir player
+los_lost_grace_secs = 2.0           # ★ Story-464 — grace post-LOS perdu avant drop Chase.
+                                     # Sans ce gene, bots chassaient à travers murs tant que
+                                     # distance ≤ detect_range. 2.0s = pattern AAA "last sight
+                                     # timer" (F.E.A.R. SAPI Orkin GDC 2006). Combiné avec
+                                     # alert (4s forced Chase post-tir player), comportement
+                                     # crédible : bot mémorise 2s, puis Idle si rien ne le ré-alerte.
 
 # Enemies — 4 personnages Forgia (pas Rex = player RPG)
 # Distribution sur les 5 spawn points. Asset path relative à assets/.

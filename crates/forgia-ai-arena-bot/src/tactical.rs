@@ -37,6 +37,9 @@ pub struct TacticalTuning {
     pub gunshot_alert_los_grace_secs: f32,
     /// Durée du flag alerted (forced Chase even out of detect_range).
     pub alert_duration_secs: f32,
+    /// Story-464 — durée pendant laquelle le bot reste autorisé à Chase après
+    /// avoir perdu LOS. 0 = drop instantanément (frustrant), 2-3s = AAA "last sight".
+    pub los_lost_grace_secs: f32,
     /// Période d'écriture sensor `forgia_bot_ai.json` (sec).
     pub sensor_period_secs: f32,
 }
@@ -53,6 +56,7 @@ impl Default for TacticalTuning {
             gunshot_alert_radius_m: 25.0,
             gunshot_alert_los_grace_secs: 0.6,
             alert_duration_secs: 4.0,
+            los_lost_grace_secs: 2.0,
             sensor_period_secs: 1.0,
         }
     }
@@ -99,6 +103,9 @@ pub fn bot_los_check(
         bot.los_check_left -= dt;
         bot.los_grace_left = (bot.los_grace_left - dt).max(0.0);
         bot.alert_left = (bot.alert_left - dt).max(0.0);
+        // Story-464 — décrément continu de la grace "LOS perdu" pour que Chase
+        // expire même entre 2 raycasts LOS (8Hz = ~125ms entre checks).
+        bot.los_lost_grace_left = (bot.los_lost_grace_left - dt).max(0.0);
         if bot.alert_left <= 0.0 {
             bot.alerted = false;
         }
@@ -137,6 +144,16 @@ pub fn bot_los_check(
                 tuning.los_grace_secs
             };
             bot.los_grace_left = grace;
+        }
+        // Story-464 — transition true → false : armer la grace "LOS perdu"
+        // pour autoriser Chase pendant los_lost_grace_secs avant de drop en Idle.
+        // Pattern AAA "last sight timer" (F.E.A.R. SAPI, Halo 2 props poll).
+        if bot.has_los && !new_los {
+            bot.los_lost_grace_left = tuning.los_lost_grace_secs;
+        }
+        // Tant que LOS est actif, on garde la grace au max (le bot voit, pas de countdown).
+        if new_los {
+            bot.los_lost_grace_left = tuning.los_lost_grace_secs;
         }
         bot.has_los = new_los;
     }
@@ -262,9 +279,14 @@ pub fn bot_tactical_movement(
             continue;
         }
         // Alerted → force Chase si hors detect_range mais dans alert (audio AI).
+        // Story-464 — gate sur has_los : sans vue récente ni alert, le bot ne
+        // doit pas Chase aveuglément à travers les murs. La state machine
+        // downgrade déjà Chase → Idle, mais on protège aussi ici en cas de
+        // course (state machine run avant nous mais override possible).
+        let has_recent_sight = bot.has_los || bot.los_lost_grace_left > 0.0;
         let to_target = target_pos - xf.translation;
         let dist = to_target.length();
-        let want_chase = matches!(bot.state, BotState::Chase)
+        let want_chase = (matches!(bot.state, BotState::Chase) && has_recent_sight)
             || (bot.alerted && dist > bot.stop_distance);
         if !want_chase || bot.speed < 0.01 || dist < 0.01 {
             continue;

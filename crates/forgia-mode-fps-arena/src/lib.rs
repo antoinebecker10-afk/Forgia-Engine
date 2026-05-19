@@ -133,6 +133,10 @@ pub struct BotAi {
     pub gunshot_alert_los_grace_secs: f32,
     #[serde(default = "default_alert_duration_secs")]
     pub alert_duration_secs: f32,
+    /// Story-464 — durée pendant laquelle un bot reste autorisé à Chase après
+    /// avoir perdu LOS sur le player. Sans ce gate, bots Chase à travers les murs.
+    #[serde(default = "default_los_lost_grace_secs")]
+    pub los_lost_grace_secs: f32,
 }
 
 fn default_bot_speed() -> f32 { 3.5 }
@@ -146,6 +150,7 @@ fn default_local_avoid_dist_m() -> f32 { 2.5 }
 fn default_gunshot_alert_radius_m() -> f32 { 25.0 }
 fn default_gunshot_alert_los_grace_secs() -> f32 { 0.6 }
 fn default_alert_duration_secs() -> f32 { 4.0 }
+fn default_los_lost_grace_secs() -> f32 { 2.0 }
 
 #[derive(Deserialize, TypePath, Clone)]
 pub struct BotSpawn {
@@ -217,6 +222,7 @@ fn default_arena_bots() -> ArenaBotsGenome {
             gunshot_alert_radius_m: 25.0,
             gunshot_alert_los_grace_secs: 0.6,
             alert_duration_secs: 4.0,
+            los_lost_grace_secs: 2.0,
         },
         spawn_positions: vec![
             BotSpawn {
@@ -374,6 +380,7 @@ fn sync_tactical_tuning_from_genome(
     tuning.gunshot_alert_radius_m = ai.gunshot_alert_radius_m;
     tuning.gunshot_alert_los_grace_secs = ai.gunshot_alert_los_grace_secs;
     tuning.alert_duration_secs = ai.alert_duration_secs;
+    tuning.los_lost_grace_secs = ai.los_lost_grace_secs;
     info!(
         "[arena-tactical] tuning synced (los_hz {:.1}, strafe_amp {:.2}m, alert_radius {:.1}m)",
         tuning.los_check_hz, tuning.strafe_amplitude_m, tuning.gunshot_alert_radius_m,

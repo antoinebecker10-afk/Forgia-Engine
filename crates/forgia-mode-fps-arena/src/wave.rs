@@ -369,6 +369,9 @@ pub fn spawn_wave_bots(
                     strafe_noise_seed: (x.to_bits() ^ z.to_bits()).wrapping_mul(2654435761),
                     alerted: false,
                     alert_left: 0.0,
+                    // Story-464 — grace de spawn = `los_lost_grace_secs` permet
+                    // au bot de Chase dès apparition même avant 1er raycast LOS.
+                    los_lost_grace_left: ai.los_lost_grace_secs,
                 },
                 BotShootConfig {
                     damage: shot_dmg,

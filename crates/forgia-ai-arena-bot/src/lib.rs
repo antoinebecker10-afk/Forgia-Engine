@@ -41,6 +41,11 @@ pub struct ArenaBot {
     pub alerted: bool,
     /// Timer décompte alerted (transition Idle→Chase forced pendant cette durée).
     pub alert_left: f32,
+    // ── Story-464 — LOS state gating ──────────────────────────────
+    /// Temps restant autorisé à Chase post-perte de LOS (sec). Set par
+    /// `bot_los_check` à la transition true→false. Décrémenté chaque frame.
+    /// Tant que > 0 : Chase autorisé (last sight memory). Sinon Chase → Idle.
+    pub los_lost_grace_left: f32,
 }
 
 impl Default for ArenaBot {
@@ -60,6 +65,10 @@ impl Default for ArenaBot {
             strafe_noise_seed: 0xDEADBEEF,
             alerted: false,
             alert_left: 0.0,
+            // Story-464 — grace de spawn 2s : bot peut Chase juste après spawn
+            // même avant le 1er raycast LOS. Sinon bots gèlent jusqu'à
+            // `1/los_check_hz` (~125ms). Resync via TacticalTuning au spawn caller.
+            los_lost_grace_left: 2.0,
         }
     }
 }
@@ -184,6 +193,26 @@ impl Plugin for ForgiaAiArenaBotPlugin {
     }
 }
 
+/// Story-456 Phase 1 — state machine 3-tier :
+/// - dist <= stop_distance : Attack (à portée tir, ne bouge plus)
+/// - stop_distance < dist <= detect_range : Chase (s'approche)
+/// - dist > detect_range : Idle (hors perception)
+///
+/// Story-464 — gate Chase/Attack sur LOS récente OU alert audio. Sans ces deux
+/// flags, le bot ne doit pas Chase à travers les murs même si distance OK.
+/// Fonction pure exposée pour tests headless (cf `tests/los_gating.rs`).
+pub fn decide_bot_state(bot: &ArenaBot, dist: f32) -> BotState {
+    let has_recent_sight = bot.has_los || bot.los_lost_grace_left > 0.0;
+    let can_pursue = has_recent_sight || bot.alerted;
+    if dist <= bot.stop_distance && can_pursue {
+        BotState::Attack
+    } else if dist <= bot.detect_range && can_pursue {
+        BotState::Chase
+    } else {
+        BotState::Idle
+    }
+}
+
 fn bot_state_machine(
     mut bots: Query<(&mut ArenaBot, &mut Transform), Without<BotTarget>>,
     targets: Query<&Transform, With<BotTarget>>,
@@ -204,14 +233,9 @@ fn bot_state_machine(
         // - dist <= stop_distance : Attack (à portée tir, ne bouge plus)
         // - stop_distance < dist <= detect_range : Chase (s'approche)
         // - dist > detect_range : Idle (hors perception)
-        // attack_range = shot_range >> stop_distance pour que le bot tire pendant Chase aussi.
-        bot.state = if dist <= bot.stop_distance {
-            BotState::Attack
-        } else if dist <= bot.detect_range {
-            BotState::Chase
-        } else {
-            BotState::Idle
-        };
+        //
+        // Story-464 — gate Chase/Attack sur LOS via `decide_bot_state` (testable).
+        bot.state = decide_bot_state(&bot, dist);
 
         // Story-456 Phase 3 — mouvement Chase délégué à `tactical::bot_tactical_movement`
         // (strafe + obstacle avoidance). Ce système ne gère plus que la state transition
