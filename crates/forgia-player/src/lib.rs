@@ -62,7 +62,12 @@ struct SkyboxPending {
 }
 
 /// Player marker — entité joueur principale.
+///
+/// Story-461 (Vague 3 Bevy 0.18 idioms) : `#[require(Transform, Visibility)]`
+/// garantit que tout spawn de Player insère ces deux components avec leur
+/// Default si non explicitement fournis. Anti-pattern bundles V0.13-V0.15.
 #[derive(Component)]
+#[require(Transform, Visibility)]
 pub struct Player {
     pub yaw: f32,
     pub pitch: f32,
@@ -114,7 +119,7 @@ fn spawn_player(mut commands: Commands) {
     commands.spawn((
         Player::default(),
         Transform::from_xyz(0.0, 2.0, 0.0),
-        Visibility::default(),
+        // Visibility::default() supprimé — fourni par #[require(Visibility)] sur Player.
         RigidBody::KinematicPositionBased,
         Collider::capsule_y(0.7, 0.3),
         // Phase I : Player health + BotTarget marker pour les enemies arena.

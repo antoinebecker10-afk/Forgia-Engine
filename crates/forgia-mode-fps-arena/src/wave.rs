@@ -345,7 +345,7 @@ pub fn spawn_wave_bots(
                 ArenaMarker,
                 TargetCube,
                 Transform::from_xyz(x, 0.0, z),
-                Visibility::default(),
+                // Visibility::default() supprimé — fourni par #[require(Visibility)] sur TargetCube.
                 Health::new(hp),
                 ArenaBot {
                     state: forgia_ai_arena_bot::BotState::Idle,

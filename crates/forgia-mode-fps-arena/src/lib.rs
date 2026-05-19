@@ -285,7 +285,11 @@ const CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min
 pub struct ArenaMarker;
 
 /// Marker pour les cubes-cibles (testables via fire_weapon_minimal).
+///
+/// Story-461 (Vague 3) : `#[require(Transform, Visibility)]` garantit que tout
+/// spawn de TargetCube insère Transform + Visibility avec Default si non fournis.
 #[derive(Component)]
+#[require(Transform, Visibility)]
 pub struct TargetCube;
 
 /// Cluster nuage en orbit circulaire autour du centre arène (Y axis).

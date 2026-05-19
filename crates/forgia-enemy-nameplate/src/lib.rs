@@ -39,7 +39,11 @@ pub mod prelude {
 }
 
 /// Marker root du nameplate (enfant du bot). Lifetime reset on each hit.
+///
+/// Story-461 (Vague 3) : `#[require(Transform, Visibility)]` garantit que tout
+/// spawn de NameplateRoot insère Transform + Visibility avec Default si non fournis.
 #[derive(Component)]
+#[require(Transform, Visibility)]
 pub struct NameplateRoot {
     pub target: Entity,
     pub lifetime_left: f32,
@@ -121,7 +125,7 @@ fn spawn_or_refresh_on_hit(
                     lifetime_left: t.lifetime,
                 },
                 Transform::from_xyz(0.0, t.y_offset, 0.0),
-                Visibility::default(),
+                // Visibility::default() supprimé — fourni par #[require(Visibility)] sur NameplateRoot.
                 Name::new("EnemyNameplate"),
                 ChildOf(ev.target),
             ))
