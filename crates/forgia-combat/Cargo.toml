@@ -12,6 +12,7 @@ bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 leafwing-input-manager = { workspace = true }
 forgia-core = { workspace = true }
+forgia-damage = { workspace = true }
 forgia-juice-hit-stop = { workspace = true }
 forgia-juice-recoil = { workspace = true }
 # forgia-assets = { workspace = true }    # TODO: uncomment when GameAssets V2 ported

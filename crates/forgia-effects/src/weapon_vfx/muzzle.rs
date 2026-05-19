@@ -18,36 +18,40 @@ use bevy_hanabi::Gradient as HanabiGradient;
 pub(super) fn create_muzzle_core_flash(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
+    // Story-450 v2 (2026-05-18 PM) — fix bloom blob screenshot user :
+    // particles stackées au même point + HDR 12+ × bloom = blob blanc géant.
+    // Solution : spread initial PLUS LARGE pour éviter stacking, burst /4,
+    // HDR très réduit (max 3.0 vs 12.0).
     let init_pos = SetPositionSphereModifier {
         center: writer.lit(Vec3::ZERO).expr(),
-        radius: writer.lit(0.03).expr(),
+        radius: writer.lit(0.025).expr(),
         dimension: ShapeDimension::Volume,
     };
 
     let init_vel = SetVelocitySphereModifier {
         center: writer.lit(Vec3::ZERO).expr(),
-        speed: writer.lit(0.1).uniform(writer.lit(0.5)).expr(),
+        speed: writer.lit(0.2).uniform(writer.lit(0.8)).expr(),
     };
 
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.06).uniform(writer.lit(0.14)).expr(),
+        writer.lit(0.015).uniform(writer.lit(0.035)).expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
         writer.lit(0.025).uniform(writer.lit(0.05)).expr(),
     );
 
-    // Ultra-bright HDR — white core with bloom blowout
+    // HDR MODÉRÉ — pas de blowout bloom. 3.0 max vs 12.0 avant.
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(12.0, 11.0, 8.0, 1.0));   // White-hot HDR
-    color_gradient.add_key(0.3, Vec4::new(8.0, 5.0, 2.0, 0.9));     // Bright yellow
-    color_gradient.add_key(0.6, Vec4::new(4.0, 1.5, 0.4, 0.5));     // Orange
-    color_gradient.add_key(1.0, Vec4::new(1.0, 0.2, 0.05, 0.0));    // Fade
+    color_gradient.add_key(0.0, Vec4::new(3.0, 2.5, 1.4, 1.0));     // Warm white doux
+    color_gradient.add_key(0.3, Vec4::new(2.5, 1.5, 0.5, 0.85));    // Yellow
+    color_gradient.add_key(0.6, Vec4::new(1.5, 0.6, 0.15, 0.45));   // Orange
+    color_gradient.add_key(1.0, Vec4::new(0.4, 0.1, 0.02, 0.0));    // Fade
 
     let effect = EffectAsset::new(
-        32,
-        SpawnerSettings::burst(20.0.into(), 99999.0.into()),
+        16,
+        SpawnerSettings::burst(5.0.into(), 99999.0.into()),
         writer.finish(),
     )
     .with_name("muzzle_core_flash")
@@ -89,16 +93,17 @@ pub(super) fn create_muzzle_sparks(effects: &mut ResMut<Assets<EffectAsset>>) ->
     let gravity = AccelModifier::new(writer.lit(Vec3::new(0.0, -6.0, 0.0)).expr());
     let drag = LinearDragModifier::new(writer.lit(2.0).expr());
 
+    // HDR doux pour sparks (était 4.0 → 2.0)
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(4.0, 3.2, 1.5, 1.0));    // Orange-white HDR
-    color_gradient.add_key(0.15, Vec4::new(3.0, 1.2, 0.3, 0.95));   // Orange
-    color_gradient.add_key(0.4, Vec4::new(1.5, 0.4, 0.08, 0.7));    // Red-orange
-    color_gradient.add_key(0.7, Vec4::new(0.6, 0.1, 0.02, 0.3));    // Dark red
+    color_gradient.add_key(0.0, Vec4::new(2.0, 1.6, 0.75, 1.0));    // Orange-white
+    color_gradient.add_key(0.15, Vec4::new(1.6, 0.7, 0.18, 0.95));  // Orange
+    color_gradient.add_key(0.4, Vec4::new(0.9, 0.25, 0.05, 0.7));   // Red-orange
+    color_gradient.add_key(0.7, Vec4::new(0.4, 0.07, 0.015, 0.3));  // Dark red
     color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0));   // Extinct
 
     let effect = EffectAsset::new(
-        64,
-        SpawnerSettings::burst(25.0.into(), 99999.0.into()),
+        32,
+        SpawnerSettings::burst(10.0.into(), 99999.0.into()),
         writer.finish(),
     )
     .with_name("muzzle_sparks")
@@ -128,30 +133,32 @@ pub(super) fn create_muzzle_smoke(effects: &mut ResMut<Assets<EffectAsset>>) -> 
         speed: writer.lit(0.2).uniform(writer.lit(0.8)).expr(),
     };
 
+    // Story-450 — smoke sizes /2 + lifetime plus court : moins persistant devant la cible.
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.04).uniform(writer.lit(0.10)).expr(),
+        writer.lit(0.02).uniform(writer.lit(0.05)).expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.3).uniform(writer.lit(0.8)).expr(),
+        writer.lit(0.18).uniform(writer.lit(0.45)).expr(),
     );
 
     // Slow upward drift + lateral asymmetry
-    let accel = AccelModifier::new(writer.lit(Vec3::new(0.15, 0.4, -0.1)).expr());
-    let drag = LinearDragModifier::new(writer.lit(3.0).expr());
+    let accel = AccelModifier::new(writer.lit(Vec3::new(0.15, 0.45, -0.1)).expr());
+    let drag = LinearDragModifier::new(writer.lit(3.5).expr());
 
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(0.6, 0.55, 0.5, 0.5));   // Light gray, semi-transparent
-    color_gradient.add_key(0.2, Vec4::new(0.4, 0.38, 0.35, 0.35));
-    color_gradient.add_key(0.5, Vec4::new(0.25, 0.22, 0.2, 0.2));
-    color_gradient.add_key(1.0, Vec4::new(0.1, 0.09, 0.08, 0.0));   // Fade out
+    color_gradient.add_key(0.0, Vec4::new(0.6, 0.55, 0.5, 0.40));  // Plus transparent
+    color_gradient.add_key(0.2, Vec4::new(0.4, 0.38, 0.35, 0.28));
+    color_gradient.add_key(0.5, Vec4::new(0.25, 0.22, 0.2, 0.15));
+    color_gradient.add_key(1.0, Vec4::new(0.1, 0.09, 0.08, 0.0));
 
+    // Sizes /2 — grows mais reste discret.
     let mut size_gradient = HanabiGradient::new();
-    size_gradient.add_key(0.0, Vec3::splat(0.04));
-    size_gradient.add_key(0.2, Vec3::splat(0.12));
-    size_gradient.add_key(0.5, Vec3::splat(0.22));
-    size_gradient.add_key(1.0, Vec3::splat(0.35));   // Grows as it dissipates
+    size_gradient.add_key(0.0, Vec3::splat(0.02));
+    size_gradient.add_key(0.2, Vec3::splat(0.06));
+    size_gradient.add_key(0.5, Vec3::splat(0.11));
+    size_gradient.add_key(1.0, Vec3::splat(0.17));
 
     let effect = EffectAsset::new(
         48,
@@ -190,20 +197,20 @@ pub(super) fn create_muzzle_heat_glow(effects: &mut ResMut<Assets<EffectAsset>>)
         speed: writer.lit(0.05).uniform(writer.lit(0.2)).expr(),
     };
 
+    // Story-450 v2 — heat glow /5 + HDR doux. Halo discret seulement.
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.3).uniform(writer.lit(0.6)).expr(),
+        writer.lit(0.06).uniform(writer.lit(0.12)).expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
         writer.lit(0.03).uniform(writer.lit(0.07)).expr(),
     );
 
-    // Warm orange glow, subtle, mostly for bloom halo
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(3.0, 1.8, 0.8, 0.4));
-    color_gradient.add_key(0.4, Vec4::new(1.8, 0.8, 0.3, 0.25));
-    color_gradient.add_key(1.0, Vec4::new(0.6, 0.2, 0.05, 0.0));
+    color_gradient.add_key(0.0, Vec4::new(1.5, 0.9, 0.4, 0.15));
+    color_gradient.add_key(0.4, Vec4::new(0.9, 0.4, 0.15, 0.10));
+    color_gradient.add_key(1.0, Vec4::new(0.3, 0.1, 0.025, 0.0));
 
     let effect = EffectAsset::new(
         12,
@@ -237,27 +244,31 @@ pub(super) fn create_muzzle_forward_flash(effects: &mut ResMut<Assets<EffectAsse
         speed: writer.lit(5.0).uniform(writer.lit(12.0)).expr(),
     };
 
+    // Story-450 v2 — forward flash : était le coupable principal du blob pink/yellow
+    // screenshot user 2026-05-18 PM. Burst 30 + HDR 10 + purple gradient + bloom →
+    // énorme blob solide centré. Solution : burst /4, HDR /3, drop le purple tint
+    // qui créait le rendu rose pixelé.
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.02).uniform(writer.lit(0.06)).expr(),
+        writer.lit(0.008).uniform(writer.lit(0.025)).expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
         writer.lit(0.02).uniform(writer.lit(0.05)).expr(),
     );
 
-    let drag = LinearDragModifier::new(writer.lit(8.0).expr()); // Strong drag = short tongue
+    let drag = LinearDragModifier::new(writer.lit(10.0).expr());
 
+    // HDR doux, pas de purple tint (était le rose du screenshot).
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(10.0, 8.0, 4.0, 1.0));   // White-yellow HDR
-    color_gradient.add_key(0.2, Vec4::new(6.0, 3.0, 0.8, 0.9));    // Bright orange
-    // Blue/purple accent (DOOM technique — pops against any background)
-    color_gradient.add_key(0.5, Vec4::new(2.0, 0.8, 1.2, 0.5));    // Purple tint
-    color_gradient.add_key(1.0, Vec4::new(0.3, 0.05, 0.1, 0.0));   // Fade
+    color_gradient.add_key(0.0, Vec4::new(3.0, 2.4, 1.2, 1.0));    // Warm white
+    color_gradient.add_key(0.3, Vec4::new(2.2, 1.1, 0.3, 0.85));   // Orange
+    color_gradient.add_key(0.7, Vec4::new(1.0, 0.3, 0.05, 0.4));   // Deeper orange
+    color_gradient.add_key(1.0, Vec4::new(0.2, 0.05, 0.01, 0.0));  // Fade
 
     let effect = EffectAsset::new(
-        48,
-        SpawnerSettings::burst(30.0.into(), 99999.0.into()),
+        24,
+        SpawnerSettings::burst(8.0.into(), 99999.0.into()),
         writer.finish(),
     )
     .with_name("muzzle_forward_flash")

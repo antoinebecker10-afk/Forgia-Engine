@@ -378,7 +378,11 @@ pub struct HitscanCtx<'w, 's> {
     pub q_children: Query<'w, 's, &'static Children>,
     pub q_child_of: Query<'w, 's, &'static ChildOf>,
     pub q_name: Query<'w, 's, &'static Name>,
+    /// Story-457 — lookup zone sur le collider directement frappé.
+    pub q_zone: Query<'w, 's, &'static forgia_damage::HitZoneTag>,
     pub sensor: ResMut<'w, HitscanSensorState>,
+    /// Story-457 — multiplicateurs damage par zone (genome-driven, hot-reload).
+    pub feedback: Res<'w, forgia_damage::HitFeedback>,
 }
 
 /// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
@@ -1088,11 +1092,21 @@ fn fire_weapon_minimal(
         // Le collider est plusieurs niveaux sous le bot parent (SceneRoot child →
         // Mesh3d nodes → rapier collider entities). `target_ancestor` calculé plus haut
         // pour le sensor — réutilisé ici (DRY, fix BUG-RUN-1 cohérent).
-        if let Some((_, toi)) = hit_result {
+        if let Some((hit_collider, toi)) = hit_result {
             if let Some(entity) = target_ancestor {
+                // Story-457 — qualifier la zone depuis le HitZoneTag du collider
+                // directement frappé (sphere sensor head proxy ou body convex hull).
+                // Body par défaut si aucun tag — préserve compat avec bots non-taggés.
+                let zone = hitscan_ctx
+                    .q_zone
+                    .get(hit_collider)
+                    .map(|t| t.0)
+                    .unwrap_or(forgia_damage::HitZone::Body);
+                let zone_mul = hitscan_ctx.feedback.0.damage_mul(zone);
+
                 if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
                     let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
-                    let effective_dmg = damage * falloff_mul;
+                    let effective_dmg = damage * falloff_mul * zone_mul;
                     hp.current = (hp.current - effective_dmg).max(0.0);
                     let dead = hp.is_dead();
                     let new_hp = hp.current;
@@ -1109,18 +1123,19 @@ fn fire_weapon_minimal(
                             });
                     }
 
-                    // Story-455 Phase C — étendu attacker/headshot/world_pos/weapon.
-                    // Headshot toujours `false` en attendant hitzone Head/Body split (story-456).
+                    // Story-457 — body_zone propagé + is_headshot dérivé du tag.
                     let attacker_entity = q_player.single().ok();
                     let hit_world = origin + pellet_dir * toi;
+                    let is_headshot = zone == forgia_damage::HitZone::Head;
                     hit_events.write(CombatHitEvent {
                         target: entity,
                         attacker: attacker_entity,
                         damage: effective_dmg,
                         is_kill: dead,
-                        is_headshot: false,
+                        is_headshot,
                         hit_world_pos: hit_world,
                         weapon: Some(ammo.equipped.current),
+                        body_zone: zone,
                     });
 
                     if hit_record.is_none() {

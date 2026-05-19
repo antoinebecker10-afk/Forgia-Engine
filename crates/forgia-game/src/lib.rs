@@ -52,6 +52,15 @@ pub fn run_game() -> AppExit {
         forgia_juice_screen_flash::prelude::ForgiaJuiceScreenFlashPlugin,
         forgia_ui_pause_menu::prelude::ForgiaUiPauseMenuPlugin,
         forgia_sensors::prelude::ForgiaSensorsPlugin,
+        forgia_observability::prelude::ForgiaObservabilityPlugin,
+    ));
+
+    // 5b. Story-457 (2026-05-19) — damage types + nameplate (split du bloc 5
+    //     pour rester sous la limite tuple Bevy 15).
+    app.add_plugins((
+        forgia_damage::ForgiaDamagePlugin,
+        forgia_damage_numbers::ForgiaDamageNumbersPlugin,
+        forgia_enemy_nameplate::prelude::ForgiaEnemyNameplatePlugin,
     ));
 
     // 6. Cross-mode systems (utilisés par forgia-rpg, requis init_resource avant Startup)

@@ -2,7 +2,7 @@
 name = "forgia-damage"
 version = "0.1.0"
 edition = "2021"
-description = "Health component + DamageEvent system"
+description = "Health component + DamageEvent system + HitZone types (story-457)"
 
 [lints]
 workspace = true
@@ -10,3 +10,5 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 forgia-core = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }

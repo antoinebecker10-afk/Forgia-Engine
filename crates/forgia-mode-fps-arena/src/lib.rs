@@ -162,6 +162,13 @@ pub struct BotSpawn {
     pub character_y_offset: f32,
     pub x: f32,
     pub z: f32,
+    /// Story-457 — Y world position de la sphere sensor head proxy par rapport
+    /// au parent bot. Override par-bot si character_y_offset/scale custom.
+    #[serde(default = "default_head_y_offset")]
+    pub head_y_offset: f32,
+    /// Story-457 — Rayon sphere head proxy (m).
+    #[serde(default = "default_head_radius")]
+    pub head_radius: f32,
 }
 
 fn default_character_scale() -> f32 {
@@ -170,6 +177,14 @@ fn default_character_scale() -> f32 {
 
 fn default_character_y_offset() -> f32 {
     0.9
+}
+
+fn default_head_y_offset() -> f32 {
+    1.75
+}
+
+fn default_head_radius() -> f32 {
+    0.22
 }
 
 #[derive(Resource)]
@@ -211,6 +226,8 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_y_offset: 0.9,
                 x: -4.0,
                 z: -7.0,
+                head_y_offset: 1.75,
+                head_radius: 0.22,
             },
             BotSpawn {
                 character_glb: String::new(),
@@ -219,6 +236,8 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_y_offset: 0.9,
                 x: 0.0,
                 z: -7.0,
+                head_y_offset: 1.75,
+                head_radius: 0.22,
             },
             BotSpawn {
                 character_glb: String::new(),
@@ -227,6 +246,8 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_y_offset: 0.9,
                 x: 4.0,
                 z: -7.0,
+                head_y_offset: 1.75,
+                head_radius: 0.22,
             },
             BotSpawn {
                 character_glb: String::new(),
@@ -235,6 +256,8 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_y_offset: 0.9,
                 x: 10.0,
                 z: -14.0,
+                head_y_offset: 1.75,
+                head_radius: 0.22,
             },
             BotSpawn {
                 character_glb: String::new(),
@@ -243,6 +266,8 @@ fn default_arena_bots() -> ArenaBotsGenome {
                 character_y_offset: 0.9,
                 x: -14.0,
                 z: 10.0,
+                head_y_offset: 1.75,
+                head_radius: 0.22,
             },
         ],
     }

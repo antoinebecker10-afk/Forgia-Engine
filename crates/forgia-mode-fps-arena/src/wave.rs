@@ -54,7 +54,16 @@ pub struct WaveSpawnEntry {
     pub character_scale: f32,
     pub x: f32,
     pub z: f32,
+    /// Story-457 — head proxy sensor Y offset (m) relatif au parent bot.
+    #[serde(default = "default_head_y")]
+    pub head_y_offset: f32,
+    /// Story-457 — head proxy sensor radius (m).
+    #[serde(default = "default_head_r")]
+    pub head_radius: f32,
 }
+
+fn default_head_y() -> f32 { 1.75 }
+fn default_head_r() -> f32 { 0.22 }
 
 fn default_one() -> f32 {
     1.0
@@ -324,6 +333,8 @@ pub fn spawn_wave_bots(
         let character_scale = spawn.character_scale;
         let character_yaw = spawn.character_yaw_deg.to_radians();
         let character_y_offset = spawn.character_y_offset;
+        let head_y_offset = spawn.head_y_offset;
+        let head_radius = spawn.head_radius;
 
         // Story-453 v2 (2026-05-18) — mesh-exact hitbox.
         // Parent = anchor world position + Health + RigidBody (PAS de Collider).
@@ -399,6 +410,21 @@ pub fn spawn_wave_bots(
                 ));
             });
         }
+
+        // Story-457 — Head proxy : sphere Sensor collider enfant du bot, tagué
+        // HitZone::Head. Ray query hit cette sphère AVANT le convex hull body
+        // si visée tête (sphère légèrement saillante du contour body convex
+        // hull). Sensor = pas de collision physique solide (le bot reste
+        // KinematicPositionBased), juste détecté en raycast.
+        commands.entity(parent_id).with_children(|p| {
+            p.spawn((
+                Transform::from_xyz(0.0, head_y_offset, 0.0),
+                Collider::ball(head_radius),
+                Sensor,
+                forgia_damage::HitZoneTag(forgia_damage::HitZone::Head),
+                Name::new("HeadProxy"),
+            ));
+        });
     }
 }
 

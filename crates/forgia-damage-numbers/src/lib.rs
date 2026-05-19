@@ -1,13 +1,13 @@
 //! forgia-damage-numbers — Floating damage numbers, 3D world-space billboards.
 //!
-//! Listens to `DamageEvent` from forgia-damage. For each damage, spawns a
-//! `Text2d`-equivalent (text mesh) at the target position that drifts up and
-//! fades out over `lifetime` seconds.
-//!
-//! V1 lesson : use a single `Text2d`-style billboard, NOT one entity per char.
+//! Story-457 (2026-05-19) — refacto : lit `CombatHitEvent` (au lieu de
+//! `DamageEvent`) car c'est l'event source-of-truth pour le fire path FPS V2.
+//! Couleur + taille pilotées par `HitFeedbackTuning` (genome hot-reload) selon
+//! `body_zone`. Position depuis `hit_world_pos` (vs `target.translation + Y`).
 
 use bevy::prelude::*;
-use forgia_damage::{DamageEvent, DamageKind};
+use forgia_combat::prelude::CombatHitEvent;
+use forgia_damage::{HitFeedback, HitZone};
 
 #[derive(Component)]
 pub struct FloatingNumber {
@@ -20,32 +20,33 @@ pub struct ForgiaDamageNumbersPlugin;
 
 impl Plugin for ForgiaDamageNumbersPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (spawn_on_damage, tick_numbers));
+        app.add_systems(Update, (spawn_on_hit, tick_numbers));
     }
 }
 
-fn spawn_on_damage(
-    mut events: MessageReader<DamageEvent>,
+fn spawn_on_hit(
+    mut events: MessageReader<CombatHitEvent>,
     mut commands: Commands,
-    targets: Query<&GlobalTransform>,
+    feedback: Res<HitFeedback>,
 ) {
     for ev in events.read() {
-        let Ok(xf) = targets.get(ev.target) else { continue };
-        let pos = xf.translation() + Vec3::Y * 1.6;
+        let rgb = feedback.0.color(ev.body_zone);
+        let font_size = feedback.0.font_size(ev.body_zone);
+        let color = Color::linear_rgb(rgb[0], rgb[1], rgb[2]);
 
-        let color = match ev.kind {
-            DamageKind::Fire => Color::srgb(1.0, 0.4, 0.1),
-            DamageKind::Poison => Color::srgb(0.3, 1.0, 0.3),
-            DamageKind::Explosion => Color::srgb(1.0, 0.6, 0.0),
-            _ => Color::srgb(1.0, 1.0, 1.0),
+        // Headshot pop : monte plus vite (lecture "important").
+        let vel_y = match ev.body_zone {
+            HitZone::Head => 2.4,
+            HitZone::Body => 1.6,
+            HitZone::Limb => 1.2,
         };
 
         commands.spawn((
-            FloatingNumber { ttl: 1.0, initial_ttl: 1.0, vel_y: 1.6 },
-            Text2d::new(format!("{:.0}", ev.amount)),
-            TextFont { font_size: 22.0, ..default() },
+            FloatingNumber { ttl: 1.0, initial_ttl: 1.0, vel_y },
+            Text2d::new(format!("{:.0}", ev.damage)),
+            TextFont { font_size, ..default() },
             TextColor(color),
-            Transform::from_translation(pos),
+            Transform::from_translation(ev.hit_world_pos + Vec3::Y * 0.1),
             GlobalTransform::default(),
         ));
     }

@@ -21,13 +21,16 @@ use forgia_combat::weapons::WeaponType;
 /// distinct (pattern V1 confirmé : Boucherie shotgun = flash large, Lenoir sniper = long
 /// flash, Pépin / Bourrasque = standard SMG).
 pub fn weapon_muzzle_scale(w: &WeaponType) -> f32 {
+    // Story-450 (2026-05-18) — softening user request : VFX trop gros bloquaient la
+    // visée. Réduction ~35% sur tous les scales, baseline ModernAR passe 1.0 → 0.65.
+    // Signature gameplay préservée (shotgun/rocket toujours plus gros).
     match w {
-        WeaponType::Shotgun => 1.5,        // Madame Lenoir (V2 mapping : sniper-shotgun hybride)
-        WeaponType::RocketLauncher => 1.7, // Boucherie (heavy)
-        WeaponType::AK47 => 1.15,
-        WeaponType::AssaultRifle => 1.1,   // Bourrasque
-        WeaponType::ModernAR => 1.0,       // Pépin (baseline)
-        WeaponType::PlasmaRifle => 1.2,
+        WeaponType::Shotgun => 1.05,       // Madame Lenoir (sniper-shotgun hybride V2)
+        WeaponType::RocketLauncher => 1.20, // Boucherie (heavy mais réduit)
+        WeaponType::AK47 => 0.80,
+        WeaponType::AssaultRifle => 0.75,  // Bourrasque
+        WeaponType::ModernAR => 0.65,      // Pépin (baseline shrink)
+        WeaponType::PlasmaRifle => 0.85,
         WeaponType::Chainsaw => 0.0,       // pas de muzzle (mêlée)
     }
 }
@@ -142,17 +145,16 @@ pub fn spawn_muzzle_flash(
         Lifetime(Timer::from_seconds(1.2, TimerMode::Once)),
     ));
 
-    // Layer 4: Heat glow — story-432 V5-A (2026-05-13) : DISABLED pour
-    // réduire le coût spawn hanabi en auto-fire (11 tirs/sec × 5 layers = 55
-    // spawn entity/sec + EffectAsset init). Layer marginal visuel (0.15s
-    // bloom halo), drop = -20% cost muzzle sans perte ressentie. Layer 5
-    // forward_flash conservé (visuel signature DOOM blue/purple).
-    // commands.spawn((
-    //     ParticleEffect::new(effects.muzzle_heat_glow.clone()),
-    //     Transform::from_translation(barrel_tip),
-    //     MuzzleVfxMarker,
-    //     Lifetime(Timer::from_seconds(0.15, TimerMode::Once)),
-    // ));
+    // Layer 4: Heat glow — story-450 (2026-05-18) : RE-ENABLED après shrink x3
+    // (0.10-0.20 vs 0.30-0.60) + alpha /2. Halo bloom subtil qui ajoute la
+    // qualité AAA "weight feel" sans bloquer la cible. Coût hanabi acceptable
+    // (12 particles × 0.07s = ~0.84 particles/s steady-state en auto-fire).
+    commands.spawn((
+        ParticleEffect::new(effects.muzzle_heat_glow.clone()),
+        Transform::from_translation(barrel_tip).with_scale(scale_v),
+        MuzzleVfxMarker,
+        Lifetime(Timer::from_seconds(0.12, TimerMode::Once)),
+    ));
 
     // Layer 5: Forward flash tongue (oriented along barrel)
     commands.spawn((

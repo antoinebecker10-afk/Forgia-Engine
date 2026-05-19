@@ -33,6 +33,9 @@ use bevy::prelude::*;
 ///   reste à `false` jusqu'à hitzone Head/Body split (story-456 deferred).
 /// - `hit_world_pos` : position monde du point d'impact (pour DDI angle + popup spawn).
 /// - `weapon` : arme utilisée (pour kill feed icon mapping). None = world/melee.
+/// - `body_zone` : zone du corps touchée (story-457, 2026-05-19). Pilote
+///   damage multiplier + visual style (couleur/taille floating number +
+///   label nameplate). `Body` par défaut si aucun `HitZoneTag` rencontré.
 #[derive(Message)]
 pub struct CombatHitEvent {
     pub target: Entity,
@@ -42,6 +45,7 @@ pub struct CombatHitEvent {
     pub is_headshot: bool,
     pub hit_world_pos: Vec3,
     pub weapon: Option<crate::weapons::WeaponType>,
+    pub body_zone: forgia_damage::HitZone,
 }
 
 /// Tracks previous health to detect damage via change detection.
