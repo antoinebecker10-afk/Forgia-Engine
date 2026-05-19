@@ -17,13 +17,17 @@ const OUTPUT_PATH: &str = "forgia2_rpg_health.json";
 
 // ─────────────────────────── Structures de sérialisation ───────────────────────────
 
+/// Format canonique Phase 5 (Vague 5 Session A) : `{id, severity, next_step}`
+/// top-level conformes `.claude/rules/observability-required.md` + payload
+/// detail (schema_version, checks map, tick_count).
 #[derive(Serialize)]
 struct HealthJson<'a> {
+    id: &'static str,
+    severity: &'a Severity,
+    next_step: &'a str,
     timestamp_secs: f32,
     schema_version: u32,
-    overall_severity: &'a Severity,
     overall_message: &'a str,
-    next_step: &'a str,
     checks: HashMap<&'static str, &'a CheckResult>,
     tick_count: u64,
 }
@@ -51,11 +55,12 @@ pub fn sys_write_rpg_health_json(
         .collect();
 
     let payload = HealthJson {
+        id: "rpg_health",
+        severity: &state.last_severity,
+        next_step: &state.last_next_step,
         timestamp_secs: time.elapsed_secs(),
         schema_version: 1,
-        overall_severity: &state.last_severity,
         overall_message: &state.last_message,
-        next_step: &state.last_next_step,
         checks: checks_ref,
         tick_count: state.tick_count,
     };

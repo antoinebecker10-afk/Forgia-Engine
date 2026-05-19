@@ -62,11 +62,13 @@ fn baseline_e1_e2() {
 /// Le binary tolère les sensors manquants pour ne pas bloquer CI pendant migration
 /// progressive. Mode strict (`--strict` flag futur) vérifierait count == 13 exact.
 const CANONICAL_SENSORS: &[&str] = &[
+    // Tier 0 (Session A Étape 1, story-457+rename) — health sensors
     "forgia2_health.json",
     "forgia2_rpg_health.json",
-    // Tier 1 (Session A étape 2-3) :
-    // "forgia2_arena.json",
-    // "forgia2_combat.json",
+    // Tier 1 (story-465 sensor fusion) — gameplay aggregators
+    "forgia2_arena.json",
+    "forgia2_combat.json",
+    // Tier 1bis (Session A étape 3 — futur) :
     // "forgia2_chunks.json",
     // Tier 2 (Session B-C) :
     // "forgia2_perf.json",
