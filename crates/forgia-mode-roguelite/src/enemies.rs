@@ -21,6 +21,8 @@ pub enum EnemyArchetype {
     Tank,
     Runner,
     Sniper,
+    /// M3 step 1 — boss final wave 3. Unique, tanky, 2 phases (enrage à 50% HP).
+    Boss,
 }
 
 impl EnemyArchetype {
@@ -30,6 +32,7 @@ impl EnemyArchetype {
             Self::Tank => "tank",
             Self::Runner => "runner",
             Self::Sniper => "sniper",
+            Self::Boss => "boss",
         }
     }
 }
@@ -93,6 +96,21 @@ pub fn stats_for(archetype: EnemyArchetype) -> EnemyStats {
             capsule_half_height: 0.85,
             color_rgb: [0.55, 0.20, 0.80],
             emissive_rgb: [0.22, 0.08, 0.35],
+        },
+        // M3 step 1 — boss : tanky, mi-range, intimidant. Capsule géante 3×Tank.
+        // Phase 2 enrage à 50% HP : speed×1.8, cooldown×0.55 (cf sys_boss_enrage).
+        EnemyArchetype::Boss => EnemyStats {
+            hp: 800.0,
+            speed: 3.5,
+            stop_distance: 10.0,
+            attack_range: 30.0,
+            detect_range: 80.0,
+            attack_cooldown: 1.3,
+            warmup_secs: 2.5,
+            capsule_radius: 1.4,
+            capsule_half_height: 2.2,
+            color_rgb: [0.90, 0.10, 0.50],
+            emissive_rgb: [0.50, 0.05, 0.25],
         },
     }
 }

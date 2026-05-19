@@ -62,10 +62,10 @@ pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
             (EnemyArchetype::Sniper, 4, 55.0),
         ],
         _ => vec![
-            // Wave 3 (final) : 6/6/4 = 16 ennemis, anneaux légèrement étendus.
-            (EnemyArchetype::Tank, 6, 16.0),
-            (EnemyArchetype::Runner, 6, 32.0),
-            (EnemyArchetype::Sniper, 4, 60.0),
+            // Wave 3 (final boss — M3 step 1) : 1 boss + 4 ennemis support pour
+            // pression de zone (cohérent climax RoR2 / Hadès).
+            (EnemyArchetype::Boss, 1, 12.0),
+            (EnemyArchetype::Runner, 4, 28.0),
         ],
     }
 }
@@ -176,6 +176,41 @@ pub fn sys_wave_orchestrator(
     }
 }
 
+/// M3 step 1 — marker enrage phase 2. Inséré quand HP boss < 50%.
+#[derive(Component, Default)]
+pub struct BossEnraged;
+
+/// Détecte boss à ≤50% HP → insert BossEnraged + boost stats AI runtime.
+/// Idempotent : `Without<BossEnraged>` filtre évite re-trigger.
+pub fn sys_boss_enrage(
+    mut commands: Commands,
+    mut q_boss: Query<
+        (Entity, &Health, &EnemyArchetype, &mut ArenaBot),
+        Without<BossEnraged>,
+    >,
+) {
+    for (entity, health, archetype, mut bot) in &mut q_boss {
+        if *archetype != EnemyArchetype::Boss {
+            continue;
+        }
+        let fraction = health.fraction();
+        if fraction <= 0.5 {
+            let stats = enemies::stats_for(EnemyArchetype::Boss);
+            bot.speed = stats.speed * 1.8;
+            bot.attack_cooldown = stats.attack_cooldown * 0.55;
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.insert(BossEnraged);
+            }
+            info!(
+                "[roguelite] BOSS ENRAGED — phase 2 (HP {:.0}%, speed {:.1}, cooldown {:.2}s)",
+                fraction * 100.0,
+                bot.speed,
+                bot.attack_cooldown
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,10 +221,18 @@ mod tests {
         let w2: u32 = wave_composition(2).iter().map(|(_, c, _)| *c).sum();
         let w3: u32 = wave_composition(3).iter().map(|(_, c, _)| *c).sum();
         assert!(w1 < w2, "wave 2 doit avoir plus d'ennemis que wave 1");
-        assert!(w2 < w3, "wave 3 doit avoir plus d'ennemis que wave 2");
         assert_eq!(w1, 8);
         assert_eq!(w2, 12);
-        assert_eq!(w3, 16);
+        assert_eq!(w3, 5, "wave 3 = 1 boss + 4 support");
+    }
+
+    #[test]
+    fn wave_3_contains_boss() {
+        let w3 = wave_composition(3);
+        assert!(
+            w3.iter().any(|(a, _, _)| *a == EnemyArchetype::Boss),
+            "wave 3 doit contenir un Boss"
+        );
     }
 
     #[test]

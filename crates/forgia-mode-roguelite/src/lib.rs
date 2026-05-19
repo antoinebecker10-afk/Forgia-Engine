@@ -73,7 +73,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             )
             .add_systems(
                 Update,
-                waves::sys_wave_orchestrator
+                (waves::sys_wave_orchestrator, waves::sys_boss_enrage)
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Roguelite)),
             )

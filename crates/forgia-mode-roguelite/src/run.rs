@@ -310,6 +310,7 @@ pub fn obs_roguelite_enemy_death(
         crate::EnemyArchetype::Tank => 5,
         crate::EnemyArchetype::Runner => 2,
         crate::EnemyArchetype::Sniper => 3,
+        crate::EnemyArchetype::Boss => 50, // M3 step 1 — récompense climax
     };
 
     let pos = xf.translation.with_y(0.6);
