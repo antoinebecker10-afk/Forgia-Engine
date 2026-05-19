@@ -325,6 +325,7 @@ pub fn write_bot_ai_sensor(
     sensor.last_write_secs = now;
     let mut alive = 0u32;
     let mut with_los = 0u32;
+    let mut in_grace = 0u32;
     let mut alerted = 0u32;
     let mut chasing = 0u32;
     let mut attacking = 0u32;
@@ -335,6 +336,11 @@ pub fn write_bot_ai_sensor(
         alive += 1;
         if bot.has_los {
             with_los += 1;
+        }
+        // BUG-464-03 — bots actuellement en "last sight grace" (LOS perdu mais
+        // grace pas encore expirée). Permet d'observer le gate story-464.
+        if !bot.has_los && bot.los_lost_grace_left > 0.0 {
+            in_grace += 1;
         }
         if bot.alerted {
             alerted += 1;
@@ -351,10 +357,11 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1}}}}}"#,
-        now, alive, with_los, alerted, chasing, attacking,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        now, alive, with_los, in_grace, alerted, chasing, attacking,
         sensor.los_checks_session, sensor.alerts_triggered_session,
         tuning.los_check_hz, tuning.strafe_amplitude_m, tuning.gunshot_alert_radius_m,
+        tuning.los_lost_grace_secs,
     );
     let _ = std::fs::write("forgia_bot_ai.json", json);
 }

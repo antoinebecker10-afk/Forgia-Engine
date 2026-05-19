@@ -81,15 +81,22 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
             .add_systems(
                 Update,
                 (
+                    cleanup_registry_on_target_removed,
                     spawn_nameplate_for_targets,
                     spawn_or_refresh_on_hit,
                     keep_permanent_nameplates_alive,
                     update_hp_fill,
-                    billboard_to_camera,
                     tick_lifetime_and_despawn,
                     sensor_write,
                 )
                     .chain(),
+            )
+            // BUG-464-02 — billboard en PostUpdate après TransformPropagate pour
+            // lire des `GlobalTransform` à jour (sinon lag 1 frame sur le yaw
+            // parent extrait). Pattern Bevy standard pour billboards.
+            .add_systems(
+                PostUpdate,
+                billboard_to_camera.after(bevy::transform::TransformSystems::Propagate),
             );
     }
 }
@@ -155,6 +162,26 @@ fn build_nameplate_for(
 
     registry.map.insert(target, root_id);
     Some(root_id)
+}
+
+/// BUG-464-01 — Purge les entrées registry dont la target a perdu son marker
+/// `NameplateTarget` (typiquement mort du bot → recursive despawn enlève le
+/// Component). Sans ça, la `HashMap` croît unbounded sur respawns successifs
+/// et `registry_size` diverge de `active_count` dans le sensor.
+fn cleanup_registry_on_target_removed(
+    mut removed: RemovedComponents<NameplateTarget>,
+    mut registry: ResMut<NameplateRegistry>,
+    mut commands: Commands,
+) {
+    for target in removed.read() {
+        if let Some(root_e) = registry.map.remove(&target) {
+            // Si le bot est despawné par parent recursive, le root est déjà
+            // mort — `get_entity` retourne Err, on skip silencieusement.
+            if let Ok(mut ec) = commands.get_entity(root_e) {
+                ec.try_despawn();
+            }
+        }
+    }
 }
 
 /// Spawn permanent — pour toute entité `With<NameplateTarget>` sans nameplate.
