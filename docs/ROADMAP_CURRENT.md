@@ -107,16 +107,18 @@ Effort réel ~3 h (vs 6 h estimé — research bevy-specialist a écarté piège
   - `Trigger<OnAdd, C>` → `On<Add, C>` (PR #19596)
   - `EntityCountDiagnosticsPlugin::default()` requis (struct avec field)
 
-**⚠️ Smoke test runtime BLOQUÉ** : crash pré-existant V6 Tier 2B (commit `6a45c6322` `refactor(viewmodel)`) — `forgia_viewmodel::genome::load_viewmodel_genome` panic car `app.init_asset::<Genome<ViewmodelGenome>>()` jamais appelé. **Indépendant de Session C**. Code Session C validé par `cargo check --workspace` (✅) + clippy `-D warnings` (✅ 0) + 66 tests (✅). `xtask verify-sensors-format` retournera 12/12 dès V6 stable.
+**✅ Smoke test runtime DÉBLOQUÉ** par fix commit `138dcc056` (10 lignes `init_asset` + `register_asset_loader` dans `ForgiaViewmodelPlugin::build()`, pattern miroir forgia-damage:202). 12/12 canonical confirmés runtime.
 
-### V6 — Crates extraction (P2) 🟡 IN PROGRESS (terminal // 2026-05-19 19:50)
+### V6 — Crates extraction (P2) ✅ DONE-partiel 2026-05-19
 
-Tier 2A/B : `forgia-weapon-hitscan`, `forgia-weapon-viewmodel`. Repris dans un terminal parallèle :
+| Étape | Cible | Statut | Commit |
+|---|---|---|---|
+| E1 | `forgia-weapon-hitscan` (scaffold design alternatif Component `Hitscan` + `TryFire` event, 148 LOC) | ✅ scaffold présent | (terminal // user) |
+| E2 | `forgia-viewmodel` (extraction Tier 2B) — `WeaponViewmodel`, `WeaponModelAssets`, `ads`, `scope_glass`, `viewmodel_debug`, `ViewmodelGenome*`, `attach/switch/auto-scale` | ✅ DONE | `6a45c6322` extraction + `138dcc056` fix init_asset |
 
-- **E1 → `forgia-weapon-hitscan`** : sort `LeftMouseState`, `track_left_mouse_state`, `BurstState`, `dispatch_fire_trigger`, `fire_weapon_minimal`, `pseudo_rand`, `find_health_ancestor` ; expose `WeaponHitscanPlugin` + `WeaponFireRequest` event.
-- **E2 → `forgia-weapon-viewmodel`** : sort `WeaponViewmodel`, `WeaponModelAssets`, attach/switch/auto-scale systems, `ads.rs`, `scope_glass.rs`, `viewmodel_debug.rs`, `ViewmodelGenome*` ; expose `WeaponViewmodelPlugin`.
-- Ordre **E1 → E2 séquentiel** (mêmes fichiers Cargo.toml/lib.rs côté `forgia-fps`).
-- Zéro breaking change Fps Arena : V7 (roguelite) attend que E1+E2 mergent pour consommer les nouvelles crates directement.
+**Note honnête** : Le scaffold `forgia-weapon-hitscan` (148 LOC) adopte un design *différent* du plan original ROADMAP (`LeftMouseState` + `dispatch_fire_trigger` + `fire_weapon_minimal` restent dans `forgia-fps`). Le scaffold expose plutôt `Hitscan` Component + `TryFire`/`HitscanFired` events. Migration complète des helpers `LeftMouseState` etc. → reportée à V7 ou plus tard si nécessité concrète (pas bloquant pour V7 roguelite qui peut consommer `Hitscan` Component directement).
+
+Zéro breaking change FPS Arena. V7 roguelite peut consommer `forgia-weapon-hitscan` (firing déclaratif) + `forgia-viewmodel` (1P render) directement.
 
 ### V7 — 3e jeu : Roguelite FPS Coop 🟡 PLAN AJUSTÉ POST-AUDIT (2026-05-19)
 
