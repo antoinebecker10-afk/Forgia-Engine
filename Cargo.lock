@@ -4245,6 +4245,9 @@ dependencies = [
  "bevy",
  "bevy_kira_audio",
  "forgia-core",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -5019,7 +5022,9 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_rapier3d",
+ "forgia-ai-arena-bot",
  "forgia-core",
+ "forgia-damage",
  "rand_xoshiro",
 ]
 

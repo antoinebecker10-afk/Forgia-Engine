@@ -12,7 +12,9 @@
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody};
+use forgia_ai_arena_bot::{ArenaBot, BotState};
 use forgia_core::prelude::*;
+use forgia_damage::{Health, Mortal};
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 
@@ -278,8 +280,55 @@ pub fn sys_spawn_roguelite_scene(
         Transform::from_xyz(50.0, 100.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
+    // ─────── 8 ennemis basiques (M2 step 1) ───────────────────────────────
+    // Capsule + ArenaBot::default() + Health 50hp + Mortal. Réutilise pleinement
+    // l'AI de forgia-ai-arena-bot (Idle/Chase/Attack via TacticalTuning Resource).
+    // Variantes M2 step 2+ → 3 archetypes (Runner/Tank/Sniper) via TOML genome.
+    let enemy_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.85, 0.20, 0.20),
+        emissive: LinearRgba::new(0.30, 0.05, 0.05, 1.0),
+        perceptual_roughness: 0.55,
+        ..default()
+    });
+    let enemy_mesh = meshes.add(Capsule3d::new(0.4, 1.2));
+    let enemy_positions: &[Vec3] = &[
+        Vec3::new(30.0, 1.0, 0.0),
+        Vec3::new(-30.0, 1.0, 0.0),
+        Vec3::new(0.0, 1.0, 30.0),
+        Vec3::new(0.0, 1.0, -30.0),
+        Vec3::new(45.0, 1.0, 45.0),
+        Vec3::new(-45.0, 1.0, 45.0),
+        Vec3::new(45.0, 1.0, -45.0),
+        Vec3::new(-45.0, 1.0, -45.0),
+    ];
+    for (idx, pos) in enemy_positions.iter().enumerate() {
+        commands.spawn((
+            Name::new(format!("RogueliteEnemy_{idx}")),
+            RogueliteRunMarker,
+            DespawnOnExit(GameMode::Roguelite),
+            Mesh3d(enemy_mesh.clone()),
+            MeshMaterial3d(enemy_mat.clone()),
+            Transform::from_translation(*pos),
+            RigidBody::KinematicPositionBased,
+            Collider::capsule_y(0.6, 0.4),
+            Health::new(50.0),
+            Mortal,
+            ArenaBot {
+                state: BotState::Idle,
+                speed: 4.5,
+                detect_range: 35.0,
+                attack_range: 20.0,
+                attack_cooldown: 1.2,
+                attack_left: 1.5,
+                stop_distance: 6.0,
+                ..ArenaBot::default()
+            },
+        ));
+    }
+
     info!(
-        "[roguelite] Scene spawned : floor 300m + 4 walls + 5 platforms + {spawned} cover + 3 landmarks (seed={SCENE_SEED:#x})"
+        "[roguelite] Scene spawned : floor 300m + 4 walls + 5 platforms + {spawned} cover + 3 landmarks + {} enemies (seed={SCENE_SEED:#x})",
+        enemy_positions.len()
     );
 }
 
