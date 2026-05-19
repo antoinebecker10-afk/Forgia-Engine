@@ -11,6 +11,7 @@
 
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
+use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_core::prelude::*;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
@@ -93,6 +94,10 @@ pub fn sys_spawn_roguelite_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Floor 50×50m, gris foncé (placeholder biome Roguelite).
+    // Fix M1.5b : collider rapier obligatoire — sans ça le Player capsule
+    // (KinematicCharacterController) tombe à travers le mesh visuel pur,
+    // safety net teleport Y=2 → re-tombe → boucle infinie.
+    // Half-extents : x=25, y=0.1 (épaisseur 0.2m), z=25.
     commands.spawn((
         Name::new("RogueliteFloor"),
         RogueliteRunMarker,
@@ -104,6 +109,8 @@ pub fn sys_spawn_roguelite_scene(
             ..default()
         })),
         Transform::from_xyz(0.0, 0.0, 0.0),
+        RigidBody::Fixed,
+        Collider::cuboid(25.0, 0.1, 25.0),
     ));
 
     // Sun (directional light).
