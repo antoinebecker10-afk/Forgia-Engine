@@ -103,7 +103,7 @@ fn handle_send_requests(
 }
 
 fn pump_inbound(
-    mut conns: ResMut<WsConnections>,
+    conns: Res<WsConnections>,
     mut msg_w: MessageWriter<WsMessage>,
     mut life_w: MessageWriter<WsLifecycle>,
 ) {

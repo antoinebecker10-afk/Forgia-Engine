@@ -19,6 +19,7 @@ pub mod weapons;
 pub mod melee;
 pub mod combat_juice;
 pub mod ammo;
+pub mod sensor;
 
 // TODO: port from V1 — viewmodel, reload, health, rpg_systems, targeting, boss, gcd
 // pub mod viewmodel;
@@ -31,6 +32,7 @@ pub mod ammo;
 
 pub mod prelude {
     pub use crate::{ForgiaCombatPlugin, Health};
+    pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
     pub use crate::weapons::{WeaponType, EquippedWeapons, WeaponFireCooldown, CasingResources, damage_falloff, ARENA_V1_WEAPONS};
     pub use crate::melee::MeleeCooldown;
     pub use crate::combat_juice::{CameraTrauma, HitFlashCache, HitFlashTimer, WeaponRecoilDebt, WeaponRecoilImpulse, CombatHitEvent};
@@ -121,6 +123,7 @@ impl Plugin for ForgiaCombatPlugin {
         }
         app.init_resource::<PlayerScore>()
             .init_resource::<PlayerLevel>()
+            .init_resource::<sensor::CombatSensorCounters>()
             .init_resource::<weapons::EquippedWeapons>()
             .init_resource::<combat_juice::CameraTrauma>()
             .add_message::<combat_juice::CombatHitEvent>()
@@ -140,6 +143,8 @@ impl Plugin for ForgiaCombatPlugin {
                     .in_set(GameSet::Effects),
                 combat_juice::hit_flash_tick_system
                     .in_set(GameSet::Effects),
+                sensor::sys_write_combat_sensor
+                    .in_set(GameSet::Sensors),
                 // hitstop_tick_system : wired par forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
             ));
         // TODO: wire weapon_fire_system, doom_projectile_system, melee_attack_system,

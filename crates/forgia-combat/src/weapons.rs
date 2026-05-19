@@ -321,12 +321,12 @@ mod tests {
     }
 
     #[test]
-    fn weapon_next_in_set_arena_v1_cycles_3() {
+    fn weapon_next_in_set_arena_v1_cycles_full() {
         let mut w = ARENA_V1_WEAPONS[0];
-        for _ in 0..3 {
+        for _ in 0..ARENA_V1_WEAPONS.len() {
             w = w.next_in_set(&ARENA_V1_WEAPONS);
         }
-        assert_eq!(w, ARENA_V1_WEAPONS[0]); // back to start
+        assert_eq!(w, ARENA_V1_WEAPONS[0]); // back to start après len() itérations
     }
 
     #[test]

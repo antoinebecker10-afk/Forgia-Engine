@@ -1,0 +1,67 @@
+# rpg_monitor.toml — Configuration genome du RPG Health Monitor (story-452)
+# Toutes les valeurs sont hot-reloadables via Shift+F12 en jeu.
+
+[meta]
+name = "rpg_monitor"
+version = 1
+enabled = true
+
+[global]
+# Intervalle entre deux ticks du monitor (secondes). 1.0 = 1 Hz.
+tick_interval_secs = 1.0
+
+[liveness]
+# Liste des sensors attendus (chemins relatifs à la racine workspace).
+# Si un sensor est absent ou non mis à jour depuis stale_secs → Warn CHK-5.
+# CHK-6 nécessite forgia_combat.json + forgia_health.json (BUG-452-10).
+expected_sensors = [
+    "forgia_terrain_lod.json",
+    "forgia_chunks_snapshot.json",
+    "forgia_anim_layer.json",
+    "forgia_combat.json",
+    "forgia_health.json",
+]
+stale_secs = 30.0
+
+[lod2_desync]
+# CHK-1 : détecte une désynchronisation entre les compteurs LOD2.
+# - lod2_count > 0 && lod2_tile_count == 0  → Critical (bug session 2026-05-18 #1)
+# - |lod2_count - lod2_tile_count| > tolerance → Warn (inclut leak inverse, BUG-452-01)
+enabled = true
+tolerance = 4
+
+[biome_luminance]
+# CHK-2 : Rec709 luminance LINÉAIRE par biome ∈ [lum_floor, lum_ceiling].
+# Floor 0.05 (linear) catch Volcanic 0.22/0.15/0.12 sRGB (lin lum 0.024).
+# Volcanic post-fix 0.35/0.27/0.22 sRGB → lin lum 0.065 → passe (intended).
+# Ceiling 0.95 catch biomes "lavés" qui blanchissent l'overlay grass.
+enabled = true
+lum_floor = 0.05
+lum_ceiling = 0.95
+
+[lod_asymmetry]
+# CHK-3 : LOD asymmetry (story-453).
+# Lit sample_points dans forgia_terrain_lod.json (12 points fixes ring 64/128/256m).
+# Pour chaque point : |lod0_y - lod2_y| > max_delta_m → Warn.
+# Underwater (lod0_y < sea_level) avec asymétrie > epsilon → Critical (phantom water).
+enabled = true
+max_delta_m = 0.5
+epsilon_m = 0.001
+
+[critical_assets]
+# CHK-4 : assets critiques préchargés en Resource CriticalAssetHandles
+# (story-453). Handles vivants pendant GameMode::Rpg → LoadState reflète l'état
+# réel sans alloc per-tick.
+enabled = true
+paths = [
+    "textures-v1/terrain/grass/diff.jpg",
+    "textures-v1/terrain/grass/normal.jpg",
+    "textures-v1/terrain/grass/roughness.jpg",
+]
+# Uptime minimum (secondes) avant de vérifier les assets — évite faux positifs au démarrage.
+asset_check_min_uptime_secs = 30.0
+
+[health_consistency]
+# CHK-6 : cohérence HP joueur via forgia_combat.json.
+# Détecte hp < 0, hp > max_hp, max_hp <= 0.
+enabled = true

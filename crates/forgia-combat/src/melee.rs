@@ -69,10 +69,17 @@ pub fn melee_cooldown_tick_system(
 mod tests {
     use super::*;
 
+    // Helper : insère Time<()> manuel sans TimePlugin pour que `advance_by`
+    // ne soit pas écrasé par `time_system` à chaque frame (Bevy 0.18 trap).
+    fn app_with_manual_time() -> App {
+        let mut app = App::new();
+        app.insert_resource(Time::<()>::default());
+        app
+    }
+
     #[test]
     fn melee_cooldown_tick_advances_and_keeps_resource() {
-        let mut app = App::new();
-        app.add_plugins(bevy::time::TimePlugin);
+        let mut app = app_with_manual_time();
         app.insert_resource(MeleeCooldown {
             timer: Timer::from_seconds(2.0, TimerMode::Once),
         });
@@ -92,8 +99,7 @@ mod tests {
 
     #[test]
     fn melee_cooldown_tick_removes_resource_when_finished() {
-        let mut app = App::new();
-        app.add_plugins(bevy::time::TimePlugin);
+        let mut app = app_with_manual_time();
         app.insert_resource(MeleeCooldown {
             timer: Timer::from_seconds(0.1, TimerMode::Once),
         });
