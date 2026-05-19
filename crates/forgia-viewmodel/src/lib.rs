@@ -75,6 +75,16 @@ impl Plugin for ForgiaViewmodelPlugin {
         if !app.is_plugin_added::<forgia_mesh_fader::MeshFaderPlugin>() {
             app.add_plugins(forgia_mesh_fader::MeshFaderPlugin);
         }
+        // Fix V5 Session C smoke test (commit 4f4506559) : Tier 2B extraction
+        // (commit 6a45c6322) avait oublié d'enregistrer le type d'asset Genome<ViewmodelGenome>.
+        // `load_viewmodel_genome` panic au boot sans ça (bevy_asset::server::info:819).
+        // ViewmodelGenome n'impl pas Reflect (HashMap fields) → init_asset direct au lieu
+        // de register_genome (qui requiert FromReflect). Pattern miroir : forgia-damage
+        // lib.rs:202, forgia-enemy-nameplate tuning.rs:55, forgia-auto-rig lib.rs:1106.
+        use forgia_genome_core::{Genome, GenomeLoader};
+        app.init_asset::<Genome<genome::ViewmodelGenome>>()
+            .register_asset_loader(GenomeLoader::<genome::ViewmodelGenome>::default());
+
         // Genome loading reste un système Startup global (pas gated FPS — l'asset
         // se charge en arrière-plan dès le boot, même en menu).
         app.add_systems(Startup, genome::load_viewmodel_genome)
