@@ -5083,11 +5083,16 @@ name = "forgia-observability"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_kira_audio",
  "forgia-ai-arena-bot",
+ "forgia-audio-biome",
  "forgia-core",
  "forgia-enemy-nameplate",
+ "forgia-input",
+ "forgia-mode-fps-arena",
  "forgia-player",
  "forgia-terrain",
+ "leafwing-input-manager",
  "serde",
  "serde_json",
  "sysinfo 0.32.1",

@@ -1,4 +1,4 @@
-//! # xtask — Forgia V2 automation
+﻿//! # xtask — Forgia V2 automation
 //!
 //! Tasks :
 //! - `check-orphans` : détecte plugins définis non wirés, sensors sans producteur, fields FpsTuning jamais lus
@@ -74,12 +74,12 @@ const CANONICAL_SENSORS: &[&str] = &[
     "forgia2_perf.json",
     "forgia2_entities.json",
     "forgia2_memory.json",
-    // Tier 2 (Session C) :
-    // "forgia2_lifecycle.json",
-    // "forgia2_watchdog.json",
-    // "forgia2_audio.json",
-    // "forgia2_input.json",
-    // "forgia2_sensor_health.json",
+    // Tier 2 (Session C — Story-469 DONE)
+    "forgia2_lifecycle.json",
+    "forgia2_watchdog.json",
+    "forgia2_audio.json",
+    "forgia2_input.json",
+    "forgia2_sensor_health.json",
 ];
 
 const VALID_SEVERITIES: &[&str] = &["ok", "warn", "critical", "info"];

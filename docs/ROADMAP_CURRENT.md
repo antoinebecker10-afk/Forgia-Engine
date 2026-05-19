@@ -1,4 +1,4 @@
-# Forgia V2 Rewrite — ROADMAP_CURRENT
+﻿# Forgia V2 Rewrite — ROADMAP_CURRENT
 
 > **Source de vérité unique** pour l'état des vagues V2 et la priorisation BMAD.
 > Mise à jour à chaque livraison story ou à la commande "Memorise" (CLAUDE.md §11).
@@ -85,18 +85,89 @@ Story-467. Effort réel ~3 h (vs 6 h estimé — research a écarté 2 pièges).
 - `default_expected_sensors` étendu (CHK-5 ne flood pas)
 - VRAM = stub honnête `"N/A — wgpu adapter telemetry custom needed"` (assumé)
 
-#### Session C (lifecycle/watchdog/audio/input + cleanup) ⏸️ Pending
+#### Session C (lifecycle/watchdog/audio/input + sensor_health) ✅ DONE 2026-05-19 (story-469)
 
-Effort estimé ~6h. Pré-requis :
-- Confirmer syntax Bevy 0.18 `OnAdd<C>` / `OnRemove<C>` hooks (context7)
-- Design Resource `GameTickCounter` pour watchdog heartbeat
-- Cleanup final `default_expected_sensors` → 13 forgia2_*
+Effort réel ~3 h (vs 6 h estimé — research bevy-specialist a écarté pièges Bevy 0.18 `On<Add, C>` syntax + `EventReader` → `MessageReader` rename).
 
-Cibles : `forgia2_lifecycle.json`, `forgia2_watchdog.json`, `forgia2_audio.json`, `forgia2_input.json`, `forgia2_sensor_health.json`.
+| Sensor | Source | Status |
+|---|---|---|
+| `forgia2_lifecycle.json` | 7 Observers `On<Add\|Remove\|Insert, C>` (Player, TargetCube, NameplateRoot, ArenaBot) | ✅ compile |
+| `forgia2_watchdog.json` | `GameTickCounter` Resource + First schedule + lag >50ms detection | ✅ compile |
+| `forgia2_audio.json` | `Assets<AudioInstance>::iter()` filter Playing + `BiomeAmbientState.current_biome()` | ✅ compile |
+| `forgia2_input.json` | `MessageReader<KeyboardInput>` + `ActionState<PlayerAction>::get_just_pressed()` | ✅ compile |
+| `forgia2_sensor_health.json` | Meta — lit timestamps des 12 forgia2_*.json, CHK-5 canonisé | ✅ compile |
 
-### V6 — Crates extraction (P2) ❌ Bloqué
+- **19 nouveaux tests purs** verts (severity_for_* + lifecycle/tick counter defaults), **66 total forgia-observability**
+- 5 nouveaux fichiers `crates/forgia-observability/src/{lifecycle,watchdog,audio,input,sensor_health}_sensor.rs`
+- 5 Cargo deps ajoutées (`forgia-mode-fps-arena`, `forgia-audio-biome`, `forgia-input`, `bevy_kira_audio`, `leafwing-input-manager`)
+- 1-line pub accessor `BiomeAmbientState::current_biome()` ajouté à `forgia-audio-biome`
+- xtask `CANONICAL_SENSORS` étendu 7 → 12, `default_expected_sensors` +5 (CHK-5 ne flood pas)
+- **Bevy 0.18 critical findings** :
+  - `EventReader` → `MessageReader` (KeyboardInput now `#[derive(Message)]`)
+  - `Trigger<OnAdd, C>` → `On<Add, C>` (PR #19596)
+  - `EntityCountDiagnosticsPlugin::default()` requis (struct avec field)
 
-Tier 2A/B : `forgia-weapon-hitscan`, `forgia-weapon-viewmodel`. Bloqué par recovery WIP fire system perdu 2026-05-17. À reprendre post-ship V1 ou si user remonte récup WIP.
+**⚠️ Smoke test runtime BLOQUÉ** : crash pré-existant V6 Tier 2B (commit `6a45c6322` `refactor(viewmodel)`) — `forgia_viewmodel::genome::load_viewmodel_genome` panic car `app.init_asset::<Genome<ViewmodelGenome>>()` jamais appelé. **Indépendant de Session C**. Code Session C validé par `cargo check --workspace` (✅) + clippy `-D warnings` (✅ 0) + 66 tests (✅). `xtask verify-sensors-format` retournera 12/12 dès V6 stable.
+
+### V6 — Crates extraction (P2) 🟡 IN PROGRESS (terminal // 2026-05-19 19:50)
+
+Tier 2A/B : `forgia-weapon-hitscan`, `forgia-weapon-viewmodel`. Repris dans un terminal parallèle :
+
+- **E1 → `forgia-weapon-hitscan`** : sort `LeftMouseState`, `track_left_mouse_state`, `BurstState`, `dispatch_fire_trigger`, `fire_weapon_minimal`, `pseudo_rand`, `find_health_ancestor` ; expose `WeaponHitscanPlugin` + `WeaponFireRequest` event.
+- **E2 → `forgia-weapon-viewmodel`** : sort `WeaponViewmodel`, `WeaponModelAssets`, attach/switch/auto-scale systems, `ads.rs`, `scope_glass.rs`, `viewmodel_debug.rs`, `ViewmodelGenome*` ; expose `WeaponViewmodelPlugin`.
+- Ordre **E1 → E2 séquentiel** (mêmes fichiers Cargo.toml/lib.rs côté `forgia-fps`).
+- Zéro breaking change Fps Arena : V7 (roguelite) attend que E1+E2 mergent pour consommer les nouvelles crates directement.
+
+### V7 — 3e jeu : Roguelite FPS Coop 🟡 PLAN AJUSTÉ POST-AUDIT (2026-05-19)
+
+**Audit deep 5 agents** : [docs/audit/Story-469-deep-audit-2026-05-19.md](audit/Story-469-deep-audit-2026-05-19.md) — 3 BLOQUANTS + 8 AJUSTER identifiés, corrigés ci-dessous.
+
+**Cible révisée Next Fest oct 2026** : **démo vertical slice SOLO-ONLY** (coop 2-3J reporté post-démo). Aucun roguelite FPS solo n'a shipped 1.0 en <18 mois (Katanaut solo = 3 ans, Roboquest 4 devs = 5 ans). 12 sem = vertical slice marketing pour wishlists + Steam page, pas ship 1.0.
+
+**Décisions préalables avant kickoff M1** :
+
+- V1/V2 freeze publique (support critique only) OU pivot V3
+- V3 cohérence vision "YouTube du gaming" : justifier ou pivoter pitch
+- CLAUDE.md correction : `bevy_rapier3d 0.33 → 0.34`
+- Fork interne `bevy-steamworks` + `bevy_hanabi` semaine 1 (dep solo mainteneur)
+
+Hook : armes loufoques qui parlent avec gimmicks mécaniques uniques. Refs : Gunfire Reborn × Risk of Rain 2 × High on Life × Hadès (dialogue reactif).
+
+**Cadrage** :
+- Crate cible : `forgia-mode-roguelite` (scaffold 16 LOC déjà présent, à peupler)
+- Bevy 0.18.1, AppMode étendu `Play(Roguelite)`
+- Coop 1-3J listen-server (un host = client+server même process)
+- Tout genome-driven (`assets/genomes/roguelite/*.toml`) — zéro hardcode
+- Patterns workspace respectés : DAG-libre, sensor JSON 1Hz, GameSet L7, NeedsAssetCalibrate, EntityEvent pour Damage/Death/Hit
+
+**Audit réutilisation V2** (cf. `docs/audit/roguelite-research-2026-05-19.md` §1) :
+- ~55 sous-systèmes **[FORGIA-CORE]** consommables tels quels (damage, inventory, crosshair, juice×5, killfeed, hitmarker, ai-arena-bot, terrain, streaming, foliage, asset-registry, genome-core, observability)
+- ~10 **[À-EXTRAIRE]** dont E1/E2 (V6) déjà en cours + E3-E8 backlog
+- ~15 **[MANQUANT]** dont 100% des scaffolds 16 LOC sont déjà créés et au workspace : `forgia-loot-tables`, `forgia-equipment`, `forgia-status-effects`, `forgia-skill-tree`, `forgia-weapon-projectile`, `forgia-mode-roguelite`, `forgia-net-lightyear`, `forgia-net-replication-genome`, `forgia-net-lobby`, `forgia-vfx-impact-library`, `forgia-vfx-decals`, `forgia-vfx-hanabi`, `forgia-scene`, `forgia-steam`
+
+**Roadmap MVP — 6 milestones × ~2 sem (cible Next Fest, 8-12 semaines)** :
+
+| M | Nom | Statut | Pré-requis |
+|---|---|---|---|
+| M1 | Fondations (RunState + AppMode::Roguelite + sensor) | ⏸️ Pending | V6 E1+E2 merge |
+| M2 | Combat solo viable (1 biome + 3 ennemis + 4 armes + loot-tables peuplé) | ⏸️ Pending | M1 |
+| M3 | Run complète + Boss (StageGraph + 1 boss + DifficultyScale) | ⏸️ Pending | M2 |
+| M4 | Armes parlantes + DA (`WeaponPersonality` + dialogue.rs + voicelines) | ⏸️ Pending | M2 |
+| M5 | Coop 2J (lightyear + Steam P2P transport + listen-server) | ⏸️ Pending | M3+M4 |
+| M6 | Polish Next Fest (pause menu, summary, audio mix) | ⏸️ Pending | M5 |
+
+**Story dédiée** : [Story-469-mode-roguelite-mvp.md](stories/Story-469-mode-roguelite-mvp.md) (enterprise scale).
+
+**Recherche industrie sourcée** : [docs/audit/roguelite-research-2026-05-19.md](audit/roguelite-research-2026-05-19.md) — 5 questions (netcode coop, loot rarity, weapons-as-characters, procgen runs, Bevy 0.18 patterns), URLs vérifiables.
+
+**Décision netcode** : `lightyear 0.26.4` + transport custom Steam P2P (via `bevy-steamworks 0.16`), modèle listen-server. Fallback UDP direct + Steam Datagram Relay si Steam P2P custom transport bloque. Cf. Story-469 §Netcode.
+
+**Genome TOML stubs préparés** (data-driven, hot-reload Shift+F12) :
+- `assets/genomes/roguelite/roguelite_run.toml` — RunSeed, stages, difficulty scaling
+- `assets/genomes/roguelite/roguelite_weapons.toml` — 4 armes parlantes MVP (Pépin, Bourrasque, Madame Lenoir, Boucherie)
+- `assets/genomes/roguelite/roguelite_enemies.toml` — 3 ennemis + 1 boss
+- `assets/genomes/roguelite/roguelite_loot.toml` — drop pools rarity (Diablo 3 Loot 2.0 + Hearthstone pity timer)
+- `assets/genomes/roguelite/roguelite_dialogue.toml` — barks contextuels (Hadès pattern : event triggers + pool + cooldown anti-spam)
 
 ---
 
@@ -147,11 +218,9 @@ Tier 2A/B : `forgia-weapon-hitscan`, `forgia-weapon-viewmodel`. Bloqué par reco
 
 3 sensors perf/entities/memory livrés, 7/13 canonical atteints. Effort réel 3h.
 
-### Option B — V5 Session C (lifecycle/watchdog/audio/input, ~6h, Enterprise)
+### Option B — V5 Session C ✅ DONE 2026-05-19 (story-469)
 
-Cibles : `forgia2_lifecycle.json` (Observer `OnAdd<Player>`) + `forgia2_watchdog.json` (heartbeat) + `forgia2_audio.json` + `forgia2_input.json` + `forgia2_sensor_health.json`.
-
-Bénéfice : Phase 5 complète 13/13. Risque MOYEN-ÉLEVÉ — Observers + timing-sensitive.
+Voir §V5 Session C ci-dessus. **V5 complète à 12/13**. Runtime validation pending V6 stable.
 
 ### Option C — Vague 1 story-456 hit feedback (Enterprise 10h+) **AAA gameplay impact**
 

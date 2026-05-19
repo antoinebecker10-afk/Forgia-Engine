@@ -1,4 +1,4 @@
-//! config.rs — Configuration genome du RPG Health Monitor.
+﻿//! config.rs — Configuration genome du RPG Health Monitor.
 //!
 //! Chargée depuis `config/genomes/rpg_monitor.toml`.
 //! Reloadable via Shift+F12 in-game (sys_reload_config_on_hotkey).
@@ -65,6 +65,12 @@ fn default_expected_sensors() -> Vec<String> {
         "forgia2_perf.json".to_string(),
         "forgia2_entities.json".to_string(),
         "forgia2_memory.json".to_string(),
+        // Story-469 V5 Session C
+        "forgia2_lifecycle.json".to_string(),
+        "forgia2_watchdog.json".to_string(),
+        "forgia2_audio.json".to_string(),
+        "forgia2_input.json".to_string(),
+        "forgia2_sensor_health.json".to_string(),
     ]
 }
 fn default_stale_secs() -> f32 { 30.0 }

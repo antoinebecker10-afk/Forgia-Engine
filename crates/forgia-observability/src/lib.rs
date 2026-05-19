@@ -1,4 +1,4 @@
-//! # forgia-observability
+﻿//! # forgia-observability
 //!
 //! RPG Health Monitor — 6 checks cross-sectoriels (story-452).
 //!
@@ -31,6 +31,12 @@ pub mod forgia2_aggregator;
 pub mod perf_sensor;
 pub mod entities_sensor;
 pub mod memory_sensor;
+// Story-469 V5 Session C — lifecycle / watchdog / audio / input / sensor_health
+pub mod lifecycle_sensor;
+pub mod watchdog_sensor;
+pub mod audio_sensor;
+pub mod input_sensor;
+pub mod sensor_health_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -66,7 +72,21 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<SensorSnapshots>()
             .init_resource::<LastWriteTimestamps>()
             .init_resource::<Forgia2AggregatorState>()
+            .init_resource::<lifecycle_sensor::LifecycleCounter>()
+            .init_resource::<watchdog_sensor::GameTickCounter>()
             .insert_resource(RpgMonitorConfig::load_or_default());
+
+        // Story-469 V5 Session C — Observers lifecycle (Bevy 0.18 syntax On<Add, C>).
+        app.add_observer(lifecycle_sensor::obs_player_added);
+        app.add_observer(lifecycle_sensor::obs_player_removed);
+        app.add_observer(lifecycle_sensor::obs_target_cube_added);
+        app.add_observer(lifecycle_sensor::obs_target_cube_removed);
+        app.add_observer(lifecycle_sensor::obs_nameplate_inserted);
+        app.add_observer(lifecycle_sensor::obs_arena_bot_added);
+        app.add_observer(lifecycle_sensor::obs_arena_bot_removed);
+
+        // Story-469 — watchdog tick counter en First (avant tous GameSets).
+        app.add_systems(First, watchdog_sensor::sys_update_tick_counter);
         // Story-453 : préchargement critical assets handles OnEnter/OnExit Rpg.
         asset_handles::register(app);
         // Sensor health cross-mode : tourne en tout état (pas de run_if mode-gate).
@@ -81,6 +101,18 @@ impl Plugin for ForgiaObservabilityPlugin {
                 perf_sensor::sys_write_perf_sensor,
                 entities_sensor::sys_write_entities_sensor,
                 memory_sensor::sys_write_memory_sensor,
+            )
+                .in_set(GameSet::Sensors),
+        );
+        // Story-469 V5 Session C — lifecycle / watchdog / audio / input / sensor_health.
+        app.add_systems(
+            Update,
+            (
+                lifecycle_sensor::sys_write_lifecycle_sensor,
+                watchdog_sensor::sys_write_watchdog_sensor,
+                audio_sensor::sys_write_audio_sensor,
+                input_sensor::sys_track_input_accum,
+                sensor_health_sensor::sys_write_sensor_health,
             )
                 .in_set(GameSet::Sensors),
         );

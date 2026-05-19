@@ -1,4 +1,4 @@
-//! # forgia-audio-biome
+﻿//! # forgia-audio-biome
 //!
 //! Ambient audio par biome — joue 1 loop OGG selon le biome courant du joueur.
 //!
@@ -33,6 +33,13 @@ pub struct AudioSampleOffset {
 pub struct BiomeAmbientState {
     current: Option<BiomeType>,
     instance: Option<Handle<AudioInstance>>,
+}
+
+impl BiomeAmbientState {
+    /// Story-469 — read-only accessor pour forgia2_audio.json sensor.
+    pub fn current_biome(&self) -> Option<BiomeType> {
+        self.current
+    }
 }
 
 pub struct ForgiaAudioBiomePlugin;
