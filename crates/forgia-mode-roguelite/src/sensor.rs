@@ -9,6 +9,7 @@
 //! - severity warn si stuck >30min en InRun (proxy run gelée)
 
 use crate::run::{RunSeed, RunState};
+use crate::waves::{RogueliteWave, WAVES_TOTAL};
 use bevy::prelude::*;
 use forgia_loot_tables::Souls;
 
@@ -73,6 +74,7 @@ pub fn sys_write_roguelite_state(
     run_seed: Option<Res<RunSeed>>,
     tel: Res<RogueliteTelemetry>,
     souls: Option<Res<Souls>>,
+    wave: Option<Res<RogueliteWave>>,
 ) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -86,14 +88,20 @@ pub fn sys_write_roguelite_state(
     let (severity, next_step) = severity_for_roguelite(tel.time_in_state_secs, state_str);
     let souls_current = souls.as_ref().map(|s| s.current).unwrap_or(0);
     let souls_total = souls.as_ref().map(|s| s.total_collected).unwrap_or(0);
+    let current_wave = wave.as_ref().map(|w| w.current_wave).unwrap_or(0);
+    let bots_alive = wave.as_ref().map(|w| w.bots_alive).unwrap_or(0);
+    let break_secs_left = wave.as_ref().map(|w| w.break_secs_left).unwrap_or(0.0);
+    let in_break = wave.as_ref().map(|w| w.in_break).unwrap_or(false);
+    let victory = wave.as_ref().map(|w| w.victory_emitted).unwrap_or(false);
 
     let json = format!(
-        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"souls_current":{souls_current},"souls_total":{souls_total}}}"#,
+        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"souls_current":{souls_current},"souls_total":{souls_total},"current_wave":{current_wave},"waves_total":{WAVES_TOTAL},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"victory":{victory}}}"#,
         time.elapsed_secs(),
         tel.tick_count,
         tel.time_in_state_secs,
         tel.transitions_count,
         time.elapsed_secs(),
+        break_secs_left,
     );
 
     if let Err(e) = std::fs::write("forgia2_roguelite_state.json", &json) {

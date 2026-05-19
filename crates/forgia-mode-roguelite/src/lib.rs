@@ -24,8 +24,10 @@ use forgia_core::prelude::*;
 pub mod enemies;
 pub mod run;
 pub mod sensor;
+pub mod waves;
 
 pub use enemies::{EnemyArchetype, EnemyStats};
+pub use waves::{RogueliteWave, WAVES_TOTAL};
 
 pub use run::{
     EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent,
@@ -50,12 +52,14 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Observer drop pickup on enemy death (filtré par EnemyArchetype).
         app.add_observer(run::obs_roguelite_enemy_death);
         // Marker PickupCollector ajouté au Player OnEnter Roguelite (sys ci-dessous).
+        // Reset RogueliteWave OnEnter (relance run propre depuis lobby).
         app.add_systems(
             OnEnter(GameMode::Roguelite),
-            run::sys_tag_player_as_collector,
+            (run::sys_tag_player_as_collector, reset_wave_resource),
         );
 
         app.init_resource::<sensor::RogueliteTelemetry>()
+            .init_resource::<waves::RogueliteWave>()
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
@@ -64,6 +68,12 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 Update,
                 (run::sys_start_run, run::sys_end_run)
                     .chain()
+                    .in_set(GameSet::Movement)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            .add_systems(
+                Update,
+                waves::sys_wave_orchestrator
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Roguelite)),
             )
@@ -77,6 +87,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Cleanup OnExit(GameMode::Roguelite) géré par terminal parallèle (V7 cleanup
         // orchestration). Ne PAS dupliquer ici.
     }
+}
+
+fn reset_wave_resource(mut wave: ResMut<waves::RogueliteWave>) {
+    *wave = waves::RogueliteWave::default();
 }
 
 #[cfg(test)]
