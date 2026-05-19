@@ -1,0 +1,17 @@
+# forgia-damage::HitFeedbackTuning — story-457 (2026-05-19)
+# Per-zone damage multipliers + visual style for floating numbers.
+# Hot-reload : éditer ce fichier → push automatique dans HitFeedback Resource.
+
+head_damage_mul = 2.0
+body_damage_mul = 1.0
+limb_damage_mul = 0.7
+
+# Couleur RGB linear (floating number / nameplate label)
+head_color = [1.0, 0.9, 0.2]   # Yellow-gold (headshot pop)
+body_color = [1.0, 1.0, 1.0]   # White
+limb_color = [0.8, 0.8, 0.8]   # Grey
+
+# Taille font px floating number
+head_font_size = 30.0
+body_font_size = 20.0
+limb_font_size = 16.0

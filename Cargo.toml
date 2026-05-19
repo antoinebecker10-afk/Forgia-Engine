@@ -46,6 +46,7 @@ members = [
     "crates/forgia-damage",
     "crates/forgia-damage-numbers",
     "crates/forgia-dialogue",
+    "crates/forgia-enemy-nameplate",
     "crates/forgia-editor-animation",
     "crates/forgia-editor-asset-browser",
     "crates/forgia-editor-blueprint",
@@ -360,6 +361,7 @@ forgia-crosshair = { path = "crates/forgia-crosshair" }
 forgia-damage = { path = "crates/forgia-damage" }
 forgia-damage-numbers = { path = "crates/forgia-damage-numbers" }
 forgia-dialogue = { path = "crates/forgia-dialogue" }
+forgia-enemy-nameplate = { path = "crates/forgia-enemy-nameplate" }
 forgia-editor-animation = { path = "crates/forgia-editor-animation" }
 forgia-editor-asset-browser = { path = "crates/forgia-editor-asset-browser" }
 forgia-editor-blueprint = { path = "crates/forgia-editor-blueprint" }

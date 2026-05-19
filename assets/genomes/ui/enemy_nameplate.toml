@@ -1,0 +1,15 @@
+# forgia-enemy-nameplate — EnemyNameplateTuning (story-457, 2026-05-19)
+# Hot-reload : éditer ce fichier → sync_tuning push automatique runtime.
+
+width = 1.4              # world-space (m)
+height = 0.18
+y_offset = 2.4           # au-dessus du bot parent
+lifetime = 2.5           # durée visible (s)
+fade_out_secs = 0.6      # début du fade en fin de lifetime
+
+# Couleurs linear RGB
+fill_color = [0.95, 0.15, 0.15]    # red HP
+bg_color = [0.05, 0.05, 0.08]      # near-black
+border_color = [0.0, 0.0, 0.0]
+
+border_thickness = 0.06  # en fraction de width pour visual outline
