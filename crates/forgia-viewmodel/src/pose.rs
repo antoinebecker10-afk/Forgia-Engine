@@ -214,7 +214,9 @@ impl Plugin for ForgiaViewmodelPosePlugin {
                     apply_ads_viewmodel,
                 )
                     .chain()
-                    .run_if(in_state(GameMode::Fps)),
+                    .run_if(
+                        in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
+                    ),
             );
     }
 }

@@ -258,7 +258,9 @@ impl Plugin for ForgiaViewmodelAttachPlugin {
                     auto_scale_viewmodel,
                     ensure_camera_shake_component,
                 )
-                    .run_if(in_state(GameMode::Fps)),
+                    .run_if(
+                        in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
+                    ),
             );
     }
 }

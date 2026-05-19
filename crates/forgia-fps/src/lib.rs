@@ -334,7 +334,9 @@ impl Plugin for ForgiaFpsPlugin {
                 )
                     .chain()
                     .in_set(GameSet::Combat)
-                    .run_if(in_state(GameMode::Fps)),
+                    .run_if(
+                        in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
+                    ),
             );
     }
 }

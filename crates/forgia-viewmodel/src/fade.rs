@@ -152,7 +152,7 @@ impl Plugin for ForgiaViewmodelFadePlugin {
         app.add_systems(
             Update,
             (identify_viewmodel_faders, sync_fader_progress)
-                .run_if(in_state(GameMode::Fps)),
+                .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
         );
     }
 }
