@@ -5025,6 +5025,7 @@ dependencies = [
  "forgia-ai-arena-bot",
  "forgia-core",
  "forgia-damage",
+ "forgia-mode-fps-arena",
  "rand_xoshiro",
 ]
 
@@ -5945,6 +5946,17 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+]
+
+[[package]]
+name = "forgia-stage-graph"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-core",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

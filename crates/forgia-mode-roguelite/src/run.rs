@@ -15,6 +15,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_core::prelude::*;
 use forgia_damage::{Health, Mortal};
+use forgia_mode_fps_arena::TargetCube;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 
@@ -319,6 +320,9 @@ pub fn sys_spawn_roguelite_scene(
                 RogueliteRunMarker,
                 DespawnOnExit(GameMode::Roguelite),
                 *archetype,
+                // TargetCube : marker requis par forgia-fps HitApplyCtx (damage routing)
+                // + despawn_dead_cubes (death). Sans ça : hitscan ignore l'entité.
+                TargetCube,
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(mat.clone()),
                 Transform::from_xyz(x, y, z),

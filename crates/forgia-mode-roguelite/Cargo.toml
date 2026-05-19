@@ -14,5 +14,7 @@ forgia-core = { workspace = true }
 # Story-470 M2 step 1 — réutilise ArenaBot AI + Health/Mortal damage path
 forgia-ai-arena-bot = { workspace = true }
 forgia-damage = { workspace = true }
+# Story-470 M2 fix — TargetCube marker requis par HitApplyCtx + despawn_dead_cubes (forgia-fps)
+forgia-mode-fps-arena = { workspace = true }
 # Story-470 V7 M1 — RunSeed déterministe (host-authoritative, choix audit §0.2)
 rand_xoshiro = "0.7"
