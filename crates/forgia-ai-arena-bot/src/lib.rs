@@ -184,12 +184,14 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     bot_attack_cooldown,
                     bot_shoot_at_target,
                     bot_tracer_lifetime,
-                    handle_bot_deaths,
+                    // Story-466 — handle_bot_deaths migré vers Observer
+                    // `on_bot_death` (cf .add_observer ci-dessous).
                     tick_respawns,
                     tactical::write_bot_ai_sensor,
                 )
                     .chain(),
-            );
+            )
+            .add_observer(on_bot_death);
     }
 }
 
@@ -413,22 +415,25 @@ fn bot_tracer_lifetime(
     }
 }
 
-fn handle_bot_deaths(
-    mut deaths: MessageReader<DeathEvent>,
+/// Story-466 — handler de mort bot migré MessageReader → Observer (Bevy 0.18).
+/// Trigger automatique via `commands.trigger(DeathEvent)` côté forgia-damage.
+/// Évite le polling 1×/frame du `MessageReader`. Pattern recommandé pour les
+/// events one-shot per-entity (cf bevy_ecs::event::EntityEvent docs 0.18).
+fn on_bot_death(
+    event: On<DeathEvent>,
     mut commands: Commands,
     bots: Query<(&Transform, Option<&BotSpawnPoint>), With<ArenaBot>>,
     mut pending: ResMut<PendingRespawns>,
 ) {
-    for ev in deaths.read() {
-        let Ok((xf, spawn)) = bots.get(ev.target) else {
-            continue;
-        };
-        let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
-        let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
-        pending.queue.push((delay, pos));
-        if let Ok(mut ec) = commands.get_entity(ev.target) {
-            ec.try_despawn();
-        }
+    let target = event.target;
+    let Ok((xf, spawn)) = bots.get(target) else {
+        return;
+    };
+    let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
+    let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
+    pending.queue.push((delay, pos));
+    if let Ok(mut ec) = commands.get_entity(target) {
+        ec.try_despawn();
     }
 }
 

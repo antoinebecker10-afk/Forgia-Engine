@@ -55,8 +55,17 @@ pub enum DamageKind {
     Other,
 }
 
-#[derive(Message, Debug, Clone, Copy)]
+/// Story-466 — DeathEvent migré Message → EntityEvent (Observer pattern Bevy 0.18).
+///
+/// Le champ `target` est annoté `#[event_target]` car le derive `EntityEvent`
+/// route auto vers les observers per-entity. Le nom `target` est conservé
+/// (vs renommer `entity`) pour préserver l'API existante (`ev.target` lecture).
+///
+/// Consume via Observer : `app.add_observer(|event: On<DeathEvent>, ...| {...})`.
+/// Trigger via `commands.trigger(DeathEvent { target, source, final_kind })`.
+#[derive(EntityEvent, Debug, Clone, Copy)]
 pub struct DeathEvent {
+    #[event_target]
     pub target: Entity,
     pub source: Option<Entity>,
     pub final_kind: DamageKind,
@@ -187,7 +196,8 @@ pub struct ForgiaDamagePlugin;
 impl Plugin for ForgiaDamagePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DamageEvent>()
-            .add_message::<DeathEvent>()
+            // Story-466 — DeathEvent migré vers EntityEvent (Observer). Plus
+            // d'add_message car les consommateurs utilisent `On<DeathEvent>`.
             .add_message::<DamageAppliedEvent>()
             .init_asset::<Genome<HitFeedbackTuning>>()
             .register_asset_loader(GenomeLoader::<HitFeedbackTuning>::default())
@@ -217,8 +227,8 @@ fn sync_hit_feedback(
 fn apply_damage(
     mut events: MessageReader<DamageEvent>,
     mut healths: Query<&mut Health>,
-    mut deaths: MessageWriter<DeathEvent>,
     mut applied: MessageWriter<DamageAppliedEvent>,
+    mut commands: Commands,
 ) {
     for ev in events.read() {
         let Ok(mut hp) = healths.get_mut(ev.target) else { continue };
@@ -235,7 +245,9 @@ fn apply_damage(
             is_kill,
         });
         if is_kill {
-            deaths.write(DeathEvent {
+            // Story-466 — DeathEvent fire via Observer (EntityEvent).
+            // commands.trigger routes auto vers observers ciblant `target`.
+            commands.trigger(DeathEvent {
                 target: ev.target,
                 source: ev.source,
                 final_kind: ev.kind,
