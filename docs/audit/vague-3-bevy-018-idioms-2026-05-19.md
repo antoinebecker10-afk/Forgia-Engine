@@ -92,13 +92,28 @@ app.observe(|trigger: Trigger<CombatHitEvent>, mut commands: Commands| {
 
 Hooks lifecycle disponibles : `OnAdd<C>`, `OnRemove<C>`, `OnInsert<C>` (utile pour patterns "spawn nameplate on enemy add").
 
-### 2.4 Story-462 suggérée
+### 2.4 Story-462 — RÉ-ÉVALUÉE 2026-05-19 PM : SKIP
 
-**Scope BMAD Standard (~2h)** :
-- Migration nameplate + killfeed vers Observer `CombatHitEvent`
-- Garder `apply_damage` en MessageReader Update (clarté > économie polling)
-- Critère : sensors `forgia_killfeed.json` + nameplate billboard restent fonctionnels, pas de regression hitbox
-- Bonus : ajouter `Changed<EquippedWeapons>` filter sur ammo HUD render
+**Audit initial Vague 3 estimait ~2h Standard.** Découverte post-impl story-461 :
+
+`CombatHitEvent` est consommé par **8 crates** (pas 2) :
+
+| Consommateur | Rôle |
+|---|---|
+| `forgia-ai-arena-bot::tactical` | Perception alert bots |
+| `forgia-enemy-nameplate` | Spawn nameplate (cible Observer initiale) |
+| `forgia-fps::score` | Kill detection + score popup |
+| `forgia-damage-numbers` | Floating damage numbers |
+| `forgia-hitmarker` | Crosshair flash |
+| `forgia-killfeed` | Kill feed (cible Observer initiale) |
+| `forgia-juice-screen-flash` | Red screen on damage |
+| `forgia-ui-damage-direction` | Compass damage direction |
+
+**Producteur unique** : `forgia-fps::fire_weapon_minimal:1130` `hit_events.write(...)`.
+
+**Verdict** : migrer SEULEMENT nameplate + killfeed = besoin d'un **bridge system** Update poll MessageReader → `commands.trigger(event)`. Aucun gain perf (polling persiste pour le bridge), juste complexité ajoutée. Le vrai gain demande migration **producteur + 8 consommateurs simultanément** → **Enterprise scope (~6-10h)**, à scoper en story dédiée.
+
+**SKIP recommandé** Vague 3 sur ce point. L'optimisation `Changed<EquippedWeapons>` filter sur ammo HUD render reste valide en isolation (Quick ~30min, à scoper séparément si besoin).
 
 ---
 
