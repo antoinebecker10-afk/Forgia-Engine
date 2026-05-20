@@ -11,11 +11,13 @@
 
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
-use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_core::prelude::*;
+use forgia_audio_voicelines::{BarkEvent, BarkKind};
+use forgia_combat::prelude::{EquippedWeapons, WeaponType};
 use forgia_damage::DeathEvent;
-use forgia_loot_tables::{Pickup, PickupCollector};
+use forgia_loot_tables::{Pickup, PickupAnimState, PickupCollector, PickupKind};
 use forgia_player::Player;
+use std::time::{SystemTime, UNIX_EPOCH};
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 
@@ -89,205 +91,207 @@ impl RunSeed {
 #[derive(Component, Default)]
 pub struct RogueliteRunMarker;
 
-/// Story-470 M1.5c — vraie zone de départ Roguelite :
-/// - Floor 300×300m (collider rapier + mesh visuel matching)
-/// - Murs périmètre 4 walls (300m × 6m haut) anti-fall-off
-/// - 5 plateformes raised (combat verticality, RoR2-style)
-/// - 25 cover obstacles xoshiro-seeded déterministe (placement = run identity)
-/// - 3 landmarks couleurs distincts (orientation visuelle joueur)
-/// - Sun directional + ambient bleu-gris (atmosphère arena)
+/// Mapping V1 depth → stage_id. Pattern simple alternance + boss force volcanique.
 ///
-/// Placement obstacles : `Xoshiro256StarStar::seed_from_u64(SCENE_SEED_CONST)` —
-/// déterministe, reproductible. M2 remplacera par procgen biome-based.
+/// Story-483 P2 (2026-05-20). V7 ne shippe que 2 stages TOML (`crypts_of_anvil`
+/// + `forge_sanctum`). Mapping :
+/// - Boss state → toujours `crypts_of_anvil` (le seul stage avec `boss_pad_required`)
+/// - Pair depths (0, 2, ...) → `crypts_of_anvil` (Volcanic, boss-ready)
+/// - Impair depths (1, 3, ...) → `forge_sanctum` (Plains, lighter biome)
 ///
-/// Despawn auto OnExit(GameMode::Roguelite) via Bevy 0.18 `DespawnOnExit`.
+/// V2 : étendre `roguelite_stages.toml` + remplacer ce mapping par lookup
+/// `RunGraph::stages[depth].variants[chosen].stage_id_pool` (data-driven).
+pub fn stage_id_for_depth(depth: u8, is_boss: bool) -> &'static str {
+    if is_boss {
+        return "crypts_of_anvil";
+    }
+    if depth.is_multiple_of(2) {
+        "crypts_of_anvil"
+    } else {
+        "forge_sanctum"
+    }
+}
+
+/// Story-483 V7 P2 (2026-05-20) — dispatcher stage_id sur transition RunState.
+///
+/// Watches `Res<State<RunState>>` et insère un `StageLoadRequest` dès qu'on
+/// entre dans `InRun{stage}` ou `Boss{stage}`. Lobby = depth 0 (pre-run
+/// visual). Defeat/Victory ne déclenchent rien (laisse stage visible jusqu'à
+/// OnExit GameMode cleanup).
+///
+/// Idempotent : `Local<Option<(u8, bool)>>` track last_depth → no-op si
+/// inchangé. Le spawn system côté stage-arena détecte stage_id change et
+/// cleanup les entités du stage précédent avant spawn du nouveau.
+pub fn sys_stage_dispatch(
+    mut commands: Commands,
+    run_state: Option<Res<State<RunState>>>,
+    run_seed: Option<Res<RunSeed>>,
+    mut last_depth: Local<Option<(u8, bool)>>,
+) {
+    let Some(state) = run_state.as_deref().map(|s| s.get()) else {
+        return;
+    };
+    let key = match state {
+        RunState::Lobby => Some((0u8, false)),
+        RunState::InRun { stage } => Some((*stage, false)),
+        RunState::Boss { stage } => Some((*stage, true)),
+        // Defeat/Victory : keep last stage visible (no-op).
+        _ => return,
+    };
+    if key == *last_depth {
+        return;
+    }
+    let Some((depth, is_boss)) = key else {
+        return;
+    };
+    let stage_id = stage_id_for_depth(depth, is_boss);
+    const FALLBACK_SEED: u64 = 0xC0FF_EE51_C0BA_1700;
+    let seed = run_seed
+        .as_ref()
+        .map(|s| s.stage_seed(depth))
+        .unwrap_or(FALLBACK_SEED);
+    commands.insert_resource(forgia_stage_arena::StageLoadRequest {
+        stage_id: stage_id.to_string(),
+        seed,
+    });
+    *last_depth = key;
+    info!(
+        "[roguelite] Stage dispatch → '{stage_id}' (depth={depth}, boss={is_boss}, seed={seed:#x})"
+    );
+}
+
+/// Parse une `music_state` string venant de `roguelite_stages.toml` vers
+/// l'enum `forgia_audio_music_state::MusicState`. Story-483 P3.
+///
+/// Convention V1 : prefix-match insensible à la casse. Inconnu → `None`
+/// (caller ignore = preserve current music state).
+///
+/// Exemples :
+/// - "combat_intense" / "combat_default" / "combat" → `Combat`
+/// - "lobby" → `Lobby` · "explore" → `Explore`
+/// - "boss" → `Boss` · "victory" → `Victory` · "defeat" → `Defeat`
+pub fn parse_music_state(s: &str) -> Option<forgia_audio_music_state::MusicState> {
+    use forgia_audio_music_state::MusicState;
+    let s = s.trim().to_ascii_lowercase();
+    if s.is_empty() {
+        return None;
+    }
+    if s.starts_with("combat") {
+        Some(MusicState::Combat)
+    } else if s.starts_with("lobby") {
+        Some(MusicState::Lobby)
+    } else if s.starts_with("explore") {
+        Some(MusicState::Explore)
+    } else if s.starts_with("boss") {
+        Some(MusicState::Boss)
+    } else if s.starts_with("victory") {
+        Some(MusicState::Victory)
+    } else if s.starts_with("defeat") {
+        Some(MusicState::Defeat)
+    } else {
+        None
+    }
+}
+
+/// Story-483 V7 P3 (2026-05-20) — applique les toggles du stage chargé.
+///
+/// Watches `StageLoadResult` : quand `state == Ready` ET stage_id changed,
+/// émet `RequestMusicState` vers `forgia-audio-music-state` (toggle réel)
+/// + log weather_override (consumer V2 future).
+///
+/// Idempotent via `Local<String>` last_applied_id. Pattern observer plutôt
+/// que system tick : 1 emission par stage transition (pas par frame).
+pub fn sys_apply_stage_toggles(
+    stage_result: Res<forgia_stage_arena::StageLoadResult>,
+    mut music_req: MessageWriter<forgia_audio_music_state::RequestMusicState>,
+    mut last_applied_id: Local<String>,
+) {
+    if stage_result.state != forgia_stage_arena::StageState::Ready {
+        return;
+    }
+    if stage_result.stage_id == *last_applied_id || stage_result.stage_id.is_empty() {
+        return;
+    }
+    // Music toggle.
+    if let Some(music) = parse_music_state(&stage_result.music_state_id) {
+        music_req.write(forgia_audio_music_state::RequestMusicState {
+            new_state: music,
+            duration_sec: None,
+        });
+        info!(
+            "[roguelite] Stage '{}' Ready → music_state='{}' → {:?}",
+            stage_result.stage_id, stage_result.music_state_id, music
+        );
+    } else if !stage_result.music_state_id.is_empty() {
+        warn!(
+            "[roguelite] Stage '{}' music_state='{}' non reconnu — fallback ignore",
+            stage_result.stage_id, stage_result.music_state_id
+        );
+    }
+    // Weather override : log seulement (pas de consumer V1, future `forgia-weather`).
+    if !stage_result.weather_override.is_empty() {
+        info!(
+            "[roguelite] Stage '{}' weather_override='{}' (consumer V2)",
+            stage_result.stage_id, stage_result.weather_override
+        );
+    }
+    *last_applied_id = stage_result.stage_id.clone();
+}
+
+/// Story-483 V7 P2 (2026-05-20) — `OnEnter(GameMode::Roguelite)` minimal.
+///
+/// Stations health/ammo (cross-stage gameplay, pas map-bound). Le stage
+/// arena lui-même est piloté par `sys_stage_dispatch` (Update, watches
+/// RunState transitions).
 pub fn sys_spawn_roguelite_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    const FLOOR_HALF: f32 = 150.0; // floor 300×300m
-    const WALL_HEIGHT: f32 = 6.0;
-    const WALL_THICKNESS: f32 = 1.0;
-    const SCENE_SEED: u64 = 0xC0FF_EE51_C0BA_1700;
+    crate::stations::spawn_stations(&mut commands, &mut meshes, &mut materials);
+}
 
-    // ─────── Floor 300×300m ────────────────────────────────────────────────
-    let floor_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.28, 0.26, 0.24),
-        perceptual_roughness: 0.92,
-        ..default()
-    });
-    commands.spawn((
-        Name::new("RogueliteFloor"),
-        RogueliteRunMarker,
-        DespawnOnExit(GameMode::Roguelite),
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(FLOOR_HALF * 2.0, FLOOR_HALF * 2.0))),
-        MeshMaterial3d(floor_mat),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-        RigidBody::Fixed,
-        Collider::cuboid(FLOOR_HALF, 0.1, FLOOR_HALF),
-    ));
 
-    // ─────── 4 murs périmètre (anti-fall-off) ─────────────────────────────
-    let wall_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.35, 0.32, 0.30),
-        perceptual_roughness: 0.85,
-        ..default()
-    });
-    let wall_mesh = meshes.add(Cuboid::new(
-        FLOOR_HALF * 2.0,
-        WALL_HEIGHT,
-        WALL_THICKNESS,
-    ));
-    for (idx, (offset_z, rot_y)) in [
-        (FLOOR_HALF, 0.0),                // mur Sud (+Z)
-        (-FLOOR_HALF, std::f32::consts::PI), // mur Nord (-Z)
-    ]
-    .iter()
-    .enumerate()
-    {
-        commands.spawn((
-            Name::new(format!("RogueliteWall_NS_{idx}")),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Mesh3d(wall_mesh.clone()),
-            MeshMaterial3d(wall_mat.clone()),
-            Transform::from_xyz(0.0, WALL_HEIGHT / 2.0, *offset_z)
-                .with_rotation(Quat::from_rotation_y(*rot_y)),
-            RigidBody::Fixed,
-            Collider::cuboid(FLOOR_HALF, WALL_HEIGHT / 2.0, WALL_THICKNESS / 2.0),
-        ));
+/// V7 M3 step 4 (2026-05-20) — Observer DeathEvent ciblant le Player → Defeat.
+///
+/// Pipeline : bot tire (BotShootConfig) → `apply_damage` mute Health → trigger
+/// DeathEvent quand HP=0 → cet observer match `target == Player entity` et émet
+/// `EndRunEvent(Defeat)`. `sys_end_run` transitionne `RunState::Defeat`, ce qui
+/// déclenche `draw_defeat_overlay` (gated). Pattern Hadès "die → return to lobby".
+///
+/// Idempotent : la victory_emitted latch dans RogueliteWave bloque double-emit
+/// si trigger arrive après une Victory déjà émise.
+pub fn obs_roguelite_player_death(
+    event: On<DeathEvent>,
+    q_player: Query<Entity, With<Player>>,
+    run_state: Option<Res<State<RunState>>>,
+    mut end_run: MessageWriter<EndRunEvent>,
+    mut wave: ResMut<crate::waves::RogueliteWave>,
+) {
+    // Filter : death cible le Player (pas un bot).
+    let Ok(player_entity) = q_player.single() else {
+        return;
+    };
+    if event.target != player_entity {
+        return;
     }
-    let wall_mesh_ew = meshes.add(Cuboid::new(
-        WALL_THICKNESS,
-        WALL_HEIGHT,
-        FLOOR_HALF * 2.0,
-    ));
-    for (idx, offset_x) in [FLOOR_HALF, -FLOOR_HALF].iter().enumerate() {
-        commands.spawn((
-            Name::new(format!("RogueliteWall_EW_{idx}")),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Mesh3d(wall_mesh_ew.clone()),
-            MeshMaterial3d(wall_mat.clone()),
-            Transform::from_xyz(*offset_x, WALL_HEIGHT / 2.0, 0.0),
-            RigidBody::Fixed,
-            Collider::cuboid(WALL_THICKNESS / 2.0, WALL_HEIGHT / 2.0, FLOOR_HALF),
-        ));
-    }
-
-    // ─────── 5 plateformes raised (verticality) ────────────────────────────
-    let platform_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.45, 0.40, 0.36),
-        perceptual_roughness: 0.80,
-        ..default()
-    });
-    let platforms: &[(Vec3, Vec3)] = &[
-        (Vec3::new(40.0, 1.5, 30.0), Vec3::new(12.0, 3.0, 12.0)),
-        (Vec3::new(-50.0, 2.5, 20.0), Vec3::new(14.0, 5.0, 14.0)),
-        (Vec3::new(60.0, 2.0, -50.0), Vec3::new(10.0, 4.0, 10.0)),
-        (Vec3::new(-30.0, 3.5, -60.0), Vec3::new(16.0, 7.0, 16.0)),
-        (Vec3::new(0.0, 1.0, 80.0), Vec3::new(20.0, 2.0, 8.0)),
-    ];
-    for (idx, (pos, size)) in platforms.iter().enumerate() {
-        let half = *size / 2.0;
-        commands.spawn((
-            Name::new(format!("RoguelitePlatform_{idx}")),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Mesh3d(meshes.add(Cuboid::from_size(*size))),
-            MeshMaterial3d(platform_mat.clone()),
-            Transform::from_translation(*pos),
-            RigidBody::Fixed,
-            Collider::cuboid(half.x, half.y, half.z),
-        ));
-    }
-
-    // ─────── 25 cover obstacles xoshiro-seeded ─────────────────────────────
-    let cover_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.50, 0.46, 0.40),
-        perceptual_roughness: 0.88,
-        ..default()
-    });
-    let mut rng = Xoshiro256StarStar::seed_from_u64(SCENE_SEED);
-    let spawn_clearance: f32 = 12.0; // pas de cover dans cercle 12m autour origin (player spawn)
-    let mut spawned = 0u32;
-    let mut attempts = 0u32;
-    while spawned < 25 && attempts < 200 {
-        attempts += 1;
-        // x, z dans [-FLOOR_HALF+10, FLOOR_HALF-10]
-        let x = (rng.next_u64() as f64 / u64::MAX as f64 * 2.0 - 1.0) as f32
-            * (FLOOR_HALF - 10.0);
-        let z = (rng.next_u64() as f64 / u64::MAX as f64 * 2.0 - 1.0) as f32
-            * (FLOOR_HALF - 10.0);
-        if x * x + z * z < spawn_clearance * spawn_clearance {
-            continue; // skip si trop proche du spawn
-        }
-        // Taille 1.5m-4m (cube)
-        let s = 1.5 + (rng.next_u64() as f64 / u64::MAX as f64) as f32 * 2.5;
-        let half_s = s / 2.0;
-        commands.spawn((
-            Name::new(format!("RogueliteCover_{spawned}")),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Mesh3d(meshes.add(Cuboid::from_size(Vec3::splat(s)))),
-            MeshMaterial3d(cover_mat.clone()),
-            Transform::from_xyz(x, half_s, z),
-            RigidBody::Fixed,
-            Collider::cuboid(half_s, half_s, half_s),
-        ));
-        spawned += 1;
-    }
-
-    // ─────── 3 landmarks colorés (orientation visuelle) ────────────────────
-    let landmarks: &[(Vec3, Color)] = &[
-        (Vec3::new(100.0, 4.0, 0.0), Color::srgb(0.95, 0.30, 0.30)), // rouge Est
-        (Vec3::new(0.0, 4.0, 100.0), Color::srgb(0.30, 0.80, 0.95)), // bleu Sud
-        (Vec3::new(-100.0, 4.0, 0.0), Color::srgb(0.95, 0.85, 0.20)), // jaune Ouest
-    ];
-    for (idx, (pos, color)) in landmarks.iter().enumerate() {
-        let emissive_lin = color.to_srgba();
-        commands.spawn((
-            Name::new(format!("RogueliteLandmark_{idx}")),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Mesh3d(meshes.add(Cuboid::new(3.0, 8.0, 3.0))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: *color,
-                emissive: LinearRgba::new(
-                    emissive_lin.red * 0.6,
-                    emissive_lin.green * 0.6,
-                    emissive_lin.blue * 0.6,
-                    1.0,
-                ),
-                ..default()
-            })),
-            Transform::from_translation(*pos),
-            RigidBody::Fixed,
-            Collider::cuboid(1.5, 4.0, 1.5),
-        ));
-    }
-
-    // ─────── Sun (directional light) ───────────────────────────────────────
-    commands.spawn((
-        Name::new("RogueliteSun"),
-        RogueliteRunMarker,
-        DespawnOnExit(GameMode::Roguelite),
-        DirectionalLight {
-            illuminance: 12_000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(50.0, 100.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    // ─────── Wave 1 enemies (M2 step 4 — orchestré par waves.rs) ─────────
-    let enemy_total =
-        crate::waves::spawn_wave_enemies(&mut commands, &mut meshes, &mut materials, 1);
-
-    info!(
-        "[roguelite] Scene spawned : floor 300m + 4 walls + 5 platforms + {spawned} cover + 3 landmarks + {enemy_total} enemies wave 1 (seed={SCENE_SEED:#x})"
+    // Gate sur run active (Lobby/Defeat/Victory : ignore).
+    let active = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
     );
+    if !active {
+        return;
+    }
+    // Anti double-emit (si Victory déjà fired = run finie, n'override pas).
+    if wave.victory_emitted {
+        return;
+    }
+    wave.victory_emitted = true; // bloque transitions further en orchestrator
+    end_run.write(EndRunEvent {
+        result: RunResult::Defeat,
+    });
+    info!("[roguelite] Player died — DEFEAT");
 }
 
 /// Observer Bevy 0.18 — sur DeathEvent d'un ennemi Roguelite, spawn un Pickup
@@ -300,44 +304,152 @@ pub fn obs_roguelite_enemy_death(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     enemies_q: Query<(&Transform, &crate::EnemyArchetype)>,
+    time: Res<Time>,
+    q_player_hp: Query<&forgia_damage::Health, With<forgia_player::Player>>,
+    equipped: Option<Res<EquippedWeapons>>,
+    mut bark_writer: MessageWriter<BarkEvent>,
 ) {
     let target = event.target;
     let Ok((xf, archetype)) = enemies_q.get(target) else {
         return; // pas un ennemi Roguelite (probablement bot Arena → ignore)
     };
 
-    let value = match *archetype {
-        crate::EnemyArchetype::Tank => 5,
-        crate::EnemyArchetype::Runner => 2,
-        crate::EnemyArchetype::Sniper => 3,
-        crate::EnemyArchetype::Boss => 50, // M3 step 1 — récompense climax
+    // Story-481 Tier 1.5 — émet BarkEvent::Kill côté arme parlante équipée.
+    // Speaker dérivé de l'arme courante (Pépin/Bourrasque/Lenoir/Boucherie).
+    // `process_bark_events` (forgia-audio-voicelines) consomme + applique
+    // cooldown + rate limit + sensor. Audio playback réel = Tier 2.
+    let speaker = equipped
+        .as_deref()
+        .map(|eq| weapon_to_speaker(eq.current))
+        .unwrap_or("any");
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+    bark_writer.write(BarkEvent {
+        speaker: speaker.to_string(),
+        kind: BarkKind::Kill,
+        now: now_secs,
+    });
+
+    // V7 M3 step 3 — Heart drop scaled par player HP (low HP = chance plus haute).
+    // Boss garantit toujours un Heart big. Sources : Hadès "Centaur Hearts" + RoR2.
+    let player_hp_frac = q_player_hp
+        .iter()
+        .next()
+        .map(|h| if h.max > 0.0 { h.current / h.max } else { 1.0 })
+        .unwrap_or(1.0);
+
+    // Seed pseudo-deterministic from time + entity bits (cheap xorshift).
+    let entity_seed: u64 = target.to_bits();
+    let mut seed = (time.elapsed_secs_f64() * 1000.0) as u64
+        ^ entity_seed.wrapping_mul(2_654_435_761);
+    seed ^= seed << 13;
+    seed ^= seed >> 7;
+    seed ^= seed << 17;
+    let roll = (seed % 100) as u32; // 0..99
+
+    let (kind, value, color, emissive) = match *archetype {
+        crate::EnemyArchetype::Boss => (
+            PickupKind::Heart,
+            40_u32, // big heart : ~33% of max HP (player max 100).
+            (1.0_f32, 0.30_f32, 0.30_f32),
+            LinearRgba::new(1.8, 0.20, 0.20, 1.0),
+        ),
+        _ if player_hp_frac < 0.40 && roll < 35 => (
+            // Low HP + 35% chance → heart drop (Hadès Centaur pattern).
+            PickupKind::Heart,
+            20,
+            (1.0, 0.30, 0.30),
+            LinearRgba::new(1.6, 0.20, 0.20, 1.0),
+        ),
+        crate::EnemyArchetype::Tank => (
+            PickupKind::Soul,
+            5,
+            (0.55, 0.80, 1.0),
+            LinearRgba::new(0.45, 0.85, 1.6, 1.0),
+        ),
+        crate::EnemyArchetype::Sniper => (
+            PickupKind::Soul,
+            3,
+            (0.55, 0.80, 1.0),
+            LinearRgba::new(0.45, 0.85, 1.6, 1.0),
+        ),
+        crate::EnemyArchetype::Runner => (
+            PickupKind::Soul,
+            2,
+            (0.55, 0.80, 1.0),
+            LinearRgba::new(0.45, 0.85, 1.6, 1.0),
+        ),
     };
 
-    let pos = xf.translation.with_y(0.6);
+    let base_y = 0.85;
+    let pos = xf.translation.with_y(base_y);
+    let core_radius = if kind == PickupKind::Heart { 0.35 } else { 0.28 };
+    let halo_radius = if kind == PickupKind::Heart { 0.70 } else { 0.55 };
+
+    let core_mat = materials.add(StandardMaterial {
+        base_color: Color::srgba(color.0, color.1, color.2, 1.0),
+        emissive,
+        metallic: 0.0,
+        perceptual_roughness: 0.4,
+        ..default()
+    });
+    let halo_mat = materials.add(StandardMaterial {
+        base_color: Color::srgba(color.0 * 0.6, color.1 * 0.6, color.2 * 0.6, 0.30),
+        emissive: LinearRgba::new(emissive.red * 0.5, emissive.green * 0.5, emissive.blue * 0.5, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        cull_mode: None,
+        unlit: true,
+        ..default()
+    });
+    let core_mesh = meshes.add(Sphere::new(core_radius));
+    let halo_mesh = meshes.add(Sphere::new(halo_radius));
+
+    let label = if kind == PickupKind::Heart {
+        format!("RoguelitePickup_heart{value}")
+    } else {
+        format!("RoguelitePickup_{value}souls")
+    };
+    let parent_id = commands
+        .spawn((
+            Name::new(label),
+            RogueliteRunMarker,
+            DespawnOnExit(GameMode::Roguelite),
+            Pickup {
+                kind,
+                value,
+                lifetime_secs: 30.0,
+                collect_radius: 2.5,
+                ..default()
+            },
+            PickupAnimState {
+                phase: 0.0,
+                velocity: Vec3::ZERO,
+                base_y,
+            },
+            Mesh3d(core_mesh),
+            MeshMaterial3d(core_mat),
+            Transform::from_translation(pos),
+        ))
+        .id();
     commands.spawn((
-        Name::new(format!("RoguelitePickup_{value}souls")),
-        RogueliteRunMarker,
-        DespawnOnExit(GameMode::Roguelite),
-        Pickup {
-            value,
-            lifetime_secs: 30.0,
-            collect_radius: 2.5,
-        },
-        Mesh3d(meshes.add(Sphere::new(0.35))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(1.0, 0.85, 0.30),
-            emissive: LinearRgba::new(0.80, 0.55, 0.10, 1.0),
-            metallic: 0.7,
-            perceptual_roughness: 0.25,
-            ..default()
-        })),
-        Transform::from_translation(pos),
+        ChildOf(parent_id),
+        Name::new("PickupHalo"),
+        Mesh3d(halo_mesh),
+        MeshMaterial3d(halo_mat),
+        Transform::default(),
     ));
 }
 
-/// OnEnter(GameMode::Roguelite) — tag le Player avec PickupCollector pour que
-/// `forgia_loot_tables::sys_collect_pickups` puisse trigger sur sa position.
-/// Player est spawn par forgia-player::OnEnter(AppMode::InGame) (cross-mode).
+/// Tag le Player avec PickupCollector pour que `forgia_loot_tables::sys_collect_pickups`
+/// puisse trigger sur sa position.
+///
+/// V7 M2.5 (2026-05-20) — DOIT tourner en `Update + run_if(in_state(Roguelite))`,
+/// PAS en `OnEnter`. Player est spawn par `forgia-player::OnEnter(AppMode::InGame)`
+/// (autre plugin) et l'ordre OnEnter cross-plugin n'est PAS garanti par Bevy 0.18.
+/// Pattern récurrent : voir memory `feedback_cross_plugin_onenter_race_pattern.md`.
+/// Guard idempotent via `Without<PickupCollector>` → no-op après 1er tag.
 pub fn sys_tag_player_as_collector(
     mut commands: Commands,
     q_player: Query<Entity, (With<Player>, Without<PickupCollector>)>,
@@ -345,23 +457,70 @@ pub fn sys_tag_player_as_collector(
     for e in &q_player {
         if let Ok(mut ec) = commands.get_entity(e) {
             ec.insert(PickupCollector);
+            info!("[roguelite] Player {e:?} tagged PickupCollector");
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn sys_start_run(
     mut events: MessageReader<StartRunEvent>,
     mut next: ResMut<NextState<RunState>>,
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    stage_graph_config: Res<forgia_stage_graph::RunGraphConfig>,
+    mut wave: ResMut<crate::waves::RogueliteWave>,
 ) {
     for ev in events.read() {
         let seed = ev.seed.unwrap_or_else(default_seed_from_clock);
+        let graph = forgia_stage_graph::generate_run_graph(&stage_graph_config, seed);
+        let total_stages = graph.total_stages;
+        let boss_depth = graph.boss_depth();
+
+        // Reset RogueliteWave (run repeatable depuis Lobby).
+        *wave = crate::waves::RogueliteWave::default();
+
+        // V7 M3 step 4 — Reset Player HP au max au start (sinon HP=0 sticky après Defeat).
+        commands.queue(|world: &mut World| {
+            let mut q = world.query_filtered::<&mut forgia_damage::Health, With<Player>>();
+            if let Ok(mut hp) = q.single_mut(world) {
+                hp.current = hp.max;
+            }
+        });
+
         commands.insert_resource(RunSeed {
             seed,
-            stage_count: 0,
+            stage_count: total_stages,
         });
-        next.set(RunState::InRun { stage: 0 });
-        info!("[roguelite] Run started — seed={seed}");
+        commands.insert_resource(graph.clone());
+
+        // Spawn stage 0 (toujours Combat par forced_kind_for_depth — voir
+        // forgia_stage_graph::forced_kind_for_depth).
+        if let Some(node) = crate::waves::current_stage_node(&graph, 0, 0) {
+            let composition = crate::waves::composition_for_stage(node);
+            crate::waves::spawn_stage_enemies(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &composition,
+                0,
+            );
+            wave.current_stage_depth = 0;
+            wave.current_stage_kind = Some(node.kind);
+            // RunState : Boss si total_stages == 1 (cas dégénéré), sinon InRun.
+            next.set(if node.kind == forgia_stage_graph::StageKind::Boss {
+                RunState::Boss { stage: 0 }
+            } else {
+                RunState::InRun { stage: 0 }
+            });
+        } else {
+            warn!("[roguelite] RunGraph vide ? Fallback Lobby");
+            next.set(RunState::Lobby);
+        }
+        info!(
+            "[roguelite] Run started — seed={seed} total_stages={total_stages} boss_depth={boss_depth}"
+        );
     }
 }
 
@@ -389,6 +548,20 @@ fn default_seed_from_clock() -> u64 {
         .unwrap_or(0xC0FF_EEDE_ADBE_EF00)
 }
 
+/// Story-481 — Map WeaponType courante → speaker_id du genome dialogue.
+/// Clés alignées sur `assets/genomes/roguelite/roguelite_dialogue.toml`
+/// (pools indexés `speaker = "pepin" | "bourrasque" | "lenoir" | "boucherie"`).
+/// Armes hors Arena V1 ou sans persona → "any" (fallback pool générique).
+pub fn weapon_to_speaker(w: WeaponType) -> &'static str {
+    match w {
+        WeaponType::ModernAR => "pepin",
+        WeaponType::AssaultRifle => "bourrasque",
+        WeaponType::Shotgun => "lenoir",
+        WeaponType::RocketLauncher => "boucherie",
+        _ => "any",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,6 +569,49 @@ mod tests {
     #[test]
     fn runstate_default_is_lobby() {
         assert_eq!(RunState::default(), RunState::Lobby);
+    }
+
+    #[test]
+    fn stage_id_for_depth_alternates() {
+        assert_eq!(stage_id_for_depth(0, false), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(1, false), "forge_sanctum");
+        assert_eq!(stage_id_for_depth(2, false), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(3, false), "forge_sanctum");
+    }
+
+    #[test]
+    fn stage_id_for_depth_boss_forces_crypts() {
+        // Boss state utilise toujours crypts_of_anvil (boss_pad_required=true).
+        assert_eq!(stage_id_for_depth(4, true), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(5, true), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(0, true), "crypts_of_anvil");
+    }
+
+    #[test]
+    fn parse_music_state_combat_variants() {
+        use forgia_audio_music_state::MusicState;
+        assert_eq!(parse_music_state("combat"), Some(MusicState::Combat));
+        assert_eq!(parse_music_state("combat_intense"), Some(MusicState::Combat));
+        assert_eq!(parse_music_state("combat_default"), Some(MusicState::Combat));
+        assert_eq!(parse_music_state("COMBAT"), Some(MusicState::Combat));
+        assert_eq!(parse_music_state("  Combat_Intense  "), Some(MusicState::Combat));
+    }
+
+    #[test]
+    fn parse_music_state_all_known_states() {
+        use forgia_audio_music_state::MusicState;
+        assert_eq!(parse_music_state("lobby"), Some(MusicState::Lobby));
+        assert_eq!(parse_music_state("explore"), Some(MusicState::Explore));
+        assert_eq!(parse_music_state("boss"), Some(MusicState::Boss));
+        assert_eq!(parse_music_state("victory"), Some(MusicState::Victory));
+        assert_eq!(parse_music_state("defeat"), Some(MusicState::Defeat));
+    }
+
+    #[test]
+    fn parse_music_state_unknown_returns_none() {
+        assert!(parse_music_state("").is_none());
+        assert!(parse_music_state("nope").is_none());
+        assert!(parse_music_state("xyz_combat").is_none()); // pas en prefix
     }
 
     #[test]
@@ -439,5 +655,20 @@ mod tests {
     fn run_result_variants_distinct() {
         assert_ne!(RunResult::Victory, RunResult::Defeat);
         assert_ne!(RunResult::Defeat, RunResult::Abort);
+    }
+
+    #[test]
+    fn weapon_to_speaker_arena_v1_mapped() {
+        assert_eq!(weapon_to_speaker(WeaponType::ModernAR), "pepin");
+        assert_eq!(weapon_to_speaker(WeaponType::AssaultRifle), "bourrasque");
+        assert_eq!(weapon_to_speaker(WeaponType::Shotgun), "lenoir");
+        assert_eq!(weapon_to_speaker(WeaponType::RocketLauncher), "boucherie");
+    }
+
+    #[test]
+    fn weapon_to_speaker_unknown_falls_back_to_any() {
+        assert_eq!(weapon_to_speaker(WeaponType::AK47), "any");
+        assert_eq!(weapon_to_speaker(WeaponType::PlasmaRifle), "any");
+        assert_eq!(weapon_to_speaker(WeaponType::Chainsaw), "any");
     }
 }

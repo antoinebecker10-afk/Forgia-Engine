@@ -1,0 +1,20 @@
+[package]
+name = "forgia-stage-arena"
+version = "0.1.0"
+edition = "2021"
+description = "Generic stage arena loader (terrain bornée + ramparts + anchors) data-driven via genome TOML. Mode-agnostic (Roguelite V1, FPS Arena M4). Story-483."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }
+forgia-anchor = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }

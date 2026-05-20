@@ -1,0 +1,31 @@
+# Roguelite POI (Point of Interest) registry — Story-483 (V7).
+#
+# Consommé par `forgia-stage-arena::RoguelitePoisGenome` via AssetServer
+# (hot-reload Shift+F12).
+#
+# Schema :
+#   [pois.<id>]
+#   weight     : u32     (pondération RNG ; 0 = forced/never, e.g. boss_pad)
+#   prefab     : string  (path GLB relatif à assets/, e.g. "models/kaykit/dungeon/chest_basic.glb")
+#   encounter  : string  ("none" | "wave_elite" | ... — déclenche wave côté caller)
+#   size_m     : f32     (footprint approximatif pour éviter overlap)
+#
+# NOTE : les paths GLB seront validés/ajustés en P1 selon assets disponibles.
+
+[pois.chest_common]
+weight = 50
+prefab = "models/kaykit/dungeon/chest.glb"
+encounter = "none"
+size_m = 3.0
+
+[pois.elite_pad]
+weight = 15
+prefab = "models/kaykit/dungeon/pillar_deco.glb"
+encounter = "wave_elite"
+size_m = 6.0
+
+[pois.boss_pad]
+weight = 0  # forcé par stage.boss_pad_required, jamais tiré aléatoire
+prefab = "models/kaykit/dungeon/floor.glb"
+encounter = "boss"
+size_m = 8.0

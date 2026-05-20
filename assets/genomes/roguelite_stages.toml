@@ -1,0 +1,39 @@
+# Roguelite stage definitions — Story-483 (V7).
+#
+# Consommé par `forgia-stage-arena::RogueliteStagesGenome` via AssetServer
+# (hot-reload Shift+F12 natif Bevy file_watcher).
+#
+# Schema :
+#   [stages.<id>]
+#   biome              : string (matches forgia-terrain BiomeKind: "Volcanic" | "Plains" | ...)
+#   arena_extent_m     : f32   (demi-côté m, hex inscrit dans cercle de ce rayon)
+#   ramparts_kit       : string ("kaykit_dungeon" | "medieval_hexagon")
+#   ramparts_shape     : string ("hexagonal", default si omis)
+#   anchor_slots       : u32   (POI anchor count sur cercle, exclus PlayerSpawn/BossPad)
+#   music_state        : string (optionnel, e.g. "combat_intense")
+#   boss_pad_required  : bool  (force BossPad anchor + boss-pad POI prefab)
+#   weather_override   : string (optionnel, consommé par VFX/audio biome)
+
+[stages.crypts_of_anvil]
+biome = "Volcanic"
+arena_extent_m = 90.0
+ramparts_kit = "kaykit_dungeon"
+ramparts_shape = "hexagonal"
+anchor_slots = 6
+music_state = "combat_intense"
+boss_pad_required = true
+weather_override = "ashfall"
+# Longueur visuelle naturelle d'1 wall.glb KayKit Dungeon Pack (m). À calibrer
+# au playtest : si gaps entre murs → diminuer ; si chevauchements → augmenter.
+# Hot-reload Shift+F12 supporté pour itération sans rebuild.
+wall_natural_len_m = 2.0
+
+[stages.forge_sanctum]
+biome = "Plains"
+arena_extent_m = 80.0
+ramparts_kit = "medieval_hexagon"
+ramparts_shape = "hexagonal"
+anchor_slots = 5
+music_state = "combat_default"
+boss_pad_required = false
+wall_natural_len_m = 2.0

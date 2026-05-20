@@ -22,12 +22,14 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod enemies;
+pub mod hud;
 pub mod run;
 pub mod sensor;
+pub mod stations;
 pub mod waves;
 
 pub use enemies::{EnemyArchetype, EnemyStats};
-pub use waves::{RogueliteWave, WAVES_TOTAL};
+pub use waves::RogueliteWave;
 
 pub use run::{
     EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent,
@@ -49,13 +51,32 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         if !app.is_plugin_added::<forgia_loot_tables::ForgiaLootTablesPlugin>() {
             app.add_plugins(forgia_loot_tables::ForgiaLootTablesPlugin);
         }
+        // V7 M3 step 2 — node-driven run loop (StageGraph Slay-the-Spire ratios).
+        if !app.is_plugin_added::<forgia_stage_graph::ForgiaStageGraphPlugin>() {
+            app.add_plugins(forgia_stage_graph::ForgiaStageGraphPlugin);
+        }
+        // Story-483 V7 P1 — data-driven stage arena (terrain + ramparts + POI anchors).
+        if !app.is_plugin_added::<forgia_stage_arena::ForgiaStageArenaPlugin>() {
+            app.add_plugins(forgia_stage_arena::ForgiaStageArenaPlugin);
+        }
+        // Story-483 V7 P3 — music state machine (consume RequestMusicState).
+        if !app.is_plugin_added::<forgia_audio_music_state::ForgiaAudioMusicStatePlugin>() {
+            app.add_plugins(forgia_audio_music_state::ForgiaAudioMusicStatePlugin);
+        }
         // Observer drop pickup on enemy death (filtré par EnemyArchetype).
         app.add_observer(run::obs_roguelite_enemy_death);
-        // Marker PickupCollector ajouté au Player OnEnter Roguelite (sys ci-dessous).
+        // V7 M3 step 4 — Defeat trigger sur Player HP=0 (DeathEvent target==Player).
+        app.add_observer(run::obs_roguelite_player_death);
         // Reset RogueliteWave OnEnter (relance run propre depuis lobby).
+        app.add_systems(OnEnter(GameMode::Roguelite), reset_wave_resource);
+        // V7 M2.5 — Tag PickupCollector en Update (PAS OnEnter) car Player spawn
+        // par autre plugin (forgia-player::OnEnter AppMode::InGame), ordre cross-plugin
+        // non garanti. Guard idempotent via `Without<PickupCollector>` (no-op après tag).
         app.add_systems(
-            OnEnter(GameMode::Roguelite),
-            (run::sys_tag_player_as_collector, reset_wave_resource),
+            Update,
+            run::sys_tag_player_as_collector
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
         );
 
         app.init_resource::<sensor::RogueliteTelemetry>()
@@ -64,6 +85,27 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
             .add_systems(OnEnter(GameMode::Roguelite), run::sys_spawn_roguelite_scene)
+            // Story-483 V7 P2 — Stage dispatch sur transition RunState
+            // (Lobby/InRun/Boss). Insère StageLoadRequest avec stage_id dérivé.
+            .add_systems(
+                Update,
+                run::sys_stage_dispatch
+                    .in_set(GameSet::Movement)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            // Story-483 V7 P3 — Toggles emission (music_state / weather_override)
+            // sur stage Ready. Émet RequestMusicState vers forgia-audio-music-state.
+            .add_systems(
+                Update,
+                run::sys_apply_stage_toggles
+                    .in_set(GameSet::Effects)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            // Story-483 V7 P1 — cleanup stage-arena entities + anchor stats on exit.
+            .add_systems(
+                OnExit(GameMode::Roguelite),
+                forgia_stage_arena::cleanup_stage_arena,
+            )
             .add_systems(
                 Update,
                 (run::sys_start_run, run::sys_end_run)
@@ -73,10 +115,26 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             )
             .add_systems(
                 Update,
-                (waves::sys_wave_orchestrator, waves::sys_boss_enrage)
+                (
+                    waves::sys_stage_orchestrator,
+                    waves::sys_boss_enrage,
+                    waves::sys_unstick_bots,
+                )
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Roguelite)),
             )
+            // V7 M3 step 3 — Health + Ammo stations walk-over collect (Effects set).
+            .add_systems(
+                Update,
+                (
+                    stations::sys_use_health_stations,
+                    stations::sys_use_ammo_stations,
+                    stations::sys_reset_stations_on_stage_change,
+                )
+                    .in_set(GameSet::Effects)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            .add_plugins(hud::RogueliteHudPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").
             // Telemetry tick counter en First pour capturer chaque frame.
             .add_systems(First, sensor::sys_update_roguelite_telemetry)
