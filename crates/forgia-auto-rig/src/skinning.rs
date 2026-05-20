@@ -83,6 +83,7 @@ pub fn inject_skinning_for_rigged_meshes(
     q_mesh3d: Query<&Mesh3d>,
     q_global: Query<&GlobalTransform>,
     q_bones: Query<(Entity, &BoneEntity)>,
+    q_names: Query<&Name>,
 ) {
     for (mesh_root, rigged) in &q_rigged {
         if rigged.bone_count == 0 {
@@ -248,6 +249,18 @@ pub fn inject_skinning_for_rigged_meshes(
             let (joint_indices, joint_weights) =
                 compute_nearest_bone_weights(&positions, &mesh3d_to_root_local, &bone_positions_local, &config);
 
+            // Story-482 P3+ — Diagnostic sensor : compte la distribution des
+            // poids par bone pour exposer le bug "vertices arm assignés à
+            // chest" (bone segment vs bone head distance). Écrit
+            // forgia_skinning_weights.json côte à côte de l'injection.
+            write_skinning_weights_sensor(
+                &bones,
+                &q_names,
+                &joint_indices,
+                &joint_weights,
+                n_verts,
+            );
+
             new_mesh.insert_attribute(
                 Mesh::ATTRIBUTE_JOINT_INDEX,
                 VertexAttributeValues::Uint16x4(joint_indices),
@@ -291,6 +304,87 @@ pub fn inject_skinning_for_rigged_meshes(
             mesh_root, meshes_processed, total_verts_processed, bones.len()
         );
     }
+}
+
+/// Story-482 — Sensor diagnostic skinning weights.
+///
+/// Pour chaque bone du rig, compte :
+/// - `count_primary` : nombre de vertices où ce bone est le top-1 (slot[0])
+/// - `count_any` : nombre de vertices avec poids non-nul (slots 0-3)
+/// - `mean_weight` : poids moyen quand bone est présent
+/// - `max_weight` : poids max obtenu
+///
+/// Permet de voir empiriquement si certains bones sont sous-utilisés
+/// (count_primary ≈ 0 → vertices vont ailleurs). Cas typique Forgia :
+/// `arm_L` count_primary=0 si nearest-bone-head met les arm vertices sur
+/// chest (bone segment vs head distance issue).
+fn write_skinning_weights_sensor(
+    bones: &[Entity],
+    q_names: &Query<&Name>,
+    joint_indices: &[[u16; 4]],
+    joint_weights: &[[f32; 4]],
+    n_verts: usize,
+) {
+    #[derive(Default, Clone)]
+    struct Per {
+        count_primary: u32,
+        count_any: u32,
+        sum_weight: f32,
+        max_weight: f32,
+    }
+    let mut per_bone: Vec<Per> = vec![Per::default(); bones.len()];
+    for (idx_row, w_row) in joint_indices.iter().zip(joint_weights.iter()) {
+        // Top-1 (slot 0, déjà sorted asc dans compute_nearest_bone_weights)
+        let bi_primary = idx_row[0] as usize;
+        if w_row[0] > 0.0 && bi_primary < per_bone.len() {
+            per_bone[bi_primary].count_primary += 1;
+        }
+        // Tous slots
+        for slot in 0..4 {
+            let bi = idx_row[slot] as usize;
+            let w = w_row[slot];
+            if w > 0.0 && bi < per_bone.len() {
+                per_bone[bi].count_any += 1;
+                per_bone[bi].sum_weight += w;
+                if w > per_bone[bi].max_weight {
+                    per_bone[bi].max_weight = w;
+                }
+            }
+        }
+    }
+
+    let names: Vec<String> = bones
+        .iter()
+        .map(|&e| {
+            q_names
+                .get(e)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|_| format!("bone_{:?}", e))
+        })
+        .collect();
+
+    // Build per-bone JSON array
+    let mut entries: Vec<String> = Vec::with_capacity(per_bone.len());
+    for (i, p) in per_bone.iter().enumerate() {
+        let mean_w = if p.count_any > 0 {
+            p.sum_weight / p.count_any as f32
+        } else {
+            0.0
+        };
+        let name = names.get(i).cloned().unwrap_or_default();
+        entries.push(format!(
+            "    {{\"index\":{},\"name\":\"{}\",\"count_primary\":{},\"count_any\":{},\"mean_weight\":{:.4},\"max_weight\":{:.4}}}",
+            i, name, p.count_primary, p.count_any, mean_w, p.max_weight
+        ));
+    }
+
+    let json = format!(
+        "{{\n  \"n_verts\": {},\n  \"n_bones\": {},\n  \"bones\": [\n{}\n  ],\n  \"diagnostic_hint\": \"count_primary=0 sur un bone qui devrait porter du mesh = vertices captures par un voisin (chest/spine si arm est short). Indique besoin de distance-to-segment au lieu de distance-to-head.\"\n}}\n",
+        n_verts,
+        bones.len(),
+        entries.join(",\n"),
+    );
+    let _ = std::fs::write("forgia_skinning_weights.json", json);
 }
 
 /// BFS descendants pour collecter les entités avec un `Mesh3d` (incluant
