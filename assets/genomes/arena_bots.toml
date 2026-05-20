@@ -69,7 +69,7 @@ x = -4.0
 z = -7.0
 
 [[spawn_positions]]
-character_glb = "models/characters/Kael.glb#Scene0"
+character_glb = "models/characters/Rex.glb#Scene0"
 character_scale = 1.0
 character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
 character_y_offset = 0.9        # ★ lift pivot center → feet at ground

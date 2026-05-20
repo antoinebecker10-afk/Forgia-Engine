@@ -240,8 +240,9 @@ pub(crate) fn spawn_rex_character(
 
 // ─── Character lineup (auto-rig tuning playground) ──────────────────────────
 //
-// 2026-05-18 : spawn les 5 personnages humanoïdes (Dorin, Kael, Mira, Apprenti,
+// 2026-05-18 : spawn 4 personnages humanoïdes (Dorin, Mira, Apprenti,
 // Maitre Forgeron) côte à côte derrière le spawn Rex pour démarrer le même
+// 2026-05-20 : Kael retiré (mesh identique MD5 à Rex.glb, doublon).
 // process de tuning template auto-rig (cf `reference_auto_rig_template_creation_process.md`).
 //
 // Tous démarrent avec template `Humanoid`. Quand on aura tuné chacun, on
@@ -271,7 +272,6 @@ pub struct LineupSpawned {
 /// (name_display, glb_path, future_dedicated_template_hint).
 const LINEUP_CHARACTERS: &[(&str, &str)] = &[
     ("Dorin", "models/characters/Dorin.glb#Scene0"),
-    ("Kael", "models/characters/Kael.glb#Scene0"),
     ("Mira", "models/characters/Mira.glb#Scene0"),
     ("Apprenti", "models/characters/L'Apprenti .glb#Scene0"),
     ("MaitreForgeron", "models/characters/Maitre Forgeron Célèste.glb#Scene0"),

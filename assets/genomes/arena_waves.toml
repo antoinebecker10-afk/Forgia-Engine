@@ -23,7 +23,7 @@ character_y_offset = 0.9
 x = -4.0
 z = -7.0
 [[wave.spawns]]
-character_glb = "models/characters/Kael.glb#Scene0"
+character_glb = "models/characters/Rex.glb#Scene0"
 character_yaw_deg = 180.0
 character_y_offset = 0.9
 x = 0.0
@@ -60,7 +60,7 @@ character_y_offset = 0.9
 x = -6.0
 z = -10.0
 [[wave.spawns]]
-character_glb = "models/characters/Kael.glb#Scene0"
+character_glb = "models/characters/Rex.glb#Scene0"
 character_yaw_deg = 180.0
 character_y_offset = 0.9
 x = 6.0
@@ -85,7 +85,7 @@ character_y_offset = 0.9
 x = -8.0
 z = -8.0
 [[wave.spawns]]
-character_glb = "models/characters/Kael.glb#Scene0"
+character_glb = "models/characters/Rex.glb#Scene0"
 character_yaw_deg = 180.0
 character_y_offset = 0.9
 x = 8.0
@@ -116,7 +116,7 @@ character_y_offset = 0.9
 x = 0.0
 z = -16.0
 [[wave.spawns]]
-character_glb = "models/characters/Kael.glb#Scene0"
+character_glb = "models/characters/Rex.glb#Scene0"
 character_yaw_deg = -90.0
 character_y_offset = 0.9
 x = 14.0
