@@ -1094,4 +1094,85 @@ mod tests {
             "filename must match Forgia2 sensor convention (forgia2_<feature>.json)"
         );
     }
+
+    // ── Phase 4 — Test régression cross-crate (TOML filesystem ↔ Rust builder) ─
+
+    /// Parse un TOML genome depuis le workspace `assets/genomes/` et le
+    /// décrypte en `SkeletonTemplate`. Helper test seulement.
+    fn parse_workspace_toml(filename: &str) -> SkeletonTemplate {
+        // CARGO_MANIFEST_DIR = `<workspace>/crates/forgia-skeleton-template`
+        // → workspace assets at `../../assets/genomes/<filename>`.
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../assets/genomes")
+            .join(filename);
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {path:?}: {e}"));
+        toml::from_str::<SkeletonTemplate>(&content)
+            .unwrap_or_else(|e| panic!("failed to parse {path:?}: {e}"))
+    }
+
+    /// Compare bone-par-bone : noms identiques + parent identique + pos
+    /// avec tolérance flottante 1e-6. Échoue avec un message ciblé sur le
+    /// premier bone qui diverge.
+    fn assert_templates_match(a: &SkeletonTemplate, b: &SkeletonTemplate, label: &str) {
+        assert_eq!(
+            a.bones.len(),
+            b.bones.len(),
+            "{label}: bone count mismatch (toml={} vs builder={})",
+            a.bones.len(),
+            b.bones.len()
+        );
+        for (i, (ba, bb)) in a.bones.iter().zip(b.bones.iter()).enumerate() {
+            assert_eq!(ba.name, bb.name, "{label}: bone[{i}] name mismatch");
+            assert_eq!(
+                ba.parent, bb.parent,
+                "{label}: bone[{i}] '{}' parent mismatch (toml={:?} vs builder={:?})",
+                ba.name, ba.parent, bb.parent
+            );
+            for axis in 0..3 {
+                let delta = (ba.pos[axis] - bb.pos[axis]).abs();
+                assert!(
+                    delta < 1e-6,
+                    "{label}: bone[{i}] '{}' pos[{axis}] mismatch (toml={} vs builder={}, delta={})",
+                    ba.name, ba.pos[axis], bb.pos[axis], delta
+                );
+            }
+        }
+    }
+
+    /// Régression : si quelqu'un modifie le TOML humanoid (e.g. tune une
+    /// proportion via Shift+F12, fix un bone parent), le builder Rust
+    /// `humanoid()` DOIT être sync. Sinon les tests headless cross-crate
+    /// (qui utilisent le builder car pas d'AssetServer) divergent de la
+    /// vérité runtime (qui utilise le TOML).
+    ///
+    /// Origin : story-480 §3 critère acceptance — "Empêche tout futur drift
+    /// entre fixture test et TOML".
+    #[test]
+    fn assert_humanoid_toml_matches_builder_fixture() {
+        let toml_template = parse_workspace_toml("skeleton_humanoid.toml");
+        let builder_template = SkeletonTemplate::humanoid();
+        assert_templates_match(&toml_template, &builder_template, "humanoid");
+    }
+
+    #[test]
+    fn assert_biped_lizard_toml_matches_builder_fixture() {
+        let toml_template = parse_workspace_toml("skeleton_biped_lizard.toml");
+        let builder_template = SkeletonTemplate::biped_lizard();
+        assert_templates_match(&toml_template, &builder_template, "biped_lizard");
+    }
+
+    /// Méta-régression : tout TOML skeleton dans `assets/genomes/skeleton_*.toml`
+    /// doit passer la validation structurelle (BFS, root unique, parents
+    /// in-range). Empêche un commit qui shippe un asset corrompu — l'asset
+    /// serait chargé à runtime, validé par le Registry, et bloquerait Rex en
+    /// `InvalidStructure` jusqu'à fix.
+    #[test]
+    fn all_shipped_skeleton_tomls_pass_validate() {
+        for filename in ["skeleton_humanoid.toml", "skeleton_biped_lizard.toml"] {
+            let t = parse_workspace_toml(filename);
+            validate(&t)
+                .unwrap_or_else(|e| panic!("{filename} fails validate(): {e}"));
+        }
+    }
 }

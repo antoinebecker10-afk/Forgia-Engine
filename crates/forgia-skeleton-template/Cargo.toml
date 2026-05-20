@@ -11,3 +11,9 @@ workspace = true
 bevy = { workspace = true }
 serde = { workspace = true }
 forgia-genome-core = { workspace = true }
+
+[dev-dependencies]
+# Story-480 Phase 4 : test régression cross-crate qui parse les TOML asset
+# files (`assets/genomes/skeleton_*.toml`) et compare avec les builders Rust
+# pour bloquer tout futur drift Definition layer ↔ Framework layer.
+toml = { workspace = true }
