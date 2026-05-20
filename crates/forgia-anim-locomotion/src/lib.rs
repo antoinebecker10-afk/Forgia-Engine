@@ -37,7 +37,9 @@
 //! app.init_resource::<RexBonesLiveSensorTimer>();
 //! ```
 
+pub mod foot_ik;
 pub mod locomotion;
 pub mod proc_walk;
 
+pub use foot_ik::*;
 pub use locomotion::*;

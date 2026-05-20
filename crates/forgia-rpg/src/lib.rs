@@ -144,6 +144,9 @@ impl Plugin for ForgiaRpgPlugin {
                     forgia_anim_locomotion::attach_locomotion_bones,
                     forgia_anim_locomotion::procedural_locomotion,
                     character::procedural_whole_body_anim,
+                    // Story-482 P3 : foot IK (skip silencieux si bones shin/foot missing).
+                    forgia_anim_locomotion::foot_ik_system,
+                    forgia_anim_locomotion::write_foot_ik_sensor,
                     forgia_anim_locomotion::write_walk_pose_sensor,
                     forgia_anim_locomotion::write_rex_bones_live_sensor,
                 )
@@ -154,6 +157,9 @@ impl Plugin for ForgiaRpgPlugin {
             .init_resource::<character::LineupSpawned>()
             .init_resource::<forgia_anim_locomotion::WalkPoseSensorTimer>()
             .init_resource::<forgia_anim_locomotion::RexBonesLiveSensorTimer>()
+            .init_resource::<forgia_anim_locomotion::FootIkConfig>()
+            .init_resource::<forgia_anim_locomotion::FootIkStats>()
+            .init_resource::<forgia_anim_locomotion::FootIkSensorTimer>()
             .add_systems(
                 bevy_egui::EguiPrimaryContextPass,
                 character::draw_lineup_names.run_if(in_state(GameMode::Rpg)),

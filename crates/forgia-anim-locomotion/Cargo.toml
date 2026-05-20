@@ -9,8 +9,10 @@ workspace = true
 
 [dependencies]
 bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
 forgia-rig-topology = { workspace = true }
 forgia-anim-debug = { workspace = true }
 forgia-secondary-motion = { workspace = true }
 forgia-skeleton-template = { workspace = true }
 forgia-genome-core = { workspace = true }
+forgia-ik = { workspace = true }
