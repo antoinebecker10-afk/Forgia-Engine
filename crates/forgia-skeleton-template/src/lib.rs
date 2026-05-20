@@ -105,6 +105,49 @@ impl TemplateBone {
 #[derive(Debug, Clone, Deserialize, TypePath, PartialEq)]
 pub struct SkeletonTemplate {
     pub bones: Vec<TemplateBone>,
+    /// Story-482 P2 : offsets de stance à appliquer entre la bind pose
+    /// (rest pose Pinocchio) et la pose game (ex: bras vertical descendant
+    /// pour un mesh T-pose Vitruvian arms-horizontal).
+    ///
+    /// Format TOML :
+    /// ```toml
+    /// [stance_offsets]
+    /// arm_l_euler_deg = [0.0, 0.0, 90.0]
+    /// arm_r_euler_deg = [0.0, 0.0, -90.0]
+    /// ```
+    ///
+    /// Convention : composé en ordre Bevy par-dessus le bind via
+    /// `Quat::from_euler(EulerRot::XYZ, x_rad, y_rad, z_rad)` AVANT le swing
+    /// du walk cycle. Defaults = identity (mesh déjà en pose game).
+    #[serde(default)]
+    pub stance_offsets: StanceOffsetsTable,
+}
+
+/// Table des offsets de stance par classe anatomique. Read par
+/// `forgia-anim-locomotion` pour positionner les bones en pose game
+/// par-dessus le bind Pinocchio.
+///
+/// Default : tous zéros (mesh est déjà dans la pose game souhaitée).
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
+pub struct StanceOffsetsTable {
+    /// Offset euler XYZ degrés sur le bone left_arm.
+    #[serde(default)]
+    pub arm_l_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone right_arm.
+    #[serde(default)]
+    pub arm_r_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone left_leg.
+    #[serde(default)]
+    pub leg_l_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone right_leg.
+    #[serde(default)]
+    pub leg_r_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone spine.
+    #[serde(default)]
+    pub spine_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone hip.
+    #[serde(default)]
+    pub hip_euler_deg: [f32; 3],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,6 +304,7 @@ impl SkeletonTemplate {
                     class: b.class,
                 })
                 .collect(),
+            stance_offsets: self.stance_offsets.clone(),
         }
     }
 
@@ -390,7 +434,10 @@ impl SkeletonTemplate {
             })
             .collect();
 
-        Self { bones: new_bones }
+        Self {
+            bones: new_bones,
+            stance_offsets: self.stance_offsets.clone(),
+        }
     }
 }
 
@@ -473,6 +520,13 @@ impl SkeletonTemplate {
                     class: *class,
                 })
                 .collect(),
+            // Defaults Humanoid Vitruvian (T-pose mesh) : arms ±90° Z pour
+            // ramener vertical. Builders biped_lizard/quadruped overrideront.
+            stance_offsets: StanceOffsetsTable {
+                arm_l_euler_deg: [0.0, 0.0, 90.0],
+                arm_r_euler_deg: [0.0, 0.0, -90.0],
+                ..Default::default()
+            },
         }
     }
 }

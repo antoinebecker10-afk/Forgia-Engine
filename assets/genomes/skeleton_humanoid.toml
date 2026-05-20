@@ -1,6 +1,19 @@
 # Template skeleton Humanoid Vitruvian — 20 bones (avec hand_L/R)
 # Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
 # Hot-reloadable via Bevy AssetServer (Shift+F12).
+
+# Story-482 P2 — Stance offsets game-pose vs bind-pose.
+# Mesh Vitruvian T-pose (bras horizontaux) → rotation Z ±90° pour ramener vertical.
+# Composé via Quat::from_euler(EulerRot::XYZ, x_rad, y_rad, z_rad) AVANT le swing
+# du walk cycle. Si mesh est déjà en pose game (arms-down), mettre tous à zéros.
+[stance_offsets]
+arm_l_euler_deg = [0.0, 0.0, 90.0]
+arm_r_euler_deg = [0.0, 0.0, -90.0]
+leg_l_euler_deg = [0.0, 0.0, 0.0]
+leg_r_euler_deg = [0.0, 0.0, 0.0]
+spine_euler_deg = [0.0, 0.0, 0.0]
+hip_euler_deg   = [0.0, 0.0, 0.0]
+
 #
 # Position normalisée : `pos = [x, y, z]` où y∈[0,1] (0=sol mesh, 1=top mesh),
 # x latéral (±), z avant/arrière (±). Scalé par mesh_height au runtime.

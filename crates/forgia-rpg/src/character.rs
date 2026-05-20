@@ -28,7 +28,7 @@ use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_anim_locomotion::{
-    LocomotionBoneCache, LocomotionState, LocomotionTarget, ProcBodyAnim,
+    LocomotionBoneCache, LocomotionState, LocomotionTarget, ProcBodyAnim, StanceOffsets,
     AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_BREATH_AMP, IDLE_BREATH_FREQ,
     IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP,
     WALK_BOB_AMP, WALK_FREQ,
@@ -132,9 +132,6 @@ pub(crate) fn spawn_rex_character(
             commands.entity(player_entity).with_children(|parent| {
                 parent.spawn((
                     RexCharacter,
-                    // Story-482 P1 : marker exposé par forgia-anim-locomotion.
-                    // Découple les queries anim de l'identité RexCharacter
-                    // (n'importe quel character avec LocomotionTarget reçoit l'anim).
                     LocomotionTarget,
                     SceneRoot(asset_server.load("models/characters/Rex.glb#Scene0")),
                     Transform::from_xyz(0.0, -0.85, 0.0)
@@ -142,6 +139,12 @@ pub(crate) fn spawn_rex_character(
                     NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
                     LocomotionBoneCache::default(),
                     ProcBodyAnim::default(),
+                    // Story-482 P2 : stance offsets per-character. Humanoid T-pose
+                    // par défaut (arms horizontal → vertical via Z ±π/2). À terme,
+                    // dériver depuis SkeletonTemplate.stance_offsets via genome
+                    // loader. Pour V2 : helper humanoid_tpose() identique au
+                    // hardcode P1 (zéro régression).
+                    StanceOffsets::humanoid_tpose(),
                 ));
             });
         }

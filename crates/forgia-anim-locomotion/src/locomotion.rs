@@ -17,6 +17,75 @@ use forgia_secondary_motion::{SpringBone, SpringBoneChain};
 #[derive(Component)]
 pub struct LocomotionTarget;
 
+/// Story-482 P2 — Stance offsets data-driven par character.
+/// Composé avec bind ET swing : `tf.rotation = bind * stance * swing_delta`.
+/// Permet à un mesh T-pose Vitruvian (arms horizontal) d'avoir des bras
+/// verticaux en pose game sans toucher le code Rust. Valeurs typiquement
+/// dérivées de `SkeletonTemplate.stance_offsets` (TOML hot-reloadable).
+#[derive(Component, Debug, Clone)]
+pub struct StanceOffsets {
+    pub arm_l: Quat,
+    pub arm_r: Quat,
+    pub leg_l: Quat,
+    pub leg_r: Quat,
+    pub spine: Quat,
+    pub hip: Quat,
+}
+
+impl Default for StanceOffsets {
+    /// Default = aucune stance offset (identity partout). Pour un mesh déjà
+    /// en pose game (arms-down naturel), ne touche rien.
+    fn default() -> Self {
+        Self {
+            arm_l: Quat::IDENTITY,
+            arm_r: Quat::IDENTITY,
+            leg_l: Quat::IDENTITY,
+            leg_r: Quat::IDENTITY,
+            spine: Quat::IDENTITY,
+            hip: Quat::IDENTITY,
+        }
+    }
+}
+
+impl StanceOffsets {
+    /// Helper humanoid T-pose Vitruvian : arms horizontaux → vertical via Z ±π/2.
+    /// Backward compat avec le hardcode story-481 ARM_STANCE_DROP_RAD.
+    pub fn humanoid_tpose() -> Self {
+        Self {
+            arm_l: Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+            arm_r: Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2),
+            ..Default::default()
+        }
+    }
+
+    /// Helper depuis euler XYZ degrés (format TOML SkeletonTemplate.stance_offsets).
+    pub fn from_euler_degs(
+        arm_l: [f32; 3],
+        arm_r: [f32; 3],
+        leg_l: [f32; 3],
+        leg_r: [f32; 3],
+        spine: [f32; 3],
+        hip: [f32; 3],
+    ) -> Self {
+        let q = |e: [f32; 3]| {
+            Quat::from_euler(
+                EulerRot::XYZ,
+                e[0].to_radians(),
+                e[1].to_radians(),
+                e[2].to_radians(),
+            )
+        };
+        Self {
+            arm_l: q(arm_l),
+            arm_r: q(arm_r),
+            leg_l: q(leg_l),
+            leg_r: q(leg_r),
+            spine: q(spine),
+            hip: q(hip),
+        }
+    }
+}
+
 /// Cache des bones articulés + topology + bind rotations.
 #[derive(Component, Default)]
 pub struct LocomotionBoneCache {
@@ -94,10 +163,10 @@ pub const JUMP_SQUASH_AMP: f32 = 0.08;
 pub const FALL_STRETCH_AMP: f32 = 0.06;
 pub const AIRBORNE_VY_THRESHOLD: f32 = 0.8;
 
-/// Stance offset bras (T-pose Vitruvian → vertical descendant).
-/// TODO P2 : extraire dans le template TOML par rig (humanoid_tpose=π/2,
-/// humanoid_armsdown=0). Hardcodé en P1 pour zéro régression.
-pub const ARM_STANCE_DROP_RAD: f32 = std::f32::consts::FRAC_PI_2;
+// ARM_STANCE_DROP_RAD supprimé en P2 (2026-05-20). Stance offsets
+// data-driven via Component StanceOffsets, défaut humanoid_tpose() pour
+// backward compat. Lire depuis SkeletonTemplate TOML quand l'asset
+// est chargé via forgia-genome-core.
 
 pub const IDLE_SPEED_THRESHOLD: f32 = 0.15;
 pub const IDLE_BREATH_FREQ: f32 = 1.2;
@@ -274,11 +343,7 @@ pub fn attach_locomotion_bones(
             dump("right_leg", &bones.right_leg);
             dump("spine", &bones.spine);
             dump("hip", &bones.hip);
-            info!(
-                "  [stance] ARM_STANCE_DROP_RAD applied at walk cycle: L=+{:.1}deg, R=-{:.1}deg",
-                ARM_STANCE_DROP_RAD.to_degrees(),
-                ARM_STANCE_DROP_RAD.to_degrees(),
-            );
+            info!("  [stance] StanceOffsets Component read at walk cycle (P2 data-driven)");
 
             // Sensor : dump bind euler + translations
             let tx_of = |opt_e: Option<Entity>| {
@@ -297,8 +362,7 @@ pub fn attach_locomotion_bones(
                 )
             };
             let json = format!(
-                "{{\n  \"captured_at\": \"cache.ready\",\n  \"arm_stance_drop_deg\": {:.1},\n  \"bones\": {{\n    \"left_arm\": {},\n    \"right_arm\": {},\n    \"forearm_l\": {},\n    \"forearm_r\": {},\n    \"left_leg\": {},\n    \"right_leg\": {},\n    \"spine\": {},\n    \"hip\": {}\n  }}\n}}\n",
-                ARM_STANCE_DROP_RAD.to_degrees(),
+                "{{\n  \"captured_at\": \"cache.ready\",\n  \"stance_source\": \"StanceOffsets Component (P2 data-driven)\",\n  \"bones\": {{\n    \"left_arm\": {},\n    \"right_arm\": {},\n    \"forearm_l\": {},\n    \"forearm_r\": {},\n    \"left_leg\": {},\n    \"right_leg\": {},\n    \"spine\": {},\n    \"hip\": {}\n  }}\n}}\n",
                 fmt_bone(&bones.left_arm, bones.forearm_l.entity),
                 fmt_bone(&bones.right_arm, bones.forearm_r.entity),
                 fmt_bone(&bones.forearm_l, None),
@@ -331,7 +395,7 @@ pub fn attach_locomotion_bones(
 pub fn procedural_locomotion(
     time: Res<Time>,
     mut q_driver: Query<(&Transform, &mut LocomotionState)>,
-    q_cache: Query<&LocomotionBoneCache, With<LocomotionTarget>>,
+    q_cache: Query<(&LocomotionBoneCache, Option<&StanceOffsets>), With<LocomotionTarget>>,
     mut bones: Query<&mut Transform, (Without<LocomotionState>, Without<LocomotionTarget>)>,
     mut stats: ResMut<AnimLayerStats>,
 ) {
@@ -361,7 +425,7 @@ pub fn procedural_locomotion(
     stats.locomotion_speed = speed;
     stats.locomotion_is_moving = is_moving;
 
-    let Ok(cache) = q_cache.single() else {
+    let Ok((cache, stance_opt)) = q_cache.single() else {
         stats.locomotion_us = timer.elapsed_us();
         return;
     };
@@ -372,14 +436,18 @@ pub fn procedural_locomotion(
     }
 
     let b = &cache.bones;
+    // Story-482 P2 : stance offsets data-driven via Component. Fallback
+    // identity si pas de Component (mesh assumé déjà en pose game).
+    let stance_default = StanceOffsets::default();
+    let stance = stance_opt.unwrap_or(&stance_default);
 
     if !is_moving {
         let t_secs = time.elapsed_secs();
         let breath = (t_secs * IDLE_BREATH_FREQ).sin() * IDLE_BREATH_AMP;
         compose_swing(&mut bones, &b.spine, breath);
 
-        slerp_to_stance(&mut bones, &b.left_arm, ARM_STANCE_DROP_RAD, 0.15);
-        slerp_to_stance(&mut bones, &b.right_arm, -ARM_STANCE_DROP_RAD, 0.15);
+        slerp_to_stance(&mut bones, &b.left_arm, stance.arm_l, 0.15);
+        slerp_to_stance(&mut bones, &b.right_arm, stance.arm_r, 0.15);
         for bone in [
             &b.forearm_l, &b.forearm_r,
             &b.left_leg, &b.right_leg, &b.shin_l, &b.shin_r, &b.foot_l, &b.foot_r,
@@ -415,8 +483,8 @@ pub fn procedural_locomotion(
     let (arm_l_pitch, elbow_l) =
         crate::proc_walk::arm_pose((gait + 0.5).rem_euclid(1.0), &tunables);
     let (arm_r_pitch, elbow_r) = crate::proc_walk::arm_pose(gait, &tunables);
-    compose_stance_swing(&mut bones, &b.left_arm, ARM_STANCE_DROP_RAD, arm_l_pitch * speed_factor);
-    compose_stance_swing(&mut bones, &b.right_arm, -ARM_STANCE_DROP_RAD, arm_r_pitch * speed_factor);
+    compose_stance_swing(&mut bones, &b.left_arm, stance.arm_l, arm_l_pitch * speed_factor);
+    compose_stance_swing(&mut bones, &b.right_arm, stance.arm_r, arm_r_pitch * speed_factor);
     compose_swing(&mut bones, &b.forearm_l, elbow_l * speed_factor);
     compose_swing(&mut bones, &b.forearm_r, elbow_r * speed_factor);
 
@@ -483,14 +551,12 @@ fn slerp_to_bind(
 fn compose_stance_swing(
     bones: &mut Query<&mut Transform, (Without<LocomotionState>, Without<LocomotionTarget>)>,
     bone: &BonePose,
-    stance_z: f32,
+    stance: Quat,
     swing_x: f32,
 ) {
     if let Some(e) = bone.entity {
         if let Ok(mut tf) = bones.get_mut(e) {
-            tf.rotation = bone.bind
-                * Quat::from_rotation_z(stance_z)
-                * Quat::from_rotation_x(swing_x);
+            tf.rotation = bone.bind * stance * Quat::from_rotation_x(swing_x);
         }
     }
 }
@@ -499,12 +565,12 @@ fn compose_stance_swing(
 fn slerp_to_stance(
     bones: &mut Query<&mut Transform, (Without<LocomotionState>, Without<LocomotionTarget>)>,
     bone: &BonePose,
-    stance_z: f32,
+    stance: Quat,
     factor: f32,
 ) {
     if let Some(e) = bone.entity {
         if let Ok(mut tf) = bones.get_mut(e) {
-            let target = bone.bind * Quat::from_rotation_z(stance_z);
+            let target = bone.bind * stance;
             tf.rotation = tf.rotation.slerp(target, factor);
         }
     }
@@ -561,9 +627,8 @@ pub fn write_rex_bones_live_sensor(
     };
 
     let json = format!(
-        "{{\n  \"timestamp_secs\": {:.4},\n  \"arm_stance_drop_deg\": {:.1},\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
+        "{{\n  \"timestamp_secs\": {:.4},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
         time.elapsed_secs(),
-        ARM_STANCE_DROP_RAD.to_degrees(),
         fmt("left_arm", &b.left_arm),
         fmt("right_arm", &b.right_arm),
         fmt("forearm_l", &b.forearm_l),
