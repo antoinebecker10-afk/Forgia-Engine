@@ -306,19 +306,48 @@ pub fn attach_locomotion_bones(
 
             // Capture bind rotations pose-agnostic
             let rot_of = |e: Entity| transforms.get(e).ok().map(|t| t.rotation);
-            let first_child = |e: Entity| -> Option<Entity> {
-                children_query.get(e).ok().and_then(|c| c.iter().next())
-            };
+
+            // Story-482 fix 2026-05-20 : Pinocchio output spawne les bones à
+            // plat (sibling under Armature root), donc first_child(leg) renvoie
+            // None. Le sensor forgia_skinning_weights.json confirme que les
+            // bones shin/foot/forearm/hand EXISTENT (1018-1458 verts primary).
+            // Fix : BFS descendants de rex_entity + Name lookup.
+            let mut name_to_entity: std::collections::HashMap<String, Entity> =
+                std::collections::HashMap::default();
+            {
+                let mut stack: Vec<Entity> = vec![rex_entity];
+                while let Some(e) = stack.pop() {
+                    if let Ok(name) = names.get(e) {
+                        name_to_entity.insert(name.to_string(), e);
+                    }
+                    if let Ok(children) = children_query.get(e) {
+                        for c in children.iter() {
+                            stack.push(c);
+                        }
+                    }
+                }
+            }
+            let lookup = |name: &str| -> Option<Entity> { name_to_entity.get(name).copied() };
+
             let left_arm_e = topo.left_arm;
             let right_arm_e = topo.right_arm;
             let left_leg_e = topo.left_leg;
             let right_leg_e = topo.right_leg;
-            let forearm_l_e = left_arm_e.and_then(first_child);
-            let forearm_r_e = right_arm_e.and_then(first_child);
-            let shin_l_e = left_leg_e.and_then(first_child);
-            let shin_r_e = right_leg_e.and_then(first_child);
-            let foot_l_e = shin_l_e.and_then(first_child);
-            let foot_r_e = shin_r_e.and_then(first_child);
+            // Name-based resolution (Pinocchio flat hierarchy).
+            // Templates Forgia humanoid : forearm_L/R, shin_L/R, foot_L/R.
+            // BipedLizard : forearm_L/R, shin_L/R, foot_L/R (mêmes noms).
+            let forearm_l_e = lookup("forearm_L");
+            let forearm_r_e = lookup("forearm_R");
+            let shin_l_e = lookup("shin_L");
+            let shin_r_e = lookup("shin_R");
+            let foot_l_e = lookup("foot_L");
+            let foot_r_e = lookup("foot_R");
+            info!(
+                "[anim-locomotion] Name-lookup bones : forearm L/R={}/{}, shin L/R={}/{}, foot L/R={}/{} (Pinocchio flat hierarchy)",
+                forearm_l_e.is_some(), forearm_r_e.is_some(),
+                shin_l_e.is_some(), shin_r_e.is_some(),
+                foot_l_e.is_some(), foot_r_e.is_some(),
+            );
             let bones = ArticulatedBones {
                 left_arm: BonePose::from_entity(left_arm_e, &rot_of),
                 right_arm: BonePose::from_entity(right_arm_e, &rot_of),
