@@ -13,7 +13,9 @@ members = [
     "crates/forgia-ai-state-machine",
     "crates/forgia-ai-utility",
     "crates/forgia-analytics",
+    "crates/forgia-anchor",
     "crates/forgia-anim-debug",
+    "crates/forgia-anim-locomotion",
     "crates/forgia-rig-topology",
     "crates/forgia-animation-blend",
     "crates/forgia-animation-mixamo",
@@ -216,6 +218,8 @@ members = [
     "crates/forgia-silk",
     "crates/forgia-skill-tree",
     "crates/forgia-spline",
+    "crates/forgia-stage-arena",
+    "crates/forgia-stage-graph",
     "crates/forgia-status-effects",
     "crates/forgia-steam",
     "crates/forgia-streaming",
@@ -308,6 +312,7 @@ zstd = "0.13"
 rstar = "0.12"
 
 # Common
+sentry = "0.34"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
@@ -329,7 +334,9 @@ forgia-ai-perception = { path = "crates/forgia-ai-perception" }
 forgia-ai-state-machine = { path = "crates/forgia-ai-state-machine" }
 forgia-ai-utility = { path = "crates/forgia-ai-utility" }
 forgia-analytics = { path = "crates/forgia-analytics" }
+forgia-anchor = { path = "crates/forgia-anchor" }
 forgia-anim-debug = { path = "crates/forgia-anim-debug" }
+forgia-anim-locomotion = { path = "crates/forgia-anim-locomotion" }
 forgia-rig-topology = { path = "crates/forgia-rig-topology" }
 forgia-animation-blend = { path = "crates/forgia-animation-blend" }
 forgia-animation-mixamo = { path = "crates/forgia-animation-mixamo" }
@@ -532,6 +539,8 @@ forgia-signals = { path = "crates/forgia-signals" }
 forgia-silk = { path = "crates/forgia-silk" }
 forgia-skill-tree = { path = "crates/forgia-skill-tree" }
 forgia-spline = { path = "crates/forgia-spline" }
+forgia-stage-arena = { path = "crates/forgia-stage-arena" }
+forgia-stage-graph = { path = "crates/forgia-stage-graph" }
 forgia-status-effects = { path = "crates/forgia-status-effects" }
 forgia-steam = { path = "crates/forgia-steam" }
 forgia-streaming = { path = "crates/forgia-streaming" }

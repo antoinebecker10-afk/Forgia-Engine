@@ -39,7 +39,7 @@ use leafwing_input_manager::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod character;
-pub mod proc_walk;
+// proc_walk déplacé vers forgia-anim-locomotion (story-482 P1)
 
 pub mod prelude {
     pub use crate::{ForgiaRpgPlugin, InteractablePoint, Npc, RpgWorldMarker};
@@ -72,7 +72,9 @@ pub struct InteractablePoint {
 // confirme la nouvelle convention.
 const RPG_MAP_SIZE: f32 = 2048.0;
 const RPG_SEED: u32 = 1337;
-const RPG_SEA_LEVEL: f32 = 4.0;
+/// Public depuis 2026-05-20 : forgia-water lit `SeaLevel` Resource insérée
+/// par ce plugin, plus de hardcode dupliqué cross-crate (cf bug Arena 2026-05-12).
+pub const RPG_SEA_LEVEL: f32 = 4.0;
 const RPG_MAX_HEIGHT: f32 = 28.0;
 
 /// Fallback Manhattan radius si `StreamingConfig` indisponible (boot frame 0,
@@ -95,6 +97,9 @@ impl Plugin for ForgiaRpgPlugin {
         // déformer le mesh visuel. ProcBodyAnim/locomotion restent disable.
         // Validation visuelle bones d'abord, anim Phase 2+ après.
         app.add_plugins(forgia_auto_rig::ForgiaAutoRigPlugin);
+        // Source de vérité sea_level cross-crate (water rendu, swim gate
+        // futur). forgia-water lit ce Resource au build → plus de duplication.
+        app.insert_resource(SeaLevel(RPG_SEA_LEVEL));
         app.init_resource::<character::TestCharacterMode>();
         // Story-450 wave 2 : residence tracking pour hystérèse unload UE5-style.
         app.init_resource::<ChunkResidence>();
@@ -133,19 +138,21 @@ impl Plugin for ForgiaRpgPlugin {
                     character::rex_make_transparent_one_shot,
                     character::spawn_character_lineup,
                     character::calibrate_lineup_y_and_height,
-                    character::attach_rex_bone_systems,
-                    character::procedural_locomotion,
-                    // debug_thigh_swing retiré 2026-05-18 : skinning validé OK
-                    // (test ±60° sin sur thigh confirme mesh suit bones).
+                    // Story-482 P1 : locomotion systems déplacés vers
+                    // forgia-anim-locomotion. Imports via use forgia_anim_locomotion::*.
+                    forgia_anim_locomotion::attach_locomotion_bones,
+                    forgia_anim_locomotion::procedural_locomotion,
                     character::procedural_whole_body_anim,
-                    character::write_walk_pose_sensor,
+                    forgia_anim_locomotion::write_walk_pose_sensor,
+                    forgia_anim_locomotion::write_rex_bones_live_sensor,
                 )
                     .chain()
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
             )
             .init_resource::<character::LineupSpawned>()
-            .init_resource::<character::WalkPoseSensorTimer>()
+            .init_resource::<forgia_anim_locomotion::WalkPoseSensorTimer>()
+            .init_resource::<forgia_anim_locomotion::RexBonesLiveSensorTimer>()
             .add_systems(
                 bevy_egui::EguiPrimaryContextPass,
                 character::draw_lineup_names.run_if(in_state(GameMode::Rpg)),

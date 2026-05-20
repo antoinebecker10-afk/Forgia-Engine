@@ -1,0 +1,14 @@
+[package]
+name = "forgia-anim-locomotion"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Animation procédurale locomotion (walk cycle anatomique, proc body anim, sensors). Pose-agnostic compose-not-overwrite. Story-482 P1 extraction depuis forgia-rpg/character.rs."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-rig-topology = { workspace = true }
+forgia-anim-debug = { workspace = true }
+forgia-secondary-motion = { workspace = true }
