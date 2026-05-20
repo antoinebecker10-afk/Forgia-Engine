@@ -25,6 +25,7 @@ forgia-camera-orbit = { workspace = true }
 forgia-secondary-motion = { workspace = true }
 forgia-anim-debug = { workspace = true }
 forgia-anim-locomotion = { workspace = true }
+forgia-skeleton-template = { workspace = true }
 forgia-rig-topology = { workspace = true }
 forgia-auto-rig = { workspace = true }
 forgia-ik = { workspace = true }

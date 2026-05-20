@@ -9,13 +9,27 @@
 use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use forgia_anim_debug::{AnimLayerStats, AnimTimer};
+use forgia_genome_core::Genome;
 use forgia_rig_topology::{analyze_rig_topology, RigTopology};
 use forgia_secondary_motion::{SpringBone, SpringBoneChain};
+use forgia_skeleton_template::{
+    SkeletonTemplate, SkeletonTemplateId, SkeletonTemplateRegistry,
+};
 
 /// Marker à insérer sur le character qui doit recevoir l'animation procédurale.
 /// forgia-rpg ajoute ce marker sur `RexCharacter` au spawn.
 #[derive(Component)]
 pub struct LocomotionTarget;
+
+/// Story-482 P2b : référence vers le template TOML chargé via
+/// `SkeletonTemplateRegistry`. Le système `apply_stance_offsets_from_template`
+/// lit `template.stance_offsets` et insère un Component `StanceOffsets` sur
+/// l'entité (avec hot-reload via AssetEvent).
+///
+/// Insérée par le consumer (forgia-rpg::spawn_rex_character) à la place de
+/// `StanceOffsets::humanoid_tpose()` hardcodé.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct LocomotionTemplate(pub SkeletonTemplateId);
 
 /// Story-482 P2 — Stance offsets data-driven par character.
 /// Composé avec bind ET swing : `tf.rotation = bind * stance * swing_delta`.
@@ -574,6 +588,76 @@ fn slerp_to_stance(
             tf.rotation = tf.rotation.slerp(target, factor);
         }
     }
+}
+
+// ── Stance offsets loader (story-482 P2b) ──────────────────────────────────
+
+/// Lit `SkeletonTemplate.stance_offsets` depuis le registry asset et insère
+/// un Component `StanceOffsets` sur chaque entité `LocomotionTarget` ayant
+/// un `LocomotionTemplate`. Hot-reload via `AssetEvent::Modified`.
+///
+/// Idempotent : insère uniquement si missing OU si l'asset a été modifié
+/// (Modified/Added/LoadedWithDependencies). Defer 1 frame si le registry
+/// n'a pas encore le template `Ready` (loading async glTF/TOML).
+pub fn apply_stance_offsets_from_template(
+    mut commands: Commands,
+    registry: Res<SkeletonTemplateRegistry>,
+    assets: Res<Assets<Genome<SkeletonTemplate>>>,
+    mut asset_events: MessageReader<AssetEvent<Genome<SkeletonTemplate>>>,
+    q_targets: Query<
+        (Entity, &LocomotionTemplate, Option<&StanceOffsets>),
+        With<LocomotionTarget>,
+    >,
+    mut dirty: Local<bool>,
+) {
+    // Détecte hot-reload OR premier load
+    for ev in asset_events.read() {
+        if matches!(
+            ev,
+            AssetEvent::Modified { .. }
+                | AssetEvent::Added { .. }
+                | AssetEvent::LoadedWithDependencies { .. }
+        ) {
+            *dirty = true;
+        }
+    }
+
+    for (entity, template, current_stance) in &q_targets {
+        // Skip si déjà appliqué ET pas de hot-reload pending
+        if current_stance.is_some() && !*dirty {
+            continue;
+        }
+        // Try fetch template — defer 1 frame si pas Ready
+        let Some(tpl) = registry.try_get(template.0, &assets) else {
+            continue;
+        };
+        let so = &tpl.stance_offsets;
+        let new_stance = StanceOffsets::from_euler_degs(
+            so.arm_l_euler_deg,
+            so.arm_r_euler_deg,
+            so.leg_l_euler_deg,
+            so.leg_r_euler_deg,
+            so.spine_euler_deg,
+            so.hip_euler_deg,
+        );
+        if current_stance.is_none() {
+            info!(
+                "[anim-locomotion] StanceOffsets loaded from TOML template '{}': arm_l_z={:.1}deg arm_r_z={:.1}deg",
+                template.0.as_str(),
+                so.arm_l_euler_deg[2],
+                so.arm_r_euler_deg[2],
+            );
+        } else {
+            info!(
+                "[anim-locomotion] StanceOffsets HOT-RELOADED from template '{}': arm_l_z={:.1}deg arm_r_z={:.1}deg",
+                template.0.as_str(),
+                so.arm_l_euler_deg[2],
+                so.arm_r_euler_deg[2],
+            );
+        }
+        commands.entity(entity).insert(new_stance);
+    }
+    *dirty = false;
 }
 
 // ── Sensors ─────────────────────────────────────────────────────────────────

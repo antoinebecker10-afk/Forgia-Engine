@@ -28,11 +28,12 @@ use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_anim_locomotion::{
-    LocomotionBoneCache, LocomotionState, LocomotionTarget, ProcBodyAnim, StanceOffsets,
+    LocomotionBoneCache, LocomotionState, LocomotionTarget, LocomotionTemplate, ProcBodyAnim,
     AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_BREATH_AMP, IDLE_BREATH_FREQ,
     IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP,
     WALK_BOB_AMP, WALK_FREQ,
 };
+use forgia_skeleton_template::SkeletonTemplateId;
 use forgia_auto_rig::{AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
 use forgia_player::prelude::{FpsCamera, Player};
@@ -139,12 +140,12 @@ pub(crate) fn spawn_rex_character(
                     NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
                     LocomotionBoneCache::default(),
                     ProcBodyAnim::default(),
-                    // Story-482 P2 : stance offsets per-character. Humanoid T-pose
-                    // par défaut (arms horizontal → vertical via Z ±π/2). À terme,
-                    // dériver depuis SkeletonTemplate.stance_offsets via genome
-                    // loader. Pour V2 : helper humanoid_tpose() identique au
-                    // hardcode P1 (zéro régression).
-                    StanceOffsets::humanoid_tpose(),
+                    // Story-482 P2b : pas de StanceOffsets hardcodé.
+                    // LocomotionTemplate(Humanoid) → apply_stance_offsets_from_template
+                    // lit SkeletonTemplate.stance_offsets depuis le TOML asset
+                    // et insère StanceOffsets Component automatiquement.
+                    // Hot-reload via Shift+F12 supporté nativement.
+                    LocomotionTemplate(SkeletonTemplateId::Humanoid),
                 ));
             });
         }

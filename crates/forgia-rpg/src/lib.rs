@@ -140,6 +140,7 @@ impl Plugin for ForgiaRpgPlugin {
                     character::calibrate_lineup_y_and_height,
                     // Story-482 P1 : locomotion systems déplacés vers
                     // forgia-anim-locomotion. Imports via use forgia_anim_locomotion::*.
+                    forgia_anim_locomotion::apply_stance_offsets_from_template,
                     forgia_anim_locomotion::attach_locomotion_bones,
                     forgia_anim_locomotion::procedural_locomotion,
                     character::procedural_whole_body_anim,
