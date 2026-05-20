@@ -1,107 +1,130 @@
-# Template skeleton Humanoid Vitruvian — 18 bones
-# Source de vérité pour `forgia-skeleton-embedder::SkeletonTemplate`.
+# Template skeleton Humanoid Vitruvian — 20 bones (avec hand_L/R)
+# Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
 # Hot-reloadable via Bevy AssetServer (Shift+F12).
 #
 # Position normalisée : `pos = [x, y, z]` où y∈[0,1] (0=sol mesh, 1=top mesh),
 # x latéral (±), z avant/arrière (±). Scalé par mesh_height au runtime.
 #
 # `parent` = index du bone parent dans cette liste (0-indexed). Omis = root.
+# `class`  = classification anatomique déclarative (story-481) :
+#            "spine" | "head" | "arm" | "leg" | "tail" | "other"
+#            Consommé par embedder (locks YXZ) + rescale (Y mapping par chaîne).
 
 [[bones]]
 name = "hip"
 pos = [0.0, 0.50, 0.0]
+class = "spine"
 
 [[bones]]
 name = "spine_lower"
 parent = 0
 pos = [0.0, 0.58, 0.0]
+class = "spine"
 
 [[bones]]
 name = "spine_mid"
 parent = 1
 pos = [0.0, 0.66, 0.0]
+class = "spine"
 
 [[bones]]
 name = "chest"
 parent = 2
 pos = [0.0, 0.75, 0.0]
+class = "spine"
 
 [[bones]]
 name = "neck"
 parent = 3
 pos = [0.0, 0.85, 0.0]
+class = "spine"
 
 [[bones]]
 name = "head"
 parent = 4
 pos = [0.0, 0.95, 0.0]
+class = "head"
 
 [[bones]]
 name = "clavicle_L"
 parent = 3
 pos = [-0.08, 0.80, 0.0]
+class = "arm"
 
 [[bones]]
 name = "arm_L"
 parent = 6
-pos = [-0.25, 0.78, 0.0]  # shoulder area (Vitruvian arm_span_half × 0.30)
+pos = [-0.25, 0.78, 0.0]
+class = "arm"
 
 [[bones]]
 name = "forearm_L"
 parent = 7
-pos = [-0.55, 0.78, 0.0]  # elbow (Vitruvian arm_span_half × 0.65)
+pos = [-0.55, 0.78, 0.0]
+class = "arm"
 
 [[bones]]
 name = "hand_L"
 parent = 8
-pos = [-0.85, 0.78, 0.0]  # wrist/hand (Vitruvian arm_span_half × 1.0)
+pos = [-0.85, 0.78, 0.0]
+class = "arm"
 
 [[bones]]
 name = "clavicle_R"
 parent = 3
 pos = [0.08, 0.80, 0.0]
+class = "arm"
 
 [[bones]]
 name = "arm_R"
 parent = 10
 pos = [0.25, 0.78, 0.0]
+class = "arm"
 
 [[bones]]
 name = "forearm_R"
 parent = 11
 pos = [0.55, 0.78, 0.0]
+class = "arm"
 
 [[bones]]
 name = "hand_R"
 parent = 12
 pos = [0.85, 0.78, 0.0]
+class = "arm"
 
 [[bones]]
 name = "thigh_L"
 parent = 0
 pos = [-0.10, 0.40, 0.0]
+class = "leg"
 
 [[bones]]
 name = "shin_L"
-parent = 14  # thigh_L (était 12 avant ajout hand_L/R indices 9 et 13)
-pos = [-0.10, 0.27, 0.03]  # knee anatomique + forward bias
+parent = 14
+pos = [-0.10, 0.27, 0.03]
+class = "leg"
 
 [[bones]]
 name = "foot_L"
-parent = 15  # shin_L
+parent = 15
 pos = [-0.10, 0.02, 0.05]
+class = "leg"
 
 [[bones]]
 name = "thigh_R"
 parent = 0
 pos = [0.10, 0.40, 0.0]
+class = "leg"
 
 [[bones]]
 name = "shin_R"
-parent = 17  # thigh_R (était 15)
-pos = [0.10, 0.27, 0.03]   # knee anatomique + forward bias
+parent = 17
+pos = [0.10, 0.27, 0.03]
+class = "leg"
 
 [[bones]]
 name = "foot_R"
-parent = 18  # shin_R (était 16)
+parent = 18
 pos = [0.10, 0.02, 0.05]
+class = "leg"

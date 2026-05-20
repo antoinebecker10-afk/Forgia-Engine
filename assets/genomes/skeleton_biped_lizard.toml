@@ -1,102 +1,124 @@
 # Template skeleton BipedLizard (Rex) — 16 bones body + 4 tail = 20 bones
-# Source de vérité pour `forgia-skeleton-embedder::SkeletonTemplate`.
+# Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
 # Hot-reloadable via Bevy AssetServer (Shift+F12).
+#
+# `class` = classification anatomique déclarative (story-481).
 
 [[bones]]
 name = "hip"
 pos = [0.0, 0.45, 0.02]
+class = "spine"
 
 [[bones]]
 name = "spine_lower"
 parent = 0
-pos = [0.0, 0.53, 0.08]    # curvature back (matche le dos courbé Rex)
+pos = [0.0, 0.53, 0.08]
+class = "spine"
 
 [[bones]]
 name = "spine_mid"
 parent = 1
-pos = [0.0, 0.63, 0.10]    # apex de la courbure
+pos = [0.0, 0.63, 0.10]
+class = "spine"
 
 [[bones]]
 name = "chest"
 parent = 2
 pos = [0.0, 0.71, 0.08]
+class = "spine"
 
 [[bones]]
 name = "neck"
 parent = 3
 pos = [0.0, 0.76, 0.06]
+class = "spine"
 
 [[bones]]
 name = "head"
 parent = 4
-pos = [0.0, 0.82, 0.10]    # head +Z (même côté que spine = DANS le mesh tête, pas dehors)
+pos = [0.0, 0.82, 0.10]
+class = "head"
 
 [[bones]]
 name = "arm_L"
 parent = 3
-pos = [-0.18, 0.71, 0.0]   # T-pose : épaule → coude latéral, même Y que chest
+pos = [-0.18, 0.71, 0.0]
+class = "arm"
 
 [[bones]]
 name = "forearm_L"
 parent = 6
-pos = [-0.36, 0.71, 0.0]   # T-pose : coude → poignet latéral, double X depuis arm
+pos = [-0.36, 0.71, 0.0]
+class = "arm"
 
 [[bones]]
 name = "arm_R"
 parent = 3
 pos = [0.18, 0.71, 0.0]
+class = "arm"
 
 [[bones]]
 name = "forearm_R"
 parent = 8
 pos = [0.36, 0.71, 0.0]
+class = "arm"
 
 [[bones]]
 name = "thigh_L"
 parent = 0
 pos = [-0.10, 0.37, 0.0]
+class = "leg"
 
 [[bones]]
 name = "shin_L"
 parent = 10
-pos = [-0.10, 0.20, 0.12]  # knee digitigrade Rex : bas + forward (articulation T-rex)
+pos = [-0.10, 0.20, 0.12]
+class = "leg"
 
 [[bones]]
 name = "foot_L"
 parent = 11
 pos = [-0.10, 0.04, 0.06]
+class = "leg"
 
 [[bones]]
 name = "thigh_R"
 parent = 0
 pos = [0.10, 0.37, 0.0]
+class = "leg"
 
 [[bones]]
 name = "shin_R"
 parent = 13
-pos = [0.10, 0.20, 0.12]   # knee digitigrade Rex : bas + forward (articulation T-rex)
+pos = [0.10, 0.20, 0.12]
+class = "leg"
 
 [[bones]]
 name = "foot_R"
 parent = 14
 pos = [0.10, 0.04, 0.06]
+class = "leg"
 
 [[bones]]
 name = "tail_01"
 parent = 0
 pos = [0.0, 0.41, -0.12]
+class = "tail"
 
 [[bones]]
 name = "tail_02"
 parent = 16
 pos = [0.0, 0.39, -0.22]
+class = "tail"
 
 [[bones]]
 name = "tail_03"
 parent = 17
 pos = [0.0, 0.37, -0.32]
+class = "tail"
 
 [[bones]]
 name = "tail_04"
 parent = 18
 pos = [0.0, 0.35, -0.42]
+class = "tail"

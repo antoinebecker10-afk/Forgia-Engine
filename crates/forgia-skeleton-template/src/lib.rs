@@ -27,6 +27,33 @@ use std::collections::HashMap;
 // Bone definition
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Classification anatomique déclarative d'un bone (story-481).
+///
+/// Avant story-481, la classe était inférée par substring matching sur
+/// `bone.name` (ex: `n.starts_with("thigh") → Leg`). Ce pattern était dupliqué
+/// dans 3 crates et cassait sur tout naming convention différent (Meshy,
+/// Mixamo, AccuRig). Pattern AAA : Unreal Skeleton / Unity Avatar / Godot
+/// SkeletonProfile déclarent la classe dans l'asset.
+///
+/// Sérialisation TOML : `class = "leg"` (snake_case).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BoneClass {
+    /// Chaîne axiale centrale : hip, spine_*, chest, neck. Lock X+Z template.
+    Spine,
+    /// Crâne / face. Lock X au template, Z et Y libres.
+    Head,
+    /// Chaîne jambe : thigh, shin, foot. Lock Y au template (knee Y précis).
+    Leg,
+    /// Chaîne bras : clavicle, arm, forearm, hand. Suit centerline path walking.
+    Arm,
+    /// Chaîne queue : tail_*. Suit la courbe medial axis.
+    Tail,
+    /// Non classifié — comportement par défaut (free embedding).
+    #[default]
+    Other,
+}
+
 /// Bone d'un template anatomique. Position normalisée : `(x, y, z)` où
 /// `y ∈ [0, 1]` (0=sol, 1=sommet du mesh) et `x, z` en fraction de la
 /// hauteur (latéralité).
@@ -36,12 +63,17 @@ use std::collections::HashMap;
 /// [[bones]]
 /// name = "hip"
 /// pos = [0.0, 0.50, 0.0]
+/// class = "spine"
 ///
 /// [[bones]]
-/// name = "spine_lower"
+/// name = "thigh_L"
 /// parent = 0
-/// pos = [0.0, 0.58, 0.0]
+/// pos = [-0.10, 0.40, 0.0]
+/// class = "leg"
 /// ```
+///
+/// Le champ `class` est declarative (story-481). `#[serde(default)]` permet
+/// la rétro-compatibilité — un TOML sans `class` parse en `Other`.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct TemplateBone {
     pub name: String,
@@ -49,6 +81,9 @@ pub struct TemplateBone {
     pub parent: Option<usize>,
     /// Position normalisée [x, y, z] dans le repère mesh.
     pub pos: [f32; 3],
+    /// Classe anatomique declarative (story-481). Default `Other`.
+    #[serde(default)]
+    pub class: BoneClass,
 }
 
 impl TemplateBone {
@@ -201,57 +236,13 @@ pub fn validate(template: &SkeletonTemplate) -> Result<(), TemplateValidationErr
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Anatomical classification (privé, utilisé par rescaled_for_landmarks)
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BoneClass {
-    Spine,
-    Leg,
-    Arm,
-    Tail,
-    Other,
-}
-
-fn classify_bone(name: &str) -> BoneClass {
-    let n = name.to_lowercase();
-    if n.contains("tail") {
-        BoneClass::Tail
-    } else if n.starts_with("thigh")
-        || n.starts_with("shin")
-        || n.starts_with("foot")
-        || n.starts_with("calf")
-        || n.starts_with("knee")
-        || n.starts_with("ankle")
-    {
-        BoneClass::Leg
-    } else if n.contains("arm")
-        || n.contains("hand")
-        || n.contains("forearm")
-        || n.contains("clavicle")
-        || n.contains("shoulder_")
-        || n.contains("wrist")
-        || n.contains("elbow")
-    {
-        BoneClass::Arm
-    } else if n.contains("spine")
-        || n.contains("chest")
-        || n.contains("neck")
-        || n.contains("head")
-        || n.contains("hip")
-        || n.contains("pelvis")
-        || n.contains("torso")
-        || n.contains("back")
-    {
-        BoneClass::Spine
-    } else {
-        BoneClass::Other
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Transformations
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// Note story-481 : `classify_bone(name: &str)` (substring matching anti-pattern)
+// a été supprimé. La classe est désormais lue depuis `bone.class` (déclaratif
+// TOML). Conforme pattern AAA — Unreal Skeleton / Unity Avatar / Godot
+// SkeletonProfile déclarent la classe dans l'asset, ne l'infèrent pas.
 
 impl SkeletonTemplate {
     /// Clone le template en inversant Z de toutes les positions. Utilisé quand
@@ -267,6 +258,7 @@ impl SkeletonTemplate {
                     name: b.name.clone(),
                     parent: b.parent,
                     pos: [b.pos[0], b.pos[1], -b.pos[2]],
+                    class: b.class,
                 })
                 .collect(),
         }
@@ -328,13 +320,13 @@ impl SkeletonTemplate {
             .or_else(|| find_y("neck"))
             .unwrap_or(0.80);
 
+        // story-481 : filtre via bone.class (declarative TOML) au lieu de
+        // substring matching `contains("arm"|"hand")`. Robuste à tout naming
+        // convention Meshy / Mixamo / AccuRig.
         let template_arm_tip_x_abs = self
             .bones
             .iter()
-            .filter(|b| {
-                let n = b.name.to_lowercase();
-                n.contains("arm") || n.contains("hand") || n.contains("forearm")
-            })
+            .filter(|b| matches!(b.class, BoneClass::Arm))
             .map(|b| b.pos[0].abs())
             .fold(0.10_f32, f32::max);
 
@@ -360,10 +352,12 @@ impl SkeletonTemplate {
             .bones
             .iter()
             .map(|b| {
-                let class = classify_bone(&b.name);
+                // story-481 : classe lue depuis `bone.class` declarative (TOML),
+                // plus de classify_bone(name) substring matching.
+                let class = b.class;
                 let (x, mut y, z) = (b.pos[0], b.pos[1], b.pos[2]);
                 y = match class {
-                    BoneClass::Spine => map_y_spine(y),
+                    BoneClass::Spine | BoneClass::Head => map_y_spine(y),
                     BoneClass::Leg => (y * leg_scale).clamp(0.0, hip_y_frac + 0.05),
                     BoneClass::Arm => map_y_spine(y),
                     BoneClass::Tail => {
@@ -382,7 +376,7 @@ impl SkeletonTemplate {
                 let apply_x_offset = torso_x_offset_frac.abs() > 0.006;
                 let x_offset = if apply_x_offset { torso_x_offset_frac } else { 0.0 };
                 let (x_final, z_final) = match class {
-                    BoneClass::Spine | BoneClass::Arm | BoneClass::Tail => {
+                    BoneClass::Spine | BoneClass::Head | BoneClass::Arm | BoneClass::Tail => {
                         (x_scaled + x_offset, z)
                     }
                     BoneClass::Leg | BoneClass::Other => (x_scaled, z),
@@ -391,6 +385,7 @@ impl SkeletonTemplate {
                     name: b.name.clone(),
                     parent: b.parent,
                     pos: [x_final, y, z_final],
+                    class,
                 }
             })
             .collect();
@@ -412,66 +407,70 @@ impl SkeletonTemplate {
     /// Template humanoid Vitruvian 20 bones (avec hand_L/R).
     /// **Source de vérité** : `assets/genomes/skeleton_humanoid.toml`.
     pub fn humanoid() -> Self {
+        use BoneClass::*;
         Self::from_data(&[
-            ("hip",         None,     [0.0,   0.50,  0.0]),
-            ("spine_lower", Some(0),  [0.0,   0.58,  0.0]),
-            ("spine_mid",   Some(1),  [0.0,   0.66,  0.0]),
-            ("chest",       Some(2),  [0.0,   0.75,  0.0]),
-            ("neck",        Some(3),  [0.0,   0.85,  0.0]),
-            ("head",        Some(4),  [0.0,   0.95,  0.0]),
-            ("clavicle_L",  Some(3),  [-0.08, 0.80,  0.0]),
-            ("arm_L",       Some(6),  [-0.25, 0.78,  0.0]),
-            ("forearm_L",   Some(7),  [-0.55, 0.78,  0.0]),
-            ("hand_L",      Some(8),  [-0.85, 0.78,  0.0]),
-            ("clavicle_R",  Some(3),  [0.08,  0.80,  0.0]),
-            ("arm_R",       Some(10), [0.25,  0.78,  0.0]),
-            ("forearm_R",   Some(11), [0.55,  0.78,  0.0]),
-            ("hand_R",      Some(12), [0.85,  0.78,  0.0]),
-            ("thigh_L",     Some(0),  [-0.10, 0.40,  0.0]),
-            ("shin_L",      Some(14), [-0.10, 0.27,  0.03]),
-            ("foot_L",      Some(15), [-0.10, 0.02,  0.05]),
-            ("thigh_R",     Some(0),  [0.10,  0.40,  0.0]),
-            ("shin_R",      Some(17), [0.10,  0.27,  0.03]),
-            ("foot_R",      Some(18), [0.10,  0.02,  0.05]),
+            ("hip",         None,     [0.0,   0.50,  0.0],  Spine),
+            ("spine_lower", Some(0),  [0.0,   0.58,  0.0],  Spine),
+            ("spine_mid",   Some(1),  [0.0,   0.66,  0.0],  Spine),
+            ("chest",       Some(2),  [0.0,   0.75,  0.0],  Spine),
+            ("neck",        Some(3),  [0.0,   0.85,  0.0],  Spine),
+            ("head",        Some(4),  [0.0,   0.95,  0.0],  Head),
+            ("clavicle_L",  Some(3),  [-0.08, 0.80,  0.0],  Arm),
+            ("arm_L",       Some(6),  [-0.25, 0.78,  0.0],  Arm),
+            ("forearm_L",   Some(7),  [-0.55, 0.78,  0.0],  Arm),
+            ("hand_L",      Some(8),  [-0.85, 0.78,  0.0],  Arm),
+            ("clavicle_R",  Some(3),  [0.08,  0.80,  0.0],  Arm),
+            ("arm_R",       Some(10), [0.25,  0.78,  0.0],  Arm),
+            ("forearm_R",   Some(11), [0.55,  0.78,  0.0],  Arm),
+            ("hand_R",      Some(12), [0.85,  0.78,  0.0],  Arm),
+            ("thigh_L",     Some(0),  [-0.10, 0.40,  0.0],  Leg),
+            ("shin_L",      Some(14), [-0.10, 0.27,  0.03], Leg),
+            ("foot_L",      Some(15), [-0.10, 0.02,  0.05], Leg),
+            ("thigh_R",     Some(0),  [0.10,  0.40,  0.0],  Leg),
+            ("shin_R",      Some(17), [0.10,  0.27,  0.03], Leg),
+            ("foot_R",      Some(18), [0.10,  0.02,  0.05], Leg),
         ])
     }
 
     /// Template biped lézard (Rex) 20 bones (16 body + 4 tail).
     /// **Source de vérité** : `assets/genomes/skeleton_biped_lizard.toml`.
     pub fn biped_lizard() -> Self {
+        use BoneClass::*;
         Self::from_data(&[
-            ("hip",         None,     [0.0,   0.45,  0.02]),
-            ("spine_lower", Some(0),  [0.0,   0.53,  0.08]),
-            ("spine_mid",   Some(1),  [0.0,   0.63,  0.10]),
-            ("chest",       Some(2),  [0.0,   0.71,  0.08]),
-            ("neck",        Some(3),  [0.0,   0.76,  0.06]),
-            ("head",        Some(4),  [0.0,   0.82,  0.10]),
-            ("arm_L",       Some(3),  [-0.18, 0.71,  0.0]),
-            ("forearm_L",   Some(6),  [-0.36, 0.71,  0.0]),
-            ("arm_R",       Some(3),  [0.18,  0.71,  0.0]),
-            ("forearm_R",   Some(8),  [0.36,  0.71,  0.0]),
-            ("thigh_L",     Some(0),  [-0.10, 0.37,  0.0]),
-            ("shin_L",      Some(10), [-0.10, 0.20,  0.12]),
-            ("foot_L",      Some(11), [-0.10, 0.04,  0.06]),
-            ("thigh_R",     Some(0),  [0.10,  0.37,  0.0]),
-            ("shin_R",      Some(13), [0.10,  0.20,  0.12]),
-            ("foot_R",      Some(14), [0.10,  0.04,  0.06]),
-            ("tail_01",     Some(0),  [0.0,   0.41, -0.12]),
-            ("tail_02",     Some(16), [0.0,   0.39, -0.22]),
-            ("tail_03",     Some(17), [0.0,   0.37, -0.32]),
-            ("tail_04",     Some(18), [0.0,   0.35, -0.42]),
+            ("hip",         None,     [0.0,   0.45,  0.02], Spine),
+            ("spine_lower", Some(0),  [0.0,   0.53,  0.08], Spine),
+            ("spine_mid",   Some(1),  [0.0,   0.63,  0.10], Spine),
+            ("chest",       Some(2),  [0.0,   0.71,  0.08], Spine),
+            ("neck",        Some(3),  [0.0,   0.76,  0.06], Spine),
+            ("head",        Some(4),  [0.0,   0.82,  0.10], Head),
+            ("arm_L",       Some(3),  [-0.18, 0.71,  0.0],  Arm),
+            ("forearm_L",   Some(6),  [-0.36, 0.71,  0.0],  Arm),
+            ("arm_R",       Some(3),  [0.18,  0.71,  0.0],  Arm),
+            ("forearm_R",   Some(8),  [0.36,  0.71,  0.0],  Arm),
+            ("thigh_L",     Some(0),  [-0.10, 0.37,  0.0],  Leg),
+            ("shin_L",      Some(10), [-0.10, 0.20,  0.12], Leg),
+            ("foot_L",      Some(11), [-0.10, 0.04,  0.06], Leg),
+            ("thigh_R",     Some(0),  [0.10,  0.37,  0.0],  Leg),
+            ("shin_R",      Some(13), [0.10,  0.20,  0.12], Leg),
+            ("foot_R",      Some(14), [0.10,  0.04,  0.06], Leg),
+            ("tail_01",     Some(0),  [0.0,   0.41, -0.12], Tail),
+            ("tail_02",     Some(16), [0.0,   0.39, -0.22], Tail),
+            ("tail_03",     Some(17), [0.0,   0.37, -0.32], Tail),
+            ("tail_04",     Some(18), [0.0,   0.35, -0.42], Tail),
         ])
     }
 
-    /// Helper : construit un template depuis `(name, parent, pos)` tuples.
-    pub fn from_data(data: &[(&str, Option<usize>, [f32; 3])]) -> Self {
+    /// Helper : construit un template depuis `(name, parent, pos, class)` tuples.
+    /// story-481 : signature étendue avec `class: BoneClass` (declarative).
+    pub fn from_data(data: &[(&str, Option<usize>, [f32; 3], BoneClass)]) -> Self {
         Self {
             bones: data
                 .iter()
-                .map(|(name, parent, pos)| TemplateBone {
+                .map(|(name, parent, pos, class)| TemplateBone {
                     name: (*name).to_string(),
                     parent: *parent,
                     pos: *pos,
+                    class: *class,
                 })
                 .collect(),
         }
@@ -878,8 +877,8 @@ mod tests {
     fn validate_rejects_no_root() {
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: Some(1), pos: [0.0; 3] },
-                TemplateBone { name: "b".into(), parent: Some(0), pos: [0.0; 3] },
+                TemplateBone { name: "a".into(), parent: Some(1), pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone { name: "b".into(), parent: Some(0), pos: [0.0; 3], class: BoneClass::Other },
             ],
         };
         // Forward ref detected first.
@@ -893,8 +892,8 @@ mod tests {
     fn validate_rejects_multiple_roots() {
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: None, pos: [0.0; 3] },
-                TemplateBone { name: "b".into(), parent: None, pos: [0.0; 3] },
+                TemplateBone { name: "a".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone { name: "b".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
             ],
         };
         assert_eq!(validate(&t), Err(TemplateValidationError::MultipleRoots));
@@ -907,6 +906,7 @@ mod tests {
                 name: "a".into(),
                 parent: Some(0),
                 pos: [0.0; 3],
+                class: BoneClass::Other,
             }],
         };
         assert_eq!(
@@ -920,8 +920,8 @@ mod tests {
         // bone[0] references bone[1] which is declared after.
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: Some(1), pos: [0.0; 3] },
-                TemplateBone { name: "b".into(), parent: None, pos: [0.0; 3] },
+                TemplateBone { name: "a".into(), parent: Some(1), pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone { name: "b".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
             ],
         };
         assert!(matches!(
@@ -934,8 +934,8 @@ mod tests {
     fn validate_rejects_out_of_bounds_parent() {
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: None, pos: [0.0; 3] },
-                TemplateBone { name: "b".into(), parent: Some(99), pos: [0.0; 3] },
+                TemplateBone { name: "a".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone { name: "b".into(), parent: Some(99), pos: [0.0; 3], class: BoneClass::Other },
             ],
         };
         assert!(matches!(

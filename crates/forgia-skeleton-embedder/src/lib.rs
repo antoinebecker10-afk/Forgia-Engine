@@ -48,7 +48,7 @@ use forgia_medial_axis::{MedialAxisGraph, MedialSphere};
 // Re-export pour compatibilité API : les consumers existants
 // (pinocchio_pipeline, tests) continuent de pouvoir importer ces types
 // depuis `forgia_skeleton_embedder` sans changer leurs `use` statements.
-pub use forgia_skeleton_template::{SkeletonTemplate, TemplateBone};
+pub use forgia_skeleton_template::{BoneClass, SkeletonTemplate, TemplateBone};
 
 
 /// Bone embedded sur le medial axis : position monde + rayon de la sphère
@@ -494,19 +494,15 @@ fn embed_one_chain(
         //   anatomique correcte), X/Z depuis path pour suivre la centerline.
         //   Évite que la distribution de sphères medial axis biaise shin vers le mollet.
         // Tail/Arm gardent le path complet (XYZ) pour suivre la courbure naturelle.
-        let bone_name_lc = template.bones[bone_idx].name.to_lowercase();
-        let is_head = bone_name_lc.contains("head");
-        let is_spine_xz = (bone_name_lc.contains("spine")
-            || bone_name_lc.contains("chest")
-            || bone_name_lc.contains("neck")
-            || bone_name_lc.contains("hip")
-            || bone_name_lc.contains("pelvis"))
-            && !is_head;
+        // story-481 : locks YXZ déterminés par `bone.class` (déclarative TOML),
+        // plus de substring matching `starts_with("thigh") || contains("spine")`.
+        // Pattern AAA conforme — Unreal Skeleton / Unity Avatar / Godot
+        // SkeletonProfile : la classe vit dans l'asset, pas dans le name.
+        let bone_class = template.bones[bone_idx].class;
+        let is_head = matches!(bone_class, BoneClass::Head);
+        let is_spine_xz = matches!(bone_class, BoneClass::Spine);
         let is_spine_x_only = is_head;
-        let is_leg_y_lock = bone_name_lc.starts_with("thigh")
-            || bone_name_lc.starts_with("shin")
-            || bone_name_lc.starts_with("calf")
-            || bone_name_lc.starts_with("knee");
+        let is_leg_y_lock = matches!(bone_class, BoneClass::Leg);
 
         let (bone_world_pos, radius) = if i == n - 1 {
             // Terminal bone : prend la sphère terminale, mais si c'est un spine
@@ -887,6 +883,7 @@ mod tests {
                 name: "single".to_string(),
                 parent: None,
                 pos: [0.0, 0.5, 0.0],
+                class: BoneClass::Other,
             }],
         };
         // bounds : center_xz = (0.5, 0, 0.5). target_world = (0.5, 0.5, 0.5).
