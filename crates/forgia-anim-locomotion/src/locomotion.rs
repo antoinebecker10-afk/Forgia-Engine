@@ -135,6 +135,8 @@ pub struct ArticulatedBones {
     pub right_arm: BonePose,
     pub forearm_l: BonePose,
     pub forearm_r: BonePose,
+    pub hand_l: BonePose,
+    pub hand_r: BonePose,
     pub left_leg: BonePose,
     pub right_leg: BonePose,
     pub shin_l: BonePose,
@@ -338,13 +340,16 @@ pub fn attach_locomotion_bones(
             // BipedLizard : forearm_L/R, shin_L/R, foot_L/R (mêmes noms).
             let forearm_l_e = lookup("forearm_L");
             let forearm_r_e = lookup("forearm_R");
+            let hand_l_e = lookup("hand_L");
+            let hand_r_e = lookup("hand_R");
             let shin_l_e = lookup("shin_L");
             let shin_r_e = lookup("shin_R");
             let foot_l_e = lookup("foot_L");
             let foot_r_e = lookup("foot_R");
             info!(
-                "[anim-locomotion] Name-lookup bones : forearm L/R={}/{}, shin L/R={}/{}, foot L/R={}/{} (Pinocchio flat hierarchy)",
+                "[anim-locomotion] Name-lookup bones : forearm L/R={}/{}, hand L/R={}/{}, shin L/R={}/{}, foot L/R={}/{}",
                 forearm_l_e.is_some(), forearm_r_e.is_some(),
+                hand_l_e.is_some(), hand_r_e.is_some(),
                 shin_l_e.is_some(), shin_r_e.is_some(),
                 foot_l_e.is_some(), foot_r_e.is_some(),
             );
@@ -353,6 +358,8 @@ pub fn attach_locomotion_bones(
                 right_arm: BonePose::from_entity(right_arm_e, &rot_of),
                 forearm_l: BonePose::from_entity(forearm_l_e, &rot_of),
                 forearm_r: BonePose::from_entity(forearm_r_e, &rot_of),
+                hand_l: BonePose::from_entity(hand_l_e, &rot_of),
+                hand_r: BonePose::from_entity(hand_r_e, &rot_of),
                 left_leg: BonePose::from_entity(left_leg_e, &rot_of),
                 right_leg: BonePose::from_entity(right_leg_e, &rot_of),
                 shin_l: BonePose::from_entity(shin_l_e, &rot_of),
@@ -740,12 +747,14 @@ pub fn write_rex_bones_live_sensor(
     };
 
     let json = format!(
-        "{{\n  \"timestamp_secs\": {:.4},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
+        "{{\n  \"timestamp_secs\": {:.4},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
         time.elapsed_secs(),
         fmt("left_arm", &b.left_arm),
         fmt("right_arm", &b.right_arm),
         fmt("forearm_l", &b.forearm_l),
         fmt("forearm_r", &b.forearm_r),
+        fmt("hand_l", &b.hand_l),
+        fmt("hand_r", &b.hand_r),
         fmt("left_leg", &b.left_leg),
         fmt("right_leg", &b.right_leg),
         fmt("spine", &b.spine),
