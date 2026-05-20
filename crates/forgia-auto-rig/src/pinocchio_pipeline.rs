@@ -24,67 +24,34 @@
 use bevy::camera::primitives::Aabb;
 use bevy::mesh::{Indices, Mesh, Mesh3d, VertexAttributeValues};
 use bevy::prelude::*;
-use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_genome_core::Genome;
 use forgia_medial_axis::{extract_medial_axis, MedialAxisConfig};
 use forgia_mesh_voxelizer::{voxelize_mesh, VoxelizerConfig};
-use forgia_skeleton_embedder::{
-    embed_template_skeleton, EmbeddedSkeleton, SkeletonTemplate,
-};
+use forgia_skeleton_embedder::{embed_template_skeleton, EmbeddedSkeleton, SkeletonTemplate};
+use forgia_skeleton_template::{SkeletonTemplateId, SkeletonTemplateRegistry};
 
-use crate::{
-    anatomy_detect, AutoRigStats, AutoRigTemplate, AutoRigged, BoneEntity, NeedsAutoRig,
-};
+use crate::{anatomy_detect, AutoRigStats, AutoRigTemplate, AutoRigged, BoneEntity, NeedsAutoRig};
 
-// ── Genome handles (TOML-driven templates — no more hardcode) ────────────
+// Story-480 Phase 3 (2026-05-20) :
+// - SkeletonHumanoidGenomeHandle / SkeletonBipedLizardGenomeHandle supprimés
+//   au profit de SkeletonTemplateRegistry (single source of truth).
+// - AutoRigBackend enum supprimé : Pinocchio est seul path runtime. La
+//   coexistence TemplateFit + Pinocchio était une dette tech qui maintenait
+//   3 sources de vérité pour les templates (cf story-480 §0.1).
+// - Fallback hardcoded supprimé : defer-frame-loop quand template not Ready
+//   (pattern AAA Unreal/Unity/Godot — pas de seed code shipping).
 
-/// Handle vers `assets/genomes/skeleton_humanoid.toml`. Loaded au Startup.
-#[derive(Resource)]
-pub struct SkeletonHumanoidGenomeHandle(pub Handle<Genome<SkeletonTemplate>>);
-
-/// Handle vers `assets/genomes/skeleton_biped_lizard.toml`. Loaded au Startup.
-#[derive(Resource)]
-pub struct SkeletonBipedLizardGenomeHandle(pub Handle<Genome<SkeletonTemplate>>);
-
-/// Système Startup : load les 2 templates en TOML genomes.
-pub fn load_skeleton_genomes(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let humanoid: Handle<Genome<SkeletonTemplate>> =
-        asset_server.load("genomes/skeleton_humanoid.toml");
-    let lizard: Handle<Genome<SkeletonTemplate>> =
-        asset_server.load("genomes/skeleton_biped_lizard.toml");
-    commands.insert_resource(SkeletonHumanoidGenomeHandle(humanoid));
-    commands.insert_resource(SkeletonBipedLizardGenomeHandle(lizard));
-    info!("[forgia-auto-rig::pinocchio] skeleton templates loading from TOML genomes");
-}
-
-/// Type alias pour le loader Bevy (utilisé par `ForgiaAutoRigPlugin::build`).
-#[allow(dead_code)]
-pub type SkeletonGenomeLoader = GenomeLoader<SkeletonTemplate>;
-
-/// Backend du pipeline auto-rig. Switcher via `world.resource_mut::<AutoRigBackend>()`.
-#[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum AutoRigBackend {
-    /// Pipeline V1 Phase 1 (Pinocchio-inspired) : voxelize → medial axis →
-    /// embed template via greedy nearest-sphere snapping. Default story-440 R&D.
-    #[default]
-    PinocchioV1,
-    /// Pipeline historique (template-fit AABB + landmarks anatomiques).
-    /// Échec connu sur GLB Meshy avec accessoires invisibles → mesh aplati.
-    TemplateFit,
-}
-
-/// Système Pinocchio V1. Tourne en parallèle de `auto_rig_pending_meshes`
-/// (historique TemplateFit), gated sur `AutoRigBackend == PinocchioV1`.
+/// Système Pinocchio V1 — **seul path runtime** auto-rig (story-480 Phase 3).
 ///
-/// Templates : lit depuis `Genome<SkeletonTemplate>` (TOML asset) avec
-/// fallback hardcoded si genome pas encore chargé (pattern graceful Forgia).
+/// Templates : lit depuis `SkeletonTemplateRegistry` (TOML asset). Si template
+/// pas encore Ready, **defer au frame suivant** (pas de fallback hardcoded —
+/// pattern AAA Unreal/Unity/Godot).
 #[allow(clippy::too_many_arguments)]
 pub fn auto_rig_pinocchio_v1(
     mut commands: Commands,
     time: Res<Time>,
-    backend: Res<AutoRigBackend>,
     mut stats: ResMut<AutoRigStats>,
-    humanoid_handle: Option<Res<SkeletonHumanoidGenomeHandle>>,
-    lizard_handle: Option<Res<SkeletonBipedLizardGenomeHandle>>,
+    registry: Res<SkeletonTemplateRegistry>,
     skeleton_genomes: Res<Assets<Genome<SkeletonTemplate>>>,
     q_pending: Query<(Entity, &NeedsAutoRig), Without<AutoRigged>>,
     children_q: Query<&Children>,
@@ -93,11 +60,6 @@ pub fn auto_rig_pinocchio_v1(
     meshes_assets: Res<Assets<Mesh>>,
     q_mesh3d: Query<&Mesh3d>,
 ) {
-    // Gate sur le backend choisi.
-    if *backend != AutoRigBackend::PinocchioV1 {
-        return;
-    }
-
     for (mesh_root, request) in &q_pending {
         let NeedsAutoRig::Template(requested_template) = *request;
 
@@ -188,13 +150,17 @@ pub fn auto_rig_pinocchio_v1(
             continue;
         }
 
-        // 4. Embed template skeleton — load depuis TOML genome avec fallback hardcoded.
-        let (skel_template_raw, genome_used) = load_skeleton_template(
-            template,
-            &humanoid_handle,
-            &lizard_handle,
-            &skeleton_genomes,
-        );
+        // 4. Embed template skeleton — load depuis SkeletonTemplateRegistry (TOML).
+        //    Si pas encore Ready : defer ce frame, pas de fallback (story-480 Phase 3).
+        let template_id = auto_rig_to_skeleton_template_id(template);
+        let Some(skel_template_raw) = registry.try_get(template_id, &skeleton_genomes).cloned()
+        else {
+            // Template asset pas encore prêt — retry frame suivant.
+            // Sensor forgia_skeleton_template_registry.json suit le load_state
+            // et alerte si stuck Loading > 5s.
+            continue;
+        };
+        let genome_used = "toml";
 
         // Orientation fix (2026-05-18 AM) : si le mesh Meshy a sa queue en +Z
         // (orientation glb variable), flipper Z du template pour matcher.
@@ -312,31 +278,17 @@ pub fn auto_rig_pinocchio_v1(
 /// genome pas encore chargé (pattern graceful Forgia identique à
 /// `ArenaBotsGenome` dans `forgia-mode-fps-arena`). Retourne aussi un label
 /// "toml" ou "fallback" pour diagnostic logs.
-fn load_skeleton_template(
-    template: AutoRigTemplate,
-    humanoid_handle: &Option<Res<SkeletonHumanoidGenomeHandle>>,
-    lizard_handle: &Option<Res<SkeletonBipedLizardGenomeHandle>>,
-    skeleton_genomes: &Assets<Genome<SkeletonTemplate>>,
-) -> (SkeletonTemplate, &'static str) {
-    let handle: Option<&Handle<Genome<SkeletonTemplate>>> = match template {
-        AutoRigTemplate::Humanoid => humanoid_handle.as_ref().map(|h| &h.0),
-        AutoRigTemplate::BipedLizard => lizard_handle.as_ref().map(|h| &h.0),
-    };
-    if let Some(h) = handle {
-        if let Some(genome) = skeleton_genomes.get(h) {
-            return (genome.data.clone(), "toml");
-        }
+/// Mapping `AutoRigTemplate` (API publique du crate auto-rig)
+/// → `SkeletonTemplateId` (registry forgia-skeleton-template).
+///
+/// Le double type existe pour ne pas faire fuiter `forgia-skeleton-template`
+/// dans tous les consumers (rpg, prefab, etc.) — `AutoRigTemplate` reste
+/// l'API stable.
+pub fn auto_rig_to_skeleton_template_id(t: AutoRigTemplate) -> SkeletonTemplateId {
+    match t {
+        AutoRigTemplate::Humanoid => SkeletonTemplateId::Humanoid,
+        AutoRigTemplate::BipedLizard => SkeletonTemplateId::BipedLizard,
     }
-    // Fallback hardcoded (graceful — log warn pour visibilité)
-    warn!(
-        "[forgia-auto-rig::pinocchio] genome {:?} pas chargé, fallback hardcoded",
-        template
-    );
-    let fallback = match template {
-        AutoRigTemplate::Humanoid => SkeletonTemplate::humanoid(),
-        AutoRigTemplate::BipedLizard => SkeletonTemplate::biped_lizard(),
-    };
-    (fallback, "fallback_hardcoded")
 }
 
 /// Walk descendants pour trouver le PREMIER Mesh3d et extraire ses positions
@@ -451,10 +403,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn backend_default_is_pinocchio_v1() {
-        // Story-440 R&D : Pinocchio V1 par défaut pour validation visuelle.
-        let b = AutoRigBackend::default();
-        assert_eq!(b, AutoRigBackend::PinocchioV1);
+    fn auto_rig_template_maps_to_skeleton_template_id() {
+        // Story-480 Phase 3 : la fonction de mapping est stable et non
+        // ambiguë — Humanoid→Humanoid, BipedLizard→BipedLizard. Test sentinel
+        // qui sauterait si l'enum AutoRigTemplate gagnait une variante sans
+        // que SkeletonTemplateId la suive (régression scaling Quadruped futur).
+        assert_eq!(
+            auto_rig_to_skeleton_template_id(AutoRigTemplate::Humanoid),
+            SkeletonTemplateId::Humanoid
+        );
+        assert_eq!(
+            auto_rig_to_skeleton_template_id(AutoRigTemplate::BipedLizard),
+            SkeletonTemplateId::BipedLizard
+        );
     }
 
     #[test]
