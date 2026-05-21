@@ -1,6 +1,6 @@
 # Story-486 — Jolcham Oak Bark Wire-up (material_override trunk)
 
-**Status** : IN PROGRESS
+**Status** : DONE
 **Type** : Standard
 **Crate** : `forgia-foliage`
 **Date** : 2026-05-21
@@ -71,3 +71,11 @@ Phase C : Extension sensor + tests + boot ON
 
 Apres commit : lancer RPG, lire `forgia_vegetation.json` -> voir
 `trunk_override.overridden > 0` apres ~30 frames.
+
+**Confirme 2026-05-21 12:30** (workspace de-blocked, sensor t=8.5s) :
+- `enabled: true` (boot ON)
+- `overridden: 423` (name match bark/trunk/wood/stem)
+- `fallback: 174` (last-by-tri-count, primitives KayKit sans nom trunk explicite)
+- `not_found: 0` (aucun arbre n'epuise les 60 frames de polling)
+- Coverage : 597 / 632 trees = 94% (35 arbres encore en window polling sur chunks Tundra fraichement charges)
+- clippy 0 warnings (via `rtk proxy` — RTK filter false positive connu, cf memory `feedback_rtk_clippy_use_proxy`)
