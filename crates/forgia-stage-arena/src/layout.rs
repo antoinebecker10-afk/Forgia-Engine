@@ -834,4 +834,138 @@ mod tests {
             assert!(idx < 2, "prop index out of range: {}", idx);
         }
     }
+
+    /// AC6 story-485 — assure que la palette prod `crypts_of_anvil`
+    /// (cover_low_cluster footprint=6m count=6 dans extent=80m) place bien
+    /// 6 CoverLow sans instances_skipped. Détecte une régression palette TOML.
+    #[test]
+    fn place_modules_crypts_palette_ac6_no_skips() {
+        let mut modules = HashMap::new();
+        // Mirroring assets/genomes/level_modules.toml prod values
+        modules.insert(
+            "cover_low_cluster".into(),
+            make_module(ModuleKind::CoverCluster, "cover_low", HeightClass::Low, 3.0, 6.0),
+        );
+        modules.insert(
+            "cover_high_wall".into(),
+            make_module(ModuleKind::CoverWall, "cover_high", HeightClass::High, 5.0, 8.0),
+        );
+        modules.insert(
+            "sniper_perch".into(),
+            make_module(ModuleKind::SniperPerch, "sniper_perch", HeightClass::Tall, 0.0, 4.0),
+        );
+        modules.insert(
+            "melee_pit".into(),
+            make_module(ModuleKind::MeleePit, "melee_pit", HeightClass::Low, 0.0, 6.0),
+        );
+        // Mirroring assets/genomes/roguelite_stages.toml crypts_of_anvil
+        let palette = vec![
+            ModulePaletteEntry { id: "cover_low_cluster".into(), count: 6 },
+            ModulePaletteEntry { id: "cover_high_wall".into(),   count: 2 },
+            ModulePaletteEntry { id: "sniper_perch".into(),      count: 1 },
+            ModulePaletteEntry { id: "melee_pit".into(),         count: 1 },
+        ];
+        // 5 seeds — robustesse multi-run replay
+        for seed in [1u64, 42, 9876, 12345, 99999] {
+            let placements = place_modules(
+                80.0,
+                &modules,
+                &palette,
+                Vec3::new(0.0, 0.0, -76.0),
+                Some(Vec3::new(0.0, 0.0, 76.0)),
+                seed,
+            );
+            let cover_low = count_by_kind(&placements, ModuleKind::CoverCluster);
+            let sniper = count_by_kind(&placements, ModuleKind::SniperPerch);
+            let melee = count_by_kind(&placements, ModuleKind::MeleePit);
+            assert_eq!(
+                cover_low, 6,
+                "AC6 cover_low shortfall on seed {} : got {}/6",
+                seed, cover_low
+            );
+            assert!(sniper >= 1, "AC6 sniper shortfall on seed {}", seed);
+            assert!(melee >= 1, "AC6 melee shortfall on seed {}", seed);
+        }
+    }
+
+    /// AC7 story-485 — assure que la palette `forge_sanctum` produit un layout
+    /// signature distincte de `crypts_of_anvil` (no sniper + 2 melee + moins
+    /// de cover bas). Détecte régression palette TOML qui aplatirait l'identity
+    /// spatiale d'un stage.
+    #[test]
+    fn place_modules_forge_distinct_from_crypts() {
+        let mut modules = HashMap::new();
+        modules.insert(
+            "cover_low_cluster".into(),
+            make_module(ModuleKind::CoverCluster, "cover_low", HeightClass::Low, 3.0, 6.0),
+        );
+        modules.insert(
+            "cover_high_wall".into(),
+            make_module(ModuleKind::CoverWall, "cover_high", HeightClass::High, 5.0, 8.0),
+        );
+        modules.insert(
+            "sniper_perch".into(),
+            make_module(ModuleKind::SniperPerch, "sniper_perch", HeightClass::Tall, 0.0, 4.0),
+        );
+        modules.insert(
+            "melee_pit".into(),
+            make_module(ModuleKind::MeleePit, "melee_pit", HeightClass::Low, 0.0, 6.0),
+        );
+
+        let crypts_palette = vec![
+            ModulePaletteEntry { id: "cover_low_cluster".into(), count: 6 },
+            ModulePaletteEntry { id: "cover_high_wall".into(),   count: 2 },
+            ModulePaletteEntry { id: "sniper_perch".into(),      count: 1 },
+            ModulePaletteEntry { id: "melee_pit".into(),         count: 1 },
+        ];
+        let forge_palette = vec![
+            ModulePaletteEntry { id: "cover_low_cluster".into(), count: 4 },
+            ModulePaletteEntry { id: "cover_high_wall".into(),   count: 1 },
+            ModulePaletteEntry { id: "melee_pit".into(),         count: 2 },
+        ];
+
+        let seed = 42u64;
+        let crypts = place_modules(
+            80.0,
+            &modules,
+            &crypts_palette,
+            Vec3::new(0.0, 0.0, -76.0),
+            Some(Vec3::new(0.0, 0.0, 76.0)),
+            seed,
+        );
+        let forge = place_modules(
+            80.0,
+            &modules,
+            &forge_palette,
+            Vec3::new(0.0, 0.0, -76.0),
+            None,
+            seed,
+        );
+
+        // Crypts identity = sniper edge + dense low cover + 1 melee
+        assert!(count_by_kind(&crypts, ModuleKind::SniperPerch) >= 1);
+        assert_eq!(count_by_kind(&crypts, ModuleKind::MeleePit), 1);
+
+        // Forge identity = no sniper + double melee + lighter cover
+        assert_eq!(count_by_kind(&forge, ModuleKind::SniperPerch), 0);
+        assert_eq!(count_by_kind(&forge, ModuleKind::MeleePit), 2);
+
+        // Signatures (kind, count) doivent différer
+        let crypts_sig = (
+            count_by_kind(&crypts, ModuleKind::CoverCluster),
+            count_by_kind(&crypts, ModuleKind::CoverWall),
+            count_by_kind(&crypts, ModuleKind::SniperPerch),
+            count_by_kind(&crypts, ModuleKind::MeleePit),
+        );
+        let forge_sig = (
+            count_by_kind(&forge, ModuleKind::CoverCluster),
+            count_by_kind(&forge, ModuleKind::CoverWall),
+            count_by_kind(&forge, ModuleKind::SniperPerch),
+            count_by_kind(&forge, ModuleKind::MeleePit),
+        );
+        assert_ne!(
+            crypts_sig, forge_sig,
+            "AC7: forge_sanctum layout signature identique à crypts_of_anvil — perte d'identity spatiale"
+        );
+    }
 }

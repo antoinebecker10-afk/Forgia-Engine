@@ -29,8 +29,11 @@ weather_override = "ashfall"
 wall_natural_len_m = 2.0
 # Story-485 — palette modules intra-arena. Identity "Crypts" : dense cover,
 # verticality sniper, brawl pit central.
+# AC6 requirement : >= 6 CoverLow placés (validation runtime sensor
+# `forgia2_stage_layout.json`). Chaque module = 1 prop (pas N props/cluster,
+# `density_per_m2` non consommé downstream — cf story-485 phase suivante).
 module_palette = [
-    { id = "cover_low_cluster", count = 3 },
+    { id = "cover_low_cluster", count = 6 },
     { id = "cover_high_wall",   count = 2 },
     { id = "sniper_perch",      count = 1 },
     { id = "melee_pit",         count = 1 },
