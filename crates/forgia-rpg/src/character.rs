@@ -141,21 +141,20 @@ pub(crate) fn spawn_rex_character(
                         .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
                     NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
                     // ── 2026-05-21 — Anim pipeline DESACTIVÉ sur Rex (baseline) ──
-                    // Cause : le pipeline (StanceOffsets arm_L/R Z=±90° + proc_walk
-                    // gait swing) assume une bind pose T-pose horizontale. Le mesh
-                    // Rex.glb actuel (= clone Kael, MD5 195ca37c…) est en bind
-                    // pose arms-down/squat. Composer stance T-pose sur un mesh
-                    // arms-down casse visuellement (cf screenshots 2026-05-21 PM
-                    // + reference_arm_rest_z_rad_t_pose_assumption.md).
+                    // Tentative ré-activation (TOML stance=0) a révélé un problème
+                    // architectural plus profond : Pinocchio embed les bones avec
+                    // des axes locaux qui varient selon la morphologie du mesh.
+                    // Rex.glb (clone Kael) a left_arm bone HORIZONTAL (tip_local
+                    // X=-0.296, Y=0) → proc_walk swing autour de X local rotate
+                    // hors plan → foot/arm deformation (cf forgia2_rex_bones.json).
                     //
-                    // Preuve baseline : le lineup (spawn_character_lineup) utilise
-                    // le MÊME template Humanoid SANS ces components → rend propre.
+                    // Story dédiée requise pour : per-character template variants,
+                    // bone axis convention validation, foot IK calibration par
+                    // mesh source. Cf reference_arm_rest_z_rad_t_pose_assumption.md
+                    // + reference_pinocchio_flat_bone_hierarchy.md.
                     //
-                    // Reactivation conditionnée à story future : capturer bind_rot
-                    // à cache.ready time et composer `tf.rot = bind * stance *
-                    // swing` au lieu de `identity * stance * swing`. Plan en 8
-                    // phases : Phase A (sensors V2, ✅), B (doc pipeline), C1-C8
-                    // (witness per stage), D (HumanoidBlocks baseline propre).
+                    // Baseline propre confirmée : lineup (spawn_character_lineup)
+                    // utilise même template SANS ces components → rend correctement.
                     //
                     // LocomotionTarget,
                     // LocomotionBoneCache::default(),
