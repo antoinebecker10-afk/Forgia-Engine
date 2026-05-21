@@ -69,6 +69,11 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_observer(run::obs_roguelite_player_death);
         // Reset RogueliteWave OnEnter (relance run propre depuis lobby).
         app.add_systems(OnEnter(GameMode::Roguelite), reset_wave_resource);
+        // 2026-05-21 — Auto-fire StartRunEvent OnEnter pour activer RunState
+        // transitions (InRun) → débloque HUD wave/souls/defeat overlays gatés
+        // run_state. Sans ça, l'utilisateur entre Roguelite, voit des bots mais
+        // pas d'UI car sys_start_run n'est jamais déclenché.
+        app.add_systems(OnEnter(GameMode::Roguelite), auto_start_run_on_enter);
         // V7 M2.5 — Tag PickupCollector en Update (PAS OnEnter) car Player spawn
         // par autre plugin (forgia-player::OnEnter AppMode::InGame), ordre cross-plugin
         // non garanti. Guard idempotent via `Without<PickupCollector>` (no-op après tag).
@@ -116,9 +121,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_systems(
                 Update,
                 (
-                    waves::sys_stage_orchestrator,
+                    waves::sys_wave_orchestrator,
                     waves::sys_boss_enrage,
-                    waves::sys_unstick_bots,
+                    // TODO(story-471..479): sys_unstick_bots supprimé de crate::waves — re-implémenter
+                    // waves::sys_unstick_bots,
                 )
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Roguelite)),
@@ -149,6 +155,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
 
 fn reset_wave_resource(mut wave: ResMut<waves::RogueliteWave>) {
     *wave = waves::RogueliteWave::default();
+}
+
+/// 2026-05-21 — Auto-fire StartRunEvent OnEnter(GameMode::Roguelite).
+///
+/// Sans ça, `sys_start_run` ne se déclenche jamais → `RunState` reste à
+/// `Lobby` (default SubState) → HUD wave/souls/defeat (gated sur `RunState::InRun`)
+/// reste invisible. Pattern Hadès "die-restart-die" : nouvelle entrée mode = nouveau run.
+fn auto_start_run_on_enter(mut events: MessageWriter<run::StartRunEvent>) {
+    events.write(run::StartRunEvent { seed: None });
+    info!("[roguelite] auto_start_run_on_enter — StartRunEvent fired");
 }
 
 #[cfg(test)]
