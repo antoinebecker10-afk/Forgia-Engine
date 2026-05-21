@@ -45,6 +45,22 @@ assets/models-v1/packs/kaykit-*/
 # medieval) restent tracked — ils sont soit des registries Forgia, soit des
 # packs trop petits pour mériter le pipeline.
 
+# Legacy V1 binary assets (2026-05-21) — repris de V1 monolithique, 126k fichiers
+# = 99% du repo, .git était 45GB → push GitHub HTTP 500. Purgés de l'historique
+# via git-filter-repo. Restent sur disque (build local OK) mais hors version
+# control. Migration prévue vers asset-CDN pattern (forgia-asset-cdn) avec
+# manifest + downloader.
+assets/models-v1/
+assets/textures-v1/
+assets/hdri-v1/
+assets/audio-v1/
+assets/bundles-v1/
+# Symlinks legacy (Linux/Mac) — pointent vers contenu V1, hors scope V2.
+assets/hdri-v1@
+
+# Backups .git pre-purge (safety net post-filter-repo, 45GB)
+.git.backup-*/
+
 # Save data (joueur)
 saves/
 *.save
