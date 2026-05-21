@@ -16,7 +16,7 @@
 | 3 — Stage palette wiring | ✅ DONE | `496551b` | inclus | 2 stages annotés, ForgiaLevelPresetsPlugin idempotent |
 | 4 — Sight-line solver pur | ✅ DONE | `496551b` | 15 layout | 6 invariants enforced, déterminisme seed |
 | 5 — Runtime spawn + sensor | ✅ DONE | `d2216e2` | 10 sensor | LayoutResult + LayoutParams bundle, sensor 1Hz |
-| 6 — Hardening + post-impl QA | ⏳ EN COURS | — | — | Sub-agents verifier+qa-lead lancés 2026-05-21 |
+| 6 — Hardening + post-impl QA | ✅ DONE | hardening commit | 56 verts (+1) | qa-lead 0 Bloquant / 2 Majeur+4 Mineur+1 Cosmétique tous traités (6 fix + 1 justify documenté) |
 | 7 — Validation runtime | ⏸️ **BLOCKED** | — | — | Workspace `cargo run` cassé depuis commit antérieur `9e149ca` (story-483 refactor incomplet par autre terminal — APIs `forgia_audio_voicelines::*`, `forgia_loot_tables::*`, `forgia_audio_music_state::*`, `crate::waves::current_stage_node` etc. référencées mais non-implémentées). Reprendre dès que workspace re-compile. |
 
 **Substitutions assets** (story §7 risque "Élevée" matérialisé) — 5/6 GLB du plan original absents du pack KayKit Dungeon, proxies appliqués :
