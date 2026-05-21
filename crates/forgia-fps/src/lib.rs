@@ -15,6 +15,8 @@ use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+// Story-490 — DamageKind + DeathEvent pour bridge V7 damage pipeline (despawn_dead_cubes triggers DeathEvent before despawn → Roguelite observers loot/defeat fire correctement).
+use forgia_damage::{DamageKind, DeathEvent};
 use forgia_combat::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponFireCooldown};
 use forgia_core::prelude::*;
@@ -386,10 +388,21 @@ fn despawn_dead_cubes(
 ) {
     for (entity, hp) in &q {
         if hp.is_dead() {
+            // Story-490 — bridge V7 damage pipeline. Trigger DeathEvent AVANT
+            // despawn pour que les observers Roguelite (loot pickup spawn cf
+            // run.rs:257, defeat detection cf run.rs:219) puissent réagir.
+            // Sans ça, ennemis Roguelite meurent silencieusement → 0 Souls drop.
+            // source=None car despawn_dead_cubes n'a pas l'info attaquant à ce
+            // point (story-491 future passera DamageEvent en amont).
+            commands.trigger(DeathEvent {
+                target: entity,
+                source: None,
+                final_kind: DamageKind::Physical,
+            });
             if let Ok(mut ec) = commands.get_entity(entity) {
                 ec.try_despawn();
             }
-            info!("[death] cube {:?} despawned (HP=0)", entity);
+            info!("[death] cube {:?} despawned (HP=0) + DeathEvent fired", entity);
         }
     }
 }

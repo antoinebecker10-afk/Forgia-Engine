@@ -17,7 +17,13 @@ use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_core::prelude::*;
-use forgia_damage::{Health, Mortal};
+// Story-490 — Health type swap forgia_damage → forgia_combat pour matcher la
+// query `find_health_ancestor` de forgia-fps hitscan (qui scanne
+// `Query<&mut forgia_combat::Health, With<TargetCube>>`). Sans ce swap, type
+// mismatch silencieux → hits classifiés `BlockerNonZone` au lieu de damage.
+// cf memory [[reference-dual-health-type-trap]] et [[reference-bevy-rapier-child-collider-pattern-2026-05-20]].
+use forgia_combat::Health;
+use forgia_damage::Mortal;
 use forgia_mode_fps_arena::TargetCube;
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
@@ -210,7 +216,13 @@ pub fn sys_boss_enrage(
         if *archetype != EnemyArchetype::Boss {
             continue;
         }
-        let fraction = health.fraction();
+        // Story-490 — forgia_combat::Health n'a pas .fraction() ; inline calcul
+        // (équivalent à forgia_damage::Health::fraction).
+        let fraction = if health.max > 0.0 {
+            (health.current / health.max).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         if fraction <= 0.5 {
             let stats = enemies::stats_for(EnemyArchetype::Boss);
             bot.speed = stats.speed * 1.8;

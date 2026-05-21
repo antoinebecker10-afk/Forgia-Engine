@@ -364,7 +364,6 @@ pub fn obs_roguelite_enemy_death(
                 value,
                 lifetime_secs: 30.0,
                 collect_radius: 2.5,
-                ..default()
             },
             // PickupAnimState supprimé — disabled
             Mesh3d(core_mesh),
