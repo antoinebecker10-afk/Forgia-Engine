@@ -231,7 +231,8 @@ pub struct StageLoadResult {
     pub music_state_id: String,
     /// `weather_override` du stage def actuel. Vide si non défini. Consommé par
     /// future crate `forgia-weather` (V2). Visibilité runtime via sensor.
-    pub weather_override: String,}
+    pub weather_override: String,
+}
 
 // ─── Genome handles Resource ────────────────────────────────────────────────
 
@@ -332,7 +333,12 @@ impl Plugin for ForgiaStageArenaPlugin {
             .add_systems(
                 Update,
                 layout_sensor::write_layout_sensor
-                    .in_set(forgia_core::prelude::GameSet::Sensors),
+                    .in_set(forgia_core::prelude::GameSet::Sensors)
+                    // BUG-485-02 fix : garantit que le sensor lit le LayoutResult
+                    // de la frame actuelle, pas la précédente. GameSet::Movement
+                    // précède Sensors dans la L7 chain, mais .after explicite
+                    // protège contre re-ordering futur.
+                    .after(spawn_stage_arena_on_request),
             );
         info!(
             "[forgia-stage-arena] Plugin loaded — genome paths: {} + {}",
@@ -960,7 +966,7 @@ fn spawn_stage_arena_on_request(
     // layout_sensor::write_layout_sensor).
     let longest_sightline_m =
         layout::longest_unbroken_sightline_m(player_pos, boss_pos, &layout_placements);
-    let min_cover_spacing_m = layout::min_cover_low_spacing_m(&layout_placements);
+    let min_cover_spacing_m = layout::min_cover_cluster_spacing_m(&layout_placements);
     layout_params.result.stage_id = req.stage_id.clone();
     layout_params.result.placements = layout_placements;
     layout_params.result.longest_sightline_m = longest_sightline_m;

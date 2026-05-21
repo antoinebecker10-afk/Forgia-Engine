@@ -123,6 +123,14 @@ pub fn write_layout_sensor(layout: Res<LayoutResult>, mut last_write: Local<f64>
     let melee_pit_count = count_by_kind(placed, ModuleKind::MeleePit);
     let flank_route_count = count_by_kind(placed, ModuleKind::FlankRoute);
 
+    // BUG-485-06 — Heuristique substring : on considère qu'un id de module
+    // contenant "cover_low" promet d'émettre des anchors CoverCluster. C'est un
+    // **contrat de nommage** (convention `cover_low_*` dans level_modules.toml),
+    // pas une dérivation depuis `ModuleDef.anchor_kinds_emitted`. Refactor vers
+    // une dérivation stricte coûterait passer `LevelModulesGenome` au sensor —
+    // disproportionné tant que le set de modules reste petit (~4 en V7). Si la
+    // palette TOML explose (>20 modules) ou si un module "cover_low_pillar_*"
+    // n'émet PAS un CoverCluster, migrer vers query du genome.
     let palette_expects_cover_low = layout
         .module_palette_used
         .iter()

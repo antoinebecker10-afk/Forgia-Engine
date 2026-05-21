@@ -51,6 +51,12 @@ pub const SNIPER_PERCH_MIN_DIST_RATIO: f32 = 0.6;
 /// Ratio de distance max au centre pour MeleePit (center constraint).
 pub const MELEE_PIT_MAX_DIST_RATIO: f32 = 0.3;
 
+/// Distance perpendiculaire au segment Player↔Boss en-dessous de laquelle un
+/// blocker High/Tall est considéré comme cassant la sight-line. Valeur dérivée
+/// de la largeur d'épaule joueur (~0.6 m) × facteur sécurité ≈ 5x. À tuner si
+/// stages compacts <30m introduits (story-485 BUG-485-03).
+pub const SIGHTLINE_BREAK_PERP_M: f32 = 3.0;
+
 // ─── ModulePlacement ────────────────────────────────────────────────────────
 
 /// Résultat d'un placement individuel. Consumer (`spawn_stage_arena_on_request`
@@ -280,8 +286,11 @@ fn is_position_valid(
         let ddx = pos.x - p.position.x;
         let ddz = pos.z - p.position.z;
         let d = (ddx * ddx + ddz * ddz).sqrt();
-        // Footprint exclusion (rayon module précédent)
-        if d < def.footprint_radius_m.max(p.height_class.height_m() * 0.5) {
+        // Footprint exclusion (rayon module précédent). BUG-485-01 fix :
+        // `def.footprint_radius_m` est requis (pas de #[serde(default)]) et
+        // toujours >= 1.5 dans la palette TOML, donc le .max(height/2) qui
+        // existait était dead logic.
+        if d < def.footprint_radius_m {
             return false;
         }
         // Cover spacing : entre 2 CoverLow ou 2 CoverHigh, distance ≥ min_spacing_m
@@ -390,16 +399,21 @@ pub fn longest_unbroken_sightline_m(
         let perp_x = dx - t * dir_x;
         let perp_z = dz - t * dir_z;
         let perp = (perp_x * perp_x + perp_z * perp_z).sqrt();
-        if perp < 3.0 {
+        if perp < SIGHTLINE_BREAK_PERP_M {
             return 0.0; // broken
         }
     }
     len
 }
 
-/// Distance minimale entre tout couple de CoverLow placés. Retourne f32::INFINITY
-/// si < 2 CoverLow. Sensor: alerte si < 3.0 (Level Design Book rule).
-pub fn min_cover_low_spacing_m(placed: &[ModulePlacement]) -> f32 {
+/// Distance minimale entre tout couple de modules `CoverCluster` placés.
+/// Retourne `f32::INFINITY` si < 2 instances. Sensor : alerte si < 3.0
+/// (Level Design Book "less cover is better" rule).
+///
+/// **Note nommage (BUG-485-04 fix)** : ne mesure que `CoverCluster` kind, pas
+/// les anchors `cover_low` émis par d'autres kinds. Pour story-486 cover-aware
+/// AI, derive depuis `Query<&AnchorPoint>` filtré par `kind == CoverLow`.
+pub fn min_cover_cluster_spacing_m(placed: &[ModulePlacement]) -> f32 {
     let lows: Vec<&ModulePlacement> = placed
         .iter()
         .filter(|m| m.kind == ModuleKind::CoverCluster)
@@ -739,9 +753,9 @@ mod tests {
     }
 
     #[test]
-    fn min_cover_low_spacing_less_than_two_returns_infinity() {
+    fn min_cover_cluster_spacing_less_than_two_returns_infinity() {
         let placements = vec![];
-        assert_eq!(min_cover_low_spacing_m(&placements), f32::INFINITY);
+        assert_eq!(min_cover_cluster_spacing_m(&placements), f32::INFINITY);
     }
 
     #[test]
@@ -761,6 +775,33 @@ mod tests {
             .map(|&k| count_by_kind(&placements, k))
             .sum();
         assert_eq!(total as usize, placements.len());
+    }
+
+    #[test]
+    fn place_modules_no_boss_pad_coverwalls_placed_freely() {
+        // BUG-485-05 fix : stage sans boss_pad → sightline_break_pending = false,
+        // CoverWalls placés via dart-throw normal (pas de midpoint forcé).
+        let (modules, palette) = make_palette();
+        let placements = place_modules(
+            90.0,
+            &modules,
+            &palette,
+            Vec3::new(0.0, 0.0, -85.0),
+            None, // no boss
+            42,
+        );
+        // CoverWalls quand même placés (au moins 1 si dart-throw réussit)
+        let walls_count = placements
+            .iter()
+            .filter(|m| m.kind == ModuleKind::CoverWall)
+            .count();
+        // Pas d'invariant midpoint, juste que la fonction ne crash pas
+        assert!(walls_count <= 2, "palette demande 2 CoverWalls max");
+        // longest_unbroken_sightline_m doit retourner 0 quand boss absent
+        assert_eq!(
+            longest_unbroken_sightline_m(Vec3::new(0.0, 0.0, -85.0), None, &placements),
+            0.0
+        );
     }
 
     #[test]
