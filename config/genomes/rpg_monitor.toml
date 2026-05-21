@@ -52,11 +52,14 @@ epsilon_m = 0.001
 # CHK-4 : assets critiques préchargés en Resource CriticalAssetHandles
 # (story-453). Handles vivants pendant GameMode::Rpg → LoadState reflète l'état
 # réel sans alloc per-tick.
+# 2026-05-21 : ex-paths "textures-v1/terrain/grass/*" supprimés — legacy V1 orphelins
+# depuis purge git 184e091 (cf memory reference_v2_asset_paths_legacy_models_v1).
+# Remplacés par les 3 textures bark V2 réellement câblées via story-486 (foliage trunk override).
 enabled = true
 paths = [
-    "textures-v1/terrain/grass/diff.jpg",
-    "textures-v1/terrain/grass/normal.jpg",
-    "textures-v1/terrain/grass/roughness.jpg",
+    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.jpg",
+    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_2k.jpg",
+    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.jpg",
 ]
 # Uptime minimum (secondes) avant de vérifier les assets — évite faux positifs au démarrage.
 asset_check_min_uptime_secs = 30.0

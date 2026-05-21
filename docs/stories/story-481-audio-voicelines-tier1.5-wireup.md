@@ -1,5 +1,13 @@
 # Story-481 — `forgia-audio-voicelines` Tier 1.5 wire-up (P0 V7 M4)
 
+> 🚨 **STATUT INVALIDÉ EN CASCADE 2026-05-21** — cette story prétend brancher
+> `BarkEvent → select_bark → sensor` mais dépend de la crate `forgia-audio-voicelines`
+> qui est restée **scaffold 16 LOC** (cf story-472 invalidé). Sans la Tier 1 réelle,
+> le wireup est vide.
+>
+> **Vrai statut : BLOCKED** (par re-impl story-472 / story-491). Voir
+> `feedback_fictive_done_status_2026_05_21.md` + audit story-gate §détail.
+
 > **Statut** : ✅ DONE 2026-05-20 — 3 fichiers + Cargo deps, 2/2 tests `weapon_to_speaker`, clippy `-D warnings` vert sur forgia-mode-roguelite + forgia-audio-voicelines + forgia-game
 > **Scale BMAD** : Standard (3 fichiers)
 > **Date** : 2026-05-20
