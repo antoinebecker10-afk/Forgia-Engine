@@ -27,8 +27,14 @@ use forgia_terrain::{
 };
 use std::collections::HashMap;
 
+pub mod material_override;
+pub use material_override::{BarkOverrideConfig, BarkTextures, NeedsTrunkOverride};
+
 pub mod prelude {
-    pub use crate::{biome_max_per_chunk, ForgiaFoliagePlugin, VegetationManager};
+    pub use crate::{
+        biome_max_per_chunk, BarkOverrideConfig, BarkTextures, ForgiaFoliagePlugin,
+        NeedsTrunkOverride, VegetationManager,
+    };
 }
 
 /// Port direct V1 `forgia-game::terrain::vegetation::types::biome_max_per_chunk`,
@@ -146,11 +152,19 @@ pub struct ForgiaFoliagePlugin;
 impl Plugin for ForgiaFoliagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VegetationManager>()
-            .add_systems(Startup, init_proc_meshes)
+            .init_resource::<BarkOverrideConfig>()
+            .add_systems(
+                Startup,
+                (
+                    init_proc_meshes,
+                    material_override::preload_bark_textures,
+                ),
+            )
             .add_systems(
                 Update,
                 (
                     populate_new_chunks,
+                    material_override::apply_trunk_bark_override,
                     despawn_far_lod_vegetation,
                     despawn_unloaded_chunks,
                     write_vegetation_sensor,
@@ -183,6 +197,7 @@ fn populate_new_chunks(
     mut veg: ResMut<VegetationManager>,
     asset_server: Res<AssetServer>,
     registry: Res<AssetRegistry>,
+    cfg: Res<BarkOverrideConfig>,
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
@@ -334,6 +349,10 @@ fn populate_new_chunks(
                 Name::new(format!("Tree_{}_{}_{}_{i}", entry.species, coord.x, coord.z)),
             ));
             if let Some(n) = needs_calib { ec.insert(n); }
+            // Si l'override bark est actif, marquer cet arbre pour traitement trunk.
+            if cfg.enabled && entry.category == AssetCategory::Tree {
+                ec.insert(NeedsTrunkOverride::default());
+            }
             let trunk_entity = ec.id();
             spawned.push(trunk_entity);
         }
@@ -436,6 +455,7 @@ const SENSOR_INTERVAL_S: f32 = 1.0;
 fn write_vegetation_sensor(
     time: Res<Time>,
     veg: Res<VegetationManager>,
+    bark_cfg: Option<Res<BarkOverrideConfig>>,
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
@@ -448,9 +468,17 @@ fn write_vegetation_sensor(
         .map(|(k, v)| format!("\"{}\":{}", k, v))
         .collect::<Vec<_>>()
         .join(",");
+    // story-486 : extension trunk_override stats si BarkOverrideConfig présente.
+    let trunk_json = match bark_cfg.as_deref() {
+        Some(cfg) => format!(
+            ",\"trunk_override\":{{\"enabled\":{},\"overridden\":{},\"fallback\":{},\"not_found\":{}}}",
+            cfg.enabled, cfg.overridden, cfg.fallback, cfg.not_found,
+        ),
+        None => String::new(),
+    };
     let json = format!(
-        "{{\"timestamp_secs\":{:.1},\"loaded_chunks\":{},\"total_trees\":{},\"per_biome\":{{{}}}}}",
-        now, veg.chunk_entities.len(), veg.total_trees, dist,
+        "{{\"timestamp_secs\":{:.1},\"loaded_chunks\":{},\"total_trees\":{},\"per_biome\":{{{}}}{}}}",
+        now, veg.chunk_entities.len(), veg.total_trees, dist, trunk_json,
     );
     let _ = std::fs::write("forgia_vegetation.json", json);
 }
