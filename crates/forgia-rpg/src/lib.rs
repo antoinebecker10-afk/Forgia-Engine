@@ -105,8 +105,16 @@ impl Plugin for ForgiaRpgPlugin {
         app.init_resource::<ChunkResidence>();
         // Story-450 wave 4c : debug overlay toggle (F3).
         app.init_resource::<StreamingDebugOverlay>();
+        app.init_resource::<forgia_anim_locomotion::RpgEntryCount>();
         app.add_systems(Startup, register_sample_dialogues)
-            .add_systems(OnEnter(GameMode::Rpg), spawn_world)
+            .add_systems(
+                OnEnter(GameMode::Rpg),
+                (
+                    forgia_anim_locomotion::increment_rpg_entry_count,
+                    spawn_world,
+                )
+                    .chain(),
+            )
             .add_systems(
                 OnExit(GameMode::Rpg),
                 (character::cleanup_rex_character, cleanup_world, cleanup_village).chain(),

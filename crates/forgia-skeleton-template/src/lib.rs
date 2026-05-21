@@ -148,6 +148,15 @@ pub struct StanceOffsetsTable {
     /// Offset euler XYZ degrés sur le bone hip.
     #[serde(default)]
     pub hip_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone clavicle_L (shoulder area).
+    /// Story-482 P2c (2026-05-21) : clavicle ancre visuellement l'arm si
+    /// non animée. Stance offset permet de "dropper" le shoulder vers le
+    /// bas pour matcher la pose game arms-down même quand arm_L rotate.
+    #[serde(default)]
+    pub clavicle_l_euler_deg: [f32; 3],
+    /// Offset euler XYZ degrés sur le bone clavicle_R.
+    #[serde(default)]
+    pub clavicle_r_euler_deg: [f32; 3],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

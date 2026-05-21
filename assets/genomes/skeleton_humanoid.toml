@@ -13,6 +13,11 @@ leg_l_euler_deg = [0.0, 0.0, 0.0]
 leg_r_euler_deg = [0.0, 0.0, 0.0]
 spine_euler_deg = [0.0, 0.0, 0.0]
 hip_euler_deg   = [0.0, 0.0, 0.0]
+# Story-482 P2c — clavicle stance : zéros = pas d'ancre (clavicle suit bind).
+# Tuner Z pour accompagner pose game arms-down (~-15° à -30° typique humanoid
+# Vitruvian). Ajuster par essai visuel, hot-reload via Shift+F12.
+clavicle_l_euler_deg = [0.0, 0.0, 0.0]
+clavicle_r_euler_deg = [0.0, 0.0, 0.0]
 
 #
 # Position normalisée : `pos = [x, y, z]` où y∈[0,1] (0=sol mesh, 1=top mesh),

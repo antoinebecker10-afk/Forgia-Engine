@@ -44,6 +44,11 @@ pub struct StanceOffsets {
     pub leg_r: Quat,
     pub spine: Quat,
     pub hip: Quat,
+    /// Story-482 P2c (2026-05-21) — shoulder anchor. Si non animée, la
+    /// clavicle reste à bind T-pose et ancre visuellement le bras horizontal
+    /// malgré la rotation arm_L/R. Permet d'accompagner la pose game.
+    pub clavicle_l: Quat,
+    pub clavicle_r: Quat,
 }
 
 impl Default for StanceOffsets {
@@ -57,6 +62,8 @@ impl Default for StanceOffsets {
             leg_r: Quat::IDENTITY,
             spine: Quat::IDENTITY,
             hip: Quat::IDENTITY,
+            clavicle_l: Quat::IDENTITY,
+            clavicle_r: Quat::IDENTITY,
         }
     }
 }
@@ -73,6 +80,7 @@ impl StanceOffsets {
     }
 
     /// Helper depuis euler XYZ degrés (format TOML SkeletonTemplate.stance_offsets).
+    #[allow(clippy::too_many_arguments)]
     pub fn from_euler_degs(
         arm_l: [f32; 3],
         arm_r: [f32; 3],
@@ -80,6 +88,8 @@ impl StanceOffsets {
         leg_r: [f32; 3],
         spine: [f32; 3],
         hip: [f32; 3],
+        clavicle_l: [f32; 3],
+        clavicle_r: [f32; 3],
     ) -> Self {
         let q = |e: [f32; 3]| {
             Quat::from_euler(
@@ -96,6 +106,8 @@ impl StanceOffsets {
             leg_r: q(leg_r),
             spine: q(spine),
             hip: q(hip),
+            clavicle_l: q(clavicle_l),
+            clavicle_r: q(clavicle_r),
         }
     }
 }
@@ -137,6 +149,8 @@ pub struct ArticulatedBones {
     pub forearm_r: BonePose,
     pub hand_l: BonePose,
     pub hand_r: BonePose,
+    pub clavicle_l: BonePose,
+    pub clavicle_r: BonePose,
     pub left_leg: BonePose,
     pub right_leg: BonePose,
     pub shin_l: BonePose,
@@ -146,6 +160,25 @@ pub struct ArticulatedBones {
     pub spine: BonePose,
     pub hip: BonePose,
     pub tail_chain: Vec<BonePose>,
+}
+
+/// Compteur d'entrées dans `GameMode::Rpg`. Incrémenté `OnEnter(Rpg)` par le
+/// consumer (forgia-rpg) via [`increment_rpg_entry_count`]. Utilisé par les
+/// sensors anim pour produire des fichiers indexés par cycle
+/// (`forgia_rex_bones_entry_{N}_bind.json` et `..._live.json`), permettant
+/// de diff la signature des bones entre cycles successifs (diagnostic
+/// state leak hand_l/r — WIP story-482 2026-05-20).
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct RpgEntryCount(pub u32);
+
+/// `OnEnter(GameMode::Rpg)` system — incrémente [`RpgEntryCount`] et log.
+/// À brancher côté consumer (forgia-rpg) sur OnEnter(Rpg).
+pub fn increment_rpg_entry_count(mut count: ResMut<RpgEntryCount>) {
+    count.0 = count.0.saturating_add(1);
+    info!(
+        "[anim-locomotion] RPG entry #{} — sensors will write forgia_rex_bones_entry_{}_*.json",
+        count.0, count.0
+    );
 }
 
 /// Vitesse précédente du driver (frame n-1), pour estimer la vélocité.
@@ -194,6 +227,7 @@ const GIVEUP_FRAMES: u32 = 120;
 
 /// Analyse topologie + calibre Y via AABB + capture bind rotations pose-agnostic.
 /// Retry chaque frame jusqu'à `cache.ready = true` ou `GIVEUP_FRAMES` atteint.
+#[allow(clippy::too_many_arguments)]
 pub fn attach_locomotion_bones(
     mut commands: Commands,
     mut q_cache: Query<(Entity, &mut LocomotionBoneCache, &mut Transform), With<LocomotionTarget>>,
@@ -201,6 +235,7 @@ pub fn attach_locomotion_bones(
     names: Query<&Name>,
     transforms: Query<&Transform, Without<LocomotionTarget>>,
     aabbs: Query<&Aabb>,
+    entry_count: Res<RpgEntryCount>,
 ) {
     for (rex_entity, mut cache, mut rex_tf) in &mut q_cache {
         if cache.ready || cache.gave_up {
@@ -342,14 +377,17 @@ pub fn attach_locomotion_bones(
             let forearm_r_e = lookup("forearm_R");
             let hand_l_e = lookup("hand_L");
             let hand_r_e = lookup("hand_R");
+            let clavicle_l_e = lookup("clavicle_L");
+            let clavicle_r_e = lookup("clavicle_R");
             let shin_l_e = lookup("shin_L");
             let shin_r_e = lookup("shin_R");
             let foot_l_e = lookup("foot_L");
             let foot_r_e = lookup("foot_R");
             info!(
-                "[anim-locomotion] Name-lookup bones : forearm L/R={}/{}, hand L/R={}/{}, shin L/R={}/{}, foot L/R={}/{}",
+                "[anim-locomotion] Name-lookup bones : forearm L/R={}/{}, hand L/R={}/{}, clavicle L/R={}/{}, shin L/R={}/{}, foot L/R={}/{}",
                 forearm_l_e.is_some(), forearm_r_e.is_some(),
                 hand_l_e.is_some(), hand_r_e.is_some(),
+                clavicle_l_e.is_some(), clavicle_r_e.is_some(),
                 shin_l_e.is_some(), shin_r_e.is_some(),
                 foot_l_e.is_some(), foot_r_e.is_some(),
             );
@@ -360,6 +398,8 @@ pub fn attach_locomotion_bones(
                 forearm_r: BonePose::from_entity(forearm_r_e, &rot_of),
                 hand_l: BonePose::from_entity(hand_l_e, &rot_of),
                 hand_r: BonePose::from_entity(hand_r_e, &rot_of),
+                clavicle_l: BonePose::from_entity(clavicle_l_e, &rot_of),
+                clavicle_r: BonePose::from_entity(clavicle_r_e, &rot_of),
                 left_leg: BonePose::from_entity(left_leg_e, &rot_of),
                 right_leg: BonePose::from_entity(right_leg_e, &rot_of),
                 shin_l: BonePose::from_entity(shin_l_e, &rot_of),
@@ -411,12 +451,18 @@ pub fn attach_locomotion_bones(
                     tip.x, tip.y, tip.z,
                 )
             };
+            let entry_idx = entry_count.0;
             let json = format!(
-                "{{\n  \"captured_at\": \"cache.ready\",\n  \"stance_source\": \"StanceOffsets Component (P2 data-driven)\",\n  \"bones\": {{\n    \"left_arm\": {},\n    \"right_arm\": {},\n    \"forearm_l\": {},\n    \"forearm_r\": {},\n    \"left_leg\": {},\n    \"right_leg\": {},\n    \"spine\": {},\n    \"hip\": {}\n  }}\n}}\n",
+                "{{\n  \"captured_at\": \"cache.ready\",\n  \"entry_index\": {},\n  \"stance_source\": \"StanceOffsets Component (P2 data-driven)\",\n  \"bones\": {{\n    \"left_arm\": {},\n    \"right_arm\": {},\n    \"forearm_l\": {},\n    \"forearm_r\": {},\n    \"hand_l\": {},\n    \"hand_r\": {},\n    \"clavicle_l\": {},\n    \"clavicle_r\": {},\n    \"left_leg\": {},\n    \"right_leg\": {},\n    \"spine\": {},\n    \"hip\": {}\n  }}\n}}\n",
+                entry_idx,
                 fmt_bone(&bones.left_arm, bones.forearm_l.entity),
                 fmt_bone(&bones.right_arm, bones.forearm_r.entity),
-                fmt_bone(&bones.forearm_l, None),
-                fmt_bone(&bones.forearm_r, None),
+                fmt_bone(&bones.forearm_l, bones.hand_l.entity),
+                fmt_bone(&bones.forearm_r, bones.hand_r.entity),
+                fmt_bone(&bones.hand_l, None),
+                fmt_bone(&bones.hand_r, None),
+                fmt_bone(&bones.clavicle_l, bones.left_arm.entity),
+                fmt_bone(&bones.clavicle_r, bones.right_arm.entity),
                 fmt_bone(&bones.left_leg, bones.shin_l.entity),
                 fmt_bone(&bones.right_leg, bones.shin_r.entity),
                 fmt_bone(&bones.spine, None),
@@ -424,6 +470,13 @@ pub fn attach_locomotion_bones(
             );
             if let Err(e) = std::fs::write("forgia_rex_bones.json", &json) {
                 warn!("[anim-locomotion] Failed to write forgia_rex_bones.json: {e}");
+            }
+            // Indexed per-cycle sensor — persists across RPG re-entries.
+            let indexed_path = format!("forgia_rex_bones_entry_{}_bind.json", entry_idx);
+            if let Err(e) = std::fs::write(&indexed_path, &json) {
+                warn!("[anim-locomotion] Failed to write {indexed_path}: {e}");
+            } else {
+                info!("[anim-locomotion] Bind snapshot persisted → {indexed_path}");
             }
             cache.bones = bones;
             cache.topology = topo;
@@ -498,6 +551,9 @@ pub fn procedural_locomotion(
 
         slerp_to_stance(&mut bones, &b.left_arm, stance.arm_l, 0.15);
         slerp_to_stance(&mut bones, &b.right_arm, stance.arm_r, 0.15);
+        // P2c : clavicle stance (no swing, pure stance offset).
+        slerp_to_stance(&mut bones, &b.clavicle_l, stance.clavicle_l, 0.15);
+        slerp_to_stance(&mut bones, &b.clavicle_r, stance.clavicle_r, 0.15);
         for bone in [
             &b.forearm_l, &b.forearm_r,
             &b.left_leg, &b.right_leg, &b.shin_l, &b.shin_r, &b.foot_l, &b.foot_r,
@@ -535,6 +591,10 @@ pub fn procedural_locomotion(
     let (arm_r_pitch, elbow_r) = crate::proc_walk::arm_pose(gait, &tunables);
     compose_stance_swing(&mut bones, &b.left_arm, stance.arm_l, arm_l_pitch * speed_factor);
     compose_stance_swing(&mut bones, &b.right_arm, stance.arm_r, arm_r_pitch * speed_factor);
+    // P2c : clavicle stance (no swing pendant walk — la clavicle est statique
+    // sur la pose game, seule l'arm pitch fait l'oscillation walk cycle).
+    slerp_to_stance(&mut bones, &b.clavicle_l, stance.clavicle_l, 0.25);
+    slerp_to_stance(&mut bones, &b.clavicle_r, stance.clavicle_r, 0.25);
     compose_swing(&mut bones, &b.forearm_l, elbow_l * speed_factor);
     compose_swing(&mut bones, &b.forearm_r, elbow_r * speed_factor);
 
@@ -675,6 +735,8 @@ pub fn apply_stance_offsets_from_template(
             so.leg_r_euler_deg,
             so.spine_euler_deg,
             so.hip_euler_deg,
+            so.clavicle_l_euler_deg,
+            so.clavicle_r_euler_deg,
         );
         if current_stance.is_none() {
             info!(
@@ -711,6 +773,7 @@ pub fn write_rex_bones_live_sensor(
     mut timer: ResMut<RexBonesLiveSensorTimer>,
     q_cache: Query<&LocomotionBoneCache, With<LocomotionTarget>>,
     bones_q: Query<&Transform, (Without<LocomotionState>, Without<LocomotionTarget>)>,
+    entry_count: Res<RpgEntryCount>,
 ) {
     let dt = time.delta_secs();
     timer.accum_s += dt;
@@ -746,21 +809,30 @@ pub fn write_rex_bones_live_sensor(
         )
     };
 
+    let entry_idx = entry_count.0;
     let json = format!(
-        "{{\n  \"timestamp_secs\": {:.4},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
+        "{{\n  \"timestamp_secs\": {:.4},\n  \"entry_index\": {},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
         time.elapsed_secs(),
+        entry_idx,
         fmt("left_arm", &b.left_arm),
         fmt("right_arm", &b.right_arm),
         fmt("forearm_l", &b.forearm_l),
         fmt("forearm_r", &b.forearm_r),
         fmt("hand_l", &b.hand_l),
         fmt("hand_r", &b.hand_r),
+        fmt("clavicle_l", &b.clavicle_l),
+        fmt("clavicle_r", &b.clavicle_r),
         fmt("left_leg", &b.left_leg),
         fmt("right_leg", &b.right_leg),
         fmt("spine", &b.spine),
         fmt("hip", &b.hip),
     );
-    let _ = std::fs::write(REX_BONES_LIVE_SENSOR_PATH, json);
+    let _ = std::fs::write(REX_BONES_LIVE_SENSOR_PATH, &json);
+    // Indexed per-cycle live snapshot — écrasé à chaque tick mais le path
+    // change quand RpgEntryCount incrémente, donc entry_1_live.json reste
+    // figé sur le dernier tick du cycle 1 quand on entre dans le cycle 2.
+    let indexed_path = format!("forgia_rex_bones_entry_{}_live.json", entry_idx);
+    let _ = std::fs::write(&indexed_path, json);
 }
 
 const WALK_POSE_SENSOR_PATH: &str = "forgia_walk_pose.json";
