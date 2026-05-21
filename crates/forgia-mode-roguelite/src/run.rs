@@ -12,12 +12,13 @@
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use forgia_core::prelude::*;
-use forgia_audio_voicelines::{BarkEvent, BarkKind};
+// TODO(story-471..479): API removed, refactor abandonné — re-implémenter
+// use forgia_audio_voicelines::{BarkEvent, BarkKind};
 use forgia_combat::prelude::{EquippedWeapons, WeaponType};
 use forgia_damage::DeathEvent;
-use forgia_loot_tables::{Pickup, PickupAnimState, PickupCollector, PickupKind};
+// TODO(story-471..479): PickupAnimState + PickupKind supprimés de forgia_loot_tables
+use forgia_loot_tables::{Pickup, PickupCollector};
 use forgia_player::Player;
-use std::time::{SystemTime, UNIX_EPOCH};
 use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 
@@ -160,50 +161,18 @@ pub fn sys_stage_dispatch(
     );
 }
 
-/// Parse une `music_state` string venant de `roguelite_stages.toml` vers
-/// l'enum `forgia_audio_music_state::MusicState`. Story-483 P3.
-///
-/// Convention V1 : prefix-match insensible à la casse. Inconnu → `None`
-/// (caller ignore = preserve current music state).
-///
-/// Exemples :
-/// - "combat_intense" / "combat_default" / "combat" → `Combat`
-/// - "lobby" → `Lobby` · "explore" → `Explore`
-/// - "boss" → `Boss` · "victory" → `Victory` · "defeat" → `Defeat`
-pub fn parse_music_state(s: &str) -> Option<forgia_audio_music_state::MusicState> {
-    use forgia_audio_music_state::MusicState;
-    let s = s.trim().to_ascii_lowercase();
-    if s.is_empty() {
-        return None;
-    }
-    if s.starts_with("combat") {
-        Some(MusicState::Combat)
-    } else if s.starts_with("lobby") {
-        Some(MusicState::Lobby)
-    } else if s.starts_with("explore") {
-        Some(MusicState::Explore)
-    } else if s.starts_with("boss") {
-        Some(MusicState::Boss)
-    } else if s.starts_with("victory") {
-        Some(MusicState::Victory)
-    } else if s.starts_with("defeat") {
-        Some(MusicState::Defeat)
-    } else {
-        None
-    }
+// TODO(story-471..479): API removed, refactor abandonné — re-implémenter
+// parse_music_state désactivé : MusicState n'existe plus dans forgia_audio_music_state (scaffold vide).
+// Stub retourne toujours None pour éviter les callsites de casser.
+pub fn parse_music_state(_s: &str) -> Option<()> {
+    None
 }
 
-/// Story-483 V7 P3 (2026-05-20) — applique les toggles du stage chargé.
-///
-/// Watches `StageLoadResult` : quand `state == Ready` ET stage_id changed,
-/// émet `RequestMusicState` vers `forgia-audio-music-state` (toggle réel)
-/// + log weather_override (consumer V2 future).
-///
-/// Idempotent via `Local<String>` last_applied_id. Pattern observer plutôt
-/// que system tick : 1 emission par stage transition (pas par frame).
+// TODO(story-471..479): API removed, refactor abandonné — re-implémenter
+// sys_apply_stage_toggles désactivé : RequestMusicState n'existe plus dans
+// forgia_audio_music_state (scaffold vide). Stub no-op.
 pub fn sys_apply_stage_toggles(
     stage_result: Res<forgia_stage_arena::StageLoadResult>,
-    mut music_req: MessageWriter<forgia_audio_music_state::RequestMusicState>,
     mut last_applied_id: Local<String>,
 ) {
     if stage_result.state != forgia_stage_arena::StageState::Ready {
@@ -212,22 +181,7 @@ pub fn sys_apply_stage_toggles(
     if stage_result.stage_id == *last_applied_id || stage_result.stage_id.is_empty() {
         return;
     }
-    // Music toggle.
-    if let Some(music) = parse_music_state(&stage_result.music_state_id) {
-        music_req.write(forgia_audio_music_state::RequestMusicState {
-            new_state: music,
-            duration_sec: None,
-        });
-        info!(
-            "[roguelite] Stage '{}' Ready → music_state='{}' → {:?}",
-            stage_result.stage_id, stage_result.music_state_id, music
-        );
-    } else if !stage_result.music_state_id.is_empty() {
-        warn!(
-            "[roguelite] Stage '{}' music_state='{}' non reconnu — fallback ignore",
-            stage_result.stage_id, stage_result.music_state_id
-        );
-    }
+    // Music toggle disabled — MusicState/RequestMusicState supprimés.
     // Weather override : log seulement (pas de consumer V1, future `forgia-weather`).
     if !stage_result.weather_override.is_empty() {
         info!(
@@ -298,6 +252,7 @@ pub fn obs_roguelite_player_death(
 /// glowing à sa position. Value selon archetype (Tank > Sniper > Runner).
 ///
 /// Pattern miroir : `forgia-ai-arena-bot::on_bot_death` (story-466).
+#[allow(clippy::too_many_arguments)]
 pub fn obs_roguelite_enemy_death(
     event: On<DeathEvent>,
     mut commands: Commands,
@@ -307,30 +262,16 @@ pub fn obs_roguelite_enemy_death(
     time: Res<Time>,
     q_player_hp: Query<&forgia_damage::Health, With<forgia_player::Player>>,
     equipped: Option<Res<EquippedWeapons>>,
-    mut bark_writer: MessageWriter<BarkEvent>,
 ) {
     let target = event.target;
     let Ok((xf, archetype)) = enemies_q.get(target) else {
         return; // pas un ennemi Roguelite (probablement bot Arena → ignore)
     };
 
-    // Story-481 Tier 1.5 — émet BarkEvent::Kill côté arme parlante équipée.
-    // Speaker dérivé de l'arme courante (Pépin/Bourrasque/Lenoir/Boucherie).
-    // `process_bark_events` (forgia-audio-voicelines) consomme + applique
-    // cooldown + rate limit + sensor. Audio playback réel = Tier 2.
-    let speaker = equipped
-        .as_deref()
-        .map(|eq| weapon_to_speaker(eq.current))
-        .unwrap_or("any");
-    let now_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
-    bark_writer.write(BarkEvent {
-        speaker: speaker.to_string(),
-        kind: BarkKind::Kill,
-        now: now_secs,
-    });
+    // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
+    // BarkEvent/BarkKind supprimés de forgia_audio_voicelines (scaffold vide).
+    // Le bloc bark est désactivé ci-dessous.
+    let _ = &equipped; // suppress unused warning
 
     // V7 M3 step 3 — Heart drop scaled par player HP (low HP = chance plus haute).
     // Boss garantit toujours un Heart big. Sources : Hadès "Centaur Hearts" + RoR2.
@@ -349,34 +290,35 @@ pub fn obs_roguelite_enemy_death(
     seed ^= seed << 17;
     let roll = (seed % 100) as u32; // 0..99
 
-    let (kind, value, color, emissive) = match *archetype {
+    // TODO(story-471..479): PickupKind supprimé de forgia_loot_tables — kind remplacé par bool is_heart
+    let (is_heart, value, color, emissive) = match *archetype {
         crate::EnemyArchetype::Boss => (
-            PickupKind::Heart,
+            true,
             40_u32, // big heart : ~33% of max HP (player max 100).
             (1.0_f32, 0.30_f32, 0.30_f32),
             LinearRgba::new(1.8, 0.20, 0.20, 1.0),
         ),
         _ if player_hp_frac < 0.40 && roll < 35 => (
             // Low HP + 35% chance → heart drop (Hadès Centaur pattern).
-            PickupKind::Heart,
+            true,
             20,
             (1.0, 0.30, 0.30),
             LinearRgba::new(1.6, 0.20, 0.20, 1.0),
         ),
         crate::EnemyArchetype::Tank => (
-            PickupKind::Soul,
+            false,
             5,
             (0.55, 0.80, 1.0),
             LinearRgba::new(0.45, 0.85, 1.6, 1.0),
         ),
         crate::EnemyArchetype::Sniper => (
-            PickupKind::Soul,
+            false,
             3,
             (0.55, 0.80, 1.0),
             LinearRgba::new(0.45, 0.85, 1.6, 1.0),
         ),
         crate::EnemyArchetype::Runner => (
-            PickupKind::Soul,
+            false,
             2,
             (0.55, 0.80, 1.0),
             LinearRgba::new(0.45, 0.85, 1.6, 1.0),
@@ -385,8 +327,9 @@ pub fn obs_roguelite_enemy_death(
 
     let base_y = 0.85;
     let pos = xf.translation.with_y(base_y);
-    let core_radius = if kind == PickupKind::Heart { 0.35 } else { 0.28 };
-    let halo_radius = if kind == PickupKind::Heart { 0.70 } else { 0.55 };
+    // TODO(story-471..479): PickupKind supprimé — is_heart bool remplace kind == PickupKind::Heart
+    let core_radius = if is_heart { 0.35 } else { 0.28 };
+    let halo_radius = if is_heart { 0.70 } else { 0.55 };
 
     let core_mat = materials.add(StandardMaterial {
         base_color: Color::srgba(color.0, color.1, color.2, 1.0),
@@ -406,7 +349,8 @@ pub fn obs_roguelite_enemy_death(
     let core_mesh = meshes.add(Sphere::new(core_radius));
     let halo_mesh = meshes.add(Sphere::new(halo_radius));
 
-    let label = if kind == PickupKind::Heart {
+    // TODO(story-471..479): PickupKind + PickupAnimState supprimés de forgia_loot_tables
+    let label = if is_heart {
         format!("RoguelitePickup_heart{value}")
     } else {
         format!("RoguelitePickup_{value}souls")
@@ -417,17 +361,12 @@ pub fn obs_roguelite_enemy_death(
             RogueliteRunMarker,
             DespawnOnExit(GameMode::Roguelite),
             Pickup {
-                kind,
                 value,
                 lifetime_secs: 30.0,
                 collect_radius: 2.5,
                 ..default()
             },
-            PickupAnimState {
-                phase: 0.0,
-                velocity: Vec3::ZERO,
-                base_y,
-            },
+            // PickupAnimState supprimé — disabled
             Mesh3d(core_mesh),
             MeshMaterial3d(core_mat),
             Transform::from_translation(pos),
@@ -495,28 +434,20 @@ pub fn sys_start_run(
         });
         commands.insert_resource(graph.clone());
 
-        // Spawn stage 0 (toujours Combat par forced_kind_for_depth — voir
-        // forgia_stage_graph::forced_kind_for_depth).
-        if let Some(node) = crate::waves::current_stage_node(&graph, 0, 0) {
-            let composition = crate::waves::composition_for_stage(node);
-            crate::waves::spawn_stage_enemies(
+        // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
+        // current_stage_node / composition_for_stage / spawn_stage_enemies supprimés de crate::waves.
+        // wave.current_stage_depth / wave.current_stage_kind supprimés de RogueliteWave.
+        // Fallback : spawn wave 1 directement via spawn_wave_enemies.
+        {
+            let _ = &graph; // graph utilisé pour total_stages + boss_depth ci-dessus
+            let spawned = crate::waves::spawn_wave_enemies(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
-                &composition,
-                0,
+                1, // wave 1
             );
-            wave.current_stage_depth = 0;
-            wave.current_stage_kind = Some(node.kind);
-            // RunState : Boss si total_stages == 1 (cas dégénéré), sinon InRun.
-            next.set(if node.kind == forgia_stage_graph::StageKind::Boss {
-                RunState::Boss { stage: 0 }
-            } else {
-                RunState::InRun { stage: 0 }
-            });
-        } else {
-            warn!("[roguelite] RunGraph vide ? Fallback Lobby");
-            next.set(RunState::Lobby);
+            info!("[roguelite] sys_start_run fallback — wave 1 spawned {spawned} enemies");
+            next.set(RunState::InRun { stage: 0 });
         }
         info!(
             "[roguelite] Run started — seed={seed} total_stages={total_stages} boss_depth={boss_depth}"
