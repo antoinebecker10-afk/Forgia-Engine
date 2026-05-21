@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn lizard_mock_detects_tail_positive_z() {
-        // Régression 2026-05-18 AM (sensor forgia_auto_rig.json) : Meshy Rex
+        // Régression 2026-05-18 AM (sensor forgia2_auto_rig.json) : Meshy Rex
         // a sa queue en direction +Z (orientation glb variable) alors que
         // l'ancien code ne scannait que min_z (-Z direction). Faux négatif
         // has_tail=false sur un mesh ayant clairement une queue.

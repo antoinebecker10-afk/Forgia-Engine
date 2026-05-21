@@ -252,7 +252,7 @@ pub fn inject_skinning_for_rigged_meshes(
             // Story-482 P3+ — Diagnostic sensor : compte la distribution des
             // poids par bone pour exposer le bug "vertices arm assignés à
             // chest" (bone segment vs bone head distance). Écrit
-            // forgia_skinning_weights.json côte à côte de l'injection.
+            // forgia2_skinning_weights.json côte à côte de l'injection.
             write_skinning_weights_sensor(
                 &bones,
                 &q_names,

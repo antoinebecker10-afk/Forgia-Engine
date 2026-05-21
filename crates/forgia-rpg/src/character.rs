@@ -27,12 +27,14 @@ use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
+#[allow(unused_imports)] // LocomotionTarget/Template gardés pour réactivation future (cf spawn_rex_character)
 use forgia_anim_locomotion::{
     LocomotionBoneCache, LocomotionState, LocomotionTarget, LocomotionTemplate, ProcBodyAnim,
     AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_BREATH_AMP, IDLE_BREATH_FREQ,
     IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP,
     WALK_BOB_AMP, WALK_FREQ,
 };
+#[allow(unused_imports)] // SkeletonTemplateId gardé pour réactivation future
 use forgia_skeleton_template::SkeletonTemplateId;
 use forgia_auto_rig::{AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
@@ -134,19 +136,31 @@ pub(crate) fn spawn_rex_character(
             commands.entity(player_entity).with_children(|parent| {
                 parent.spawn((
                     RexCharacter,
-                    LocomotionTarget,
                     SceneRoot(asset_server.load("models/characters/Rex.glb#Scene0")),
                     Transform::from_xyz(0.0, -0.85, 0.0)
                         .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
                     NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
-                    LocomotionBoneCache::default(),
-                    ProcBodyAnim::default(),
-                    // Story-482 P2b : pas de StanceOffsets hardcodé.
-                    // LocomotionTemplate(Humanoid) → apply_stance_offsets_from_template
-                    // lit SkeletonTemplate.stance_offsets depuis le TOML asset
-                    // et insère StanceOffsets Component automatiquement.
-                    // Hot-reload via Shift+F12 supporté nativement.
-                    LocomotionTemplate(SkeletonTemplateId::Humanoid),
+                    // ── 2026-05-21 — Anim pipeline DESACTIVÉ sur Rex (baseline) ──
+                    // Cause : le pipeline (StanceOffsets arm_L/R Z=±90° + proc_walk
+                    // gait swing) assume une bind pose T-pose horizontale. Le mesh
+                    // Rex.glb actuel (= clone Kael, MD5 195ca37c…) est en bind
+                    // pose arms-down/squat. Composer stance T-pose sur un mesh
+                    // arms-down casse visuellement (cf screenshots 2026-05-21 PM
+                    // + reference_arm_rest_z_rad_t_pose_assumption.md).
+                    //
+                    // Preuve baseline : le lineup (spawn_character_lineup) utilise
+                    // le MÊME template Humanoid SANS ces components → rend propre.
+                    //
+                    // Reactivation conditionnée à story future : capturer bind_rot
+                    // à cache.ready time et composer `tf.rot = bind * stance *
+                    // swing` au lieu de `identity * stance * swing`. Plan en 8
+                    // phases : Phase A (sensors V2, ✅), B (doc pipeline), C1-C8
+                    // (witness per stage), D (HumanoidBlocks baseline propre).
+                    //
+                    // LocomotionTarget,
+                    // LocomotionBoneCache::default(),
+                    // ProcBodyAnim::default(),
+                    // LocomotionTemplate(SkeletonTemplateId::Humanoid),
                 ));
             });
         }

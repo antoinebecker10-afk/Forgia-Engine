@@ -51,7 +51,7 @@ pub mod prelude {
 
 // ── Sensor / observability ──────────────────────────────────────────────────
 
-/// Intervalle d'écriture `forgia_auto_rig.json` (secondes).
+/// Intervalle d'écriture `forgia2_auto_rig.json` (secondes).
 pub const SENSOR_INTERVAL_S: f32 = 1.0;
 /// Seuil au-delà duquel un mesh "pending" depuis trop longtemps déclenche
 /// l'alerte health (= GLB jamais loaded ou AABB jamais calculable).
@@ -184,11 +184,11 @@ fn diagnose_interpretation(s: &AutoRigStats) -> String {
     }
 }
 
-const SENSOR_JSON_PATH: &str = "forgia_auto_rig.json";
-const SENSOR_HEALTH_PATH: &str = "forgia_auto_rig_health.json";
+const SENSOR_JSON_PATH: &str = "forgia2_auto_rig.json";
+const SENSOR_HEALTH_PATH: &str = "forgia2_auto_rig_health.json";
 
-/// Écrit `forgia_auto_rig.json` toutes les `SENSOR_INTERVAL_S`. Émet
-/// `forgia_auto_rig_health.json` (severity warning) si un mesh reste `pending`
+/// Écrit `forgia2_auto_rig.json` toutes les `SENSOR_INTERVAL_S`. Émet
+/// `forgia2_auto_rig_health.json` (severity warning) si un mesh reste `pending`
 /// plus de `PENDING_STALE_THRESHOLD_S` (= GLB jamais loaded / AABB jamais
 /// calculable). Convention V1 : fichier health absent = OK.
 pub fn write_auto_rig_sensor(
@@ -222,10 +222,14 @@ pub fn write_auto_rig_sensor(
     }
     timer.accum_s = 0.0;
 
-    let severity = if pending_age_s > PENDING_STALE_THRESHOLD_S {
-        "warning"
+    let (severity, state_str, next_step) = if pending_age_s > PENDING_STALE_THRESHOLD_S {
+        ("warn", "stale_pending", "Mesh(es) coincés en pending — AABB jamais computed (GLB load échoué ou pas d'Aabb component)")
+    } else if pending_count > 0 {
+        ("ok", "pending_in_progress", "")
+    } else if rigged_count > 0 {
+        ("ok", "rigged", "")
     } else {
-        "ok"
+        ("ok", "no_target", "Aucune entité NeedsAutoRig — pipeline en attente (mode RPG pas entré ?)")
     };
     let last_template_str = stats
         .last_template
@@ -252,6 +256,10 @@ pub fn write_auto_rig_sensor(
 
     let json = format!(
         r#"{{
+  "id": "auto_rig",
+  "severity": "{}",
+  "next_step": "{}",
+  "state": "{}",
   "timestamp_secs": {:.1},
   "rigged_count": {},
   "pending_count": {},
@@ -290,6 +298,9 @@ pub fn write_auto_rig_sensor(
   }},
   "severity": "{}"
 }}"#,
+        severity,
+        next_step,
+        state_str,
         now,
         rigged_count,
         pending_count,
@@ -338,7 +349,7 @@ pub fn write_auto_rig_sensor(
   "timestamp_secs": {:.1},
   "severity": "{}",
   "message": "{} mesh(es) pending auto-rig since {:.1}s — AABB likely never computed (GLB load failure / mesh has no Aabb component)",
-  "next_step": "Read forgia_auto_rig.json then inspect the SceneRoot of pending entities — check that GLB instantiated children with Aabb component (cargo run + log filter '[forgia-auto-rig]')"
+  "next_step": "Read forgia2_auto_rig.json then inspect the SceneRoot of pending entities — check that GLB instantiated children with Aabb component (cargo run + log filter '[forgia-auto-rig]')"
 }}"#,
             now, severity, pending_count, pending_age_s,
         );

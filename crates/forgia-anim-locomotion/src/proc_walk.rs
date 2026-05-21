@@ -203,7 +203,7 @@ pub fn tail_segment_yaw(idx: usize, n: usize, pelvic_yaw: f32) -> f32 {
 // ── Helpers debug / sensor export ───────────────────────────────────────────
 
 /// Snapshot des angles clés pour export sensor JSON. Caller passe ça à
-/// `forgia-anim-debug` ou directement à `forgia_auto_rig.json` enrichi.
+/// `forgia-anim-debug` ou directement à `forgia2_auto_rig.json` enrichi.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WalkPoseSnapshot {
     pub gait_phase: f32,

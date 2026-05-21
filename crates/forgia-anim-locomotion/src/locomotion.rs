@@ -165,7 +165,7 @@ pub struct ArticulatedBones {
 /// Compteur d'entrées dans `GameMode::Rpg`. Incrémenté `OnEnter(Rpg)` par le
 /// consumer (forgia-rpg) via [`increment_rpg_entry_count`]. Utilisé par les
 /// sensors anim pour produire des fichiers indexés par cycle
-/// (`forgia_rex_bones_entry_{N}_bind.json` et `..._live.json`), permettant
+/// (`forgia2_rex_bones_entry_{N}_bind.json` et `..._live.json`), permettant
 /// de diff la signature des bones entre cycles successifs (diagnostic
 /// state leak hand_l/r — WIP story-482 2026-05-20).
 #[derive(Resource, Default, Debug, Clone, Copy)]
@@ -176,7 +176,7 @@ pub struct RpgEntryCount(pub u32);
 pub fn increment_rpg_entry_count(mut count: ResMut<RpgEntryCount>) {
     count.0 = count.0.saturating_add(1);
     info!(
-        "[anim-locomotion] RPG entry #{} — sensors will write forgia_rex_bones_entry_{}_*.json",
+        "[anim-locomotion] RPG entry #{} — sensors will write forgia2_rex_bones_entry_{}_*.json",
         count.0, count.0
     );
 }
@@ -346,7 +346,7 @@ pub fn attach_locomotion_bones(
 
             // Story-482 fix 2026-05-20 : Pinocchio output spawne les bones à
             // plat (sibling under Armature root), donc first_child(leg) renvoie
-            // None. Le sensor forgia_skinning_weights.json confirme que les
+            // None. Le sensor forgia2_skinning_weights.json confirme que les
             // bones shin/foot/forearm/hand EXISTENT (1018-1458 verts primary).
             // Fix : BFS descendants de rex_entity + Name lookup.
             let mut name_to_entity: std::collections::HashMap<String, Entity> =
@@ -468,11 +468,11 @@ pub fn attach_locomotion_bones(
                 fmt_bone(&bones.spine, None),
                 fmt_bone(&bones.hip, None),
             );
-            if let Err(e) = std::fs::write("forgia_rex_bones.json", &json) {
-                warn!("[anim-locomotion] Failed to write forgia_rex_bones.json: {e}");
+            if let Err(e) = std::fs::write("forgia2_rex_bones.json", &json) {
+                warn!("[anim-locomotion] Failed to write forgia2_rex_bones.json: {e}");
             }
             // Indexed per-cycle sensor — persists across RPG re-entries.
-            let indexed_path = format!("forgia_rex_bones_entry_{}_bind.json", entry_idx);
+            let indexed_path = format!("forgia2_rex_bones_entry_{}_bind.json", entry_idx);
             if let Err(e) = std::fs::write(&indexed_path, &json) {
                 warn!("[anim-locomotion] Failed to write {indexed_path}: {e}");
             } else {
@@ -760,7 +760,7 @@ pub fn apply_stance_offsets_from_template(
 
 // ── Sensors ─────────────────────────────────────────────────────────────────
 
-const REX_BONES_LIVE_SENSOR_PATH: &str = "forgia_rex_bones_live.json";
+const REX_BONES_LIVE_SENSOR_PATH: &str = "forgia2_rex_bones_live.json";
 const REX_BONES_LIVE_INTERVAL_S: f32 = 0.1;
 
 #[derive(Resource, Default)]
@@ -782,10 +782,39 @@ pub fn write_rex_bones_live_sensor(
     }
     timer.accum_s = 0.0;
 
-    let Ok(cache) = q_cache.single() else { return };
-    if !cache.ready {
+    // Phase A.2 (story-anim-pipeline-observability) — unconditional write :
+    // au lieu d'un early-return silencieux, écrire un payload explicite avec
+    // `state` + `severity` + `next_step` pour rester visible au sensor_health.
+    let cache_opt = q_cache.iter().next();
+    let (state_str, severity, next_step, ready, frames_waited, gave_up) = match cache_opt {
+        None => (
+            "no_locomotion_target",
+            "warn",
+            "Aucune entité avec LocomotionTarget — vérifier spawn_rex_character (mode RPG entré ?)",
+            false, 0u32, false,
+        ),
+        Some(c) if c.gave_up => (
+            "gave_up", "warn",
+            "LocomotionBoneCache a abandonné le BFS bones (GIVEUP_FRAMES dépassé). Pinocchio bones absents.",
+            c.ready, c.frames_waited, true,
+        ),
+        Some(c) if !c.ready => (
+            "cache_pending", "warn",
+            "LocomotionBoneCache.ready=false — attente BFS bones depuis Pinocchio spawn (frames_waited compte).",
+            false, c.frames_waited, false,
+        ),
+        Some(c) => ("ok", "ok", "", true, c.frames_waited, false),
+    };
+    if !ready {
+        let entry_idx = entry_count.0;
+        let payload = format!(
+            "{{\n  \"id\":\"rex_bones_live\",\n  \"severity\":\"{}\",\n  \"next_step\":\"{}\",\n  \"timestamp_secs\":{:.4},\n  \"entry_index\":{},\n  \"state\":\"{}\",\n  \"cache_ready\":{},\n  \"frames_waited\":{},\n  \"gave_up\":{}\n}}\n",
+            severity, next_step, time.elapsed_secs(), entry_idx, state_str, ready, frames_waited, gave_up
+        );
+        let _ = std::fs::write(REX_BONES_LIVE_SENSOR_PATH, &payload);
         return;
     }
+    let cache = cache_opt.unwrap();
     let b = &cache.bones;
 
     let fmt = |label: &str, bone: &BonePose| -> String {
@@ -811,7 +840,7 @@ pub fn write_rex_bones_live_sensor(
 
     let entry_idx = entry_count.0;
     let json = format!(
-        "{{\n  \"timestamp_secs\": {:.4},\n  \"entry_index\": {},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
+        "{{\n  \"id\":\"rex_bones_live\",\n  \"severity\":\"ok\",\n  \"next_step\":\"\",\n  \"state\":\"ok\",\n  \"timestamp_secs\": {:.4},\n  \"entry_index\": {},\n  \"stance_source\": \"StanceOffsets Component (P2)\",\n  \"current_rotations\": {{\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{},\n{}\n  }}\n}}\n",
         time.elapsed_secs(),
         entry_idx,
         fmt("left_arm", &b.left_arm),
@@ -831,11 +860,11 @@ pub fn write_rex_bones_live_sensor(
     // Indexed per-cycle live snapshot — écrasé à chaque tick mais le path
     // change quand RpgEntryCount incrémente, donc entry_1_live.json reste
     // figé sur le dernier tick du cycle 1 quand on entre dans le cycle 2.
-    let indexed_path = format!("forgia_rex_bones_entry_{}_live.json", entry_idx);
+    let indexed_path = format!("forgia2_rex_bones_entry_{}_live.json", entry_idx);
     let _ = std::fs::write(&indexed_path, json);
 }
 
-const WALK_POSE_SENSOR_PATH: &str = "forgia_walk_pose.json";
+const WALK_POSE_SENSOR_PATH: &str = "forgia2_walk_pose.json";
 const WALK_POSE_SENSOR_INTERVAL_S: f32 = 0.5;
 
 #[derive(Resource, Default)]
@@ -856,6 +885,12 @@ pub fn write_walk_pose_sensor(
     timer.accum_s = 0.0;
 
     let Ok(state) = q_state.single() else {
+        // Phase A.2 unconditional : pas de LocomotionState → mode RPG pas entré.
+        let payload = format!(
+            "{{\n  \"id\":\"walk_pose\",\n  \"severity\":\"warn\",\n  \"next_step\":\"LocomotionState absent — entrer en GameMode::Rpg pour activer locomotion\",\n  \"state\":\"no_locomotion_state\",\n  \"timestamp_secs\":{:.1}\n}}\n",
+            time.elapsed_secs()
+        );
+        let _ = std::fs::write(WALK_POSE_SENSOR_PATH, payload);
         return;
     };
 
@@ -874,6 +909,10 @@ pub fn write_walk_pose_sensor(
 
     let json = format!(
         r#"{{
+  "id": "walk_pose",
+  "severity": "ok",
+  "next_step": "",
+  "state": "ok",
   "timestamp_secs": {:.1},
   "is_moving": {},
   "speed_m_s": {:.3},

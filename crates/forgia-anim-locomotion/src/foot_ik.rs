@@ -131,7 +131,7 @@ pub fn foot_ik_system(
             warn!(
                 "[foot-ik] Bones chain incomplete (L_complete={l_complete}, R_complete={r_complete}). \
                  Foot IK skipped until Pinocchio output provides hip + thigh + shin + foot. \
-                 Voir forgia_foot_ik.json sensor."
+                 Voir forgia2_foot_ik.json sensor."
             );
             state.bones_missing_warned = true;
         }
@@ -257,8 +257,19 @@ pub fn write_foot_ik_sensor(
     }
     timer.accum_s = 0.0;
 
+    let (severity, next_step, state_str) = if stats.bones_missing {
+        ("warn", "bones_missing=true — chaîne hip+thigh+shin+foot incomplète depuis Pinocchio. Voir forgia2_auto_rig.json + forgia2_rex_bones_live.json", "bones_missing")
+    } else if stats.ticks_total == 0 {
+        ("warn", "ticks_total=0 — foot_ik_system n'a jamais tourné (RPG pas entré ?)", "never_ticked")
+    } else {
+        ("ok", "", "ok")
+    };
     let json = format!(
         r#"{{
+  "id": "foot_ik",
+  "severity": "{}",
+  "next_step": "{}",
+  "state": "{}",
   "timestamp_secs": {:.2},
   "config": {{
     "enabled": {},
@@ -283,6 +294,9 @@ pub fn write_foot_ik_sensor(
   }},
   "blocker_note": "Si bones_missing=true, Pinocchio ne produit que 1 bone par jambe (thigh). Chaîne 3-segments hip+thigh+shin+foot requise pour foot IK 2-bone."
 }}"#,
+        severity,
+        next_step,
+        state_str,
         time.elapsed_secs(),
         config.enabled,
         config.raycast_down_dist,
