@@ -6,10 +6,15 @@
 //!
 //! Pattern :
 //! - `AnchorPoint` Component porte `kind: AnchorKind` + `slot_index: u32`
-//! - `AnchorKind` enum à 6 variantes : `PlayerSpawn`, `PoiSlot`, `Landmark`,
-//!   `BossPad`, `Teleporter`, `LootZone`
+//! - `AnchorKind` enum à 11 variantes : `PlayerSpawn`, `PoiSlot`, `Landmark`,
+//!   `BossPad`, `Teleporter`, `LootZone` (story-483, indices [0..6) stables),
+//!   `CoverLow`, `CoverHigh`, `SniperPerch`, `MeleePit`, `FlankRoute` (story-485)
 //! - Helpers déterministes pour placement (`layout_circle`, `layout_grid`)
 //! - Sensor `forgia2_anchor.json` 1Hz expose counts par kind + severity/next_step
+//!
+//! **Invariant rétro-compat (story-485)** : indices [0..6) jamais renumérotés.
+//! Variants ajoutés en fin d'enum, indices [6..11) sont les nouveaux cover/lane
+//! types. Sensor JSON nouveaux champs additifs uniquement.
 //!
 //! Sources convention pattern :
 //! - Unreal Engine `ActorSpawn` markers + Anchor sockets
@@ -27,8 +32,12 @@ const SENSOR_WRITE_PERIOD_SEC: f64 = 1.0;
 
 // ─── AnchorKind ─────────────────────────────────────────────────────────────
 
-/// Type d'anchor. 6 variantes couvrent l'usage cross-mode V7 ; extension future
-/// via variante `Custom(SmolStr)` envisageable au besoin (post-V7).
+/// Type d'anchor. 11 variantes couvrent l'usage cross-mode V7 :
+/// - [0..6) : story-483 baseline (spawn/POI/decor/boss/teleporter/loot)
+/// - [6..11) : story-485 arena spatial identity (cover/lane structure)
+///
+/// **Indices [0..6) jamais renumérotés** — sensor JSON et downstream tooling
+/// (consumers `forgia-stage-arena`, `forgia-mode-roguelite`) s'y fient.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AnchorKind {
@@ -44,10 +53,20 @@ pub enum AnchorKind {
     Teleporter,
     /// Loot drop magnet radius center. N par stage.
     LootZone,
+    /// Cover bas 1.0–1.25 m (Uncharted 4 standard). Crouch behind, peek over.
+    CoverLow,
+    /// Cover haut ≥ 1.75 m. Full body conceal, blocks ranged sight-line.
+    CoverHigh,
+    /// Overlook perch ~6 m verticality (Resistance pattern). Sniper vantage point.
+    SniperPerch,
+    /// Close-quarter brawl zone (cramped, low cover). Favors Tank/melee archetype.
+    MeleePit,
+    /// Flank path waypoint (AI navigation hint). Pas de mesh — pur AI marker.
+    FlankRoute,
 }
 
 impl AnchorKind {
-    /// Index stable [0..6) pour AtomicU32 array. Ne **jamais renuméroter** —
+    /// Index stable [0..11) pour AtomicU32 array. Ne **jamais renuméroter** —
     /// indice persisté dans sensor JSON, downstream tooling peut s'y fier.
     pub const fn index(self) -> usize {
         match self {
@@ -57,10 +76,15 @@ impl AnchorKind {
             AnchorKind::BossPad => 3,
             AnchorKind::Teleporter => 4,
             AnchorKind::LootZone => 5,
+            AnchorKind::CoverLow => 6,
+            AnchorKind::CoverHigh => 7,
+            AnchorKind::SniperPerch => 8,
+            AnchorKind::MeleePit => 9,
+            AnchorKind::FlankRoute => 10,
         }
     }
 
-    pub const fn all() -> [AnchorKind; 6] {
+    pub const fn all() -> [AnchorKind; 11] {
         [
             AnchorKind::PlayerSpawn,
             AnchorKind::PoiSlot,
@@ -68,6 +92,11 @@ impl AnchorKind {
             AnchorKind::BossPad,
             AnchorKind::Teleporter,
             AnchorKind::LootZone,
+            AnchorKind::CoverLow,
+            AnchorKind::CoverHigh,
+            AnchorKind::SniperPerch,
+            AnchorKind::MeleePit,
+            AnchorKind::FlankRoute,
         ]
     }
 
@@ -79,6 +108,11 @@ impl AnchorKind {
             AnchorKind::BossPad => "boss_pad",
             AnchorKind::Teleporter => "teleporter",
             AnchorKind::LootZone => "loot_zone",
+            AnchorKind::CoverLow => "cover_low",
+            AnchorKind::CoverHigh => "cover_high",
+            AnchorKind::SniperPerch => "sniper_perch",
+            AnchorKind::MeleePit => "melee_pit",
+            AnchorKind::FlankRoute => "flank_route",
         }
     }
 }
@@ -154,7 +188,7 @@ pub fn layout_grid(rows: u32, cols: u32, spacing_m: f32, center: Vec3) -> Vec<Ve
 /// `reset_anchor_stats` on OnExit(GameMode::Roguelite) (caller responsibility).
 #[derive(Resource, Default)]
 pub struct AnchorStats {
-    counts: [AtomicU32; 6],
+    counts: [AtomicU32; 11],
 }
 
 impl AnchorStats {
@@ -215,6 +249,12 @@ struct AnchorCountsJson {
     boss_pad: u32,
     teleporter: u32,
     loot_zone: u32,
+    // story-485 — additif uniquement (downstream JSON consumers default to 0)
+    cover_low: u32,
+    cover_high: u32,
+    sniper_perch: u32,
+    melee_pit: u32,
+    flank_route: u32,
 }
 
 fn write_anchor_sensor(stats: Res<AnchorStats>, mut last_write: Local<f64>) {
@@ -235,6 +275,11 @@ fn write_anchor_sensor(stats: Res<AnchorStats>, mut last_write: Local<f64>) {
         boss_pad: stats.count(AnchorKind::BossPad),
         teleporter: stats.count(AnchorKind::Teleporter),
         loot_zone: stats.count(AnchorKind::LootZone),
+        cover_low: stats.count(AnchorKind::CoverLow),
+        cover_high: stats.count(AnchorKind::CoverHigh),
+        sniper_perch: stats.count(AnchorKind::SniperPerch),
+        melee_pit: stats.count(AnchorKind::MeleePit),
+        flank_route: stats.count(AnchorKind::FlankRoute),
     };
     let total = stats.total();
     let severity = severity_for_anchors(total, counts.player_spawn);
@@ -286,7 +331,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn anchor_kind_index_stable() {
+    fn anchor_kind_index_stability_legacy_indices() {
+        // story-483 baseline — indices [0..6) JAMAIS renumérotés, lock invariant
         assert_eq!(AnchorKind::PlayerSpawn.index(), 0);
         assert_eq!(AnchorKind::PoiSlot.index(), 1);
         assert_eq!(AnchorKind::Landmark.index(), 2);
@@ -296,10 +342,20 @@ mod tests {
     }
 
     #[test]
-    fn anchor_kind_all_covers_6_variants() {
-        assert_eq!(AnchorKind::all().len(), 6);
+    fn anchor_kind_index_story_485_new_variants() {
+        // story-485 — indices [6..11) cover/lane structure
+        assert_eq!(AnchorKind::CoverLow.index(), 6);
+        assert_eq!(AnchorKind::CoverHigh.index(), 7);
+        assert_eq!(AnchorKind::SniperPerch.index(), 8);
+        assert_eq!(AnchorKind::MeleePit.index(), 9);
+        assert_eq!(AnchorKind::FlankRoute.index(), 10);
+    }
+
+    #[test]
+    fn anchor_kind_all_covers_11_variants() {
+        assert_eq!(AnchorKind::all().len(), 11);
         // Tous distincts
-        let mut seen = [false; 6];
+        let mut seen = [false; 11];
         for k in AnchorKind::all() {
             seen[k.index()] = true;
         }
@@ -311,6 +367,29 @@ mod tests {
         assert_eq!(AnchorKind::PlayerSpawn.as_str(), "player_spawn");
         assert_eq!(AnchorKind::BossPad.as_str(), "boss_pad");
         assert_eq!(AnchorKind::LootZone.as_str(), "loot_zone");
+        // story-485
+        assert_eq!(AnchorKind::CoverLow.as_str(), "cover_low");
+        assert_eq!(AnchorKind::CoverHigh.as_str(), "cover_high");
+        assert_eq!(AnchorKind::SniperPerch.as_str(), "sniper_perch");
+        assert_eq!(AnchorKind::MeleePit.as_str(), "melee_pit");
+        assert_eq!(AnchorKind::FlankRoute.as_str(), "flank_route");
+    }
+
+    #[test]
+    fn anchor_stats_new_kinds_recordable() {
+        let s = AnchorStats::default();
+        s.record(AnchorKind::CoverLow);
+        s.record(AnchorKind::CoverLow);
+        s.record(AnchorKind::CoverHigh);
+        s.record(AnchorKind::SniperPerch);
+        s.record(AnchorKind::MeleePit);
+        s.record(AnchorKind::FlankRoute);
+        assert_eq!(s.count(AnchorKind::CoverLow), 2);
+        assert_eq!(s.count(AnchorKind::CoverHigh), 1);
+        assert_eq!(s.count(AnchorKind::SniperPerch), 1);
+        assert_eq!(s.count(AnchorKind::MeleePit), 1);
+        assert_eq!(s.count(AnchorKind::FlankRoute), 1);
+        assert_eq!(s.total(), 6);
     }
 
     #[test]
