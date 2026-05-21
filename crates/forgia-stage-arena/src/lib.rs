@@ -31,12 +31,16 @@
 //! - Forgia memory `[[reference-pattern-genome-driven-plugin-with-sensor]]`.
 
 pub mod layout;
+pub mod layout_sensor;
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_anchor::{AnchorKind, AnchorPoint, AnchorStats};
 use forgia_genome_core::{Genome, GenomeLoader};
-use forgia_level_presets::ModulePaletteEntry;
+use forgia_level_presets::{
+    LevelModulesGenome, LevelModulesHandles, ModulePaletteEntry,
+};
 use forgia_prefab::{spawn_gltf_prefab, PrefabSpawn, PrefabStats};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -244,6 +248,35 @@ pub struct StageGenomeHandles {
 // propre `LevelModulesHandles` Resource. Phase 5 read directement via
 // `Res<LevelModulesHandles>` + `Res<Assets<Genome<LevelModulesGenome>>>`.
 
+// ─── LayoutResult Resource (story-485 phase 5) ──────────────────────────────
+
+/// État runtime du dernier placement de modules. Mis à jour par
+/// `spawn_stage_arena_on_request` quand un stage devient Ready.
+/// Consommé par `layout_sensor::write_layout_sensor` pour
+/// `forgia2_stage_layout.json`.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct LayoutResult {
+    pub stage_id: String,
+    pub placements: Vec<layout::ModulePlacement>,
+    pub longest_sightline_m: f32,
+    pub min_cover_spacing_m: f32,
+    /// Combien d'instances de la palette n'ont pas pu être placées (dart-throw
+    /// exhausted ou id inconnu). Si élevé → palette trop dense ou TOML cassé.
+    pub instances_skipped: u32,
+    pub module_palette_used: Vec<String>,
+}
+
+// ─── LayoutParams SystemParam bundle (évite limite Bevy 16 params) ──────────
+
+/// Bundle des ressources liées à la layout palette. Évite le system param
+/// overflow dans `spawn_stage_arena_on_request` (limite Bevy 0.18 = 16).
+#[derive(SystemParam)]
+pub struct LayoutParams<'w> {
+    pub handles: Res<'w, LevelModulesHandles>,
+    pub assets: Res<'w, Assets<Genome<LevelModulesGenome>>>,
+    pub result: ResMut<'w, LayoutResult>,
+}
+
 // ─── Marker Component ───────────────────────────────────────────────────────
 
 /// Marker — toute entité spawnée par stage-arena la porte. Cleanup via
@@ -279,6 +312,7 @@ impl Plugin for ForgiaStageArenaPlugin {
             .init_resource::<StageLoadResult>()
             .init_resource::<StageGenomeHandles>()
             .init_resource::<StageArenaTuning>()
+            .init_resource::<LayoutResult>()
             .add_systems(Startup, load_stage_genomes)
             // L7 SystemSets — stage-arena is **mode-agnostic by design** : il sera
             // consommé par forgia-mode-roguelite (V1), forgia-mode-fps-arena (M4),
@@ -294,6 +328,11 @@ impl Plugin for ForgiaStageArenaPlugin {
             .add_systems(
                 Update,
                 write_stage_sensor.in_set(forgia_core::prelude::GameSet::Sensors),
+            )
+            .add_systems(
+                Update,
+                layout_sensor::write_layout_sensor
+                    .in_set(forgia_core::prelude::GameSet::Sensors),
             );
         info!(
             "[forgia-stage-arena] Plugin loaded — genome paths: {} + {}",
@@ -651,6 +690,7 @@ fn spawn_stage_arena_on_request(
     prefab_stats: Res<PrefabStats>,
     q_existing: Query<Entity, With<StageArenaMarker>>,
     mut last_processed_id: Local<String>,
+    mut layout_params: LayoutParams,
 ) {
     let Some(req) = request else {
         return;
@@ -841,6 +881,92 @@ fn spawn_stage_arena_on_request(
             props_spawned += 1;
         }
     }
+
+    // 5.5 — Module placements (story-485 phase 5).
+    // Place les modules de la palette du stage (cover/lanes/perch/pit) via
+    // `layout::place_modules` (pur, déterministe via req.seed). Spawn prefab GLB
+    // + AnchorPoint companion + record stats.
+    let player_pos = Vec3::ZERO;
+    let boss_pos = if stage_def.boss_pad_required {
+        Some(Vec3::new(0.0, 0.0, -extent * 0.7))
+    } else {
+        None
+    };
+    let modules_genome_opt = layout_params.assets.get(&layout_params.handles.modules);
+    let mut layout_placements: Vec<layout::ModulePlacement> = Vec::new();
+    let mut instances_skipped: u32 = 0;
+    let mut palette_used: Vec<String> = Vec::new();
+    if let Some(modules_genome) = modules_genome_opt {
+        let expected_total: u32 = stage_def.module_palette.iter().map(|e| e.count).sum();
+        layout_placements = layout::place_modules(
+            extent,
+            &modules_genome.data.modules,
+            &stage_def.module_palette,
+            player_pos,
+            boss_pos,
+            req.seed,
+        );
+        instances_skipped = expected_total.saturating_sub(layout_placements.len() as u32);
+        palette_used = stage_def
+            .module_palette
+            .iter()
+            .filter(|e| e.count > 0)
+            .map(|e| e.id.clone())
+            .collect();
+
+        for (idx, placement) in layout_placements.iter().enumerate() {
+            let def = match modules_genome.data.modules.get(&placement.module_id) {
+                Some(d) => d,
+                None => continue,
+            };
+            let prop = match def.prop_palette.get(placement.prop_index) {
+                Some(p) => p,
+                None => continue,
+            };
+            let spawn = PrefabSpawn::new(&prop.prefab, placement.position)
+                .with_name(format!("Module_{}_{idx}", placement.module_id));
+            let _e = spawn_gltf_prefab(
+                &mut commands,
+                &asset_server,
+                &prefab_stats,
+                spawn,
+                (StageArenaMarker,),
+            );
+            commands.spawn((
+                Name::new(format!("StageModuleAnchor_{}_{idx}", placement.module_id)),
+                StageArenaMarker,
+                AnchorPoint::new(placement.anchor_kind, idx as u32),
+                Transform::from_translation(placement.position),
+                GlobalTransform::default(),
+            ));
+            anchor_stats.record(placement.anchor_kind);
+            props_spawned += 1;
+        }
+        info!(
+            "[stage-arena] Modules placed: {}/{} (skipped={}) palette={:?}",
+            layout_placements.len(),
+            expected_total,
+            instances_skipped,
+            palette_used
+        );
+    } else if !stage_def.module_palette.is_empty() {
+        warn!(
+            "[stage-arena] Stage '{}' has module_palette but LevelModulesGenome not yet loaded — skipping module placement this frame",
+            req.stage_id
+        );
+    }
+
+    // Compute layout metrics and store in LayoutResult Resource (consommé par
+    // layout_sensor::write_layout_sensor).
+    let longest_sightline_m =
+        layout::longest_unbroken_sightline_m(player_pos, boss_pos, &layout_placements);
+    let min_cover_spacing_m = layout::min_cover_low_spacing_m(&layout_placements);
+    layout_params.result.stage_id = req.stage_id.clone();
+    layout_params.result.placements = layout_placements;
+    layout_params.result.longest_sightline_m = longest_sightline_m;
+    layout_params.result.min_cover_spacing_m = min_cover_spacing_m;
+    layout_params.result.instances_skipped = instances_skipped;
+    layout_params.result.module_palette_used = palette_used;
 
     // 6. Sun — directional light biome-tuned later (P2). Default cool sky.
     commands.spawn((

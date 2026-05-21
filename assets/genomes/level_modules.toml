@@ -21,7 +21,7 @@ allowed_biomes = ["Volcanic", "Plains"]
 anchor_kinds_emitted = ["cover_low"]
 
 [[modules.cover_low_cluster.prop_palette]]
-prefab = "models/kaykit/dungeon/crate_small.glb"
+prefab = "models/kaykit/dungeon/crates.glb"
 weight = 0.6
 anchor_kind = "cover_low"
 height_class = "Low"
@@ -44,13 +44,13 @@ allowed_biomes = ["Volcanic"]
 anchor_kinds_emitted = ["cover_high"]
 
 [[modules.cover_high_wall.prop_palette]]
-prefab = "models/kaykit/dungeon/pillar_round.glb"
+prefab = "models/kaykit/dungeon/pillar.glb"
 weight = 0.7
 anchor_kind = "cover_high"
 height_class = "High"
 
 [[modules.cover_high_wall.prop_palette]]
-prefab = "models/kaykit/dungeon/wall_section.glb"
+prefab = "models/kaykit/dungeon/wall.glb"
 weight = 0.3
 anchor_kind = "cover_high"
 height_class = "High"
@@ -67,8 +67,12 @@ footprint_radius_m = 4.0
 allowed_biomes = ["Volcanic", "Plains"]
 anchor_kinds_emitted = ["sniper_perch"]
 
+# TODO story-485b — proxy `pillar_deco.glb` en attendant un vrai asset tower 6m
+# (KayKit Dungeon Pack ne contient pas de section tour walkable native).
+# Le sight-line solver classifie quand même ce module en height_class="Tall"
+# pour casser les LoS, mais visuellement c'est un pilier décoré, pas un perch.
 [[modules.sniper_perch.prop_palette]]
-prefab = "models/kaykit/dungeon/tower_section.glb"
+prefab = "models/kaykit/dungeon/pillar_deco.glb"
 weight = 1.0
 anchor_kind = "sniper_perch"
 height_class = "Tall"
@@ -85,8 +89,11 @@ footprint_radius_m = 6.0
 allowed_biomes = ["Volcanic", "Plains"]
 anchor_kinds_emitted = ["melee_pit"]
 
+# Proxy `rubble.glb` — marqueur visuel ground-level zone brawl. KayKit Dungeon
+# n'a pas de "pit" descendant ; un vrai pit nécessiterait heightmap override
+# story-488 (verticality terrain). En attendant, rubble matérialise la zone.
 [[modules.melee_pit.prop_palette]]
-prefab = "models/kaykit/dungeon/arena_floor_pit.glb"
+prefab = "models/kaykit/dungeon/rubble.glb"
 weight = 1.0
 anchor_kind = "melee_pit"
 height_class = "Low"
