@@ -30,10 +30,13 @@
 //! - Forgia memory `[[reference-loader-request-result-pattern]]` (story-441).
 //! - Forgia memory `[[reference-pattern-genome-driven-plugin-with-sensor]]`.
 
+pub mod layout;
+
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_anchor::{AnchorKind, AnchorPoint, AnchorStats};
 use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_level_presets::ModulePaletteEntry;
 use forgia_prefab::{spawn_gltf_prefab, PrefabSpawn, PrefabStats};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -127,6 +130,11 @@ pub struct StageDef {
     /// default par-kit). Hot-reload Shift+F12 supporté.
     #[serde(default)]
     pub wall_natural_len_m: Option<f32>,
+    /// Palette de modules à placer intra-arena (story-485 phase 3).
+    /// Chaque entry référence un `ModuleDef` de `LevelModulesGenome` par id + count.
+    /// Vide = stage sans cover designed (rétro-compat story-483 baseline).
+    #[serde(default)]
+    pub module_palette: Vec<ModulePaletteEntry>,
 }
 
 /// Smart default par kit basé sur les dimensions natives du pack KayKit.
@@ -231,6 +239,11 @@ pub struct StageGenomeHandles {
     pub pois: Handle<Genome<RoguelitePoisGenome>>,
 }
 
+// Note story-485 phase 3 : `LevelModulesGenome` n'est pas stocké ici. Le
+// `ForgiaLevelPresetsPlugin` (ajouté via `is_plugin_added` guard) gère son
+// propre `LevelModulesHandles` Resource. Phase 5 read directement via
+// `Res<LevelModulesHandles>` + `Res<Assets<Genome<LevelModulesGenome>>>`.
+
 // ─── Marker Component ───────────────────────────────────────────────────────
 
 /// Marker — toute entité spawnée par stage-arena la porte. Cleanup via
@@ -254,6 +267,10 @@ impl Plugin for ForgiaStageArenaPlugin {
         }
         if !app.is_plugin_added::<forgia_prefab::ForgiaPrefabPlugin>() {
             app.add_plugins(forgia_prefab::ForgiaPrefabPlugin);
+        }
+        // Story-485 phase 3 — level modules palette (cover/lane data layer).
+        if !app.is_plugin_added::<forgia_level_presets::ForgiaLevelPresetsPlugin>() {
+            app.add_plugins(forgia_level_presets::ForgiaLevelPresetsPlugin);
         }
         app.init_asset::<Genome<RogueliteStagesGenome>>()
             .register_asset_loader(GenomeLoader::<RogueliteStagesGenome>::default())
@@ -1145,6 +1162,43 @@ mod tests {
         assert!(def.boss_pad_required);
         assert_eq!(def.ramparts_shape, RampartsShape::Hexagonal);
         assert!(def.music_state.is_none());
+    }
+
+    #[test]
+    fn stage_def_without_palette_defaults_empty() {
+        // Story-485 phase 3 — rétro-compat : stage sans module_palette = Vec vide
+        let toml_str = r#"
+            biome = "Volcanic"
+            arena_extent_m = 90.0
+            ramparts_kit = "kaykit_dungeon"
+            anchor_slots = 6
+            boss_pad_required = false
+        "#;
+        let def: StageDef = toml::from_str(toml_str).expect("parse");
+        assert!(def.module_palette.is_empty(),
+            "module_palette must default to empty for backward compat");
+    }
+
+    #[test]
+    fn stage_def_with_module_palette_parses() {
+        // Story-485 phase 3 — palette annotation parses correctly
+        let toml_str = r#"
+            biome = "Volcanic"
+            arena_extent_m = 90.0
+            ramparts_kit = "kaykit_dungeon"
+            anchor_slots = 6
+            boss_pad_required = true
+            module_palette = [
+                { id = "cover_low_cluster", count = 3 },
+                { id = "sniper_perch",      count = 1 },
+            ]
+        "#;
+        let def: StageDef = toml::from_str(toml_str).expect("parse with palette");
+        assert_eq!(def.module_palette.len(), 2);
+        assert_eq!(def.module_palette[0].id, "cover_low_cluster");
+        assert_eq!(def.module_palette[0].count, 3);
+        assert_eq!(def.module_palette[1].id, "sniper_perch");
+        assert_eq!(def.module_palette[1].count, 1);
     }
 
     #[test]

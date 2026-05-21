@@ -27,6 +27,14 @@ weather_override = "ashfall"
 # au playtest : si gaps entre murs → diminuer ; si chevauchements → augmenter.
 # Hot-reload Shift+F12 supporté pour itération sans rebuild.
 wall_natural_len_m = 2.0
+# Story-485 — palette modules intra-arena. Identity "Crypts" : dense cover,
+# verticality sniper, brawl pit central.
+module_palette = [
+    { id = "cover_low_cluster", count = 3 },
+    { id = "cover_high_wall",   count = 2 },
+    { id = "sniper_perch",      count = 1 },
+    { id = "melee_pit",         count = 1 },
+]
 
 [stages.forge_sanctum]
 biome = "Plains"
@@ -37,3 +45,10 @@ anchor_slots = 5
 music_state = "combat_default"
 boss_pad_required = false
 wall_natural_len_m = 2.0
+# Story-485 — palette modules. Identity "Forge" : plain combat focus, plus de
+# cover bas, double melee pit, pas de sniper perch (distinct du Crypts).
+module_palette = [
+    { id = "cover_low_cluster", count = 4 },
+    { id = "cover_high_wall",   count = 1 },
+    { id = "melee_pit",         count = 2 },
+]
