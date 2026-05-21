@@ -4892,7 +4892,12 @@ name = "forgia-level-presets"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-anchor",
  "forgia-core",
+ "forgia-genome-core",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -5963,6 +5968,7 @@ dependencies = [
  "forgia-anchor",
  "forgia-core",
  "forgia-genome-core",
+ "forgia-level-presets",
  "forgia-prefab",
  "serde",
  "serde_json",

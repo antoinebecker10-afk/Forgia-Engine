@@ -2,7 +2,7 @@
 name = "forgia-level-presets"
 version = "0.1.0"
 edition = "2021"
-description = "Level templates (Arena/RPG/Race/Survival)"
+description = "Module palette data layer (CoverCluster / SniperPerch / MeleePit / FlankRoute) data-driven via genome TOML. Consumed by forgia-stage-arena. Story-485 phase 2."
 
 [lints]
 workspace = true
@@ -10,3 +10,8 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 forgia-core = { workspace = true }
+forgia-anchor = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

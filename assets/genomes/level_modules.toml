@@ -1,0 +1,92 @@
+# forgia-level-presets — Module palette V7 (story-485 phase 2)
+#
+# Modules placés intra-arena par forgia-stage-arena (sight-line solver).
+# Sources industry :
+# - Uncharted 4 (Naughty Dog) — heights 1.0/1.25/1.75 m
+# - Resistance (Insomniac) — verticality 3 m / 6 m
+# - Level Design Book — "less cover is better" (cover spacing rule)
+# - Risk of Rain 2 (Hopoo) — module palette count-per-stage
+#
+# Hot-reload : Shift+F12 dans la session.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# cover_low_cluster — crates/barrels cluster, crouch behind / peek over
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.cover_low_cluster]
+kind = "CoverCluster"
+density_per_m2 = 0.08
+min_spacing_m = 3.0
+footprint_radius_m = 6.0
+allowed_biomes = ["Volcanic", "Plains"]
+anchor_kinds_emitted = ["cover_low"]
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/kaykit/dungeon/crate_small.glb"
+weight = 0.6
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/kaykit/dungeon/barrel.glb"
+weight = 0.4
+anchor_kind = "cover_low"
+height_class = "Low"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# cover_high_wall — pillars / wall sections, full body conceal, blocks LoS
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.cover_high_wall]
+kind = "CoverWall"
+density_per_m2 = 0.04
+min_spacing_m = 5.0
+footprint_radius_m = 8.0
+allowed_biomes = ["Volcanic"]
+anchor_kinds_emitted = ["cover_high"]
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/kaykit/dungeon/pillar_round.glb"
+weight = 0.7
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/kaykit/dungeon/wall_section.glb"
+weight = 0.3
+anchor_kind = "cover_high"
+height_class = "High"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# sniper_perch — overlook vantage point (Resistance 6 m verticality)
+# Singleton (density=0). Placé en bord par stage-arena solver (distance > 0.6*extent).
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.sniper_perch]
+kind = "SniperPerch"
+density_per_m2 = 0.0
+min_spacing_m = 0.0
+footprint_radius_m = 4.0
+allowed_biomes = ["Volcanic", "Plains"]
+anchor_kinds_emitted = ["sniper_perch"]
+
+[[modules.sniper_perch.prop_palette]]
+prefab = "models/kaykit/dungeon/tower_section.glb"
+weight = 1.0
+anchor_kind = "sniper_perch"
+height_class = "Tall"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# melee_pit — central close-combat zone, cramped (Tank/melee archetype favored)
+# Singleton (density=0). Placé central par stage-arena solver (distance < 0.3*extent).
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.melee_pit]
+kind = "MeleePit"
+density_per_m2 = 0.0
+min_spacing_m = 0.0
+footprint_radius_m = 6.0
+allowed_biomes = ["Volcanic", "Plains"]
+anchor_kinds_emitted = ["melee_pit"]
+
+[[modules.melee_pit.prop_palette]]
+prefab = "models/kaykit/dungeon/arena_floor_pit.glb"
+weight = 1.0
+anchor_kind = "melee_pit"
+height_class = "Low"
