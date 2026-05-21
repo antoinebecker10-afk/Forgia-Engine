@@ -79,7 +79,7 @@ impl Inventory {
                 if stack.is_empty() { return None; }
             }
         }
-        for slot in self.slots.iter_mut() {
+        for slot in &mut self.slots {
             if slot.is_none() {
                 *slot = Some(stack);
                 return None;
@@ -91,7 +91,7 @@ impl Inventory {
     /// Remove `count` of `id`. Returns actual amount removed.
     pub fn remove(&mut self, id: &ItemId, mut count: u32) -> u32 {
         let mut removed = 0;
-        for slot in self.slots.iter_mut() {
+        for slot in &mut self.slots {
             if count == 0 { break; }
             if let Some(s) = slot {
                 if s.id == *id {

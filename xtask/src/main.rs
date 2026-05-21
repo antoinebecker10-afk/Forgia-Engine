@@ -363,7 +363,7 @@ fn claimed_tests(head: &str) -> Option<usize> {
         for token in line.split_whitespace() {
             if let Some((a, b)) = token.split_once('/') {
                 if let (Ok(n), Ok(m)) = (a.parse::<usize>(), b.parse::<usize>()) {
-                    if n == m && n >= 1 && n <= 500 {
+                    if n == m && (1..=500).contains(&n) {
                         return Some(n);
                     }
                 }
@@ -375,7 +375,7 @@ fn claimed_tests(head: &str) -> Option<usize> {
         let tokens: Vec<&str> = lower.split_whitespace().collect();
         for i in 0..tokens.len().saturating_sub(2) {
             if let Ok(n) = tokens[i].parse::<usize>() {
-                if n >= 1 && n <= 500 && tokens[i + 1].starts_with("test") {
+                if (1..=500).contains(&n) && tokens[i + 1].starts_with("test") {
                     let next2 = tokens.get(i + 2).copied().unwrap_or("");
                     if next2.starts_with("vert")
                         || next2.starts_with("pass")

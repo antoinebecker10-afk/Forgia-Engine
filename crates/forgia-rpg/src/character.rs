@@ -47,12 +47,13 @@ pub struct RexCharacter;
 #[derive(Component)]
 pub struct RpgOrbitCamera;
 
-/// Cache des entités bones utilisés par la locomotion procédurale.
-/// Posé sur Rex SceneRoot. `ready = true` quand la topologie a été analysée.
-///
-/// Story-440 : on n'utilise plus la BFS-par-Name (fragile cross-rig). On délègue
-/// à `forgia-rig-topology` qui classifie par heuristiques 3D positionnelles —
-/// marche sur Meshy/AccuRig/Mixamo/Blender sans modifier le GLB.
+// Cache des entités bones utilisés par la locomotion procédurale.
+// Posé sur Rex SceneRoot. `ready = true` quand la topologie a été analysée.
+//
+// Story-440 : on n'utilise plus la BFS-par-Name (fragile cross-rig). On délègue
+// à `forgia-rig-topology` qui classifie par heuristiques 3D positionnelles —
+// marche sur Meshy/AccuRig/Mixamo/Blender sans modifier le GLB.
+//
 // Story-482 P1 : types LocomotionBoneCache / BonePose / ArticulatedBones /
 // LocomotionState / ProcBodyAnim + tunables WALK_* / LEAN_* / IDLE_* / etc.
 // déplacés vers `forgia-anim-locomotion`. Imports en haut du fichier.

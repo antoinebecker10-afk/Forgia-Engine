@@ -1,5 +1,21 @@
 # Story-491 — Workspace Re-compile : API bridge voicelines/loot/music/waves
 
+> ✅ **RÉSOLU 2026-05-21 plus simplement que prévu** : `cargo check --workspace` était déjà vert (les stubs no-op des fonctions `parse_music_state` / `sys_apply_stage_toggles` / `draw_portal_overlay` / `draw_bark_bubble` / `draw_stage_notification` sont définis IN-CRATE, pas références d'APIs cassées). L'audit avait extrapolé "workspace cassé" depuis les commentaires TODO, conclusion erronée.
+>
+> Seuls **5 warnings clippy `-D warnings`** bloquaient `cargo clippy --workspace` :
+> - `forgia-rpg/character.rs:55` : empty_line_after_doc_comments (orphan doc après refacto story-482 P1)
+> - `forgia-inventory/lib.rs:82,94` : explicit_iter_loop (2× `for x in iter_mut()`)
+> - `forgia-weapon-hitscan/lib.rs:104` : useless_conversion (`(*xf.forward()).into()`)
+> - `forgia-websocket/lib.rs:150` : useless_conversion (`out.into()`)
+> - `forgia-asset-cdn/lib.rs:140` : derivable_impls (manual Default vs derive)
+> - `xtask/main.rs:366,378` : manual_range_contains (2× `n >= 1 && n <= 500`)
+>
+> Tous fixés en BMAD-Quick. Workspace clippy clean. Reste pour vraie validation runtime :
+> - Story-490 hits_with_damage > 0 in-game
+> - Story-485 AC6/AC7 sensor `forgia2_stage_layout.json` runtime
+>
+> Voir commit `<a-venir>`.
+
 **Status:** DRAFT
 **Scale:** BMAD Standard (4 crates touchées, story requise, checklist post-impl)
 **Created:** 2026-05-21

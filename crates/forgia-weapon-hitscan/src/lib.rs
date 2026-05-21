@@ -101,7 +101,7 @@ fn fire_hitscan(
         hitscan.cooldown_left = hitscan.cooldown;
 
         let origin = xf.translation();
-        let direction: Vec3 = (*xf.forward()).into();
+        let direction: Vec3 = *xf.forward();
 
         let filter = QueryFilter::default().exclude_collider(shooter);
         let hit = ctx.cast_ray_and_get_normal(

@@ -130,20 +130,11 @@ fn hex_encode(bytes: &[u8]) -> String {
 
 // ── Stage 3 : extract ───────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ExtractOptions<'a> {
     pub strip_prefix: &'a str,
-    /// Si true, refuse d'écraser un dest non vide. Default true (sécurité).
+    /// Si true, refuse d'écraser un dest non vide.
     pub fail_if_dest_non_empty: bool,
-}
-
-impl<'a> Default for ExtractOptions<'a> {
-    fn default() -> Self {
-        Self {
-            strip_prefix: "",
-            fail_if_dest_non_empty: false,
-        }
-    }
 }
 
 /// Extrait un .zip vers `dest_dir`. Anti-traversal hardened : refuse les

@@ -147,7 +147,7 @@ fn ws_worker(
     loop {
         // Drain pending outbound
         while let Ok(out) = rx_out.try_recv() {
-            if socket.send(tungstenite::Message::Text(out.into())).is_err() {
+            if socket.send(tungstenite::Message::Text(out)).is_err() {
                 let _ = tx_in.send(WsInbound::Disconnected("send error".into()));
                 return;
             }
