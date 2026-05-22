@@ -29,7 +29,9 @@ use forgia_terrain::{
 use std::collections::HashMap;
 
 pub mod material_override;
-pub use material_override::{BarkOverrideConfig, BarkTextures, NeedsTrunkOverride};
+pub use material_override::{
+    BarkOverrideConfig, BarkTextures, FoliageFallbackDiagnostic, NeedsTrunkOverride,
+};
 
 pub mod prelude {
     pub use crate::{
@@ -154,6 +156,7 @@ impl Plugin for ForgiaFoliagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VegetationManager>()
             .init_resource::<BarkOverrideConfig>()
+            .init_resource::<FoliageFallbackDiagnostic>()
             .add_systems(
                 Startup,
                 (
@@ -166,6 +169,7 @@ impl Plugin for ForgiaFoliagePlugin {
                 (
                     populate_new_chunks,
                     material_override::apply_trunk_bark_override,
+                    material_override::write_foliage_fallback_sensor,
                     despawn_far_lod_vegetation,
                     despawn_unloaded_chunks,
                     write_vegetation_sensor,
