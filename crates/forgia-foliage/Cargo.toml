@@ -13,3 +13,4 @@ bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-asset-registry = { workspace = true }
+forgia-streaming = { workspace = true }

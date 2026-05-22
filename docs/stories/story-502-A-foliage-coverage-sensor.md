@@ -32,9 +32,9 @@ Cette sous-story livre **uniquement la couche sensor + Resource publique** côt�
 
 ## Hors scope (= story-502-B)
 
-- Wiring producteur foliage qui populate `FoliageCoverageReport` à chaque chunk veg ready
-- Retry pending foliage (G2 plan original)
-- Budget per-frame foliage (G1 plan original)
+- ~~Wiring producteur foliage qui populate `FoliageCoverageReport`~~ → **livré dans la même session** (autre terminal a fini Roguelite). `forgia-foliage/src/lib.rs::write_foliage_coverage_report` + dep `forgia-streaming` ajoutée dans `Cargo.toml`. eligible = LOD0+LOD1 chunks (LOD2 exclu car mega-tile plate sans veg).
+- Retry pending foliage (G2 plan original) → future story-502-C
+- Budget per-frame foliage (G1 plan original) → future story-502-D
 
 ## Test in-game
 

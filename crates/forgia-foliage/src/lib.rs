@@ -21,6 +21,7 @@ use forgia_core::prelude::*;
 use forgia_asset_registry::{
     target_size_for, AssetCategory, AssetQuery, AssetRegistry, AssetSeason, NeedsAssetCalibrate,
 };
+use forgia_streaming::FoliageCoverageReport;
 use forgia_terrain::{
     sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, PathNetwork,
     TerrainConfig, CHUNK_X, CHUNK_Z,
@@ -168,6 +169,7 @@ impl Plugin for ForgiaFoliagePlugin {
                     despawn_far_lod_vegetation,
                     despawn_unloaded_chunks,
                     write_vegetation_sensor,
+                    write_foliage_coverage_report,
                 )
                     .chain()
                     .in_set(GameSet::Movement)
@@ -481,6 +483,29 @@ fn write_vegetation_sensor(
         now, veg.chunk_entities.len(), veg.total_trees, dist, trunk_json,
     );
     let _ = std::fs::write("forgia_vegetation.json", json);
+}
+
+/// Story-502-B : producteur du `FoliageCoverageReport` côté foliage.
+/// Update toutes les frames (sensor côté streaming throttle à 1Hz par défaut).
+/// `chunks_loaded` = nombre de chunks éligibles à recevoir foliage (LOD0+LOD1 ;
+/// LOD2 exclu car mega-tile plate, populate_new_chunks `continue` dessus).
+/// `chunks_with_veg` = nb chunks effectivement passés dans populate (clé dans
+/// `veg.chunk_entities`). Le delta = chunks "loaded sans veg" → couvert par
+/// le sensor severity du crate streaming.
+fn write_foliage_coverage_report(
+    veg: Res<VegetationManager>,
+    q_chunks: Query<(&ChunkCoord, Option<&ChunkLod>)>,
+    mut report: ResMut<FoliageCoverageReport>,
+) {
+    let mut eligible = 0u32;
+    for (_, lod) in &q_chunks {
+        let l = lod.copied().unwrap_or(ChunkLod::Lod0);
+        if !matches!(l, ChunkLod::Lod2) {
+            eligible = eligible.saturating_add(1);
+        }
+    }
+    report.chunks_loaded = eligible;
+    report.chunks_with_veg = veg.chunk_entities.len() as u32;
 }
 
 #[cfg(test)]
