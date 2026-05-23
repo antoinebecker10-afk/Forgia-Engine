@@ -21,6 +21,7 @@ fn main() {
         "baseline-e1-e2" => { baseline_e1_e2(); 0 }
         "verify-sensors-format" => verify_sensors_format(),
         "story-gate" => story_gate(&args),
+        "no-scaffold" => no_scaffold(&args),
         _ => { print_help(); 0 }
     };
 
@@ -36,6 +37,7 @@ fn print_help() {
     println!("  baseline-e1-e2           Regenerate asset_load_whitelist.txt baseline");
     println!("  verify-sensors-format    Validate forgia2_*.json canonical sensors");
     println!("  story-gate [--all-done|--story <id>]   Verify DONE stories claims vs git/code");
+    println!("  no-scaffold [--fix]      Fail if any crate is a scaffold (<50 effective LOC or >80% TODO comments). Allowlist in xtask/no-scaffold-allowlist.toml.");
 }
 
 fn check_orphans() {
@@ -434,6 +436,176 @@ fn walk_test_count(p: &Path, total: &mut usize) {
         } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
             if let Ok(s) = fs::read_to_string(&path) {
                 *total += s.matches("#[test]").count();
+            }
+        }
+    }
+}
+
+// ─────────────────────────── no-scaffold (story-515) ───────────────────────────
+//
+// Story-512+513 ont supprime 99 crates scaffolds. Cette commande empeche la
+// regression : fail si une crate `crates/forgia-*` a moins de 50 LOC
+// effectives (non-blank, non-comment) OU si plus de 80% de ses lignes
+// non-blanches sont des TODO comments.
+//
+// Allowlist : `xtask/no-scaffold-allowlist.toml` pour les foundation crates
+// legitimes (forgia-core 121 LOC, forgia-rng, etc.).
+//
+// Usage CI : `cargo xtask no-scaffold` exit code != 0 si violations.
+
+fn no_scaffold(_args: &[String]) -> i32 {
+    println!("[xtask] no-scaffold — checking workspace for scaffold crates");
+
+    let allowlist = load_no_scaffold_allowlist();
+    println!("  Allowlist : {} entries (skip)", allowlist.len());
+
+    let crates_dir = Path::new("crates");
+    if !crates_dir.exists() {
+        eprintln!("ERROR: crates/ directory not found (run from workspace root)");
+        return 2;
+    }
+
+    let mut violations: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+
+    let entries = match fs::read_dir(crates_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("ERROR: cannot read crates/ : {e}");
+            return 2;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = match path.file_name().and_then(|s| s.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+        if !name.starts_with("forgia-") {
+            continue;
+        }
+        if allowlist.contains(&name) {
+            continue;
+        }
+
+        let src_dir = path.join("src");
+        if !src_dir.exists() {
+            continue;
+        }
+
+        let (effective, todo) = count_effective_and_todo(&src_dir);
+        checked += 1;
+
+        if effective < 50 {
+            violations.push(format!(
+                "  ❌ {name} : {effective} effective LOC (< 50). Implement or add to allowlist."
+            ));
+            continue;
+        }
+        if effective > 0 {
+            let todo_pct = (todo * 100) / effective;
+            if todo_pct > 80 {
+                violations.push(format!(
+                    "  ❌ {name} : {todo_pct}% TODO comments ({todo}/{effective}). Implement or remove."
+                ));
+            }
+        }
+    }
+
+    println!("  Checked {checked} crates (allowlist skipped)");
+
+    if violations.is_empty() {
+        println!("✅ no-scaffold : 0 violations");
+        0
+    } else {
+        eprintln!("❌ no-scaffold : {} violations", violations.len());
+        for v in &violations {
+            eprintln!("{v}");
+        }
+        eprintln!();
+        eprintln!("Fix : implement the crate, or add to `xtask/no-scaffold-allowlist.toml` with justification.");
+        1
+    }
+}
+
+fn load_no_scaffold_allowlist() -> Vec<String> {
+    let path = Path::new("xtask/no-scaffold-allowlist.toml");
+    if !path.exists() {
+        return Vec::new();
+    }
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    // Minimal TOML parse : look for `allowed = ["a", "b", ...]` line.
+    // Avoid adding `toml` crate dep complexity for this single use.
+    let mut out = Vec::new();
+    let mut in_array = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.starts_with("allowed") && trimmed.contains('[') {
+            in_array = true;
+        }
+        if in_array {
+            for tok in trimmed.split([',', '[', ']']) {
+                let s = tok.trim().trim_matches('"').trim_matches('\'');
+                if !s.is_empty() && !s.starts_with("allowed") && !s.contains('=') {
+                    out.push(s.to_string());
+                }
+            }
+            if trimmed.contains(']') {
+                in_array = false;
+            }
+        }
+    }
+    out
+}
+
+/// Returns (effective_loc, todo_loc).
+/// effective = lines non-blank non-pure-comment.
+/// todo = lines containing TODO / FIXME / XXX markers.
+fn count_effective_and_todo(dir: &Path) -> (usize, usize) {
+    let mut effective = 0usize;
+    let mut todo = 0usize;
+    walk_loc_and_todo(dir, &mut effective, &mut todo);
+    (effective, todo)
+}
+
+fn walk_loc_and_todo(p: &Path, effective: &mut usize, todo: &mut usize) {
+    let entries = match fs::read_dir(p) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_loc_and_todo(&path, effective, todo);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            if let Ok(s) = fs::read_to_string(&path) {
+                for line in s.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+                        // Comment line — does it contain TODO marker ?
+                        if trimmed.contains("TODO") || trimmed.contains("FIXME") || trimmed.contains("XXX") {
+                            *todo += 1;
+                        }
+                        continue;
+                    }
+                    *effective += 1;
+                    if trimmed.contains("TODO") || trimmed.contains("FIXME") || trimmed.contains("XXX") {
+                        *todo += 1;
+                    }
+                }
             }
         }
     }
