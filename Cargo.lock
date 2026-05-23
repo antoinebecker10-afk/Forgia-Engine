@@ -4533,6 +4533,7 @@ dependencies = [
  "bevy_rapier3d",
  "forgia-asset-registry",
  "forgia-core",
+ "forgia-streaming",
  "forgia-terrain",
 ]
 
@@ -4586,6 +4587,7 @@ dependencies = [
  "forgia-assets",
  "forgia-audio-biome",
  "forgia-audio-core",
+ "forgia-audio-voicelines",
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",

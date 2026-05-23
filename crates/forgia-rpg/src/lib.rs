@@ -97,9 +97,11 @@ impl Plugin for ForgiaRpgPlugin {
         // déformer le mesh visuel. ProcBodyAnim/locomotion restent disable.
         // Validation visuelle bones d'abord, anim Phase 2+ après.
         app.add_plugins(forgia_auto_rig::ForgiaAutoRigPlugin);
-        // Source de vérité sea_level cross-crate (water rendu, swim gate
-        // futur). forgia-water lit ce Resource au build → plus de duplication.
-        app.insert_resource(SeaLevel(RPG_SEA_LEVEL));
+        // TODO(story-450 wave 2) : ré-activer SeaLevel Resource cross-crate
+        // (water rendu, swim gate). Bloqué : `pub struct SeaLevel(pub f32)`
+        // pas encore défini dans forgia-water. Pour l'instant forgia-water
+        // utilise const SEA_LEVEL=4.0 privée (cf forgia-water/src/lib.rs:19).
+        // app.insert_resource(SeaLevel(RPG_SEA_LEVEL));
         app.init_resource::<character::TestCharacterMode>();
         // Story-450 wave 2 : residence tracking pour hystérèse unload UE5-style.
         app.init_resource::<ChunkResidence>();
