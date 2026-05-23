@@ -69,8 +69,6 @@ members = [
     "crates/forgia-hitmarker",
     "crates/forgia-hyworld-import",
     "crates/forgia-ik",
-    "crates/forgia-import-glb-validated",
-    "crates/forgia-import-usd",
     "crates/forgia-input",
     "crates/forgia-input-azerty-qwerty",
     "crates/forgia-input-gamepad",
@@ -163,10 +161,6 @@ members = [
     "crates/forgia-rng",
     "crates/forgia-rpg",
     "crates/forgia-scene",
-    "crates/forgia-script-api-bindings",
-    "crates/forgia-script-hot-reload",
-    "crates/forgia-script-sandbox",
-    "crates/forgia-script-variables",
     "crates/forgia-scripting-luau",
     "crates/forgia-secondary-motion",
     "crates/forgia-sensors",
@@ -347,8 +341,6 @@ forgia-grid = { path = "crates/forgia-grid" }
 forgia-hitmarker = { path = "crates/forgia-hitmarker" }
 forgia-hyworld-import = { path = "crates/forgia-hyworld-import" }
 forgia-ik = { path = "crates/forgia-ik" }
-forgia-import-glb-validated = { path = "crates/forgia-import-glb-validated" }
-forgia-import-usd = { path = "crates/forgia-import-usd" }
 forgia-input = { path = "crates/forgia-input" }
 forgia-input-azerty-qwerty = { path = "crates/forgia-input-azerty-qwerty" }
 forgia-input-gamepad = { path = "crates/forgia-input-gamepad" }
@@ -441,10 +433,6 @@ forgia-ribbons = { path = "crates/forgia-ribbons" }
 forgia-rng = { path = "crates/forgia-rng" }
 forgia-rpg = { path = "crates/forgia-rpg" }
 forgia-scene = { path = "crates/forgia-scene" }
-forgia-script-api-bindings = { path = "crates/forgia-script-api-bindings" }
-forgia-script-hot-reload = { path = "crates/forgia-script-hot-reload" }
-forgia-script-sandbox = { path = "crates/forgia-script-sandbox" }
-forgia-script-variables = { path = "crates/forgia-script-variables" }
 forgia-scripting-luau = { path = "crates/forgia-scripting-luau" }
 forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
 forgia-sensors = { path = "crates/forgia-sensors" }
