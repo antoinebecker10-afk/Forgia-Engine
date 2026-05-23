@@ -2,8 +2,8 @@
 //! Port verbatim de `forgia-game/src/combat/weapons.rs` (V1).
 //! TODOs de dépendances cross-module marqués inline.
 
-use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
+use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 // TODO: port from V1 — app_state (GameMode, GameSet, WorldMode)
@@ -38,10 +38,10 @@ use crate::ammo::AmmoSlot;
 // =============================================================================
 
 pub const ARENA_V1_WEAPONS: [WeaponType; 4] = [
-    WeaponType::ModernAR,      // Digit1 = Pépin
-    WeaponType::AssaultRifle,  // Digit2 = Bourrasque
-    WeaponType::Shotgun,       // Digit3 = Madame Lenoir
-    WeaponType::RocketLauncher,// Digit4 = Boucherie
+    WeaponType::ModernAR,       // Digit1 = Pépin
+    WeaponType::AssaultRifle,   // Digit2 = Bourrasque
+    WeaponType::Shotgun,        // Digit3 = Madame Lenoir
+    WeaponType::RocketLauncher, // Digit4 = Boucherie
 ];
 
 // =============================================================================
@@ -89,7 +89,9 @@ impl WeaponType {
     /// Cycle to next weapon within a restricted set (Arena V1: MAR/Shotgun/Rocket).
     /// If current is not in the set, resets to the first element.
     pub fn next_in_set(self, set: &[WeaponType]) -> WeaponType {
-        if set.is_empty() { return self; }
+        if set.is_empty() {
+            return self;
+        }
         let pos = set.iter().position(|w| *w == self);
         match pos {
             Some(i) => set[(i + 1) % set.len()],
@@ -183,7 +185,9 @@ pub struct DoomProjectile {
 /// linéaire vers `floor_mult` à range max. Hors-range = floor_mult (Halo)
 /// plutôt que 0 (TTK plus skill-friendly que cut-off brutal).
 pub fn damage_falloff(dist: f32, range: f32, start_pct: f32, floor_mult: f32) -> f32 {
-    if range <= 0.0 { return 1.0; }
+    if range <= 0.0 {
+        return 1.0;
+    }
     let dist_pct = (dist / range).clamp(0.0, 1.0);
     if dist_pct < start_pct {
         1.0
@@ -215,7 +219,7 @@ pub fn setup_casing_resources(
     commands.insert_resource(CasingResources {
         mesh: meshes.add(Cuboid::new(0.004, 0.004, 0.012)),
         material: materials.add(StandardMaterial {
-            base_color: Color::srgb(0.85, 0.70, 0.30), // brass
+            base_color: Color::srgb(0.85, 0.70, 0.30),     // brass
             emissive: LinearRgba::new(1.5, 1.0, 0.3, 1.0), // warm glint for bloom catch
             metallic: 0.95,
             perceptual_roughness: 0.2,

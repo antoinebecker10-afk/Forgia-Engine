@@ -40,7 +40,8 @@ mod tests {
     #[test]
     fn plugin_builds() {
         let mut app = App::new();
-        app.add_plugins(MinimalPlugins).add_plugins(AssetPlugin::default());
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(AssetPlugin::default());
         app.add_plugins(ForgiaAssetsPlugin);
     }
 }

@@ -17,7 +17,7 @@ use leafwing_input_manager::prelude::*;
 
 pub mod prelude {
     pub use crate::{
-        CameraMode, FpsCamera, ForgiaPlayerPlugin, MouseLookTuning, MovementSpeedMultiplier, Player,
+        CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning, MovementSpeedMultiplier, Player,
     };
 }
 
@@ -106,7 +106,12 @@ impl Plugin for ForgiaPlayerPlugin {
             .add_systems(OnExit(AppMode::InGame), despawn_player)
             .add_systems(
                 Update,
-                (mouse_look, weapon_recoil_apply, player_movement, player_floor_safety_net)
+                (
+                    mouse_look,
+                    weapon_recoil_apply,
+                    player_movement,
+                    player_floor_safety_net,
+                )
                     .chain()
                     .run_if(in_state(AppMode::InGame)),
             );
@@ -164,12 +169,10 @@ fn spawn_player(mut commands: Commands) {
 /// Startup : load skybox PNG stacked (sera reinterpreted en cube par attach_skybox_to_camera).
 /// Settings linear filter pour transitions cube faces lisses (V1 default).
 fn load_skybox(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle: Handle<Image> = asset_server.load_with_settings(
-        SKYBOX_PATH,
-        |s: &mut ImageLoaderSettings| {
+    let handle: Handle<Image> =
+        asset_server.load_with_settings(SKYBOX_PATH, |s: &mut ImageLoaderSettings| {
             s.sampler = ImageSampler::linear();
-        },
-    );
+        });
     commands.insert_resource(SkyboxPending {
         handle,
         reinterpreted: false,
@@ -191,7 +194,9 @@ fn attach_skybox_to_camera(
 
     // Phase 1 : reinterpret stacked → cube une fois
     if !pending.reinterpreted {
-        let Some(image) = images.get_mut(&pending.handle) else { return };
+        let Some(image) = images.get_mut(&pending.handle) else {
+            return;
+        };
         if let Err(e) = image.reinterpret_stacked_2d_as_array(6) {
             warn!("[forgia-player] Skybox reinterpret failed: {e}");
             commands.remove_resource::<SkyboxPending>();
@@ -304,10 +309,7 @@ fn weapon_recoil_apply(
     // Decay exponentielle depuis Tuning (default 8/s ≈ 125ms recovery).
     let decay = tuning.recoil_decay_per_sec * time.delta_secs();
     let pitch_recover = (debt.pitch_rad * decay).min(debt.pitch_rad);
-    let yaw_recover = (debt.yaw_rad * decay)
-        .abs()
-        .min(debt.yaw_rad.abs())
-        * debt.yaw_rad.signum();
+    let yaw_recover = (debt.yaw_rad * decay).abs().min(debt.yaw_rad.abs()) * debt.yaw_rad.signum();
 
     player.pitch = (player.pitch - pitch_recover).clamp(-1.5, 1.5);
     player.yaw += yaw_recover;

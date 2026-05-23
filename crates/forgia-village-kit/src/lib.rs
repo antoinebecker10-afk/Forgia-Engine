@@ -162,9 +162,14 @@ impl VillageDef {
         if !path.exists() {
             return Err(VillageKitError::TomlMissing(path));
         }
-        let raw = std::fs::read_to_string(&path)
-            .map_err(|source| VillageKitError::TomlRead { path: path.clone(), source })?;
-        toml::from_str(&raw).map_err(|source| VillageKitError::TomlParse { path, source: Box::new(source) })
+        let raw = std::fs::read_to_string(&path).map_err(|source| VillageKitError::TomlRead {
+            path: path.clone(),
+            source,
+        })?;
+        toml::from_str(&raw).map_err(|source| VillageKitError::TomlParse {
+            path,
+            source: Box::new(source),
+        })
     }
 }
 
@@ -199,7 +204,9 @@ impl KitResolver {
                     "models/kaykit/medieval_hexagon/buildings/{color}/{piece}_{color}.gltf"
                 ))
             }
-            _ => Err(VillageKitError::UnknownKit { kit: kit.to_string() }),
+            _ => Err(VillageKitError::UnknownKit {
+                kit: kit.to_string(),
+            }),
         }
     }
 
@@ -209,10 +216,12 @@ impl KitResolver {
     /// → `"models/kaykit/medieval_hexagon/walls/wall_straight.gltf"`.
     pub fn wall_path(&self, kit: &str, piece: &str) -> Result<String, VillageKitError> {
         match kit {
-            "kaykit_medieval_hexagon" => Ok(format!(
-                "models/kaykit/medieval_hexagon/walls/{piece}.gltf"
-            )),
-            _ => Err(VillageKitError::UnknownKit { kit: kit.to_string() }),
+            "kaykit_medieval_hexagon" => {
+                Ok(format!("models/kaykit/medieval_hexagon/walls/{piece}.gltf"))
+            }
+            _ => Err(VillageKitError::UnknownKit {
+                kit: kit.to_string(),
+            }),
         }
     }
 }
@@ -351,7 +360,8 @@ mod tests {
     fn resolver_hexagon_well_red() {
         let r = KitResolver;
         assert_eq!(
-            r.building_path("kaykit_medieval_hexagon", "building_well", Some("red")).unwrap(),
+            r.building_path("kaykit_medieval_hexagon", "building_well", Some("red"))
+                .unwrap(),
             "models/kaykit/medieval_hexagon/buildings/red/building_well_red.gltf"
         );
     }
@@ -360,7 +370,8 @@ mod tests {
     fn resolver_hexagon_wall() {
         let r = KitResolver;
         assert_eq!(
-            r.wall_path("kaykit_medieval_hexagon", "wall_straight").unwrap(),
+            r.wall_path("kaykit_medieval_hexagon", "wall_straight")
+                .unwrap(),
             "models/kaykit/medieval_hexagon/walls/wall_straight.gltf"
         );
     }
@@ -399,11 +410,20 @@ mod tests {
         // gate at 350° must match edge 5 (centered at 330°, delta 20°) not edge 0 (30°).
         let def = hex_def(30.0, vec![350.0]);
         let pieces = compute_rampart_pieces(&def, 2.0);
-        let gate_count = pieces.iter().filter(|p| p.kind == RampartPieceKind::Gate).count();
-        assert_eq!(gate_count, 1, "wrap-around gate at 350° should match exactly one piece");
+        let gate_count = pieces
+            .iter()
+            .filter(|p| p.kind == RampartPieceKind::Gate)
+            .count();
+        assert_eq!(
+            gate_count, 1,
+            "wrap-around gate at 350° should match exactly one piece"
+        );
         // The gate piece must be on side 5 (one of its sub-walls).
         let walls_per_side = pieces.len() / 6;
-        let gate_idx = pieces.iter().position(|p| p.kind == RampartPieceKind::Gate).unwrap();
+        let gate_idx = pieces
+            .iter()
+            .position(|p| p.kind == RampartPieceKind::Gate)
+            .unwrap();
         let side = gate_idx / walls_per_side;
         assert_eq!(side, 5, "gate must land on side 5 (centered at 330°)");
     }
@@ -412,7 +432,10 @@ mod tests {
     fn hexagon_with_gate_north_single_gate() {
         let def = hex_def(30.0, vec![30.0]);
         let pieces = compute_rampart_pieces(&def, 2.0);
-        let gates = pieces.iter().filter(|p| p.kind == RampartPieceKind::Gate).count();
+        let gates = pieces
+            .iter()
+            .filter(|p| p.kind == RampartPieceKind::Gate)
+            .count();
         assert_eq!(gates, 1, "exactly one wall sub-piece is marked gate");
     }
 
@@ -431,7 +454,10 @@ mod tests {
         // Tolerance = half a chunk length.
         let side_len = 30.0;
         let chunk_len = side_len / walls_per_side as f32;
-        assert!((dist - expected_apothem).abs() < chunk_len, "mid wall within chunk_len of apothem");
+        assert!(
+            (dist - expected_apothem).abs() < chunk_len,
+            "mid wall within chunk_len of apothem"
+        );
     }
 
     #[test]

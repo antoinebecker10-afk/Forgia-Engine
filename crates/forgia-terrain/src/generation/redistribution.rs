@@ -12,7 +12,9 @@ use crate::biomes::BiomeType;
 /// Strength 0.0 = no effect, 1.0 = full sigmoid.
 #[inline]
 fn s_curve(n01: f32, strength: f32) -> f32 {
-    if strength < 0.01 { return n01; }
+    if strength < 0.01 {
+        return n01;
+    }
     // Hermite S-curve: 3t² - 2t³, applied iteratively for stronger effect
     let s = n01 * n01 * (3.0 - 2.0 * n01);
     n01 + (s - n01) * strength
@@ -108,8 +110,10 @@ mod tests {
     #[test]
     fn s_curve_strength_zero_is_identity() {
         for v in [0.0_f32, 0.25, 0.5, 0.75, 1.0] {
-            assert!((s_curve(v, 0.0) - v).abs() < 1e-6,
-                    "s_curve({v}, 0.0) should equal {v}");
+            assert!(
+                (s_curve(v, 0.0) - v).abs() < 1e-6,
+                "s_curve({v}, 0.0) should equal {v}"
+            );
         }
     }
 
@@ -122,15 +126,24 @@ mod tests {
     #[test]
     fn redistribute_is_finite_for_all_biomes() {
         let biomes = [
-            BiomeType::Plains, BiomeType::Forest, BiomeType::Desert,
-            BiomeType::Mountain, BiomeType::Swamp, BiomeType::Tundra,
-            BiomeType::Savanna, BiomeType::Jungle, BiomeType::Volcanic,
+            BiomeType::Plains,
+            BiomeType::Forest,
+            BiomeType::Desert,
+            BiomeType::Mountain,
+            BiomeType::Swamp,
+            BiomeType::Tundra,
+            BiomeType::Savanna,
+            BiomeType::Jungle,
+            BiomeType::Volcanic,
             BiomeType::Canyon,
         ];
         for b in biomes {
             for n in [-1.0_f32, -0.5, -0.01, 0.0, 0.01, 0.5, 1.0] {
                 let out = redistribute(n, b);
-                assert!(out.is_finite(), "redistribute({n}, {b:?}) = {out} (not finite)");
+                assert!(
+                    out.is_finite(),
+                    "redistribute({n}, {b:?}) = {out} (not finite)"
+                );
             }
         }
     }
@@ -138,16 +151,24 @@ mod tests {
     #[test]
     fn redistribute_stays_near_unit_range() {
         let biomes = [
-            BiomeType::Plains, BiomeType::Forest, BiomeType::Desert,
-            BiomeType::Mountain, BiomeType::Swamp, BiomeType::Tundra,
-            BiomeType::Savanna, BiomeType::Jungle, BiomeType::Volcanic,
+            BiomeType::Plains,
+            BiomeType::Forest,
+            BiomeType::Desert,
+            BiomeType::Mountain,
+            BiomeType::Swamp,
+            BiomeType::Tundra,
+            BiomeType::Savanna,
+            BiomeType::Jungle,
+            BiomeType::Volcanic,
             BiomeType::Canyon,
         ];
         for b in biomes {
             for n in [-1.0_f32, -0.5, 0.0, 0.5, 1.0] {
                 let out = redistribute(n, b);
-                assert!((-1.1..=1.1).contains(&out),
-                        "redistribute({n}, {b:?}) = {out} outside ~[-1, 1]");
+                assert!(
+                    (-1.1..=1.1).contains(&out),
+                    "redistribute({n}, {b:?}) = {out} outside ~[-1, 1]"
+                );
             }
         }
     }
@@ -157,15 +178,23 @@ mod tests {
         let peak = redistribute(0.0, BiomeType::Mountain);
         let valley_pos = redistribute(1.0, BiomeType::Mountain);
         let valley_neg = redistribute(-1.0, BiomeType::Mountain);
-        assert!(peak > valley_pos, "peak({peak}) doit dépasser valley+({valley_pos})");
-        assert!(peak > valley_neg, "peak({peak}) doit dépasser valley-({valley_neg})");
+        assert!(
+            peak > valley_pos,
+            "peak({peak}) doit dépasser valley+({valley_pos})"
+        );
+        assert!(
+            peak > valley_neg,
+            "peak({peak}) doit dépasser valley-({valley_neg})"
+        );
         assert!(peak > 0.5, "ridged peak attendu > 0.5, obtenu {peak}");
     }
 
     #[test]
     fn redistribute_mountain_monotone_descent() {
         let samples: Vec<f32> = [0.0_f32, 0.25, 0.5, 0.75, 1.0]
-            .iter().map(|&n| redistribute(n, BiomeType::Mountain)).collect();
+            .iter()
+            .map(|&n| redistribute(n, BiomeType::Mountain))
+            .collect();
         for w in samples.windows(2) {
             assert!(w[0] >= w[1] - 1e-5, "Mountain non-monotone : {w:?}");
         }

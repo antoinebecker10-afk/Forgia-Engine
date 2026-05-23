@@ -51,11 +51,8 @@ impl AmmoCtx<'_> {
         if !slot.can_fire() {
             // Auto-reload si possible.
             if slot.try_start_reload() {
-                let snapshot = AmmoChanged::snapshot(
-                    weapon,
-                    slot,
-                    AmmoChangeKind::Reload { transferred: 0 },
-                );
+                let snapshot =
+                    AmmoChanged::snapshot(weapon, slot, AmmoChangeKind::Reload { transferred: 0 });
                 self.events.write(snapshot);
             }
             return false;
@@ -102,7 +99,9 @@ pub fn sync_ammo_slots_from_genome(
     let mut should_sync = false;
     for ev in events.read() {
         match ev {
-            AssetEvent::Added { id } | AssetEvent::Modified { id } | AssetEvent::LoadedWithDependencies { id } => {
+            AssetEvent::Added { id }
+            | AssetEvent::Modified { id }
+            | AssetEvent::LoadedWithDependencies { id } => {
                 if *id == handle.0.id() {
                     should_sync = true;
                 }
@@ -126,7 +125,12 @@ pub fn sync_ammo_slots_from_genome(
         sync_ammo_slot_from_config(&mut equipped.slots, weapon, cfg, &mut ammo_events);
         info!(
             "[ammo-sync] {:?} → mag={} reserve_max={} reload={:.2}s kind={:?} infinite={}",
-            weapon, cfg.mag_size, cfg.reserve_max, cfg.reload_time_secs, cfg.reload_kind, cfg.infinite_ammo,
+            weapon,
+            cfg.mag_size,
+            cfg.reserve_max,
+            cfg.reload_time_secs,
+            cfg.reload_kind,
+            cfg.infinite_ammo,
         );
     }
 }
@@ -145,7 +149,9 @@ pub fn reload_key_input(
         return;
     }
     let weapon = equipped.current;
-    let Some(slot) = equipped.slots.get_mut(&weapon) else { return };
+    let Some(slot) = equipped.slots.get_mut(&weapon) else {
+        return;
+    };
     if slot.try_start_reload() {
         let snap = AmmoChanged::snapshot(weapon, slot, AmmoChangeKind::Reload { transferred: 0 });
         events.write(snap);
@@ -174,7 +180,9 @@ pub fn tick_ammo_reload(
     keys_buf.clear();
     keys_buf.extend(equipped.slots.keys().copied());
     for w in keys_buf.iter().copied() {
-        let Some(slot) = equipped.slots.get_mut(&w) else { continue };
+        let Some(slot) = equipped.slots.get_mut(&w) else {
+            continue;
+        };
         if let Some(kind) = slot.tick_reload(dt) {
             let snap = AmmoChanged::snapshot(w, slot, kind);
             events.write(snap);

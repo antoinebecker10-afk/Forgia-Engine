@@ -214,12 +214,9 @@ pub fn voxelize_mesh(positions: &[Vec3], indices: &[u32], config: &VoxelizerConf
                 let v0 = positions[i0];
                 let v1 = positions[i1];
                 let v2 = positions[i2];
-                if let Some(t_y) = vertical_ray_triangle_y(
-                    Vec3::new(ray_origin_x, 0.0, ray_origin_z),
-                    v0,
-                    v1,
-                    v2,
-                ) {
+                if let Some(t_y) =
+                    vertical_ray_triangle_y(Vec3::new(ray_origin_x, 0.0, ray_origin_z), v0, v1, v2)
+                {
                     intersections.push(t_y);
                 }
             }
@@ -311,16 +308,11 @@ mod tests {
         // 12 triangles (face winding outward)
         let indices = vec![
             // -Z face (z=0)
-            0, 2, 1, 1, 2, 3,
-            // +Z face (z=1)
-            4, 5, 6, 5, 7, 6,
-            // -Y face (y=0)
-            0, 1, 4, 1, 5, 4,
-            // +Y face (y=1)
-            2, 6, 3, 3, 6, 7,
-            // -X face (x=0)
-            0, 4, 2, 2, 4, 6,
-            // +X face (x=1)
+            0, 2, 1, 1, 2, 3, // +Z face (z=1)
+            4, 5, 6, 5, 7, 6, // -Y face (y=0)
+            0, 1, 4, 1, 5, 4, // +Y face (y=1)
+            2, 6, 3, 3, 6, 7, // -X face (x=0)
+            0, 4, 2, 2, 4, 6, // +X face (x=1)
             1, 3, 5, 3, 7, 5,
         ];
         (positions, indices)
@@ -427,7 +419,11 @@ mod tests {
         let grid = voxelize_mesh(&positions, &indices, &VoxelizerConfig::default());
         // Triangle dégénéré : 0 voxels d'interieur, mais surface fallback marque
         // les vertex → 3 voxels (ou collapsed) → assert pas crash + filled <= 3.
-        assert!(grid.filled_count() <= 5, "degenerate triangle, got {}", grid.filled_count());
+        assert!(
+            grid.filled_count() <= 5,
+            "degenerate triangle, got {}",
+            grid.filled_count()
+        );
     }
 
     #[test]

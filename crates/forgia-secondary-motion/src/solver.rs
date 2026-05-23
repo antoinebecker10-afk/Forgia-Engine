@@ -69,7 +69,9 @@ pub fn update_spring_bones(
                 let len = (pos - prev).length();
                 lengths.push(len);
                 // Insert state component si absent
-                commands.entity(bone_entity).insert(SpringBoneState::new(pos));
+                commands
+                    .entity(bone_entity)
+                    .insert(SpringBoneState::new(pos));
                 prev = pos;
             }
             chain.rest_lengths = lengths;
@@ -127,8 +129,7 @@ pub fn update_spring_bones(
                     // Ré-enforce distance exacte après stiffness blend (constraint pass)
                     let new_delta = blended - parent_pos;
                     let new_dist = new_delta.length().max(1e-5);
-                    scratch_positions[bone_idx] =
-                        parent_pos + (new_delta / new_dist) * rest_len;
+                    scratch_positions[bone_idx] = parent_pos + (new_delta / new_dist) * rest_len;
                 } else {
                     scratch_positions[bone_idx] = rigid_pos;
                 }

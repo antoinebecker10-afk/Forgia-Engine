@@ -54,8 +54,8 @@ struct WsConnections {
 }
 
 struct ConnectionHandle {
-    tx_out: Sender<String>,      // game -> ws thread
-    rx_in: Receiver<WsInbound>,  // ws thread -> game
+    tx_out: Sender<String>,     // game -> ws thread
+    rx_in: Receiver<WsInbound>, // ws thread -> game
 }
 
 enum WsInbound {
@@ -73,7 +73,10 @@ impl Plugin for ForgiaWebsocketPlugin {
             .add_message::<WsSendRequest>()
             .add_message::<WsMessage>()
             .add_message::<WsLifecycle>()
-            .add_systems(Update, (handle_open_requests, handle_send_requests, pump_inbound));
+            .add_systems(
+                Update,
+                (handle_open_requests, handle_send_requests, pump_inbound),
+            );
     }
 }
 
@@ -91,10 +94,7 @@ fn handle_open_requests(
     }
 }
 
-fn handle_send_requests(
-    mut events: MessageReader<WsSendRequest>,
-    conns: Res<WsConnections>,
-) {
+fn handle_send_requests(mut events: MessageReader<WsSendRequest>, conns: Res<WsConnections>) {
     for ev in events.read() {
         if let Some(h) = conns.handles.get(&ev.id) {
             let _ = h.tx_out.send(ev.payload.clone());
@@ -112,8 +112,12 @@ fn pump_inbound(
         if let Some(h) = conns.handles.get(&id) {
             while let Ok(msg) = h.rx_in.try_recv() {
                 match msg {
-                    WsInbound::Connected => { life_w.write(WsLifecycle::Connected(id)); }
-                    WsInbound::Message(p) => { msg_w.write(WsMessage { id, payload: p }); }
+                    WsInbound::Connected => {
+                        life_w.write(WsLifecycle::Connected(id));
+                    }
+                    WsInbound::Message(p) => {
+                        msg_w.write(WsMessage { id, payload: p });
+                    }
                     WsInbound::Disconnected(reason) => {
                         life_w.write(WsLifecycle::Disconnected(id, reason));
                     }
@@ -123,12 +127,7 @@ fn pump_inbound(
     }
 }
 
-fn ws_worker(
-    _id: WsConnectionId,
-    url: String,
-    rx_out: Receiver<String>,
-    tx_in: Sender<WsInbound>,
-) {
+fn ws_worker(_id: WsConnectionId, url: String, rx_out: Receiver<String>, tx_in: Sender<WsInbound>) {
     let Ok(parsed) = url::Url::parse(&url) else {
         let _ = tx_in.send(WsInbound::Disconnected(format!("invalid url: {url}")));
         return;

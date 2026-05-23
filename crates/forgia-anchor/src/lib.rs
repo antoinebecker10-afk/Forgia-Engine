@@ -201,10 +201,7 @@ impl AnchorStats {
     }
 
     pub fn total(&self) -> u32 {
-        self.counts
-            .iter()
-            .map(|a| a.load(Ordering::Relaxed))
-            .sum()
+        self.counts.iter().map(|a| a.load(Ordering::Relaxed)).sum()
     }
 }
 

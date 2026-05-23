@@ -138,41 +138,111 @@ pub struct ViewmodelGenomeEntry {
     pub low_ammo_threshold: f32,
 }
 
-fn default_barrel_length() -> f32 { 0.55 }
-fn default_ads_offset_x() -> f32 { 0.0 }
-fn default_ads_offset_y() -> f32 { -0.10 }
-fn default_ads_offset_z() -> f32 { -0.30 }
-fn default_ads_fov() -> f32 { 25.0 }
-fn default_sight_distance() -> f32 { 0.35 }
-fn default_ads_move_speed_factor() -> f32 { 0.65 }
-fn default_scope_glass_alpha_ads() -> f32 { 0.25 }
-fn default_hipfire_tilt_y_deg() -> f32 { 5.0 }
-fn default_fire_mode() -> String { "auto".to_string() }
-fn default_burst_count() -> u8 { 3 }
-fn default_damage() -> f32 { 25.0 }
-fn default_fire_rate() -> f32 { 10.0 }
-fn default_range() -> f32 { 100.0 }
-fn default_pellets() -> u8 { 1 }
-fn default_spread_deg() -> f32 { 0.0 }
-fn default_hit_flash_duration() -> f32 { 0.15 }
-fn default_hit_stop_duration() -> f32 { 0.05 }
-fn default_hit_stop_speed() -> f32 { 0.05 }
-fn default_ads_viewmodel_fade_alpha() -> f32 { 0.4 }
-fn default_ads_mouse_sensitivity_factor() -> f32 { 0.7 }
-fn default_head_damage_mul() -> f32 { 1.5 }
-fn default_damage_falloff_start() -> f32 { 30.0 }
-fn default_damage_falloff_end() -> f32 { 80.0 }
-fn default_damage_falloff_min() -> f32 { 0.6 }
-fn default_shake_trauma() -> f32 { 0.06 }
-fn default_recoil_pitch_deg() -> f32 { 0.4 }
-fn default_recoil_yaw_random_deg() -> f32 { 0.1 }
-fn default_fov_punch_deg() -> f32 { 0.0 }
-fn default_ads_scale_factor() -> f32 { 0.7 }
-fn default_mag_size() -> u32 { 30 }
-fn default_reserve_max() -> u32 { 120 }
-fn default_reload_time_secs() -> f32 { 1.8 }
-fn default_reload_kind() -> String { "mag".to_string() }
-fn default_low_ammo_threshold() -> f32 { 0.25 }
+fn default_barrel_length() -> f32 {
+    0.55
+}
+fn default_ads_offset_x() -> f32 {
+    0.0
+}
+fn default_ads_offset_y() -> f32 {
+    -0.10
+}
+fn default_ads_offset_z() -> f32 {
+    -0.30
+}
+fn default_ads_fov() -> f32 {
+    25.0
+}
+fn default_sight_distance() -> f32 {
+    0.35
+}
+fn default_ads_move_speed_factor() -> f32 {
+    0.65
+}
+fn default_scope_glass_alpha_ads() -> f32 {
+    0.25
+}
+fn default_hipfire_tilt_y_deg() -> f32 {
+    5.0
+}
+fn default_fire_mode() -> String {
+    "auto".to_string()
+}
+fn default_burst_count() -> u8 {
+    3
+}
+fn default_damage() -> f32 {
+    25.0
+}
+fn default_fire_rate() -> f32 {
+    10.0
+}
+fn default_range() -> f32 {
+    100.0
+}
+fn default_pellets() -> u8 {
+    1
+}
+fn default_spread_deg() -> f32 {
+    0.0
+}
+fn default_hit_flash_duration() -> f32 {
+    0.15
+}
+fn default_hit_stop_duration() -> f32 {
+    0.05
+}
+fn default_hit_stop_speed() -> f32 {
+    0.05
+}
+fn default_ads_viewmodel_fade_alpha() -> f32 {
+    0.4
+}
+fn default_ads_mouse_sensitivity_factor() -> f32 {
+    0.7
+}
+fn default_head_damage_mul() -> f32 {
+    1.5
+}
+fn default_damage_falloff_start() -> f32 {
+    30.0
+}
+fn default_damage_falloff_end() -> f32 {
+    80.0
+}
+fn default_damage_falloff_min() -> f32 {
+    0.6
+}
+fn default_shake_trauma() -> f32 {
+    0.06
+}
+fn default_recoil_pitch_deg() -> f32 {
+    0.4
+}
+fn default_recoil_yaw_random_deg() -> f32 {
+    0.1
+}
+fn default_fov_punch_deg() -> f32 {
+    0.0
+}
+fn default_ads_scale_factor() -> f32 {
+    0.7
+}
+fn default_mag_size() -> u32 {
+    30
+}
+fn default_reserve_max() -> u32 {
+    120
+}
+fn default_reload_time_secs() -> f32 {
+    1.8
+}
+fn default_reload_kind() -> String {
+    "mag".to_string()
+}
+fn default_low_ammo_threshold() -> f32 {
+    0.25
+}
 
 /// Handle persistant vers le Genome chargé au Startup.
 #[derive(Resource)]
@@ -223,8 +293,7 @@ pub fn lookup_genome_entry<'a>(
 /// Startup : load le genome viewmodel TOML.
 /// Hot-reload Bevy natif via Shift+F12 ou save TOML.
 pub fn load_viewmodel_genome(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle: Handle<Genome<ViewmodelGenome>> =
-        asset_server.load("genomes/viewmodel_arena.toml");
+    let handle: Handle<Genome<ViewmodelGenome>> = asset_server.load("genomes/viewmodel_arena.toml");
     commands.insert_resource(ViewmodelGenomeHandle(handle));
     info!("[forgia-viewmodel] genome loading : genomes/viewmodel_arena.toml");
 }

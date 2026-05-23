@@ -92,7 +92,9 @@ mod tests {
             .resource_mut::<Time>()
             .advance_by(std::time::Duration::from_millis(500));
         app.update();
-        let cd = app.world().get_resource::<MeleeCooldown>()
+        let cd = app
+            .world()
+            .get_resource::<MeleeCooldown>()
             .expect("MeleeCooldown must remain at 0.5s/2s");
         assert!(cd.timer.fraction() > 0.20 && cd.timer.fraction() < 0.30);
     }

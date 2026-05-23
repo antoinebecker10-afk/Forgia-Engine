@@ -94,11 +94,7 @@ fn run(cli: Cli) -> Result<(), CdnError> {
                 PackLockfile::empty(now_iso8601())
             };
             let targets: Vec<_> = match &name {
-                Some(n) => manifest
-                    .packs
-                    .iter()
-                    .filter(|p| &p.name == n)
-                    .collect(),
+                Some(n) => manifest.packs.iter().filter(|p| &p.name == n).collect(),
                 None => manifest.packs.iter().collect(),
             };
             if targets.is_empty() {

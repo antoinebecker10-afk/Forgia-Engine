@@ -92,7 +92,9 @@ fn start_sessions(
     registry: Res<DialogueRegistry>,
 ) {
     for ev in events.read() {
-        let Some(tree) = registry.trees.get(&ev.tree_id) else { continue };
+        let Some(tree) = registry.trees.get(&ev.tree_id) else {
+            continue;
+        };
         commands.entity(ev.player).insert(DialogueSession {
             tree_id: ev.tree_id.clone(),
             current_node: tree.root.clone(),
@@ -108,13 +110,23 @@ fn advance_sessions(
     mut end_w: MessageWriter<EndDialogue>,
 ) {
     for ev in events.read() {
-        let Ok(mut session) = sessions.get_mut(ev.player) else { continue };
-        let Some(tree) = registry.trees.get(&session.tree_id) else { continue };
-        let Some(node) = tree.nodes.get(&session.current_node) else { continue };
-        let Some(choice) = node.choices.get(ev.choice_index) else { continue };
+        let Ok(mut session) = sessions.get_mut(ev.player) else {
+            continue;
+        };
+        let Some(tree) = registry.trees.get(&session.tree_id) else {
+            continue;
+        };
+        let Some(node) = tree.nodes.get(&session.current_node) else {
+            continue;
+        };
+        let Some(choice) = node.choices.get(ev.choice_index) else {
+            continue;
+        };
         let mut should_end = false;
         for eff in &choice.effects {
-            if matches!(eff, DialogueEffect::EndConversation) { should_end = true; }
+            if matches!(eff, DialogueEffect::EndConversation) {
+                should_end = true;
+            }
             // TODO: route GiveItem to forgia-inventory, StartQuest to forgia-quests
         }
         if let Some(next) = &choice.next {
@@ -128,10 +140,7 @@ fn advance_sessions(
     }
 }
 
-fn end_sessions(
-    mut events: MessageReader<EndDialogue>,
-    mut commands: Commands,
-) {
+fn end_sessions(mut events: MessageReader<EndDialogue>, mut commands: Commands) {
     for ev in events.read() {
         commands.entity(ev.player).remove::<DialogueSession>();
     }

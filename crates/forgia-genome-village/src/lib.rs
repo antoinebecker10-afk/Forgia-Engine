@@ -100,9 +100,15 @@ impl Default for TerrainLevelingDef {
     }
 }
 
-fn default_terrain_leveling_enabled() -> bool { true }
-fn default_terrain_leveling_radius() -> f32 { 18.0 }
-fn default_terrain_leveling_falloff() -> f32 { 10.0 }
+fn default_terrain_leveling_enabled() -> bool {
+    true
+}
+fn default_terrain_leveling_radius() -> f32 {
+    18.0
+}
+fn default_terrain_leveling_falloff() -> f32 {
+    10.0
+}
 
 /// Player spawn point — local XZ offset from village center.
 ///
@@ -366,8 +372,10 @@ impl VillageGenome {
         if !path.exists() {
             return Err(VillageGenomeError::Missing(path));
         }
-        let raw = std::fs::read_to_string(&path)
-            .map_err(|source| VillageGenomeError::Read { path: path.clone(), source })?;
+        let raw = std::fs::read_to_string(&path).map_err(|source| VillageGenomeError::Read {
+            path: path.clone(),
+            source,
+        })?;
         toml::from_str(&raw).map_err(|source| VillageGenomeError::Parse {
             path,
             source: Box::new(source),

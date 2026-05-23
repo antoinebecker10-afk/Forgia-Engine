@@ -25,7 +25,10 @@ pub struct RogueliteTelemetry {
 const STUCK_RUN_THRESHOLD_SECS: f32 = 30.0 * 60.0; // 30 min sans transition = warn
 
 /// Pur — extrait pour tests headless.
-pub fn severity_for_roguelite(time_in_state_secs: f32, state_label: &str) -> (&'static str, &'static str) {
+pub fn severity_for_roguelite(
+    time_in_state_secs: f32,
+    state_label: &str,
+) -> (&'static str, &'static str) {
     if state_label == "in_run" && time_in_state_secs > STUCK_RUN_THRESHOLD_SECS {
         (
             "warn",
@@ -122,7 +125,10 @@ mod tests {
     #[test]
     fn severity_ok_in_run_under_threshold() {
         assert_eq!(severity_for_roguelite(1000.0, "in_run").0, "ok");
-        assert_eq!(severity_for_roguelite(STUCK_RUN_THRESHOLD_SECS, "in_run").0, "ok");
+        assert_eq!(
+            severity_for_roguelite(STUCK_RUN_THRESHOLD_SECS, "in_run").0,
+            "ok"
+        );
     }
 
     #[test]

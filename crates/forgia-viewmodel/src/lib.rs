@@ -51,9 +51,7 @@ pub use calibration::{
     viewmodel_fallback_scale, viewmodel_rotation_ads, viewmodel_rotation_hipfire,
     viewmodel_target_size, viewmodel_transform,
 };
-pub use fade::{
-    ForgiaViewmodelFadePlugin, ScopeGlassFader, ScopeGlassScanned, ViewmodelBodyFader,
-};
+pub use fade::{ForgiaViewmodelFadePlugin, ScopeGlassFader, ScopeGlassScanned, ViewmodelBodyFader};
 pub use genome::{
     load_viewmodel_genome, lookup_genome_entry, weapon_genome_key, ViewmodelGenome,
     ViewmodelGenomeCtx, ViewmodelGenomeEntry, ViewmodelGenomeHandle,

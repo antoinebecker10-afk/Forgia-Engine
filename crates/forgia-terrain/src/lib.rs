@@ -32,17 +32,19 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
-pub use chunk::{ChunkCoord, ChunkManager, TerrainConfig, CHUNK_X, CHUNK_Z};
 pub use biomes::{BiomeMap, BiomeType};
-pub use map_gen_config::{BiomeMode, MapGenConfig, preset_island, preset_forgia_showcase};
+pub use chunk::{ChunkCoord, ChunkManager, TerrainConfig, CHUNK_X, CHUNK_Z};
+pub use flatten::{FlattenZones, VillageFlattenZone};
 pub use generation::heightmap_at;
-pub use meshing_heightmap::{build_chunk_mesh, spawn_chunk_entity, ChunkMeshData, VERTS_PER_AXIS};
-pub use terrain_material::{init_terrain_material, repeat_sampler, TerrainSharedMaterial};
 pub use lod::{
     ChunkLod, Lod2TileManager, LodSampleOffset, LodStats, LOD0_MAX_M, LOD1_MAX_M, LOD2_MAX_M,
 };
-pub use paths::{build_path_network, build_path_segment, PathNetwork, PathPolyline, PathSample, RoadTier};
-pub use flatten::{FlattenZones, VillageFlattenZone};
+pub use map_gen_config::{preset_forgia_showcase, preset_island, BiomeMode, MapGenConfig};
+pub use meshing_heightmap::{build_chunk_mesh, spawn_chunk_entity, ChunkMeshData, VERTS_PER_AXIS};
+pub use paths::{
+    build_path_network, build_path_segment, PathNetwork, PathPolyline, PathSample, RoadTier,
+};
+pub use terrain_material::{init_terrain_material, repeat_sampler, TerrainSharedMaterial};
 
 pub mod biome_registry;
 pub mod biome_spec;
@@ -69,9 +71,8 @@ pub mod lod;
 
 pub mod prelude {
     pub use crate::{
-        BiomeMap, BiomeType, BiomeMode, ChunkCoord, ChunkManager, ForgiaTerrainPlugin,
-        MapGenConfig, TerrainConfig, TerrainSharedMaterial, build_chunk_mesh,
-        spawn_chunk_entity,
+        build_chunk_mesh, spawn_chunk_entity, BiomeMap, BiomeMode, BiomeType, ChunkCoord,
+        ChunkManager, ForgiaTerrainPlugin, MapGenConfig, TerrainConfig, TerrainSharedMaterial,
     };
 }
 

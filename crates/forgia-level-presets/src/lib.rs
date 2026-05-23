@@ -125,9 +125,9 @@ impl HeightClass {
     /// déterminer si un module casse une ligne de vue donnée.
     pub const fn height_m(self) -> f32 {
         match self {
-            HeightClass::Low => 1.125,  // mid 1.0–1.25
-            HeightClass::High => 1.85,  // ≥ 1.75
-            HeightClass::Tall => 6.0,   // Resistance perch
+            HeightClass::Low => 1.125, // mid 1.0–1.25
+            HeightClass::High => 1.85, // ≥ 1.75
+            HeightClass::Tall => 6.0,  // Resistance perch
         }
     }
 }
@@ -222,8 +222,7 @@ impl Plugin for ForgiaLevelPresetsPlugin {
             .add_systems(Startup, load_level_modules_genome)
             .add_systems(
                 Update,
-                write_level_modules_sensor
-                    .in_set(forgia_core::prelude::GameSet::Sensors),
+                write_level_modules_sensor.in_set(forgia_core::prelude::GameSet::Sensors),
             );
         info!(
             "[forgia-level-presets] Plugin loaded — genome path: {}",
@@ -352,12 +351,18 @@ height_class = "Low"
     fn parse_level_modules_toml_minimal() {
         let genome: LevelModulesGenome = toml::from_str(MINIMAL_TOML).expect("parse genome");
         assert_eq!(genome.modules.len(), 1);
-        let m = genome.modules.get("cover_low_cluster").expect("module present");
+        let m = genome
+            .modules
+            .get("cover_low_cluster")
+            .expect("module present");
         assert_eq!(m.kind, ModuleKind::CoverCluster);
         assert!((m.density_per_m2 - 0.08).abs() < 1e-6);
         assert!((m.min_spacing_m - 3.0).abs() < 1e-6);
         assert!((m.footprint_radius_m - 6.0).abs() < 1e-6);
-        assert_eq!(m.allowed_biomes, vec!["Volcanic".to_string(), "Plains".to_string()]);
+        assert_eq!(
+            m.allowed_biomes,
+            vec!["Volcanic".to_string(), "Plains".to_string()]
+        );
         assert_eq!(m.anchor_kinds_emitted, vec!["cover_low".to_string()]);
         assert_eq!(m.prop_palette.len(), 2);
     }
@@ -387,8 +392,8 @@ height_class = "Low"
     fn module_kind_serde_roundtrip() {
         for k in ModuleKind::all() {
             let s = format!("\"{}\"", k.as_str());
-            let parsed: ModuleKind = serde_json::from_str(&s)
-                .unwrap_or_else(|e| panic!("parse {}: {}", s, e));
+            let parsed: ModuleKind =
+                serde_json::from_str(&s).unwrap_or_else(|e| panic!("parse {}: {}", s, e));
             assert_eq!(parsed, k);
         }
     }
@@ -397,8 +402,8 @@ height_class = "Low"
     fn height_class_serde_roundtrip() {
         for h in [HeightClass::Low, HeightClass::High, HeightClass::Tall] {
             let s = format!("\"{}\"", h.as_str());
-            let parsed: HeightClass = serde_json::from_str(&s)
-                .unwrap_or_else(|e| panic!("parse {}: {}", s, e));
+            let parsed: HeightClass =
+                serde_json::from_str(&s).unwrap_or_else(|e| panic!("parse {}: {}", s, e));
             assert_eq!(parsed, h);
         }
     }

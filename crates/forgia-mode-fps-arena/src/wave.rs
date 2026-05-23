@@ -17,9 +17,7 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
 use std::fs;
 
-use crate::{
-    ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, TargetCube, default_arena_bots,
-};
+use crate::{default_arena_bots, ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, TargetCube};
 
 // ─── Wave config genome ──────────────────────────────────────────────
 
@@ -62,8 +60,12 @@ pub struct WaveSpawnEntry {
     pub head_radius: f32,
 }
 
-fn default_head_y() -> f32 { 1.75 }
-fn default_head_r() -> f32 { 0.22 }
+fn default_head_y() -> f32 {
+    1.75
+}
+fn default_head_r() -> f32 {
+    0.22
+}
 
 fn default_one() -> f32 {
     1.0
@@ -195,22 +197,22 @@ fn wave_orchestrator(
     state.bots_alive = alive;
 
     let waves_owned;
-    let waves_data: &ArenaWavesGenome = match waves_handle
-        .as_deref()
-        .and_then(|h| waves_assets.get(&h.0))
-    {
-        Some(g) => &g.data,
-        None => {
-            waves_owned = fallback_waves();
-            &waves_owned
-        }
-    };
+    let waves_data: &ArenaWavesGenome =
+        match waves_handle.as_deref().and_then(|h| waves_assets.get(&h.0)) {
+            Some(g) => &g.data,
+            None => {
+                waves_owned = fallback_waves();
+                &waves_owned
+            }
+        };
 
     // Sync final_wave_index depuis TOML (hot-reload friendly).
     state.final_wave_index = waves_data.final_wave_index;
-    state.break_timer.set_duration(std::time::Duration::from_secs_f32(
-        waves_data.break_secs.max(0.5),
-    ));
+    state
+        .break_timer
+        .set_duration(std::time::Duration::from_secs_f32(
+            waves_data.break_secs.max(0.5),
+        ));
 
     match state.phase {
         WavePhase::PreBoot => {
@@ -230,7 +232,9 @@ fn wave_orchestrator(
                 state.bots_total_wave = wave1.spawns.len() as u32;
                 state.bots_alive = state.bots_total_wave;
                 state.phase = WavePhase::Active;
-                started.write(WaveStartedEvent { wave_index: wave1.index });
+                started.write(WaveStartedEvent {
+                    wave_index: wave1.index,
+                });
                 info!(
                     "[arena-waves] WAVE {} START — {} enemies",
                     wave1.index, state.bots_total_wave
@@ -239,7 +243,9 @@ fn wave_orchestrator(
         }
         WavePhase::Active => {
             if alive == 0 {
-                completed.write(WaveCompletedEvent { wave_index: state.current_wave });
+                completed.write(WaveCompletedEvent {
+                    wave_index: state.current_wave,
+                });
                 if state.current_wave >= state.final_wave_index {
                     state.phase = WavePhase::AllComplete;
                     info!("[arena-waves] ALL WAVES COMPLETE — Boss defeated");
@@ -248,8 +254,7 @@ fn wave_orchestrator(
                     state.break_timer.reset();
                     info!(
                         "[arena-waves] Wave {} done → break {:.1}s",
-                        state.current_wave,
-                        waves_data.break_secs
+                        state.current_wave, waves_data.break_secs
                     );
                 }
             }
@@ -272,7 +277,9 @@ fn wave_orchestrator(
                     state.bots_total_wave = next.spawns.len() as u32;
                     state.bots_alive = state.bots_total_wave;
                     state.phase = WavePhase::Active;
-                    started.write(WaveStartedEvent { wave_index: next.index });
+                    started.write(WaveStartedEvent {
+                        wave_index: next.index,
+                    });
                     info!(
                         "[arena-waves] WAVE {} START — {} enemies",
                         next.index, state.bots_total_wave
@@ -366,7 +373,8 @@ pub fn spawn_wave_bots(
                     los_grace_left: 0.0,
                     // strafe_phase_rad offset par-bot pour désync (sinon tous bougent en sync).
                     // Hash basé sur position spawn = déterministe + diversifié.
-                    strafe_phase_rad: ((x.to_bits() ^ z.to_bits()) as f32 * 0.0001) % std::f32::consts::TAU,
+                    strafe_phase_rad: ((x.to_bits() ^ z.to_bits()) as f32 * 0.0001)
+                        % std::f32::consts::TAU,
                     strafe_noise_seed: (x.to_bits() ^ z.to_bits()).wrapping_mul(2654435761),
                     alerted: false,
                     alert_left: 0.0,

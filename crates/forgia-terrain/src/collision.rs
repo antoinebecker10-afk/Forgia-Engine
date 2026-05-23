@@ -15,7 +15,10 @@ pub const COLLISION_GROUP_GOBLIN: Group = Group::GROUP_5;
 pub fn world_collision_groups() -> CollisionGroups {
     CollisionGroups::new(
         COLLISION_GROUP_WORLD,
-        COLLISION_GROUP_PLAYER | COLLISION_GROUP_PROJECTILE | COLLISION_GROUP_TARGET | COLLISION_GROUP_GOBLIN,
+        COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_PROJECTILE
+            | COLLISION_GROUP_TARGET
+            | COLLISION_GROUP_GOBLIN,
     )
 }
 
@@ -26,14 +29,23 @@ mod tests {
     #[test]
     fn collision_groups_are_distinct() {
         let groups = [
-            COLLISION_GROUP_PLAYER, COLLISION_GROUP_WORLD, COLLISION_GROUP_PROJECTILE,
-            COLLISION_GROUP_TARGET, COLLISION_GROUP_GOBLIN,
+            COLLISION_GROUP_PLAYER,
+            COLLISION_GROUP_WORLD,
+            COLLISION_GROUP_PROJECTILE,
+            COLLISION_GROUP_TARGET,
+            COLLISION_GROUP_GOBLIN,
         ];
         for (i, a) in groups.iter().enumerate() {
             for (j, b) in groups.iter().enumerate() {
-                if i == j { continue; }
-                assert!((a.bits() & b.bits()) == 0,
-                    "group {i} bits {:#b} overlaps group {j} bits {:#b}", a.bits(), b.bits());
+                if i == j {
+                    continue;
+                }
+                assert!(
+                    (a.bits() & b.bits()) == 0,
+                    "group {i} bits {:#b} overlaps group {j} bits {:#b}",
+                    a.bits(),
+                    b.bits()
+                );
             }
         }
     }
@@ -43,11 +55,15 @@ mod tests {
         let cg = world_collision_groups();
         let filter_bits = cg.filters.bits();
         for (name, g) in [
-            ("PLAYER", COLLISION_GROUP_PLAYER), ("PROJECTILE", COLLISION_GROUP_PROJECTILE),
-            ("TARGET", COLLISION_GROUP_TARGET), ("GOBLIN", COLLISION_GROUP_GOBLIN),
+            ("PLAYER", COLLISION_GROUP_PLAYER),
+            ("PROJECTILE", COLLISION_GROUP_PROJECTILE),
+            ("TARGET", COLLISION_GROUP_TARGET),
+            ("GOBLIN", COLLISION_GROUP_GOBLIN),
         ] {
-            assert!((filter_bits & g.bits()) != 0,
-                "world filter dropped {name} — collisions will be silently skipped");
+            assert!(
+                (filter_bits & g.bits()) != 0,
+                "world filter dropped {name} — collisions will be silently skipped"
+            );
         }
         assert_eq!(cg.memberships, COLLISION_GROUP_WORLD);
     }

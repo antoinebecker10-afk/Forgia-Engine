@@ -99,11 +99,11 @@ const KIND_WEIGHTS_NONBOSS: &[(StageKind, u32)] = &[
 /// Tire un kind non-boss en évitant `forbidden` (anti-consecutif).
 /// Conservé pour tests headless — la prod utilise `pick_nonboss_kind_with_multi`.
 #[cfg(test)]
-fn pick_nonboss_kind_with_constraint(
-    state: &mut u64,
-    forbidden: Option<StageKind>,
-) -> StageKind {
-    pick_nonboss_kind_with_multi(state, &[forbidden].into_iter().flatten().collect::<Vec<_>>())
+fn pick_nonboss_kind_with_constraint(state: &mut u64, forbidden: Option<StageKind>) -> StageKind {
+    pick_nonboss_kind_with_multi(
+        state,
+        &[forbidden].into_iter().flatten().collect::<Vec<_>>(),
+    )
 }
 
 /// V7 M3 step 3 fix (2026-05-20) — tire un kind non-boss en évitant TOUS les
@@ -235,7 +235,7 @@ pub struct RunGraphConfig {
 impl Default for RunGraphConfig {
     fn default() -> Self {
         Self {
-            total_stages: 5,         // 4 combat + 1 boss
+            total_stages: 5, // 4 combat + 1 boss
             boss_stage_index: 4,
             branching: 2,
             director_credits_base: 2.0,
@@ -306,11 +306,7 @@ pub fn generate_run_graph(config: &RunGraphConfig, seed: u64) -> RunGraph {
         let is_start = depth == 0;
         let is_boss = depth == boss_depth;
 
-        let variant_count = if is_start || is_boss {
-            1
-        } else {
-            branching
-        };
+        let variant_count = if is_start || is_boss { 1 } else { branching };
 
         // Anti-consecutif : si depth-1 contient un kind restreint (Elite/Shop/Rest),
         // on l'interdit pour ce depth. Approche conservative (avec branching, le joueur
@@ -320,13 +316,11 @@ pub fn generate_run_graph(config: &RunGraphConfig, seed: u64) -> RunGraph {
         let forbidden = if forced.is_some() {
             None
         } else {
-            stages
-                .last()
-                .and_then(|prev| {
-                    prev.iter()
-                        .map(|n| n.kind)
-                        .find(|k| k.is_restricted_consecutive())
-                })
+            stages.last().and_then(|prev| {
+                prev.iter()
+                    .map(|n| n.kind)
+                    .find(|k| k.is_restricted_consecutive())
+            })
         };
 
         let mut variants: Vec<StageNode> = Vec::with_capacity(usize::from(variant_count));
@@ -457,10 +451,7 @@ fn write_stage_graph_sensor(
 }
 
 /// Severity pure (testable).
-pub fn severity_for_stage_graph(
-    config: &RunGraphConfig,
-    _state: &StageGraphState,
-) -> &'static str {
+pub fn severity_for_stage_graph(config: &RunGraphConfig, _state: &StageGraphState) -> &'static str {
     if config.total_stages < 2 {
         "warn"
     } else {
@@ -469,10 +460,7 @@ pub fn severity_for_stage_graph(
 }
 
 /// Next-step actionnable.
-pub fn next_step_for_stage_graph(
-    config: &RunGraphConfig,
-    state: &StageGraphState,
-) -> &'static str {
+pub fn next_step_for_stage_graph(config: &RunGraphConfig, state: &StageGraphState) -> &'static str {
     if config.total_stages < 2 {
         "Config invalid: total_stages < 2. Fix roguelite_run.toml gene roguelite_stage_count."
     } else if state.total_graphs_generated_session == 0 {
@@ -589,8 +577,7 @@ default = 999.0
         let g1 = generate_run_graph(&c, 1);
         let g2 = generate_run_graph(&c, 2);
         // At least one stage variant differs between seeds (high probability)
-        let differs = (0..g1.stages.len())
-            .any(|d| g1.stages[d] != g2.stages[d]);
+        let differs = (0..g1.stages.len()).any(|d| g1.stages[d] != g2.stages[d]);
         assert!(differs, "Different seeds should produce different graphs");
     }
 
@@ -634,8 +621,7 @@ default = 999.0
                     continue;
                 }
                 // Au moins 2 kinds distincts parmi les variants à ce depth.
-                let kinds: std::collections::HashSet<_> =
-                    variants.iter().map(|n| n.kind).collect();
+                let kinds: std::collections::HashSet<_> = variants.iter().map(|n| n.kind).collect();
                 assert!(
                     kinds.len() >= 2,
                     "seed={seed} depth={d} : {} variants tous de kind identique → portal vide",
@@ -866,8 +852,12 @@ default = 999.0
     #[test]
     fn stage_kind_as_str_roundtrip_concept() {
         for k in [
-            StageKind::Combat, StageKind::Elite, StageKind::Shop,
-            StageKind::Event, StageKind::Treasure, StageKind::Boss,
+            StageKind::Combat,
+            StageKind::Elite,
+            StageKind::Shop,
+            StageKind::Event,
+            StageKind::Treasure,
+            StageKind::Boss,
         ] {
             assert!(!k.as_str().is_empty());
         }

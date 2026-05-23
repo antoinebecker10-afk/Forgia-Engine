@@ -117,7 +117,11 @@ fn color_for_name(name: &str) -> Color {
             // Right ou non-specifié → variante plus sombre
             Color::srgb(0.80, 0.20, 0.20)
         }
-    } else if n.contains("arm") || n.contains("forearm") || n.contains("clavicle") || n.contains("hand") {
+    } else if n.contains("arm")
+        || n.contains("forearm")
+        || n.contains("clavicle")
+        || n.contains("hand")
+    {
         if n.contains("_l") || n.ends_with("l") {
             COLOR_ARM
         } else {
@@ -127,7 +131,8 @@ fn color_for_name(name: &str) -> Color {
         COLOR_TAIL
     } else if n.contains("head") || n.contains("neck") || n.contains("skull") {
         COLOR_HEAD
-    } else if n.contains("spine") || n.contains("chest") || n.contains("hip") || n.contains("torso") {
+    } else if n.contains("spine") || n.contains("chest") || n.contains("hip") || n.contains("torso")
+    {
         COLOR_SPINE
     } else {
         COLOR_UNKNOWN

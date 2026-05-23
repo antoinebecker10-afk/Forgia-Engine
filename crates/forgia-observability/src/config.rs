@@ -1,4 +1,4 @@
-﻿//! config.rs — Configuration genome du RPG Health Monitor.
+//! config.rs — Configuration genome du RPG Health Monitor.
 //!
 //! Chargée depuis `config/genomes/rpg_monitor.toml`.
 //! Reloadable via Shift+F12 in-game (sys_reload_config_on_hotkey).
@@ -18,13 +18,23 @@ pub struct MetaConfig {
     pub enabled: bool,
 }
 
-fn default_name() -> String { "rpg_monitor".to_string() }
-fn default_version() -> u32 { 1 }
-fn default_true() -> bool { true }
+fn default_name() -> String {
+    "rpg_monitor".to_string()
+}
+fn default_version() -> u32 {
+    1
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Default for MetaConfig {
     fn default() -> Self {
-        Self { name: default_name(), version: default_version(), enabled: default_true() }
+        Self {
+            name: default_name(),
+            version: default_version(),
+            enabled: default_true(),
+        }
     }
 }
 
@@ -34,11 +44,15 @@ pub struct GlobalConfig {
     pub tick_interval_secs: f32,
 }
 
-fn default_tick_interval() -> f32 { 1.0 }
+fn default_tick_interval() -> f32 {
+    1.0
+}
 
 impl Default for GlobalConfig {
     fn default() -> Self {
-        Self { tick_interval_secs: default_tick_interval() }
+        Self {
+            tick_interval_secs: default_tick_interval(),
+        }
     }
 }
 
@@ -73,7 +87,9 @@ fn default_expected_sensors() -> Vec<String> {
         "forgia2_sensor_health.json".to_string(),
     ]
 }
-fn default_stale_secs() -> f32 { 30.0 }
+fn default_stale_secs() -> f32 {
+    30.0
+}
 
 impl Default for LivenessConfig {
     fn default() -> Self {
@@ -92,11 +108,16 @@ pub struct Lod2DesyncConfig {
     pub tolerance: u64,
 }
 
-fn default_lod2_tolerance() -> u64 { 4 }
+fn default_lod2_tolerance() -> u64 {
+    4
+}
 
 impl Default for Lod2DesyncConfig {
     fn default() -> Self {
-        Self { enabled: true, tolerance: default_lod2_tolerance() }
+        Self {
+            enabled: true,
+            tolerance: default_lod2_tolerance(),
+        }
     }
 }
 
@@ -114,8 +135,12 @@ pub struct BiomeLuminanceConfig {
 // Volcanic 0.22/0.15/0.12 sRGB → linear lum ≈ 0.024 (catch ancien bug).
 // Volcanic 0.35/0.27/0.22 sRGB → linear lum ≈ 0.065 (current passe).
 // Jungle 0.12/0.32/0.10 → linear lum ≈ 0.063 (current passe).
-fn default_lum_floor() -> f32 { 0.05 }
-fn default_lum_ceiling() -> f32 { 0.95 }
+fn default_lum_floor() -> f32 {
+    0.05
+}
+fn default_lum_ceiling() -> f32 {
+    0.95
+}
 
 impl Default for BiomeLuminanceConfig {
     fn default() -> Self {
@@ -139,8 +164,12 @@ pub struct LodAsymmetryConfig {
     pub epsilon_m: f32,
 }
 
-fn default_lod_asym_delta() -> f32 { 0.5 }
-fn default_lod_asym_epsilon() -> f32 { 0.001 }
+fn default_lod_asym_delta() -> f32 {
+    0.5
+}
+fn default_lod_asym_epsilon() -> f32 {
+    0.001
+}
 
 impl Default for LodAsymmetryConfig {
     fn default() -> Self {
@@ -171,7 +200,9 @@ fn default_asset_paths() -> Vec<String> {
         "textures-v1/terrain/grass/roughness.jpg".to_string(),
     ]
 }
-fn default_asset_min_uptime() -> f32 { 30.0 }
+fn default_asset_min_uptime() -> f32 {
+    30.0
+}
 
 impl Default for CriticalAssetsConfig {
     fn default() -> Self {
@@ -192,7 +223,9 @@ pub struct HealthConsistencyConfig {
 }
 
 impl Default for HealthConsistencyConfig {
-    fn default() -> Self { Self { enabled: true } }
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 // ─────────────────────────── RpgMonitorConfig ───────────────────────────
@@ -241,15 +274,17 @@ impl RpgMonitorConfig {
 
     pub fn reload(&mut self) {
         match std::fs::read_to_string(CONFIG_PATH) {
-            Ok(content) => match toml::from_str::<Self>(&content) {
-                Ok(new_cfg) => {
-                    *self = new_cfg;
-                    info!("[rpg-monitor] Config hot-reloaded from {CONFIG_PATH}");
+            Ok(content) => {
+                match toml::from_str::<Self>(&content) {
+                    Ok(new_cfg) => {
+                        *self = new_cfg;
+                        info!("[rpg-monitor] Config hot-reloaded from {CONFIG_PATH}");
+                    }
+                    Err(e) => {
+                        warn!("[rpg-monitor] Hot-reload TOML parse error: {e} — keeping current config");
+                    }
                 }
-                Err(e) => {
-                    warn!("[rpg-monitor] Hot-reload TOML parse error: {e} — keeping current config");
-                }
-            },
+            }
             Err(e) => {
                 warn!("[rpg-monitor] Hot-reload read error: {e} — keeping current config");
             }

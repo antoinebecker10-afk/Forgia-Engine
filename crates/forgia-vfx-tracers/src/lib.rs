@@ -75,7 +75,10 @@ fn spawn_tracers(
         xf.scale.z = len;
 
         commands.spawn((
-            Tracer { ttl: ev.lifetime, initial_ttl: ev.lifetime },
+            Tracer {
+                ttl: ev.lifetime,
+                initial_ttl: ev.lifetime,
+            },
             Mesh3d(cache.mesh.clone()),
             MeshMaterial3d(cache.material.clone()),
             xf,
@@ -84,11 +87,7 @@ fn spawn_tracers(
     }
 }
 
-fn tick_tracers(
-    time: Res<Time>,
-    mut q: Query<(Entity, &mut Tracer)>,
-    mut commands: Commands,
-) {
+fn tick_tracers(time: Res<Time>, mut q: Query<(Entity, &mut Tracer)>, mut commands: Commands) {
     let dt = time.delta_secs();
     for (e, mut t) in &mut q {
         t.ttl -= dt;

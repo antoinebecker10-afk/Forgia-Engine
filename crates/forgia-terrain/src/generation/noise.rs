@@ -11,8 +11,8 @@
 use noise::{NoiseFn, Perlin};
 use std::cell::RefCell;
 
-use crate::biomes::BiomeType;
 use super::{BiomeGenomeOverrides, BiomeNoiseLayers};
+use crate::biomes::BiomeType;
 
 // Thread-local Perlin cache — avoid recreating 1156× per chunk (512-entry permutation table).
 thread_local! {
@@ -157,7 +157,8 @@ fn default_noise_layers(biome: BiomeType) -> BiomeNoiseLayers {
 
 /// Domain warping Inigo Quilez — 3 passes (AAA standard).
 pub(super) fn domain_warp_2d(
-    x: f64, z: f64,
+    x: f64,
+    z: f64,
     perlin: &Perlin,
     freq: f64,
     warp_strength: f64,
@@ -177,12 +178,16 @@ pub(super) fn domain_warp_2d(
     let sx = perlin.get([(x + ws * rx) * freq + 3.4, (z + ws * rz) * freq + 7.1]);
     let sz = perlin.get([(x + ws * rx) * freq + 6.8, (z + ws * rz) * freq + 0.9]);
 
-    perlin.get([(x + ws * rx + ws2 * sx) * freq, (z + ws * rz + ws2 * sz) * freq])
+    perlin.get([
+        (x + ws * rx + ws2 * sx) * freq,
+        (z + ws * rz + ws2 * sz) * freq,
+    ])
 }
 
 /// Ridged multifractal noise — sharp peaks and mountain ridges.
 fn ridged_noise_2d(
-    x: f64, z: f64,
+    x: f64,
+    z: f64,
     perlin: &Perlin,
     base_freq: f64,
     octaves: usize,
@@ -206,13 +211,18 @@ fn ridged_noise_2d(
         freq *= lacunarity;
     }
 
-    if amp_sum > 0.0 { result / amp_sum * 2.0 - 1.0 } else { 0.0 }
+    if amp_sum > 0.0 {
+        result / amp_sum * 2.0 - 1.0
+    } else {
+        0.0
+    }
 }
 
 /// Billow noise — smooth rounded dunes and soft hills.
 #[allow(clippy::too_many_arguments)]
 fn billow_noise_2d(
-    x: f64, z: f64,
+    x: f64,
+    z: f64,
     perlin: &Perlin,
     base_freq: f64,
     octaves: usize,
@@ -235,7 +245,11 @@ fn billow_noise_2d(
         amp *= persistence;
     }
 
-    if amp_sum > 0.0 { (result / amp_sum) * 2.0 - 1.0 } else { 0.0 }
+    if amp_sum > 0.0 {
+        (result / amp_sum) * 2.0 - 1.0
+    } else {
+        0.0
+    }
 }
 
 /// Cellular/Voronoi noise — distance to nearest cell center.
@@ -284,7 +298,8 @@ fn cell_hash(x: i32, z: i32, seed: u32) -> u32 {
 /// Swiss turbulence noise — FBm with derivative feedback (de Carpentier).
 #[allow(clippy::too_many_arguments)]
 fn swiss_noise_2d(
-    x: f64, z: f64,
+    x: f64,
+    z: f64,
     perlin: &Perlin,
     base_freq: f64,
     octaves: usize,
@@ -311,8 +326,10 @@ fn swiss_noise_2d(
 
         let n = perlin.get([wx, wz]);
 
-        let grad_x = (perlin.get([wx + EPSILON, wz]) - perlin.get([wx - EPSILON, wz])) / (2.0 * EPSILON);
-        let grad_z = (perlin.get([wx, wz + EPSILON]) - perlin.get([wx, wz - EPSILON])) / (2.0 * EPSILON);
+        let grad_x =
+            (perlin.get([wx + EPSILON, wz]) - perlin.get([wx - EPSILON, wz])) / (2.0 * EPSILON);
+        let grad_z =
+            (perlin.get([wx, wz + EPSILON]) - perlin.get([wx, wz - EPSILON])) / (2.0 * EPSILON);
 
         let ridge = 1.0 - n.abs();
         let ridge_sq = ridge * ridge;
@@ -327,13 +344,18 @@ fn swiss_noise_2d(
         amp *= persistence;
     }
 
-    if amp_sum > 0.0 { result / amp_sum * 2.0 - 1.0 } else { 0.0 }
+    if amp_sum > 0.0 {
+        result / amp_sum * 2.0 - 1.0
+    } else {
+        0.0
+    }
 }
 
 /// Multi-layer noise blend for a single point.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn biome_noise_layered(
-    x: f64, z: f64,
+    x: f64,
+    z: f64,
     perlin: &Perlin,
     base_freq: f64,
     octaves: usize,
@@ -356,45 +378,51 @@ pub(super) fn biome_noise_layered(
             freq *= lac;
             amp *= pers;
         }
-        if amp_sum > 0.0 { h_fbm /= amp_sum; }
+        if amp_sum > 0.0 {
+            h_fbm /= amp_sum;
+        }
     }
 
     // Layer 2: Ridged multifractal (if weight > 0)
     let h_ridged = if layers.ridged_weight > 0.001 {
         ridged_noise_2d(
-            x, z, perlin,
+            x,
+            z,
+            perlin,
             base_freq * f64::from(layers.ridged_freq_mult),
             octaves,
             lac,
             seed,
         )
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     // Layer 3: Billow (if weight > 0)
     let h_billow = if layers.billow_weight > 0.001 {
-        billow_noise_2d(
-            x, z, perlin,
-            base_freq,
-            octaves,
-            lac,
-            pers,
-            seed,
-        )
-    } else { 0.0 };
+        billow_noise_2d(x, z, perlin, base_freq, octaves, lac, pers, seed)
+    } else {
+        0.0
+    };
 
     // Layer 4: Cellular/Worley (if weight > 0)
     let h_worley = if layers.worley_weight > 0.001 {
         cellular_noise_2d(
-            x, z,
+            x,
+            z,
             seed.wrapping_add(33333),
             base_freq * f64::from(layers.worley_freq_mult) * 100.0,
         )
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     // Layer 5: Swiss turbulence (if weight > 0)
     let h_swiss = if layers.swiss_weight > 0.001 {
         swiss_noise_2d(
-            x, z, perlin,
+            x,
+            z,
+            perlin,
             base_freq,
             octaves,
             lac,
@@ -402,9 +430,17 @@ pub(super) fn biome_noise_layered(
             f64::from(layers.swiss_warp),
             seed,
         )
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
-    let fbm_w = f64::from((1.0 - layers.ridged_weight - layers.billow_weight - layers.worley_weight - layers.swiss_weight).max(0.0));
+    let fbm_w = f64::from(
+        (1.0 - layers.ridged_weight
+            - layers.billow_weight
+            - layers.worley_weight
+            - layers.swiss_weight)
+            .max(0.0),
+    );
     let total_w = fbm_w
         + f64::from(layers.ridged_weight)
         + f64::from(layers.billow_weight)
@@ -424,7 +460,10 @@ pub(super) fn biome_noise_layered(
 }
 
 /// Resolve noise layers for a biome: genome override > hardcoded default.
-pub(super) fn resolve_noise_layers(biome: BiomeType, overrides: Option<&BiomeGenomeOverrides>) -> BiomeNoiseLayers {
+pub(super) fn resolve_noise_layers(
+    biome: BiomeType,
+    overrides: Option<&BiomeGenomeOverrides>,
+) -> BiomeNoiseLayers {
     if let Some(ovr) = overrides {
         if let Some(layers) = &ovr.noise_layers[(biome as u8 as usize).min(9)] {
             return layers.clone();
@@ -461,8 +500,10 @@ mod tests {
             (-1e6, 1e6, 0.001, 5.0),
         ] {
             let v = domain_warp_2d(x, z, &p, freq, warp);
-            assert!(v.is_finite(),
-                    "domain_warp({x}, {z}, freq={freq}, warp={warp}) = {v}");
+            assert!(
+                v.is_finite(),
+                "domain_warp({x}, {z}, freq={freq}, warp={warp}) = {v}"
+            );
         }
     }
 
@@ -470,17 +511,25 @@ mod tests {
     fn biome_noise_layered_covers_all_biomes_finite() {
         let p = Perlin::new(123);
         let biomes = [
-            BiomeType::Plains, BiomeType::Forest, BiomeType::Desert,
-            BiomeType::Mountain, BiomeType::Swamp, BiomeType::Tundra,
-            BiomeType::Savanna, BiomeType::Jungle, BiomeType::Volcanic,
+            BiomeType::Plains,
+            BiomeType::Forest,
+            BiomeType::Desert,
+            BiomeType::Mountain,
+            BiomeType::Swamp,
+            BiomeType::Tundra,
+            BiomeType::Savanna,
+            BiomeType::Jungle,
+            BiomeType::Volcanic,
             BiomeType::Canyon,
         ];
         for b in biomes {
             let layers = default_noise_layers(b);
             let v = biome_noise_layered(50.0, 50.0, &p, 0.01, 4, 1.0, &layers, 123);
             assert!(v.is_finite(), "biome_noise_layered({b:?}) = {v}");
-            assert!((-3.0..=3.0).contains(&v),
-                    "biome_noise_layered({b:?}) = {v} outside [-3, 3] bounds");
+            assert!(
+                (-3.0..=3.0).contains(&v),
+                "biome_noise_layered({b:?}) = {v} outside [-3, 3] bounds"
+            );
         }
     }
 

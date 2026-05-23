@@ -5,8 +5,8 @@
 //! Architecture mirrors fireball_vfx: resource cache of EffectAsset handles,
 //! setup at Startup, spawned at fire time via event or direct spawn.
 
-pub mod muzzle;
 pub mod impact;
+pub mod muzzle;
 pub mod tracer;
 
 use bevy::prelude::*;
@@ -25,13 +25,13 @@ pub fn weapon_muzzle_scale(w: &WeaponType) -> f32 {
     // visée. Réduction ~35% sur tous les scales, baseline ModernAR passe 1.0 → 0.65.
     // Signature gameplay préservée (shotgun/rocket toujours plus gros).
     match w {
-        WeaponType::Shotgun => 1.05,       // Madame Lenoir (sniper-shotgun hybride V2)
+        WeaponType::Shotgun => 1.05, // Madame Lenoir (sniper-shotgun hybride V2)
         WeaponType::RocketLauncher => 1.20, // Boucherie (heavy mais réduit)
         WeaponType::AK47 => 0.80,
-        WeaponType::AssaultRifle => 0.75,  // Bourrasque
-        WeaponType::ModernAR => 0.65,      // Pépin (baseline shrink)
+        WeaponType::AssaultRifle => 0.75, // Bourrasque
+        WeaponType::ModernAR => 0.65,     // Pépin (baseline shrink)
         WeaponType::PlasmaRifle => 0.85,
-        WeaponType::Chainsaw => 0.0,       // pas de muzzle (mêlée)
+        WeaponType::Chainsaw => 0.0, // pas de muzzle (mêlée)
     }
 }
 
@@ -39,7 +39,7 @@ pub fn weapon_muzzle_scale(w: &WeaponType) -> f32 {
 pub fn weapon_impact_scale(w: &WeaponType) -> f32 {
     match w {
         WeaponType::RocketLauncher => 2.0,
-        WeaponType::Shotgun => 0.8,        // par pellet plus petit (8 pellets cumulés)
+        WeaponType::Shotgun => 0.8, // par pellet plus petit (8 pellets cumulés)
         WeaponType::PlasmaRifle => 1.3,
         _ => 1.0,
     }
@@ -58,11 +58,11 @@ pub fn weapon_impact_scale(w: &WeaponType) -> f32 {
 /// Apex tuning sheets — muzzle = warm white avec twist per-weapon.
 pub fn weapon_muzzle_tint(w: &WeaponType) -> LinearRgba {
     match w {
-        WeaponType::ModernAR => LinearRgba::new(3.0, 2.6, 1.4, 1.0),       // blanc-jaune
-        WeaponType::AssaultRifle => LinearRgba::new(3.2, 2.5, 1.2, 1.0),   // blanc-jaune chaud
-        WeaponType::Shotgun => LinearRgba::new(3.0, 3.0, 3.5, 1.0),        // blanc froid sniper
+        WeaponType::ModernAR => LinearRgba::new(3.0, 2.6, 1.4, 1.0), // blanc-jaune
+        WeaponType::AssaultRifle => LinearRgba::new(3.2, 2.5, 1.2, 1.0), // blanc-jaune chaud
+        WeaponType::Shotgun => LinearRgba::new(3.0, 3.0, 3.5, 1.0),  // blanc froid sniper
         WeaponType::RocketLauncher => LinearRgba::new(3.5, 1.6, 0.6, 1.0), // rouge-orange poudre
-        WeaponType::PlasmaRifle => LinearRgba::new(0.8, 1.8, 3.5, 1.0),    // cyan plasma
+        WeaponType::PlasmaRifle => LinearRgba::new(0.8, 1.8, 3.5, 1.0), // cyan plasma
         _ => LinearRgba::new(3.0, 2.6, 1.4, 1.0),
     }
 }
@@ -70,10 +70,10 @@ pub fn weapon_muzzle_tint(w: &WeaponType) -> LinearRgba {
 /// Tint impact VFX per-arme. Plus sobre que muzzle (impact = poussière/spark, pas flash).
 pub fn weapon_impact_tint(w: &WeaponType) -> LinearRgba {
     match w {
-        WeaponType::RocketLauncher => LinearRgba::new(3.0, 1.4, 0.5, 1.0),  // orange explosif
-        WeaponType::Shotgun => LinearRgba::new(2.0, 2.0, 2.4, 1.0),         // blanc froid sniper
-        WeaponType::PlasmaRifle => LinearRgba::new(0.6, 1.6, 3.0, 1.0),     // cyan plasma
-        _ => LinearRgba::new(2.4, 2.0, 1.2, 1.0),                            // étincelles standard
+        WeaponType::RocketLauncher => LinearRgba::new(3.0, 1.4, 0.5, 1.0), // orange explosif
+        WeaponType::Shotgun => LinearRgba::new(2.0, 2.0, 2.4, 1.0),        // blanc froid sniper
+        WeaponType::PlasmaRifle => LinearRgba::new(0.6, 1.6, 3.0, 1.0),    // cyan plasma
+        _ => LinearRgba::new(2.4, 2.0, 1.2, 1.0),                          // étincelles standard
     }
 }
 
@@ -81,9 +81,9 @@ pub fn weapon_impact_tint(w: &WeaponType) -> LinearRgba {
 /// Shotgun = court (déjà compensé par spawn larger).
 pub fn weapon_muzzle_smoke_lifetime(w: &WeaponType) -> f32 {
     match w {
-        WeaponType::Shotgun => 2.5,         // sniper Lenoir : long trail
-        WeaponType::RocketLauncher => 1.6,  // shotgun Boucherie : smoke lourd
-        WeaponType::AssaultRifle => 0.9,    // SMG full-auto : court pour pas accumuler
+        WeaponType::Shotgun => 2.5,        // sniper Lenoir : long trail
+        WeaponType::RocketLauncher => 1.6, // shotgun Boucherie : smoke lourd
+        WeaponType::AssaultRifle => 0.9,   // SMG full-auto : court pour pas accumuler
         _ => 1.2,
     }
 }
@@ -93,10 +93,10 @@ pub fn weapon_muzzle_smoke_lifetime(w: &WeaponType) -> f32 {
 pub fn weapon_muzzle_light_intensity(w: &WeaponType) -> f32 {
     match w {
         WeaponType::Chainsaw => 0.0,
-        WeaponType::RocketLauncher => 8_000.0,  // shotgun boom
-        WeaponType::Shotgun => 6_000.0,         // sniper one-shot
-        WeaponType::AssaultRifle => 2_500.0,    // SMG sustained = faible (anti eye-strain)
-        WeaponType::ModernAR => 3_500.0,        // pistolet
+        WeaponType::RocketLauncher => 8_000.0, // shotgun boom
+        WeaponType::Shotgun => 6_000.0,        // sniper one-shot
+        WeaponType::AssaultRifle => 2_500.0,   // SMG sustained = faible (anti eye-strain)
+        WeaponType::ModernAR => 3_500.0,       // pistolet
         _ => 3_000.0,
     }
 }
@@ -129,10 +129,7 @@ pub struct MuzzleVfxMarker;
 #[derive(Component)]
 pub struct ImpactVfxMarker;
 
-pub fn setup_weapon_vfx(
-    mut commands: Commands,
-    mut effects: ResMut<Assets<EffectAsset>>,
-) {
+pub fn setup_weapon_vfx(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
     let muzzle_core_flash = muzzle::create_muzzle_core_flash(&mut effects);
     let muzzle_sparks = muzzle::create_muzzle_sparks(&mut effects);
     let muzzle_smoke = muzzle::create_muzzle_smoke(&mut effects);
@@ -198,7 +195,10 @@ pub fn spawn_muzzle_flash(
         ParticleEffect::new(effects.muzzle_smoke.clone()),
         Transform::from_translation(barrel_tip + shot_dir * 0.05).with_scale(scale_v),
         MuzzleVfxMarker,
-        Lifetime(Timer::from_seconds(weapon_muzzle_smoke_lifetime(weapon), TimerMode::Once)),
+        Lifetime(Timer::from_seconds(
+            weapon_muzzle_smoke_lifetime(weapon),
+            TimerMode::Once,
+        )),
     ));
 
     // Layer 4: Heat glow — story-450 (2026-05-18) : RE-ENABLED après shrink x3
@@ -320,7 +320,10 @@ mod tests {
         // Lenoir (sniper) = blanc froid → bleu > rouge ; Boucherie (shotgun)
         // = rouge-orange → rouge > bleu. Inversion garantit lecture distincte.
         assert!(lenoir.blue > lenoir.red, "Lenoir doit être bleu-froid");
-        assert!(boucherie.red > boucherie.blue, "Boucherie doit être rouge-orange");
+        assert!(
+            boucherie.red > boucherie.blue,
+            "Boucherie doit être rouge-orange"
+        );
         // Pépin et Bourrasque sont proches (deux gunfeels chauds) mais doivent rester
         // dans la même famille warm white.
         assert!(pepin.red > pepin.blue, "Pépin warm");
@@ -344,13 +347,19 @@ mod tests {
         let bourrasque = weapon_muzzle_smoke_lifetime(&WeaponType::AssaultRifle);
         assert!(lenoir > pepin, "sniper trail > pistolet");
         assert!(lenoir > bourrasque, "sniper trail > SMG");
-        assert!(bourrasque < pepin, "SMG plus court que pistolet (anti accumulation)");
+        assert!(
+            bourrasque < pepin,
+            "SMG plus court que pistolet (anti accumulation)"
+        );
     }
 
     #[test]
     fn muzzle_light_intensity_melee_zero() {
-        assert_eq!(weapon_muzzle_light_intensity(&WeaponType::Chainsaw), 0.0,
-            "mêlée : pas de PointLight");
+        assert_eq!(
+            weapon_muzzle_light_intensity(&WeaponType::Chainsaw),
+            0.0,
+            "mêlée : pas de PointLight"
+        );
     }
 
     #[test]

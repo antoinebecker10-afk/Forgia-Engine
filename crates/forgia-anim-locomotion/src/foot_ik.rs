@@ -168,7 +168,12 @@ pub fn foot_ik_system(
 
 /// Retourne `(hit_y, target_delta, smoothed_offset)`.
 fn solve_one_leg(
-    chain: &(Option<Entity>, Option<Entity>, Option<Entity>, Option<Entity>),
+    chain: &(
+        Option<Entity>,
+        Option<Entity>,
+        Option<Entity>,
+        Option<Entity>,
+    ),
     transforms: &Query<&GlobalTransform, Without<LocomotionState>>,
     rapier: &ReadRapierContext,
     exclude_entity: Entity,
@@ -195,7 +200,9 @@ fn solve_one_leg(
     let foot_pos = foot_gt.translation();
 
     // Raycast vertical depuis foot.xz + raycast_up_dist au-dessus
-    let Ok(ctx) = rapier.single() else { return (0.0, 0.0, 0.0) };
+    let Ok(ctx) = rapier.single() else {
+        return (0.0, 0.0, 0.0);
+    };
     let origin = Vec3::new(foot_pos.x, foot_pos.y + config.raycast_up_dist, foot_pos.z);
     let filter = QueryFilter::default().exclude_collider(exclude_entity);
     let max_dist = config.raycast_up_dist + config.raycast_down_dist;
@@ -211,8 +218,8 @@ fn solve_one_leg(
     if *smoothed_target_y == 0.0 {
         *smoothed_target_y = target_y;
     } else {
-        *smoothed_target_y = *smoothed_target_y * (1.0 - config.lerp_factor)
-            + target_y * config.lerp_factor;
+        *smoothed_target_y =
+            *smoothed_target_y * (1.0 - config.lerp_factor) + target_y * config.lerp_factor;
     }
     let smoothed_offset = *smoothed_target_y - foot_pos.y;
 
@@ -260,7 +267,11 @@ pub fn write_foot_ik_sensor(
     let (severity, next_step, state_str) = if stats.bones_missing {
         ("warn", "bones_missing=true — chaîne hip+thigh+shin+foot incomplète depuis Pinocchio. Voir forgia2_auto_rig.json + forgia2_rex_bones_live.json", "bones_missing")
     } else if stats.ticks_total == 0 {
-        ("warn", "ticks_total=0 — foot_ik_system n'a jamais tourné (RPG pas entré ?)", "never_ticked")
+        (
+            "warn",
+            "ticks_total=0 — foot_ik_system n'a jamais tourné (RPG pas entré ?)",
+            "never_ticked",
+        )
     } else {
         ("ok", "", "ok")
     };

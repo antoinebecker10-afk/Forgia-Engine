@@ -15,7 +15,9 @@ use bevy_hanabi::Gradient as HanabiGradient;
 
 /// Layer 1: Impact sparks — directional debris bouncing off surface.
 /// Gravity-affected, parabolic arcs, longer lived than muzzle sparks.
-pub(super) fn create_impact_sparks(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_impact_sparks(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -43,11 +45,11 @@ pub(super) fn create_impact_sparks(effects: &mut ResMut<Assets<EffectAsset>>) ->
     let drag = LinearDragModifier::new(writer.lit(1.5).expr());
 
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(5.0, 4.0, 2.0, 1.0));    // Bright orange-white
-    color_gradient.add_key(0.1, Vec4::new(3.5, 1.5, 0.3, 0.95));    // Orange
-    color_gradient.add_key(0.35, Vec4::new(1.8, 0.5, 0.08, 0.7));   // Red-orange
-    color_gradient.add_key(0.6, Vec4::new(0.7, 0.15, 0.03, 0.35));  // Dark red
-    color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0));   // Extinct
+    color_gradient.add_key(0.0, Vec4::new(5.0, 4.0, 2.0, 1.0)); // Bright orange-white
+    color_gradient.add_key(0.1, Vec4::new(3.5, 1.5, 0.3, 0.95)); // Orange
+    color_gradient.add_key(0.35, Vec4::new(1.8, 0.5, 0.08, 0.7)); // Red-orange
+    color_gradient.add_key(0.6, Vec4::new(0.7, 0.15, 0.03, 0.35)); // Dark red
+    color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0)); // Extinct
 
     let effect = EffectAsset::new(
         96,
@@ -61,7 +63,10 @@ pub(super) fn create_impact_sparks(effects: &mut ResMut<Assets<EffectAsset>>) ->
     .init(init_lifetime)
     .update(gravity)
     .update(drag)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() });
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    });
 
     effects.add(effect)
 }
@@ -118,7 +123,10 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
     .init(init_lifetime)
     .update(accel)
     .update(drag)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() })
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    })
     .render(SizeOverLifetimeModifier {
         gradient: size_gradient,
         screen_space_size: false,
@@ -128,7 +136,9 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
 }
 
 /// Layer 3: Impact flash — very brief bright burst at hit point.
-pub(super) fn create_impact_flash(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_impact_flash(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -152,9 +162,9 @@ pub(super) fn create_impact_flash(effects: &mut ResMut<Assets<EffectAsset>>) -> 
     );
 
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(10.0, 8.0, 5.0, 1.0));   // White-hot
-    color_gradient.add_key(0.4, Vec4::new(5.0, 2.5, 0.8, 0.7));    // Yellow
-    color_gradient.add_key(1.0, Vec4::new(1.0, 0.3, 0.05, 0.0));   // Fade
+    color_gradient.add_key(0.0, Vec4::new(10.0, 8.0, 5.0, 1.0)); // White-hot
+    color_gradient.add_key(0.4, Vec4::new(5.0, 2.5, 0.8, 0.7)); // Yellow
+    color_gradient.add_key(1.0, Vec4::new(1.0, 0.3, 0.05, 0.0)); // Fade
 
     let effect = EffectAsset::new(
         16,
@@ -166,7 +176,10 @@ pub(super) fn create_impact_flash(effects: &mut ResMut<Assets<EffectAsset>>) -> 
     .init(init_vel)
     .init(init_size)
     .init(init_lifetime)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() });
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    });
 
     effects.add(effect)
 }

@@ -254,8 +254,16 @@ mod tests {
             counts[i] += 1;
         }
         assert_eq!(counts[0], 0, "zero weight must never be picked");
-        assert!(counts[1] > 8500 && counts[1] < 9500, "bucket 1 ~9000, got {}", counts[1]);
-        assert!(counts[2] > 500 && counts[2] < 1500, "bucket 2 ~1000, got {}", counts[2]);
+        assert!(
+            counts[1] > 8500 && counts[1] < 9500,
+            "bucket 1 ~9000, got {}",
+            counts[1]
+        );
+        assert!(
+            counts[2] > 500 && counts[2] < 1500,
+            "bucket 2 ~1000, got {}",
+            counts[2]
+        );
     }
 
     #[test]
@@ -276,6 +284,10 @@ mod tests {
                 trues += 1;
             }
         }
-        assert!(trues > 2700 && trues < 3300, "bool(0.3) gave {} true out of 10000", trues);
+        assert!(
+            trues > 2700 && trues < 3300,
+            "bool(0.3) gave {} true out of 10000",
+            trues
+        );
     }
 }

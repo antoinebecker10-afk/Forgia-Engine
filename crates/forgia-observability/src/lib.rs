@@ -1,4 +1,4 @@
-﻿//! # forgia-observability
+//! # forgia-observability
 //!
 //! RPG Health Monitor — 6 checks cross-sectoriels (story-452).
 //!
@@ -19,24 +19,24 @@
 //!
 //! Shift+F12 : recharge `config/genomes/rpg_monitor.toml` à chaud.
 
-pub mod config;
-pub mod state;
-pub mod sensor_reader;
-pub mod checks;
-pub mod exporter;
 pub mod asset_handles;
-pub mod health_sensor;
+pub mod checks;
+pub mod config;
+pub mod exporter;
 pub mod forgia2_aggregator;
+pub mod health_sensor;
+pub mod sensor_reader;
+pub mod state;
 // Story-467 V5 Session B — perf / entities / memory producers
-pub mod perf_sensor;
 pub mod entities_sensor;
 pub mod memory_sensor;
+pub mod perf_sensor;
 // Story-469 V5 Session C — lifecycle / watchdog / audio / input / sensor_health
-pub mod lifecycle_sensor;
-pub mod watchdog_sensor;
 pub mod audio_sensor;
 pub mod input_sensor;
+pub mod lifecycle_sensor;
 pub mod sensor_health_sensor;
+pub mod watchdog_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -46,13 +46,13 @@ use bevy::diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin}
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
-use config::{RpgMonitorConfig, sys_reload_config_on_hotkey};
-use sensor_reader::sys_read_sensors_1hz;
 use checks::sys_run_crosschecks;
-use exporter::{sys_write_rpg_health_json, sys_sensor_liveness_watchdog};
+use config::{sys_reload_config_on_hotkey, RpgMonitorConfig};
+use exporter::{sys_sensor_liveness_watchdog, sys_write_rpg_health_json};
+use forgia2_aggregator::{sys_write_forgia2_aggregates, Forgia2AggregatorState};
 use health_sensor::sys_write_health_sensor;
-use forgia2_aggregator::{Forgia2AggregatorState, sys_write_forgia2_aggregates};
-use state::{RpgHealthState, SensorSnapshots, LastWriteTimestamps};
+use sensor_reader::sys_read_sensors_1hz;
+use state::{LastWriteTimestamps, RpgHealthState, SensorSnapshots};
 
 /// Plugin Bevy. Ajouter à l'App via app.add_plugins(ForgiaObservabilityPlugin).
 pub struct ForgiaObservabilityPlugin;
@@ -90,10 +90,7 @@ impl Plugin for ForgiaObservabilityPlugin {
         // Story-453 : préchargement critical assets handles OnEnter/OnExit Rpg.
         asset_handles::register(app);
         // Sensor health cross-mode : tourne en tout état (pas de run_if mode-gate).
-        app.add_systems(
-            Update,
-            sys_write_health_sensor.in_set(GameSet::Sensors),
-        );
+        app.add_systems(Update, sys_write_health_sensor.in_set(GameSet::Sensors));
         // Story-467 V5 Session B — perf / entities / memory producers cross-mode.
         app.add_systems(
             Update,
@@ -124,22 +121,20 @@ impl Plugin for ForgiaObservabilityPlugin {
             Update,
             sys_write_forgia2_aggregates
                 .in_set(GameSet::Sensors)
-                .run_if(
-                    in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
-                ),
+                .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
         );
         app.add_systems(
-                Update,
-                (
-                    sys_reload_config_on_hotkey,
-                    sys_read_sensors_1hz,
-                    sys_run_crosschecks,
-                    sys_write_rpg_health_json,
-                    sys_sensor_liveness_watchdog,
-                )
-                    .chain()
-                    .in_set(GameSet::Sensors)
-                    .run_if(in_state(GameMode::Rpg)),
-            );
+            Update,
+            (
+                sys_reload_config_on_hotkey,
+                sys_read_sensors_1hz,
+                sys_run_crosschecks,
+                sys_write_rpg_health_json,
+                sys_sensor_liveness_watchdog,
+            )
+                .chain()
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Rpg)),
+        );
     }
 }

@@ -170,7 +170,11 @@ pub fn apply_ads_viewmodel(
     let hipfire_rot = viewmodel_rotation_hipfire(entry);
     let ads_rot = viewmodel_rotation_ads(entry);
 
-    let sight_local = Vec3::new(entry.sight_local_x, entry.sight_local_y, entry.sight_local_z);
+    let sight_local = Vec3::new(
+        entry.sight_local_x,
+        entry.sight_local_y,
+        entry.sight_local_z,
+    );
     let use_sight_align = sight_local.length_squared() > 0.0001;
     let hide_for_sniper = entry.sniper_scope_fullscreen && ads.progress > 0.5;
 
@@ -192,7 +196,11 @@ pub fn apply_ads_viewmodel(
         tf.translation = hipfire.translation.lerp(ads_target, ads.progress);
         tf.rotation = hipfire_rot.slerp(ads_rot, ads.progress);
 
-        *vis = if hide_for_sniper { Visibility::Hidden } else { Visibility::Inherited };
+        *vis = if hide_for_sniper {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
     }
 }
 
@@ -214,9 +222,7 @@ impl Plugin for ForgiaViewmodelPosePlugin {
                     apply_ads_viewmodel,
                 )
                     .chain()
-                    .run_if(
-                        in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
-                    ),
+                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
             );
     }
 }

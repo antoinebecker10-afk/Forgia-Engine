@@ -117,20 +117,12 @@ pub fn place_modules(
         };
         for instance_idx in 0..entry.count {
             let pos_opt = match def.kind {
-                ModuleKind::SniperPerch => sample_edge(
-                    max_radius,
-                    &mut rng_state,
-                    player_xz,
-                    &placements,
-                    def,
-                ),
-                ModuleKind::MeleePit => sample_center(
-                    max_radius,
-                    &mut rng_state,
-                    player_xz,
-                    &placements,
-                    def,
-                ),
+                ModuleKind::SniperPerch => {
+                    sample_edge(max_radius, &mut rng_state, player_xz, &placements, def)
+                }
+                ModuleKind::MeleePit => {
+                    sample_center(max_radius, &mut rng_state, player_xz, &placements, def)
+                }
                 ModuleKind::CoverWall if sightline_break_pending && instance_idx == 0 => {
                     let mp = midpoint_player_boss(player_xz, boss_xz_opt.unwrap());
                     if is_position_valid(mp, max_radius, player_xz, &placements, def) {
@@ -152,13 +144,7 @@ pub fn place_modules(
                         })
                     }
                 }
-                _ => sample_dart_throw(
-                    max_radius,
-                    &mut rng_state,
-                    player_xz,
-                    &placements,
-                    def,
-                ),
+                _ => sample_dart_throw(max_radius, &mut rng_state, player_xz, &placements, def),
             };
 
             if let Some(pos) = pos_opt {
@@ -331,11 +317,7 @@ fn u64_to_unit_f32(n: u64) -> f32 {
 
 /// Midpoint XZ entre player et boss.
 fn midpoint_player_boss(player: Vec3, boss: Vec3) -> Vec3 {
-    Vec3::new(
-        (player.x + boss.x) * 0.5,
-        0.0,
-        (player.z + boss.z) * 0.5,
-    )
+    Vec3::new((player.x + boss.x) * 0.5, 0.0, (player.z + boss.z) * 0.5)
 }
 
 /// Weighted RNG selection dans `def.prop_palette`. Retourne (index, height_class).
@@ -474,25 +456,61 @@ mod tests {
         let mut modules = HashMap::new();
         modules.insert(
             "cover_low".into(),
-            make_module(ModuleKind::CoverCluster, "cover_low", HeightClass::Low, 3.0, 1.5),
+            make_module(
+                ModuleKind::CoverCluster,
+                "cover_low",
+                HeightClass::Low,
+                3.0,
+                1.5,
+            ),
         );
         modules.insert(
             "cover_high".into(),
-            make_module(ModuleKind::CoverWall, "cover_high", HeightClass::High, 5.0, 2.5),
+            make_module(
+                ModuleKind::CoverWall,
+                "cover_high",
+                HeightClass::High,
+                5.0,
+                2.5,
+            ),
         );
         modules.insert(
             "sniper".into(),
-            make_module(ModuleKind::SniperPerch, "sniper_perch", HeightClass::Tall, 0.0, 4.0),
+            make_module(
+                ModuleKind::SniperPerch,
+                "sniper_perch",
+                HeightClass::Tall,
+                0.0,
+                4.0,
+            ),
         );
         modules.insert(
             "pit".into(),
-            make_module(ModuleKind::MeleePit, "melee_pit", HeightClass::Low, 0.0, 6.0),
+            make_module(
+                ModuleKind::MeleePit,
+                "melee_pit",
+                HeightClass::Low,
+                0.0,
+                6.0,
+            ),
         );
         let palette = vec![
-            ModulePaletteEntry { id: "cover_low".into(), count: 6 },
-            ModulePaletteEntry { id: "cover_high".into(), count: 2 },
-            ModulePaletteEntry { id: "sniper".into(), count: 1 },
-            ModulePaletteEntry { id: "pit".into(), count: 1 },
+            ModulePaletteEntry {
+                id: "cover_low".into(),
+                count: 6,
+            },
+            ModulePaletteEntry {
+                id: "cover_high".into(),
+                count: 2,
+            },
+            ModulePaletteEntry {
+                id: "sniper".into(),
+                count: 1,
+            },
+            ModulePaletteEntry {
+                id: "pit".into(),
+                count: 1,
+            },
         ];
         (modules, palette)
     }
@@ -714,8 +732,14 @@ mod tests {
     fn place_modules_unknown_id_skipped() {
         let (modules, _) = make_palette();
         let palette = vec![
-            ModulePaletteEntry { id: "does_not_exist".into(), count: 3 },
-            ModulePaletteEntry { id: "cover_low".into(), count: 2 },
+            ModulePaletteEntry {
+                id: "does_not_exist".into(),
+                count: 3,
+            },
+            ModulePaletteEntry {
+                id: "cover_low".into(),
+                count: 2,
+            },
         ];
         let r = place_modules(
             90.0,
@@ -844,26 +868,62 @@ mod tests {
         // Mirroring assets/genomes/level_modules.toml prod values
         modules.insert(
             "cover_low_cluster".into(),
-            make_module(ModuleKind::CoverCluster, "cover_low", HeightClass::Low, 3.0, 6.0),
+            make_module(
+                ModuleKind::CoverCluster,
+                "cover_low",
+                HeightClass::Low,
+                3.0,
+                6.0,
+            ),
         );
         modules.insert(
             "cover_high_wall".into(),
-            make_module(ModuleKind::CoverWall, "cover_high", HeightClass::High, 5.0, 8.0),
+            make_module(
+                ModuleKind::CoverWall,
+                "cover_high",
+                HeightClass::High,
+                5.0,
+                8.0,
+            ),
         );
         modules.insert(
             "sniper_perch".into(),
-            make_module(ModuleKind::SniperPerch, "sniper_perch", HeightClass::Tall, 0.0, 4.0),
+            make_module(
+                ModuleKind::SniperPerch,
+                "sniper_perch",
+                HeightClass::Tall,
+                0.0,
+                4.0,
+            ),
         );
         modules.insert(
             "melee_pit".into(),
-            make_module(ModuleKind::MeleePit, "melee_pit", HeightClass::Low, 0.0, 6.0),
+            make_module(
+                ModuleKind::MeleePit,
+                "melee_pit",
+                HeightClass::Low,
+                0.0,
+                6.0,
+            ),
         );
         // Mirroring assets/genomes/roguelite_stages.toml crypts_of_anvil
         let palette = vec![
-            ModulePaletteEntry { id: "cover_low_cluster".into(), count: 6 },
-            ModulePaletteEntry { id: "cover_high_wall".into(),   count: 2 },
-            ModulePaletteEntry { id: "sniper_perch".into(),      count: 1 },
-            ModulePaletteEntry { id: "melee_pit".into(),         count: 1 },
+            ModulePaletteEntry {
+                id: "cover_low_cluster".into(),
+                count: 6,
+            },
+            ModulePaletteEntry {
+                id: "cover_high_wall".into(),
+                count: 2,
+            },
+            ModulePaletteEntry {
+                id: "sniper_perch".into(),
+                count: 1,
+            },
+            ModulePaletteEntry {
+                id: "melee_pit".into(),
+                count: 1,
+            },
         ];
         // 5 seeds — robustesse multi-run replay
         for seed in [1u64, 42, 9876, 12345, 99999] {
@@ -897,31 +957,76 @@ mod tests {
         let mut modules = HashMap::new();
         modules.insert(
             "cover_low_cluster".into(),
-            make_module(ModuleKind::CoverCluster, "cover_low", HeightClass::Low, 3.0, 6.0),
+            make_module(
+                ModuleKind::CoverCluster,
+                "cover_low",
+                HeightClass::Low,
+                3.0,
+                6.0,
+            ),
         );
         modules.insert(
             "cover_high_wall".into(),
-            make_module(ModuleKind::CoverWall, "cover_high", HeightClass::High, 5.0, 8.0),
+            make_module(
+                ModuleKind::CoverWall,
+                "cover_high",
+                HeightClass::High,
+                5.0,
+                8.0,
+            ),
         );
         modules.insert(
             "sniper_perch".into(),
-            make_module(ModuleKind::SniperPerch, "sniper_perch", HeightClass::Tall, 0.0, 4.0),
+            make_module(
+                ModuleKind::SniperPerch,
+                "sniper_perch",
+                HeightClass::Tall,
+                0.0,
+                4.0,
+            ),
         );
         modules.insert(
             "melee_pit".into(),
-            make_module(ModuleKind::MeleePit, "melee_pit", HeightClass::Low, 0.0, 6.0),
+            make_module(
+                ModuleKind::MeleePit,
+                "melee_pit",
+                HeightClass::Low,
+                0.0,
+                6.0,
+            ),
         );
 
         let crypts_palette = vec![
-            ModulePaletteEntry { id: "cover_low_cluster".into(), count: 6 },
-            ModulePaletteEntry { id: "cover_high_wall".into(),   count: 2 },
-            ModulePaletteEntry { id: "sniper_perch".into(),      count: 1 },
-            ModulePaletteEntry { id: "melee_pit".into(),         count: 1 },
+            ModulePaletteEntry {
+                id: "cover_low_cluster".into(),
+                count: 6,
+            },
+            ModulePaletteEntry {
+                id: "cover_high_wall".into(),
+                count: 2,
+            },
+            ModulePaletteEntry {
+                id: "sniper_perch".into(),
+                count: 1,
+            },
+            ModulePaletteEntry {
+                id: "melee_pit".into(),
+                count: 1,
+            },
         ];
         let forge_palette = vec![
-            ModulePaletteEntry { id: "cover_low_cluster".into(), count: 4 },
-            ModulePaletteEntry { id: "cover_high_wall".into(),   count: 1 },
-            ModulePaletteEntry { id: "melee_pit".into(),         count: 2 },
+            ModulePaletteEntry {
+                id: "cover_low_cluster".into(),
+                count: 4,
+            },
+            ModulePaletteEntry {
+                id: "cover_high_wall".into(),
+                count: 1,
+            },
+            ModulePaletteEntry {
+                id: "melee_pit".into(),
+                count: 2,
+            },
         ];
 
         let seed = 42u64;

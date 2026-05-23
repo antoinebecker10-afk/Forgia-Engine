@@ -34,11 +34,15 @@ impl Plugin for ForgiaWaterPlugin {
 }
 
 fn show_water(mut q: Query<&mut Visibility, With<WaterTiles>>) {
-    for mut v in &mut q { *v = Visibility::Visible; }
+    for mut v in &mut q {
+        *v = Visibility::Visible;
+    }
 }
 
 fn hide_water(mut q: Query<&mut Visibility, With<WaterTiles>>) {
-    for mut v in &mut q { *v = Visibility::Hidden; }
+    for mut v in &mut q {
+        *v = Visibility::Hidden;
+    }
 }
 
 /// Anti-trap : `bevy_water::WaterTiles` spawn avec Visibility default = visible.

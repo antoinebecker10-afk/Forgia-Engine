@@ -126,10 +126,7 @@ pub struct WaveCounterPlugin;
 impl Plugin for WaveCounterPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WaveCounterAnim>()
-            .add_systems(
-                Update,
-                tick_wave_anim.run_if(in_state(GameMode::Fps)),
-            )
+            .add_systems(Update, tick_wave_anim.run_if(in_state(GameMode::Fps)))
             .add_systems(EguiPrimaryContextPass, draw_wave_counter);
     }
 }

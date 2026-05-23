@@ -37,4 +37,6 @@ pub struct ChunkPipelineDiag {
 pub fn record_event(_label: &str) {}
 pub fn record_chunk_metric(_x: i32, _z: i32, _metric: f64) {}
 pub fn flush_diagnostics() {}
-pub fn compute_saturation_pct(_used: u32, _total: u32) -> f32 { 0.0 }
+pub fn compute_saturation_pct(_used: u32, _total: u32) -> f32 {
+    0.0
+}

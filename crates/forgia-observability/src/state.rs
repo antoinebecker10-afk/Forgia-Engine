@@ -63,7 +63,12 @@ impl CheckResult {
         }
     }
 
-    pub fn warn(value: f32, threshold: f32, message: impl Into<String>, next_step: impl Into<String>) -> Self {
+    pub fn warn(
+        value: f32,
+        threshold: f32,
+        message: impl Into<String>,
+        next_step: impl Into<String>,
+    ) -> Self {
         Self {
             severity: Severity::Warn,
             value,
@@ -73,7 +78,12 @@ impl CheckResult {
         }
     }
 
-    pub fn critical(value: f32, threshold: f32, message: impl Into<String>, next_step: impl Into<String>) -> Self {
+    pub fn critical(
+        value: f32,
+        threshold: f32,
+        message: impl Into<String>,
+        next_step: impl Into<String>,
+    ) -> Self {
         Self {
             severity: Severity::Critical,
             value,
@@ -95,7 +105,9 @@ impl CheckResult {
 }
 
 impl Default for CheckResult {
-    fn default() -> Self { Self::ok("not yet evaluated") }
+    fn default() -> Self {
+        Self::ok("not yet evaluated")
+    }
 }
 
 // ─────────────────────────── RpgHealthState ───────────────────────────

@@ -20,12 +20,10 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 /// Chemin relatif aux 3 textures PBR Jolcham Oak Bark (depuis `assets/`).
-pub const BARK_DIFF_PATH: &str =
-    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.jpg";
+pub const BARK_DIFF_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.jpg";
 pub const BARK_NOR_PATH: &str =
     "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_2k.jpg";
-pub const BARK_ARM_PATH: &str =
-    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.jpg";
+pub const BARK_ARM_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.jpg";
 
 /// Noms de primitives consideres comme "tronc" (lowercase substring match).
 pub const TRUNK_PATTERNS: &[&str] = &["bark", "trunk", "wood", "stem"];
@@ -124,7 +122,9 @@ pub struct FallbackEvent {
 /// UVs > 1.0, et le default Bevy 0.18 (Clamp) renverrait le bord de l'image
 /// partout = aplat uniforme. Voir memory `reference_v2_terrain_uv_tiling_repeat_sampler`.
 pub fn preload_bark_textures(mut commands: Commands, asset_server: Res<AssetServer>) {
-    use bevy::image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
+    use bevy::image::{
+        ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor,
+    };
     let repeat = |s: &mut ImageLoaderSettings| {
         let mut desc = ImageSamplerDescriptor::linear();
         desc.address_mode_u = ImageAddressMode::Repeat;

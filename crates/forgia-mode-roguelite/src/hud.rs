@@ -69,15 +69,8 @@ pub(crate) fn draw_wave_counter(
     // Texte principal "WAVE X / N".
     // TODO(story-471..479): current_stage_kind + current_stage_depth supprimés de RogueliteWave
     // — remplacés par current_wave (plus simple, pas de stage graph).
-    let total = run_graph
-        .as_deref()
-        .map(|g| g.total_stages)
-        .unwrap_or(5);
-    let main_text = format!(
-        "WAVE {} / {}",
-        wave.current_wave,
-        total
-    );
+    let total = run_graph.as_deref().map(|g| g.total_stages).unwrap_or(5);
+    let main_text = format!("WAVE {} / {}", wave.current_wave, total);
     text_with_outline(
         &painter,
         egui::pos2(center_x, top_y + 22.0),
@@ -381,11 +374,11 @@ pub(crate) fn draw_portal_overlay(
 /// Tier 2 audio (story future) gardera la même palette pour cohérence visuelle/sonore.
 pub fn speaker_color(speaker: &str) -> egui::Color32 {
     match speaker {
-        "pepin" => egui::Color32::from_rgb(120, 220, 130),       // vert frais (timide)
-        "bourrasque" => egui::Color32::from_rgb(110, 180, 240),  // bleu vent
-        "lenoir" => egui::Color32::from_rgb(180, 130, 220),      // violet noble
-        "boucherie" => egui::Color32::from_rgb(230, 110, 110),   // rouge sang
-        _ => egui::Color32::from_rgb(180, 180, 180),             // gris fallback "any"
+        "pepin" => egui::Color32::from_rgb(120, 220, 130), // vert frais (timide)
+        "bourrasque" => egui::Color32::from_rgb(110, 180, 240), // bleu vent
+        "lenoir" => egui::Color32::from_rgb(180, 130, 220), // violet noble
+        "boucherie" => egui::Color32::from_rgb(230, 110, 110), // rouge sang
+        _ => egui::Color32::from_rgb(180, 180, 180),       // gris fallback "any"
     }
 }
 
@@ -499,9 +492,18 @@ mod tests {
         let s5 = RunState::Victory;
         assert!(matches!(s1, RunState::InRun { .. } | RunState::Boss { .. }));
         assert!(matches!(s2, RunState::InRun { .. } | RunState::Boss { .. }));
-        assert!(!matches!(s3, RunState::InRun { .. } | RunState::Boss { .. }));
-        assert!(!matches!(s4, RunState::InRun { .. } | RunState::Boss { .. }));
-        assert!(!matches!(s5, RunState::InRun { .. } | RunState::Boss { .. }));
+        assert!(!matches!(
+            s3,
+            RunState::InRun { .. } | RunState::Boss { .. }
+        ));
+        assert!(!matches!(
+            s4,
+            RunState::InRun { .. } | RunState::Boss { .. }
+        ));
+        assert!(!matches!(
+            s5,
+            RunState::InRun { .. } | RunState::Boss { .. }
+        ));
     }
 
     #[test]

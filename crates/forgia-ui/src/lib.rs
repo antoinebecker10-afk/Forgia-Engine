@@ -61,10 +61,7 @@ impl Plugin for ForgiaUiPlugin {
 struct MenuCamera2d;
 
 /// MenuCamera2d permanente — spawn une fois au Startup, JAMAIS despawn.
-fn spawn_menu_camera_permanent(
-    mut commands: Commands,
-    q: Query<Entity, With<MenuCamera2d>>,
-) {
+fn spawn_menu_camera_permanent(mut commands: Commands, q: Query<Entity, With<MenuCamera2d>>) {
     if q.is_empty() {
         commands.spawn((
             Camera2d,
@@ -106,33 +103,69 @@ fn main_menu_ui(
         .show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(120.0);
-                ui.heading(egui::RichText::new("FORGIA V2").size(64.0).color(egui::Color32::from_rgb(255, 140, 50)));
+                ui.heading(
+                    egui::RichText::new("FORGIA V2")
+                        .size(64.0)
+                        .color(egui::Color32::from_rgb(255, 140, 50)),
+                );
                 ui.add_space(20.0);
-                ui.label(egui::RichText::new("Choisis ton mode").size(24.0).color(egui::Color32::WHITE));
+                ui.label(
+                    egui::RichText::new("Choisis ton mode")
+                        .size(24.0)
+                        .color(egui::Color32::WHITE),
+                );
                 ui.add_space(60.0);
 
-                if ui.add(egui::Button::new(egui::RichText::new("⚔  FPS Arena").size(28.0)).min_size(egui::vec2(280.0, 60.0))).clicked() {
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("⚔  FPS Arena").size(28.0))
+                            .min_size(egui::vec2(280.0, 60.0)),
+                    )
+                    .clicked()
+                {
                     next_game.set(GameMode::Fps);
                     next_app.set(AppMode::InGame);
                 }
                 ui.add_space(20.0);
-                if ui.add(egui::Button::new(egui::RichText::new("🗺  RPG OpenWorld").size(28.0)).min_size(egui::vec2(280.0, 60.0))).clicked() {
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("🗺  RPG OpenWorld").size(28.0))
+                            .min_size(egui::vec2(280.0, 60.0)),
+                    )
+                    .clicked()
+                {
                     next_game.set(GameMode::Rpg);
                     next_app.set(AppMode::InGame);
                 }
                 ui.add_space(20.0);
-                if ui.add(egui::Button::new(egui::RichText::new("🎲  Roguelite Run").size(28.0)).min_size(egui::vec2(280.0, 60.0))).clicked() {
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("🎲  Roguelite Run").size(28.0))
+                            .min_size(egui::vec2(280.0, 60.0)),
+                    )
+                    .clicked()
+                {
                     next_game.set(GameMode::Roguelite);
                     next_app.set(AppMode::InGame);
                     start_run.write(forgia_mode_roguelite::StartRunEvent { seed: None });
                 }
                 ui.add_space(40.0);
-                if ui.add(egui::Button::new(egui::RichText::new("Quitter").size(20.0)).min_size(egui::vec2(180.0, 40.0))).clicked() {
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("Quitter").size(20.0))
+                            .min_size(egui::vec2(180.0, 40.0)),
+                    )
+                    .clicked()
+                {
                     exit.write(AppExit::Success);
                 }
 
                 ui.add_space(80.0);
-                ui.label(egui::RichText::new("Phase 1 — Hello World jouable").size(14.0).color(egui::Color32::GRAY));
+                ui.label(
+                    egui::RichText::new("Phase 1 — Hello World jouable")
+                        .size(14.0)
+                        .color(egui::Color32::GRAY),
+                );
             });
         });
 }
@@ -140,10 +173,7 @@ fn main_menu_ui(
 /// Overlay PAUSED legacy (remplacé story-455 Phase G par forgia-ui-pause-menu cliquable).
 /// Conservé en `#[allow(dead_code)]` pour référence courte ; à supprimer story-457.
 #[allow(dead_code)]
-fn paused_overlay_ui(
-    app_state: Res<State<AppMode>>,
-    mut ctx: EguiContexts,
-) {
+fn paused_overlay_ui(app_state: Res<State<AppMode>>, mut ctx: EguiContexts) {
     if !matches!(app_state.get(), AppMode::Paused) {
         return;
     }

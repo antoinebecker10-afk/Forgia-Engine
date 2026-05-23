@@ -220,7 +220,9 @@ fn bot_state_machine(
     targets: Query<&Transform, With<BotTarget>>,
     time: Res<Time>,
 ) {
-    let Some(target) = targets.iter().next() else { return };
+    let Some(target) = targets.iter().next() else {
+        return;
+    };
     let target_pos = target.translation;
     let dt = time.delta_secs();
 
@@ -437,11 +439,7 @@ fn on_bot_death(
     }
 }
 
-fn tick_respawns(
-    time: Res<Time>,
-    mut pending: ResMut<PendingRespawns>,
-    mut commands: Commands,
-) {
+fn tick_respawns(time: Res<Time>, mut pending: ResMut<PendingRespawns>, mut commands: Commands) {
     let dt = time.delta_secs();
     let mut ready = Vec::new();
     pending.queue.retain_mut(|(t, pos)| {

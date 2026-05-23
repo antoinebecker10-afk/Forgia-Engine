@@ -22,22 +22,22 @@ pub fn sys_write_health_sensor(
     }
     *accum = 0.0;
 
-    let (severity_str, source_str, next_step_str, checks_count) =
-        if let Some(ref state) = rpg_state {
-            let sev = match state.last_severity {
-                Severity::Ok => "ok",
-                Severity::Warn => "warn",
-                Severity::Critical => "critical",
-            };
-            let next = if state.last_next_step.is_empty() {
-                ""
-            } else {
-                state.last_next_step.as_str()
-            };
-            (sev, "rpg_health", next, state.checks.len() as u32)
-        } else {
-            ("ok", "fps_default", "", 0u32)
+    let (severity_str, source_str, next_step_str, checks_count) = if let Some(ref state) = rpg_state
+    {
+        let sev = match state.last_severity {
+            Severity::Ok => "ok",
+            Severity::Warn => "warn",
+            Severity::Critical => "critical",
         };
+        let next = if state.last_next_step.is_empty() {
+            ""
+        } else {
+            state.last_next_step.as_str()
+        };
+        (sev, "rpg_health", next, state.checks.len() as u32)
+    } else {
+        ("ok", "fps_default", "", 0u32)
+    };
 
     let json = format!(
         r#"{{

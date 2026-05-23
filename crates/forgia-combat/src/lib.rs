@@ -15,11 +15,11 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
-pub mod weapons;
-pub mod melee;
-pub mod combat_juice;
 pub mod ammo;
+pub mod combat_juice;
+pub mod melee;
 pub mod sensor;
+pub mod weapons;
 
 // TODO: port from V1 — viewmodel, reload, health, rpg_systems, targeting, boss, gcd
 // pub mod viewmodel;
@@ -31,12 +31,21 @@ pub mod sensor;
 // pub mod gcd;
 
 pub mod prelude {
-    pub use crate::{ForgiaCombatPlugin, Health};
-    pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
-    pub use crate::weapons::{WeaponType, EquippedWeapons, WeaponFireCooldown, CasingResources, damage_falloff, ARENA_V1_WEAPONS};
+    pub use crate::ammo::{
+        sync_ammo_slot_from_config, AmmoChangeKind, AmmoChanged, AmmoConfig, AmmoSlot, ReloadKind,
+        ReloadState,
+    };
+    pub use crate::combat_juice::{
+        CameraTrauma, CombatHitEvent, HitFlashCache, HitFlashTimer, WeaponRecoilDebt,
+        WeaponRecoilImpulse,
+    };
     pub use crate::melee::MeleeCooldown;
-    pub use crate::combat_juice::{CameraTrauma, HitFlashCache, HitFlashTimer, WeaponRecoilDebt, WeaponRecoilImpulse, CombatHitEvent};
-    pub use crate::ammo::{AmmoChanged, AmmoChangeKind, AmmoConfig, AmmoSlot, ReloadKind, ReloadState, sync_ammo_slot_from_config};
+    pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
+    pub use crate::weapons::{
+        damage_falloff, CasingResources, EquippedWeapons, WeaponFireCooldown, WeaponType,
+        ARENA_V1_WEAPONS,
+    };
+    pub use crate::{ForgiaCombatPlugin, Health};
     // HitStopState : migré vers forgia-juice-hit-stop (Tier 1D 2026-05-17).
     // Importer directement : `use forgia_juice_hit_stop::HitStopState;`
 }
@@ -60,7 +69,11 @@ pub struct PlayerLevel {
 
 impl Default for PlayerLevel {
     fn default() -> Self {
-        Self { level: 1, xp: 0, xp_to_next: 100 }
+        Self {
+            level: 1,
+            xp: 0,
+            xp_to_next: 100,
+        }
     }
 }
 
@@ -128,25 +141,28 @@ impl Plugin for ForgiaCombatPlugin {
             .init_resource::<combat_juice::CameraTrauma>()
             .add_message::<combat_juice::CombatHitEvent>()
             .add_message::<ammo::AmmoChanged>()
-            .add_systems(Startup, (
-                weapons::setup_casing_resources,
-                combat_juice::setup_hit_flash_cache,
-            ))
-            .add_systems(Update, (
-                weapons::weapon_cooldown_tick_system
-                    .run_if(|cd: Option<Res<weapons::WeaponFireCooldown>>| cd.is_some())
-                    .in_set(GameSet::Combat),
-                melee::melee_cooldown_tick_system
-                    .run_if(resource_exists::<melee::MeleeCooldown>)
-                    .in_set(GameSet::Combat),
-                combat_juice::trauma_decay_system
-                    .in_set(GameSet::Effects),
-                combat_juice::hit_flash_tick_system
-                    .in_set(GameSet::Effects),
-                sensor::sys_write_combat_sensor
-                    .in_set(GameSet::Sensors),
-                // hitstop_tick_system : wired par forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
-            ));
+            .add_systems(
+                Startup,
+                (
+                    weapons::setup_casing_resources,
+                    combat_juice::setup_hit_flash_cache,
+                ),
+            )
+            .add_systems(
+                Update,
+                (
+                    weapons::weapon_cooldown_tick_system
+                        .run_if(|cd: Option<Res<weapons::WeaponFireCooldown>>| cd.is_some())
+                        .in_set(GameSet::Combat),
+                    melee::melee_cooldown_tick_system
+                        .run_if(resource_exists::<melee::MeleeCooldown>)
+                        .in_set(GameSet::Combat),
+                    combat_juice::trauma_decay_system.in_set(GameSet::Effects),
+                    combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
+                    sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
+                    // hitstop_tick_system : wired par forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
+                ),
+            );
         // TODO: wire weapon_fire_system, doom_projectile_system, melee_attack_system,
         //       weapon_switch_system, stagger systems, glory_kill_system, pickup systems,
         //       detect_combat_hits, weapon_recoil_system, weapon_fire_flash_system

@@ -15,7 +15,9 @@ use bevy_hanabi::Gradient as HanabiGradient;
 
 /// Layer 1: Core flash — intense white-yellow HDR burst, blooms hard.
 /// Very short lifetime (~30-50ms), small radius, max HDR.
-pub(super) fn create_muzzle_core_flash(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_muzzle_core_flash(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     // Story-450 v2 (2026-05-18 PM) — fix bloom blob screenshot user :
@@ -44,10 +46,10 @@ pub(super) fn create_muzzle_core_flash(effects: &mut ResMut<Assets<EffectAsset>>
 
     // HDR MODÉRÉ — pas de blowout bloom. 3.0 max vs 12.0 avant.
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(3.0, 2.5, 1.4, 1.0));     // Warm white doux
-    color_gradient.add_key(0.3, Vec4::new(2.5, 1.5, 0.5, 0.85));    // Yellow
-    color_gradient.add_key(0.6, Vec4::new(1.5, 0.6, 0.15, 0.45));   // Orange
-    color_gradient.add_key(1.0, Vec4::new(0.4, 0.1, 0.02, 0.0));    // Fade
+    color_gradient.add_key(0.0, Vec4::new(3.0, 2.5, 1.4, 1.0)); // Warm white doux
+    color_gradient.add_key(0.3, Vec4::new(2.5, 1.5, 0.5, 0.85)); // Yellow
+    color_gradient.add_key(0.6, Vec4::new(1.5, 0.6, 0.15, 0.45)); // Orange
+    color_gradient.add_key(1.0, Vec4::new(0.4, 0.1, 0.02, 0.0)); // Fade
 
     let effect = EffectAsset::new(
         16,
@@ -59,14 +61,19 @@ pub(super) fn create_muzzle_core_flash(effects: &mut ResMut<Assets<EffectAsset>>
     .init(init_vel)
     .init(init_size)
     .init(init_lifetime)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() });
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    });
 
     effects.add(effect)
 }
 
 /// Layer 2: Spark spray — hot metallic debris ejected from barrel.
 /// Fast, gravity-affected, parabolic arcs.
-pub(super) fn create_muzzle_sparks(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_muzzle_sparks(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -95,11 +102,11 @@ pub(super) fn create_muzzle_sparks(effects: &mut ResMut<Assets<EffectAsset>>) ->
 
     // HDR doux pour sparks (était 4.0 → 2.0)
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(2.0, 1.6, 0.75, 1.0));    // Orange-white
-    color_gradient.add_key(0.15, Vec4::new(1.6, 0.7, 0.18, 0.95));  // Orange
-    color_gradient.add_key(0.4, Vec4::new(0.9, 0.25, 0.05, 0.7));   // Red-orange
-    color_gradient.add_key(0.7, Vec4::new(0.4, 0.07, 0.015, 0.3));  // Dark red
-    color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0));   // Extinct
+    color_gradient.add_key(0.0, Vec4::new(2.0, 1.6, 0.75, 1.0)); // Orange-white
+    color_gradient.add_key(0.15, Vec4::new(1.6, 0.7, 0.18, 0.95)); // Orange
+    color_gradient.add_key(0.4, Vec4::new(0.9, 0.25, 0.05, 0.7)); // Red-orange
+    color_gradient.add_key(0.7, Vec4::new(0.4, 0.07, 0.015, 0.3)); // Dark red
+    color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0)); // Extinct
 
     let effect = EffectAsset::new(
         32,
@@ -113,13 +120,18 @@ pub(super) fn create_muzzle_sparks(effects: &mut ResMut<Assets<EffectAsset>>) ->
     .init(init_lifetime)
     .update(gravity)
     .update(drag)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() });
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    });
 
     effects.add(effect)
 }
 
 /// Layer 3: Smoke puff — residual gunpowder smoke, slow drift upward.
-pub(super) fn create_muzzle_smoke(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_muzzle_smoke(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -148,7 +160,7 @@ pub(super) fn create_muzzle_smoke(effects: &mut ResMut<Assets<EffectAsset>>) -> 
     let drag = LinearDragModifier::new(writer.lit(3.5).expr());
 
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(0.6, 0.55, 0.5, 0.40));  // Plus transparent
+    color_gradient.add_key(0.0, Vec4::new(0.6, 0.55, 0.5, 0.40)); // Plus transparent
     color_gradient.add_key(0.2, Vec4::new(0.4, 0.38, 0.35, 0.28));
     color_gradient.add_key(0.5, Vec4::new(0.25, 0.22, 0.2, 0.15));
     color_gradient.add_key(1.0, Vec4::new(0.1, 0.09, 0.08, 0.0));
@@ -172,7 +184,10 @@ pub(super) fn create_muzzle_smoke(effects: &mut ResMut<Assets<EffectAsset>>) -> 
     .init(init_lifetime)
     .update(accel)
     .update(drag)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() })
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    })
     .render(SizeOverLifetimeModifier {
         gradient: size_gradient,
         screen_space_size: false,
@@ -183,7 +198,9 @@ pub(super) fn create_muzzle_smoke(effects: &mut ResMut<Assets<EffectAsset>>) -> 
 
 /// Layer 4: Heat glow — large soft envelope simulating heat distortion.
 /// Few particles, big, very short lifetime, low opacity.
-pub(super) fn create_muzzle_heat_glow(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_muzzle_heat_glow(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -222,14 +239,19 @@ pub(super) fn create_muzzle_heat_glow(effects: &mut ResMut<Assets<EffectAsset>>)
     .init(init_vel)
     .init(init_size)
     .init(init_lifetime)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() });
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    });
 
     effects.add(effect)
 }
 
 /// Layer 5: Forward flash tongue — elongated burst along barrel direction.
 /// Fast particles shot forward, drag-decelerated, bright.
-pub(super) fn create_muzzle_forward_flash(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_muzzle_forward_flash(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -261,10 +283,10 @@ pub(super) fn create_muzzle_forward_flash(effects: &mut ResMut<Assets<EffectAsse
 
     // HDR doux, pas de purple tint (était le rose du screenshot).
     let mut color_gradient = HanabiGradient::new();
-    color_gradient.add_key(0.0, Vec4::new(3.0, 2.4, 1.2, 1.0));    // Warm white
-    color_gradient.add_key(0.3, Vec4::new(2.2, 1.1, 0.3, 0.85));   // Orange
-    color_gradient.add_key(0.7, Vec4::new(1.0, 0.3, 0.05, 0.4));   // Deeper orange
-    color_gradient.add_key(1.0, Vec4::new(0.2, 0.05, 0.01, 0.0));  // Fade
+    color_gradient.add_key(0.0, Vec4::new(3.0, 2.4, 1.2, 1.0)); // Warm white
+    color_gradient.add_key(0.3, Vec4::new(2.2, 1.1, 0.3, 0.85)); // Orange
+    color_gradient.add_key(0.7, Vec4::new(1.0, 0.3, 0.05, 0.4)); // Deeper orange
+    color_gradient.add_key(1.0, Vec4::new(0.2, 0.05, 0.01, 0.0)); // Fade
 
     let effect = EffectAsset::new(
         24,
@@ -277,7 +299,10 @@ pub(super) fn create_muzzle_forward_flash(effects: &mut ResMut<Assets<EffectAsse
     .init(init_size)
     .init(init_lifetime)
     .update(drag)
-    .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() });
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    });
 
     effects.add(effect)
 }

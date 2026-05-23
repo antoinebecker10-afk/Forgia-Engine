@@ -82,19 +82,29 @@ impl TracerResources {
 pub fn tracer_color(weapon: &WeaponType) -> (LinearRgba, LinearRgba) {
     match weapon {
         // SMG/AR — yellow-white head, warm orange trail
-        WeaponType::ModernAR | WeaponType::AssaultRifle | WeaponType::AK47 =>
-            (LinearRgba::new(15.0, 12.0, 5.0, 1.0), LinearRgba::new(3.0, 1.8, 0.5, 0.55)),
+        WeaponType::ModernAR | WeaponType::AssaultRifle | WeaponType::AK47 => (
+            LinearRgba::new(15.0, 12.0, 5.0, 1.0),
+            LinearRgba::new(3.0, 1.8, 0.5, 0.55),
+        ),
         // Shotgun (Boucherie) — warm orange pellet trail
-        WeaponType::Shotgun =>
-            (LinearRgba::new(16.0, 10.0, 3.0, 1.0), LinearRgba::new(3.5, 1.4, 0.3, 0.50)),
+        WeaponType::Shotgun => (
+            LinearRgba::new(16.0, 10.0, 3.0, 1.0),
+            LinearRgba::new(3.5, 1.4, 0.3, 0.50),
+        ),
         // Plasma — electric cyan-blue
-        WeaponType::PlasmaRifle =>
-            (LinearRgba::new(5.0, 13.0, 18.0, 1.0), LinearRgba::new(0.8, 2.2, 4.5, 0.55)),
+        WeaponType::PlasmaRifle => (
+            LinearRgba::new(5.0, 13.0, 18.0, 1.0),
+            LinearRgba::new(0.8, 2.2, 4.5, 0.55),
+        ),
         // Rocket — red-yellow (legacy, projectile remplace)
-        WeaponType::RocketLauncher =>
-            (LinearRgba::new(18.0, 6.0, 1.5, 1.0), LinearRgba::new(4.0, 1.2, 0.2, 0.50)),
-        WeaponType::Chainsaw =>
-            (LinearRgba::new(0.0, 0.0, 0.0, 0.0), LinearRgba::new(0.0, 0.0, 0.0, 0.0)),
+        WeaponType::RocketLauncher => (
+            LinearRgba::new(18.0, 6.0, 1.5, 1.0),
+            LinearRgba::new(4.0, 1.2, 0.2, 0.50),
+        ),
+        WeaponType::Chainsaw => (
+            LinearRgba::new(0.0, 0.0, 0.0, 0.0),
+            LinearRgba::new(0.0, 0.0, 0.0, 0.0),
+        ),
     }
 }
 
@@ -143,7 +153,15 @@ pub fn setup_tracer_resources(
             unlit: true,
             ..default()
         });
-        pairs.insert(w, TracerMatPair { core, glow, core_color, glow_color });
+        pairs.insert(
+            w,
+            TracerMatPair {
+                core,
+                glow,
+                core_color,
+                glow_color,
+            },
+        );
     }
 
     commands.insert_resource(TracerResources {

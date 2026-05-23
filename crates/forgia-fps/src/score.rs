@@ -100,10 +100,7 @@ pub fn tick_kill_popups(
 }
 
 /// System Update : TAB toggle scoreboard visibility.
-pub fn scoreboard_toggle(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut visible: ResMut<ScoreboardVisible>,
-) {
+pub fn scoreboard_toggle(keys: Res<ButtonInput<KeyCode>>, mut visible: ResMut<ScoreboardVisible>) {
     if keys.just_pressed(KeyCode::Tab) {
         visible.0 = !visible.0;
     }

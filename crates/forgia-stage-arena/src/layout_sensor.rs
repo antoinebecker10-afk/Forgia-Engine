@@ -198,34 +198,22 @@ mod tests {
 
     #[test]
     fn severity_healthy_layout_is_ok() {
-        assert_eq!(
-            severity_for_layout(25.0, 4.5, 6, true, 0, 9),
-            "ok"
-        );
+        assert_eq!(severity_for_layout(25.0, 4.5, 6, true, 0, 9), "ok");
     }
 
     #[test]
     fn severity_sightline_over_40_is_error() {
-        assert_eq!(
-            severity_for_layout(42.0, 4.0, 6, true, 0, 9),
-            "error"
-        );
+        assert_eq!(severity_for_layout(42.0, 4.0, 6, true, 0, 9), "error");
     }
 
     #[test]
     fn severity_sightline_35_to_40_is_warn() {
-        assert_eq!(
-            severity_for_layout(37.5, 4.0, 6, true, 0, 9),
-            "warn"
-        );
+        assert_eq!(severity_for_layout(37.5, 4.0, 6, true, 0, 9), "warn");
     }
 
     #[test]
     fn severity_cover_spacing_under_3_is_error() {
-        assert_eq!(
-            severity_for_layout(25.0, 2.5, 6, true, 0, 9),
-            "error"
-        );
+        assert_eq!(severity_for_layout(25.0, 2.5, 6, true, 0, 9), "error");
     }
 
     #[test]
@@ -238,10 +226,7 @@ mod tests {
 
     #[test]
     fn severity_instances_skipped_is_warn() {
-        assert_eq!(
-            severity_for_layout(25.0, 4.0, 6, true, 3, 9),
-            "warn"
-        );
+        assert_eq!(severity_for_layout(25.0, 4.0, 6, true, 3, 9), "warn");
     }
 
     #[test]

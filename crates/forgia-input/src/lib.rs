@@ -81,10 +81,10 @@ pub fn default_input_map() -> InputMap<PlayerAction> {
     use bevy::input::keyboard::KeyCode::*;
     use bevy::input::mouse::MouseButton;
     let mut map = InputMap::default();
-    map.insert(PlayerAction::MoveForward, KeyW);  // Position Z en AZERTY
+    map.insert(PlayerAction::MoveForward, KeyW); // Position Z en AZERTY
     map.insert(PlayerAction::MoveBackward, KeyS); // Position S en AZERTY (identique)
-    map.insert(PlayerAction::MoveLeft, KeyA);     // Position Q en AZERTY
-    map.insert(PlayerAction::MoveRight, KeyD);    // Position D en AZERTY (identique)
+    map.insert(PlayerAction::MoveLeft, KeyA); // Position Q en AZERTY
+    map.insert(PlayerAction::MoveRight, KeyD); // Position D en AZERTY (identique)
     map.insert(PlayerAction::Jump, Space);
     map.insert(PlayerAction::Sprint, ShiftLeft);
     map.insert(PlayerAction::Fire, MouseButton::Left);

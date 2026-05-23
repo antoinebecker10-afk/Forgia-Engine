@@ -1,4 +1,4 @@
-﻿#![allow(dead_code, unused_imports)]
+#![allow(dead_code, unused_imports)]
 //! Port verbatim de `forgia-game/src/effects/combat_juice.rs` (V1).
 //! Combat Juice â€” Hitstop, Trauma Shake, Hit Flash, Kill SlowMo
 //!
@@ -127,10 +127,7 @@ pub fn setup_hit_flash_cache(
 // hitstop_tick_system : extrait vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
 // Wiring : `forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin` ajouté idempotent dans `ForgiaCombatPlugin`.
 
-pub fn trauma_decay_system(
-    time: Res<Time>,
-    mut trauma: ResMut<CameraTrauma>,
-) {
+pub fn trauma_decay_system(time: Res<Time>, mut trauma: ResMut<CameraTrauma>) {
     if trauma.trauma > 0.001 {
         trauma.trauma *= (-4.0 * time.delta_secs()).exp();
         trauma.time_acc += time.delta_secs();
@@ -150,7 +147,11 @@ pub fn compute_trauma_offset(trauma: &CameraTrauma) -> Vec3 {
     let offset_x = (t * 23.7).sin() * (t * 41.3).cos();
     let offset_y = (t * 31.1).sin() * (t * 53.7).cos();
     let max_offset = 0.15;
-    Vec3::new(offset_x * shake * max_offset, offset_y * shake * max_offset, 0.0)
+    Vec3::new(
+        offset_x * shake * max_offset,
+        offset_y * shake * max_offset,
+        0.0,
+    )
 }
 
 pub fn hit_flash_tick_system(
@@ -260,8 +261,11 @@ mod tests {
         let mut t = CameraTrauma::default();
         for trauma in [0.1f32, 0.3, 0.5, 0.7, 0.9] {
             t.trauma = trauma;
-            assert!(t.shake_amount() <= trauma,
-                "quadratic shake must be <= linear trauma at {trauma}: got {}", t.shake_amount());
+            assert!(
+                t.shake_amount() <= trauma,
+                "quadratic shake must be <= linear trauma at {trauma}: got {}",
+                t.shake_amount()
+            );
         }
     }
 }

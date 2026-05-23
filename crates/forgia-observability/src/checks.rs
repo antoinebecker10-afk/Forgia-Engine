@@ -8,7 +8,7 @@ use forgia_terrain::BiomeType;
 use std::time::SystemTime;
 
 use crate::config::RpgMonitorConfig;
-use crate::state::{CheckResult, LastWriteTimestamps, RpgHealthState, Severity, SensorSnapshots};
+use crate::state::{CheckResult, LastWriteTimestamps, RpgHealthState, SensorSnapshots, Severity};
 
 // ─────────────────────────── CHK-1 : LOD2 desync ───────────────────────────
 
@@ -22,8 +22,14 @@ pub fn chk_lod2_desync(snapshots: &SensorSnapshots, config: &RpgMonitorConfig) -
         return CheckResult::ok("CHK-1: terrain_lod sensor absent (not yet loaded)");
     };
 
-    let lod2_count = lod_json.get("lod2_count").and_then(|v| v.as_u64()).unwrap_or(0);
-    let lod2_tile_count = lod_json.get("lod2_tile_count").and_then(|v| v.as_u64()).unwrap_or(0);
+    let lod2_count = lod_json
+        .get("lod2_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let lod2_tile_count = lod_json
+        .get("lod2_tile_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     if lod2_count > 0 && lod2_tile_count == 0 {
         return CheckResult::critical(
@@ -106,7 +112,11 @@ pub fn chk_biome_luminance(config: &RpgMonitorConfig) -> CheckResult {
         .iter()
         .map(|(b, lum)| format!("{} lin_lum={:.3}", b.as_str(), lum))
         .collect();
-    let msg = format!("CHK-2: {} biome(s) hors plage [{floor:.3},{ceiling:.3}] (Rec709 lin): {}", failing.len(), details.join(", "));
+    let msg = format!(
+        "CHK-2: {} biome(s) hors plage [{floor:.3},{ceiling:.3}] (Rec709 lin): {}",
+        failing.len(),
+        details.join(", ")
+    );
     let next_step = format!(
         "Ajuster BiomeType::color() dans forgia-terrain/biomes.rs:46 pour respecter le floor lin {floor:.3} (sRGB ≈ {:.2})",
         floor.powf(1.0 / 2.2)
@@ -316,7 +326,10 @@ pub fn chk_sensor_liveness(
 // ─────────────────────────── CHK-6 : Health consistency ───────────────────────────
 
 /// CHK-6 : vérifie la cohérence des données de santé du joueur dans forgia_combat.json.
-pub fn chk_health_consistency(snapshots: &SensorSnapshots, config: &RpgMonitorConfig) -> CheckResult {
+pub fn chk_health_consistency(
+    snapshots: &SensorSnapshots,
+    config: &RpgMonitorConfig,
+) -> CheckResult {
     if !config.health_consistency.enabled {
         return CheckResult::skipped("CHK-6 disabled via config");
     }
@@ -324,8 +337,14 @@ pub fn chk_health_consistency(snapshots: &SensorSnapshots, config: &RpgMonitorCo
         return CheckResult::ok("CHK-6: forgia_combat.json absent (non chargé)");
     };
 
-    let player_hp = combat.get("player_hp").and_then(|v| v.as_f64()).map(|v| v as f32);
-    let max_hp = combat.get("max_hp").and_then(|v| v.as_f64()).map(|v| v as f32);
+    let player_hp = combat
+        .get("player_hp")
+        .and_then(|v| v.as_f64())
+        .map(|v| v as f32);
+    let max_hp = combat
+        .get("max_hp")
+        .and_then(|v| v.as_f64())
+        .map(|v| v as f32);
 
     match (player_hp, max_hp) {
         (Some(hp), Some(max)) => {
@@ -394,7 +413,8 @@ pub fn sys_run_crosschecks(
     let r6 = chk_health_consistency(&snapshots, &config);
 
     // Severity globale
-    let overall = r1.severity
+    let overall = r1
+        .severity
         .max(r2.severity)
         .max(r3.severity)
         .max(r4.severity)
@@ -531,7 +551,12 @@ mod tests {
         cfg.biome_luminance.lum_floor = 0.0;
         cfg.biome_luminance.lum_ceiling = 1.0;
         let r = chk_biome_luminance(&cfg);
-        assert!(matches!(r.severity, Severity::Ok), "all biomes should pass with permissive thresholds, got {:?} — {}", r.severity, r.message);
+        assert!(
+            matches!(r.severity, Severity::Ok),
+            "all biomes should pass with permissive thresholds, got {:?} — {}",
+            r.severity,
+            r.message
+        );
     }
 
     /// BUG-452-08 regression : confirme que CHK-2 détecte l'ancien Volcanic
@@ -602,7 +627,12 @@ mod tests {
         ]);
         let cfg = default_config();
         let r = chk_lod_asymmetry(&s, &cfg);
-        assert!(matches!(r.severity, Severity::Ok), "got {:?} — {}", r.severity, r.message);
+        assert!(
+            matches!(r.severity, Severity::Ok),
+            "got {:?} — {}",
+            r.severity,
+            r.message
+        );
     }
 
     #[test]
@@ -613,7 +643,12 @@ mod tests {
         ]);
         let cfg = default_config();
         let r = chk_lod_asymmetry(&s, &cfg);
-        assert!(matches!(r.severity, Severity::Warn), "got {:?} — {}", r.severity, r.message);
+        assert!(
+            matches!(r.severity, Severity::Warn),
+            "got {:?} — {}",
+            r.severity,
+            r.message
+        );
     }
 
     #[test]
@@ -624,7 +659,12 @@ mod tests {
         ]);
         let cfg = default_config();
         let r = chk_lod_asymmetry(&s, &cfg);
-        assert!(matches!(r.severity, Severity::Critical), "got {:?} — {}", r.severity, r.message);
+        assert!(
+            matches!(r.severity, Severity::Critical),
+            "got {:?} — {}",
+            r.severity,
+            r.message
+        );
         assert!(r.message.contains("phantom"));
     }
 
@@ -705,4 +745,3 @@ mod tests {
         assert!(r.message.contains("mort"));
     }
 }
-

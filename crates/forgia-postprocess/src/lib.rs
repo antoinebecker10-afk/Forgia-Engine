@@ -82,49 +82,264 @@ macro_rules! define_simple_pp_effect {
 }
 
 // 43 simple effects (identical strength: f32 template)
-define_simple_pp_effect!(ascii, AsciiSettings, ForgiaPpAsciiPlugin, "shaders/post_process/ascii.wgsl");
-define_simple_pp_effect!(auto_exposure, AutoExposureSettings, ForgiaPpAutoExposurePlugin, "shaders/post_process/auto_exposure.wgsl");
-define_simple_pp_effect!(bloom, BloomSettings, ForgiaPpBloomPlugin, "shaders/post_process/bloom.wgsl");
-define_simple_pp_effect!(chromatic_aberration, ChromaticAberrationSettings, ForgiaPpChromaticAberrationPlugin, "shaders/post_process/chromatic_aberration.wgsl");
-define_simple_pp_effect!(color_grading, ColorGradingSettings, ForgiaPpColorGradingPlugin, "shaders/post_process/color_grading.wgsl");
-define_simple_pp_effect!(color_split, ColorSplitSettings, ForgiaPpColorSplitPlugin, "shaders/post_process/color_split.wgsl");
-define_simple_pp_effect!(cross_hatch, CrossHatchSettings, ForgiaPpCrossHatchPlugin, "shaders/post_process/cross_hatch.wgsl");
-define_simple_pp_effect!(crt, CrtSettings, ForgiaPpCrtPlugin, "shaders/post_process/crt.wgsl");
-define_simple_pp_effect!(distance_fog, DistanceFogSettings, ForgiaPpDistanceFogPlugin, "shaders/post_process/distance_fog.wgsl");
-define_simple_pp_effect!(distortion, DistortionSettings, ForgiaPpDistortionPlugin, "shaders/post_process/distortion.wgsl");
-define_simple_pp_effect!(dream, DreamSettings, ForgiaPpDreamPlugin, "shaders/post_process/dream.wgsl");
-define_simple_pp_effect!(emboss, EmbossSettings, ForgiaPpEmbossPlugin, "shaders/post_process/emboss.wgsl");
-define_simple_pp_effect!(fog, FogSettings, ForgiaPpFogPlugin, "shaders/post_process/fog.wgsl");
-define_simple_pp_effect!(frosted_glass, FrostedGlassSettings, ForgiaPpFrostedGlassPlugin, "shaders/post_process/frosted_glass.wgsl");
-define_simple_pp_effect!(gaussian_blur, GaussianBlurSettings, ForgiaPpGaussianBlurPlugin, "shaders/post_process/gaussian_blur.wgsl");
-define_simple_pp_effect!(glitch, GlitchSettings, ForgiaPpGlitchPlugin, "shaders/post_process/glitch.wgsl");
-define_simple_pp_effect!(grayscale, GrayscaleSettings, ForgiaPpGrayscalePlugin, "shaders/post_process/grayscale.wgsl");
-define_simple_pp_effect!(halftone, HalftoneSettings, ForgiaPpHalftonePlugin, "shaders/post_process/halftone.wgsl");
-define_simple_pp_effect!(heat_haze, HeatHazeSettings, ForgiaPpHeatHazePlugin, "shaders/post_process/heat_haze.wgsl");
-define_simple_pp_effect!(hex_pixelate, HexPixelateSettings, ForgiaPpHexPixelatePlugin, "shaders/post_process/hex_pixelate.wgsl");
-define_simple_pp_effect!(invert, InvertSettings, ForgiaPpInvertPlugin, "shaders/post_process/invert.wgsl");
-define_simple_pp_effect!(kaleidoscope, KaleidoscopeSettings, ForgiaPpKaleidoscopePlugin, "shaders/post_process/kaleidoscope.wgsl");
-define_simple_pp_effect!(kuwahara, KuwaharaSettings, ForgiaPpKuwaharaPlugin, "shaders/post_process/kuwahara.wgsl");
-define_simple_pp_effect!(light_streaks, LightStreaksSettings, ForgiaPpLightStreaksPlugin, "shaders/post_process/light_streaks.wgsl");
-define_simple_pp_effect!(matrix, MatrixSettings, ForgiaPpMatrixPlugin, "shaders/post_process/matrix.wgsl");
-define_simple_pp_effect!(motion_blur, MotionBlurSettings, ForgiaPpMotionBlurPlugin, "shaders/post_process/motion_blur.wgsl");
-define_simple_pp_effect!(night_vision, NightVisionSettings, ForgiaPpNightVisionPlugin, "shaders/post_process/night_vision.wgsl");
-define_simple_pp_effect!(oil_painting, OilPaintingSettings, ForgiaPpOilPaintingPlugin, "shaders/post_process/oil_painting.wgsl");
-define_simple_pp_effect!(palette_quantize, PaletteQuantizeSettings, ForgiaPpPaletteQuantizePlugin, "shaders/post_process/palette_quantize.wgsl");
-define_simple_pp_effect!(pixelation, PixelationSettings, ForgiaPpPixelationPlugin, "shaders/post_process/pixelation.wgsl");
-define_simple_pp_effect!(posterize, PosterizeSettings, ForgiaPpPosterizePlugin, "shaders/post_process/posterize.wgsl");
-define_simple_pp_effect!(radial_blur, RadialBlurSettings, ForgiaPpRadialBlurPlugin, "shaders/post_process/radial_blur.wgsl");
-define_simple_pp_effect!(rain, RainSettings, ForgiaPpRainPlugin, "shaders/post_process/rain.wgsl");
-define_simple_pp_effect!(scanlines, ScanlinesSettings, ForgiaPpScanlinesPlugin, "shaders/post_process/scanlines.wgsl");
-define_simple_pp_effect!(sepia, SepiaSettings, ForgiaPpSepiaPlugin, "shaders/post_process/sepia.wgsl");
-define_simple_pp_effect!(sketch, SketchSettings, ForgiaPpSketchPlugin, "shaders/post_process/sketch.wgsl");
-define_simple_pp_effect!(sobel_edge, SobelEdgeSettings, ForgiaPpSobelEdgePlugin, "shaders/post_process/sobel_edge.wgsl");
-define_simple_pp_effect!(swirl, SwirlSettings, ForgiaPpSwirlPlugin, "shaders/post_process/swirl.wgsl");
-define_simple_pp_effect!(thermal, ThermalSettings, ForgiaPpThermalPlugin, "shaders/post_process/thermal.wgsl");
-define_simple_pp_effect!(tilt_shift, TiltShiftSettings, ForgiaPpTiltShiftPlugin, "shaders/post_process/tilt_shift.wgsl");
-define_simple_pp_effect!(tonemapping, TonemappingSettings, ForgiaPpTonemappingPlugin, "shaders/post_process/tonemapping.wgsl");
-define_simple_pp_effect!(vibrance, VibranceSettings, ForgiaPpVibrancePlugin, "shaders/post_process/vibrance.wgsl");
-define_simple_pp_effect!(vignette, VignetteSettings, ForgiaPpVignettePlugin, "shaders/post_process/vignette.wgsl");
+define_simple_pp_effect!(
+    ascii,
+    AsciiSettings,
+    ForgiaPpAsciiPlugin,
+    "shaders/post_process/ascii.wgsl"
+);
+define_simple_pp_effect!(
+    auto_exposure,
+    AutoExposureSettings,
+    ForgiaPpAutoExposurePlugin,
+    "shaders/post_process/auto_exposure.wgsl"
+);
+define_simple_pp_effect!(
+    bloom,
+    BloomSettings,
+    ForgiaPpBloomPlugin,
+    "shaders/post_process/bloom.wgsl"
+);
+define_simple_pp_effect!(
+    chromatic_aberration,
+    ChromaticAberrationSettings,
+    ForgiaPpChromaticAberrationPlugin,
+    "shaders/post_process/chromatic_aberration.wgsl"
+);
+define_simple_pp_effect!(
+    color_grading,
+    ColorGradingSettings,
+    ForgiaPpColorGradingPlugin,
+    "shaders/post_process/color_grading.wgsl"
+);
+define_simple_pp_effect!(
+    color_split,
+    ColorSplitSettings,
+    ForgiaPpColorSplitPlugin,
+    "shaders/post_process/color_split.wgsl"
+);
+define_simple_pp_effect!(
+    cross_hatch,
+    CrossHatchSettings,
+    ForgiaPpCrossHatchPlugin,
+    "shaders/post_process/cross_hatch.wgsl"
+);
+define_simple_pp_effect!(
+    crt,
+    CrtSettings,
+    ForgiaPpCrtPlugin,
+    "shaders/post_process/crt.wgsl"
+);
+define_simple_pp_effect!(
+    distance_fog,
+    DistanceFogSettings,
+    ForgiaPpDistanceFogPlugin,
+    "shaders/post_process/distance_fog.wgsl"
+);
+define_simple_pp_effect!(
+    distortion,
+    DistortionSettings,
+    ForgiaPpDistortionPlugin,
+    "shaders/post_process/distortion.wgsl"
+);
+define_simple_pp_effect!(
+    dream,
+    DreamSettings,
+    ForgiaPpDreamPlugin,
+    "shaders/post_process/dream.wgsl"
+);
+define_simple_pp_effect!(
+    emboss,
+    EmbossSettings,
+    ForgiaPpEmbossPlugin,
+    "shaders/post_process/emboss.wgsl"
+);
+define_simple_pp_effect!(
+    fog,
+    FogSettings,
+    ForgiaPpFogPlugin,
+    "shaders/post_process/fog.wgsl"
+);
+define_simple_pp_effect!(
+    frosted_glass,
+    FrostedGlassSettings,
+    ForgiaPpFrostedGlassPlugin,
+    "shaders/post_process/frosted_glass.wgsl"
+);
+define_simple_pp_effect!(
+    gaussian_blur,
+    GaussianBlurSettings,
+    ForgiaPpGaussianBlurPlugin,
+    "shaders/post_process/gaussian_blur.wgsl"
+);
+define_simple_pp_effect!(
+    glitch,
+    GlitchSettings,
+    ForgiaPpGlitchPlugin,
+    "shaders/post_process/glitch.wgsl"
+);
+define_simple_pp_effect!(
+    grayscale,
+    GrayscaleSettings,
+    ForgiaPpGrayscalePlugin,
+    "shaders/post_process/grayscale.wgsl"
+);
+define_simple_pp_effect!(
+    halftone,
+    HalftoneSettings,
+    ForgiaPpHalftonePlugin,
+    "shaders/post_process/halftone.wgsl"
+);
+define_simple_pp_effect!(
+    heat_haze,
+    HeatHazeSettings,
+    ForgiaPpHeatHazePlugin,
+    "shaders/post_process/heat_haze.wgsl"
+);
+define_simple_pp_effect!(
+    hex_pixelate,
+    HexPixelateSettings,
+    ForgiaPpHexPixelatePlugin,
+    "shaders/post_process/hex_pixelate.wgsl"
+);
+define_simple_pp_effect!(
+    invert,
+    InvertSettings,
+    ForgiaPpInvertPlugin,
+    "shaders/post_process/invert.wgsl"
+);
+define_simple_pp_effect!(
+    kaleidoscope,
+    KaleidoscopeSettings,
+    ForgiaPpKaleidoscopePlugin,
+    "shaders/post_process/kaleidoscope.wgsl"
+);
+define_simple_pp_effect!(
+    kuwahara,
+    KuwaharaSettings,
+    ForgiaPpKuwaharaPlugin,
+    "shaders/post_process/kuwahara.wgsl"
+);
+define_simple_pp_effect!(
+    light_streaks,
+    LightStreaksSettings,
+    ForgiaPpLightStreaksPlugin,
+    "shaders/post_process/light_streaks.wgsl"
+);
+define_simple_pp_effect!(
+    matrix,
+    MatrixSettings,
+    ForgiaPpMatrixPlugin,
+    "shaders/post_process/matrix.wgsl"
+);
+define_simple_pp_effect!(
+    motion_blur,
+    MotionBlurSettings,
+    ForgiaPpMotionBlurPlugin,
+    "shaders/post_process/motion_blur.wgsl"
+);
+define_simple_pp_effect!(
+    night_vision,
+    NightVisionSettings,
+    ForgiaPpNightVisionPlugin,
+    "shaders/post_process/night_vision.wgsl"
+);
+define_simple_pp_effect!(
+    oil_painting,
+    OilPaintingSettings,
+    ForgiaPpOilPaintingPlugin,
+    "shaders/post_process/oil_painting.wgsl"
+);
+define_simple_pp_effect!(
+    palette_quantize,
+    PaletteQuantizeSettings,
+    ForgiaPpPaletteQuantizePlugin,
+    "shaders/post_process/palette_quantize.wgsl"
+);
+define_simple_pp_effect!(
+    pixelation,
+    PixelationSettings,
+    ForgiaPpPixelationPlugin,
+    "shaders/post_process/pixelation.wgsl"
+);
+define_simple_pp_effect!(
+    posterize,
+    PosterizeSettings,
+    ForgiaPpPosterizePlugin,
+    "shaders/post_process/posterize.wgsl"
+);
+define_simple_pp_effect!(
+    radial_blur,
+    RadialBlurSettings,
+    ForgiaPpRadialBlurPlugin,
+    "shaders/post_process/radial_blur.wgsl"
+);
+define_simple_pp_effect!(
+    rain,
+    RainSettings,
+    ForgiaPpRainPlugin,
+    "shaders/post_process/rain.wgsl"
+);
+define_simple_pp_effect!(
+    scanlines,
+    ScanlinesSettings,
+    ForgiaPpScanlinesPlugin,
+    "shaders/post_process/scanlines.wgsl"
+);
+define_simple_pp_effect!(
+    sepia,
+    SepiaSettings,
+    ForgiaPpSepiaPlugin,
+    "shaders/post_process/sepia.wgsl"
+);
+define_simple_pp_effect!(
+    sketch,
+    SketchSettings,
+    ForgiaPpSketchPlugin,
+    "shaders/post_process/sketch.wgsl"
+);
+define_simple_pp_effect!(
+    sobel_edge,
+    SobelEdgeSettings,
+    ForgiaPpSobelEdgePlugin,
+    "shaders/post_process/sobel_edge.wgsl"
+);
+define_simple_pp_effect!(
+    swirl,
+    SwirlSettings,
+    ForgiaPpSwirlPlugin,
+    "shaders/post_process/swirl.wgsl"
+);
+define_simple_pp_effect!(
+    thermal,
+    ThermalSettings,
+    ForgiaPpThermalPlugin,
+    "shaders/post_process/thermal.wgsl"
+);
+define_simple_pp_effect!(
+    tilt_shift,
+    TiltShiftSettings,
+    ForgiaPpTiltShiftPlugin,
+    "shaders/post_process/tilt_shift.wgsl"
+);
+define_simple_pp_effect!(
+    tonemapping,
+    TonemappingSettings,
+    ForgiaPpTonemappingPlugin,
+    "shaders/post_process/tonemapping.wgsl"
+);
+define_simple_pp_effect!(
+    vibrance,
+    VibranceSettings,
+    ForgiaPpVibrancePlugin,
+    "shaders/post_process/vibrance.wgsl"
+);
+define_simple_pp_effect!(
+    vignette,
+    VignetteSettings,
+    ForgiaPpVignettePlugin,
+    "shaders/post_process/vignette.wgsl"
+);
 
 // 2 outliers with richer settings — hand-written
 pub mod outline;

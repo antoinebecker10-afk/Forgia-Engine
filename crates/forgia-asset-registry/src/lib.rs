@@ -36,9 +36,7 @@ pub mod pack_registry;
 const REGISTRY_TOML_PATH: &str = "assets/asset_registry.toml";
 
 pub mod prelude {
-    pub use crate::pack_registry::{
-        ForgiaPackRegistryPlugin, PackRegistry, PackRuntimeEntry,
-    };
+    pub use crate::pack_registry::{ForgiaPackRegistryPlugin, PackRegistry, PackRuntimeEntry};
     pub use crate::{
         target_size_for, AssetCategory, AssetEntry, AssetQuery, AssetRegistry, AssetSeason,
         BiomeCompat, ForgiaAssetRegistryPlugin, NeedsAssetCalibrate,
@@ -66,7 +64,7 @@ pub struct NeedsAssetCalibrate {
 pub enum AssetCategory {
     Tree,
     Bush,
-    Ground,  // flowers, grass tufts
+    Ground, // flowers, grass tufts
     Cactus,
     Stump,
     Rock,
@@ -77,16 +75,16 @@ pub enum AssetCategory {
 pub enum AssetSeason {
     Default, // été/printemps neutre
     Autumn,
-    Winter,  // = snow
+    Winter, // = snow
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BiomeCompat {
     Any,
     Desert,
-    Tundra,    // = neige cold
-    Forest,    // = humide tempéré
-    Volcanic,  // = brûlé dead
+    Tundra,   // = neige cold
+    Forest,   // = humide tempéré
+    Volcanic, // = brûlé dead
 }
 
 // ─────────────────────────── AssetEntry ───────────────────────────
@@ -134,11 +132,25 @@ pub struct AssetQuery {
 }
 
 impl AssetQuery {
-    pub fn new() -> Self { Self::default() }
-    pub fn category(mut self, c: AssetCategory) -> Self { self.category = Some(c); self }
-    pub fn biome(mut self, b: BiomeType) -> Self { self.biome = Some(b); self }
-    pub fn season(mut self, s: AssetSeason) -> Self { self.season = Some(s); self }
-    pub fn alive(mut self) -> Self { self.exclude_dead = true; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn category(mut self, c: AssetCategory) -> Self {
+        self.category = Some(c);
+        self
+    }
+    pub fn biome(mut self, b: BiomeType) -> Self {
+        self.biome = Some(b);
+        self
+    }
+    pub fn season(mut self, s: AssetSeason) -> Self {
+        self.season = Some(s);
+        self
+    }
+    pub fn alive(mut self) -> Self {
+        self.exclude_dead = true;
+        self
+    }
 }
 
 /// Mapping `BiomeType` ↔ `BiomeCompat` (les biomes V2 → familles asset).
@@ -146,7 +158,9 @@ fn biome_to_compat(b: BiomeType) -> BiomeCompat {
     match b {
         BiomeType::Desert | BiomeType::Canyon | BiomeType::Savanna => BiomeCompat::Desert,
         BiomeType::Tundra | BiomeType::Mountain => BiomeCompat::Tundra,
-        BiomeType::Forest | BiomeType::Jungle | BiomeType::Plains | BiomeType::Swamp => BiomeCompat::Forest,
+        BiomeType::Forest | BiomeType::Jungle | BiomeType::Plains | BiomeType::Swamp => {
+            BiomeCompat::Forest
+        }
         BiomeType::Volcanic => BiomeCompat::Volcanic,
     }
 }
@@ -162,7 +176,9 @@ pub struct AssetRegistry {
 }
 
 impl AssetRegistry {
-    pub fn entries(&self) -> &[AssetEntry] { &self.entries }
+    pub fn entries(&self) -> &[AssetEntry] {
+        &self.entries
+    }
 
     /// Lookup par path exact. Retourne `None` si absent.
     pub fn find(&self, path: &str) -> Option<&AssetEntry> {
@@ -194,8 +210,12 @@ impl AssetRegistry {
             .collect()
     }
 
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 // ─────────────────────────── Scanner ───────────────────────────
@@ -218,36 +238,71 @@ fn tag_from_filename(stem: &str) -> AssetEntry {
     let is_dead = lower.contains("dead");
 
     // Catégorie + species (heuristique ordre = priorité)
-    let (category, species, biome_compat) =
-        if lower.contains("cactus") {
-            (AssetCategory::Cactus, "cactus".to_string(), BiomeCompat::Desert)
-        } else if lower.contains("palm") {
-            (AssetCategory::Tree, "palm".to_string(), BiomeCompat::Desert)
-        } else if lower.contains("stump") {
-            (AssetCategory::Stump, extract_species(&lower), BiomeCompat::Any)
-        } else if lower.contains("rock") || lower.contains("cliff") {
-            (AssetCategory::Rock, "rock".to_string(), BiomeCompat::Any)
-        } else if lower.starts_with("bush") || lower.contains("_bush") {
-            let bc = if season == AssetSeason::Winter { BiomeCompat::Tundra } else { BiomeCompat::Any };
-            (AssetCategory::Bush, "bush".to_string(), bc)
-        } else if lower.contains("flower") || lower.contains("grass") {
-            (AssetCategory::Ground, "ground".to_string(), BiomeCompat::Any)
-        } else if lower.contains("birch") {
-            let bc = if season == AssetSeason::Winter { BiomeCompat::Tundra } else { BiomeCompat::Forest };
-            (AssetCategory::Tree, "birch".to_string(), bc)
-        } else if lower.contains("pine") {
-            let bc = if season == AssetSeason::Winter { BiomeCompat::Tundra } else { BiomeCompat::Forest };
-            (AssetCategory::Tree, "pine".to_string(), bc)
-        } else if lower.contains("twisted_tree") || lower.contains("twistedtree") {
-            (AssetCategory::Tree, "twisted".to_string(), BiomeCompat::Forest)
-        } else if lower.contains("common_tree") || lower.contains("commontree") {
-            let bc = if season == AssetSeason::Winter { BiomeCompat::Tundra } else { BiomeCompat::Forest };
-            (AssetCategory::Tree, "common".to_string(), bc)
-        } else if lower.contains("tree") {
-            (AssetCategory::Tree, extract_species(&lower), BiomeCompat::Forest)
+    let (category, species, biome_compat) = if lower.contains("cactus") {
+        (
+            AssetCategory::Cactus,
+            "cactus".to_string(),
+            BiomeCompat::Desert,
+        )
+    } else if lower.contains("palm") {
+        (AssetCategory::Tree, "palm".to_string(), BiomeCompat::Desert)
+    } else if lower.contains("stump") {
+        (
+            AssetCategory::Stump,
+            extract_species(&lower),
+            BiomeCompat::Any,
+        )
+    } else if lower.contains("rock") || lower.contains("cliff") {
+        (AssetCategory::Rock, "rock".to_string(), BiomeCompat::Any)
+    } else if lower.starts_with("bush") || lower.contains("_bush") {
+        let bc = if season == AssetSeason::Winter {
+            BiomeCompat::Tundra
         } else {
-            (AssetCategory::Other, lower, BiomeCompat::Any)
+            BiomeCompat::Any
         };
+        (AssetCategory::Bush, "bush".to_string(), bc)
+    } else if lower.contains("flower") || lower.contains("grass") {
+        (
+            AssetCategory::Ground,
+            "ground".to_string(),
+            BiomeCompat::Any,
+        )
+    } else if lower.contains("birch") {
+        let bc = if season == AssetSeason::Winter {
+            BiomeCompat::Tundra
+        } else {
+            BiomeCompat::Forest
+        };
+        (AssetCategory::Tree, "birch".to_string(), bc)
+    } else if lower.contains("pine") {
+        let bc = if season == AssetSeason::Winter {
+            BiomeCompat::Tundra
+        } else {
+            BiomeCompat::Forest
+        };
+        (AssetCategory::Tree, "pine".to_string(), bc)
+    } else if lower.contains("twisted_tree") || lower.contains("twistedtree") {
+        (
+            AssetCategory::Tree,
+            "twisted".to_string(),
+            BiomeCompat::Forest,
+        )
+    } else if lower.contains("common_tree") || lower.contains("commontree") {
+        let bc = if season == AssetSeason::Winter {
+            BiomeCompat::Tundra
+        } else {
+            BiomeCompat::Forest
+        };
+        (AssetCategory::Tree, "common".to_string(), bc)
+    } else if lower.contains("tree") {
+        (
+            AssetCategory::Tree,
+            extract_species(&lower),
+            BiomeCompat::Forest,
+        )
+    } else {
+        (AssetCategory::Other, lower, BiomeCompat::Any)
+    };
 
     AssetEntry {
         path: String::new(),
@@ -270,25 +325,31 @@ fn tag_from_filename(stem: &str) -> AssetEntry {
 /// stub.
 pub fn target_size_for(category: AssetCategory) -> f32 {
     match category {
-        AssetCategory::Tree => 4.5,    // arbre adulte mâture (cèdre/birch ~5m)
-        AssetCategory::Bush => 1.0,    // arbuste taille humaine
-        AssetCategory::Ground => 0.4,  // fleurs, touffes herbe
-        AssetCategory::Cactus => 2.0,  // cactus saguaro géant
-        AssetCategory::Stump => 0.7,   // souche basse
-        AssetCategory::Rock => 1.5,    // rocher décor
-        AssetCategory::Other => 1.5,   // fallback safe
+        AssetCategory::Tree => 4.5,   // arbre adulte mâture (cèdre/birch ~5m)
+        AssetCategory::Bush => 1.0,   // arbuste taille humaine
+        AssetCategory::Ground => 0.4, // fleurs, touffes herbe
+        AssetCategory::Cactus => 2.0, // cactus saguaro géant
+        AssetCategory::Stump => 0.7,  // souche basse
+        AssetCategory::Rock => 1.5,   // rocher décor
+        AssetCategory::Other => 1.5,  // fallback safe
     }
 }
 
 fn extract_species(lower: &str) -> String {
-    lower.split(['_', '.']).next().unwrap_or("unknown").to_string()
+    lower
+        .split(['_', '.'])
+        .next()
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 /// Scan récursif d'un dossier pour les `.glb` et `.gltf`. Path résolu relatif
 /// au CWD du process (workspace root en cargo run).
 fn scan_dir(root: &Path, asset_prefix: &str) -> Vec<AssetEntry> {
     let mut out = Vec::new();
-    let Ok(entries) = fs::read_dir(root) else { return out };
+    let Ok(entries) = fs::read_dir(root) else {
+        return out;
+    };
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() {
@@ -299,9 +360,15 @@ fn scan_dir(root: &Path, asset_prefix: &str) -> Vec<AssetEntry> {
             out.extend(scan_dir(&p, sub_prefix.to_string_lossy().as_ref()));
             continue;
         }
-        let Some(ext) = p.extension().and_then(|s| s.to_str()) else { continue };
-        if ext != "glb" && ext != "gltf" { continue }
-        let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else { continue };
+        let Some(ext) = p.extension().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if ext != "glb" && ext != "gltf" {
+            continue;
+        }
+        let Some(stem) = p.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
         let mut entry = tag_from_filename(stem);
         let filename = format!("{}.{}", stem, ext);
         entry.path = format!("{asset_prefix}/{filename}").replace('\\', "/");
@@ -318,7 +385,10 @@ impl Plugin for ForgiaAssetRegistryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AssetRegistry>()
             .add_systems(Startup, populate_registry)
-            .add_systems(Update, (hot_reload_input, calibrate_assets, save_dirty_registry));
+            .add_systems(
+                Update,
+                (hot_reload_input, calibrate_assets, save_dirty_registry),
+            );
     }
 }
 
@@ -339,7 +409,10 @@ fn calibrate_assets(
             continue; // Scene pas encore chargée, retry next frame
         };
         if max_dim <= 0.0 || !max_dim.is_finite() {
-            warn!("[asset-registry] {} : AABB invalide ({max_dim}) — skip calibration", needs.entry_path);
+            warn!(
+                "[asset-registry] {} : AABB invalide ({max_dim}) — skip calibration",
+                needs.entry_path
+            );
             commands.entity(entity).remove::<NeedsAssetCalibrate>();
             continue;
         }
@@ -377,7 +450,11 @@ fn compute_aabb_max_dim(
             found = true;
         }
     }
-    if found { Some(max) } else { None }
+    if found {
+        Some(max)
+    } else {
+        None
+    }
 }
 
 /// Save TOML debounced toutes les 2s si dirty flag levé. Évite N writes par
@@ -387,9 +464,13 @@ fn save_dirty_registry(
     mut registry: ResMut<AssetRegistry>,
     mut last_save: Local<f32>,
 ) {
-    if !registry.dirty { return }
+    if !registry.dirty {
+        return;
+    }
     let now = time.elapsed_secs();
-    if now - *last_save < 2.0 { return }
+    if now - *last_save < 2.0 {
+        return;
+    }
     *last_save = now;
     if let Err(e) = save_toml(&registry.entries) {
         warn!("[asset-registry] save_dirty failed : {e}");
@@ -405,7 +486,10 @@ fn save_dirty_registry(
 fn populate_registry(mut registry: ResMut<AssetRegistry>) {
     let mut entries = match load_toml() {
         Some(loaded) => {
-            info!("[asset-registry] Loaded {} entries from {REGISTRY_TOML_PATH}", loaded.len());
+            info!(
+                "[asset-registry] Loaded {} entries from {REGISTRY_TOML_PATH}",
+                loaded.len()
+            );
             loaded
         }
         None => {
@@ -427,9 +511,18 @@ fn populate_registry(mut registry: ResMut<AssetRegistry>) {
     // Stats + sensor.
     let total = entries.len();
     let active = entries.iter().filter(|e| !e.missing && !e.disabled).count();
-    let trees = entries.iter().filter(|e| e.category == AssetCategory::Tree && !e.missing).count();
-    let autumn = entries.iter().filter(|e| e.season == AssetSeason::Autumn && !e.missing).count();
-    let snow = entries.iter().filter(|e| e.season == AssetSeason::Winter && !e.missing).count();
+    let trees = entries
+        .iter()
+        .filter(|e| e.category == AssetCategory::Tree && !e.missing)
+        .count();
+    let autumn = entries
+        .iter()
+        .filter(|e| e.season == AssetSeason::Autumn && !e.missing)
+        .count();
+    let snow = entries
+        .iter()
+        .filter(|e| e.season == AssetSeason::Winter && !e.missing)
+        .count();
     let dead = entries.iter().filter(|e| e.is_dead).count();
     let missing = entries.iter().filter(|e| e.missing).count();
     let disabled = entries.iter().filter(|e| e.disabled).count();
@@ -450,7 +543,10 @@ fn populate_registry(mut registry: ResMut<AssetRegistry>) {
 fn scan_nature_root() -> Vec<AssetEntry> {
     let root = Path::new("assets/models-v1/nature");
     if !root.exists() {
-        warn!("[asset-registry] {:?} introuvable — scan skipped. CWD must be workspace root.", root);
+        warn!(
+            "[asset-registry] {:?} introuvable — scan skipped. CWD must be workspace root.",
+            root
+        );
         return Vec::new();
     }
     scan_dir(root, "models-v1/nature")
@@ -468,7 +564,9 @@ fn load_toml() -> Option<Vec<AssetEntry>> {
 }
 
 fn save_toml(entries: &[AssetEntry]) -> std::io::Result<()> {
-    let wrapper = RegistryToml { asset: entries.to_vec() };
+    let wrapper = RegistryToml {
+        asset: entries.to_vec(),
+    };
     let body = toml::to_string_pretty(&wrapper)
         .map_err(|e| std::io::Error::other(format!("toml serialize : {e}")))?;
     let header = "# forgia-asset-registry — manifest auto-généré au 1er boot.\n# Éditable à la main. Hot-reload via Shift+F12 en cours de jeu.\n# Les entries `missing = true` sont conservées pour history (le GLB peut\n# revenir). `disabled = true` désactive temporairement sans supprimer.\n\n";
@@ -488,7 +586,9 @@ fn reconcile_with_filesystem(entries: &mut Vec<AssetEntry>) {
     for e in entries.iter_mut() {
         let prev = e.missing;
         e.missing = !scanned_paths.contains(e.path.as_str());
-        if e.missing != prev { changed = true; }
+        if e.missing != prev {
+            changed = true;
+        }
     }
 
     // 2. Ajoute les nouveaux scannés (filesystem présents, TOML absents).
@@ -515,10 +615,7 @@ fn reconcile_with_filesystem(entries: &mut Vec<AssetEntry>) {
 
 /// Shift+F12 → reload TOML à chaud. Permet d'éditer asset_registry.toml en
 /// cours de jeu et voir les nouveaux tags appliqués au prochain spawn chunk.
-fn hot_reload_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut registry: ResMut<AssetRegistry>,
-) {
+fn hot_reload_input(keys: Res<ButtonInput<KeyCode>>, mut registry: ResMut<AssetRegistry>) {
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     if shift && keys.just_pressed(KeyCode::F12) {
         match load_toml() {

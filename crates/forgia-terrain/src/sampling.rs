@@ -80,7 +80,9 @@ pub fn poisson_disk_sample(
                         }
                     }
                 }
-                if too_close { break; }
+                if too_close {
+                    break;
+                }
             }
 
             if !too_close {

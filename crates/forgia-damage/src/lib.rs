@@ -29,7 +29,11 @@ impl Health {
     }
 
     pub fn fraction(&self) -> f32 {
-        if self.max <= 0.0 { 0.0 } else { (self.current / self.max).clamp(0.0, 1.0) }
+        if self.max <= 0.0 {
+            0.0
+        } else {
+            (self.current / self.max).clamp(0.0, 1.0)
+        }
     }
 }
 
@@ -231,8 +235,12 @@ fn apply_damage(
     mut commands: Commands,
 ) {
     for ev in events.read() {
-        let Ok(mut hp) = healths.get_mut(ev.target) else { continue };
-        if !hp.is_alive() { continue; }
+        let Ok(mut hp) = healths.get_mut(ev.target) else {
+            continue;
+        };
+        if !hp.is_alive() {
+            continue;
+        }
         hp.current = (hp.current - ev.amount).max(0.0);
         let is_kill = hp.current <= 0.0;
         applied.write(DamageAppliedEvent {

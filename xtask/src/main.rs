@@ -1,4 +1,4 @@
-﻿//! # xtask — Forgia V2 automation
+//! # xtask — Forgia V2 automation
 //!
 //! Tasks :
 //! - `check-orphans` : détecte plugins définis non wirés, sensors sans producteur, fields FpsTuning jamais lus
@@ -16,13 +16,25 @@ fn main() {
     let cmd = args.get(1).map(String::as_str).unwrap_or("help");
 
     let exit_code = match cmd {
-        "check-orphans" => { check_orphans(); 0 }
-        "schedule-dump" => { schedule_dump(); 0 }
-        "baseline-e1-e2" => { baseline_e1_e2(); 0 }
+        "check-orphans" => {
+            check_orphans();
+            0
+        }
+        "schedule-dump" => {
+            schedule_dump();
+            0
+        }
+        "baseline-e1-e2" => {
+            baseline_e1_e2();
+            0
+        }
         "verify-sensors-format" => verify_sensors_format(),
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
-        _ => { print_help(); 0 }
+        _ => {
+            print_help();
+            0
+        }
     };
 
     std::process::exit(exit_code);
@@ -210,7 +222,11 @@ fn story_gate(args: &[String]) -> i32 {
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
         }
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         if !file_name.starts_with("story-") {
             continue;
         }
@@ -290,7 +306,14 @@ fn story_gate(args: &[String]) -> i32 {
         println!("{icon} story-{}", r.story_id);
         println!("   file:   {}", r.file_name);
         if let Some(t) = r.g1_tracked {
-            println!("   G1 git-tracked: {}", if t { "PASS" } else { "FAIL — file is ?? (untracked)" });
+            println!(
+                "   G1 git-tracked: {}",
+                if t {
+                    "PASS"
+                } else {
+                    "FAIL — file is ?? (untracked)"
+                }
+            );
         }
         if let Some((name, loc, ok)) = &r.g3_crate {
             println!(
@@ -594,15 +617,24 @@ fn walk_loc_and_todo(p: &Path, effective: &mut usize, todo: &mut usize) {
                     if trimmed.is_empty() {
                         continue;
                     }
-                    if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+                    if trimmed.starts_with("//")
+                        || trimmed.starts_with("/*")
+                        || trimmed.starts_with('*')
+                    {
                         // Comment line — does it contain TODO marker ?
-                        if trimmed.contains("TODO") || trimmed.contains("FIXME") || trimmed.contains("XXX") {
+                        if trimmed.contains("TODO")
+                            || trimmed.contains("FIXME")
+                            || trimmed.contains("XXX")
+                        {
                             *todo += 1;
                         }
                         continue;
                     }
                     *effective += 1;
-                    if trimmed.contains("TODO") || trimmed.contains("FIXME") || trimmed.contains("XXX") {
+                    if trimmed.contains("TODO")
+                        || trimmed.contains("FIXME")
+                        || trimmed.contains("XXX")
+                    {
                         *todo += 1;
                     }
                 }

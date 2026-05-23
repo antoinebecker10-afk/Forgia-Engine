@@ -48,11 +48,8 @@ pub fn sys_write_rpg_health_json(
     *last_write = 0.0;
 
     // Construire la map checks sérialisable
-    let checks_ref: HashMap<&'static str, &CheckResult> = state
-        .checks
-        .iter()
-        .map(|(&k, v)| (k, v))
-        .collect();
+    let checks_ref: HashMap<&'static str, &CheckResult> =
+        state.checks.iter().map(|(&k, v)| (k, v)).collect();
 
     let payload = HealthJson {
         id: "rpg_health",
@@ -101,8 +98,7 @@ pub fn sys_sensor_liveness_watchdog(
         if chk5.severity != crate::state::Severity::Ok {
             warn!(
                 "[rpg-monitor] HEALTH ALERT: {} — {}",
-                chk5.severity,
-                chk5.message
+                chk5.severity, chk5.message
             );
             if !chk5.next_step.is_empty() {
                 warn!("[rpg-monitor] Next step: {}", chk5.next_step);

@@ -100,7 +100,9 @@ pub fn attach_viewmodel_to_camera(
                 SceneRoot(scene),
                 tf,
                 Visibility::Hidden,
-                NeedsAutoScale { target_size: target },
+                NeedsAutoScale {
+                    target_size: target,
+                },
                 Name::new("WeaponViewmodel"),
             ))
             .id();
@@ -119,7 +121,13 @@ pub fn update_viewmodel_on_switch(
     equipped: Res<EquippedWeapons>,
     genome_handle: Option<Res<ViewmodelGenomeHandle>>,
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
-    mut q: Query<(Entity, &mut SceneRoot, &mut Transform, &mut Visibility, &mut WeaponViewmodel)>,
+    mut q: Query<(
+        Entity,
+        &mut SceneRoot,
+        &mut Transform,
+        &mut Visibility,
+        &mut WeaponViewmodel,
+    )>,
 ) {
     if !equipped.is_changed() {
         return;
@@ -258,9 +266,7 @@ impl Plugin for ForgiaViewmodelAttachPlugin {
                     auto_scale_viewmodel,
                     ensure_camera_shake_component,
                 )
-                    .run_if(
-                        in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
-                    ),
+                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
             );
     }
 }

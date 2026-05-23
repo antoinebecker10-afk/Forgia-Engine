@@ -15,16 +15,16 @@
 //! 6. Micro-roughness (Couche 4)
 //! 7. Clamp max_height + floor
 
-use bevy::prelude::*;
 use ::noise::{NoiseFn, Perlin};
+use bevy::prelude::*;
 
 use crate::biomes::BiomeType;
 use crate::chunk::TerrainConfig;
 use crate::map_gen_config::{MapGenConfig, TerrainFeature};
 
-use super::BiomeGenomeOverrides;
 use super::noise::{biome_noise_layered, cached_perlin, domain_warp_2d, resolve_noise_layers};
 use super::redistribution::redistribute;
+use super::BiomeGenomeOverrides;
 
 /// Evaluate one octave of very-low-frequency Perlin noise for the continental layer.
 fn continental_bias(
@@ -35,7 +35,9 @@ fn continental_bias(
     strength: f32,
     max_height: f32,
 ) -> f32 {
-    if strength <= 0.0 { return 0.0; }
+    if strength <= 0.0 {
+        return 0.0;
+    }
     let c = perlin.get([
         f64::from(x) * f64::from(scale),
         f64::from(z) * f64::from(scale),
@@ -48,12 +50,7 @@ pub fn heightmap_at(x: f32, z: f32, config: &TerrainConfig) -> f32 {
     let perlin = cached_perlin(config.seed);
     let half = config.map_size / 2.0;
 
-    let octaves: [(f64, f32); 4] = [
-        (0.003, 1.0),
-        (0.008, 0.5),
-        (0.025, 0.15),
-        (0.060, 0.05),
-    ];
+    let octaves: [(f64, f32); 4] = [(0.003, 1.0), (0.008, 0.5), (0.025, 0.15), (0.060, 0.05)];
 
     let mut h: f32 = 0.0;
     for &(freq, amp) in &octaves {
@@ -76,7 +73,8 @@ pub fn heightmap_at(x: f32, z: f32, config: &TerrainConfig) -> f32 {
 
 /// Configurable heightmap with MapGenConfig support.
 pub fn heightmap_at_gen(
-    x: f32, z: f32,
+    x: f32,
+    z: f32,
     config: &TerrainConfig,
     gen_config: &MapGenConfig,
     biome: Option<BiomeType>,
@@ -86,7 +84,8 @@ pub fn heightmap_at_gen(
 
 /// Extended heightmap with genome noise layer overrides.
 pub fn heightmap_at_gen_ext(
-    x: f32, z: f32,
+    x: f32,
+    z: f32,
     config: &TerrainConfig,
     gen_config: &MapGenConfig,
     biome: Option<BiomeType>,
@@ -97,7 +96,8 @@ pub fn heightmap_at_gen_ext(
 
 /// Multi-biome blend variant: skips slope-amp (60% cheaper) for neighbor biomes.
 pub fn heightmap_at_gen_ext_fast(
-    x: f32, z: f32,
+    x: f32,
+    z: f32,
     config: &TerrainConfig,
     gen_config: &MapGenConfig,
     biome: Option<BiomeType>,
@@ -107,7 +107,8 @@ pub fn heightmap_at_gen_ext_fast(
 }
 
 fn heightmap_at_gen_ext_impl(
-    x: f32, z: f32,
+    x: f32,
+    z: f32,
     config: &TerrainConfig,
     gen_config: &MapGenConfig,
     biome: Option<BiomeType>,
@@ -125,8 +126,7 @@ fn heightmap_at_gen_ext_impl(
     // Resolve per-biome warp strength
     let warp = f64::from(if let Some(b) = biome {
         if let Some(ovr) = genome_overrides {
-            ovr.warp_strength[(b as u8 as usize).min(9)]
-                .unwrap_or(gen_config.warp_strength)
+            ovr.warp_strength[(b as u8 as usize).min(9)].unwrap_or(gen_config.warp_strength)
         } else {
             gen_config.warp_strength
         }
@@ -139,7 +139,8 @@ fn heightmap_at_gen_ext_impl(
         let layers = resolve_noise_layers(b, genome_overrides);
 
         let raw = biome_noise_layered(
-            f64::from(x), f64::from(z),
+            f64::from(x),
+            f64::from(z),
             &perlin,
             base_freq,
             num_octaves as usize,
@@ -151,12 +152,24 @@ fn heightmap_at_gen_ext_impl(
         // Slope-dependent amplitude mask
         if !skip_slope_amp && layers.slope_amp_factor > 0.001 {
             let dx_h = biome_noise_layered(
-                f64::from(x) + 1.0, f64::from(z), &perlin, base_freq,
-                num_octaves as usize, warp, &layers, config.seed,
+                f64::from(x) + 1.0,
+                f64::from(z),
+                &perlin,
+                base_freq,
+                num_octaves as usize,
+                warp,
+                &layers,
+                config.seed,
             ) as f32;
             let dz_h = biome_noise_layered(
-                f64::from(x), f64::from(z) + 1.0, &perlin, base_freq,
-                num_octaves as usize, warp, &layers, config.seed,
+                f64::from(x),
+                f64::from(z) + 1.0,
+                &perlin,
+                base_freq,
+                num_octaves as usize,
+                warp,
+                &layers,
+                config.seed,
             ) as f32;
             let slope = ((dx_h - raw).powi(2) + (dz_h - raw).powi(2)).sqrt();
             let slope_mask = (slope * 5.0).clamp(0.2, 1.0);
@@ -198,7 +211,9 @@ fn heightmap_at_gen_ext_impl(
 
     // GAP 2: Continental bias
     h += continental_bias(
-        x, z, &perlin,
+        x,
+        z,
+        &perlin,
         gen_config.continental_scale,
         gen_config.continental_strength,
         config.max_height,
@@ -232,7 +247,9 @@ fn heightmap_at_gen_ext_impl(
 
     // Couche 4: Micro-roughness (per-biome amplitude from genome).
     let micro_amp = biome
-        .and_then(|b| genome_overrides.and_then(|o| o.micro_roughness_amp[(b as u8 as usize).min(9)]))
+        .and_then(|b| {
+            genome_overrides.and_then(|o| o.micro_roughness_amp[(b as u8 as usize).min(9)])
+        })
         .unwrap_or(0.35);
     h += micro_roughness(x, z, config.seed, micro_amp);
 
@@ -260,7 +277,9 @@ fn heightmap_at_gen_ext_impl(
 
 /// Compute the procedural SDF value at a single world voxel position.
 pub fn procedural_sdf_at(
-    wx: f32, wy: f32, wz: f32,
+    wx: f32,
+    wy: f32,
+    wz: f32,
     config: &TerrainConfig,
     gen_config: Option<&MapGenConfig>,
     biome: Option<BiomeType>,
@@ -302,10 +321,17 @@ pub(super) fn micro_roughness(x: f32, z: f32, seed: u32, amp: f32) -> f32 {
 /// Compute height contribution of a single terrain feature at (x, z).
 pub(super) fn feature_height(x: f32, z: f32, feature: &TerrainFeature, map_size: f32) -> f32 {
     match feature {
-        TerrainFeature::MountainRange { center, direction, width, height } => {
+        TerrainFeature::MountainRange {
+            center,
+            direction,
+            width,
+            height,
+        } => {
             let cx = center[0] * map_size;
             let cz = center[1] * map_size;
-            let dir_len = (direction[0] * direction[0] + direction[1] * direction[1]).sqrt().max(0.001);
+            let dir_len = (direction[0] * direction[0] + direction[1] * direction[1])
+                .sqrt()
+                .max(0.001);
             let nx = -direction[1] / dir_len;
             let nz = direction[0] / dir_len;
             let px = x - cx;
@@ -321,7 +347,11 @@ pub(super) fn feature_height(x: f32, z: f32, feature: &TerrainFeature, map_size:
             }
         }
 
-        TerrainFeature::Lake { center, radius, depth } => {
+        TerrainFeature::Lake {
+            center,
+            radius,
+            depth,
+        } => {
             let cx = center[0] * map_size;
             let cz = center[1] * map_size;
             let r = radius * map_size;
@@ -334,7 +364,12 @@ pub(super) fn feature_height(x: f32, z: f32, feature: &TerrainFeature, map_size:
             }
         }
 
-        TerrainFeature::River { start, end, width, depth } => {
+        TerrainFeature::River {
+            start,
+            end,
+            width,
+            depth,
+        } => {
             let sx = start[0] * map_size;
             let sz = start[1] * map_size;
             let ex = end[0] * map_size;
@@ -342,7 +377,9 @@ pub(super) fn feature_height(x: f32, z: f32, feature: &TerrainFeature, map_size:
             let dx = ex - sx;
             let dz = ez - sz;
             let len_sq = dx * dx + dz * dz;
-            if len_sq < 0.001 { return 0.0; }
+            if len_sq < 0.001 {
+                return 0.0;
+            }
             let t = ((x - sx) * dx + (z - sz) * dz) / len_sq;
             let t = t.clamp(0.0, 1.0);
             let closest_x = sx + t * dx;
@@ -362,7 +399,12 @@ pub(super) fn feature_height(x: f32, z: f32, feature: &TerrainFeature, map_size:
             }
         }
 
-        TerrainFeature::Crater { center, radius, rim_height, depth } => {
+        TerrainFeature::Crater {
+            center,
+            radius,
+            rim_height,
+            depth,
+        } => {
             let cx = center[0] * map_size;
             let cz = center[1] * map_size;
             let r = radius * map_size;
@@ -382,7 +424,11 @@ pub(super) fn feature_height(x: f32, z: f32, feature: &TerrainFeature, map_size:
             }
         }
 
-        TerrainFeature::Plateau { center, radius, height } => {
+        TerrainFeature::Plateau {
+            center,
+            radius,
+            height,
+        } => {
             let cx = center[0] * map_size;
             let cz = center[1] * map_size;
             let r = radius * map_size;
@@ -417,13 +463,19 @@ mod tests {
         let v0 = edge_falloff(0.0, half, half, 80.0);
         assert!(v0 <= 1e-5, "edge should be ~0, got {v0}");
         let v_neg = edge_falloff(0.0, -half, half, 80.0);
-        assert!(v_neg <= 1e-5, "negative edge should also be ~0, got {v_neg}");
+        assert!(
+            v_neg <= 1e-5,
+            "negative edge should also be ~0, got {v_neg}"
+        );
         // Au centre (0,0) : dx = dz = half → loin du fade → 1.0
         let v1 = edge_falloff(0.0, 0.0, half, 80.0);
         assert!((v1 - 1.0).abs() < 1e-5, "center should be ~1, got {v1}");
         // Spawn typique world (19, 19) doit être > 0.99 (presque centre)
         let v_spawn = edge_falloff(19.0, 19.0, half, 80.0);
-        assert!(v_spawn > 0.99, "spawn (19,19) should be near-1, got {v_spawn}");
+        assert!(
+            v_spawn > 0.99,
+            "spawn (19,19) should be near-1, got {v_spawn}"
+        );
     }
 
     #[test]
@@ -442,8 +494,14 @@ mod tests {
         let h = heightmap_at(100.0, 100.0, &cfg);
         let below = procedural_sdf_at(100.0, h - 5.0, 100.0, &cfg, None, None);
         let above = procedural_sdf_at(100.0, h + 5.0, 100.0, &cfg, None, None);
-        assert!(below < 0.0, "below terrain should be solid (SDF < 0), got {below}");
-        assert!(above > 0.0, "above terrain should be air (SDF > 0), got {above}");
+        assert!(
+            below < 0.0,
+            "below terrain should be solid (SDF < 0), got {below}"
+        );
+        assert!(
+            above > 0.0,
+            "above terrain should be air (SDF > 0), got {above}"
+        );
     }
 
     #[test]

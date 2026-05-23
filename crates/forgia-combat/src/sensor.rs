@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 
-use crate::{Health, weapons::EquippedWeapons};
+use crate::{weapons::EquippedWeapons, Health};
 
 /// Compteurs de combat mis à jour par les systèmes de tir/hit (optionnels, défaut 0).
 /// Doivent être reset à chaque tick sensor (1Hz) — le sensor writer s'en charge.
@@ -43,8 +43,18 @@ pub fn sys_write_combat_sensor(
 
     // Résoudre hp : priorité marqueur, sinon premier health, sinon absent
     let (player_hp_str, max_hp_str, severity, next_step) = if let Ok(h) = q_player.single() {
-        let severity = if h.current <= 0.0 { "critical" } else if h.current < h.max * 0.25 { "warn" } else { "ok" };
-        let next_step = if h.current <= 0.0 { "Player mort — vérifier respawn system" } else { "" };
+        let severity = if h.current <= 0.0 {
+            "critical"
+        } else if h.current < h.max * 0.25 {
+            "warn"
+        } else {
+            "ok"
+        };
+        let next_step = if h.current <= 0.0 {
+            "Player mort — vérifier respawn system"
+        } else {
+            ""
+        };
         (
             format!("{:.1}", h.current),
             format!("{:.1}", h.max),

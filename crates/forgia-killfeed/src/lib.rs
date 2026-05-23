@@ -17,8 +17,8 @@ use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_combat::prelude::*;
 use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::*;
-use forgia_player::Player;
 use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_player::Player;
 use forgia_ui_style::*;
 use std::collections::VecDeque;
 use std::fs;
@@ -77,11 +77,16 @@ fn entity_label(
     q_name: &Query<&Name>,
     q_player_marker: &Query<(), With<Player>>,
 ) -> String {
-    let Some(e) = entity else { return "World".to_string() };
+    let Some(e) = entity else {
+        return "World".to_string();
+    };
     if q_player_marker.get(e).is_ok() {
         return "You".to_string();
     }
-    q_name.get(e).map(|n| n.as_str().to_string()).unwrap_or_else(|_| "Bot".to_string())
+    q_name
+        .get(e)
+        .map(|n| n.as_str().to_string())
+        .unwrap_or_else(|_| "Bot".to_string())
 }
 
 fn weapon_short(w: WeaponType) -> &'static str {
@@ -175,10 +180,10 @@ pub(crate) fn tick_killfeed(
 ) {
     let now = time.elapsed_secs();
     // Cleanup entries trop vieilles.
-    feed.entries.retain(|e| now - e.spawned_at < tuning.display_secs);
+    feed.entries
+        .retain(|e| now - e.spawned_at < tuning.display_secs);
     // Clear banner expiré.
-    if streak.banner_text.is_some()
-        && now - streak.banner_started_at > tuning.multikill_banner_secs
+    if streak.banner_text.is_some() && now - streak.banner_started_at > tuning.multikill_banner_secs
     {
         streak.banner_text = None;
     }
@@ -238,7 +243,13 @@ pub(crate) fn draw_killfeed(
             C_BG_DARK.b(),
             (200.0 * alpha) as u8,
         );
-        chunky_rect_filled(&painter, entry_rect, bg, tuning.entry_outline_px, tuning.entry_corner_rounding);
+        chunky_rect_filled(
+            &painter,
+            entry_rect,
+            bg,
+            tuning.entry_outline_px,
+            tuning.entry_corner_rounding,
+        );
 
         // Couleurs attacker / victim selon team (player vs bot).
         let attacker_color = if entry.attacker_is_player {
@@ -331,7 +342,9 @@ pub(crate) fn draw_multikill_banner(
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
         return;
     }
-    let Some(banner) = &streak.banner_text else { return };
+    let Some(banner) = &streak.banner_text else {
+        return;
+    };
     let Ok(ctx) = contexts.ctx_mut() else { return };
     let now = time.elapsed_secs();
     let age = now - streak.banner_started_at;

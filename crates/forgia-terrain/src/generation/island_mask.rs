@@ -52,7 +52,10 @@ pub fn island_mask_at(x: f32, z: f32, params: &IslandMaskParams) -> f32 {
     // 1. Perlin warp on coast
     let perlin = Perlin::new(params.seed);
     let warp_amp = radius * 0.18;
-    let warp = perlin.get([f64::from(x) * params.perlin_freq, f64::from(z) * params.perlin_freq]) as f32
+    let warp = perlin.get([
+        f64::from(x) * params.perlin_freq,
+        f64::from(z) * params.perlin_freq,
+    ]) as f32
         * warp_amp;
     let warped_dist = (dist + warp).max(0.0);
 
@@ -84,8 +87,7 @@ fn worley_bays_at(x: f32, z: f32, params: &IslandMaskParams, radius: f32) -> f32
     for i in 0..n {
         let h = hash_u32(params.seed.wrapping_add(i.wrapping_mul(2654435761)));
         let angle_jitter = (h as f32 / u32::MAX as f32) * 0.4 - 0.2;
-        let radius_jitter =
-            ((hash_u32(h) as f32 / u32::MAX as f32) * 0.3 - 0.15) * radius;
+        let radius_jitter = ((hash_u32(h) as f32 / u32::MAX as f32) * 0.3 - 0.15) * radius;
 
         let theta = (i as f32 / n as f32) * two_pi + angle_jitter;
         let sx = params.center_x + (ring_radius + radius_jitter) * theta.cos();
@@ -143,8 +145,14 @@ mod tests {
 
     #[test]
     fn island_mask_different_seeds_produce_different_shapes() {
-        let p1 = IslandMaskParams { seed: 1, ..IslandMaskParams::default() };
-        let p2 = IslandMaskParams { seed: 99999, ..IslandMaskParams::default() };
+        let p1 = IslandMaskParams {
+            seed: 1,
+            ..IslandMaskParams::default()
+        };
+        let p2 = IslandMaskParams {
+            seed: 99999,
+            ..IslandMaskParams::default()
+        };
         let mut total_diff = 0.0_f32;
         let n = 24;
         for i in 0..n {
@@ -163,8 +171,14 @@ mod tests {
 
     #[test]
     fn island_mask_radius_scales_island() {
-        let small = IslandMaskParams { radius: 500.0, ..IslandMaskParams::default() };
-        let big = IslandMaskParams { radius: 2000.0, ..IslandMaskParams::default() };
+        let small = IslandMaskParams {
+            radius: 500.0,
+            ..IslandMaskParams::default()
+        };
+        let big = IslandMaskParams {
+            radius: 2000.0,
+            ..IslandMaskParams::default()
+        };
         let m_small = island_mask_at(1000.0, 0.0, &small);
         let m_big = island_mask_at(1000.0, 0.0, &big);
         assert!(m_big > m_small);

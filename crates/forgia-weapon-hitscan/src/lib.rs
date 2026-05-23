@@ -46,8 +46,12 @@ impl Hitscan {
 
     /// Damage at distance `d`. Linear falloff between `falloff_start` and `range_max`.
     pub fn damage_at(&self, d: f32) -> f32 {
-        if d <= self.falloff_start { return self.damage_base; }
-        if d >= self.range_max { return 0.0; }
+        if d <= self.falloff_start {
+            return self.damage_base;
+        }
+        if d >= self.range_max {
+            return 0.0;
+        }
         let t = (d - self.falloff_start) / (self.range_max - self.falloff_start);
         self.damage_base * (1.0 - t)
     }
@@ -95,22 +99,20 @@ fn fire_hitscan(
 ) {
     let Ok(ctx) = rapier.single() else { return };
     for (shooter, mut hitscan, mut try_fire, xf) in &mut q {
-        if !try_fire.pull { continue; }
+        if !try_fire.pull {
+            continue;
+        }
         try_fire.pull = false;
-        if hitscan.cooldown_left > 0.0 { continue; }
+        if hitscan.cooldown_left > 0.0 {
+            continue;
+        }
         hitscan.cooldown_left = hitscan.cooldown;
 
         let origin = xf.translation();
         let direction: Vec3 = *xf.forward();
 
         let filter = QueryFilter::default().exclude_collider(shooter);
-        let hit = ctx.cast_ray_and_get_normal(
-            origin,
-            direction,
-            hitscan.range_max,
-            true,
-            filter,
-        );
+        let hit = ctx.cast_ray_and_get_normal(origin, direction, hitscan.range_max, true, filter);
 
         match hit {
             Some((target, intersect)) => {

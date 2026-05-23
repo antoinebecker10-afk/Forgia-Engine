@@ -13,8 +13,8 @@
 //! Le producteur des `AmmoConfig` vit dans `forgia-fps` (qui parse le genome) et les
 //! pousse via [`sync_ammo_slot_from_config`] / [`AmmoSlot::apply_config`].
 
-use bevy::prelude::*;
 use bevy::platform::collections::HashMap;
+use bevy::prelude::*;
 
 use crate::weapons::WeaponType;
 
@@ -137,7 +137,11 @@ impl AmmoSlot {
     ///   proportionnellement pour ne pas casser l'animation.
     pub fn apply_config(&mut self, new_config: AmmoConfig) {
         let old_reload_total = self.config.reload_time_secs.max(0.001);
-        if let ReloadState::Reloading { remaining_secs, kind } = &mut self.reload_state {
+        if let ReloadState::Reloading {
+            remaining_secs,
+            kind,
+        } = &mut self.reload_state
+        {
             let new_reload_total = new_config.reload_time_secs.max(0.001);
             if (old_reload_total - new_reload_total).abs() > f32::EPSILON {
                 let progress = 1.0 - (*remaining_secs / old_reload_total).clamp(0.0, 1.0);
@@ -201,7 +205,11 @@ impl AmmoSlot {
     /// Tick une frame de reload. Retourne `Some(AmmoChangeKind::Reload {..})` si transfer
     /// de munitions eu lieu cette frame, `None` sinon.
     pub fn tick_reload(&mut self, dt: f32) -> Option<AmmoChangeKind> {
-        let ReloadState::Reloading { remaining_secs, kind } = &mut self.reload_state else {
+        let ReloadState::Reloading {
+            remaining_secs,
+            kind,
+        } = &mut self.reload_state
+        else {
             return None;
         };
         *remaining_secs -= dt;
@@ -326,7 +334,11 @@ pub fn sync_ammo_slot_from_config(
             entry.insert(AmmoSlot::full_from_config(config))
         }
     };
-    events.write(AmmoChanged::snapshot(weapon, slot, AmmoChangeKind::GenomeApplied));
+    events.write(AmmoChanged::snapshot(
+        weapon,
+        slot,
+        AmmoChangeKind::GenomeApplied,
+    ));
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
@@ -390,7 +402,10 @@ mod tests {
         assert!(s.reload_state.is_reloading());
         assert_eq!(s.current_mag, 3); // pas encore appliqué
         let change = s.tick_reload(0.6); // fini (0.5 + 0.6 > 1.0)
-        assert!(matches!(change, Some(AmmoChangeKind::Reload { transferred: 7 })));
+        assert!(matches!(
+            change,
+            Some(AmmoChangeKind::Reload { transferred: 7 })
+        ));
         assert_eq!(s.current_mag, 10);
         assert_eq!(s.reserve, 23);
         assert!(!s.reload_state.is_reloading());
@@ -408,10 +423,13 @@ mod tests {
         assert!(s.try_start_reload());
         // Tick 1 shell.
         let c1 = s.tick_reload(0.31);
-        assert!(matches!(c1, Some(AmmoChangeKind::Reload { transferred: 1 })));
+        assert!(matches!(
+            c1,
+            Some(AmmoChangeKind::Reload { transferred: 1 })
+        ));
         assert_eq!(s.current_mag, 2);
         assert!(s.reload_state.is_reloading()); // relance auto
-        // Tick 2.
+                                                // Tick 2.
         s.tick_reload(0.31);
         assert_eq!(s.current_mag, 3);
         // Tick 3 → mag plein, fin.
@@ -476,10 +494,14 @@ mod tests {
         s.consume_shot();
         s.try_start_reload();
         s.tick_reload(0.5); // 25% done, remaining 1.5s
-        // New genome : reload_time 4.0s. Restant doit scaler à 3.0s (75% restant).
+                            // New genome : reload_time 4.0s. Restant doit scaler à 3.0s (75% restant).
         s.apply_config(cfg(10, 10, 4.0));
         if let ReloadState::Reloading { remaining_secs, .. } = s.reload_state {
-            assert!((remaining_secs - 3.0).abs() < 0.01, "remaining={}", remaining_secs);
+            assert!(
+                (remaining_secs - 3.0).abs() < 0.01,
+                "remaining={}",
+                remaining_secs
+            );
         } else {
             panic!("should still be reloading");
         }
@@ -497,8 +519,14 @@ mod tests {
     #[test]
     fn reload_kind_parses_aliases() {
         assert_eq!(ReloadKind::from_genome_str("mag"), ReloadKind::Mag);
-        assert_eq!(ReloadKind::from_genome_str("Shell_Per_Shell"), ReloadKind::ShellPerShell);
-        assert_eq!(ReloadKind::from_genome_str("pump"), ReloadKind::ShellPerShell);
+        assert_eq!(
+            ReloadKind::from_genome_str("Shell_Per_Shell"),
+            ReloadKind::ShellPerShell
+        );
+        assert_eq!(
+            ReloadKind::from_genome_str("pump"),
+            ReloadKind::ShellPerShell
+        );
         // Unknown → Mag fallback (warn).
         assert_eq!(ReloadKind::from_genome_str("foobar"), ReloadKind::Mag);
     }

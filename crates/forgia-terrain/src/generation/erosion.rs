@@ -8,8 +8,8 @@
 //! - `save_padding_ring` / `restore_padding_ring` : preservent la bordure
 //!   deterministe pour les chunks voisins (seamless meshing)
 
-use crate::biomes::BiomeType;
 use super::BiomeGenomeOverrides;
+use crate::biomes::BiomeType;
 
 /// Valley carving pass: deepens low areas by following steepest-descent gradients.
 /// Reduces micro-roughness in valley floors for smoother ground.
@@ -50,7 +50,10 @@ pub(super) fn valley_carve(heights: &mut [f32], w: usize, d: usize, sea_level: f
 
 /// Per-biome erosion parameters (passes, rate).
 /// Reads from genome overrides if available, falls back to hardcoded defaults.
-pub(super) fn erosion_params(biome: BiomeType, overrides: Option<&BiomeGenomeOverrides>) -> (usize, f32) {
+pub(super) fn erosion_params(
+    biome: BiomeType,
+    overrides: Option<&BiomeGenomeOverrides>,
+) -> (usize, f32) {
     if let Some(ovr) = overrides {
         if let Some(params) = ovr.erosion[(biome as u8 as usize).min(9)] {
             return params;
@@ -58,33 +61,36 @@ pub(super) fn erosion_params(biome: BiomeType, overrides: Option<&BiomeGenomeOve
     }
     // AAA erosion: more passes + higher rates for dramatic valleys/drainage
     match biome {
-        BiomeType::Plains   => (2, 0.06),  // gentle rolling drainage (was 1, 0.04)
-        BiomeType::Forest   => (2, 0.08),  // forest gulches (was 1, 0.05)
-        BiomeType::Desert   => (1, 0.03),  // wind-smoothed (was 1, 0.02)
-        BiomeType::Mountain => (3, 0.10),  // deep V-cuts on slopes (was 1, 0.03)
-        BiomeType::Swamp    => (2, 0.08),  // water channels (was 1, 0.06)
-        BiomeType::Tundra   => (1, 0.02),  // glacial, still flat (was 1, 0.01)
-        BiomeType::Savanna  => (1, 0.04),  // dry washes (was 1, 0.02)
-        BiomeType::Jungle   => (3, 0.12),  // deep ravines (was 2, 0.07)
-        BiomeType::Volcanic => (2, 0.05),  // lava channels (was 1, 0.01)
-        BiomeType::Canyon   => (4, 0.15),  // deep incision, the most eroded (was 2, 0.08)
+        BiomeType::Plains => (2, 0.06), // gentle rolling drainage (was 1, 0.04)
+        BiomeType::Forest => (2, 0.08), // forest gulches (was 1, 0.05)
+        BiomeType::Desert => (1, 0.03), // wind-smoothed (was 1, 0.02)
+        BiomeType::Mountain => (3, 0.10), // deep V-cuts on slopes (was 1, 0.03)
+        BiomeType::Swamp => (2, 0.08),  // water channels (was 1, 0.06)
+        BiomeType::Tundra => (1, 0.02), // glacial, still flat (was 1, 0.01)
+        BiomeType::Savanna => (1, 0.04), // dry washes (was 1, 0.02)
+        BiomeType::Jungle => (3, 0.12), // deep ravines (was 2, 0.07)
+        BiomeType::Volcanic => (2, 0.05), // lava channels (was 1, 0.01)
+        BiomeType::Canyon => (4, 0.15), // deep incision, the most eroded (was 2, 0.08)
     }
 }
 
 /// Per-biome maximum slope for slope limiting.
 /// Reads from genome overrides (BiomeSpec::slope_max) if available, falls back to hardcoded defaults.
-pub(super) fn slope_max_for_biome(biome: BiomeType, overrides: Option<&BiomeGenomeOverrides>) -> f32 {
+pub(super) fn slope_max_for_biome(
+    biome: BiomeType,
+    overrides: Option<&BiomeGenomeOverrides>,
+) -> f32 {
     if let Some(ovr) = overrides {
         if let Some(v) = ovr.slope_max[(biome as u8 as usize).min(9)] {
             return v;
         }
     }
     match biome {
-        BiomeType::Mountain => 3.0,  // steep cliffs allowed (was 2.2)
-        BiomeType::Canyon => 3.2,    // sheer canyon walls
-        BiomeType::Volcanic => 2.8,  // caldera rim steepness
-        BiomeType::Jungle => 2.4,    // ravine walls
-        _ => 2.0,                    // was 1.8
+        BiomeType::Mountain => 3.0, // steep cliffs allowed (was 2.2)
+        BiomeType::Canyon => 3.2,   // sheer canyon walls
+        BiomeType::Volcanic => 2.8, // caldera rim steepness
+        BiomeType::Jungle => 2.4,   // ravine walls
+        _ => 2.0,                   // was 1.8
     }
 }
 
@@ -106,7 +112,12 @@ pub(super) fn save_padding_ring(heights: &[f32], w: usize, d: usize) -> Vec<(usi
 }
 
 /// Restore the padding ring saved by save_padding_ring.
-pub(super) fn restore_padding_ring(heights: &mut [f32], _w: usize, _d: usize, ring: &[(usize, f32)]) {
+pub(super) fn restore_padding_ring(
+    heights: &mut [f32],
+    _w: usize,
+    _d: usize,
+    ring: &[(usize, f32)],
+) {
     for &(idx, val) in ring {
         heights[idx] = val;
     }
@@ -115,7 +126,8 @@ pub(super) fn restore_padding_ring(heights: &mut [f32], _w: usize, _d: usize, ri
 /// Erosion with per-cell rates — eliminates seams at biome chunk boundaries.
 pub(super) fn erode_heightmap_variable(
     heights: &mut [f32],
-    w: usize, d: usize,
+    w: usize,
+    d: usize,
     passes: usize,
     rates: &[f32],
 ) {
@@ -133,10 +145,26 @@ pub(super) fn erode_heightmap_variable(
                 let mut outflow = 0.0_f32;
                 let mut neighbor_data: [(usize, f32); 4] = [(0, 0.0); 4];
 
-                let n = snapshot[idx - w]; neighbor_data[0] = (idx - w, n); if n < center { outflow += center - n; }
-                let s = snapshot[idx + w]; neighbor_data[1] = (idx + w, s); if s < center { outflow += center - s; }
-                let ww = snapshot[idx - 1]; neighbor_data[2] = (idx - 1, ww); if ww < center { outflow += center - ww; }
-                let e = snapshot[idx + 1]; neighbor_data[3] = (idx + 1, e); if e < center { outflow += center - e; }
+                let n = snapshot[idx - w];
+                neighbor_data[0] = (idx - w, n);
+                if n < center {
+                    outflow += center - n;
+                }
+                let s = snapshot[idx + w];
+                neighbor_data[1] = (idx + w, s);
+                if s < center {
+                    outflow += center - s;
+                }
+                let ww = snapshot[idx - 1];
+                neighbor_data[2] = (idx - 1, ww);
+                if ww < center {
+                    outflow += center - ww;
+                }
+                let e = snapshot[idx + 1];
+                neighbor_data[3] = (idx + 1, e);
+                if e < center {
+                    outflow += center - e;
+                }
 
                 if outflow > 0.01 {
                     heights[idx] -= outflow * rate;
@@ -160,7 +188,13 @@ pub(super) fn erode_heightmap_variable(
 
 /// Slope limiting with per-cell max slope — eliminates seams at biome chunk boundaries.
 /// Skips padding ring to preserve deterministic chunk boundaries.
-pub(super) fn slope_limit_variable(heights: &mut [f32], w: usize, d: usize, max_slopes: &[f32], passes: usize) {
+pub(super) fn slope_limit_variable(
+    heights: &mut [f32],
+    w: usize,
+    d: usize,
+    max_slopes: &[f32],
+    passes: usize,
+) {
     for _ in 0..passes {
         // Forward pass — skip padding (start at 1, end at w-2/d-2)
         for z in 1..d - 1 {
@@ -201,8 +235,14 @@ mod tests {
     #[test]
     fn slope_max_descends_cliffs_allowed_higher() {
         // Mountain/Canyon/Volcanic/Jungle allow steeper slopes than default 2.0
-        assert!(slope_max_for_biome(BiomeType::Mountain, None) > slope_max_for_biome(BiomeType::Plains, None));
-        assert!(slope_max_for_biome(BiomeType::Canyon, None) > slope_max_for_biome(BiomeType::Forest, None));
+        assert!(
+            slope_max_for_biome(BiomeType::Mountain, None)
+                > slope_max_for_biome(BiomeType::Plains, None)
+        );
+        assert!(
+            slope_max_for_biome(BiomeType::Canyon, None)
+                > slope_max_for_biome(BiomeType::Forest, None)
+        );
     }
 
     /// Padding ring round-trip : save + mutate interior + restore should
@@ -216,29 +256,43 @@ mod tests {
 
         let ring = save_padding_ring(&h, w, d);
         // Zap everything (including ring).
-        for v in h.iter_mut() { *v = -999.0; }
+        for v in h.iter_mut() {
+            *v = -999.0;
+        }
         // Restore ring : centre reste zapped, bord revient.
         restore_padding_ring(&mut h, w, d, &ring);
 
         // Top/bottom rows
         for x in 0..w {
             assert_eq!(h[x], original[x], "top row px={x} differs");
-            assert_eq!(h[x + w * (d - 1)], original[x + w * (d - 1)],
-                       "bottom row px={x} differs");
+            assert_eq!(
+                h[x + w * (d - 1)],
+                original[x + w * (d - 1)],
+                "bottom row px={x} differs"
+            );
         }
         // Left/right cols
         for z in 1..d - 1 {
             assert_eq!(h[w * z], original[w * z], "left col pz={z} differs");
-            assert_eq!(h[w - 1 + w * z], original[w - 1 + w * z],
-                       "right col pz={z} differs");
+            assert_eq!(
+                h[w - 1 + w * z],
+                original[w - 1 + w * z],
+                "right col pz={z} differs"
+            );
         }
     }
 
     /// Extract the 1-cell padding ring of a height buffer as a flat Vec.
     fn extract_padding_ring(h: &[f32], w: usize, d: usize) -> Vec<f32> {
         let mut r = Vec::new();
-        for x in 0..w { r.push(h[x]); r.push(h[x + w * (d - 1)]); }
-        for z in 1..d - 1 { r.push(h[w * z]); r.push(h[w - 1 + w * z]); }
+        for x in 0..w {
+            r.push(h[x]);
+            r.push(h[x + w * (d - 1)]);
+        }
+        for z in 1..d - 1 {
+            r.push(h[w * z]);
+            r.push(h[w - 1 + w * z]);
+        }
         r
     }
 
@@ -301,8 +355,11 @@ mod tests {
         h[12] = 50.0;
         let original_center = h[12];
         valley_carve(&mut h, w, d, 5.0);
-        assert!(h[12] <= original_center,
-                "valley_carve raised central peak from {original_center} to {}", h[12]);
+        assert!(
+            h[12] <= original_center,
+            "valley_carve raised central peak from {original_center} to {}",
+            h[12]
+        );
     }
 
     #[test]
@@ -316,8 +373,11 @@ mod tests {
             for x in 1..w - 1 {
                 let idx = x + w * z;
                 let cap = h[idx - 1].min(h[idx - w]);
-                assert!(h[idx] <= cap + 1e-5,
-                        "cell {idx} = {} > neighbour cap {cap}", h[idx]);
+                assert!(
+                    h[idx] <= cap + 1e-5,
+                    "cell {idx} = {} > neighbour cap {cap}",
+                    h[idx]
+                );
             }
         }
     }

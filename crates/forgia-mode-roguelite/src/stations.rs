@@ -118,7 +118,11 @@ pub fn spawn_stations(
 pub fn sys_use_health_stations(
     q_player: Query<(Entity, &Transform), With<PickupCollector>>,
     mut q_stations: Query<
-        (&Transform, &mut HealthStation, &mut MeshMaterial3d<StandardMaterial>),
+        (
+            &Transform,
+            &mut HealthStation,
+            &mut MeshMaterial3d<StandardMaterial>,
+        ),
         Without<PickupCollector>,
     >,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -166,7 +170,11 @@ pub fn sys_use_health_stations(
 pub fn sys_use_ammo_stations(
     q_player: Query<&Transform, With<PickupCollector>>,
     mut q_stations: Query<
-        (&Transform, &mut AmmoStation, &mut MeshMaterial3d<StandardMaterial>),
+        (
+            &Transform,
+            &mut AmmoStation,
+            &mut MeshMaterial3d<StandardMaterial>,
+        ),
         Without<PickupCollector>,
     >,
     mut equipped: Option<ResMut<EquippedWeapons>>,
@@ -283,7 +291,10 @@ mod tests {
     #[test]
     fn spawn_points_balanced_kinds() {
         let pts = station_spawn_points();
-        let health = pts.iter().filter(|(_, k)| *k == StationKind::Health).count();
+        let health = pts
+            .iter()
+            .filter(|(_, k)| *k == StationKind::Health)
+            .count();
         let ammo = pts.iter().filter(|(_, k)| *k == StationKind::Ammo).count();
         assert_eq!(health, 4);
         assert_eq!(ammo, 4);

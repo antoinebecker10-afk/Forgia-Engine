@@ -76,6 +76,9 @@ pub fn sync_damage_dir_tuning(
     }
     if let Some(g) = assets.get(&handle.0) {
         *tuning = g.data.clone();
-        info!("[damage-dir] tuning synced (radius {}px, max {})", tuning.radius_px, tuning.max_arcs);
+        info!(
+            "[damage-dir] tuning synced (radius {}px, max {})",
+            tuning.radius_px, tuning.max_arcs
+        );
     }
 }

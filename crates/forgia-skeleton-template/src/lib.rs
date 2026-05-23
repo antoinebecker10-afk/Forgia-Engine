@@ -212,7 +212,11 @@ pub enum TemplateValidationError {
     /// `bone_idx, parent_idx` : le bone à `bone_idx` référence parent à `parent_idx`.
     ForwardReference { bone_idx: usize, parent_idx: usize },
     /// Index parent hors bornes.
-    OutOfBoundsParent { bone_idx: usize, parent_idx: usize, total: usize },
+    OutOfBoundsParent {
+        bone_idx: usize,
+        parent_idx: usize,
+        total: usize,
+    },
     /// Auto-référence (un bone se déclare son propre parent).
     SelfReference { bone_idx: usize },
 }
@@ -221,19 +225,31 @@ impl std::fmt::Display for TemplateValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Empty => write!(f, "skeleton template is empty"),
-            Self::MultipleRoots => write!(f, "skeleton template has multiple root bones (parent = None)"),
+            Self::MultipleRoots => write!(
+                f,
+                "skeleton template has multiple root bones (parent = None)"
+            ),
             Self::NoRoot => write!(f, "skeleton template has no root bone (all have parent)"),
-            Self::ForwardReference { bone_idx, parent_idx } => write!(
+            Self::ForwardReference {
+                bone_idx,
+                parent_idx,
+            } => write!(
                 f,
                 "bone[{}] references parent[{}] declared after it (BFS order violated)",
                 bone_idx, parent_idx
             ),
-            Self::OutOfBoundsParent { bone_idx, parent_idx, total } => write!(
+            Self::OutOfBoundsParent {
+                bone_idx,
+                parent_idx,
+                total,
+            } => write!(
                 f,
                 "bone[{}] references parent[{}] but template has only {} bones",
                 bone_idx, parent_idx, total
             ),
-            Self::SelfReference { bone_idx } => write!(f, "bone[{}] references itself as parent", bone_idx),
+            Self::SelfReference { bone_idx } => {
+                write!(f, "bone[{}] references itself as parent", bone_idx)
+            }
         }
     }
 }
@@ -427,7 +443,11 @@ impl SkeletonTemplate {
                     x
                 };
                 let apply_x_offset = torso_x_offset_frac.abs() > 0.006;
-                let x_offset = if apply_x_offset { torso_x_offset_frac } else { 0.0 };
+                let x_offset = if apply_x_offset {
+                    torso_x_offset_frac
+                } else {
+                    0.0
+                };
                 let (x_final, z_final) = match class {
                     BoneClass::Spine | BoneClass::Head | BoneClass::Arm | BoneClass::Tail => {
                         (x_scaled + x_offset, z)
@@ -465,26 +485,26 @@ impl SkeletonTemplate {
     pub fn humanoid() -> Self {
         use BoneClass::*;
         Self::from_data(&[
-            ("hip",         None,     [0.0,   0.50,  0.0],  Spine),
-            ("spine_lower", Some(0),  [0.0,   0.58,  0.0],  Spine),
-            ("spine_mid",   Some(1),  [0.0,   0.66,  0.0],  Spine),
-            ("chest",       Some(2),  [0.0,   0.75,  0.0],  Spine),
-            ("neck",        Some(3),  [0.0,   0.85,  0.0],  Spine),
-            ("head",        Some(4),  [0.0,   0.95,  0.0],  Head),
-            ("clavicle_L",  Some(3),  [-0.08, 0.80,  0.0],  Arm),
-            ("arm_L",       Some(6),  [-0.25, 0.78,  0.0],  Arm),
-            ("forearm_L",   Some(7),  [-0.55, 0.78,  0.0],  Arm),
-            ("hand_L",      Some(8),  [-0.85, 0.78,  0.0],  Arm),
-            ("clavicle_R",  Some(3),  [0.08,  0.80,  0.0],  Arm),
-            ("arm_R",       Some(10), [0.25,  0.78,  0.0],  Arm),
-            ("forearm_R",   Some(11), [0.55,  0.78,  0.0],  Arm),
-            ("hand_R",      Some(12), [0.85,  0.78,  0.0],  Arm),
-            ("thigh_L",     Some(0),  [-0.10, 0.40,  0.0],  Leg),
-            ("shin_L",      Some(14), [-0.10, 0.27,  0.03], Leg),
-            ("foot_L",      Some(15), [-0.10, 0.02,  0.05], Leg),
-            ("thigh_R",     Some(0),  [0.10,  0.40,  0.0],  Leg),
-            ("shin_R",      Some(17), [0.10,  0.27,  0.03], Leg),
-            ("foot_R",      Some(18), [0.10,  0.02,  0.05], Leg),
+            ("hip", None, [0.0, 0.50, 0.0], Spine),
+            ("spine_lower", Some(0), [0.0, 0.58, 0.0], Spine),
+            ("spine_mid", Some(1), [0.0, 0.66, 0.0], Spine),
+            ("chest", Some(2), [0.0, 0.75, 0.0], Spine),
+            ("neck", Some(3), [0.0, 0.85, 0.0], Spine),
+            ("head", Some(4), [0.0, 0.95, 0.0], Head),
+            ("clavicle_L", Some(3), [-0.08, 0.80, 0.0], Arm),
+            ("arm_L", Some(6), [-0.25, 0.78, 0.0], Arm),
+            ("forearm_L", Some(7), [-0.55, 0.78, 0.0], Arm),
+            ("hand_L", Some(8), [-0.85, 0.78, 0.0], Arm),
+            ("clavicle_R", Some(3), [0.08, 0.80, 0.0], Arm),
+            ("arm_R", Some(10), [0.25, 0.78, 0.0], Arm),
+            ("forearm_R", Some(11), [0.55, 0.78, 0.0], Arm),
+            ("hand_R", Some(12), [0.85, 0.78, 0.0], Arm),
+            ("thigh_L", Some(0), [-0.10, 0.40, 0.0], Leg),
+            ("shin_L", Some(14), [-0.10, 0.27, 0.03], Leg),
+            ("foot_L", Some(15), [-0.10, 0.02, 0.05], Leg),
+            ("thigh_R", Some(0), [0.10, 0.40, 0.0], Leg),
+            ("shin_R", Some(17), [0.10, 0.27, 0.03], Leg),
+            ("foot_R", Some(18), [0.10, 0.02, 0.05], Leg),
         ])
     }
 
@@ -493,26 +513,26 @@ impl SkeletonTemplate {
     pub fn biped_lizard() -> Self {
         use BoneClass::*;
         Self::from_data(&[
-            ("hip",         None,     [0.0,   0.45,  0.02], Spine),
-            ("spine_lower", Some(0),  [0.0,   0.53,  0.08], Spine),
-            ("spine_mid",   Some(1),  [0.0,   0.63,  0.10], Spine),
-            ("chest",       Some(2),  [0.0,   0.71,  0.08], Spine),
-            ("neck",        Some(3),  [0.0,   0.76,  0.06], Spine),
-            ("head",        Some(4),  [0.0,   0.82,  0.10], Head),
-            ("arm_L",       Some(3),  [-0.18, 0.71,  0.0],  Arm),
-            ("forearm_L",   Some(6),  [-0.36, 0.71,  0.0],  Arm),
-            ("arm_R",       Some(3),  [0.18,  0.71,  0.0],  Arm),
-            ("forearm_R",   Some(8),  [0.36,  0.71,  0.0],  Arm),
-            ("thigh_L",     Some(0),  [-0.10, 0.37,  0.0],  Leg),
-            ("shin_L",      Some(10), [-0.10, 0.20,  0.12], Leg),
-            ("foot_L",      Some(11), [-0.10, 0.04,  0.06], Leg),
-            ("thigh_R",     Some(0),  [0.10,  0.37,  0.0],  Leg),
-            ("shin_R",      Some(13), [0.10,  0.20,  0.12], Leg),
-            ("foot_R",      Some(14), [0.10,  0.04,  0.06], Leg),
-            ("tail_01",     Some(0),  [0.0,   0.41, -0.12], Tail),
-            ("tail_02",     Some(16), [0.0,   0.39, -0.22], Tail),
-            ("tail_03",     Some(17), [0.0,   0.37, -0.32], Tail),
-            ("tail_04",     Some(18), [0.0,   0.35, -0.42], Tail),
+            ("hip", None, [0.0, 0.45, 0.02], Spine),
+            ("spine_lower", Some(0), [0.0, 0.53, 0.08], Spine),
+            ("spine_mid", Some(1), [0.0, 0.63, 0.10], Spine),
+            ("chest", Some(2), [0.0, 0.71, 0.08], Spine),
+            ("neck", Some(3), [0.0, 0.76, 0.06], Spine),
+            ("head", Some(4), [0.0, 0.82, 0.10], Head),
+            ("arm_L", Some(3), [-0.18, 0.71, 0.0], Arm),
+            ("forearm_L", Some(6), [-0.36, 0.71, 0.0], Arm),
+            ("arm_R", Some(3), [0.18, 0.71, 0.0], Arm),
+            ("forearm_R", Some(8), [0.36, 0.71, 0.0], Arm),
+            ("thigh_L", Some(0), [-0.10, 0.37, 0.0], Leg),
+            ("shin_L", Some(10), [-0.10, 0.20, 0.12], Leg),
+            ("foot_L", Some(11), [-0.10, 0.04, 0.06], Leg),
+            ("thigh_R", Some(0), [0.10, 0.37, 0.0], Leg),
+            ("shin_R", Some(13), [0.10, 0.20, 0.12], Leg),
+            ("foot_R", Some(14), [0.10, 0.04, 0.06], Leg),
+            ("tail_01", Some(0), [0.0, 0.41, -0.12], Tail),
+            ("tail_02", Some(16), [0.0, 0.39, -0.22], Tail),
+            ("tail_03", Some(17), [0.0, 0.37, -0.32], Tail),
+            ("tail_04", Some(18), [0.0, 0.35, -0.42], Tail),
         ])
     }
 
@@ -611,7 +631,12 @@ impl SkeletonTemplateRegistry {
         id: SkeletonTemplateId,
         assets: &'a Assets<Genome<SkeletonTemplate>>,
     ) -> Option<&'a SkeletonTemplate> {
-        if !self.load_state.get(&id).map(|s| s.is_ready()).unwrap_or(false) {
+        if !self
+            .load_state
+            .get(&id)
+            .map(|s| s.is_ready())
+            .unwrap_or(false)
+        {
             return None;
         }
         let handle = self.handles.get(&id)?;
@@ -659,7 +684,10 @@ pub struct SkeletonTemplatePlugin {
 impl Default for SkeletonTemplatePlugin {
     fn default() -> Self {
         Self {
-            preload: vec![SkeletonTemplateId::Humanoid, SkeletonTemplateId::BipedLizard],
+            preload: vec![
+                SkeletonTemplateId::Humanoid,
+                SkeletonTemplateId::BipedLizard,
+            ],
         }
     }
 }
@@ -684,9 +712,7 @@ impl Plugin for SkeletonTemplatePlugin {
                     let handle: Handle<Genome<SkeletonTemplate>> =
                         asset_server.load(id.asset_path());
                     registry.handles.insert(*id, handle);
-                    registry
-                        .load_state
-                        .insert(*id, TemplateLoadState::Loading);
+                    registry.load_state.insert(*id, TemplateLoadState::Loading);
                     registry
                         .requested_at_elapsed
                         .insert(*id, time.elapsed_secs());
@@ -757,8 +783,7 @@ pub fn update_skeleton_registry_load_state(
 
 /// Filename du sensor JSON. Public pour permettre aux dashboards externes
 /// (sensor_reader, dashboards Tauri) de pointer dessus sans dupliquer la string.
-pub const SKELETON_TEMPLATE_REGISTRY_SENSOR_FILE: &str =
-    "forgia2_skeleton_template_registry.json";
+pub const SKELETON_TEMPLATE_REGISTRY_SENSOR_FILE: &str = "forgia2_skeleton_template_registry.json";
 
 /// Décide severity + next_step depuis l'état Registry. **Pur** — extrait pour
 /// tests headless. Convention next-step Quality Gate (§3 QUALITY_GATE.md).
@@ -838,7 +863,11 @@ pub fn sys_write_skeleton_template_registry_sensor(
         .iter()
         .filter_map(|id| {
             let st = registry.load_state.get(id)?;
-            let req = registry.requested_at_elapsed.get(id).copied().unwrap_or(0.0);
+            let req = registry
+                .requested_at_elapsed
+                .get(id)
+                .copied()
+                .unwrap_or(0.0);
             Some((*id, st, req))
         })
         .collect();
@@ -911,7 +940,11 @@ mod tests {
     #[test]
     fn humanoid_has_20_bones_with_root_hip() {
         let t = SkeletonTemplate::humanoid();
-        assert_eq!(t.bones.len(), 20, "humanoid should have 20 bones (with hand_L/R)");
+        assert_eq!(
+            t.bones.len(),
+            20,
+            "humanoid should have 20 bones (with hand_L/R)"
+        );
         assert_eq!(t.bones[0].name, "hip");
         assert!(t.bones[0].parent.is_none(), "hip must be root");
     }
@@ -940,8 +973,18 @@ mod tests {
     fn validate_rejects_no_root() {
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: Some(1), pos: [0.0; 3], class: BoneClass::Other },
-                TemplateBone { name: "b".into(), parent: Some(0), pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone {
+                    name: "a".into(),
+                    parent: Some(1),
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
+                TemplateBone {
+                    name: "b".into(),
+                    parent: Some(0),
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
             ],
         };
         // Forward ref detected first.
@@ -955,8 +998,18 @@ mod tests {
     fn validate_rejects_multiple_roots() {
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
-                TemplateBone { name: "b".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone {
+                    name: "a".into(),
+                    parent: None,
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
+                TemplateBone {
+                    name: "b".into(),
+                    parent: None,
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
             ],
         };
         assert_eq!(validate(&t), Err(TemplateValidationError::MultipleRoots));
@@ -983,13 +1036,26 @@ mod tests {
         // bone[0] references bone[1] which is declared after.
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: Some(1), pos: [0.0; 3], class: BoneClass::Other },
-                TemplateBone { name: "b".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone {
+                    name: "a".into(),
+                    parent: Some(1),
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
+                TemplateBone {
+                    name: "b".into(),
+                    parent: None,
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
             ],
         };
         assert!(matches!(
             validate(&t),
-            Err(TemplateValidationError::ForwardReference { bone_idx: 0, parent_idx: 1 })
+            Err(TemplateValidationError::ForwardReference {
+                bone_idx: 0,
+                parent_idx: 1
+            })
         ));
     }
 
@@ -997,8 +1063,18 @@ mod tests {
     fn validate_rejects_out_of_bounds_parent() {
         let t = SkeletonTemplate {
             bones: vec![
-                TemplateBone { name: "a".into(), parent: None, pos: [0.0; 3], class: BoneClass::Other },
-                TemplateBone { name: "b".into(), parent: Some(99), pos: [0.0; 3], class: BoneClass::Other },
+                TemplateBone {
+                    name: "a".into(),
+                    parent: None,
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
+                TemplateBone {
+                    name: "b".into(),
+                    parent: Some(99),
+                    pos: [0.0; 3],
+                    class: BoneClass::Other,
+                },
             ],
         };
         assert!(matches!(
@@ -1013,10 +1089,18 @@ mod tests {
         let rescaled = t.rescaled_for_landmarks(0.42, 0.67, 0.95, 0.50);
 
         let hip = rescaled.bones.iter().find(|b| b.name == "hip").unwrap();
-        assert!((hip.pos[1] - 0.42).abs() < 0.01, "hip should map to 0.42 got {}", hip.pos[1]);
+        assert!(
+            (hip.pos[1] - 0.42).abs() < 0.01,
+            "hip should map to 0.42 got {}",
+            hip.pos[1]
+        );
 
         let head = rescaled.bones.iter().find(|b| b.name == "head").unwrap();
-        assert!((head.pos[1] - 0.95).abs() < 0.01, "head should map to 0.95 got {}", head.pos[1]);
+        assert!(
+            (head.pos[1] - 0.95).abs() < 0.01,
+            "head should map to 0.95 got {}",
+            head.pos[1]
+        );
     }
 
     #[test]
@@ -1024,7 +1108,11 @@ mod tests {
         let t = SkeletonTemplate::biped_lizard();
         let rescaled = t.rescaled_for_landmarks(0.42, 0.67, 0.95, 0.40);
         let tail4 = rescaled.bones.iter().find(|b| b.name == "tail_04").unwrap();
-        assert!(tail4.pos[2] < -0.30, "tail_04 z must stay backward, got {}", tail4.pos[2]);
+        assert!(
+            tail4.pos[2] < -0.30,
+            "tail_04 z must stay backward, got {}",
+            tail4.pos[2]
+        );
     }
 
     #[test]
@@ -1040,16 +1128,26 @@ mod tests {
             assert!(
                 (orig.pos[2] + flip.pos[2]).abs() < 1e-6,
                 "flip should negate z: {} vs {}",
-                orig.pos[2], flip.pos[2]
+                orig.pos[2],
+                flip.pos[2]
             );
         }
     }
 
     #[test]
     fn skeleton_template_id_asset_path_convention() {
-        assert_eq!(SkeletonTemplateId::Humanoid.asset_path(), "genomes/skeleton_humanoid.toml");
-        assert_eq!(SkeletonTemplateId::BipedLizard.asset_path(), "genomes/skeleton_biped_lizard.toml");
-        assert_eq!(SkeletonTemplateId::Quadruped.asset_path(), "genomes/skeleton_quadruped.toml");
+        assert_eq!(
+            SkeletonTemplateId::Humanoid.asset_path(),
+            "genomes/skeleton_humanoid.toml"
+        );
+        assert_eq!(
+            SkeletonTemplateId::BipedLizard.asset_path(),
+            "genomes/skeleton_biped_lizard.toml"
+        );
+        assert_eq!(
+            SkeletonTemplateId::Quadruped.asset_path(),
+            "genomes/skeleton_quadruped.toml"
+        );
     }
 
     // ── Phase 2 Registry tests ──────────────────────────────────────────────
@@ -1058,7 +1156,10 @@ mod tests {
     fn load_state_str_mapping_stable() {
         assert_eq!(TemplateLoadState::Loading.as_str(), "loading");
         assert_eq!(TemplateLoadState::Ready.as_str(), "ready");
-        assert_eq!(TemplateLoadState::InvalidStructure("x".into()).as_str(), "invalid");
+        assert_eq!(
+            TemplateLoadState::InvalidStructure("x".into()).as_str(),
+            "invalid"
+        );
         assert_eq!(TemplateLoadState::Failed("y".into()).as_str(), "failed");
     }
 
@@ -1137,7 +1238,10 @@ mod tests {
         ];
         let (sev, msg) = severity_for_registry(&states, 10.0);
         assert_eq!(sev, "warn");
-        assert!(msg.contains("biped_lizard"), "failed dominates stale loading");
+        assert!(
+            msg.contains("biped_lizard"),
+            "failed dominates stale loading"
+        );
         assert!(msg.contains("failed to load"));
     }
 
@@ -1152,8 +1256,7 @@ mod tests {
     #[test]
     fn sensor_filename_canonical() {
         assert_eq!(
-            SKELETON_TEMPLATE_REGISTRY_SENSOR_FILE,
-            "forgia2_skeleton_template_registry.json",
+            SKELETON_TEMPLATE_REGISTRY_SENSOR_FILE, "forgia2_skeleton_template_registry.json",
             "filename must match Forgia2 sensor convention (forgia2_<feature>.json)"
         );
     }
@@ -1234,8 +1337,7 @@ mod tests {
     fn all_shipped_skeleton_tomls_pass_validate() {
         for filename in ["skeleton_humanoid.toml", "skeleton_biped_lizard.toml"] {
             let t = parse_workspace_toml(filename);
-            validate(&t)
-                .unwrap_or_else(|e| panic!("{filename} fails validate(): {e}"));
+            validate(&t).unwrap_or_else(|e| panic!("{filename} fails validate(): {e}"));
         }
     }
 }

@@ -126,7 +126,9 @@ pub fn apply_fov_to_camera(
     if !settings.is_changed() && (*last_applied - settings.fov_deg).abs() < 0.01 {
         return;
     }
-    let Ok(mut proj) = q_cam.single_mut() else { return };
+    let Ok(mut proj) = q_cam.single_mut() else {
+        return;
+    };
     if let Projection::Perspective(ref mut p) = *proj {
         p.fov = settings.fov_deg.to_radians();
         *last_applied = settings.fov_deg;
@@ -171,22 +173,17 @@ pub(crate) fn draw_pause_menu(
                 .corner_radius(egui::CornerRadius::same(10))
                 .stroke(egui::Stroke::new(2.5, C_PRIMARY))
                 .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        match state.sub {
-                            PauseSubMenu::Root => draw_root(
-                                ui,
-                                &mut next_app,
-                                &mut next_game,
-                                &mut state,
-                            ),
-                            PauseSubMenu::Settings => draw_settings(
-                                ui,
-                                &mut state,
-                                &mut settings,
-                                &mut sensor,
-                                time.elapsed_secs(),
-                            ),
+                    ui.vertical_centered(|ui| match state.sub {
+                        PauseSubMenu::Root => {
+                            draw_root(ui, &mut next_app, &mut next_game, &mut state)
                         }
+                        PauseSubMenu::Settings => draw_settings(
+                            ui,
+                            &mut state,
+                            &mut settings,
+                            &mut sensor,
+                            time.elapsed_secs(),
+                        ),
                     });
                 });
         });
@@ -290,7 +287,11 @@ fn draw_settings(
             let saved = save_user_settings(settings);
             sensor.last_save_secs = now;
             sensor.last_save_success = saved;
-            state.last_action = if saved { "saved".to_string() } else { "save_failed".to_string() };
+            state.last_action = if saved {
+                "saved".to_string()
+            } else {
+                "save_failed".to_string()
+            };
             if saved {
                 info!("[pause-menu] settings saved to {USER_SETTINGS_PATH}");
             }

@@ -268,7 +268,11 @@ fn draw_sniper_scope_overlay(
             ring_alpha,
         );
         let r = scope_radius + ring_thickness * t * tuning.sniper_ring_outer_extent;
-        painter.circle_stroke(center, r, egui::Stroke::new(ring_thickness * 0.35, ring_color));
+        painter.circle_stroke(
+            center,
+            r,
+            egui::Stroke::new(ring_thickness * 0.35, ring_color),
+        );
     }
 
     // Bordure scope métallique
@@ -340,7 +344,12 @@ fn draw_sniper_scope_overlay(
     let tick_y = center.y;
     let tick_size = tuning.sniper_reticle_tick_size;
     let tick_stroke = egui::Stroke::new(tuning.sniper_reticle_tick_stroke, reticle_color);
-    for offset in [-line_len * 0.5, -line_len * 0.25, line_len * 0.25, line_len * 0.5] {
+    for offset in [
+        -line_len * 0.5,
+        -line_len * 0.25,
+        line_len * 0.25,
+        line_len * 0.5,
+    ] {
         painter.line_segment(
             [
                 egui::pos2(center.x + offset, tick_y - tick_size),

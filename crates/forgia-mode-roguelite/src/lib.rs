@@ -31,15 +31,13 @@ pub mod waves;
 pub use enemies::{EnemyArchetype, EnemyStats};
 pub use waves::RogueliteWave;
 
-pub use run::{
-    EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent,
-};
+pub use run::{EndRunEvent, RogueliteRunMarker, RunResult, RunSeed, RunState, StartRunEvent};
 pub use sensor::RogueliteTelemetry;
 
 pub mod prelude {
     pub use crate::{
-        EndRunEvent, ForgiaModeRoguelitePlugin, RogueliteRunMarker, RunResult, RunSeed,
-        RunState, StartRunEvent,
+        EndRunEvent, ForgiaModeRoguelitePlugin, RogueliteRunMarker, RunResult, RunSeed, RunState,
+        StartRunEvent,
     };
 }
 

@@ -42,16 +42,15 @@ pub struct ArenaFeedbackPlugin;
 
 impl Plugin for ArenaFeedbackPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ArenaFeedbackStats>()
-            .add_systems(
-                Update,
-                (
-                    // TODO: re-enable once BotKilledEvent + AudioRegistry ported
-                    // arena_bot_kill_sound.in_set(GameSet::Effects),
-                    // arena_player_damage_sound.in_set(GameSet::Effects),
-                    arena_feedback_sensor_export,
-                ),
-            );
+        app.init_resource::<ArenaFeedbackStats>().add_systems(
+            Update,
+            (
+                // TODO: re-enable once BotKilledEvent + AudioRegistry ported
+                // arena_bot_kill_sound.in_set(GameSet::Effects),
+                // arena_player_damage_sound.in_set(GameSet::Effects),
+                arena_feedback_sensor_export,
+            ),
+        );
     }
 }
 

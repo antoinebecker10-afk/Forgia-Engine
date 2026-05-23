@@ -27,18 +27,19 @@ use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
-#[allow(unused_imports)] // LocomotionTarget/Template gardés pour réactivation future (cf spawn_rex_character)
+#[allow(unused_imports)]
+// LocomotionTarget/Template gardés pour réactivation future (cf spawn_rex_character)
 use forgia_anim_locomotion::{
     LocomotionBoneCache, LocomotionState, LocomotionTarget, LocomotionTemplate, ProcBodyAnim,
     AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_BREATH_AMP, IDLE_BREATH_FREQ,
-    IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP,
-    WALK_BOB_AMP, WALK_FREQ,
+    IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP, WALK_BOB_AMP,
+    WALK_FREQ,
 };
-#[allow(unused_imports)] // SkeletonTemplateId gardé pour réactivation future
-use forgia_skeleton_template::SkeletonTemplateId;
 use forgia_auto_rig::{AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
 use forgia_player::prelude::{FpsCamera, Player};
+#[allow(unused_imports)] // SkeletonTemplateId gardé pour réactivation future
+use forgia_skeleton_template::SkeletonTemplateId;
 use std::f32::consts::TAU;
 
 /// Marker de l'entité Scene Rex (enfant du Player).
@@ -116,12 +117,7 @@ pub(crate) fn spawn_rex_character(
     // 2. Spawn character selon mode (HumanoidBlocks baseline ou RexGlb).
     match *mode {
         TestCharacterMode::HumanoidBlocks => {
-            spawn_humanoid_blocks(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                player_entity,
-            );
+            spawn_humanoid_blocks(&mut commands, &mut meshes, &mut materials, player_entity);
         }
         TestCharacterMode::RexGlb => {
             // Story-440 R&D 2026-05-17 night : re-add NeedsAutoRig pour que
@@ -223,7 +219,10 @@ const LINEUP_CHARACTERS: &[(&str, &str)] = &[
     ("Dorin", "models/characters/Dorin.glb#Scene0"),
     ("Mira", "models/characters/Mira.glb#Scene0"),
     ("Apprenti", "models/characters/L'Apprenti .glb#Scene0"),
-    ("MaitreForgeron", "models/characters/Maitre Forgeron Célèste.glb#Scene0"),
+    (
+        "MaitreForgeron",
+        "models/characters/Maitre Forgeron Célèste.glb#Scene0",
+    ),
 ];
 
 /// Spawn 5 personnages côte à côte (1.6m d'écart en X) à 4m derrière le spawn
@@ -333,7 +332,10 @@ pub(crate) fn calibrate_lineup_y_and_height(
             let local_pos = if e == entity {
                 Vec3::ZERO
             } else {
-                transforms_q.get(e).map(|t| t.translation).unwrap_or(Vec3::ZERO)
+                transforms_q
+                    .get(e)
+                    .map(|t| t.translation)
+                    .unwrap_or(Vec3::ZERO)
             };
             let mesh_local_pos = parent_local + local_pos;
             if let Ok(aabb) = aabbs_q.get(e) {
@@ -402,9 +404,14 @@ pub(crate) fn draw_lineup_names(
         // Outline noir 8 passes pour lisibilité sur tout fond.
         let outline_thickness = (1.5 * scale).max(1.0);
         for (dx, dy) in &[
-            (-1.0_f32, -1.0_f32), (0.0, -1.0), (1.0, -1.0),
-            (-1.0,  0.0),                       (1.0,  0.0),
-            (-1.0,  1.0),         (0.0,  1.0),  (1.0,  1.0),
+            (-1.0_f32, -1.0_f32),
+            (0.0, -1.0),
+            (1.0, -1.0),
+            (-1.0, 0.0),
+            (1.0, 0.0),
+            (-1.0, 1.0),
+            (0.0, 1.0),
+            (1.0, 1.0),
         ] {
             painter.text(
                 egui::pos2(
@@ -463,10 +470,7 @@ pub struct RexYCalibrated;
 /// via marker `RexYCalibrated`.
 pub(crate) fn calibrate_rex_y_one_shot(
     mut commands: Commands,
-    mut q_rex: Query<
-        (Entity, &mut Transform),
-        (With<RexCharacter>, Without<RexYCalibrated>),
-    >,
+    mut q_rex: Query<(Entity, &mut Transform), (With<RexCharacter>, Without<RexYCalibrated>)>,
     children_q: Query<&Children>,
     transforms_q: Query<&Transform, Without<RexCharacter>>,
     aabbs_q: Query<&Aabb>,
@@ -505,9 +509,7 @@ pub(crate) fn calibrate_rex_y_one_shot(
             commands.entity(rex_entity).insert(RexYCalibrated);
             info!(
                 "[forgia-rpg::character] Rex Y calibrated: aabb_min_y={:.3} → tf.y {:.3} → {:.3}",
-                min_y,
-                old_y,
-                rex_tf.translation.y
+                min_y, old_y, rex_tf.translation.y
             );
         }
     }
@@ -525,10 +527,7 @@ pub(crate) fn rex_make_transparent_one_shot(
     mut materials: ResMut<Assets<StandardMaterial>>,
     q_rex: Query<Entity, With<RexCharacter>>,
     children_q: Query<&Children>,
-    q_mat: Query<
-        (Entity, &MeshMaterial3d<StandardMaterial>),
-        Without<RexMaterialTransparent>,
-    >,
+    q_mat: Query<(Entity, &MeshMaterial3d<StandardMaterial>), Without<RexMaterialTransparent>>,
 ) {
     let Ok(rex_entity) = q_rex.single() else {
         return;
@@ -543,10 +542,9 @@ pub(crate) fn rex_make_transparent_one_shot(
                 new_mat.base_color = new_mat.base_color.with_alpha(0.40);
                 new_mat.alpha_mode = AlphaMode::Blend;
                 let new_handle = materials.add(new_mat);
-                commands.entity(entity).insert((
-                    MeshMaterial3d(new_handle),
-                    RexMaterialTransparent,
-                ));
+                commands
+                    .entity(entity)
+                    .insert((MeshMaterial3d(new_handle), RexMaterialTransparent));
                 applied += 1;
             }
         }
@@ -685,9 +683,7 @@ pub(crate) fn cleanup_rex_character(
         commands.entity(e).despawn();
     }
     if let Ok(player) = q_player.single() {
-        commands
-            .entity(player)
-            .remove::<LocomotionState>();
+        commands.entity(player).remove::<LocomotionState>();
     }
     for mut cam in &mut q_fps_cam {
         cam.is_active = true;
@@ -706,10 +702,7 @@ pub(crate) fn cleanup_rex_character(
 pub(crate) fn procedural_whole_body_anim(
     time: Res<Time>,
     q_player: Query<(Entity, &Transform, &Player, &LocomotionState), Without<RexCharacter>>,
-    mut q_rex: Query<
-        (&mut Transform, &mut ProcBodyAnim, &LocomotionBoneCache),
-        With<RexCharacter>,
-    >,
+    mut q_rex: Query<(&mut Transform, &mut ProcBodyAnim, &LocomotionBoneCache), With<RexCharacter>>,
     rapier: ReadRapierContext,
 ) {
     let dt = time.delta_secs();
@@ -814,4 +807,3 @@ pub(crate) fn procedural_whole_body_anim(
         );
     }
 }
-

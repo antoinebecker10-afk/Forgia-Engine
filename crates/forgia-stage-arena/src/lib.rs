@@ -38,9 +38,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_anchor::{AnchorKind, AnchorPoint, AnchorStats};
 use forgia_genome_core::{Genome, GenomeLoader};
-use forgia_level_presets::{
-    LevelModulesGenome, LevelModulesHandles, ModulePaletteEntry,
-};
+use forgia_level_presets::{LevelModulesGenome, LevelModulesHandles, ModulePaletteEntry};
 use forgia_prefab::{spawn_gltf_prefab, PrefabSpawn, PrefabStats};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -349,10 +347,7 @@ impl Plugin for ForgiaStageArenaPlugin {
 
 // ─── Startup : load genomes ─────────────────────────────────────────────────
 
-fn load_stage_genomes(
-    asset_server: Res<AssetServer>,
-    mut handles: ResMut<StageGenomeHandles>,
-) {
+fn load_stage_genomes(asset_server: Res<AssetServer>, mut handles: ResMut<StageGenomeHandles>) {
     handles.stages = asset_server.load(STAGES_GENOME_PATH);
     handles.pois = asset_server.load(POIS_GENOME_PATH);
     info!(
@@ -549,10 +544,7 @@ pub fn ramparts_hex_positions(extent_m: f32) -> Vec<(Vec3, Quat)> {
 /// Bug fix story-483 P1 (2026-05-20 PM) : la version précédente stretchait 1
 /// mur via `scale_x = side / 4.0` → ratio 22× sur extent=90, murs apparaissaient
 /// tordus comme des planches. Cf. screenshot user 2026-05-20 PM.
-pub fn ramparts_hex_tiled_positions(
-    extent_m: f32,
-    wall_natural_len: f32,
-) -> Vec<(Vec3, Quat)> {
+pub fn ramparts_hex_tiled_positions(extent_m: f32, wall_natural_len: f32) -> Vec<(Vec3, Quat)> {
     if extent_m <= 0.0 || wall_natural_len <= 0.0 {
         return Vec::new();
     }
@@ -710,9 +702,7 @@ fn spawn_stage_arena_on_request(
     }
     // P2 — Stage transition detection : nouveau stage_id différent du dernier
     // spawn → cleanup old entities AVANT spawn new. Permet le run loop multi-stage.
-    if !last_processed_id.is_empty()
-        && *last_processed_id != req.stage_id
-        && !q_existing.is_empty()
+    if !last_processed_id.is_empty() && *last_processed_id != req.stage_id && !q_existing.is_empty()
     {
         let prev = std::mem::take(&mut *last_processed_id);
         let n = despawn_stage_entities(&mut commands, &q_existing, &anchor_stats, &mut result);
@@ -788,7 +778,10 @@ fn spawn_stage_arena_on_request(
     };
     let hex_side_len = extent;
     // 1 collider per segment (midpoint + rotation).
-    for (i, (mid, rot)) in ramparts_hex_segment_midpoints(extent).into_iter().enumerate() {
+    for (i, (mid, rot)) in ramparts_hex_segment_midpoints(extent)
+        .into_iter()
+        .enumerate()
+    {
         commands.spawn((
             Name::new(format!("RampartCollider_{i}")),
             StageArenaMarker,
@@ -849,9 +842,14 @@ fn spawn_stage_arena_on_request(
         let Some(poi) = pick_poi_weighted(&pois_pool, &mut rng_state) else {
             break;
         };
-        let spawn = PrefabSpawn::new(&poi.prefab, *pos)
-            .with_name(format!("POI_{slot}"));
-        let _e = spawn_gltf_prefab(&mut commands, &asset_server, &prefab_stats, spawn, (StageArenaMarker,));
+        let spawn = PrefabSpawn::new(&poi.prefab, *pos).with_name(format!("POI_{slot}"));
+        let _e = spawn_gltf_prefab(
+            &mut commands,
+            &asset_server,
+            &prefab_stats,
+            spawn,
+            (StageArenaMarker,),
+        );
         commands.spawn((
             Name::new(format!("StagePoiAnchor_{slot}")),
             StageArenaMarker,
@@ -875,7 +873,13 @@ fn spawn_stage_arena_on_request(
             let spawn = PrefabSpawn::new(&boss.prefab, boss_pos)
                 .with_scale((boss.size_m / 4.0).max(1.0))
                 .with_name("BossPad");
-            let _e = spawn_gltf_prefab(&mut commands, &asset_server, &prefab_stats, spawn, (StageArenaMarker,));
+            let _e = spawn_gltf_prefab(
+                &mut commands,
+                &asset_server,
+                &prefab_stats,
+                spawn,
+                (StageArenaMarker,),
+            );
             commands.spawn((
                 Name::new("StageBossPadAnchor"),
                 StageArenaMarker,
@@ -1307,8 +1311,10 @@ mod tests {
             boss_pad_required = false
         "#;
         let def: StageDef = toml::from_str(toml_str).expect("parse");
-        assert!(def.module_palette.is_empty(),
-            "module_palette must default to empty for backward compat");
+        assert!(
+            def.module_palette.is_empty(),
+            "module_palette must default to empty for backward compat"
+        );
     }
 
     #[test]
