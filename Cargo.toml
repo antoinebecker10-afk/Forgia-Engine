@@ -103,51 +103,7 @@ members = [
     "crates/forgia-player-platformer",
     "crates/forgia-player-tp",
     "crates/forgia-player-vehicle-control",
-    "crates/forgia-pp-ascii",
-    "crates/forgia-pp-auto-exposure",
-    "crates/forgia-pp-bloom",
-    "crates/forgia-pp-chromatic-aberration",
-    "crates/forgia-pp-color-grading",
-    "crates/forgia-pp-color-split",
-    "crates/forgia-pp-cross-hatch",
-    "crates/forgia-pp-crt",
-    "crates/forgia-pp-distance-fog",
-    "crates/forgia-pp-distortion",
-    "crates/forgia-pp-dream",
-    "crates/forgia-pp-emboss",
-    "crates/forgia-pp-fog",
-    "crates/forgia-pp-frosted-glass",
-    "crates/forgia-pp-gaussian-blur",
-    "crates/forgia-pp-glitch",
-    "crates/forgia-pp-grayscale",
-    "crates/forgia-pp-halftone",
-    "crates/forgia-pp-heat-haze",
-    "crates/forgia-pp-hex-pixelate",
-    "crates/forgia-pp-invert",
-    "crates/forgia-pp-kaleidoscope",
-    "crates/forgia-pp-kuwahara",
-    "crates/forgia-pp-light-streaks",
-    "crates/forgia-pp-matrix",
-    "crates/forgia-pp-motion-blur",
-    "crates/forgia-pp-night-vision",
-    "crates/forgia-pp-oil-painting",
-    "crates/forgia-pp-outline",
-    "crates/forgia-pp-palette-quantize",
-    "crates/forgia-pp-pixelation",
-    "crates/forgia-pp-posterize",
-    "crates/forgia-pp-radial-blur",
-    "crates/forgia-pp-rain",
-    "crates/forgia-pp-scanlines",
-    "crates/forgia-pp-sepia",
-    "crates/forgia-pp-sketch",
-    "crates/forgia-pp-sobel-edge",
-    "crates/forgia-pp-swirl",
-    "crates/forgia-pp-thermal",
-    "crates/forgia-pp-tilt-shift",
-    "crates/forgia-pp-tonemapping",
-    "crates/forgia-pp-toon",
-    "crates/forgia-pp-vibrance",
-    "crates/forgia-pp-vignette",
+    "crates/forgia-postprocess",
     "crates/forgia-prefab",
     "crates/forgia-quests",
     "crates/forgia-ragdoll",
@@ -369,51 +325,7 @@ forgia-player-fps = { path = "crates/forgia-player-fps" }
 forgia-player-platformer = { path = "crates/forgia-player-platformer" }
 forgia-player-tp = { path = "crates/forgia-player-tp" }
 forgia-player-vehicle-control = { path = "crates/forgia-player-vehicle-control" }
-forgia-pp-ascii = { path = "crates/forgia-pp-ascii" }
-forgia-pp-auto-exposure = { path = "crates/forgia-pp-auto-exposure" }
-forgia-pp-bloom = { path = "crates/forgia-pp-bloom" }
-forgia-pp-chromatic-aberration = { path = "crates/forgia-pp-chromatic-aberration" }
-forgia-pp-color-grading = { path = "crates/forgia-pp-color-grading" }
-forgia-pp-color-split = { path = "crates/forgia-pp-color-split" }
-forgia-pp-cross-hatch = { path = "crates/forgia-pp-cross-hatch" }
-forgia-pp-crt = { path = "crates/forgia-pp-crt" }
-forgia-pp-distance-fog = { path = "crates/forgia-pp-distance-fog" }
-forgia-pp-distortion = { path = "crates/forgia-pp-distortion" }
-forgia-pp-dream = { path = "crates/forgia-pp-dream" }
-forgia-pp-emboss = { path = "crates/forgia-pp-emboss" }
-forgia-pp-fog = { path = "crates/forgia-pp-fog" }
-forgia-pp-frosted-glass = { path = "crates/forgia-pp-frosted-glass" }
-forgia-pp-gaussian-blur = { path = "crates/forgia-pp-gaussian-blur" }
-forgia-pp-glitch = { path = "crates/forgia-pp-glitch" }
-forgia-pp-grayscale = { path = "crates/forgia-pp-grayscale" }
-forgia-pp-halftone = { path = "crates/forgia-pp-halftone" }
-forgia-pp-heat-haze = { path = "crates/forgia-pp-heat-haze" }
-forgia-pp-hex-pixelate = { path = "crates/forgia-pp-hex-pixelate" }
-forgia-pp-invert = { path = "crates/forgia-pp-invert" }
-forgia-pp-kaleidoscope = { path = "crates/forgia-pp-kaleidoscope" }
-forgia-pp-kuwahara = { path = "crates/forgia-pp-kuwahara" }
-forgia-pp-light-streaks = { path = "crates/forgia-pp-light-streaks" }
-forgia-pp-matrix = { path = "crates/forgia-pp-matrix" }
-forgia-pp-motion-blur = { path = "crates/forgia-pp-motion-blur" }
-forgia-pp-night-vision = { path = "crates/forgia-pp-night-vision" }
-forgia-pp-oil-painting = { path = "crates/forgia-pp-oil-painting" }
-forgia-pp-outline = { path = "crates/forgia-pp-outline" }
-forgia-pp-palette-quantize = { path = "crates/forgia-pp-palette-quantize" }
-forgia-pp-pixelation = { path = "crates/forgia-pp-pixelation" }
-forgia-pp-posterize = { path = "crates/forgia-pp-posterize" }
-forgia-pp-radial-blur = { path = "crates/forgia-pp-radial-blur" }
-forgia-pp-rain = { path = "crates/forgia-pp-rain" }
-forgia-pp-scanlines = { path = "crates/forgia-pp-scanlines" }
-forgia-pp-sepia = { path = "crates/forgia-pp-sepia" }
-forgia-pp-sketch = { path = "crates/forgia-pp-sketch" }
-forgia-pp-sobel-edge = { path = "crates/forgia-pp-sobel-edge" }
-forgia-pp-swirl = { path = "crates/forgia-pp-swirl" }
-forgia-pp-thermal = { path = "crates/forgia-pp-thermal" }
-forgia-pp-tilt-shift = { path = "crates/forgia-pp-tilt-shift" }
-forgia-pp-tonemapping = { path = "crates/forgia-pp-tonemapping" }
-forgia-pp-toon = { path = "crates/forgia-pp-toon" }
-forgia-pp-vibrance = { path = "crates/forgia-pp-vibrance" }
-forgia-pp-vignette = { path = "crates/forgia-pp-vignette" }
+forgia-postprocess = { path = "crates/forgia-postprocess" }
 forgia-prefab = { path = "crates/forgia-prefab" }
 forgia-quests = { path = "crates/forgia-quests" }
 forgia-ragdoll = { path = "crates/forgia-ragdoll" }
