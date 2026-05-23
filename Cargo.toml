@@ -164,14 +164,6 @@ members = [
     "crates/forgia-pp-vibrance",
     "crates/forgia-pp-vignette",
     "crates/forgia-prefab",
-    "crates/forgia-qa-autopilot",
-    "crates/forgia-qa-core",
-    "crates/forgia-qa-harness",
-    "crates/forgia-qa-invariants",
-    "crates/forgia-qa-kg",
-    "crates/forgia-qa-replay",
-    "crates/forgia-qa-telemetry",
-    "crates/forgia-qa-vlm",
     "crates/forgia-quests",
     "crates/forgia-ragdoll",
     "crates/forgia-ribbons",
@@ -457,14 +449,6 @@ forgia-pp-toon = { path = "crates/forgia-pp-toon" }
 forgia-pp-vibrance = { path = "crates/forgia-pp-vibrance" }
 forgia-pp-vignette = { path = "crates/forgia-pp-vignette" }
 forgia-prefab = { path = "crates/forgia-prefab" }
-forgia-qa-autopilot = { path = "crates/forgia-qa-autopilot" }
-forgia-qa-core = { path = "crates/forgia-qa-core" }
-forgia-qa-harness = { path = "crates/forgia-qa-harness" }
-forgia-qa-invariants = { path = "crates/forgia-qa-invariants" }
-forgia-qa-kg = { path = "crates/forgia-qa-kg" }
-forgia-qa-replay = { path = "crates/forgia-qa-replay" }
-forgia-qa-telemetry = { path = "crates/forgia-qa-telemetry" }
-forgia-qa-vlm = { path = "crates/forgia-qa-vlm" }
 forgia-quests = { path = "crates/forgia-quests" }
 forgia-ragdoll = { path = "crates/forgia-ragdoll" }
 forgia-ribbons = { path = "crates/forgia-ribbons" }
