@@ -103,13 +103,6 @@ members = [
     "crates/forgia-mode-rts",
     "crates/forgia-mode-survival",
     "crates/forgia-navigator",
-    "crates/forgia-net-chat",
-    "crates/forgia-net-lightyear",
-    "crates/forgia-net-lobby",
-    "crates/forgia-net-matchmaking",
-    "crates/forgia-net-replication-genome",
-    "crates/forgia-net-rollback",
-    "crates/forgia-net-voice",
     "crates/forgia-observability",
     "crates/forgia-oxr",
     "crates/forgia-physics",
@@ -388,13 +381,6 @@ forgia-mode-rpg-openworld = { path = "crates/forgia-mode-rpg-openworld" }
 forgia-mode-rts = { path = "crates/forgia-mode-rts" }
 forgia-mode-survival = { path = "crates/forgia-mode-survival" }
 forgia-navigator = { path = "crates/forgia-navigator" }
-forgia-net-chat = { path = "crates/forgia-net-chat" }
-forgia-net-lightyear = { path = "crates/forgia-net-lightyear" }
-forgia-net-lobby = { path = "crates/forgia-net-lobby" }
-forgia-net-matchmaking = { path = "crates/forgia-net-matchmaking" }
-forgia-net-replication-genome = { path = "crates/forgia-net-replication-genome" }
-forgia-net-rollback = { path = "crates/forgia-net-rollback" }
-forgia-net-voice = { path = "crates/forgia-net-voice" }
 forgia-observability = { path = "crates/forgia-observability" }
 forgia-oxr = { path = "crates/forgia-oxr" }
 forgia-physics = { path = "crates/forgia-physics" }
