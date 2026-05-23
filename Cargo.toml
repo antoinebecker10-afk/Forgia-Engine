@@ -49,22 +49,6 @@ members = [
     "crates/forgia-damage-numbers",
     "crates/forgia-dialogue",
     "crates/forgia-enemy-nameplate",
-    "crates/forgia-editor-animation",
-    "crates/forgia-editor-asset-browser",
-    "crates/forgia-editor-blueprint",
-    "crates/forgia-editor-command-palette",
-    "crates/forgia-editor-core",
-    "crates/forgia-editor-foliage",
-    "crates/forgia-editor-gizmo",
-    "crates/forgia-editor-hierarchy",
-    "crates/forgia-editor-inspector",
-    "crates/forgia-editor-kit-macros",
-    "crates/forgia-editor-material",
-    "crates/forgia-editor-particle",
-    "crates/forgia-editor-terrain",
-    "crates/forgia-editor-theme",
-    "crates/forgia-editor-undo-redo",
-    "crates/forgia-editor-viewport",
     "crates/forgia-effects",
     "crates/forgia-equipment",
     "crates/forgia-events-bus",
@@ -370,22 +354,6 @@ forgia-damage = { path = "crates/forgia-damage" }
 forgia-damage-numbers = { path = "crates/forgia-damage-numbers" }
 forgia-dialogue = { path = "crates/forgia-dialogue" }
 forgia-enemy-nameplate = { path = "crates/forgia-enemy-nameplate" }
-forgia-editor-animation = { path = "crates/forgia-editor-animation" }
-forgia-editor-asset-browser = { path = "crates/forgia-editor-asset-browser" }
-forgia-editor-blueprint = { path = "crates/forgia-editor-blueprint" }
-forgia-editor-command-palette = { path = "crates/forgia-editor-command-palette" }
-forgia-editor-core = { path = "crates/forgia-editor-core" }
-forgia-editor-foliage = { path = "crates/forgia-editor-foliage" }
-forgia-editor-gizmo = { path = "crates/forgia-editor-gizmo" }
-forgia-editor-hierarchy = { path = "crates/forgia-editor-hierarchy" }
-forgia-editor-inspector = { path = "crates/forgia-editor-inspector" }
-forgia-editor-kit-macros = { path = "crates/forgia-editor-kit-macros" }
-forgia-editor-material = { path = "crates/forgia-editor-material" }
-forgia-editor-particle = { path = "crates/forgia-editor-particle" }
-forgia-editor-terrain = { path = "crates/forgia-editor-terrain" }
-forgia-editor-theme = { path = "crates/forgia-editor-theme" }
-forgia-editor-undo-redo = { path = "crates/forgia-editor-undo-redo" }
-forgia-editor-viewport = { path = "crates/forgia-editor-viewport" }
 forgia-effects = { path = "crates/forgia-effects" }
 forgia-equipment = { path = "crates/forgia-equipment" }
 forgia-events-bus = { path = "crates/forgia-events-bus" }
