@@ -837,6 +837,7 @@ mod tests {
             roads: Default::default(),
             npcs: Default::default(),
             spawn: Default::default(),
+            terrain_leveling: Default::default(),
         }
     }
 

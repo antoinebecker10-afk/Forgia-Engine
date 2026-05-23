@@ -667,12 +667,14 @@ mod tests {
 
     #[test]
     fn query_filters_by_category_and_biome() {
-        let mut reg = AssetRegistry::default();
-        reg.entries = vec![
-            tag_from_filename("birch_tree_autumn_1"),
-            tag_from_filename("cactus_2"),
-            tag_from_filename("bush_1"),
-        ];
+        let reg = AssetRegistry {
+            entries: vec![
+                tag_from_filename("birch_tree_autumn_1"),
+                tag_from_filename("cactus_2"),
+                tag_from_filename("bush_1"),
+            ],
+            ..Default::default()
+        };
         let q = AssetQuery::new()
             .category(AssetCategory::Tree)
             .biome(BiomeType::Forest);
@@ -683,11 +685,13 @@ mod tests {
 
     #[test]
     fn query_alive_filters_dead() {
-        let mut reg = AssetRegistry::default();
-        reg.entries = vec![
-            tag_from_filename("common_tree_dead_1"),
-            tag_from_filename("common_tree_1"),
-        ];
+        let reg = AssetRegistry {
+            entries: vec![
+                tag_from_filename("common_tree_dead_1"),
+                tag_from_filename("common_tree_1"),
+            ],
+            ..Default::default()
+        };
         let q = AssetQuery::new().category(AssetCategory::Tree).alive();
         let res = reg.query(&q);
         assert_eq!(res.len(), 1);

@@ -98,6 +98,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn variant_count_constants_valid() {
         assert!(KILL_AUDIO_VARIANTS >= 1);
         assert!(DAMAGE_AUDIO_VARIANTS >= 1);

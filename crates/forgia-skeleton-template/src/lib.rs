@@ -965,7 +965,10 @@ mod tests {
 
     #[test]
     fn validate_rejects_empty() {
-        let t = SkeletonTemplate { bones: vec![] };
+        let t = SkeletonTemplate {
+            bones: vec![],
+            stance_offsets: Default::default(),
+        };
         assert_eq!(validate(&t), Err(TemplateValidationError::Empty));
     }
 
@@ -986,6 +989,7 @@ mod tests {
                     class: BoneClass::Other,
                 },
             ],
+            stance_offsets: Default::default(),
         };
         // Forward ref detected first.
         assert!(matches!(
@@ -1011,6 +1015,7 @@ mod tests {
                     class: BoneClass::Other,
                 },
             ],
+            stance_offsets: Default::default(),
         };
         assert_eq!(validate(&t), Err(TemplateValidationError::MultipleRoots));
     }
@@ -1024,6 +1029,7 @@ mod tests {
                 pos: [0.0; 3],
                 class: BoneClass::Other,
             }],
+            stance_offsets: Default::default(),
         };
         assert_eq!(
             validate(&t),
@@ -1049,6 +1055,7 @@ mod tests {
                     class: BoneClass::Other,
                 },
             ],
+            stance_offsets: Default::default(),
         };
         assert!(matches!(
             validate(&t),
@@ -1076,6 +1083,7 @@ mod tests {
                     class: BoneClass::Other,
                 },
             ],
+            stance_offsets: Default::default(),
         };
         assert!(matches!(
             validate(&t),

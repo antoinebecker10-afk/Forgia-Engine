@@ -893,6 +893,7 @@ mod tests {
                 pos: [0.0, 0.5, 0.0],
                 class: BoneClass::Other,
             }],
+            stance_offsets: Default::default(),
         };
         // bounds : center_xz = (0.5, 0, 0.5). target_world = (0.5, 0.5, 0.5).
         // Place la sphère là pour snap_distance = 0.

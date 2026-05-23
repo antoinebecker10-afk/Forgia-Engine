@@ -214,7 +214,7 @@ mod tests {
         let mut r = Rng::new(42);
         for _ in 0..10_000 {
             let v = r.range_f32(-5.0, 7.5);
-            assert!(v >= -5.0 && v < 7.5);
+            assert!((-5.0..7.5).contains(&v));
         }
     }
 

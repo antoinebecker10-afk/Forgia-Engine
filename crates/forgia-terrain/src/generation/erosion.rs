@@ -256,7 +256,7 @@ mod tests {
 
         let ring = save_padding_ring(&h, w, d);
         // Zap everything (including ring).
-        for v in h.iter_mut() {
+        for v in &mut h {
             *v = -999.0;
         }
         // Restore ring : centre reste zapped, bord revient.

@@ -186,6 +186,10 @@ type_complexity = "allow"
 single_match_else = "allow"
 must_use_candidate = "allow"
 missing_errors_doc = "allow"
+# Story-516+ : ces 3 lints sont legit en tests/sanity-checks, on garde explicites
+assertions_on_constants = "allow"
+field_reassign_with_default = "allow"
+manual_range_contains = "allow"
 
 [workspace.lints.rust]
 dead_code = "warn"
