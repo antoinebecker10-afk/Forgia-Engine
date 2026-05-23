@@ -1,9 +1,11 @@
 {
-  "timestamp_secs": 0,
+  "timestamp_secs": 1779560302,
   "baseline_date": "2026-05-23",
   "story": "story-512",
   "crates_count": 211,
   "crates_count_baseline": 266,
+  "crates_count_baseline_audit_doc": 264,
+  "baseline_delta_explanation": "Audit doc 2026-05-23 comptait 264 crates; baseline reelle au demarrage story-512 etait 266 (2 crates ajoutees entre audit et execution, hors scope purge). Delta purge effectif: -55 (16 editor + 12 render + 8 qa + 7 net + 4 script + 2 import + 6 mode).",
   "crates_purged": 55,
   "total_loc_rust": 56599,
   "scaffolds_lt50_loc": 92,

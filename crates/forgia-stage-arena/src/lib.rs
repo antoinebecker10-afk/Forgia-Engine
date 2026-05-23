@@ -317,7 +317,7 @@ impl Plugin for ForgiaStageArenaPlugin {
             .add_systems(Startup, load_stage_genomes)
             // L7 SystemSets — stage-arena is **mode-agnostic by design** : il sera
             // consommé par forgia-mode-roguelite (V1), forgia-mode-fps-arena (M4),
-            // forgia-mode-rpg-openworld (POI hubs), etc. Pas de `run_if(in_state(
+            // forgia-rpg (POI hubs), etc. Pas de `run_if(in_state(
             // GameMode::X))` au niveau plugin — guard naturel via `request: Option<
             // Res<StageLoadRequest>>` + `q_existing` archetype scan (~0 cost si
             // empty). Caller responsible pour insert/cleanup le StageLoadRequest.
