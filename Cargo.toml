@@ -93,13 +93,7 @@ members = [
     "crates/forgia-meshy-import",
     "crates/forgia-mod-outline",
     "crates/forgia-mode-fps-arena",
-    "crates/forgia-mode-platformer",
-    "crates/forgia-mode-puzzle",
-    "crates/forgia-mode-race",
     "crates/forgia-mode-roguelite",
-    "crates/forgia-mode-rpg-openworld",
-    "crates/forgia-mode-rts",
-    "crates/forgia-mode-survival",
     "crates/forgia-navigator",
     "crates/forgia-observability",
     "crates/forgia-oxr",
@@ -365,13 +359,7 @@ forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
 forgia-meshy-import = { path = "crates/forgia-meshy-import" }
 forgia-mod-outline = { path = "crates/forgia-mod-outline" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
-forgia-mode-platformer = { path = "crates/forgia-mode-platformer" }
-forgia-mode-puzzle = { path = "crates/forgia-mode-puzzle" }
-forgia-mode-race = { path = "crates/forgia-mode-race" }
 forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
-forgia-mode-rpg-openworld = { path = "crates/forgia-mode-rpg-openworld" }
-forgia-mode-rts = { path = "crates/forgia-mode-rts" }
-forgia-mode-survival = { path = "crates/forgia-mode-survival" }
 forgia-navigator = { path = "crates/forgia-navigator" }
 forgia-observability = { path = "crates/forgia-observability" }
 forgia-oxr = { path = "crates/forgia-oxr" }
