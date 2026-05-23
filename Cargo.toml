@@ -174,18 +174,6 @@ members = [
     "crates/forgia-qa-vlm",
     "crates/forgia-quests",
     "crates/forgia-ragdoll",
-    "crates/forgia-render-atmosphere",
-    "crates/forgia-render-clouds",
-    "crates/forgia-render-dof",
-    "crates/forgia-render-env-map",
-    "crates/forgia-render-forward-decal",
-    "crates/forgia-render-god-rays",
-    "crates/forgia-render-oit",
-    "crates/forgia-render-pcss",
-    "crates/forgia-render-rt",
-    "crates/forgia-render-skybox",
-    "crates/forgia-render-ssao",
-    "crates/forgia-render-ssr",
     "crates/forgia-ribbons",
     "crates/forgia-rng",
     "crates/forgia-rpg",
@@ -479,18 +467,6 @@ forgia-qa-telemetry = { path = "crates/forgia-qa-telemetry" }
 forgia-qa-vlm = { path = "crates/forgia-qa-vlm" }
 forgia-quests = { path = "crates/forgia-quests" }
 forgia-ragdoll = { path = "crates/forgia-ragdoll" }
-forgia-render-atmosphere = { path = "crates/forgia-render-atmosphere" }
-forgia-render-clouds = { path = "crates/forgia-render-clouds" }
-forgia-render-dof = { path = "crates/forgia-render-dof" }
-forgia-render-env-map = { path = "crates/forgia-render-env-map" }
-forgia-render-forward-decal = { path = "crates/forgia-render-forward-decal" }
-forgia-render-god-rays = { path = "crates/forgia-render-god-rays" }
-forgia-render-oit = { path = "crates/forgia-render-oit" }
-forgia-render-pcss = { path = "crates/forgia-render-pcss" }
-forgia-render-rt = { path = "crates/forgia-render-rt" }
-forgia-render-skybox = { path = "crates/forgia-render-skybox" }
-forgia-render-ssao = { path = "crates/forgia-render-ssao" }
-forgia-render-ssr = { path = "crates/forgia-render-ssr" }
 forgia-ribbons = { path = "crates/forgia-ribbons" }
 forgia-rng = { path = "crates/forgia-rng" }
 forgia-rpg = { path = "crates/forgia-rpg" }
