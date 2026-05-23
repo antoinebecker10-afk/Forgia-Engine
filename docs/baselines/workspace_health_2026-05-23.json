@@ -1,0 +1,16 @@
+{
+  "timestamp_secs": 0,
+  "baseline_date": "2026-05-23",
+  "story": "story-512",
+  "crates_count": 211,
+  "crates_count_baseline": 266,
+  "crates_purged": 55,
+  "total_loc_rust": 56599,
+  "scaffolds_lt50_loc": 92,
+  "scaffolds_baseline": 145,
+  "scaffolds_purged_pct_of_total": 36.6,
+  "ratio_loc_per_crate": 268,
+  "industry_target_ratio_min": 1500,
+  "industry_target_ratio_max": 5000,
+  "next_step": "story-513 fusion 45 forgia-pp-* en forgia-postprocess, story-514 split forgia-core god-object"
+}
