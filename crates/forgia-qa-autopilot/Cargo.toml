@@ -1,0 +1,19 @@
+[package]
+name = "forgia-qa-autopilot"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Forgia QA autopilot bots — SmokeBot + SoakBot + LLM ExplorerBot (story-391 P6)"
+
+[dependencies]
+bevy = { workspace = true }
+forgia-qa-core = { workspace = true }
+forgia-qa-replay = { workspace = true }
+forgia-qa-harness = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+
+[features]
+default = ["qa-runtime"]
+qa-runtime = ["forgia-qa-core/qa-runtime", "forgia-qa-harness/qa-runtime"]

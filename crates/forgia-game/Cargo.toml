@@ -27,6 +27,10 @@ forgia-foliage = { workspace = true }
 forgia-water = { workspace = true }
 forgia-audio-core = { workspace = true }
 forgia-audio-biome = { workspace = true }
+# Story-521 port V1 QA (bus BugReport + replay session). Harness + autopilot
+# référencés via dev-deps si on veut tests intégrés plus tard.
+forgia-qa-core = { workspace = true }
+forgia-qa-replay = { workspace = true }
 forgia-asset-registry = { workspace = true }
 forgia-streaming = { workspace = true }
 forgia-fps = { workspace = true }
