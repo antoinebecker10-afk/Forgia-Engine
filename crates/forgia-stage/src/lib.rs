@@ -645,6 +645,62 @@ fn biome_floor_color(biome: &str) -> Color {
     }
 }
 
+/// Lighting cartoon family-friendly per biome. Bible v1 direction artistique :
+/// jamais pitch black, fill light cartoon généreux, sky teinté biome.
+///
+/// Pattern key+fill : Sun (illuminance haut, shadows) + Fill (illuminance
+/// modéré ~30% du sun, no shadows, couleur ambient inverse).
+///
+/// Returns (sun_color, sun_illuminance, fill_color, fill_illuminance, sky_color).
+fn biome_lighting_params(biome: &str) -> (Color, f32, Color, f32, Color) {
+    match biome {
+        // Crypts of Anvil bible: warm amber sun + fill orange forge + sky rouge sombre
+        "Volcanic" => (
+            Color::srgb(1.0, 0.75, 0.50),  // sun amber forge
+            8_000.0,                        // dimmer = moodier mais lisible
+            Color::srgb(0.95, 0.55, 0.35), // fill orangé braise (réchauffe les ombres)
+            3_000.0,                        // ~37% du sun, fill généreux
+            Color::srgb(0.12, 0.06, 0.05), // sky rouge braise sombre
+        ),
+        // Forge Sanctum bible: lumière douce sanctuaire ouvert
+        "Plains" => (
+            Color::srgb(1.0, 0.98, 0.92),
+            12_000.0,
+            Color::srgb(0.70, 0.78, 0.90), // fill bleu ciel doux
+            3_500.0,
+            Color::srgb(0.55, 0.70, 0.88),
+        ),
+        "Desert" => (
+            Color::srgb(1.0, 0.92, 0.75),
+            14_000.0,
+            Color::srgb(0.92, 0.82, 0.60),
+            4_000.0,
+            Color::srgb(0.85, 0.78, 0.62),
+        ),
+        "Forest" | "Jungle" => (
+            Color::srgb(0.95, 1.0, 0.88),
+            10_000.0,
+            Color::srgb(0.55, 0.78, 0.55),
+            2_800.0,
+            Color::srgb(0.40, 0.55, 0.45),
+        ),
+        "Tundra" => (
+            Color::srgb(0.92, 0.96, 1.0),
+            11_000.0,
+            Color::srgb(0.80, 0.86, 0.95),
+            3_200.0,
+            Color::srgb(0.78, 0.85, 0.92),
+        ),
+        _ => (
+            Color::srgb(1.0, 0.98, 0.95),
+            12_000.0,
+            Color::srgb(0.70, 0.72, 0.78),
+            3_000.0,
+            Color::srgb(0.50, 0.55, 0.65),
+        ),
+    }
+}
+
 /// Pondère et tire un POI parmi `pool` selon les `weight` field. Pure (testable).
 /// Retourne `None` si pool vide ou total_weight == 0.
 fn pick_poi_weighted<'a>(
@@ -979,17 +1035,39 @@ fn spawn_stage_arena_on_request(
     layout_params.result.instances_skipped = instances_skipped;
     layout_params.result.module_palette_used = palette_used;
 
-    // 6. Sun — directional light biome-tuned later (P2). Default cool sky.
+    // 6. Lighting cartoon biome-tuned — bible v1 direction artistique
+    //    family-friendly. Pattern key+fill : Sun (key, shadows) + Fill
+    //    (opposé, no shadows, couleur ambient) = jamais pitch black sans
+    //    Resource AmbientLight (deprecated Resource→Component Bevy 0.18).
+    //    + ClearColor sky teinté biome.
+    let (sun_color, sun_illuminance, fill_color, fill_illuminance, sky_color) =
+        biome_lighting_params(&stage_def.biome);
+
     commands.spawn((
         Name::new("StageSun"),
         StageArenaMarker,
         DirectionalLight {
-            illuminance: 12_000.0,
+            color: sun_color,
+            illuminance: sun_illuminance,
             shadows_enabled: true,
             ..default()
         },
         Transform::from_xyz(50.0, 100.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
+
+    commands.spawn((
+        Name::new("StageFill"),
+        StageArenaMarker,
+        DirectionalLight {
+            color: fill_color,
+            illuminance: fill_illuminance,
+            shadows_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(-50.0, 60.0, -50.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    commands.insert_resource(ClearColor(sky_color));
 
     // Finalize result.
     result.state = StageState::Ready;
