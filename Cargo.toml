@@ -130,11 +130,7 @@ members = [
     "crates/forgia-village-kit",
     "crates/forgia-village-loader",
     "crates/forgia-water",
-    "crates/forgia-weapon-beam",
-    "crates/forgia-weapon-charged",
     "crates/forgia-weapon-hitscan",
-    "crates/forgia-weapon-melee",
-    "crates/forgia-weapon-projectile",
     "crates/forgia-websocket",
     "crates/forgia-xp-curves",
     "xtask",
@@ -326,11 +322,7 @@ forgia-village-generator = { path = "crates/forgia-village-generator" }
 forgia-village-kit = { path = "crates/forgia-village-kit" }
 forgia-village-loader = { path = "crates/forgia-village-loader" }
 forgia-water = { path = "crates/forgia-water" }
-forgia-weapon-beam = { path = "crates/forgia-weapon-beam" }
-forgia-weapon-charged = { path = "crates/forgia-weapon-charged" }
 forgia-weapon-hitscan = { path = "crates/forgia-weapon-hitscan" }
-forgia-weapon-melee = { path = "crates/forgia-weapon-melee" }
-forgia-weapon-projectile = { path = "crates/forgia-weapon-projectile" }
 forgia-websocket = { path = "crates/forgia-websocket" }
 forgia-xp-curves = { path = "crates/forgia-xp-curves" }
 

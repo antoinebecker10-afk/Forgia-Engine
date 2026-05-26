@@ -78,8 +78,4 @@ allowed = [
     "forgia-trails",
     "forgia-underwater",
     "forgia-water",
-    "forgia-weapon-beam",
-    "forgia-weapon-charged",
-    "forgia-weapon-melee",
-    "forgia-weapon-projectile",
 ]

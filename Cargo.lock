@@ -4397,22 +4397,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-weapon-beam"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-weapon-charged"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
 name = "forgia-weapon-hitscan"
 version = "0.1.0"
 dependencies = [
@@ -4420,22 +4404,6 @@ dependencies = [
  "bevy_rapier3d",
  "forgia-core",
  "forgia-damage",
-]
-
-[[package]]
-name = "forgia-weapon-melee"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-weapon-projectile"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
 ]
 
 [[package]]
