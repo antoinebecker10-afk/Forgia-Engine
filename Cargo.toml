@@ -139,9 +139,6 @@ members = [
     "crates/forgia-ui-pause-menu",
     "crates/forgia-ui-tooltip",
     "crates/forgia-underwater",
-    "crates/forgia-vfx-decals",
-    "crates/forgia-vfx-hanabi",
-    "crates/forgia-vfx-impact-library",
     "crates/forgia-vfx-tracers",
     "crates/forgia-viewmodel",
     "crates/forgia-viewmodel-calibration",
@@ -356,9 +353,6 @@ forgia-ui-damage-direction = { path = "crates/forgia-ui-damage-direction" }
 forgia-ui-pause-menu = { path = "crates/forgia-ui-pause-menu" }
 forgia-ui-tooltip = { path = "crates/forgia-ui-tooltip" }
 forgia-underwater = { path = "crates/forgia-underwater" }
-forgia-vfx-decals = { path = "crates/forgia-vfx-decals" }
-forgia-vfx-hanabi = { path = "crates/forgia-vfx-hanabi" }
-forgia-vfx-impact-library = { path = "crates/forgia-vfx-impact-library" }
 forgia-vfx-tracers = { path = "crates/forgia-vfx-tracers" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
 forgia-viewmodel-calibration = { path = "crates/forgia-viewmodel-calibration" }

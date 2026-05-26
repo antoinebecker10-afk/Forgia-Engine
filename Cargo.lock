@@ -4882,33 +4882,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-vfx-decals"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_hanabi",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-vfx-hanabi"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_hanabi",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-vfx-impact-library"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_hanabi",
- "forgia-core",
-]
-
-[[package]]
 name = "forgia-vfx-tracers"
 version = "0.1.0"
 dependencies = [
