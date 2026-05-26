@@ -115,6 +115,29 @@ pub fn stats_for(archetype: EnemyArchetype) -> EnemyStats {
     }
 }
 
+/// KayKit Skeleton GLB asset path par archetype (story-517 fix).
+/// Mapping : Tank=Warrior, Runner=Minion, Sniper=Mage, Boss=Warrior×2.5.
+/// Memory ref : reference_roguelite_enemy_skeleton_mapping.md.
+pub fn skeleton_asset_path(archetype: EnemyArchetype) -> &'static str {
+    match archetype {
+        EnemyArchetype::Tank => "models/kaykit/skeletons/Skeleton_Warrior.glb",
+        EnemyArchetype::Runner => "models/kaykit/skeletons/Skeleton_Minion.glb",
+        EnemyArchetype::Sniper => "models/kaykit/skeletons/Skeleton_Mage.glb",
+        EnemyArchetype::Boss => "models/kaykit/skeletons/Skeleton_Warrior.glb",
+    }
+}
+
+/// Scale uniforme à appliquer au SceneRoot KayKit pour matcher la silhouette
+/// capsule originale (visual cohérence avec les colliders existants).
+pub fn skeleton_scale(archetype: EnemyArchetype) -> f32 {
+    match archetype {
+        EnemyArchetype::Tank => 1.4,
+        EnemyArchetype::Runner => 1.0,
+        EnemyArchetype::Sniper => 1.1,
+        EnemyArchetype::Boss => 2.5,
+    }
+}
+
 /// Construit un `ArenaBot` configuré pour l'archetype donné.
 /// Réutilise les champs default pour les LOS/strafe/alert (préservés inchangés).
 pub fn arena_bot_for(archetype: EnemyArchetype) -> ArenaBot {
