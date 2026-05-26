@@ -37,6 +37,10 @@ pub mod input_sensor;
 pub mod lifecycle_sensor;
 pub mod sensor_health_sensor;
 pub mod watchdog_sensor;
+// Story-520+ regression detector cross-migration. Snapshot baseline T+5s →
+// compare cross-runs → HealthAlert on drift (entity count / sensor missing /
+// player despawn).
+pub mod migration_baseline;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -74,7 +78,15 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<Forgia2AggregatorState>()
             .init_resource::<lifecycle_sensor::LifecycleCounter>()
             .init_resource::<watchdog_sensor::GameTickCounter>()
+            .init_resource::<migration_baseline::MigrationBaselineState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
+
+        // Migration baseline : Startup load previous, Update capture+compare at T+5s.
+        app.add_systems(Startup, migration_baseline::sys_load_previous_baseline);
+        app.add_systems(
+            Update,
+            migration_baseline::sys_capture_and_compare_baseline.in_set(GameSet::Sensors),
+        );
 
         // Story-469 V5 Session C — Observers lifecycle (Bevy 0.18 syntax On<Add, C>).
         app.add_observer(lifecycle_sensor::obs_player_added);

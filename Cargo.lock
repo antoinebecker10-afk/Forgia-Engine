@@ -3275,7 +3275,6 @@ dependencies = [
  "forgia-prefab",
  "forgia-rpg",
  "forgia-secondary-motion",
- "forgia-sensors",
  "forgia-streaming",
  "forgia-terrain",
  "forgia-ui",
@@ -3610,16 +3609,6 @@ dependencies = [
  "bevy",
  "forgia-anim-debug",
  "forgia-core",
-]
-
-[[package]]
-name = "forgia-sensors"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "serde_json",
 ]
 
 [[package]]

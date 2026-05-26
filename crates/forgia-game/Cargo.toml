@@ -38,7 +38,6 @@ forgia-ui = { workspace = true }
 forgia-ui-lib = { workspace = true }
 forgia-killfeed = { workspace = true }
 forgia-juice-screen-flash = { workspace = true }
-forgia-sensors = { workspace = true }
 forgia-observability = { workspace = true }
 forgia-camera-orbit = { workspace = true }
 forgia-secondary-motion = { workspace = true }
