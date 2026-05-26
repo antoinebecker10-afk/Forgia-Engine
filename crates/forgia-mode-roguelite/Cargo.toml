@@ -29,5 +29,4 @@ rand_xoshiro = "0.7"
 bevy_egui = { workspace = true }
 forgia-ui-lib = { workspace = true }
 # Story-470 V7 M3 step 2 (2026-05-20) — StageGraph node-driven run loop.
-forgia-stage-graph = { workspace = true }
-forgia-stage-arena = { workspace = true }
+forgia-stage = { workspace = true }

@@ -3501,8 +3501,7 @@ dependencies = [
  "forgia-loot-tables",
  "forgia-mode-fps-arena",
  "forgia-player",
- "forgia-stage-arena",
- "forgia-stage-graph",
+ "forgia-stage",
  "forgia-ui-lib",
  "rand_xoshiro",
 ]
@@ -3710,7 +3709,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-stage-arena"
+name = "forgia-stage"
 version = "0.1.0"
 dependencies = [
  "bevy",
@@ -3723,17 +3722,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "toml",
-]
-
-[[package]]
-name = "forgia-stage-graph"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "serde_json",
  "toml",
 ]
 

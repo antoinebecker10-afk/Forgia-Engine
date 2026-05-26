@@ -25,7 +25,7 @@ use crate::waves::RogueliteWave;
 use forgia_player::FpsCamera;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
-use forgia_stage_graph::{RunGraph, StageKind};
+use forgia_stage::graph::{RunGraph, StageKind};
 // TODO(story-471..479): SystemTime/UNIX_EPOCH utilisés par draw_bark_bubble — désactivé
 // use std::time::{SystemTime, UNIX_EPOCH};
 

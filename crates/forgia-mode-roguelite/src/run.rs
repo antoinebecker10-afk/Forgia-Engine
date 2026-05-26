@@ -151,7 +151,7 @@ pub fn sys_stage_dispatch(
         .as_ref()
         .map(|s| s.stage_seed(depth))
         .unwrap_or(FALLBACK_SEED);
-    commands.insert_resource(forgia_stage_arena::StageLoadRequest {
+    commands.insert_resource(forgia_stage::StageLoadRequest {
         stage_id: stage_id.to_string(),
         seed,
     });
@@ -172,10 +172,10 @@ pub fn parse_music_state(_s: &str) -> Option<()> {
 // sys_apply_stage_toggles désactivé : RequestMusicState n'existe plus dans
 // forgia_audio_music_state (scaffold vide). Stub no-op.
 pub fn sys_apply_stage_toggles(
-    stage_result: Res<forgia_stage_arena::StageLoadResult>,
+    stage_result: Res<forgia_stage::StageLoadResult>,
     mut last_applied_id: Local<String>,
 ) {
-    if stage_result.state != forgia_stage_arena::StageState::Ready {
+    if stage_result.state != forgia_stage::StageState::Ready {
         return;
     }
     if stage_result.stage_id == *last_applied_id || stage_result.stage_id.is_empty() {
@@ -412,12 +412,12 @@ pub fn sys_start_run(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
-    stage_graph_config: Res<forgia_stage_graph::RunGraphConfig>,
+    stage_graph_config: Res<forgia_stage::graph::RunGraphConfig>,
     mut wave: ResMut<crate::waves::RogueliteWave>,
 ) {
     for ev in events.read() {
         let seed = ev.seed.unwrap_or_else(default_seed_from_clock);
-        let graph = forgia_stage_graph::generate_run_graph(&stage_graph_config, seed);
+        let graph = forgia_stage::graph::generate_run_graph(&stage_graph_config, seed);
         let total_stages = graph.total_stages;
         let boss_depth = graph.boss_depth();
 

@@ -30,6 +30,7 @@
 //! - Forgia memory `[[reference-loader-request-result-pattern]]` (story-441).
 //! - Forgia memory `[[reference-pattern-genome-driven-plugin-with-sensor]]`.
 
+pub mod graph;
 pub mod layout;
 pub mod layout_sensor;
 

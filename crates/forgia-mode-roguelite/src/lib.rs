@@ -50,12 +50,12 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             app.add_plugins(forgia_loot_tables::ForgiaLootTablesPlugin);
         }
         // V7 M3 step 2 — node-driven run loop (StageGraph Slay-the-Spire ratios).
-        if !app.is_plugin_added::<forgia_stage_graph::ForgiaStageGraphPlugin>() {
-            app.add_plugins(forgia_stage_graph::ForgiaStageGraphPlugin);
+        if !app.is_plugin_added::<forgia_stage::graph::ForgiaStageGraphPlugin>() {
+            app.add_plugins(forgia_stage::graph::ForgiaStageGraphPlugin);
         }
         // Story-483 V7 P1 — data-driven stage arena (terrain + ramparts + POI anchors).
-        if !app.is_plugin_added::<forgia_stage_arena::ForgiaStageArenaPlugin>() {
-            app.add_plugins(forgia_stage_arena::ForgiaStageArenaPlugin);
+        if !app.is_plugin_added::<forgia_stage::ForgiaStageArenaPlugin>() {
+            app.add_plugins(forgia_stage::ForgiaStageArenaPlugin);
         }
         // Observer drop pickup on enemy death (filtré par EnemyArchetype).
         app.add_observer(run::obs_roguelite_enemy_death);
@@ -103,7 +103,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // Story-483 V7 P1 — cleanup stage-arena entities + anchor stats on exit.
             .add_systems(
                 OnExit(GameMode::Roguelite),
-                forgia_stage_arena::cleanup_stage_arena,
+                forgia_stage::cleanup_stage_arena,
             )
             .add_systems(
                 Update,

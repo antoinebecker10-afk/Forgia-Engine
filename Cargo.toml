@@ -47,8 +47,7 @@ members = [
     "crates/forgia-rpg",
     "crates/forgia-secondary-motion",
     "crates/forgia-spline",
-    "crates/forgia-stage-arena",
-    "crates/forgia-stage-graph",
+    "crates/forgia-stage",
     "crates/forgia-streaming",
     "crates/forgia-terrain",
     "crates/forgia-ui",
@@ -175,8 +174,7 @@ forgia-rng = { path = "crates/forgia-rng" }
 forgia-rpg = { path = "crates/forgia-rpg" }
 forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
 forgia-spline = { path = "crates/forgia-spline" }
-forgia-stage-arena = { path = "crates/forgia-stage-arena" }
-forgia-stage-graph = { path = "crates/forgia-stage-graph" }
+forgia-stage = { path = "crates/forgia-stage" }
 forgia-streaming = { path = "crates/forgia-streaming" }
 forgia-terrain = { path = "crates/forgia-terrain" }
 forgia-ui = { path = "crates/forgia-ui" }

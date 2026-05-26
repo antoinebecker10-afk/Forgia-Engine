@@ -1,8 +1,8 @@
 [package]
-name = "forgia-stage-arena"
+name = "forgia-stage"
 version = "0.1.0"
 edition = "2021"
-description = "Generic stage arena loader (terrain bornée + ramparts + anchors) data-driven via genome TOML. Mode-agnostic (Roguelite V1, FPS Arena M4). Story-483."
+description = "Stage system — arena loader (terrain + ramparts + anchors) + run graph (Slay-the-Spire DAG + Hades branching). Fused from forgia-stage-arena + forgia-stage-graph (2026-05-26)."
 
 [lints]
 workspace = true
