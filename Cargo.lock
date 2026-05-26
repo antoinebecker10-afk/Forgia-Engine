@@ -4237,15 +4237,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-ui-credits"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
 name = "forgia-ui-damage-direction"
 version = "0.1.0"
 dependencies = [
@@ -4267,15 +4258,6 @@ dependencies = [
  "bevy_egui",
  "forgia-core",
  "forgia-dialogue",
-]
-
-[[package]]
-name = "forgia-ui-gauges"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
 ]
 
 [[package]]
@@ -4305,60 +4287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-ui-inventory"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ui-loadscreen"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ui-menu"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ui-minimap"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ui-notifications"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ui-objectives"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
 name = "forgia-ui-pause-menu"
 version = "0.1.0"
 dependencies = [
@@ -4372,28 +4300,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-ui-settings-panel"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
-]
-
-[[package]]
 name = "forgia-ui-style"
 version = "0.1.0"
 dependencies = [
  "bevy_egui",
-]
-
-[[package]]
-name = "forgia-ui-tooltip"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
 ]
 
 [[package]]

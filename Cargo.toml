@@ -113,23 +113,13 @@ members = [
     "crates/forgia-time",
     "crates/forgia-trails",
     "crates/forgia-ui",
-    "crates/forgia-ui-credits",
     "crates/forgia-ui-dialogue",
-    "crates/forgia-ui-gauges",
     "crates/forgia-ui-hud",
-    "crates/forgia-ui-inventory",
-    "crates/forgia-ui-loadscreen",
-    "crates/forgia-ui-menu",
-    "crates/forgia-ui-minimap",
-    "crates/forgia-ui-notifications",
-    "crates/forgia-ui-objectives",
-    "crates/forgia-ui-settings-panel",
     "crates/forgia-ui-style",
     "crates/forgia-ui-hud-ammo",
     "crates/forgia-killfeed",
     "crates/forgia-ui-damage-direction",
     "crates/forgia-ui-pause-menu",
-    "crates/forgia-ui-tooltip",
     "crates/forgia-underwater",
     "crates/forgia-vfx-tracers",
     "crates/forgia-viewmodel",
@@ -319,23 +309,13 @@ forgia-terrain = { path = "crates/forgia-terrain" }
 forgia-time = { path = "crates/forgia-time" }
 forgia-trails = { path = "crates/forgia-trails" }
 forgia-ui = { path = "crates/forgia-ui" }
-forgia-ui-credits = { path = "crates/forgia-ui-credits" }
 forgia-ui-dialogue = { path = "crates/forgia-ui-dialogue" }
-forgia-ui-gauges = { path = "crates/forgia-ui-gauges" }
 forgia-ui-hud = { path = "crates/forgia-ui-hud" }
-forgia-ui-inventory = { path = "crates/forgia-ui-inventory" }
-forgia-ui-loadscreen = { path = "crates/forgia-ui-loadscreen" }
-forgia-ui-menu = { path = "crates/forgia-ui-menu" }
-forgia-ui-minimap = { path = "crates/forgia-ui-minimap" }
-forgia-ui-notifications = { path = "crates/forgia-ui-notifications" }
-forgia-ui-objectives = { path = "crates/forgia-ui-objectives" }
-forgia-ui-settings-panel = { path = "crates/forgia-ui-settings-panel" }
 forgia-ui-style = { path = "crates/forgia-ui-style" }
 forgia-ui-hud-ammo = { path = "crates/forgia-ui-hud-ammo" }
 forgia-killfeed = { path = "crates/forgia-killfeed" }
 forgia-ui-damage-direction = { path = "crates/forgia-ui-damage-direction" }
 forgia-ui-pause-menu = { path = "crates/forgia-ui-pause-menu" }
-forgia-ui-tooltip = { path = "crates/forgia-ui-tooltip" }
 forgia-underwater = { path = "crates/forgia-underwater" }
 forgia-vfx-tracers = { path = "crates/forgia-vfx-tracers" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
