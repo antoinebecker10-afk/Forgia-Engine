@@ -21,12 +21,6 @@ members = [
     "crates/forgia-assets-bundle",
     "crates/forgia-audio-biome",
     "crates/forgia-audio-core",
-    "crates/forgia-audio-ducking",
-    "crates/forgia-audio-footsteps",
-    "crates/forgia-audio-mixer",
-    "crates/forgia-audio-music-state",
-    "crates/forgia-audio-occlusion",
-    "crates/forgia-audio-voicelines",
     "crates/forgia-camera-fps",
     "crates/forgia-camera-orbit",
     "crates/forgia-coedit-crdt",
@@ -53,11 +47,6 @@ members = [
     "crates/forgia-hyworld-import",
     "crates/forgia-ik",
     "crates/forgia-input",
-    "crates/forgia-input-azerty-qwerty",
-    "crates/forgia-input-gamepad",
-    "crates/forgia-input-keybind",
-    "crates/forgia-input-rebind-ui",
-    "crates/forgia-input-recording",
     "crates/forgia-inventory",
     "crates/forgia-juice-camera-shake",
     "crates/forgia-juice-fov-punch",
@@ -202,12 +191,6 @@ forgia-assets = { path = "crates/forgia-assets" }
 forgia-assets-bundle = { path = "crates/forgia-assets-bundle" }
 forgia-audio-biome = { path = "crates/forgia-audio-biome" }
 forgia-audio-core = { path = "crates/forgia-audio-core" }
-forgia-audio-ducking = { path = "crates/forgia-audio-ducking" }
-forgia-audio-footsteps = { path = "crates/forgia-audio-footsteps" }
-forgia-audio-mixer = { path = "crates/forgia-audio-mixer" }
-forgia-audio-music-state = { path = "crates/forgia-audio-music-state" }
-forgia-audio-occlusion = { path = "crates/forgia-audio-occlusion" }
-forgia-audio-voicelines = { path = "crates/forgia-audio-voicelines" }
 forgia-camera-fps = { path = "crates/forgia-camera-fps" }
 forgia-camera-orbit = { path = "crates/forgia-camera-orbit" }
 forgia-coedit-crdt = { path = "crates/forgia-coedit-crdt" }
@@ -234,11 +217,6 @@ forgia-hitmarker = { path = "crates/forgia-hitmarker" }
 forgia-hyworld-import = { path = "crates/forgia-hyworld-import" }
 forgia-ik = { path = "crates/forgia-ik" }
 forgia-input = { path = "crates/forgia-input" }
-forgia-input-azerty-qwerty = { path = "crates/forgia-input-azerty-qwerty" }
-forgia-input-gamepad = { path = "crates/forgia-input-gamepad" }
-forgia-input-keybind = { path = "crates/forgia-input-keybind" }
-forgia-input-rebind-ui = { path = "crates/forgia-input-rebind-ui" }
-forgia-input-recording = { path = "crates/forgia-input-recording" }
 forgia-inventory = { path = "crates/forgia-inventory" }
 forgia-juice-camera-shake = { path = "crates/forgia-juice-camera-shake" }
 forgia-juice-fov-punch = { path = "crates/forgia-juice-fov-punch" }

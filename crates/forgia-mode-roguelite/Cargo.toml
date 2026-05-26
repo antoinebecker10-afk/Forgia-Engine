@@ -30,11 +30,4 @@ bevy_egui = { workspace = true }
 forgia-ui-lib = { workspace = true }
 # Story-470 V7 M3 step 2 (2026-05-20) — StageGraph node-driven run loop.
 forgia-stage-graph = { workspace = true }
-# Story-481 Tier 1.5 (2026-05-20) — émettre BarkEvent sur kill ennemi.
-forgia-audio-voicelines = { workspace = true }
-# Story-483 V7 P1 (2026-05-20) — data-driven stage arena (terrain bornée +
-# ramparts hex KayKit + POI anchors). Remplace primitives Cuboid de run.rs.
 forgia-stage-arena = { workspace = true }
-# Story-483 V7 P3 (2026-05-20) — émettre RequestMusicState sur stage Ready
-# (toggle music_state from stage TOML).
-forgia-audio-music-state = { workspace = true }
