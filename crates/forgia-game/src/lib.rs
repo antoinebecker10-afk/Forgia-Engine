@@ -78,10 +78,6 @@ pub fn run_game() -> AppExit {
         forgia_foliage::prelude::ForgiaFoliagePlugin,
         forgia_water::prelude::ForgiaWaterPlugin,
         forgia_audio_biome::prelude::ForgiaAudioBiomePlugin,
-        // Story-481 Tier 1.5 — wire-up barks (selection logic Tier 1 story-472).
-        // Plugin auto-charge assets/genomes/roguelite/roguelite_dialogue.toml.
-        // Émetteur BarkEvent côté forgia-mode-roguelite (obs_roguelite_enemy_death).
-        forgia_audio_voicelines::ForgiaAudioVoicelinesPlugin,
     ));
 
     // 7b. Anim Layer (story-437) + 3P camera (story-438) — utilisés par forgia-rpg

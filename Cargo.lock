@@ -3216,60 +3216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-audio-ducking"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-audio-footsteps"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-audio-mixer"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-audio-music-state"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-audio-occlusion"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-audio-voicelines"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
-]
-
-[[package]]
 name = "forgia-auto-rig"
 version = "0.1.0"
 dependencies = [
@@ -3479,7 +3425,6 @@ dependencies = [
  "forgia-assets",
  "forgia-audio-biome",
  "forgia-audio-core",
- "forgia-audio-voicelines",
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
@@ -3581,51 +3526,6 @@ dependencies = [
 
 [[package]]
 name = "forgia-input"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "leafwing-input-manager",
-]
-
-[[package]]
-name = "forgia-input-azerty-qwerty"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "leafwing-input-manager",
-]
-
-[[package]]
-name = "forgia-input-gamepad"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "leafwing-input-manager",
-]
-
-[[package]]
-name = "forgia-input-keybind"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "leafwing-input-manager",
-]
-
-[[package]]
-name = "forgia-input-rebind-ui"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "leafwing-input-manager",
-]
-
-[[package]]
-name = "forgia-input-recording"
 version = "0.1.0"
 dependencies = [
  "bevy",
@@ -3788,8 +3688,6 @@ dependencies = [
  "bevy_egui",
  "bevy_rapier3d",
  "forgia-ai-arena-bot",
- "forgia-audio-music-state",
- "forgia-audio-voicelines",
  "forgia-combat",
  "forgia-core",
  "forgia-damage",

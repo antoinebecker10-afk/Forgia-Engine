@@ -57,10 +57,6 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         if !app.is_plugin_added::<forgia_stage_arena::ForgiaStageArenaPlugin>() {
             app.add_plugins(forgia_stage_arena::ForgiaStageArenaPlugin);
         }
-        // Story-483 V7 P3 — music state machine (consume RequestMusicState).
-        if !app.is_plugin_added::<forgia_audio_music_state::ForgiaAudioMusicStatePlugin>() {
-            app.add_plugins(forgia_audio_music_state::ForgiaAudioMusicStatePlugin);
-        }
         // Observer drop pickup on enemy death (filtré par EnemyArchetype).
         app.add_observer(run::obs_roguelite_enemy_death);
         // V7 M3 step 4 — Defeat trigger sur Player HP=0 (DeathEvent target==Player).
