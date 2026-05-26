@@ -326,6 +326,64 @@ pub fn bot_tactical_movement(
     }
 }
 
+// ─── Separation steering (story-517) ──────────────────────────────────
+//
+// Empêche les bots de se traverser. Pattern AAA classique : pairwise
+// push-out post-movement. O(N²) acceptable jusqu'à ~50 bots.
+//
+// Kinematic body ne se pousse pas naturellement via physics → on push
+// directement la Transform en XZ (Y reste au spawn). Min distance = 1.0m
+// (assez pour silhouettes humanoïdes, < 2× capsule_radius typique 0.55).
+
+const SEPARATION_MIN_DIST_M: f32 = 1.0;
+const SEPARATION_MAX_DIST_M: f32 = 1.2;
+const SEPARATION_PUSH_STRENGTH: f32 = 0.5;
+
+pub fn bot_separation(
+    mut bots: Query<(Entity, &mut Transform), (With<ArenaBot>, Without<BotTarget>)>,
+) {
+    // Snapshot positions pour comparaison stable (sinon mutation iterative biaise).
+    let positions: Vec<(Entity, Vec3)> = bots
+        .iter()
+        .map(|(e, tf)| (e, tf.translation))
+        .collect();
+    let mut deltas: bevy::platform::collections::HashMap<Entity, Vec2> = Default::default();
+    for i in 0..positions.len() {
+        for j in (i + 1)..positions.len() {
+            let (e_a, pos_a) = positions[i];
+            let (e_b, pos_b) = positions[j];
+            let diff = Vec2::new(pos_b.x - pos_a.x, pos_b.z - pos_a.z);
+            let dist = diff.length();
+            if dist < 0.01 {
+                // Co-located — push aléatoire petit pour les séparer ensuite.
+                let nudge = Vec2::new(0.05, 0.05);
+                *deltas.entry(e_a).or_default() -= nudge;
+                *deltas.entry(e_b).or_default() += nudge;
+                continue;
+            }
+            if dist < SEPARATION_MAX_DIST_M {
+                // Force linéaire entre [min,max] : pleine force à min, zéro à max.
+                let overlap = (SEPARATION_MAX_DIST_M - dist) / SEPARATION_MAX_DIST_M;
+                let push = (diff / dist) * overlap * SEPARATION_PUSH_STRENGTH;
+                *deltas.entry(e_a).or_default() -= push;
+                *deltas.entry(e_b).or_default() += push;
+                // Aussi push fort si réellement overlap.
+                if dist < SEPARATION_MIN_DIST_M {
+                    let extra = (diff / dist) * (SEPARATION_MIN_DIST_M - dist) * 0.5;
+                    *deltas.entry(e_a).or_default() -= extra;
+                    *deltas.entry(e_b).or_default() += extra;
+                }
+            }
+        }
+    }
+    for (entity, mut tf) in &mut bots {
+        if let Some(delta) = deltas.get(&entity) {
+            tf.translation.x += delta.x;
+            tf.translation.z += delta.y; // Vec2.y → world Z
+        }
+    }
+}
+
 // ─── Sensor `forgia_bot_ai.json` ───────────────────────────────────────
 
 pub fn write_bot_ai_sensor(

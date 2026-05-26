@@ -103,7 +103,11 @@ impl Plugin for ForgiaPlayerPlugin {
             .add_systems(Startup, load_skybox)
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
-            .add_systems(OnExit(AppMode::InGame), despawn_player)
+            // Story-517 fix : despawn UNIQUEMENT au retour au menu, PAS sur OnExit(InGame).
+            // ESC pause = transition InGame→Paused → OnExit(InGame) tirait avant fix,
+            // ce qui despawn le player et perdait position/HP/ammo au resume.
+            // Memory ref : reference_player_lifecycle_pause_safe.md.
+            .add_systems(OnEnter(AppMode::Menu), despawn_player)
             .add_systems(
                 Update,
                 (
@@ -118,7 +122,13 @@ impl Plugin for ForgiaPlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands) {
+fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
+    // Story-517 fix : idempotent guard. OnEnter(InGame) fire à chaque transition
+    // INTO InGame, incluant Paused→InGame après resume. Si player déjà spawné
+    // (pause case), skip pour ne pas créer un doublon.
+    if !existing.is_empty() {
+        return;
+    }
     let map = default_input_map();
     // Spawn y=2 (vs y=5) : limite vélocité d'impact pour éviter tunneling.
     commands.spawn((

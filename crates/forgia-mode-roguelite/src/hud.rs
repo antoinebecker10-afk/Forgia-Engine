@@ -19,8 +19,10 @@ use forgia_core::prelude::*;
 use forgia_loot_tables::Souls;
 use forgia_ui_lib::style::*;
 
+use crate::enemies::EnemyArchetype;
 use crate::run::{RunState, StartRunEvent};
 use crate::waves::RogueliteWave;
+use forgia_player::FpsCamera;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
 use forgia_stage_graph::{RunGraph, StageKind};
@@ -420,6 +422,99 @@ pub(crate) fn draw_stage_notification(
     // disabled — wave.notification supprimé
 }
 
+/// Story-517 nameplate texte au-dessus de chaque ennemi (Tank/Runner/Sniper/Boss).
+/// Pattern miroir `forgia-rpg::character::draw_lineup_names` — egui world→viewport
+/// projection avec outline noir 8 passes pour lisibilité tous fonds.
+pub fn draw_enemy_archetype_labels(
+    mut contexts: EguiContexts,
+    q_enemies: Query<(&Transform, &EnemyArchetype)>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<FpsCamera>>,
+) {
+    let Ok((cam, cam_tf)) = q_cam.single() else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_enemy_labels"),
+    ));
+
+    for (tf, archetype) in &q_enemies {
+        // Position monde au-dessus de la tête : capsule center + ~2m offset
+        // (couvre toutes les tailles archetype, Boss inclus).
+        let world_pos = tf.translation + Vec3::Y * 2.4;
+        let Ok(screen_pos) = cam.world_to_viewport(cam_tf, world_pos) else {
+            continue;
+        };
+        // Distance fade : 0..40m → alpha 1, 40..60m → fade, >60m → hidden.
+        let dist = (cam_tf.translation() - tf.translation).length();
+        if dist > 60.0 {
+            continue;
+        }
+        let alpha = if dist > 40.0 {
+            ((60.0 - dist) / 20.0).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let scale = (10.0 / dist.max(2.0)).clamp(0.5, 2.0);
+        let font = egui::FontId::proportional(16.0 * scale);
+        let label = match archetype {
+            EnemyArchetype::Tank => "TANK",
+            EnemyArchetype::Runner => "RUNNER",
+            EnemyArchetype::Sniper => "SNIPER",
+            EnemyArchetype::Boss => "BOSS",
+        };
+        let color = match archetype {
+            EnemyArchetype::Tank => egui::Color32::from_rgba_unmultiplied(
+                240,
+                70,
+                70,
+                (255.0 * alpha) as u8,
+            ),
+            EnemyArchetype::Runner => egui::Color32::from_rgba_unmultiplied(
+                255,
+                180,
+                60,
+                (255.0 * alpha) as u8,
+            ),
+            EnemyArchetype::Sniper => egui::Color32::from_rgba_unmultiplied(
+                190,
+                100,
+                255,
+                (255.0 * alpha) as u8,
+            ),
+            EnemyArchetype::Boss => egui::Color32::from_rgba_unmultiplied(
+                255,
+                80,
+                200,
+                (255.0 * alpha) as u8,
+            ),
+        };
+        let pos = egui::pos2(screen_pos.x, screen_pos.y);
+        let outline = egui::Color32::from_rgba_unmultiplied(0, 0, 0, (255.0 * alpha) as u8);
+        // Outline 8 directions.
+        for (dx, dy) in &[
+            (-1.0_f32, -1.0_f32),
+            (0.0, -1.0),
+            (1.0, -1.0),
+            (-1.0, 0.0),
+            (1.0, 0.0),
+            (-1.0, 1.0),
+            (0.0, 1.0),
+            (1.0, 1.0),
+        ] {
+            painter.text(
+                egui::pos2(pos.x + dx * scale.max(1.0), pos.y + dy * scale.max(1.0)),
+                egui::Align2::CENTER_CENTER,
+                label,
+                font.clone(),
+                outline,
+            );
+        }
+        painter.text(pos, egui::Align2::CENTER_CENTER, label, font, color);
+    }
+}
+
 pub struct RogueliteHudPlugin;
 
 impl Plugin for RogueliteHudPlugin {
@@ -434,6 +529,7 @@ impl Plugin for RogueliteHudPlugin {
                 draw_victory_overlay,
                 draw_bark_bubble,
                 draw_stage_notification,
+                draw_enemy_archetype_labels,
             ),
         );
     }

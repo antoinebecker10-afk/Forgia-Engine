@@ -181,6 +181,9 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     // Phase 3 tactical_movement run APRÈS state_machine pour override le
                     // mouvement basique chase forward avec strafe + obstacle avoidance.
                     tactical::bot_tactical_movement,
+                    // Story-517 — separation post-movement empêche les bots de
+                    // se traverser (kinematic body ne push pas via physique).
+                    tactical::bot_separation,
                     bot_attack_cooldown,
                     bot_shoot_at_target,
                     bot_tracer_lifetime,
