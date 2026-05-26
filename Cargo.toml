@@ -46,14 +46,8 @@ members = [
     "crates/forgia-fps",
     "crates/forgia-game",
     "crates/forgia-gauge",
-    "crates/forgia-genome-ai-personality",
-    "crates/forgia-genome-balance",
-    "crates/forgia-genome-catalogue",
     "crates/forgia-genome-core",
-    "crates/forgia-genome-economy",
     "crates/forgia-genome-registry",
-    "crates/forgia-genome-sync",
-    "crates/forgia-genome-validator",
     "crates/forgia-grid",
     "crates/forgia-hitmarker",
     "crates/forgia-hyworld-import",
@@ -233,14 +227,8 @@ forgia-founders-pass = { path = "crates/forgia-founders-pass" }
 forgia-fps = { path = "crates/forgia-fps" }
 forgia-game = { path = "crates/forgia-game" }
 forgia-gauge = { path = "crates/forgia-gauge" }
-forgia-genome-ai-personality = { path = "crates/forgia-genome-ai-personality" }
-forgia-genome-balance = { path = "crates/forgia-genome-balance" }
-forgia-genome-catalogue = { path = "crates/forgia-genome-catalogue" }
 forgia-genome-core = { path = "crates/forgia-genome-core" }
-forgia-genome-economy = { path = "crates/forgia-genome-economy" }
 forgia-genome-registry = { path = "crates/forgia-genome-registry" }
-forgia-genome-sync = { path = "crates/forgia-genome-sync" }
-forgia-genome-validator = { path = "crates/forgia-genome-validator" }
 forgia-grid = { path = "crates/forgia-grid" }
 forgia-hitmarker = { path = "crates/forgia-hitmarker" }
 forgia-hyworld-import = { path = "crates/forgia-hyworld-import" }

@@ -3518,36 +3518,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-genome-ai-personality"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "toml",
-]
-
-[[package]]
-name = "forgia-genome-balance"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "toml",
-]
-
-[[package]]
-name = "forgia-genome-catalogue"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "toml",
-]
-
-[[package]]
 name = "forgia-genome-core"
 version = "0.1.0"
 dependencies = [
@@ -3559,41 +3529,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-genome-economy"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "toml",
-]
-
-[[package]]
 name = "forgia-genome-registry"
 version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
-]
-
-[[package]]
-name = "forgia-genome-sync"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "toml",
-]
-
-[[package]]
-name = "forgia-genome-validator"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "toml",
 ]
 
 [[package]]
