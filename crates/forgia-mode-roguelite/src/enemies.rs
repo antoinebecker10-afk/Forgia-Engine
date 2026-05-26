@@ -115,6 +115,72 @@ pub fn stats_for(archetype: EnemyArchetype) -> EnemyStats {
     }
 }
 
+/// KayKit Skeleton GLB asset path par archetype (story-517 fix).
+/// Mapping : Tank=Warrior, Runner=Minion, Sniper=Mage, Boss=Warrior×2.5.
+/// Memory ref : reference_roguelite_enemy_skeleton_mapping.md.
+pub fn skeleton_asset_path(archetype: EnemyArchetype) -> &'static str {
+    match archetype {
+        EnemyArchetype::Tank => "models/kaykit/skeletons/Skeleton_Warrior.glb",
+        EnemyArchetype::Runner => "models/kaykit/skeletons/Skeleton_Minion.glb",
+        EnemyArchetype::Sniper => "models/kaykit/skeletons/Skeleton_Mage.glb",
+        EnemyArchetype::Boss => "models/kaykit/skeletons/Skeleton_Warrior.glb",
+    }
+}
+
+/// Scale uniforme à appliquer au SceneRoot KayKit pour matcher la silhouette
+/// capsule originale (visual cohérence avec les colliders existants).
+pub fn skeleton_scale(archetype: EnemyArchetype) -> f32 {
+    match archetype {
+        EnemyArchetype::Tank => 1.4,
+        EnemyArchetype::Runner => 1.0,
+        EnemyArchetype::Sniper => 1.1,
+        EnemyArchetype::Boss => 2.5,
+    }
+}
+
+/// BotShootConfig par archetype (story-517 fix combat differentiation).
+/// Tank = melee (range courte, dmg élevé), Runner = mid (dmg moyen),
+/// Sniper = long range (dmg élevé spread faible), Boss = mid range high-dmg.
+/// Stats matchent les `attack_range` de [`stats_for`] pour cohérence AI.
+pub fn bot_shoot_for(archetype: EnemyArchetype) -> forgia_ai_arena_bot::BotShootConfig {
+    use forgia_ai_arena_bot::BotShootConfig;
+    use bevy::color::LinearRgba;
+    match archetype {
+        EnemyArchetype::Tank => BotShootConfig {
+            damage: 25.0,
+            range: 5.0,
+            jitter_rad: 6.0_f32.to_radians(),
+            tracer_emissive: LinearRgba::new(5.0, 0.5, 0.5, 1.0), // rouge sombre
+            shoulder_y: 1.2,
+            target_torso_y: 1.0,
+        },
+        EnemyArchetype::Runner => BotShootConfig {
+            damage: 8.0,
+            range: 8.0,
+            jitter_rad: 5.0_f32.to_radians(),
+            tracer_emissive: LinearRgba::new(4.0, 2.0, 0.5, 1.0), // orange
+            shoulder_y: 0.9,
+            target_torso_y: 1.0,
+        },
+        EnemyArchetype::Sniper => BotShootConfig {
+            damage: 18.0,
+            range: 28.0,
+            jitter_rad: 1.5_f32.to_radians(),
+            tracer_emissive: LinearRgba::new(3.0, 0.5, 5.0, 1.0), // violet
+            shoulder_y: 1.1,
+            target_torso_y: 1.0,
+        },
+        EnemyArchetype::Boss => BotShootConfig {
+            damage: 22.0,
+            range: 32.0,
+            jitter_rad: 3.0_f32.to_radians(),
+            tracer_emissive: LinearRgba::new(5.0, 0.5, 3.0, 1.0), // magenta
+            shoulder_y: 2.4,
+            target_torso_y: 1.0,
+        },
+    }
+}
+
 /// Construit un `ArenaBot` configuré pour l'archetype donné.
 /// Réutilise les champs default pour les LOS/strafe/alert (préservés inchangés).
 pub fn arena_bot_for(archetype: EnemyArchetype) -> ArenaBot {

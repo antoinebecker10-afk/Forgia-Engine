@@ -411,6 +411,7 @@ pub fn sys_start_run(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
     stage_graph_config: Res<forgia_stage_graph::RunGraphConfig>,
     mut wave: ResMut<crate::waves::RogueliteWave>,
 ) {
@@ -447,6 +448,7 @@ pub fn sys_start_run(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
+                &asset_server,
                 1, // wave 1
             );
             info!("[roguelite] sys_start_run fallback — wave 1 spawned {spawned} enemies");

@@ -14,7 +14,7 @@ use crate::enemies::{self, EnemyArchetype};
 use crate::run::{EndRunEvent, RogueliteRunMarker, RunResult};
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
-use bevy_rapier3d::prelude::{Collider, RigidBody};
+use bevy_rapier3d::prelude::{Collider, RigidBody, Sensor};
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_core::prelude::*;
 // Story-490 — Health type swap forgia_damage → forgia_combat pour matcher la
@@ -78,10 +78,15 @@ pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
 
 /// Spawn N ennemis de la composition wave donnée. Caller : OnEnter scene ou
 /// orchestrator au passage de vague.
+///
+/// Story-517 (2026-05-26) : visual KayKit Skeleton SceneRoot + head proxy
+/// sensor pour permettre headshots (zone-based damage multiplier via
+/// `forgia_damage::HitZoneTag`). Capsule physique conservée (collision OK).
 pub fn spawn_wave_enemies(
     commands: &mut Commands,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
+    _meshes: &mut Assets<Mesh>,
+    _materials: &mut Assets<StandardMaterial>,
+    asset_server: &AssetServer,
     wave: u8,
 ) -> u32 {
     let composition = wave_composition(wave);
@@ -89,21 +94,15 @@ pub fn spawn_wave_enemies(
     let mut total = 0u32;
     for (archetype, count, ring_radius) in &composition {
         let stats = enemies::stats_for(*archetype);
-        let mesh = meshes.add(Capsule3d::new(
-            stats.capsule_radius,
-            stats.capsule_half_height * 2.0,
-        ));
-        let mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(stats.color_rgb[0], stats.color_rgb[1], stats.color_rgb[2]),
-            emissive: LinearRgba::new(
-                stats.emissive_rgb[0],
-                stats.emissive_rgb[1],
-                stats.emissive_rgb[2],
-                1.0,
-            ),
-            perceptual_roughness: 0.55,
-            ..default()
-        });
+        let skeleton_handle: Handle<Scene> = asset_server.load(
+            // KayKit GLB scene root : `#Scene0` est la convention Bevy GltfLoader.
+            format!("{}#Scene0", enemies::skeleton_asset_path(*archetype)),
+        );
+        let scene_scale = enemies::skeleton_scale(*archetype);
+        // Head proxy : sphère sensor ~80% en haut de la capsule body.
+        // Y offset relatif au parent (qui est au centre de la capsule).
+        let head_y_offset = stats.capsule_half_height * 0.85;
+        let head_radius = stats.capsule_radius * 0.55;
         let yaw0 = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * std::f32::consts::TAU;
         for i in 0..*count {
             let theta = yaw0 + (i as f32 / *count as f32) * std::f32::consts::TAU;
@@ -113,13 +112,11 @@ pub fn spawn_wave_enemies(
 
             // Pattern miroir forgia-mode-fps-arena::wave::spawn_wave_bots:343 :
             // PARENT = Health + TargetCube + RigidBody + ArenaBot (PAS de Collider).
-            // CHILD  = Collider + Mesh + Material + ChildOf(parent).
-            //
-            // Raison : le ray hitscan retourne l'Entity avec le Collider. Si Collider
-            // est sur PARENT (même entité que Health+TargetCube), find_health_ancestor
-            // devrait matcher immediatement — MAIS bug rapier 0.33 observé runtime :
-            // `Query<&mut Health, With<TargetCube>>.get(parent)` retourne Err quand le
-            // Collider est sur la même entité. Workaround : split parent/child.
+            // CHILD 1 = Collider body capsule (HitZone::Body default).
+            // CHILD 2 = SceneRoot KayKit visual (skeleton GLB), rotation_y(PI) pour
+            //           aligner KayKit +Z forward vs Bevy -Z forward
+            //           (memory : reference_kaykit_skeleton_forward_axis_pi.md).
+            // CHILD 3 = Head proxy sensor sphere (HitZone::Head), Y offset.
             let parent = commands
                 .spawn((
                     Name::new(format!("RogueliteEnemy_W{wave}_{}_{i}", archetype.label())),
@@ -132,18 +129,49 @@ pub fn spawn_wave_enemies(
                     Health::new(stats.hp),
                     Mortal,
                     enemies::arena_bot_for(*archetype),
+                    // Story-517 fix : ennemis n'avaient pas BotShootConfig → ne
+                    // tiraient pas. Damage + range différencié par archetype.
+                    enemies::bot_shoot_for(*archetype),
                 ))
                 .id();
+            // Body collider (capsule), classified HitZone::Body par défaut.
             commands.spawn((
                 Name::new(format!(
-                    "RogueliteEnemy_W{wave}_{}_{i}_collider",
+                    "RogueliteEnemy_W{wave}_{}_{i}_body",
                     archetype.label()
                 )),
                 ChildOf(parent),
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(mat.clone()),
                 Transform::default(),
                 Collider::capsule_y(stats.capsule_half_height, stats.capsule_radius),
+            ));
+            // Visual KayKit Skeleton SceneRoot (story-517 — remplace Capsule3d).
+            commands.spawn((
+                Name::new(format!(
+                    "RogueliteEnemy_W{wave}_{}_{i}_visual",
+                    archetype.label()
+                )),
+                ChildOf(parent),
+                SceneRoot(skeleton_handle.clone()),
+                // KayKit forward = +Z, Bevy parent yaw uses -Z → rotate PI.
+                // Y offset : KayKit pivot au sol → translate down par
+                // (capsule_half_height + capsule_radius) pour aligner les
+                // pieds avec le BAS de la capsule parent (sinon lévitation).
+                Transform::from_xyz(0.0, -(stats.capsule_half_height + stats.capsule_radius), 0.0)
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
+                    .with_scale(Vec3::splat(scene_scale)),
+            ));
+            // Head proxy sensor (story-517 headshot — sphère détectée AVANT capsule
+            // body si ray traverse les deux. Tagué HitZone::Head → multiplier dégâts.
+            commands.spawn((
+                Name::new(format!(
+                    "RogueliteEnemy_W{wave}_{}_{i}_head_proxy",
+                    archetype.label()
+                )),
+                ChildOf(parent),
+                Transform::from_xyz(0.0, head_y_offset, 0.0),
+                Collider::ball(head_radius),
+                Sensor,
+                forgia_damage::HitZoneTag(forgia_damage::HitZone::Head),
             ));
             total += 1;
         }
@@ -160,6 +188,7 @@ pub fn sys_wave_orchestrator(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
     mut end_run: MessageWriter<EndRunEvent>,
 ) {
@@ -200,6 +229,7 @@ pub fn sys_wave_orchestrator(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
+                &asset_server,
                 wave.current_wave,
             );
         }

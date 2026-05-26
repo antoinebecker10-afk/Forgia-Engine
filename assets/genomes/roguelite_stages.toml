@@ -26,7 +26,7 @@ weather_override = "ashfall"
 # Longueur visuelle naturelle d'1 wall.glb KayKit Dungeon Pack (m). À calibrer
 # au playtest : si gaps entre murs → diminuer ; si chevauchements → augmenter.
 # Hot-reload Shift+F12 supporté pour itération sans rebuild.
-wall_natural_len_m = 2.0
+wall_natural_len_m = 1.0
 # Story-485 — palette modules intra-arena. Identity "Crypts" : dense cover,
 # verticality sniper, brawl pit central.
 # AC6 requirement : >= 6 CoverLow placés (validation runtime sensor
@@ -47,7 +47,7 @@ ramparts_shape = "hexagonal"
 anchor_slots = 5
 music_state = "combat_default"
 boss_pad_required = false
-wall_natural_len_m = 2.0
+wall_natural_len_m = 1.0
 # Story-485 — palette modules. Identity "Forge" : plain combat focus, plus de
 # cover bas, double melee pit, pas de sniper perch (distinct du Crypts).
 module_palette = [

@@ -103,7 +103,11 @@ impl Plugin for ForgiaPlayerPlugin {
             .add_systems(Startup, load_skybox)
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
-            .add_systems(OnExit(AppMode::InGame), despawn_player)
+            // Story-517 fix : despawn UNIQUEMENT au retour au menu, PAS sur OnExit(InGame).
+            // ESC pause = transition InGame→Paused → OnExit(InGame) tirait avant fix,
+            // ce qui despawn le player et perdait position/HP/ammo au resume.
+            // Memory ref : reference_player_lifecycle_pause_safe.md.
+            .add_systems(OnEnter(AppMode::Menu), despawn_player)
             .add_systems(
                 Update,
                 (
@@ -118,7 +122,13 @@ impl Plugin for ForgiaPlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands) {
+fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
+    // Story-517 fix : idempotent guard. OnEnter(InGame) fire à chaque transition
+    // INTO InGame, incluant Paused→InGame après resume. Si player déjà spawné
+    // (pause case), skip pour ne pas créer un doublon.
+    if !existing.is_empty() {
+        return;
+    }
     let map = default_input_map();
     // Spawn y=2 (vs y=5) : limite vélocité d'impact pour éviter tunneling.
     commands.spawn((
@@ -424,14 +434,23 @@ fn player_movement(
     if grounded && action.just_pressed(&PlayerAction::Jump) {
         player.vertical_velocity = jump_velocity;
     }
-    player.vertical_velocity -= gravity * dt;
-    player.vertical_velocity = player.vertical_velocity.max(-max_fall_speed);
+    // Story-517 fix jitter à l'arrêt : ne PAS appliquer gravité tant que grounded
+    // (sinon micro-fall -gravity*dt² chaque frame → KCC snap_to_ground corrige →
+    // oscillation visible sub-pixel).
+    if !grounded {
+        player.vertical_velocity -= gravity * dt;
+        player.vertical_velocity = player.vertical_velocity.max(-max_fall_speed);
+    }
 
-    let move_vec = Vec3::new(
-        horizontal.x * dt,
-        player.vertical_velocity * dt,
-        horizontal.z * dt,
-    );
+    // Quand grounded ET vertical_velocity ≤ 0, on annule la translation verticale
+    // pour éviter le micro-déplacement qui retrigger le snap_to_ground.
+    let vertical_step = if grounded && player.vertical_velocity <= 0.0 {
+        0.0
+    } else {
+        player.vertical_velocity * dt
+    };
+
+    let move_vec = Vec3::new(horizontal.x * dt, vertical_step, horizontal.z * dt);
 
     kcc.translation = Some(move_vec);
 }
