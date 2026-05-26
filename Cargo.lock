@@ -1284,27 +1284,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_landmass"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d3cd3372ac07d952c642099662bd864124d6b93a2c70bfc1f3b3b170ffc64f8"
-dependencies = [
- "bevy_app",
- "bevy_asset",
- "bevy_color",
- "bevy_ecs",
- "bevy_gizmos",
- "bevy_log",
- "bevy_math",
- "bevy_mesh",
- "bevy_platform",
- "bevy_reflect",
- "bevy_time",
- "bevy_transform",
- "landmass",
-]
-
-[[package]]
 name = "bevy_light"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3029,12 +3008,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "disjoint"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c37b399c91d093763e38c7a57a740e0005e30e5aff7132e791aada5eef3fed99"
-
-[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3085,16 +3058,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
 dependencies = [
  "litrs",
-]
-
-[[package]]
-name = "dodgy_2d"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d35627725e918aa4593ca54937cd8ef58078d3b9ab0fd060aee60c9bc3a2050e"
-dependencies = [
- "glam 0.29.3",
- "rand 0.9.4",
 ]
 
 [[package]]
@@ -3508,79 +3471,6 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
-]
-
-[[package]]
-name = "forgia-ai-blackboard"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-bt"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-flocking"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-formation"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-goap"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-navmesh"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_landmass",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-perception"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-state-machine"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-ai-utility"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
 ]
 
 [[package]]
@@ -5257,24 +5147,6 @@ dependencies = [
 
 [[package]]
 name = "geo"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fc1a1678e54befc9b4bcab6cd43b8e7f834ae8ea121118b0fd8c42747675b4a"
-dependencies = [
- "earcutr",
- "float_next_after",
- "geo-types",
- "geographiclib-rs",
- "i_overlay",
- "log",
- "num-traits",
- "robust",
- "rstar",
- "spade",
-]
-
-[[package]]
-name = "geo"
 version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f3901269ec6d4f6068d3f09e5f02f995bd076398dcd1dfec407cd230b02d11b"
@@ -6243,16 +6115,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kdtree"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f0a0e9f770b65bac9aad00f97a67ab5c5319effed07f6da385da3c2115e47ba"
-dependencies = [
- "num-traits",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6313,21 +6175,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff7f53bdf698e7aa7ec916411bbdc8078135da11b66db5182675b2227f6c0d07"
 dependencies = [
  "bitflags 2.11.1",
-]
-
-[[package]]
-name = "landmass"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6a89496cbf307f53baa9d6a33e9d1eaa461452afb67e9c59ebc6b9a6a0cf28c"
-dependencies = [
- "disjoint",
- "dodgy_2d",
- "geo 0.31.0",
- "glam 0.30.10",
- "kdtree",
- "slotmap",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -7476,7 +7323,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a1cb0a84a11080ff93d943a023e9e386c34d3dcc3c988bc6785f990b1964277"
 dependencies = [
  "bvh2d",
- "geo 0.32.0",
+ "geo",
  "glam 0.30.10",
  "hashbrown 0.16.1",
  "log",

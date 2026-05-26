@@ -19,15 +19,6 @@ allowed = [
     "forgia-rng",
 
     # Baseline 2026-05-23 — 93 scaffolds restants (a purger dans stories 516+)
-    "forgia-ai-blackboard",
-    "forgia-ai-bt",
-    "forgia-ai-flocking",
-    "forgia-ai-formation",
-    "forgia-ai-goap",
-    "forgia-ai-navmesh",
-    "forgia-ai-perception",
-    "forgia-ai-state-machine",
-    "forgia-ai-utility",
     "forgia-analytics",
     "forgia-animation-blend",
     "forgia-animation-mixamo",

@@ -3,15 +3,6 @@ resolver = "2"
 members = [
     ".",
     "crates/forgia-ai-arena-bot",
-    "crates/forgia-ai-blackboard",
-    "crates/forgia-ai-bt",
-    "crates/forgia-ai-flocking",
-    "crates/forgia-ai-formation",
-    "crates/forgia-ai-goap",
-    "crates/forgia-ai-navmesh",
-    "crates/forgia-ai-perception",
-    "crates/forgia-ai-state-machine",
-    "crates/forgia-ai-utility",
     "crates/forgia-analytics",
     "crates/forgia-anchor",
     "crates/forgia-anim-debug",
@@ -229,15 +220,6 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "cloc
 # Pour ajouter une crate : éditer [workspace] members + cd & créer crate, puis re-générer cette section via xtask.
 
 forgia-ai-arena-bot = { path = "crates/forgia-ai-arena-bot" }
-forgia-ai-blackboard = { path = "crates/forgia-ai-blackboard" }
-forgia-ai-bt = { path = "crates/forgia-ai-bt" }
-forgia-ai-flocking = { path = "crates/forgia-ai-flocking" }
-forgia-ai-formation = { path = "crates/forgia-ai-formation" }
-forgia-ai-goap = { path = "crates/forgia-ai-goap" }
-forgia-ai-navmesh = { path = "crates/forgia-ai-navmesh" }
-forgia-ai-perception = { path = "crates/forgia-ai-perception" }
-forgia-ai-state-machine = { path = "crates/forgia-ai-state-machine" }
-forgia-ai-utility = { path = "crates/forgia-ai-utility" }
 forgia-analytics = { path = "crates/forgia-analytics" }
 forgia-anchor = { path = "crates/forgia-anchor" }
 forgia-anim-debug = { path = "crates/forgia-anim-debug" }
