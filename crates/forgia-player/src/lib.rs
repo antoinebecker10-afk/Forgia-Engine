@@ -434,14 +434,23 @@ fn player_movement(
     if grounded && action.just_pressed(&PlayerAction::Jump) {
         player.vertical_velocity = jump_velocity;
     }
-    player.vertical_velocity -= gravity * dt;
-    player.vertical_velocity = player.vertical_velocity.max(-max_fall_speed);
+    // Story-517 fix jitter à l'arrêt : ne PAS appliquer gravité tant que grounded
+    // (sinon micro-fall -gravity*dt² chaque frame → KCC snap_to_ground corrige →
+    // oscillation visible sub-pixel).
+    if !grounded {
+        player.vertical_velocity -= gravity * dt;
+        player.vertical_velocity = player.vertical_velocity.max(-max_fall_speed);
+    }
 
-    let move_vec = Vec3::new(
-        horizontal.x * dt,
-        player.vertical_velocity * dt,
-        horizontal.z * dt,
-    );
+    // Quand grounded ET vertical_velocity ≤ 0, on annule la translation verticale
+    // pour éviter le micro-déplacement qui retrigger le snap_to_ground.
+    let vertical_step = if grounded && player.vertical_velocity <= 0.0 {
+        0.0
+    } else {
+        player.vertical_velocity * dt
+    };
+
+    let move_vec = Vec3::new(horizontal.x * dt, vertical_step, horizontal.z * dt);
 
     kcc.translation = Some(move_vec);
 }
