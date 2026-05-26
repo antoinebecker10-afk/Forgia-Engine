@@ -22,7 +22,9 @@ pub(crate) fn draw_player_hp(
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
         return;
     }
-    let Ok(health) = q_player.single() else { return };
+    let Ok(health) = q_player.single() else {
+        return;
+    };
     let Ok(ctx) = contexts.ctx_mut() else { return };
 
     let screen = ctx.content_rect();
@@ -51,10 +53,8 @@ pub(crate) fn draw_player_hp(
     chunky_rect_filled(&painter, outer, C_BG_DARK, 3.0, 8.0);
 
     // Bar background (track noir)
-    let bar_rect = egui::Rect::from_min_size(
-        egui::pos2(left_x, bottom_y),
-        egui::vec2(bar_w, bar_h),
-    );
+    let bar_rect =
+        egui::Rect::from_min_size(egui::pos2(left_x, bottom_y), egui::vec2(bar_w, bar_h));
     painter.rect_filled(
         bar_rect,
         4.0,
@@ -64,18 +64,12 @@ pub(crate) fn draw_player_hp(
     // Fill colored par fraction
     let fill_w = bar_w * frac;
     if fill_w > 0.5 {
-        let fill_rect = egui::Rect::from_min_size(
-            bar_rect.min,
-            egui::vec2(fill_w, bar_h),
-        );
+        let fill_rect = egui::Rect::from_min_size(bar_rect.min, egui::vec2(fill_w, bar_h));
         let fill_color = hp_color(frac);
         painter.rect_filled(fill_rect, 4.0, fill_color);
 
         // Highlight stripe (top quart, plus clair) — effet bombé cartoon
-        let hl_rect = egui::Rect::from_min_size(
-            fill_rect.min,
-            egui::vec2(fill_w, bar_h * 0.35),
-        );
+        let hl_rect = egui::Rect::from_min_size(fill_rect.min, egui::vec2(fill_w, bar_h * 0.35));
         let hl_color = egui::Color32::from_rgba_unmultiplied(
             fill_color.r().saturating_add(40),
             fill_color.g().saturating_add(40),
@@ -94,7 +88,11 @@ pub(crate) fn draw_player_hp(
     );
 
     // HP number "75 / 100" centré sur la bar
-    let hp_text = format!("{} / {}", health.current.round() as i32, health.max.round() as i32);
+    let hp_text = format!(
+        "{} / {}",
+        health.current.round() as i32,
+        health.max.round() as i32
+    );
     text_with_outline(
         &painter,
         bar_rect.center(),

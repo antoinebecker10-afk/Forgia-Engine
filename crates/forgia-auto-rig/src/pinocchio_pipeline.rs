@@ -64,9 +64,13 @@ pub fn auto_rig_pinocchio_v1(
         let NeedsAutoRig::Template(requested_template) = *request;
 
         // 1. Extract first mesh3d (positions + indices) en repère mesh-local.
-        let Some((positions_local, indices)) =
-            extract_first_mesh_local(mesh_root, &children_q, &transforms_q, &q_mesh3d, &meshes_assets)
-        else {
+        let Some((positions_local, indices)) = extract_first_mesh_local(
+            mesh_root,
+            &children_q,
+            &transforms_q,
+            &q_mesh3d,
+            &meshes_assets,
+        ) else {
             // Pas encore de Mesh3d dispo, retry frame suivant.
             continue;
         };
@@ -385,7 +389,9 @@ fn spawn_embedded_bones(
                 Name::new(bone.name.clone()),
                 Transform::from_translation(local_translation),
                 Visibility::default(),
-                BoneEntity { rig_root: mesh_root },
+                BoneEntity {
+                    rig_root: mesh_root,
+                },
             ))
             .id();
         entity_by_idx.insert(idx, bone_entity);

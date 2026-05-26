@@ -12,9 +12,9 @@
 //! V2 vertical slice : constantes Rust pures (genome system pas prêt). Hystérèse
 //! intégrée pour éviter LOD flip-flop aux frontières.
 
-use bevy::prelude::*;
-use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::asset::RenderAssetUsages;
+use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::prelude::*;
 use std::collections::HashMap;
 
 use crate::biomes::BiomeMap;
@@ -103,11 +103,20 @@ pub fn simulate_lod2_y_at(x: f32, z: f32, terrain_cfg: &TerrainConfig) -> f32 {
 /// Permet un échantillonnage déterministe indépendant de la position joueur.
 const SAMPLE_POINTS_XZ: [(f32, f32); 12] = [
     // Ring 64m
-    (64.0, 0.0), (-64.0, 0.0), (0.0, 64.0), (0.0, -64.0),
+    (64.0, 0.0),
+    (-64.0, 0.0),
+    (0.0, 64.0),
+    (0.0, -64.0),
     // Ring 128m (LOD0/LOD2 transition)
-    (128.0, 0.0), (-128.0, 0.0), (0.0, 128.0), (0.0, -128.0),
+    (128.0, 0.0),
+    (-128.0, 0.0),
+    (0.0, 128.0),
+    (0.0, -128.0),
     // Ring 256m
-    (181.0, 181.0), (-181.0, -181.0), (181.0, -181.0), (-181.0, 181.0),
+    (181.0, 181.0),
+    (-181.0, -181.0),
+    (181.0, -181.0),
+    (-181.0, 181.0),
 ];
 
 // ─────────────────────────── Lod2 Mega-Tiles ───────────────────────────
@@ -194,9 +203,13 @@ pub fn update_chunk_lod(
     mut frame_counter: Local<u32>,
 ) {
     *frame_counter += 1;
-    if !frame_counter.is_multiple_of(15) { return; }
+    if !frame_counter.is_multiple_of(15) {
+        return;
+    }
 
-    let Some(player_tf) = player_q.iter().next() else { return };
+    let Some(player_tf) = player_q.iter().next() else {
+        return;
+    };
     let player_pos = player_tf.translation;
 
     let lod0_sq = LOD0_MAX_M * LOD0_MAX_M;
@@ -225,19 +238,31 @@ pub fn update_chunk_lod(
 
         let target_lod = match current_lod {
             ChunkLod::Lod0 => {
-                if dist_sq > lod1_sq { ChunkLod::Lod2 }
-                else if dist_sq > lod0_sq { ChunkLod::Lod1 }
-                else { ChunkLod::Lod0 }
+                if dist_sq > lod1_sq {
+                    ChunkLod::Lod2
+                } else if dist_sq > lod0_sq {
+                    ChunkLod::Lod1
+                } else {
+                    ChunkLod::Lod0
+                }
             }
             ChunkLod::Lod1 => {
-                if dist_sq > lod1_back_sq { ChunkLod::Lod2 }
-                else if dist_sq < lod0_sq { ChunkLod::Lod0 }
-                else { ChunkLod::Lod1 }
+                if dist_sq > lod1_back_sq {
+                    ChunkLod::Lod2
+                } else if dist_sq < lod0_sq {
+                    ChunkLod::Lod0
+                } else {
+                    ChunkLod::Lod1
+                }
             }
             ChunkLod::Lod2 => {
-                if dist_sq < lod0_back_sq { ChunkLod::Lod0 }
-                else if dist_sq < lod1_back_sq { ChunkLod::Lod1 }
-                else { ChunkLod::Lod2 }
+                if dist_sq < lod0_back_sq {
+                    ChunkLod::Lod0
+                } else if dist_sq < lod1_back_sq {
+                    ChunkLod::Lod1
+                } else {
+                    ChunkLod::Lod2
+                }
             }
         };
 
@@ -312,8 +337,8 @@ fn build_lod2_terrain_mesh(
             let world_y = [local_x, raw_y, local_z];
             positions.push(world_y);
             normals.push([0.0, 1.0, 0.0]); // approx — PBR lit accepte
-            // Wave 5 phase 2g : UV × UV_TILE_REPS pour densité texture cohérente
-            // avec chunks (chunks 32m = 1 rep, LOD2 128m = 4 reps).
+                                           // Wave 5 phase 2g : UV × UV_TILE_REPS pour densité texture cohérente
+                                           // avec chunks (chunks 32m = 1 rep, LOD2 128m = 4 reps).
             uvs.push([
                 (i as f32 / SUBDIVS as f32) * UV_TILE_REPS,
                 (j as f32 / SUBDIVS as f32) * UV_TILE_REPS,
@@ -407,18 +432,28 @@ pub fn build_lod2_tiles_system(
     mut frame_counter: Local<u32>,
 ) {
     *frame_counter += 1;
-    if !frame_counter.is_multiple_of(30) { return; }
+    if !frame_counter.is_multiple_of(30) {
+        return;
+    }
 
     let Some(biome_map) = biome_map else { return };
-    let Some(terrain_cfg) = terrain_cfg else { return };
-    let Some(terrain_shared_mat) = terrain_shared_mat else { return };
-    let Some(player_tf) = player_q.iter().next() else { return };
+    let Some(terrain_cfg) = terrain_cfg else {
+        return;
+    };
+    let Some(terrain_shared_mat) = terrain_shared_mat else {
+        return;
+    };
+    let Some(player_tf) = player_q.iter().next() else {
+        return;
+    };
     let off = offset.map(|r| (r.x, r.z)).unwrap_or((0.0, 0.0));
     let player_pos = player_tf.translation;
 
     let inner_m = LOD1_MAX_M;
     let outer_m = LOD2_MAX_M;
-    if outer_m <= inner_m { return; }
+    if outer_m <= inner_m {
+        return;
+    }
 
     let inner_sq = inner_m * inner_m;
     let outer_sq = outer_m * outer_m;
@@ -460,9 +495,8 @@ pub fn build_lod2_tiles_system(
             "models-v1/packs/kaykit-forest/Assets/gltf/Tree_1_C_Color1.gltf",
         ];
         for p in TREE_PATHS {
-            let h: Handle<Scene> = asset_server.load(
-                bevy::asset::AssetPath::from(*p).with_label("Scene0"),
-            );
+            let h: Handle<Scene> =
+                asset_server.load(bevy::asset::AssetPath::from(*p).with_label("Scene0"));
             tile_mgr.tree_scenes.push(h);
         }
     }
@@ -473,9 +507,8 @@ pub fn build_lod2_tiles_system(
             "models-v1/packs/kaykit-forest/Assets/gltf/Rock_1_G_Color1.gltf",
         ];
         for p in ROCK_PATHS {
-            let h: Handle<Scene> = asset_server.load(
-                bevy::asset::AssetPath::from(*p).with_label("Scene0"),
-            );
+            let h: Handle<Scene> =
+                asset_server.load(bevy::asset::AssetPath::from(*p).with_label("Scene0"));
             tile_mgr.rock_scenes.push(h);
         }
     }
@@ -483,13 +516,14 @@ pub fn build_lod2_tiles_system(
     let _ = (&materials, &meshes);
 
     for &key in desired.keys() {
-        if tile_mgr.tiles.contains_key(&key) { continue; }
+        if tile_mgr.tiles.contains_key(&key) {
+            continue;
+        }
 
         let center = cluster_world_center(key);
 
         // Per-cluster mesh : Y per-vertex heightmap + color per-vertex biome.
-        let cluster_mesh =
-            build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map);
+        let cluster_mesh = build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map);
         let mesh_handle = meshes.add(cluster_mesh);
 
         let tile_entity = commands
@@ -601,7 +635,9 @@ pub fn build_lod2_tiles_system(
         .collect();
     for key in to_remove {
         if let Some(entity) = tile_mgr.tiles.remove(&key) {
-            if let Ok(mut ec) = commands.get_entity(entity) { ec.try_despawn(); }
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
         }
     }
 
@@ -616,17 +652,25 @@ pub fn export_lod_sensor_system(
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
-    if now - *last_write < 1.0 { return; }
+    if now - *last_write < 1.0 {
+        return;
+    }
     *last_write = now;
 
     // Story-453 : serialize sample_points (LOD0 vs LOD2 dual reading).
     let sp_json = if lod_stats.sample_points.is_empty() {
         "[]".to_string()
     } else {
-        let parts: Vec<String> = lod_stats.sample_points.iter().map(|p| format!(
+        let parts: Vec<String> = lod_stats
+            .sample_points
+            .iter()
+            .map(|p| {
+                format!(
             "{{\"x\":{:.1},\"z\":{:.1},\"lod0_y\":{:.3},\"lod2_y\":{:.3},\"sea_level\":{:.2}}}",
             p.x, p.z, p.lod0_y, p.lod2_y, p.sea_level
-        )).collect();
+        )
+            })
+            .collect();
         format!("[{}]", parts.join(","))
     };
 
@@ -657,7 +701,9 @@ pub fn sys_update_lod_sample_points(
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
-    if now - *last_write < 1.0 { return; }
+    if now - *last_write < 1.0 {
+        return;
+    }
     *last_write = now;
 
     let Some(cfg) = terrain_cfg else { return };
@@ -665,14 +711,27 @@ pub fn sys_update_lod_sample_points(
 
     if lod_stats.sample_points.len() != SAMPLE_POINTS_XZ.len() {
         lod_stats.sample_points.clear();
-        lod_stats.sample_points.resize(SAMPLE_POINTS_XZ.len(), LodSamplePoint {
-            x: 0.0, z: 0.0, lod0_y: 0.0, lod2_y: 0.0, sea_level: sea,
-        });
+        lod_stats.sample_points.resize(
+            SAMPLE_POINTS_XZ.len(),
+            LodSamplePoint {
+                x: 0.0,
+                z: 0.0,
+                lod0_y: 0.0,
+                lod2_y: 0.0,
+                sea_level: sea,
+            },
+        );
     }
     for (i, &(x, z)) in SAMPLE_POINTS_XZ.iter().enumerate() {
         let lod0_y = heightmap_at(x, z, &cfg);
         let lod2_y = simulate_lod2_y_at(x, z, &cfg);
-        lod_stats.sample_points[i] = LodSamplePoint { x, z, lod0_y, lod2_y, sea_level: sea };
+        lod_stats.sample_points[i] = LodSamplePoint {
+            x,
+            z,
+            lod0_y,
+            lod2_y,
+            sea_level: sea,
+        };
     }
 }
 

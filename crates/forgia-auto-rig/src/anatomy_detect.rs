@@ -104,9 +104,7 @@ impl MeshLandmarks {
     /// aspect ratio avait causé un faux négatif systématique → classification
     /// BipedLizard incorrecte sur tout humanoid Meshy.
     pub fn looks_humanoid(&self) -> bool {
-        self.vertex_count >= 100
-            && !self.has_tail
-            && (0.35..=0.65).contains(&self.hip_y_frac)
+        self.vertex_count >= 100 && !self.has_tail && (0.35..=0.65).contains(&self.hip_y_frac)
     }
 }
 
@@ -458,8 +456,14 @@ mod tests {
             half_extents: Vec3::new(0.15, 0.5, 0.6).into(),
         };
         let landmarks = detect_landmarks_from_vertices(&v, &aabb);
-        assert!(landmarks.has_tail, "lizard with vertices behind should detect tail");
-        assert!(!landmarks.looks_humanoid(), "lizard should not look_humanoid");
+        assert!(
+            landmarks.has_tail,
+            "lizard with vertices behind should detect tail"
+        );
+        assert!(
+            !landmarks.looks_humanoid(),
+            "lizard should not look_humanoid"
+        );
     }
 
     #[test]

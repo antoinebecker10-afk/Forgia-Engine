@@ -1,4 +1,4 @@
-﻿//! input_sensor.rs — Producteur `forgia2_input.json` (1Hz, cross-mode).
+//! input_sensor.rs — Producteur `forgia2_input.json` (1Hz, cross-mode).
 //!
 //! Accumule `KeyboardInput` messages + `ActionState<PlayerAction>::get_just_pressed()`
 //! chaque frame (sinon Bevy purge les messages après 2 frames), flush JSON 1Hz.
@@ -8,8 +8,8 @@
 //! Story-469 — Vague 5 Phase 5b Session C.
 
 use bevy::ecs::message::MessageReader;
-use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
+use bevy::input::ButtonState;
 use bevy::prelude::*;
 use forgia_input::PlayerAction;
 use leafwing_input_manager::action_state::ActionState;

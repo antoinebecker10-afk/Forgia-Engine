@@ -84,8 +84,10 @@ fn spawn_grace_allows_initial_chase() {
     // ArenaBot::default() init `los_lost_grace_left = 2.0` (grace spawn).
     // Sans cette grace, les bots gèleraient jusqu'au 1er raycast LOS (~125ms).
     let bot = ArenaBot::default();
-    assert!(bot.los_lost_grace_left > 0.0,
-        "default ArenaBot doit avoir grace de spawn pour bootstrap");
+    assert!(
+        bot.los_lost_grace_left > 0.0,
+        "default ArenaBot doit avoir grace de spawn pour bootstrap"
+    );
     // À distance Chase, le bot peut Chase dès spawn même sans 1er LOS check.
     assert_eq!(decide_bot_state(&bot, 10.0), BotState::Chase);
 }

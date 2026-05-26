@@ -26,8 +26,8 @@
 //! `forgia_enemy_nameplate.json` (1Hz) — active_count + tracked targets.
 
 use bevy::prelude::*;
-use forgia_combat::Health as CombatHealth;
 use forgia_combat::prelude::CombatHitEvent;
+use forgia_combat::Health as CombatHealth;
 use std::collections::HashMap;
 use std::fs;
 
@@ -195,7 +195,14 @@ fn spawn_nameplate_for_targets(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for target in &q_targets {
-        let _ = build_nameplate_for(target, &mut commands, &mut registry, &tuning, &mut meshes, &mut materials);
+        let _ = build_nameplate_for(
+            target,
+            &mut commands,
+            &mut registry,
+            &tuning,
+            &mut meshes,
+            &mut materials,
+        );
     }
 }
 
@@ -218,7 +225,14 @@ fn spawn_or_refresh_on_hit(
                 continue;
             }
         }
-        let _ = build_nameplate_for(ev.target, &mut commands, &mut registry, &tuning, &mut meshes, &mut materials);
+        let _ = build_nameplate_for(
+            ev.target,
+            &mut commands,
+            &mut registry,
+            &tuning,
+            &mut meshes,
+            &mut materials,
+        );
     }
 }
 
@@ -244,7 +258,9 @@ fn update_hp_fill(
     q_health: Query<&CombatHealth>,
 ) {
     for (root, children) in &q_roots {
-        let Ok(hp) = q_health.get(root.target) else { continue };
+        let Ok(hp) = q_health.get(root.target) else {
+            continue;
+        };
         let frac = if hp.max > 0.01 {
             (hp.current / hp.max).clamp(0.0, 1.0)
         } else {

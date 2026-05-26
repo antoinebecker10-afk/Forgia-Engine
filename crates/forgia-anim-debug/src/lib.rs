@@ -146,10 +146,8 @@ fn write_sensor_and_health(
     timer.accum_s += dt;
 
     // Total time-budget tracking
-    stats.total_us = stats.spring_solver_us
-        + stats.locomotion_us
-        + stats.ik_solver_us
-        + stats.cloth_solver_us;
+    stats.total_us =
+        stats.spring_solver_us + stats.locomotion_us + stats.ik_solver_us + stats.cloth_solver_us;
 
     // Overrun tracking
     if stats.total_us > ANIM_LAYER_BUDGET_US {

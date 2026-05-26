@@ -50,22 +50,30 @@ impl Default for HydroErosionParams {
 #[cfg(test)]
 pub(super) fn droplet_erosion(
     heights: &mut [f32],
-    w: usize, d: usize,
+    w: usize,
+    d: usize,
     num_droplets: usize,
     seed: u32,
 ) {
-    droplet_erosion_params(heights, w, d, num_droplets, seed, &HydroErosionParams::default());
+    droplet_erosion_params(
+        heights,
+        w,
+        d,
+        num_droplets,
+        seed,
+        &HydroErosionParams::default(),
+    );
 }
 
 /// Hydraulic droplet erosion with genome-driven parameters (Beyer/Lague algorithm).
 pub(super) fn droplet_erosion_params(
     heights: &mut [f32],
-    w: usize, d: usize,
+    w: usize,
+    d: usize,
     num_droplets: usize,
     seed: u32,
     params: &HydroErosionParams,
 ) {
-
     let mut rng = u64::from(seed) ^ 0xABCD_EF01;
     let next_f32 = |state: &mut u64| -> f32 {
         *state ^= *state << 13;
@@ -131,17 +139,18 @@ pub(super) fn droplet_erosion_params(
             let nfz = new_z - niz as f32;
             let nidx = nix + w * niz;
             let new_h = heights[nidx] * (1.0 - nfx) * (1.0 - nfz)
-                      + heights[nidx + 1] * nfx * (1.0 - nfz)
-                      + heights[nidx + w] * (1.0 - nfx) * nfz
-                      + heights[nidx + 1 + w] * nfx * nfz;
+                + heights[nidx + 1] * nfx * (1.0 - nfz)
+                + heights[nidx + w] * (1.0 - nfx) * nfz
+                + heights[nidx + 1 + w] * nfx * nfz;
             let old_h = h00 * (1.0 - fx) * (1.0 - fz)
-                      + h10 * fx * (1.0 - fz)
-                      + h01 * (1.0 - fx) * fz
-                      + h11 * fx * fz;
+                + h10 * fx * (1.0 - fz)
+                + h01 * (1.0 - fx) * fz
+                + h11 * fx * fz;
 
             let height_diff = new_h - old_h;
 
-            let capacity = (-height_diff).max(params.min_slope) * speed * water * params.capacity_mult;
+            let capacity =
+                (-height_diff).max(params.min_slope) * speed * water * params.capacity_mult;
 
             if sediment > capacity || height_diff > 0.0 {
                 let deposit = if height_diff > 0.0 {
@@ -150,16 +159,16 @@ pub(super) fn droplet_erosion_params(
                     (sediment - capacity) * params.deposit_speed
                 };
                 sediment -= deposit;
-                heights[idx]         += deposit * (1.0 - fx) * (1.0 - fz);
-                heights[idx + 1]     += deposit * fx * (1.0 - fz);
-                heights[idx + w]     += deposit * (1.0 - fx) * fz;
+                heights[idx] += deposit * (1.0 - fx) * (1.0 - fz);
+                heights[idx + 1] += deposit * fx * (1.0 - fz);
+                heights[idx + w] += deposit * (1.0 - fx) * fz;
                 heights[idx + 1 + w] += deposit * fx * fz;
             } else {
                 let erode = ((capacity - sediment) * params.erode_speed).min(-height_diff);
                 sediment += erode;
-                heights[idx]         -= erode * (1.0 - fx) * (1.0 - fz);
-                heights[idx + 1]     -= erode * fx * (1.0 - fz);
-                heights[idx + w]     -= erode * (1.0 - fx) * fz;
+                heights[idx] -= erode * (1.0 - fx) * (1.0 - fz);
+                heights[idx + 1] -= erode * fx * (1.0 - fz);
+                heights[idx + w] -= erode * (1.0 - fx) * fz;
                 heights[idx + 1 + w] -= erode * fx * fz;
             }
 
@@ -168,7 +177,9 @@ pub(super) fn droplet_erosion_params(
             pos_x = new_x;
             pos_z = new_z;
 
-            if water < 0.01 { break; }
+            if water < 0.01 {
+                break;
+            }
         }
     }
 }
@@ -177,7 +188,8 @@ pub(super) fn droplet_erosion_params(
 /// Creates natural talus/scree at cliff bases (Houdini: heightfield erode thermal).
 pub(super) fn thermal_erosion(
     heights: &mut [f32],
-    w: usize, d: usize,
+    w: usize,
+    d: usize,
     passes: usize,
     talus_angle: f32,
 ) {
@@ -233,7 +245,10 @@ mod tests {
         assert!(p.evaporate >= 0.0 && p.evaporate <= 0.1);
         assert!(p.gravity > 0.0);
         assert!(p.max_steps > 0);
-        assert!(p.min_slope > 0.0, "min_slope == 0 cause flat-area explosion");
+        assert!(
+            p.min_slope > 0.0,
+            "min_slope == 0 cause flat-area explosion"
+        );
     }
 
     #[test]
@@ -244,7 +259,10 @@ mod tests {
         droplet_erosion(&mut h, w, d, 20, 42);
         for v in &h {
             assert!(v.is_finite(), "flat-terrain droplet produced NaN");
-            assert!((*v - 50.0).abs() < 10.0, "flat-terrain droplet drifted too far: {v}");
+            assert!(
+                (*v - 50.0).abs() < 10.0,
+                "flat-terrain droplet drifted too far: {v}"
+            );
         }
     }
 
@@ -255,7 +273,10 @@ mod tests {
         let original: Vec<f32> = (0..(w * d)).map(|i| (i as f32) * 10.0).collect();
         let mut h = original.clone();
         thermal_erosion(&mut h, w, d, 3, 1e6);
-        assert_eq!(h, original, "thermal erosion with huge talus should be no-op");
+        assert_eq!(
+            h, original,
+            "thermal erosion with huge talus should be no-op"
+        );
     }
 
     #[test]
@@ -266,13 +287,24 @@ mod tests {
         h[12] = 100.0;
         let original_center = h[12];
         thermal_erosion(&mut h, w, d, 10, 1.0);
-        assert!(h[12] < original_center, "peak should erode : {} -> {}", original_center, h[12]);
+        assert!(
+            h[12] < original_center,
+            "peak should erode : {} -> {}",
+            original_center,
+            h[12]
+        );
     }
 
     fn extract_padding_ring(h: &[f32], w: usize, d: usize) -> Vec<f32> {
         let mut r = Vec::new();
-        for x in 0..w { r.push(h[x]); r.push(h[x + w * (d - 1)]); }
-        for z in 1..d - 1 { r.push(h[w * z]); r.push(h[w - 1 + w * z]); }
+        for x in 0..w {
+            r.push(h[x]);
+            r.push(h[x + w * (d - 1)]);
+        }
+        for z in 1..d - 1 {
+            r.push(h[w * z]);
+            r.push(h[w - 1 + w * z]);
+        }
         r
     }
 
@@ -296,11 +328,13 @@ mod tests {
     fn droplet_erosion_never_touches_padding_ring() {
         let w = 10;
         let d = 10;
-        let mut h: Vec<f32> = (0..(w * d)).map(|i| {
-            let x = i % w;
-            let z = i / w;
-            (x + z) as f32 * 20.0
-        }).collect();
+        let mut h: Vec<f32> = (0..(w * d))
+            .map(|i| {
+                let x = i % w;
+                let z = i / w;
+                (x + z) as f32 * 20.0
+            })
+            .collect();
         let original_ring = extract_padding_ring(&h, w, d);
         droplet_erosion(&mut h, w, d, 200, 12345);
         let new_ring = extract_padding_ring(&h, w, d);

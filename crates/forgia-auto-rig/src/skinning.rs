@@ -88,7 +88,9 @@ pub fn inject_skinning_for_rigged_meshes(
     for (mesh_root, rigged) in &q_rigged {
         if rigged.bone_count == 0 {
             // Phase 1A a marqué AutoRigged sans bones (AABB dégénérée) — skip.
-            commands.entity(mesh_root).insert(SkinningInjected::default());
+            commands
+                .entity(mesh_root)
+                .insert(SkinningInjected::default());
             continue;
         }
 
@@ -104,7 +106,9 @@ pub fn inject_skinning_for_rigged_meshes(
                 mesh_root
             );
             stats.total_meshes_skinning_failed += 1;
-            commands.entity(mesh_root).insert(SkinningInjected::default());
+            commands
+                .entity(mesh_root)
+                .insert(SkinningInjected::default());
             continue;
         }
 
@@ -124,7 +128,9 @@ pub fn inject_skinning_for_rigged_meshes(
 
         // Si tous les bones sont à (0,0,0), GlobalTransform pas encore propagé.
         // Retry au prochain frame (ne pas poser SkinningInjected).
-        let all_zero = bone_world_positions.iter().all(|p| p.length_squared() < 1e-6);
+        let all_zero = bone_world_positions
+            .iter()
+            .all(|p| p.length_squared() < 1e-6);
         if all_zero {
             // Note : pas de stats incrément ici, c'est un retry attendu.
             continue;
@@ -246,8 +252,12 @@ pub fn inject_skinning_for_rigged_meshes(
             let mut new_mesh = mesh.clone();
 
             // Calcul nearest bones + weights, vectorisé en 2 buffers Uint16x4 / Float32x4.
-            let (joint_indices, joint_weights) =
-                compute_nearest_bone_weights(&positions, &mesh3d_to_root_local, &bone_positions_local, &config);
+            let (joint_indices, joint_weights) = compute_nearest_bone_weights(
+                &positions,
+                &mesh3d_to_root_local,
+                &bone_positions_local,
+                &config,
+            );
 
             // Story-482 P3+ — Diagnostic sensor : compte la distribution des
             // poids par bone pour exposer le bug "vertices arm assignés à
@@ -301,7 +311,10 @@ pub fn inject_skinning_for_rigged_meshes(
 
         info!(
             "[forgia-auto-rig::skinning] mesh_root {:?} : {} mesh(es) skinned, {} verts, {} bones",
-            mesh_root, meshes_processed, total_verts_processed, bones.len()
+            mesh_root,
+            meshes_processed,
+            total_verts_processed,
+            bones.len()
         );
     }
 }
@@ -439,12 +452,16 @@ fn compute_nearest_bone_weights(
             if top.len() < k {
                 top.push((bi, d2));
                 if top.len() == k {
-                    top.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    top.sort_unstable_by(|a, b| {
+                        a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                    });
                 }
             } else if d2 < top[k - 1].1 {
                 top[k - 1] = (bi, d2);
                 // Re-sort la tail (k≤4 → coût constant).
-                top.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                top.sort_unstable_by(|a, b| {
+                    a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
         }
 
@@ -463,8 +480,13 @@ fn compute_nearest_bone_weights(
             [raw[0] / sum, raw[1] / sum, raw[2] / sum, raw[3] / sum]
         } else {
             // Tous les bones sont à distance infinie ou même point → uniform.
-            [1.0 / k as f32, 1.0 / k as f32, 1.0 / k as f32, 1.0 / k as f32]
-                .map(|w| if k >= 1 { w } else { 0.0 })
+            [
+                1.0 / k as f32,
+                1.0 / k as f32,
+                1.0 / k as f32,
+                1.0 / k as f32,
+            ]
+            .map(|w| if k >= 1 { w } else { 0.0 })
         };
 
         let mut idx = [0_u16; 4];
@@ -529,12 +551,8 @@ mod tests {
             Vec3::new(0.0, 0.5, 0.5),
             Vec3::new(0.0, 0.5, -0.5),
         ];
-        let (_, weights) = compute_nearest_bone_weights(
-            &positions,
-            &Mat4::IDENTITY,
-            &bones,
-            &cfg(),
-        );
+        let (_, weights) =
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
         for w in &weights {
             let sum: f32 = w.iter().sum();
             assert!(
@@ -555,12 +573,8 @@ mod tests {
             Vec3::new(10.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, 10.0),
         ];
-        let (indices, weights) = compute_nearest_bone_weights(
-            &positions,
-            &Mat4::IDENTITY,
-            &bones,
-            &cfg(),
-        );
+        let (indices, weights) =
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
         assert_eq!(indices[0][0], 0, "bone 0 doit être le 1er joint");
         assert!(
             weights[0][0] > 0.9,
@@ -580,7 +594,11 @@ mod tests {
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
         assert_eq!(indices[0][0], 0);
         let sum: f32 = weights[0].iter().sum();
-        assert!((sum - 1.0).abs() < 1e-4 || sum.abs() < 1e-4, "got sum={}", sum);
+        assert!(
+            (sum - 1.0).abs() < 1e-4 || sum.abs() < 1e-4,
+            "got sum={}",
+            sum
+        );
     }
 
     #[test]
@@ -593,4 +611,3 @@ mod tests {
         assert_eq!(weights.len(), 100);
     }
 }
-

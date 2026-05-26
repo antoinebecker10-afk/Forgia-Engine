@@ -156,7 +156,9 @@ pub(crate) fn ingest_flash_events(
     tuning: Res<ScreenFlashTuning>,
     q_player: Query<Entity, With<Player>>,
 ) {
-    let Ok(player_entity) = q_player.single() else { return };
+    let Ok(player_entity) = q_player.single() else {
+        return;
+    };
     // BUG-455-06 fix : helper push_capped — drop front si cap atteint (anti-spam).
     let cap = tuning.max_flash_layers.max(1);
     for hit in events.read() {

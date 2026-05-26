@@ -1,0 +1,180 @@
+id = "roguelite_loot"
+name = "Roguelite Loot Tables MVP"
+domain = "Loot"
+category = "Loot"
+description = "Drop tables weighted rarity (Diablo 3 Loot 2.0 + Path of Exile 2-phase + Hearthstone pity timer). RNG seedé (run_seed, stage_id, encounter_idx). Host-authoritative en coop."
+version = "0.1.0"
+
+# === Pity Timer (Hearthstone pattern) ===
+
+[[genes]]
+id = "loot_pity_increment_per_dry"
+label = "Pity counter increment per dry drop (+% rare chance)"
+chromosome = "Pity"
+target = "Value"
+min = 0.0
+max = 0.20
+default = 0.05
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_pity_legendary_threshold"
+label = "Drops without legendary before guaranteed legendary"
+chromosome = "Pity"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 40.0
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_smart_loot_bias"
+label = "Smart loot bias (% chance to roll player-class-aligned)"
+chromosome = "Bias"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.40
+layer = "roguelite_loot"
+
+# === Rarity weights base (phase 1 RNG: rarity selection) ===
+
+[[genes]]
+id = "loot_rarity_common_weight"
+label = "Common rarity base weight"
+chromosome = "Rarity"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 60.0
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_rarity_uncommon_weight"
+label = "Uncommon rarity base weight"
+chromosome = "Rarity"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 28.0
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_rarity_rare_weight"
+label = "Rare rarity base weight"
+chromosome = "Rarity"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 10.0
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_rarity_legendary_weight"
+label = "Legendary rarity base weight"
+chromosome = "Rarity"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 2.0
+layer = "roguelite_loot"
+
+# === Drop rate per kill type ===
+
+[[genes]]
+id = "loot_drop_rate_runt"
+label = "Drop probability on Runt kill"
+chromosome = "DropRate"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.08
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_drop_rate_tireur"
+label = "Drop probability on Tireur kill"
+chromosome = "DropRate"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.18
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_drop_rate_brute"
+label = "Drop probability on Brute kill"
+chromosome = "DropRate"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.45
+layer = "roguelite_loot"
+
+[[genes]]
+id = "loot_drop_rate_boss"
+label = "Drop probability on Boss kill (guaranteed drop = 1.0)"
+chromosome = "DropRate"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "roguelite_loot"
+
+# === Pool definitions ===
+# Format : pool_id → entries (item_id, weight, min_rarity_class)
+# Le code interprète les pools référencés par stage_id.
+
+[[pool]]
+id = "stage_1_basic"
+description = "Stage 1 — armes communes + munitions + santé"
+entries = [
+  { item = "pickup_ammo_small", weight = 35, rarity = "common" },
+  { item = "pickup_health_small", weight = 25, rarity = "common" },
+  { item = "weapon_pepin", weight = 18, rarity = "common" },
+  { item = "weapon_bourrasque", weight = 12, rarity = "uncommon" },
+  { item = "weapon_lenoir", weight = 6, rarity = "rare" },
+  { item = "weapon_boucherie", weight = 2, rarity = "rare" },
+  { item = "status_buff_speed_5pct", weight = 2, rarity = "uncommon" },
+]
+
+[[pool]]
+id = "stage_2_3_mid"
+description = "Stages 2-3 — mix armes + accessoires"
+entries = [
+  { item = "pickup_ammo_small", weight = 20, rarity = "common" },
+  { item = "pickup_ammo_large", weight = 12, rarity = "uncommon" },
+  { item = "pickup_health_medium", weight = 18, rarity = "common" },
+  { item = "weapon_pepin", weight = 10, rarity = "common" },
+  { item = "weapon_bourrasque", weight = 14, rarity = "uncommon" },
+  { item = "weapon_lenoir", weight = 12, rarity = "rare" },
+  { item = "weapon_boucherie", weight = 8, rarity = "rare" },
+  { item = "status_buff_damage_10pct", weight = 4, rarity = "rare" },
+  { item = "accessory_armor_plate", weight = 2, rarity = "legendary" },
+]
+
+[[pool]]
+id = "stage_4_pre_boss"
+description = "Stage 4 — préparation boss, plus rare"
+entries = [
+  { item = "pickup_health_large", weight = 22, rarity = "uncommon" },
+  { item = "pickup_ammo_large", weight = 18, rarity = "uncommon" },
+  { item = "weapon_lenoir", weight = 14, rarity = "rare" },
+  { item = "weapon_boucherie", weight = 12, rarity = "rare" },
+  { item = "status_buff_damage_10pct", weight = 8, rarity = "rare" },
+  { item = "status_buff_lifesteal_5pct", weight = 6, rarity = "rare" },
+  { item = "accessory_armor_plate", weight = 4, rarity = "legendary" },
+  { item = "accessory_extra_mag", weight = 4, rarity = "legendary" },
+]
+
+[[pool]]
+id = "boss_forgeron_drop"
+description = "Boss Forgeron Noir — drop garanti rare ou mieux"
+entries = [
+  { item = "weapon_boucherie", weight = 30, rarity = "rare" },
+  { item = "weapon_lenoir", weight = 30, rarity = "rare" },
+  { item = "status_buff_lifesteal_5pct", weight = 15, rarity = "rare" },
+  { item = "accessory_armor_plate", weight = 12, rarity = "legendary" },
+  { item = "accessory_extra_mag", weight = 10, rarity = "legendary" },
+  { item = "currency_soul_large", weight = 3, rarity = "legendary" },
+]

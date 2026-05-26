@@ -13,16 +13,17 @@
 //! W2 : streaming N chunks autour joueur. W3 : Voronoi 10 biomes. W4 : preset_island.
 
 use bevy::prelude::*;
+use forgia_audio_biome::prelude::AudioSampleOffset;
 use forgia_core::prelude::*;
 use forgia_dialogue::{
     DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueTree,
     NodeId, StartDialogue,
 };
-use forgia_input::PlayerAction;
-use forgia_player::prelude::Player;
-use forgia_audio_biome::prelude::AudioSampleOffset;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{FoliageExclusionDisc, RpgSampleOffset, VegetationTree};
+use forgia_genome_village::VillageGenome;
+use forgia_input::PlayerAction;
+use forgia_player::prelude::Player;
 use forgia_streaming::{
     EvictionEvent, EvictionReason, StreamingConfig, StreamingPause, StreamingStats,
 };
@@ -31,7 +32,6 @@ use forgia_terrain::{
     FlattenZones, Lod2TileManager, LodSampleOffset, LodStats, MapGenConfig, PathNetwork, RoadTier,
     TerrainConfig, TerrainSharedMaterial, VillageFlattenZone, CHUNK_X, CHUNK_Z,
 };
-use forgia_genome_village::VillageGenome;
 use forgia_village_loader::{
     cleanup_village, LoadVillageGenomeRequest, LoadVillageRequest, VillageLoadResult,
 };
@@ -97,9 +97,11 @@ impl Plugin for ForgiaRpgPlugin {
         // déformer le mesh visuel. ProcBodyAnim/locomotion restent disable.
         // Validation visuelle bones d'abord, anim Phase 2+ après.
         app.add_plugins(forgia_auto_rig::ForgiaAutoRigPlugin);
-        // Source de vérité sea_level cross-crate (water rendu, swim gate
-        // futur). forgia-water lit ce Resource au build → plus de duplication.
-        app.insert_resource(SeaLevel(RPG_SEA_LEVEL));
+        // TODO(story-450 wave 2) : ré-activer SeaLevel Resource cross-crate
+        // (water rendu, swim gate). Bloqué : `pub struct SeaLevel(pub f32)`
+        // pas encore défini dans forgia-water. Pour l'instant forgia-water
+        // utilise const SEA_LEVEL=4.0 privée (cf forgia-water/src/lib.rs:19).
+        // app.insert_resource(SeaLevel(RPG_SEA_LEVEL));
         app.init_resource::<character::TestCharacterMode>();
         // Story-450 wave 2 : residence tracking pour hystérèse unload UE5-style.
         app.init_resource::<ChunkResidence>();
@@ -218,7 +220,7 @@ fn make_map_gen_config() -> MapGenConfig {
         island_mode: false, // pas d'île pour le vertical slice 1 chunk
         biome_mode: forgia_terrain::BiomeMode::Voronoi,
         biome_cell_size: 96.0, // cellules + petites → biomes visibles au W1 (32m chunk)
-        features: vec![], // preset features non-adaptées RPG max=28 → bandes d'eau parasites
+        features: vec![],      // preset features non-adaptées RPG max=28 → bandes d'eau parasites
         ..MapGenConfig::default()
     }
 }
@@ -307,15 +309,23 @@ fn spawn_world(
                 target_y, genome.terrain_leveling.radius_m, genome.terrain_leveling.falloff_m
             );
         }
-        Ok(_) => info!("[forgia-rpg] terrain_leveling disabled (genome.terrain_leveling.enabled=false)"),
-        Err(e) => warn!(
-            "[forgia-rpg] terrain_leveling : genome load failed ({e}) — terrain restera brut"
-        ),
+        Ok(_) => {
+            info!("[forgia-rpg] terrain_leveling disabled (genome.terrain_leveling.enabled=false)")
+        }
+        Err(e) => {
+            warn!("[forgia-rpg] terrain_leveling : genome load failed ({e}) — terrain restera brut")
+        }
     }
 
     // ── 1 chunk static à l'origine (W1 vertical slice) ───────────────────
     let coord = ChunkCoord::new(0, 0);
-    let mesh_data = build_chunk_mesh(coord, sample_offset(), &terrain_cfg, &biome_map, Some(&flatten_zones));
+    let mesh_data = build_chunk_mesh(
+        coord,
+        sample_offset(),
+        &terrain_cfg,
+        &biome_map,
+        Some(&flatten_zones),
+    );
     let mesh_handle = meshes.add(mesh_data.mesh.clone());
     let chunk_entity = spawn_chunk_entity(
         &mut commands,
@@ -445,8 +455,13 @@ fn stream_chunks_around_player(
     mut pending: Local<VecDeque<ChunkCoord>>,
 ) {
     let (Some(terrain_cfg), Some(biome_map), Some(shared_mat)) =
-        (terrain_cfg, biome_map, shared_mat) else { return };
-    let Ok(player_tf) = player_q.single() else { return };
+        (terrain_cfg, biome_map, shared_mat)
+    else {
+        return;
+    };
+    let Ok(player_tf) = player_q.single() else {
+        return;
+    };
 
     // Resolve runtime radii + chunks_per_frame depuis StreamingConfig (genome)
     // ou fallback hardcoded si config pas encore chargée.
@@ -511,7 +526,8 @@ fn stream_chunks_around_player(
             let resident_since = residence.loaded_at_secs.get(&coord).copied().unwrap_or(now);
             let residence_secs = now - resident_since;
             if residence_secs < min_residence_secs {
-                stats.hysteresis_blocked_unloads = stats.hysteresis_blocked_unloads.saturating_add(1);
+                stats.hysteresis_blocked_unloads =
+                    stats.hysteresis_blocked_unloads.saturating_add(1);
                 continue;
             }
             // Eviction autorisée.
@@ -572,11 +588,21 @@ fn stream_chunks_around_player(
     let off = sample_offset();
     let mut gen_count_this_frame = 0u32;
     for _ in 0..chunks_per_frame {
-        let Some(coord) = pending.pop_front() else { break };
-        if chunk_mgr.loaded_entities.contains_key(&coord) { continue; }
+        let Some(coord) = pending.pop_front() else {
+            break;
+        };
+        if chunk_mgr.loaded_entities.contains_key(&coord) {
+            continue;
+        }
 
         let t0 = std::time::Instant::now();
-        let mesh_data = build_chunk_mesh(coord, off, &terrain_cfg, &biome_map, flatten_zones.as_deref());
+        let mesh_data = build_chunk_mesh(
+            coord,
+            off,
+            &terrain_cfg,
+            &biome_map,
+            flatten_zones.as_deref(),
+        );
         let gen_ms = t0.elapsed().as_secs_f32() * 1000.0;
         stats.record_gen_ms(gen_ms);
         gen_count_this_frame += 1;
@@ -707,7 +733,9 @@ fn draw_streaming_debug_overlay(
     }
     let Some(cfg) = streaming_cfg else { return };
     let Some(chunk_mgr) = chunk_mgr else { return };
-    let Ok(player_tf) = player_q.single() else { return };
+    let Ok(player_tf) = player_q.single() else {
+        return;
+    };
     let player_pos = player_tf.translation;
     let chunk_m = CHUNK_X as f32;
     let half = chunk_m * 0.5;
@@ -741,7 +769,10 @@ fn draw_streaming_debug_overlay(
     for (coord, entity) in &chunk_mgr.loaded_entities {
         let origin = coord.world_origin();
         let cube_center = Vec3::new(origin.x + half, y_overlay, origin.z + half);
-        let lod = q_chunk_lod.get(*entity).copied().unwrap_or(forgia_terrain::ChunkLod::Lod0);
+        let lod = q_chunk_lod
+            .get(*entity)
+            .copied()
+            .unwrap_or(forgia_terrain::ChunkLod::Lod0);
         let color = match lod {
             forgia_terrain::ChunkLod::Lod0 => Color::srgb(0.0, 1.0, 0.0), // green
             forgia_terrain::ChunkLod::Lod1 => Color::srgb(1.0, 1.0, 0.0), // yellow
@@ -784,10 +815,7 @@ fn draw_streaming_debug_overlay(
             if dist_sq > view_r_sq {
                 continue;
             }
-            let coord = forgia_terrain::ChunkCoord::new(
-                player_chunk.x + dx,
-                player_chunk.z + dz,
-            );
+            let coord = forgia_terrain::ChunkCoord::new(player_chunk.x + dx, player_chunk.z + dz);
             if chunk_mgr.loaded_entities.contains_key(&coord) {
                 continue; // OK loaded
             }
@@ -845,7 +873,9 @@ fn enforce_chunk_memory_budget(
     player_q: Query<&Transform, With<Player>>,
 ) {
     let Some(cfg) = streaming_cfg else { return };
-    let Ok(player_tf) = player_q.single() else { return };
+    let Ok(player_tf) = player_q.single() else {
+        return;
+    };
     let player_chunk = ChunkCoord::from_world(player_tf.translation);
     let now = time.elapsed_secs();
     let min_residence = cfg.hysteresis.min_residence_secs;
@@ -938,11 +968,15 @@ fn write_chunks_sensor(
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
-    if now - *last_write < SENSOR_INTERVAL_S { return; }
+    if now - *last_write < SENSOR_INTERVAL_S {
+        return;
+    }
     *last_write = now;
 
-    let (Some(chunk_mgr), Some(biome_map), Some(terrain_cfg)) =
-        (chunk_mgr, biome_map, terrain_cfg) else { return };
+    let (Some(chunk_mgr), Some(biome_map), Some(terrain_cfg)) = (chunk_mgr, biome_map, terrain_cfg)
+    else {
+        return;
+    };
 
     // Distribution biomes : compte 1 sample / chunk au centre.
     let off = sample_offset();
@@ -990,7 +1024,9 @@ fn teleport_player_to_terrain(
     pause: Option<Res<StreamingPause>>,
     mut q: Query<&mut Transform, With<Player>>,
 ) {
-    if pending.is_none() { return; }
+    if pending.is_none() {
+        return;
+    }
     let Some(village) = village else { return };
     // Wave 4a — block teleport tant que le sim ring n'est pas loaded.
     // Pattern Roblox StreamingPauseMode : "min-radius is a correctness contract".
@@ -1030,11 +1066,15 @@ fn spawn_village_paths_when_loaded(
     asset_server: Res<AssetServer>,
     q_existing_trees: Query<(Entity, &Transform), With<VegetationTree>>,
 ) {
-    if built.is_some() { return; }
+    if built.is_some() {
+        return;
+    }
     let Some(village) = village else { return };
     // BUG-441-04 fix : lire Res<TerrainConfig> au lieu de reconstruire via
     // `make_terrain_config()` — évite la dérive si les constantes changent.
-    let Some(terrain_cfg) = terrain_cfg else { return };
+    let Some(terrain_cfg) = terrain_cfg else {
+        return;
+    };
     let mut polylines = Vec::with_capacity(village.roads.len());
     for seg in &village.roads {
         let tier = RoadTier::from_tier_name(&seg.tier);
@@ -1102,7 +1142,11 @@ fn spawn_village_paths_when_loaded(
 /// Register sample DialogueTrees so the E-interact loop has content to show.
 /// Each NPC's tree_id follows the convention "npc_<lowercase_name_with_underscores>".
 fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
-    fn node(speaker: &str, line: &str, choices: Vec<(&str, Option<&str>, Vec<DialogueEffect>)>) -> DialogueNode {
+    fn node(
+        speaker: &str,
+        line: &str,
+        choices: Vec<(&str, Option<&str>, Vec<DialogueEffect>)>,
+    ) -> DialogueNode {
         DialogueNode {
             speaker: speaker.to_string(),
             line: line.to_string(),
@@ -1123,30 +1167,50 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
         root: NodeId("greet".into()),
         nodes: HashMap::new(),
     };
-    aldric.nodes.insert(NodeId("greet".into()), node(
-        "Forgeron Aldric",
-        "Bienvenue voyageur. Mes mines sont infestées de gobelins, j'ai besoin d'aide.",
-        vec![
-            ("J'accepte la quête.", Some("accept"), vec![DialogueEffect::StartQuest { id: "kill_goblins".into() }]),
-            ("Pas maintenant.", Some("refuse"), vec![]),
-            ("Au revoir.", None, vec![DialogueEffect::EndConversation]),
-        ],
-    ));
-    aldric.nodes.insert(NodeId("accept".into()), node(
-        "Forgeron Aldric",
-        "Excellent. Tuez 5 gobelins et revenez me voir. Voici une dague pour commencer.",
-        vec![
-            ("Merci.", None, vec![
-                DialogueEffect::GiveItem { id: "iron_dagger".into(), count: 1 },
-                DialogueEffect::EndConversation,
-            ]),
-        ],
-    ));
-    aldric.nodes.insert(NodeId("refuse".into()), node(
-        "Forgeron Aldric",
-        "Comme vous voudrez. Mais les mines ne se nettoieront pas toutes seules...",
-        vec![("Au revoir.", None, vec![DialogueEffect::EndConversation])],
-    ));
+    aldric.nodes.insert(
+        NodeId("greet".into()),
+        node(
+            "Forgeron Aldric",
+            "Bienvenue voyageur. Mes mines sont infestées de gobelins, j'ai besoin d'aide.",
+            vec![
+                (
+                    "J'accepte la quête.",
+                    Some("accept"),
+                    vec![DialogueEffect::StartQuest {
+                        id: "kill_goblins".into(),
+                    }],
+                ),
+                ("Pas maintenant.", Some("refuse"), vec![]),
+                ("Au revoir.", None, vec![DialogueEffect::EndConversation]),
+            ],
+        ),
+    );
+    aldric.nodes.insert(
+        NodeId("accept".into()),
+        node(
+            "Forgeron Aldric",
+            "Excellent. Tuez 5 gobelins et revenez me voir. Voici une dague pour commencer.",
+            vec![(
+                "Merci.",
+                None,
+                vec![
+                    DialogueEffect::GiveItem {
+                        id: "iron_dagger".into(),
+                        count: 1,
+                    },
+                    DialogueEffect::EndConversation,
+                ],
+            )],
+        ),
+    );
+    aldric.nodes.insert(
+        NodeId("refuse".into()),
+        node(
+            "Forgeron Aldric",
+            "Comme vous voudrez. Mais les mines ne se nettoieront pas toutes seules...",
+            vec![("Au revoir.", None, vec![DialogueEffect::EndConversation])],
+        ),
+    );
     registry.trees.insert(aldric.id.clone(), aldric);
 
     // ── Marchande Lyra : commerce ─────────────────────────────────────────
@@ -1155,33 +1219,47 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
         root: NodeId("greet".into()),
         nodes: HashMap::new(),
     };
-    lyra.nodes.insert(NodeId("greet".into()), node(
-        "Marchande Lyra",
-        "Mes étals sont ouverts ! Que cherchez-vous ?",
-        vec![
-            ("Vos potions.", Some("potions"), vec![]),
-            ("Vos armes.", Some("weapons"), vec![]),
-            ("Rien, merci.", None, vec![DialogueEffect::EndConversation]),
-        ],
-    ));
-    lyra.nodes.insert(NodeId("potions".into()), node(
-        "Marchande Lyra",
-        "Une fiole de soin pour 10 pièces ?",
-        vec![
-            ("J'achète.", None, vec![
-                DialogueEffect::GiveItem { id: "potion_heal".into(), count: 1 },
-                DialogueEffect::EndConversation,
-            ]),
-            ("Retour", Some("greet"), vec![]),
-        ],
-    ));
-    lyra.nodes.insert(NodeId("weapons".into()), node(
-        "Marchande Lyra",
-        "Je n'ai qu'un poignard rouillé pour le moment.",
-        vec![
-            ("Tant pis.", Some("greet"), vec![]),
-        ],
-    ));
+    lyra.nodes.insert(
+        NodeId("greet".into()),
+        node(
+            "Marchande Lyra",
+            "Mes étals sont ouverts ! Que cherchez-vous ?",
+            vec![
+                ("Vos potions.", Some("potions"), vec![]),
+                ("Vos armes.", Some("weapons"), vec![]),
+                ("Rien, merci.", None, vec![DialogueEffect::EndConversation]),
+            ],
+        ),
+    );
+    lyra.nodes.insert(
+        NodeId("potions".into()),
+        node(
+            "Marchande Lyra",
+            "Une fiole de soin pour 10 pièces ?",
+            vec![
+                (
+                    "J'achète.",
+                    None,
+                    vec![
+                        DialogueEffect::GiveItem {
+                            id: "potion_heal".into(),
+                            count: 1,
+                        },
+                        DialogueEffect::EndConversation,
+                    ],
+                ),
+                ("Retour", Some("greet"), vec![]),
+            ],
+        ),
+    );
+    lyra.nodes.insert(
+        NodeId("weapons".into()),
+        node(
+            "Marchande Lyra",
+            "Je n'ai qu'un poignard rouillé pour le moment.",
+            vec![("Tant pis.", Some("greet"), vec![])],
+        ),
+    );
     registry.trees.insert(lyra.id.clone(), lyra);
 
     info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
@@ -1228,7 +1306,9 @@ fn build_path_ribbon_mesh(
     let mut base_vertex: u32 = 0;
     for polyline in &path_net.polylines {
         let n = polyline.samples.len();
-        if n < 2 { continue; }
+        if n < 2 {
+            continue;
+        }
 
         let mut v_dist = 0.0_f32;
         let mut prev_center: Option<Vec2> = None;
@@ -1246,8 +1326,7 @@ fn build_path_ribbon_mesh(
 
             // Épaisseur slab variable par sample — hash déterministe.
             // 4-12cm donne une silhouette irrégulière "pavés posés", pas planche plate.
-            let thickness_h =
-                (i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32;
+            let thickness_h = (i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32;
             let thickness = THICKNESS_MIN_M + thickness_h * THICKNESS_RANGE_M;
 
             // Y per vertex — profil bombé Roman road sur slab épais :
@@ -1352,25 +1431,28 @@ fn build_path_ribbon_mesh(
                 // Convention code : outer_L = pos - perp, mais perp pointe -X
                 // pour tangent +Z → outer_L est en réalité côté +X. Normale wall
                 // doit pointer +X (extérieur du path côté outer_L). Winding fix.
-                let lw_a0 = base0;       // outer_L_top i-1
-                let lw_b0 = base0 + 5;   // outer_L_bot i-1
-                let lw_a1 = base1;       // outer_L_top i
-                let lw_b1 = base1 + 5;   // outer_L_bot i
+                let lw_a0 = base0; // outer_L_top i-1
+                let lw_b0 = base0 + 5; // outer_L_bot i-1
+                let lw_a1 = base1; // outer_L_top i
+                let lw_b1 = base1 + 5; // outer_L_bot i
                 indices.extend_from_slice(&[lw_a0, lw_a1, lw_b0, lw_a1, lw_b1, lw_b0]);
                 // Wall droite : outer_R_top (idx 4) ↓ outer_R_bot (idx 6).
                 // outer_R = pos + perp → côté -X. Normale wall doit pointer -X.
                 // Winding inverse de wall gauche.
-                let rw_a0 = base0 + 4;   // outer_R_top i-1
-                let rw_b0 = base0 + 6;   // outer_R_bot i-1
-                let rw_a1 = base1 + 4;   // outer_R_top i
-                let rw_b1 = base1 + 6;   // outer_R_bot i
+                let rw_a0 = base0 + 4; // outer_R_top i-1
+                let rw_b0 = base0 + 6; // outer_R_bot i-1
+                let rw_a1 = base1 + 4; // outer_R_top i
+                let rw_b1 = base1 + 6; // outer_R_bot i
                 indices.extend_from_slice(&[rw_a0, rw_b0, rw_a1, rw_b0, rw_b1, rw_a1]);
             }
         }
         base_vertex += (n * verts_per_sample) as u32;
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
@@ -1389,7 +1471,9 @@ fn spawn_path_ribbons(
     terrain_cfg: &TerrainConfig,
     flatten_zones: Option<&FlattenZones>,
 ) {
-    if path_net.polylines.is_empty() { return; }
+    if path_net.polylines.is_empty() {
+        return;
+    }
 
     let mesh = build_path_ribbon_mesh(path_net, terrain_cfg, flatten_zones);
     let mesh_handle = meshes.add(mesh);
@@ -1401,8 +1485,10 @@ fn spawn_path_ribbons(
     // Sampler en Repeat (cf. terrain_material::repeat_sampler) car les UV
     // ribbon utilisent `v = v_dist * 0.5` cumulatif → sans Repeat le sampler
     // clamp à v=1.0 et étire un seul texel sur toute la longueur du path.
-    let diff: Handle<Image> = asset_server
-        .load_with_settings("textures-v1/terrain/path/diff.jpg", forgia_terrain::repeat_sampler());
+    let diff: Handle<Image> = asset_server.load_with_settings(
+        "textures-v1/terrain/path/diff.jpg",
+        forgia_terrain::repeat_sampler(),
+    );
     let normal: Handle<Image> = asset_server.load_with_settings(
         "textures-v1/terrain/path/normal.jpg",
         forgia_terrain::repeat_sampler(),
@@ -1436,7 +1522,8 @@ fn spawn_path_ribbons(
     let total: usize = path_net.polylines.iter().map(|p| p.samples.len()).sum();
     info!(
         "[forgia-rpg] Path ribbon spawned : {} polylines, {} samples total",
-        path_net.polylines.len(), total
+        path_net.polylines.len(),
+        total
     );
 }
 
@@ -1465,8 +1552,8 @@ fn spawn_cave_entrance(
     let forward = to_center;
     let right = Vec3::new(-forward.z, 0.0, forward.x);
 
-    let arched: Handle<Scene> =
-        asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/wall_arched.glb"));
+    let arched: Handle<Scene> = asset_server
+        .load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/wall_arched.glb"));
     let pillar: Handle<Scene> =
         asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/kaykit/dungeon/pillar.glb"));
     let stairs: Handle<Scene> =
@@ -1626,9 +1713,12 @@ fn spawn_rpg_cartoon_clouds(
         let parent_id = commands
             .spawn((
                 RpgWorldMarker,
-                RpgCloudOrbit { angle, radius, height: cy },
-                Transform::from_xyz(cx, cy, cz)
-                    .with_scale(Vec3::new(scale, hscale * scale, scale)),
+                RpgCloudOrbit {
+                    angle,
+                    radius,
+                    height: cy,
+                },
+                Transform::from_xyz(cx, cy, cz).with_scale(Vec3::new(scale, hscale * scale, scale)),
                 Visibility::default(),
                 Name::new(format!("RpgCloud_{preset_name}_{ci}")),
             ))
@@ -1650,10 +1740,7 @@ fn spawn_rpg_cartoon_clouds(
     info!("[forgia-rpg] Cartoon sky : 18 cloud clusters spawned");
 }
 
-fn rpg_cloud_drift_system(
-    time: Res<Time>,
-    mut q: Query<(&mut Transform, &mut RpgCloudOrbit)>,
-) {
+fn rpg_cloud_drift_system(time: Res<Time>, mut q: Query<(&mut Transform, &mut RpgCloudOrbit)>) {
     let dt = time.delta_secs();
     for (mut tf, mut orbit) in &mut q {
         orbit.angle += dt * RPG_CLOUD_ORBIT_SPEED;
@@ -1670,9 +1757,13 @@ fn cleanup_world(
     mut lod2_mgr: ResMut<Lod2TileManager>,
 ) {
     let count = q.iter().count();
-    for e in &q { commands.entity(e).despawn(); }
+    for e in &q {
+        commands.entity(e).despawn();
+    }
     let tree_count = trees.iter().count();
-    for e in &trees { commands.entity(e).despawn(); }
+    for e in &trees {
+        commands.entity(e).despawn();
+    }
     // LOD2 mega-tiles : despawn explicite (entités non taggées RpgWorldMarker).
     lod2_mgr.despawn_all(&mut commands);
     // Resources terrain — TerrainSharedMaterial conservé (réutilisable session suivante).
@@ -1704,7 +1795,9 @@ fn interact_system(
     interactables: Query<(Entity, &Transform, &InteractablePoint, Option<&Npc>)>,
     mut start_dialogue: MessageWriter<StartDialogue>,
 ) {
-    let Ok((player_e, player_tf, action)) = players.single() else { return };
+    let Ok((player_e, player_tf, action)) = players.single() else {
+        return;
+    };
     if !action.just_pressed(&PlayerAction::Interact) {
         return;
     }
@@ -1846,8 +1939,13 @@ mod tests {
             for z in (0..32).step_by(4) {
                 let h = terrain_height_local(x as f32, z as f32, &cfg);
                 assert!(h.is_finite(), "h={} not finite at ({},{})", h, x, z);
-                assert!(h >= 0.0 && h <= RPG_MAX_HEIGHT * 1.1,
-                    "h={} out of expected bounds at ({},{})", h, x, z);
+                assert!(
+                    h >= 0.0 && h <= RPG_MAX_HEIGHT * 1.1,
+                    "h={} out of expected bounds at ({},{})",
+                    h,
+                    x,
+                    z
+                );
             }
         }
     }

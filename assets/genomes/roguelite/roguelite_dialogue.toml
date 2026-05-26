@@ -1,0 +1,253 @@
+id = "roguelite_dialogue"
+name = "Roguelite Talking Weapons Dialogue"
+domain = "Audio"
+category = "Audio"
+description = "Système barks contextuels pour les 4 armes parlantes MVP. Pattern Hadès (Kasavin GDC 2021) : event triggers + LinePool weighted + BarkSelector cooldown + priority override. Mantra : 'What would these characters notice?'"
+version = "0.1.0"
+
+# === Global bark tuning ===
+
+[[genes]]
+id = "bark_global_speaker_lock_sec"
+label = "Time another weapon must wait after one barks (anti-overlap)"
+chromosome = "Cooldown"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 2.5
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_global_max_per_minute"
+label = "Max barks per minute (anti-fatigue)"
+chromosome = "Cooldown"
+target = "Value"
+min = 1.0
+max = 60.0
+default = 12.0
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_priority_death_override"
+label = "Priority threshold above which cooldown is ignored"
+chromosome = "Priority"
+target = "Value"
+min = 50.0
+max = 255.0
+default = 150.0
+layer = "roguelite_dialogue"
+
+# === Event trigger probabilities (chance to fire a bark on event) ===
+
+[[genes]]
+id = "bark_chance_on_kill"
+label = "P(bark) on enemy kill"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.30
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_lowhp"
+label = "P(bark) when player HP crosses lowhp threshold"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.70
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_lowhp_threshold_pct"
+label = "Low HP threshold for bark trigger"
+chromosome = "Trigger"
+target = "Value"
+min = 0.05
+max = 0.60
+default = 0.25
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_reload"
+label = "P(bark) on reload (limit to empty mag only)"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.15
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_idle_after_sec"
+label = "Idle bark fires after this many sec without combat"
+chromosome = "Trigger"
+target = "Value"
+min = 10.0
+max = 120.0
+# 2026-05-20 — relevé 30 → 45 (RoR2 ~45, LoL ~50). Idle à 30s donne sensation
+# "blabla constant" en gameplay calme. Source : audit standards AAA + leçon
+# Borderlands 3 anti-fatigue (>30/min muté par les joueurs).
+default = 45.0
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_pickup"
+label = "P(bark) on item pickup"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+# 2026-05-20 — relevé 0.25 → 0.35 (RoR2 item callout >0.40, OW pickup chatter
+# ~0.40). Pickup = event excitant, peut tolérer plus de chance sans fatigue.
+default = 0.35
+layer = "roguelite_dialogue"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ LINE POOLS — pattern Hadès                                   ║
+# ║ Format: speaker.event = [{ text, weight, priority, cooldown_sec }]
+# ║ priority 0-255 ; >bark_priority_death_override = override CD ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# --- PÉPIN (timide, hésitant, voix douce) ---
+
+[[pool]]
+speaker = "pepin"
+event = "kill"
+lines = [
+  { id = "pepin_kill_01", text = "Oh... pardon...", weight = 30, priority = 30, cooldown_sec = 12.0 },
+  { id = "pepin_kill_02", text = "Je crois que je l'ai eu ?", weight = 25, priority = 30, cooldown_sec = 12.0 },
+  { id = "pepin_kill_03", text = "Ce n'était pas mon intention...", weight = 20, priority = 30, cooldown_sec = 15.0 },
+  { id = "pepin_kill_04", text = "Désolé !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "lowhp"
+lines = [
+  { id = "pepin_lowhp_01", text = "Aïe... ça pique...", weight = 50, priority = 80, cooldown_sec = 20.0 },
+  { id = "pepin_lowhp_02", text = "Tu... tu fais attention ?", weight = 50, priority = 80, cooldown_sec = 20.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "idle"
+lines = [
+  { id = "pepin_idle_01", text = "Tu... tu veux que je dorme ?", weight = 40, priority = 10, cooldown_sec = 60.0 },
+  { id = "pepin_idle_02", text = "On bouge ?", weight = 60, priority = 10, cooldown_sec = 45.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "reload"
+lines = [
+  { id = "pepin_reload_01", text = "Une seconde, j'arrive pas à...", weight = 100, priority = 20, cooldown_sec = 30.0 },
+]
+
+# --- BOURRASQUE (extravertie, énergique, voix pétillante) ---
+
+[[pool]]
+speaker = "bourrasque"
+event = "kill"
+lines = [
+  { id = "bourr_kill_01", text = "WHOOSH ! Voilà ce que j'appelle un kill !", weight = 30, priority = 30, cooldown_sec = 10.0 },
+  { id = "bourr_kill_02", text = "Au suivant, au suivant !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+  { id = "bourr_kill_03", text = "Souffle moi tout ça !", weight = 20, priority = 30, cooldown_sec = 12.0 },
+  { id = "bourr_kill_04", text = "Yes ! Encore !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "lowhp"
+lines = [
+  { id = "bourr_lowhp_01", text = "Eh oh ! On respire pas pour rien là !", weight = 50, priority = 80, cooldown_sec = 18.0 },
+  { id = "bourr_lowhp_02", text = "Bouge bouge bouge !", weight = 50, priority = 80, cooldown_sec = 15.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "idle"
+lines = [
+  { id = "bourr_idle_01", text = "Allez ! Du nerf ! On a pas que ça à faire !", weight = 50, priority = 10, cooldown_sec = 40.0 },
+  { id = "bourr_idle_02", text = "Y'a personne ? Vraiment ? Personne ?", weight = 50, priority = 10, cooldown_sec = 50.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "pickup"
+lines = [
+  { id = "bourr_pickup_01", text = "Ooooh, joli !", weight = 100, priority = 25, cooldown_sec = 20.0 },
+]
+
+# --- MADAME LENOIR (snob aristocratique, voix posée acerbe) ---
+
+[[pool]]
+speaker = "lenoir"
+event = "kill"
+lines = [
+  { id = "lenoir_kill_01", text = "Plébéien.", weight = 25, priority = 30, cooldown_sec = 15.0 },
+  { id = "lenoir_kill_02", text = "Quelle médiocrité.", weight = 25, priority = 30, cooldown_sec = 15.0 },
+  { id = "lenoir_kill_03", text = "Élégant. Comme moi.", weight = 30, priority = 30, cooldown_sec = 12.0 },
+  { id = "lenoir_kill_04", text = "Encore un. Soupir.", weight = 20, priority = 30, cooldown_sec = 18.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "lowhp"
+lines = [
+  { id = "lenoir_lowhp_01", text = "C'est inadmissible. Je suis salie.", weight = 50, priority = 80, cooldown_sec = 20.0 },
+  { id = "lenoir_lowhp_02", text = "Mes manchettes ! Quel scandale.", weight = 50, priority = 80, cooldown_sec = 25.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "idle"
+lines = [
+  { id = "lenoir_idle_01", text = "Je n'ai pas que ça à faire, mon cher.", weight = 60, priority = 10, cooldown_sec = 50.0 },
+  { id = "lenoir_idle_02", text = "L'attente est un crime du peuple.", weight = 40, priority = 10, cooldown_sec = 60.0 },
+]
+
+# --- BOUCHERIE (butcher brutal, voix grasse joyeuse) ---
+
+[[pool]]
+speaker = "boucherie"
+event = "kill"
+lines = [
+  { id = "bouch_kill_01", text = "AAAH ! Le bon morceau !", weight = 30, priority = 30, cooldown_sec = 10.0 },
+  { id = "bouch_kill_02", text = "Coupe ! Coupe ! Coupe !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+  { id = "bouch_kill_03", text = "Trois pièces pour le prix d'une !", weight = 20, priority = 30, cooldown_sec = 12.0 },
+  { id = "bouch_kill_04", text = "À la prochaine, monsieur !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "lowhp"
+lines = [
+  { id = "bouch_lowhp_01", text = "Eh ! Je suis pas ton steak !", weight = 50, priority = 80, cooldown_sec = 18.0 },
+  { id = "bouch_lowhp_02", text = "Tu te trompes de viande !", weight = 50, priority = 80, cooldown_sec = 18.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "idle"
+lines = [
+  { id = "bouch_idle_01", text = "Y'a pas de clients ? J'en ai marre !", weight = 50, priority = 10, cooldown_sec = 45.0 },
+  { id = "bouch_idle_02", text = "Trouve-moi un truc à découper, allez !", weight = 50, priority = 10, cooldown_sec = 50.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "reload"
+lines = [
+  { id = "bouch_reload_01", text = "Une seconde, je rappelle l'apprenti !", weight = 100, priority = 20, cooldown_sec = 25.0 },
+]
+
+# --- TOUS — événements partagés (Death = priority max, override CD) ---
+
+[[pool]]
+speaker = "any"
+event = "death"
+lines = [
+  { id = "any_death_01", text = "...", weight = 100, priority = 200, cooldown_sec = 0.0 },
+]

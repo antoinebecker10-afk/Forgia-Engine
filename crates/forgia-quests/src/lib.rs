@@ -131,13 +131,21 @@ fn advance_quests(
     mut logs: Query<(Entity, &mut QuestLog)>,
 ) {
     let events: Vec<_> = progress.read().cloned().collect();
-    if events.is_empty() { return; }
+    if events.is_empty() {
+        return;
+    }
     for (player, mut log) in &mut logs {
         let active_ids: Vec<QuestId> = log.active_ids().cloned().collect();
         for qid in active_ids {
-            let Some(def) = catalogue.get(&qid) else { continue };
-            let Some(state) = log.entries.get_mut(&qid) else { continue };
-            if state.status != QuestStatus::Active { continue; }
+            let Some(def) = catalogue.get(&qid) else {
+                continue;
+            };
+            let Some(state) = log.entries.get_mut(&qid) else {
+                continue;
+            };
+            if state.status != QuestStatus::Active {
+                continue;
+            }
             for ev in &events {
                 for (i, obj) in def.objectives.iter().enumerate() {
                     if obj.tag == ev.tag {

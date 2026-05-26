@@ -1,4 +1,4 @@
-﻿//! lifecycle_sensor.rs — Producteur `forgia2_lifecycle.json` (1Hz, cross-mode).
+//! lifecycle_sensor.rs — Producteur `forgia2_lifecycle.json` (1Hz, cross-mode).
 //!
 //! Compte les Add/Remove/Insert sur 3 markers clés via Observer hooks Bevy 0.18 :
 //! - `Player` (forgia-player) : Add + Remove

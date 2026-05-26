@@ -4432,3 +4432,23 @@ biome_compat = "Any"
 is_dead = false
 missing = false
 disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_old.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_old_tall.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false

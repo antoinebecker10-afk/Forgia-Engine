@@ -1,4 +1,4 @@
-﻿//! watchdog_sensor.rs — Producteur `forgia2_watchdog.json` (1Hz, cross-mode).
+//! watchdog_sensor.rs — Producteur `forgia2_watchdog.json` (1Hz, cross-mode).
 //!
 //! Tick counter en `First` schedule (avant tous GameSets) + lag detection.
 //! Lag frame = `delta_secs > 50ms` (proxy stutter 20fps).

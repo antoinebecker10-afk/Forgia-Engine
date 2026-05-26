@@ -1,4 +1,4 @@
-﻿//! sensor_health_sensor.rs — Producteur `forgia2_sensor_health.json` (1Hz, meta).
+//! sensor_health_sensor.rs — Producteur `forgia2_sensor_health.json` (1Hz, meta).
 //!
 //! Lit les timestamps des 12 forgia2_*.json canoniques (Sessions A+B+C) et
 //! expose un résumé CHK-5 canonisé : count present/missing/stale.
@@ -57,10 +57,7 @@ pub fn sys_write_sensor_health(time: Res<Time>, mut accum: Local<f32>) {
     for path in EXPECTED_SENSORS {
         match std::fs::metadata(path).and_then(|m| m.modified()) {
             Ok(mtime) => {
-                let age = now
-                    .duration_since(mtime)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
+                let age = now.duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0);
                 if age > STALE_THRESHOLD_SECS {
                     stale.push(path);
                 }

@@ -20,8 +20,8 @@ mod wave;
 
 pub mod prelude {
     pub use crate::wave::{
-        ArenaWavesGenome, ArenaWavesHandle, ArenaWavesPlugin, WavePhase, WaveState,
-        WaveStartedEvent, WaveCompletedEvent,
+        ArenaWavesGenome, ArenaWavesHandle, ArenaWavesPlugin, WaveCompletedEvent, WavePhase,
+        WaveStartedEvent, WaveState,
     };
     pub use crate::{
         ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, CloudOrbit, ForgiaModeFpsArenaPlugin,
@@ -30,8 +30,8 @@ pub mod prelude {
 }
 
 pub use wave::{
-    ArenaWavesGenome, ArenaWavesHandle, ArenaWavesPlugin, WavePhase, WaveState,
-    WaveStartedEvent, WaveCompletedEvent,
+    ArenaWavesGenome, ArenaWavesHandle, ArenaWavesPlugin, WaveCompletedEvent, WavePhase,
+    WaveStartedEvent, WaveState,
 };
 
 // Story-453 v2 (2026-05-18) — mesh-exact hitbox via `AsyncSceneCollider` ConvexHull.
@@ -48,7 +48,9 @@ fn sync_existing_bot_hp(
     mut last_hp: Local<f32>,
 ) {
     let Some(handle) = bots_handle else { return };
-    let Some(genome) = bots_assets.get(&handle.0) else { return };
+    let Some(genome) = bots_assets.get(&handle.0) else {
+        return;
+    };
     let new_hp = genome.data.hp;
     if (new_hp - *last_hp).abs() < 0.01 {
         return;
@@ -139,18 +141,42 @@ pub struct BotAi {
     pub los_lost_grace_secs: f32,
 }
 
-fn default_bot_speed() -> f32 { 3.5 }
-fn default_bot_stop_distance() -> f32 { 6.0 }
-fn default_los_check_hz() -> f32 { 8.0 }
-fn default_los_grace_secs() -> f32 { 0.35 }
-fn default_strafe_amplitude_m() -> f32 { 1.8 }
-fn default_strafe_freq_hz() -> f32 { 0.9 }
-fn default_strafe_noise_weight() -> f32 { 0.35 }
-fn default_local_avoid_dist_m() -> f32 { 2.5 }
-fn default_gunshot_alert_radius_m() -> f32 { 25.0 }
-fn default_gunshot_alert_los_grace_secs() -> f32 { 0.6 }
-fn default_alert_duration_secs() -> f32 { 4.0 }
-fn default_los_lost_grace_secs() -> f32 { 2.0 }
+fn default_bot_speed() -> f32 {
+    3.5
+}
+fn default_bot_stop_distance() -> f32 {
+    6.0
+}
+fn default_los_check_hz() -> f32 {
+    8.0
+}
+fn default_los_grace_secs() -> f32 {
+    0.35
+}
+fn default_strafe_amplitude_m() -> f32 {
+    1.8
+}
+fn default_strafe_freq_hz() -> f32 {
+    0.9
+}
+fn default_strafe_noise_weight() -> f32 {
+    0.35
+}
+fn default_local_avoid_dist_m() -> f32 {
+    2.5
+}
+fn default_gunshot_alert_radius_m() -> f32 {
+    25.0
+}
+fn default_gunshot_alert_los_grace_secs() -> f32 {
+    0.6
+}
+fn default_alert_duration_secs() -> f32 {
+    4.0
+}
+fn default_los_lost_grace_secs() -> f32 {
+    2.0
+}
 
 #[derive(Deserialize, TypePath, Clone)]
 pub struct BotSpawn {
@@ -358,10 +384,10 @@ fn sync_tactical_tuning_from_genome(
         match ev {
             AssetEvent::Added { id }
             | AssetEvent::Modified { id }
-            | AssetEvent::LoadedWithDependencies { id } => {
-                if *id == handle.0.id() {
-                    should = true;
-                }
+            | AssetEvent::LoadedWithDependencies { id }
+                if *id == handle.0.id() =>
+            {
+                should = true;
             }
             _ => {}
         }
@@ -369,7 +395,9 @@ fn sync_tactical_tuning_from_genome(
     if !should {
         return;
     }
-    let Some(g) = assets.get(&handle.0) else { return };
+    let Some(g) = assets.get(&handle.0) else {
+        return;
+    };
     let ai = &g.data.ai;
     tuning.los_check_hz = ai.los_check_hz;
     tuning.los_grace_secs = ai.los_grace_secs;
@@ -400,27 +428,39 @@ fn spawn_arena(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
-    let floor_dirt: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
-    let floor_rocks: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor_rocks.glb#Scene0");
+    let floor_dirt: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
+    let floor_rocks: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/floor_rocks.glb#Scene0");
     let wall: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall.glb#Scene0");
-    let wall_arched: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_arched.glb#Scene0");
-    let wall_window: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_window.glb#Scene0");
-    let wall_broken: Handle<Scene> = asset_server.load("models/kaykit/dungeon/wall_broken.glb#Scene0");
+    let wall_arched: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/wall_arched.glb#Scene0");
+    let wall_window: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/wall_window.glb#Scene0");
+    let wall_broken: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/wall_broken.glb#Scene0");
     let column: Handle<Scene> = asset_server.load("models/kaykit/dungeon/column.glb#Scene0");
     let pillar: Handle<Scene> = asset_server.load("models/kaykit/dungeon/pillar.glb#Scene0");
-    let pillar_deco: Handle<Scene> = asset_server.load("models/kaykit/dungeon/pillar_deco.glb#Scene0");
+    let pillar_deco: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/pillar_deco.glb#Scene0");
     let torch: Handle<Scene> = asset_server.load("models/kaykit/dungeon/torch.glb#Scene0");
-    let torch_wall: Handle<Scene> = asset_server.load("models/kaykit/dungeon/torch_wall.glb#Scene0");
-    let banner_red: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_red.glb#Scene0");
-    let banner_blue: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_blue.glb#Scene0");
-    let banner_yellow: Handle<Scene> = asset_server.load("models/kaykit/dungeon/banner_yellow.glb#Scene0");
+    let torch_wall: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/torch_wall.glb#Scene0");
+    let banner_red: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/banner_red.glb#Scene0");
+    let banner_blue: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/banner_blue.glb#Scene0");
+    let banner_yellow: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/banner_yellow.glb#Scene0");
     let chest: Handle<Scene> = asset_server.load("models/kaykit/dungeon/chest.glb#Scene0");
-    let chest_gold: Handle<Scene> = asset_server.load("models/kaykit/dungeon/chest_gold.glb#Scene0");
+    let chest_gold: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/chest_gold.glb#Scene0");
     let crates: Handle<Scene> = asset_server.load("models/kaykit/dungeon/crates.glb#Scene0");
     let rubble: Handle<Scene> = asset_server.load("models/kaykit/dungeon/rubble.glb#Scene0");
     let table: Handle<Scene> = asset_server.load("models/kaykit/dungeon/table.glb#Scene0");
     let barrel: Handle<Scene> = asset_server.load("models/kaykit/dungeon/barrel.glb#Scene0");
-    let barrels_stack: Handle<Scene> = asset_server.load("models/kaykit/dungeon/barrels_stack.glb#Scene0");
+    let barrels_stack: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/barrels_stack.glb#Scene0");
 
     let half = ARENA_SIZE / 2;
     let arena_extent = (ARENA_SIZE as f32 * TILE_SIZE) / 2.0;
@@ -469,22 +509,58 @@ fn spawn_arena(
                 _ => wall.clone(),
             }
         };
-        let nord = if i == 0 { wall_arched.clone() } else { pick_wall(i) };
-        let sud = if i == 0 { wall_arched.clone() } else { pick_wall(i + 1) };
-        let est = if i == 0 { wall_arched.clone() } else { pick_wall(i + 2) };
-        let ouest = if i == 0 { wall_arched.clone() } else { pick_wall(i + 3) };
+        let nord = if i == 0 {
+            wall_arched.clone()
+        } else {
+            pick_wall(i)
+        };
+        let sud = if i == 0 {
+            wall_arched.clone()
+        } else {
+            pick_wall(i + 1)
+        };
+        let est = if i == 0 {
+            wall_arched.clone()
+        } else {
+            pick_wall(i + 2)
+        };
+        let ouest = if i == 0 {
+            wall_arched.clone()
+        } else {
+            pick_wall(i + 3)
+        };
 
         spawn_wall(&mut commands, &nord, Vec3::new(offset, 0.0, edge), 0.0);
-        spawn_wall(&mut commands, &sud, Vec3::new(offset, 0.0, -edge), std::f32::consts::PI);
-        spawn_wall(&mut commands, &est, Vec3::new(edge, 0.0, offset), -std::f32::consts::FRAC_PI_2);
-        spawn_wall(&mut commands, &ouest, Vec3::new(-edge, 0.0, offset), std::f32::consts::FRAC_PI_2);
+        spawn_wall(
+            &mut commands,
+            &sud,
+            Vec3::new(offset, 0.0, -edge),
+            std::f32::consts::PI,
+        );
+        spawn_wall(
+            &mut commands,
+            &est,
+            Vec3::new(edge, 0.0, offset),
+            -std::f32::consts::FRAC_PI_2,
+        );
+        spawn_wall(
+            &mut commands,
+            &ouest,
+            Vec3::new(-edge, 0.0, offset),
+            std::f32::consts::FRAC_PI_2,
+        );
     }
 
     // Story-453 — Cylinder primitives simples (vs TriMesh). Bottom = Y=0.
     let pillar_half_h = 2.0;
     let pillar_radius = 0.5;
     let col_d = TILE_SIZE * 2.5;
-    for &(x, z) in &[(col_d, col_d), (-col_d, col_d), (col_d, -col_d), (-col_d, -col_d)] {
+    for &(x, z) in &[
+        (col_d, col_d),
+        (-col_d, col_d),
+        (col_d, -col_d),
+        (-col_d, -col_d),
+    ] {
         commands
             .spawn((
                 ArenaMarker,
@@ -503,7 +579,12 @@ fn spawn_arena(
     }
 
     let outer_d = TILE_SIZE * 4.5;
-    for &(x, z) in &[(outer_d, 0.0), (-outer_d, 0.0), (0.0, outer_d), (0.0, -outer_d)] {
+    for &(x, z) in &[
+        (outer_d, 0.0),
+        (-outer_d, 0.0),
+        (0.0, outer_d),
+        (0.0, -outer_d),
+    ] {
         commands
             .spawn((
                 ArenaMarker,
@@ -549,7 +630,15 @@ fn spawn_arena(
         ("Rubble_S", 0.0, 14.0, &rubble, 1.0, 0.3, 1.0),
         ("Rubble_E", 14.0, 0.0, &rubble, 1.0, 0.3, 1.0),
         ("Rubble_W", -14.0, 0.0, &rubble, 1.0, 0.3, 1.0),
-        ("BarrelStack_NW", -10.0, -10.0, &barrels_stack, 0.7, 1.0, 0.7),
+        (
+            "BarrelStack_NW",
+            -10.0,
+            -10.0,
+            &barrels_stack,
+            0.7,
+            1.0,
+            0.7,
+        ),
         ("BarrelStack_SE", 10.0, 10.0, &barrels_stack, 0.7, 1.0, 0.7),
         ("Table_E", 6.0, 4.0, &table, 0.8, 0.5, 0.4),
         ("Table_W", -6.0, -4.0, &table, 0.8, 0.5, 0.4),
@@ -587,7 +676,10 @@ fn spawn_arena(
             Name::new("ChestGold_NE"),
         ))
         .with_children(|p| {
-            p.spawn((SceneRoot(chest_gold), Transform::from_xyz(0.0, -chest_half.1, 0.0)));
+            p.spawn((
+                SceneRoot(chest_gold),
+                Transform::from_xyz(0.0, -chest_half.1, 0.0),
+            ));
         });
     commands
         .spawn((
@@ -599,15 +691,36 @@ fn spawn_arena(
             Name::new("Chest_SW"),
         ))
         .with_children(|p| {
-            p.spawn((SceneRoot(chest), Transform::from_xyz(0.0, -chest_half.1, 0.0)));
+            p.spawn((
+                SceneRoot(chest),
+                Transform::from_xyz(0.0, -chest_half.1, 0.0),
+            ));
         });
 
     let banners: &[(&str, f32, f32, Handle<Scene>, f32)] = &[
         ("Banner_N_red", -6.0, edge - 0.3, banner_red.clone(), 0.0),
         ("Banner_N_blue", 6.0, edge - 0.3, banner_blue.clone(), 0.0),
-        ("Banner_S_yellow", 0.0, -edge + 0.3, banner_yellow, std::f32::consts::PI),
-        ("Banner_E_red", edge - 0.3, -6.0, banner_red, -std::f32::consts::FRAC_PI_2),
-        ("Banner_W_blue", -edge + 0.3, 6.0, banner_blue, std::f32::consts::FRAC_PI_2),
+        (
+            "Banner_S_yellow",
+            0.0,
+            -edge + 0.3,
+            banner_yellow,
+            std::f32::consts::PI,
+        ),
+        (
+            "Banner_E_red",
+            edge - 0.3,
+            -6.0,
+            banner_red,
+            -std::f32::consts::FRAC_PI_2,
+        ),
+        (
+            "Banner_W_blue",
+            -edge + 0.3,
+            6.0,
+            banner_blue,
+            std::f32::consts::FRAC_PI_2,
+        ),
     ];
     for (name, x, z, scene, yaw) in banners {
         commands.spawn((
@@ -741,7 +854,11 @@ fn spawn_arena(
         let parent_id = commands
             .spawn((
                 ArenaMarker,
-                CloudOrbit { angle, radius, height: cy },
+                CloudOrbit {
+                    angle,
+                    radius,
+                    height: cy,
+                },
                 Transform::from_xyz(cx, cy, cz).with_scale(Vec3::new(scale, hscale * scale, scale)),
                 Visibility::default(),
                 Name::new(format!("Cloud_{preset_name}_{ci}")),
@@ -827,6 +944,10 @@ mod tests {
 
     #[test]
     fn arena_size_is_odd() {
-        assert_eq!(ARENA_SIZE % 2, 1, "ARENA_SIZE must be odd for centered grid");
+        assert_eq!(
+            ARENA_SIZE % 2,
+            1,
+            "ARENA_SIZE must be odd for centered grid"
+        );
     }
 }

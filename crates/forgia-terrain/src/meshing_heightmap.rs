@@ -73,7 +73,8 @@ pub fn build_chunk_mesh(
             // World coord = chunk center + local + (sample shift vers intérieur monde)
             let wx = origin.x + half_x + lx;
             let wz = origin.z + half_z + lz;
-            let raw_h = crate::generation::heightmap_at(wx + sample_offset.x, wz + sample_offset.y, config);
+            let raw_h =
+                crate::generation::heightmap_at(wx + sample_offset.x, wz + sample_offset.y, config);
             // Story-447 — apply village flatten zones post-process. World-space XZ
             // = chunk origin + local (not offset by sample_offset, since FlattenZones
             // are inserted in world-RPG-space matching village_world_center).
@@ -107,7 +108,10 @@ pub fn build_chunk_mesh(
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_indices(Indices::U32(indices));
@@ -133,7 +137,12 @@ pub fn build_chunk_mesh(
     }
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
 
-    ChunkMeshData { mesh, heights, min_y, max_y }
+    ChunkMeshData {
+        mesh,
+        heights,
+        min_y,
+        max_y,
+    }
 }
 
 fn blend_biome_color(biome: BiomeType, h: f32, slope: f32, config: &TerrainConfig) -> [f32; 4] {
@@ -219,7 +228,11 @@ mod tests {
         let data = build_chunk_mesh(ChunkCoord::new(1, 1), Vec2::ZERO, &cfg, &bm, None);
         assert!(data.min_y <= data.max_y);
         let observed_min = data.heights.iter().cloned().fold(f32::INFINITY, f32::min);
-        let observed_max = data.heights.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let observed_max = data
+            .heights
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         assert_eq!(data.min_y, observed_min);
         assert_eq!(data.max_y, observed_max);
     }
@@ -249,7 +262,8 @@ mod tests {
                 let collider_y = data.heights[ix * stride + iz];
                 assert_eq!(
                     mesh_y, collider_y,
-                    "Mesh / collider mismatch at (ix={}, iz={})", ix, iz,
+                    "Mesh / collider mismatch at (ix={}, iz={})",
+                    ix, iz,
                 );
             }
         }

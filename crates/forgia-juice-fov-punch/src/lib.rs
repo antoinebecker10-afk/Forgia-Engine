@@ -128,8 +128,7 @@ fn tick_fov_state(time: Res<Time>, mut state: ResMut<FovPunchState>) {
         let attack_rate = state.target_peak_deg / state.attack_secs.max(0.001);
         let new_val = state.current_deg + attack_rate * dt;
         // Détecte fin attack : on a dépassé ou atteint le peak.
-        let reached =
-            (attack_rate > 0.0 && new_val >= state.target_peak_deg)
+        let reached = (attack_rate > 0.0 && new_val >= state.target_peak_deg)
             || (attack_rate < 0.0 && new_val <= state.target_peak_deg);
         if reached {
             state.current_deg = state.target_peak_deg;

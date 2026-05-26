@@ -35,13 +35,17 @@ impl ItemStack {
     }
 
     pub fn try_merge(&mut self, other: &mut ItemStack) {
-        if !self.can_merge(other) { return; }
+        if !self.can_merge(other) {
+            return;
+        }
         let take = (self.max_stack - self.count).min(other.count);
         self.count += take;
         other.count -= take;
     }
 
-    pub fn is_empty(&self) -> bool { self.count == 0 }
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
 }
 
 #[derive(Component, Debug, Clone)]
@@ -65,8 +69,12 @@ impl Inventory {
         }
     }
 
-    pub fn capacity(&self) -> usize { self.capacity }
-    pub fn slots(&self) -> &[Option<ItemStack>] { &self.slots }
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+    pub fn slots(&self) -> &[Option<ItemStack>] {
+        &self.slots
+    }
     pub fn slot(&self, idx: usize) -> Option<&ItemStack> {
         self.slots.get(idx)?.as_ref()
     }
@@ -76,7 +84,9 @@ impl Inventory {
         for s in self.slots.iter_mut().flatten() {
             if s.can_merge(&stack) {
                 s.try_merge(&mut stack);
-                if stack.is_empty() { return None; }
+                if stack.is_empty() {
+                    return None;
+                }
             }
         }
         for slot in &mut self.slots {
@@ -92,14 +102,18 @@ impl Inventory {
     pub fn remove(&mut self, id: &ItemId, mut count: u32) -> u32 {
         let mut removed = 0;
         for slot in &mut self.slots {
-            if count == 0 { break; }
+            if count == 0 {
+                break;
+            }
             if let Some(s) = slot {
                 if s.id == *id {
                     let take = s.count.min(count);
                     s.count -= take;
                     removed += take;
                     count -= take;
-                    if s.is_empty() { *slot = None; }
+                    if s.is_empty() {
+                        *slot = None;
+                    }
                 }
             }
         }
@@ -107,7 +121,12 @@ impl Inventory {
     }
 
     pub fn count_of(&self, id: &ItemId) -> u32 {
-        self.slots.iter().flatten().filter(|s| s.id == *id).map(|s| s.count).sum()
+        self.slots
+            .iter()
+            .flatten()
+            .filter(|s| s.id == *id)
+            .map(|s| s.count)
+            .sum()
     }
 
     pub fn is_full(&self) -> bool {
@@ -118,9 +137,20 @@ impl Inventory {
 
 #[derive(Message, Debug, Clone)]
 pub enum InventoryEvent {
-    Added { entity: Entity, id: ItemId, count: u32 },
-    Removed { entity: Entity, id: ItemId, count: u32 },
-    Full { entity: Entity, dropped: ItemStack },
+    Added {
+        entity: Entity,
+        id: ItemId,
+        count: u32,
+    },
+    Removed {
+        entity: Entity,
+        id: ItemId,
+        count: u32,
+    },
+    Full {
+        entity: Entity,
+        dropped: ItemStack,
+    },
 }
 
 pub struct ForgiaInventoryPlugin;

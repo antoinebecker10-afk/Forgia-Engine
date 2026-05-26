@@ -8,10 +8,10 @@
 //! Each consumer crate (forgia-weapon-hitscan, forgia-terrain, etc.) declares
 //! its own typed genome struct + uses `Genome::<MyGenome>` asset handle.
 
+use bevy::asset::{io::Reader, Asset, AssetLoader, LoadContext};
 use bevy::prelude::*;
-use bevy::asset::{Asset, AssetLoader, LoadContext, io::Reader};
-use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
+use std::marker::PhantomData;
 
 /// Generic typed genome asset. `T` is the user-defined Serde struct.
 #[derive(Asset, TypePath)]
@@ -27,7 +27,9 @@ pub struct GenomeLoader<T: Send + Sync + 'static + TypePath + DeserializeOwned> 
 
 impl<T: Send + Sync + 'static + TypePath + DeserializeOwned> Default for GenomeLoader<T> {
     fn default() -> Self {
-        Self { _marker: PhantomData }
+        Self {
+            _marker: PhantomData,
+        }
     }
 }
 

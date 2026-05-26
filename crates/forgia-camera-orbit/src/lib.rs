@@ -107,8 +107,8 @@ fn orbit_cursor_grab(
     let Ok(mut cursor) = q.single_mut() else {
         return;
     };
-    let any_held = mouse_buttons.pressed(MouseButton::Left)
-        || mouse_buttons.pressed(MouseButton::Right);
+    let any_held =
+        mouse_buttons.pressed(MouseButton::Left) || mouse_buttons.pressed(MouseButton::Right);
     let desired_grab = if any_held {
         CursorGrabMode::Locked
     } else {
@@ -161,8 +161,8 @@ fn orbit_input(
     for mut cam in &mut q {
         // Pitch : seulement si un bouton souris est tenu (pattern WoW).
         if any_held && delta_y.abs() > f32::EPSILON {
-            cam.pitch = (cam.pitch - delta_y * cam.pitch_sensitivity)
-                .clamp(cam.min_pitch, cam.max_pitch);
+            cam.pitch =
+                (cam.pitch - delta_y * cam.pitch_sensitivity).clamp(cam.min_pitch, cam.max_pitch);
         }
         // RMB tenu : la cam suit le yaw du player → reset yaw_offset à 0
         // smooth-lerp pour éviter snap brutal au passage LMB → RMB.
@@ -215,8 +215,8 @@ fn orbit_auto_recenter_on_move(
 ) {
     // Si user tient un bouton, il steer la cam — annule la transition courante
     // et save la position pour calculer le delta au release suivant.
-    let any_held = mouse_buttons.pressed(MouseButton::Left)
-        || mouse_buttons.pressed(MouseButton::Right);
+    let any_held =
+        mouse_buttons.pressed(MouseButton::Left) || mouse_buttons.pressed(MouseButton::Right);
     if any_held {
         state.active = false;
         if let Some(orbit) = q_cam.iter().next() {
@@ -232,7 +232,9 @@ fn orbit_auto_recenter_on_move(
             state.active = false;
             continue;
         }
-        let Ok(target_gt) = targets.get(orbit.target) else { continue };
+        let Ok(target_gt) = targets.get(orbit.target) else {
+            continue;
+        };
         let pos = target_gt.translation();
         let moved = match *last_pos {
             // Seuil 1e-4 m² (~10mm) : ignore les micro-jitters de la physique.

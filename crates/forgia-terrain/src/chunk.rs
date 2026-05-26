@@ -27,10 +27,16 @@ pub struct ChunkCoord {
 }
 
 impl ChunkCoord {
-    pub fn new(x: i32, z: i32) -> Self { Self { x, z } }
+    pub fn new(x: i32, z: i32) -> Self {
+        Self { x, z }
+    }
 
     pub fn world_origin(&self) -> Vec3 {
-        Vec3::new(self.x as f32 * CHUNK_X as f32, 0.0, self.z as f32 * CHUNK_Z as f32)
+        Vec3::new(
+            self.x as f32 * CHUNK_X as f32,
+            0.0,
+            self.z as f32 * CHUNK_Z as f32,
+        )
     }
 
     pub fn world_center(&self) -> Vec3 {
@@ -81,8 +87,12 @@ impl ChunkData {
         self.sdf[Self::index(x, y, z)]
     }
 
-    pub fn is_all_air(&self) -> bool { self.sdf.iter().all(|&v| v > 0.0) }
-    pub fn is_all_solid(&self) -> bool { self.sdf.iter().all(|&v| v < 0.0) }
+    pub fn is_all_air(&self) -> bool {
+        self.sdf.iter().all(|&v| v > 0.0)
+    }
+    pub fn is_all_solid(&self) -> bool {
+        self.sdf.iter().all(|&v| v < 0.0)
+    }
 }
 
 // ─────────────────────────── SDF Cache Quantization ───────────────────────────
@@ -106,9 +116,15 @@ impl CachedChunkData {
         }
         let original_i16_count = sdf_i16.len();
         let mut bytes = Vec::with_capacity(sdf_i16.len() * 2);
-        for &v in &sdf_i16 { bytes.extend_from_slice(&v.to_le_bytes()); }
+        for &v in &sdf_i16 {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
         let sdf_compressed = zstd::bulk::compress(&bytes, CACHE_ZSTD_LEVEL).unwrap_or(bytes);
-        Self { sdf_compressed, original_i16_count, biome_ids: data.biome_ids.clone() }
+        Self {
+            sdf_compressed,
+            original_i16_count,
+            biome_ids: data.biome_ids.clone(),
+        }
     }
 
     pub fn to_chunk(&self) -> ChunkData {
@@ -123,10 +139,18 @@ impl CachedChunkData {
             sdf.push(f32::from(v) * inv_scale);
         }
         sdf.resize(self.original_i16_count, 1.0);
-        ChunkData { sdf, biome_ids: self.biome_ids.clone(), dirty: true, modified: false, pipeline_diag: None }
+        ChunkData {
+            sdf,
+            biome_ids: self.biome_ids.clone(),
+            dirty: true,
+            modified: false,
+            pipeline_diag: None,
+        }
     }
 
-    pub fn byte_size(&self) -> usize { self.sdf_compressed.len() + self.biome_ids.len() }
+    pub fn byte_size(&self) -> usize {
+        self.sdf_compressed.len() + self.biome_ids.len()
+    }
 }
 
 // ─────────────────────────── ChunkManager ───────────────────────────
@@ -145,19 +169,24 @@ pub struct ChunkManager {
 }
 
 impl ChunkManager {
-    pub fn get(&self, coord: &ChunkCoord) -> Option<&ChunkData> { self.chunks.get(coord) }
+    pub fn get(&self, coord: &ChunkCoord) -> Option<&ChunkData> {
+        self.chunks.get(coord)
+    }
 
     pub fn cache_unloaded(&mut self, coord: ChunkCoord) {
         self.empty_mesh_coords.remove(&coord);
         if let Some(data) = self.chunks.remove(&coord) {
-            if data.modified { return; }
+            if data.modified {
+                return;
+            }
             if self.cache_order.len() >= CHUNK_CACHE_SIZE {
                 if let Some(old) = self.cache_order.pop_front() {
                     self.chunk_cache.remove(&old);
                 }
             }
             self.cache_order.push_back(coord);
-            self.chunk_cache.insert(coord, CachedChunkData::from_chunk(&data));
+            self.chunk_cache
+                .insert(coord, CachedChunkData::from_chunk(&data));
         }
     }
 
@@ -166,11 +195,17 @@ impl ChunkManager {
             self.cache_order.retain(|c| *c != coord);
             self.chunks.insert(coord, cached.to_chunk());
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
-    pub fn cache_bytes(&self) -> usize { self.chunk_cache.values().map(|c| c.byte_size()).sum() }
-    pub fn cache_len(&self) -> usize { self.chunk_cache.len() }
+    pub fn cache_bytes(&self) -> usize {
+        self.chunk_cache.values().map(|c| c.byte_size()).sum()
+    }
+    pub fn cache_len(&self) -> usize {
+        self.chunk_cache.len()
+    }
 }
 
 // ─────────────────────────── TerrainConfig ───────────────────────────
@@ -301,9 +336,13 @@ mod tests {
         let cached = CachedChunkData::from_chunk(&chunk);
         let restored = cached.to_chunk();
         for (i, (&orig, &back)) in src.iter().zip(restored.sdf.iter()).enumerate() {
-            if orig > 0.0 { assert!(back >= 0.0, "positive {orig} flipped to {back} at {i}"); }
-            else if orig < 0.0 { assert!(back <= 0.0, "negative {orig} flipped to {back} at {i}"); }
-            else { assert_eq!(back, 0.0, "zero must round-trip at {i}"); }
+            if orig > 0.0 {
+                assert!(back >= 0.0, "positive {orig} flipped to {back} at {i}");
+            } else if orig < 0.0 {
+                assert!(back <= 0.0, "negative {orig} flipped to {back} at {i}");
+            } else {
+                assert_eq!(back, 0.0, "zero must round-trip at {i}");
+            }
         }
     }
 
@@ -316,7 +355,10 @@ mod tests {
         let restored = cached.to_chunk();
         let epsilon = 1.0 / SDF_QUANT_SCALE + 1e-6;
         for (i, (&orig, &back)) in src.iter().zip(restored.sdf.iter()).enumerate() {
-            assert!((orig - back).abs() <= epsilon, "precision lost at {i}: {orig} -> {back}");
+            assert!(
+                (orig - back).abs() <= epsilon,
+                "precision lost at {i}: {orig} -> {back}"
+            );
         }
     }
 
@@ -328,7 +370,10 @@ mod tests {
         let cached = CachedChunkData::from_chunk(&chunk);
         let restored = cached.to_chunk();
         for &v in restored.sdf.iter().take(src.len()) {
-            assert!(v.is_finite(), "saturation must produce finite values, got {v}");
+            assert!(
+                v.is_finite(),
+                "saturation must produce finite values, got {v}"
+            );
         }
     }
 
@@ -358,22 +403,31 @@ mod tests {
         mgr.chunks.insert(coord, ChunkData::new_air());
         mgr.cache_unloaded(coord);
         let stored = mgr.cache_bytes();
-        let f32_equiv = PADDED_TOTAL * std::mem::size_of::<f32>() + COLUMNS * std::mem::size_of::<u8>();
-        assert!(stored < f32_equiv, "cache {stored} B must be smaller than f32 equivalent {f32_equiv} B");
+        let f32_equiv =
+            PADDED_TOTAL * std::mem::size_of::<f32>() + COLUMNS * std::mem::size_of::<u8>();
+        assert!(
+            stored < f32_equiv,
+            "cache {stored} B must be smaller than f32 equivalent {f32_equiv} B"
+        );
         let raw_i16 = PADDED_TOTAL * std::mem::size_of::<i16>();
         assert!(stored < raw_i16 / 4, "all-air chunk should compress well");
     }
 
     #[test]
     fn zstd_cache_roundtrip_preserves_values_within_epsilon() {
-        let src: Vec<f32> = (0..128).map(|i| ((i as f32 - 64.0) * 0.37).sin() * 12.5).collect();
+        let src: Vec<f32> = (0..128)
+            .map(|i| ((i as f32 - 64.0) * 0.37).sin() * 12.5)
+            .collect();
         let mut chunk = ChunkData::new_air();
         chunk.sdf[..src.len()].copy_from_slice(&src);
         let cached = CachedChunkData::from_chunk(&chunk);
         let restored = cached.to_chunk();
         let epsilon = 1.0 / SDF_QUANT_SCALE + 1e-6;
         for (i, (&orig, &back)) in src.iter().zip(restored.sdf.iter()).enumerate() {
-            assert!((orig - back).abs() <= epsilon, "zstd roundtrip lost precision at {i}");
+            assert!(
+                (orig - back).abs() <= epsilon,
+                "zstd roundtrip lost precision at {i}"
+            );
         }
     }
 }

@@ -26,9 +26,7 @@
 //! at known sites.
 
 use bevy::math::Vec2;
-use forgia_genome_village::{
-    BuildingsGenome, KitMixDef, LayoutType, VillageGenome,
-};
+use forgia_genome_village::{BuildingsGenome, KitMixDef, LayoutType, VillageGenome};
 use forgia_procgen_graph::{
     BuildingNode, DistrictRole, GraphDistrict, GraphEdge, GraphNode, NodeKind, RoadSegment2D,
     VillageGraph,
@@ -60,11 +58,7 @@ impl RTreeObject for RoadIndexEntry {
 /// Returns `true` if `p` is within `clearance` of any road in the index.
 /// Cost : O(log n) average via R-tree window query, falling back to O(k)
 /// where k = number of segments whose AABB intersects the search box.
-fn point_too_close_to_road(
-    rtree: &RTree<RoadIndexEntry>,
-    p: Vec2,
-    clearance: f32,
-) -> bool {
+fn point_too_close_to_road(rtree: &RTree<RoadIndexEntry>, p: Vec2, clearance: f32) -> bool {
     // Expand search box by clearance — anything outside cannot reach p.
     let search = AABB::from_corners(
         [p.x - clearance, p.y - clearance],
@@ -206,14 +200,8 @@ fn hamlet_layout(
     let buildings = &genome.buildings;
     let required = &buildings.required;
     let min_sep = poisson_min_separation(genome);
-    let placed_required = place_required_with_roads(
-        genome,
-        rng,
-        &mut graph,
-        required,
-        &road_rtree,
-        min_sep,
-    );
+    let placed_required =
+        place_required_with_roads(genome, rng, &mut graph, required, &road_rtree, min_sep);
 
     // 4. Fill remaining slots with road clearance enforced.
     let slots_to_fill = genome
@@ -349,7 +337,9 @@ fn place_required_with_roads(
         // Try 16 micro-rotations within ±half-step.
         let mut placed = false;
         for k in 0..16 {
-            let micro = if k == 0 { 0.0 } else {
+            let micro = if k == 0 {
+                0.0
+            } else {
                 let sign = if k % 2 == 0 { 1.0 } else { -1.0 };
                 sign * (k as f32) * (angle_step / 32.0)
             };
@@ -414,11 +404,8 @@ fn fill_with_poisson_road_aware(
     }
 
     let radius = genome.scale.bounding_radius;
-    let optional_entries: Vec<(&String, f32)> = buildings
-        .optional
-        .iter()
-        .map(|(k, v)| (k, *v))
-        .collect();
+    let optional_entries: Vec<(&String, f32)> =
+        buildings.optional.iter().map(|(k, v)| (k, *v)).collect();
     let weights: Vec<f32> = optional_entries.iter().map(|(_, w)| *w).collect();
     let clearance = road_clearance_total(genome);
     let setback = genome.scale.setback_m;
@@ -589,8 +576,7 @@ fn pick_color(mix: &KitMixDef, rng: &mut Rng) -> Option<String> {
     }
     let entries: Vec<(&String, f32)> = mix.colors.iter().map(|(k, v)| (k, *v)).collect();
     let weights: Vec<f32> = entries.iter().map(|(_, w)| *w).collect();
-    rng.weighted_pick(&weights)
-        .map(|i| entries[i].0.clone())
+    rng.weighted_pick(&weights).map(|i| entries[i].0.clone())
 }
 
 fn yaw_facing_center(pos: Vec2) -> f32 {
@@ -689,9 +675,13 @@ fn village_layout(
     // Required first — anchored to center.
     let mut placed_required = 0;
     if let Some(first) = genome.buildings.required.first() {
-        graph
-            .nodes
-            .push(build_node(genome, rng, Vec2::ZERO, first.as_str(), Some("center".into())));
+        graph.nodes.push(build_node(
+            genome,
+            rng,
+            Vec2::ZERO,
+            first.as_str(),
+            Some("center".into()),
+        ));
         placed_required += 1;
         // Distribute extra required across district centers (1 per cell).
         for (i, piece) in genome.buildings.required.iter().enumerate().skip(1) {
@@ -847,6 +837,7 @@ mod tests {
             roads: Default::default(),
             npcs: Default::default(),
             spawn: Default::default(),
+            terrain_leveling: Default::default(),
         }
     }
 
@@ -910,7 +901,10 @@ mod tests {
         g.scale.bounding_radius = 25.0;
         let (graph, stats) = generate(&g).unwrap();
         assert_eq!(graph.district_count(), 3);
-        assert!(stats.placed_buildings >= 6, "village should place at least half target");
+        assert!(
+            stats.placed_buildings >= 6,
+            "village should place at least half target"
+        );
     }
 
     #[test]

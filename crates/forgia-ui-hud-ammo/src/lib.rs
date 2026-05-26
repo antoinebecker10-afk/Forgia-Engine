@@ -266,7 +266,11 @@ pub(crate) fn draw_slot_strip(
 
     for (cursor_idx, (weapon, slot, hotkey)) in ordered.into_iter().enumerate() {
         let is_active = weapon == equipped.current;
-        let scale = if is_active { tuning.slot_active_scale } else { 1.0 };
+        let scale = if is_active {
+            tuning.slot_active_scale
+        } else {
+            1.0
+        };
         let w_box = tuning.slot_box_w * scale;
         let h_box = tuning.slot_box_h * scale;
         let box_rect = egui::Rect::from_min_size(
@@ -418,9 +422,6 @@ impl Plugin for ForgiaUiHudAmmoPlugin {
                     sensor::write_ammo_hud_sensor,
                 ),
             )
-            .add_systems(
-                EguiPrimaryContextPass,
-                (draw_ammo_counter, draw_slot_strip),
-            );
+            .add_systems(EguiPrimaryContextPass, (draw_ammo_counter, draw_slot_strip));
     }
 }

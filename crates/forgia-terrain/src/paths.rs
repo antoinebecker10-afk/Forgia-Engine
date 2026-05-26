@@ -109,7 +109,11 @@ fn bezier_tangent(start: Vec2, control: Vec2, end: Vec2, t: f32) -> Vec2 {
     let inv = 1.0 - t;
     let raw = 2.0 * inv * (control - start) + 2.0 * t * (end - control);
     let n = raw.length();
-    if n > 1e-4 { raw / n } else { Vec2::X }
+    if n > 1e-4 {
+        raw / n
+    } else {
+        Vec2::X
+    }
 }
 
 /// Génère un réseau de routes en anneau passant par les `pois` (ordre =
@@ -117,7 +121,9 @@ fn bezier_tangent(start: Vec2, control: Vec2, end: Vec2, t: f32) -> Vec2 {
 /// `bezier_warp` contrôle l'arc des segments (0 = ligne droite, 0.3 = courbe).
 pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> PathNetwork {
     let mut polylines: Vec<PathPolyline> = Vec::new();
-    if pois.len() < 2 { return PathNetwork { polylines }; }
+    if pois.len() < 2 {
+        return PathNetwork { polylines };
+    }
 
     let steps_per_segment = 1 << BEZIER_SUBDIVISIONS; // 16 sub-steps
     let dt = 1.0 / steps_per_segment as f32;
@@ -144,7 +150,9 @@ pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> Pa
             let t = step as f32 / steps_per_segment as f32;
             let pos = bezier_quadratic(start, control, end, t);
             let delta = (pos - last_pos).length();
-            if delta < 1e-5 { continue; }
+            if delta < 1e-5 {
+                continue;
+            }
             acc_dist += delta;
             while acc_dist >= SAMPLE_INTERVAL_M {
                 let overshoot = acc_dist - SAMPLE_INTERVAL_M;
@@ -152,7 +160,11 @@ pub fn build_path_network(pois: &[Vec2], tier: RoadTier, bezier_warp: f32) -> Pa
                 let t_sample = t - frac_back * dt;
                 let p = bezier_quadratic(start, control, end, t_sample);
                 let tg = bezier_tangent(start, control, end, t_sample);
-                samples.push(PathSample { pos: p, tangent: tg, tier });
+                samples.push(PathSample {
+                    pos: p,
+                    tangent: tg,
+                    tier,
+                });
                 acc_dist -= SAMPLE_INTERVAL_M;
             }
             last_pos = pos;
@@ -211,7 +223,11 @@ pub fn build_path_segment(start: Vec2, end: Vec2, tier: RoadTier, warp: f32) -> 
             let t_sample = t - frac_back * dt;
             let p = bezier_quadratic(start, control, end, t_sample);
             let tg = bezier_tangent(start, control, end, t_sample);
-            samples.push(PathSample { pos: p, tangent: tg, tier });
+            samples.push(PathSample {
+                pos: p,
+                tangent: tg,
+                tier,
+            });
             acc_dist -= SAMPLE_INTERVAL_M;
         }
         last_pos = pos;

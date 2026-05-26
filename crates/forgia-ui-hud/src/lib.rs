@@ -24,9 +24,6 @@ pub struct ForgiaUiHudPlugin;
 
 impl Plugin for ForgiaUiHudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            player_hp::PlayerHpPlugin,
-            wave_counter::WaveCounterPlugin,
-        ));
+        app.add_plugins((player_hp::PlayerHpPlugin, wave_counter::WaveCounterPlugin));
     }
 }

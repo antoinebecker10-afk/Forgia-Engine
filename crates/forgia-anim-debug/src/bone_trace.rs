@@ -227,7 +227,10 @@ fn write_json(timestamp_secs: f32, snapshots: &[CharacterSnapshot]) {
             snap.mesh_root_world.z
         ));
         if let Some(m3) = snap.mesh3d_world {
-            json.push_str(&format!(",\"mesh3d_world\":[{:.3},{:.3},{:.3}]", m3.x, m3.y, m3.z));
+            json.push_str(&format!(
+                ",\"mesh3d_world\":[{:.3},{:.3},{:.3}]",
+                m3.x, m3.y, m3.z
+            ));
         } else {
             json.push_str(",\"mesh3d_world\":null");
         }

@@ -137,7 +137,13 @@ mod tests {
         for d in 110..=145 {
             let dist = d as f32 * 0.1;
             let y = z.sample(dist, 0.0, 5.0);
-            assert!(y <= last + 0.01, "should be monotonic decreasing : d={} last={} y={}", dist, last, y);
+            assert!(
+                y <= last + 0.01,
+                "should be monotonic decreasing : d={} last={} y={}",
+                dist,
+                last,
+                y
+            );
             assert!(y >= 5.0 - 0.01 && y <= 20.0 + 0.01);
             last = y;
         }

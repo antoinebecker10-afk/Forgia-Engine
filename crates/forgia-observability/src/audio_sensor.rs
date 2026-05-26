@@ -1,4 +1,4 @@
-﻿//! audio_sensor.rs — Producteur `forgia2_audio.json` (1Hz, cross-mode).
+//! audio_sensor.rs — Producteur `forgia2_audio.json` (1Hz, cross-mode).
 //!
 //! Compte les `AudioInstance` actives (PlaybackState != Stopped) via
 //! `Assets<AudioInstance>::iter()` + expose `BiomeAmbientState.current_biome()`.

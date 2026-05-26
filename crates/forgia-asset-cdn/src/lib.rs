@@ -175,13 +175,12 @@ pub fn extract_zip(
         })?;
 
         let raw_name = entry.name().to_string();
-        let stripped: &str = if !opts.strip_prefix.is_empty()
-            && raw_name.starts_with(opts.strip_prefix)
-        {
-            &raw_name[opts.strip_prefix.len()..]
-        } else {
-            &raw_name
-        };
+        let stripped: &str =
+            if !opts.strip_prefix.is_empty() && raw_name.starts_with(opts.strip_prefix) {
+                &raw_name[opts.strip_prefix.len()..]
+            } else {
+                &raw_name
+            };
         let stripped = stripped.trim_start_matches('/').trim_start_matches('\\');
         if stripped.is_empty() {
             continue;
@@ -218,7 +217,9 @@ pub fn extract_zip(
 }
 
 fn dest_non_empty(p: &Path) -> bool {
-    fs::read_dir(p).map(|mut d| d.next().is_some()).unwrap_or(false)
+    fs::read_dir(p)
+        .map(|mut d| d.next().is_some())
+        .unwrap_or(false)
 }
 
 /// Normalise + check qu'un chemin reste contenu dans `root`. Robust à .. via
@@ -226,7 +227,11 @@ fn dest_non_empty(p: &Path) -> bool {
 fn is_within(candidate: &Path, root: &Path) -> bool {
     use std::path::Component;
     let mut depth: i32 = 0;
-    for comp in candidate.strip_prefix(root).unwrap_or(candidate).components() {
+    for comp in candidate
+        .strip_prefix(root)
+        .unwrap_or(candidate)
+        .components()
+    {
         match comp {
             Component::Normal(_) | Component::CurDir => {}
             Component::ParentDir => depth -= 1,
@@ -255,7 +260,9 @@ pub fn install_pack(
     let expected_sha = pack
         .sha256
         .as_deref()
-        .ok_or_else(|| CdnError::MissingHash { name: pack.name.clone() })?;
+        .ok_or_else(|| CdnError::MissingHash {
+            name: pack.name.clone(),
+        })?;
 
     let zip_path = cache_dir.join(format!("{}.zip", pack.name));
     // Re-use cached zip si hash matche déjà.
@@ -269,7 +276,9 @@ pub fn install_pack(
         verify_sha256(&zip_path, expected_sha, &pack.name)?;
     }
     let actual_sha = compute_sha256(&zip_path)?;
-    let size_bytes = fs::metadata(&zip_path).map_err(|e| io_err(&zip_path, e))?.len();
+    let size_bytes = fs::metadata(&zip_path)
+        .map_err(|e| io_err(&zip_path, e))?
+        .len();
 
     let dest_dir = manifest.install_path(pack, workspace_root);
     let file_count = extract_zip(
@@ -465,7 +474,10 @@ mod tests {
         let count = extract_zip(
             &zip_path,
             &tmp_dir,
-            ExtractOptions { strip_prefix: "KayKit_v1/", fail_if_dest_non_empty: false },
+            ExtractOptions {
+                strip_prefix: "KayKit_v1/",
+                fail_if_dest_non_empty: false,
+            },
         )
         .unwrap();
         assert_eq!(count, 1);

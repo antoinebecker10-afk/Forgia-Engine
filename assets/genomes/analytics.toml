@@ -1,0 +1,24 @@
+id = "analytics"
+name = "Analytics & Crash Dump Config"
+domain = "Telemetry"
+category = "Telemetry"
+description = "Sentry crash dump opt-in RGPD. Default OFF — l'utilisateur doit cocher explicitement dans Settings pour envoyer les crash dumps. Aucune télémétrie comportementale au MVP."
+version = "0.1.0"
+
+[config]
+# Opt-in obligatoire RGPD. Default false. UI Settings basculera ce champ.
+opt_in = false
+
+# DSN Sentry. Vide en dev. Production : "https://<key>@<org>.ingest.sentry.io/<project>"
+# NE PAS COMMITER un vrai DSN prod ici — utiliser variable d'env SENTRY_DSN ou fichier user_settings.toml override.
+dsn = ""
+
+# Release version (utilisée par Sentry pour grouper crashes par version)
+release = "0.1.0-dev"
+
+# Environment Sentry : "dev", "staging", "production"
+environment = "dev"
+
+# Sample rate des crash events (1.0 = 100%, 0.5 = 50% des crashes envoyés).
+# Pour MVP indé : 1.0 (chaque crash compte vu le faible volume).
+sample_rate = 1.0

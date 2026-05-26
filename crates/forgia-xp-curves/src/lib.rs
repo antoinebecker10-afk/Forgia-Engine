@@ -29,7 +29,10 @@ impl XpCurve {
 
 impl Default for XpCurve {
     fn default() -> Self {
-        XpCurve::Linear { base: 100, per_level: 50 }
+        XpCurve::Linear {
+            base: 100,
+            per_level: 50,
+        }
     }
 }
 
@@ -42,7 +45,11 @@ pub struct XpProgress {
 
 impl Default for XpProgress {
     fn default() -> Self {
-        Self { level: 1, xp: 0, curve: XpCurve::default() }
+        Self {
+            level: 1,
+            xp: 0,
+            curve: XpCurve::default(),
+        }
     }
 }
 
@@ -92,7 +99,9 @@ fn apply_xp_gain(
     mut level_w: MessageWriter<LevelUpEvent>,
 ) {
     for ev in events.read() {
-        let Ok(mut prog) = q.get_mut(ev.entity) else { continue };
+        let Ok(mut prog) = q.get_mut(ev.entity) else {
+            continue;
+        };
         let gained = prog.add_xp(ev.amount);
         for _ in 0..gained {
             level_w.write(LevelUpEvent {
@@ -109,7 +118,10 @@ mod tests {
 
     #[test]
     fn linear_curve_xp_required() {
-        let c = XpCurve::Linear { base: 100, per_level: 50 };
+        let c = XpCurve::Linear {
+            base: 100,
+            per_level: 50,
+        };
         assert_eq!(c.xp_required(0), 100);
         assert_eq!(c.xp_required(1), 150);
         assert_eq!(c.xp_required(10), 600);

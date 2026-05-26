@@ -40,13 +40,13 @@ pub struct KillfeedTuning {
     pub font_weapon_icon: f32,
     pub text_outline_px: f32,
     /// Layout interne d'un entry (depuis bord gauche).
-    pub entry_pad_inner: f32,         // padding interne gauche/droite (texte attacker depuis L)
-    pub icon_offset_x: f32,           // icon position depuis (L + pad)
-    pub arrow_offset_x_from_icon: f32,// arrow depuis icon position
-    pub victim_offset_x_from_icon: f32,// victim depuis icon position
-    pub entry_corner_rounding: f32,   // corner rounding entry
-    pub entry_outline_px: f32,        // outline thickness entry
-    pub headshot_font_bonus: f32,     // bonus size pour le star headshot
+    pub entry_pad_inner: f32, // padding interne gauche/droite (texte attacker depuis L)
+    pub icon_offset_x: f32,             // icon position depuis (L + pad)
+    pub arrow_offset_x_from_icon: f32,  // arrow depuis icon position
+    pub victim_offset_x_from_icon: f32, // victim depuis icon position
+    pub entry_corner_rounding: f32,     // corner rounding entry
+    pub entry_outline_px: f32,          // outline thickness entry
+    pub headshot_font_bonus: f32,       // bonus size pour le star headshot
 
     // ─── Multi-kill banner (Halo-style sweeping CENTER_TOP) ────
     /// Fenêtre temporelle pour comptabiliser un multi-kill (secondes).
@@ -134,6 +134,9 @@ pub fn sync_killfeed_tuning(
     }
     if let Some(g) = assets.get(&handle.0) {
         *tuning = g.data.clone();
-        info!("[killfeed] tuning synced (display {}s, max {})", tuning.display_secs, tuning.max_entries);
+        info!(
+            "[killfeed] tuning synced (display {}s, max {})",
+            tuning.display_secs, tuning.max_entries
+        );
     }
 }

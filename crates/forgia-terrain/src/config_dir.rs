@@ -9,10 +9,7 @@ use std::path::{Path, PathBuf};
 ///
 /// Pure sur le filesystem : l'appelant fournit `start` + un prédicat `has_biomes`
 /// (injecté en test pour ne pas toucher le disque réel).
-pub fn find_config_dir_from(
-    start: &Path,
-    has_biomes: impl Fn(&Path) -> bool,
-) -> Option<PathBuf> {
+pub fn find_config_dir_from(start: &Path, has_biomes: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     let mut cursor: Option<PathBuf> = Some(start.to_path_buf());
     while let Some(d) = cursor {
         if has_biomes(&d) {
@@ -29,7 +26,9 @@ pub fn find_config_dir_from(
 pub fn find_config_dir() -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
-            if let Some(found) = find_config_dir_from(parent, |d| d.join("config").join("biomes").exists()) {
+            if let Some(found) =
+                find_config_dir_from(parent, |d| d.join("config").join("biomes").exists())
+            {
                 return found;
             }
         }
@@ -61,7 +60,8 @@ mod tests {
     fn stops_at_first_match_not_deepest() {
         let start = PathBuf::from("/fake/outer/inner");
         // Both outer and inner would match — must pick the deepest first (start itself).
-        let has_biomes = |d: &Path| d == Path::new("/fake/outer/inner") || d == Path::new("/fake/outer");
+        let has_biomes =
+            |d: &Path| d == Path::new("/fake/outer/inner") || d == Path::new("/fake/outer");
         let found = find_config_dir_from(&start, has_biomes);
         assert_eq!(found, Some(PathBuf::from("/fake/outer/inner/config")));
     }

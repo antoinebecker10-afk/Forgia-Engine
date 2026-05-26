@@ -20,9 +20,9 @@
 //! garde la closure system minimale.
 
 use bevy::asset::{AssetServer, Handle};
+use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::scene::{Scene, SceneRoot};
-use bevy::gltf::GltfAssetLabel;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 /// Plugin. Add via `app.add_plugins(ForgiaPrefabPlugin)`.

@@ -30,8 +30,9 @@ use thiserror::Error;
 
 pub mod prelude {
     pub use crate::{
-        EvictionEvent, EvictionReason, ForgiaStreamingPlugin, GenMsHistogram, MemoryBudget,
-        StreamingConfig, StreamingPause, StreamingRadii, StreamingStats, UnloadHysteresis,
+        EvictionEvent, EvictionReason, FoliageCoverageReport, ForgiaStreamingPlugin,
+        GenMsHistogram, MemoryBudget, StreamingConfig, StreamingPause, StreamingRadii,
+        StreamingStats, UnloadHysteresis,
     };
 }
 
@@ -76,6 +77,17 @@ pub struct DebugGenome {
     pub sensor_enabled: u32,
     pub sensor_interval_s: f32,
     pub gen_ms_buckets: u32,
+    #[serde(default = "default_foliage_coverage_warn_threshold")]
+    pub foliage_coverage_warn_threshold: u32,
+    #[serde(default = "default_foliage_coverage_sustained_s")]
+    pub foliage_coverage_sustained_s: f32,
+}
+
+fn default_foliage_coverage_warn_threshold() -> u32 {
+    4
+}
+fn default_foliage_coverage_sustained_s() -> f32 {
+    3.0
 }
 
 impl Default for StreamingGenome {
@@ -104,6 +116,8 @@ impl Default for StreamingGenome {
                 sensor_enabled: 1,
                 sensor_interval_s: 1.0,
                 gen_ms_buckets: 16,
+                foliage_coverage_warn_threshold: default_foliage_coverage_warn_threshold(),
+                foliage_coverage_sustained_s: default_foliage_coverage_sustained_s(),
             },
         }
     }
@@ -241,6 +255,8 @@ pub struct DebugConfig {
     pub sensor_enabled: bool,
     pub sensor_interval_s: f32,
     pub gen_ms_buckets: u32,
+    pub foliage_coverage_warn_threshold: u32,
+    pub foliage_coverage_sustained_s: f32,
 }
 
 impl Default for StreamingConfig {
@@ -272,6 +288,8 @@ impl StreamingConfig {
                 sensor_enabled: g.debug.sensor_enabled != 0,
                 sensor_interval_s: g.debug.sensor_interval_s.max(0.1),
                 gen_ms_buckets: g.debug.gen_ms_buckets.max(4),
+                foliage_coverage_warn_threshold: g.debug.foliage_coverage_warn_threshold,
+                foliage_coverage_sustained_s: g.debug.foliage_coverage_sustained_s.max(0.0),
             },
             source,
         }
@@ -414,6 +432,29 @@ pub struct StreamingPause {
     pub waiting_chunks: u32,
 }
 
+// ── FoliageCoverageReport Resource (public, populé par producteurs externes) ──
+//
+// Cross-check chunks chargés vs foliage placée. Couvre G2+G3 audit V2 2026-05-21
+// (« veg charge mal »). Default vide → innocuous tant que producteur (story-502-B
+// côté forgia-foliage) pas wiré. Lecture seule côté `forgia-streaming`.
+
+#[derive(Resource, Debug, Default, Clone, Copy)]
+pub struct FoliageCoverageReport {
+    pub chunks_loaded: u32,
+    pub chunks_with_veg: u32,
+}
+
+impl FoliageCoverageReport {
+    pub fn without_veg(&self) -> u32 {
+        self.chunks_loaded.saturating_sub(self.chunks_with_veg)
+    }
+}
+
+#[derive(Resource, Debug, Default)]
+struct FoliageCoverageState {
+    sustained_s: f32,
+}
+
 // ── Sensor system ───────────────────────────────────────────────────────────
 
 const SENSOR_PATH: &str = "forgia_chunk_stream.json";
@@ -454,6 +495,8 @@ fn write_chunk_stream_sensor(
     cfg: Option<Res<StreamingConfig>>,
     mut stats: ResMut<StreamingStats>,
     pause: Res<StreamingPause>,
+    coverage: Res<FoliageCoverageReport>,
+    mut coverage_state: ResMut<FoliageCoverageState>,
     mut timer: ResMut<SensorTimer>,
 ) {
     let Some(cfg) = cfg else { return };
@@ -464,12 +507,28 @@ fn write_chunk_stream_sensor(
     if timer.accum_s < cfg.debug.sensor_interval_s {
         return;
     }
+    let dt = timer.accum_s;
     timer.accum_s = 0.0;
     let now = time.elapsed_secs();
     stats.tick_window(now);
 
-    let severity = compute_severity(&cfg, &stats, &pause);
-    let json = build_sensor_json(now, &cfg, &stats, &pause, severity);
+    let cov = *coverage;
+    if cov.without_veg() > cfg.debug.foliage_coverage_warn_threshold {
+        coverage_state.sustained_s += dt;
+    } else {
+        coverage_state.sustained_s = 0.0;
+    }
+
+    let severity = compute_severity(&cfg, &stats, &pause, &cov, coverage_state.sustained_s);
+    let json = build_sensor_json(
+        now,
+        &cfg,
+        &stats,
+        &pause,
+        &cov,
+        coverage_state.sustained_s,
+        severity,
+    );
     if let Err(e) = std::fs::write(SENSOR_PATH, json) {
         warn!("[forgia-streaming] sensor write failed: {e}");
     }
@@ -477,7 +536,15 @@ fn write_chunk_stream_sensor(
     if severity == "ok" {
         let _ = std::fs::remove_file(HEALTH_PATH);
     } else {
-        let health = build_health_json(now, &cfg, &stats, &pause, severity);
+        let health = build_health_json(
+            now,
+            &cfg,
+            &stats,
+            &pause,
+            &cov,
+            coverage_state.sustained_s,
+            severity,
+        );
         if let Err(e) = std::fs::write(HEALTH_PATH, health) {
             warn!("[forgia-streaming] health write failed: {e}");
         }
@@ -488,6 +555,8 @@ fn compute_severity(
     cfg: &StreamingConfig,
     stats: &StreamingStats,
     pause: &StreamingPause,
+    coverage: &FoliageCoverageReport,
+    coverage_sustained_s: f32,
 ) -> &'static str {
     if pause.active && stats.pending_load_count > 0 {
         return "info";
@@ -501,6 +570,11 @@ fn compute_severity(
     if stats.gen_ms_hist.percentile_ms(0.99) > 50.0 && stats.gen_ms_hist.sample_count > 10 {
         return "warning";
     }
+    if coverage.without_veg() > cfg.debug.foliage_coverage_warn_threshold
+        && coverage_sustained_s >= cfg.debug.foliage_coverage_sustained_s
+    {
+        return "warning";
+    }
     "ok"
 }
 
@@ -509,6 +583,8 @@ fn build_sensor_json(
     cfg: &StreamingConfig,
     stats: &StreamingStats,
     pause: &StreamingPause,
+    coverage: &FoliageCoverageReport,
+    coverage_sustained_s: f32,
     severity: &str,
 ) -> String {
     let h = &stats.gen_ms_hist;
@@ -546,6 +622,7 @@ fn build_sensor_json(
   "gen_ms": {{ "sample_count": {}, "mean": {:.2}, "max": {:.2}, "p50": {:.2}, "p95": {:.2}, "p99": {:.2}, "buckets_log2": [{}] }},
   "recent_evictions": [{}],
   "pause": {{ "active": {}, "reason": "{}", "waiting_chunks": {} }},
+  "foliage_coverage": {{ "loaded": {}, "with_veg": {}, "without_veg": {}, "threshold": {}, "sustained_s": {:.2} }},
   "severity": "{}"
 }}"#,
         now,
@@ -584,6 +661,11 @@ fn build_sensor_json(
         pause.active,
         pause.reason.replace('"', "'"),
         pause.waiting_chunks,
+        coverage.chunks_loaded,
+        coverage.chunks_with_veg,
+        coverage.without_veg(),
+        cfg.debug.foliage_coverage_warn_threshold,
+        coverage_sustained_s,
         severity,
     )
 }
@@ -593,9 +675,11 @@ fn build_health_json(
     cfg: &StreamingConfig,
     stats: &StreamingStats,
     pause: &StreamingPause,
+    coverage: &FoliageCoverageReport,
+    coverage_sustained_s: f32,
     severity: &str,
 ) -> String {
-    let (message, next_step) = diagnose(cfg, stats, pause);
+    let (message, next_step) = diagnose(cfg, stats, pause, coverage, coverage_sustained_s);
     format!(
         r#"{{
   "timestamp_secs": {:.1},
@@ -612,6 +696,8 @@ fn diagnose(
     cfg: &StreamingConfig,
     stats: &StreamingStats,
     pause: &StreamingPause,
+    coverage: &FoliageCoverageReport,
+    coverage_sustained_s: f32,
 ) -> (String, String) {
     if pause.active && stats.pending_load_count > 0 {
         return (
@@ -649,6 +735,19 @@ fn diagnose(
             "Profile meshing_heightmap + biome generation. Move to async pool if sync. Check forgia_terrain_pipeline.json buckets".into(),
         );
     }
+    if coverage.without_veg() > cfg.debug.foliage_coverage_warn_threshold
+        && coverage_sustained_s >= cfg.debug.foliage_coverage_sustained_s
+    {
+        return (
+            format!(
+                "Foliage coverage gap: {} chunks loaded sans veg sustained {:.1}s (threshold {})",
+                coverage.without_veg(),
+                coverage_sustained_s,
+                cfg.debug.foliage_coverage_warn_threshold
+            ),
+            "Si producteur foliage non wiré (story-502-B pas livrée) ce warning est attendu. Sinon : check forgia-foliage::populate_new_chunks (AssetRegistry::is_ready au boot ?). Voir story-502 plan G2+G3".into(),
+        );
+    }
     ("All streaming invariants OK".into(), String::new())
 }
 
@@ -660,6 +759,8 @@ impl Plugin for ForgiaStreamingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<StreamingStats>()
             .init_resource::<StreamingPause>()
+            .init_resource::<FoliageCoverageReport>()
+            .init_resource::<FoliageCoverageState>()
             .init_resource::<SensorTimer>()
             .add_systems(Startup, load_streaming_genome)
             .add_systems(Update, write_chunk_stream_sensor);
@@ -806,7 +907,8 @@ gen_ms_buckets = 16
         let cfg = StreamingConfig::default();
         let stats = StreamingStats::default();
         let pause = StreamingPause::default();
-        assert_eq!(compute_severity(&cfg, &stats, &pause), "ok");
+        let cov = FoliageCoverageReport::default();
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 0.0), "ok");
     }
 
     #[test]
@@ -821,7 +923,8 @@ gen_ms_buckets = 16
             reason: "boot".into(),
             waiting_chunks: 3,
         };
-        assert_eq!(compute_severity(&cfg, &stats, &pause), "info");
+        let cov = FoliageCoverageReport::default();
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 0.0), "info");
     }
 
     #[test]
@@ -832,7 +935,8 @@ gen_ms_buckets = 16
             ..Default::default()
         };
         let pause = StreamingPause::default();
-        assert_eq!(compute_severity(&cfg, &stats, &pause), "warning");
+        let cov = FoliageCoverageReport::default();
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 0.0), "warning");
     }
 
     #[test]
@@ -843,7 +947,8 @@ gen_ms_buckets = 16
             ..Default::default()
         };
         let pause = StreamingPause::default();
-        assert_eq!(compute_severity(&cfg, &stats, &pause), "warning");
+        let cov = FoliageCoverageReport::default();
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 0.0), "warning");
     }
 
     #[test]
@@ -858,7 +963,8 @@ gen_ms_buckets = 16
             reason: "teleport".into(),
             waiting_chunks: 5,
         };
-        let (msg, next) = diagnose(&cfg, &stats, &pause);
+        let cov = FoliageCoverageReport::default();
+        let (msg, next) = diagnose(&cfg, &stats, &pause, &cov, 0.0);
         assert!(msg.contains("teleport"));
         assert!(!next.is_empty());
     }
@@ -868,9 +974,140 @@ gen_ms_buckets = 16
         let cfg = StreamingConfig::default();
         let stats = StreamingStats::default();
         let pause = StreamingPause::default();
-        let json = build_sensor_json(123.4, &cfg, &stats, &pause, "ok");
+        let cov = FoliageCoverageReport::default();
+        let json = build_sensor_json(123.4, &cfg, &stats, &pause, &cov, 0.0, "ok");
         assert!(json.contains(r#""schema_version": 1"#));
         assert!(json.contains(r#""severity": "ok""#));
         assert!(json.contains(r#""buckets_log2": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"#));
+    }
+
+    // ── Story-502-A : FoliageCoverageReport ───────────────────────────────
+
+    #[test]
+    fn foliage_coverage_default_is_zero() {
+        let cov = FoliageCoverageReport::default();
+        assert_eq!(cov.chunks_loaded, 0);
+        assert_eq!(cov.chunks_with_veg, 0);
+        assert_eq!(cov.without_veg(), 0);
+    }
+
+    #[test]
+    fn foliage_coverage_without_veg_saturating() {
+        // Producteur incohérent (with_veg > loaded) ne doit pas underflow.
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 2,
+            chunks_with_veg: 10,
+        };
+        assert_eq!(cov.without_veg(), 0);
+    }
+
+    #[test]
+    fn foliage_coverage_without_veg_arithmetic() {
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 12,
+            chunks_with_veg: 5,
+        };
+        assert_eq!(cov.without_veg(), 7);
+    }
+
+    #[test]
+    fn severity_warning_when_coverage_gap_sustained() {
+        let cfg = StreamingConfig::default();
+        let stats = StreamingStats::default();
+        let pause = StreamingPause::default();
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 10,
+            chunks_with_veg: 0,
+        };
+        // without_veg = 10 > threshold (4) ET sustained 3.0s >= cfg sustained 3.0s
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 3.0), "warning");
+    }
+
+    #[test]
+    fn severity_ok_when_coverage_gap_below_sustained() {
+        let cfg = StreamingConfig::default();
+        let stats = StreamingStats::default();
+        let pause = StreamingPause::default();
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 10,
+            chunks_with_veg: 0,
+        };
+        // gap au-dessus du threshold mais sustained 1s < cfg sustained 3s
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 1.0), "ok");
+    }
+
+    #[test]
+    fn severity_ok_when_coverage_full() {
+        let cfg = StreamingConfig::default();
+        let stats = StreamingStats::default();
+        let pause = StreamingPause::default();
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 100,
+            chunks_with_veg: 100,
+        };
+        // 0 gap même sustained long
+        assert_eq!(compute_severity(&cfg, &stats, &pause, &cov, 60.0), "ok");
+    }
+
+    #[test]
+    fn build_sensor_json_contains_foliage_coverage_block() {
+        let cfg = StreamingConfig::default();
+        let stats = StreamingStats::default();
+        let pause = StreamingPause::default();
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 12,
+            chunks_with_veg: 3,
+        };
+        let json = build_sensor_json(0.0, &cfg, &stats, &pause, &cov, 2.5, "ok");
+        assert!(json.contains(r#""foliage_coverage""#));
+        assert!(json.contains(r#""loaded": 12"#));
+        assert!(json.contains(r#""with_veg": 3"#));
+        assert!(json.contains(r#""without_veg": 9"#));
+        assert!(json.contains(r#""threshold": 4"#));
+        assert!(json.contains(r#""sustained_s": 2.50"#));
+    }
+
+    #[test]
+    fn diagnose_coverage_gap_returns_actionable_next_step() {
+        let cfg = StreamingConfig::default();
+        let stats = StreamingStats::default();
+        let pause = StreamingPause::default();
+        let cov = FoliageCoverageReport {
+            chunks_loaded: 20,
+            chunks_with_veg: 0,
+        };
+        let (msg, next) = diagnose(&cfg, &stats, &pause, &cov, 5.0);
+        assert!(msg.contains("Foliage coverage gap"));
+        assert!(msg.contains("20"));
+        assert!(next.contains("story-502"));
+    }
+
+    #[test]
+    fn legacy_genome_without_coverage_fields_parses_with_defaults() {
+        // Backward compat : un TOML pré-story-502-A doit parser via serde(default).
+        let legacy = MINIMAL_GENOME; // n'a pas les 2 nouveaux champs
+        let g = StreamingGenome::parse(legacy).unwrap();
+        assert_eq!(
+            g.debug.foliage_coverage_warn_threshold,
+            default_foliage_coverage_warn_threshold()
+        );
+        assert!(
+            (g.debug.foliage_coverage_sustained_s - default_foliage_coverage_sustained_s()).abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn genome_with_coverage_overrides_propagates_to_config() {
+        let with_overrides = format!(
+            "{}\nfoliage_coverage_warn_threshold = 12\nfoliage_coverage_sustained_s = 7.5\n",
+            MINIMAL_GENOME.trim_end()
+        );
+        let g = StreamingGenome::parse(&with_overrides).unwrap();
+        assert_eq!(g.debug.foliage_coverage_warn_threshold, 12);
+        assert_eq!(g.debug.foliage_coverage_sustained_s, 7.5);
+        let cfg = StreamingConfig::from_genome(&g, ConfigSource::TomlGenome);
+        assert_eq!(cfg.debug.foliage_coverage_warn_threshold, 12);
+        assert_eq!(cfg.debug.foliage_coverage_sustained_s, 7.5);
     }
 }

@@ -140,8 +140,10 @@ mod tests {
         let hipfire = viewmodel_rotation_hipfire(&e);
         let ads = viewmodel_rotation_ads(&e);
         // Hipfire ≠ ADS si tilt non nul.
-        assert!(hipfire.angle_between(ads) > 0.0,
-            "tilt non nul doit produire rotation différente");
+        assert!(
+            hipfire.angle_between(ads) > 0.0,
+            "tilt non nul doit produire rotation différente"
+        );
     }
 
     #[test]
@@ -153,7 +155,10 @@ mod tests {
         let expected = Quat::from_rotation_y((-90.0_f32).to_radians());
         // Robust same-rotation check : |dot| ≈ 1.0 (Quat double-cover safe).
         let same = (1.0 - ads.dot(expected).abs()).abs();
-        assert!(same < 1e-4, "ADS rotation = base seule (tilt ignoré), 1-|dot|={same}");
+        assert!(
+            same < 1e-4,
+            "ADS rotation = base seule (tilt ignoré), 1-|dot|={same}"
+        );
     }
 
     #[test]
@@ -182,7 +187,10 @@ mod tests {
     #[test]
     fn fallback_scale_uses_genome_when_provided() {
         let e = mock_entry();
-        assert_eq!(viewmodel_fallback_scale(WeaponType::ModernAR, Some(&e)), 1.0);
+        assert_eq!(
+            viewmodel_fallback_scale(WeaponType::ModernAR, Some(&e)),
+            1.0
+        );
         // Sans genome : 1.0 (no-op).
         assert_eq!(viewmodel_fallback_scale(WeaponType::ModernAR, None), 1.0);
     }

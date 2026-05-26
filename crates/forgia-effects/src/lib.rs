@@ -14,8 +14,8 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
-pub mod weapon_vfx;
 pub mod arena_feedback;
+pub mod weapon_vfx;
 
 // TODO: port from V1 effects/ — les modules suivants nécessitent des deps supplémentaires
 // pub mod fireball_vfx;   // needs forgia-player (Fireball, IceBolt, GoblinOnFire, etc.)
@@ -32,10 +32,13 @@ pub mod arena_feedback;
 // pub mod fade_in;         // needs forgia-core (FadeIn component)
 
 pub mod prelude {
-    pub use crate::ForgiaEffectsPlugin;
-    pub use crate::weapon_vfx::{WeaponVfxEffects, MuzzleVfxMarker, ImpactVfxMarker, Lifetime, spawn_muzzle_flash, spawn_impact_vfx};
-    pub use crate::weapon_vfx::tracer::{TracerResources, EmissiveFade, spawn_hitscan_tracer};
     pub use crate::arena_feedback::{ArenaFeedbackPlugin, ArenaFeedbackStats};
+    pub use crate::weapon_vfx::tracer::{spawn_hitscan_tracer, EmissiveFade, TracerResources};
+    pub use crate::weapon_vfx::{
+        spawn_impact_vfx, spawn_muzzle_flash, ImpactVfxMarker, Lifetime, MuzzleVfxMarker,
+        WeaponVfxEffects,
+    };
+    pub use crate::ForgiaEffectsPlugin;
 }
 
 pub struct ForgiaEffectsPlugin;
@@ -48,7 +51,16 @@ impl Plugin for ForgiaEffectsPlugin {
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
             .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
             .add_plugins(arena_feedback::ArenaFeedbackPlugin)
-            .add_systems(Update, (effects_tick, emissive_fade_tick, lifetime_tick, weapon_vfx::tracer::tick_bullets_in_flight).in_set(GameSet::Effects));
+            .add_systems(
+                Update,
+                (
+                    effects_tick,
+                    emissive_fade_tick,
+                    lifetime_tick,
+                    weapon_vfx::tracer::tick_bullets_in_flight,
+                )
+                    .in_set(GameSet::Effects),
+            );
     }
 }
 
@@ -73,7 +85,11 @@ fn emissive_fade_tick(
     time: Res<Time>,
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut q: Query<(Entity, &mut weapon_vfx::tracer::EmissiveFade, &MeshMaterial3d<StandardMaterial>)>,
+    mut q: Query<(
+        Entity,
+        &mut weapon_vfx::tracer::EmissiveFade,
+        &MeshMaterial3d<StandardMaterial>,
+    )>,
 ) {
     for (entity, mut fade, mat) in &mut q {
         fade.timer.tick(time.delta());

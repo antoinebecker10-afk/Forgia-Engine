@@ -50,7 +50,6 @@ use forgia_medial_axis::{MedialAxisGraph, MedialSphere};
 // depuis `forgia_skeleton_embedder` sans changer leurs `use` statements.
 pub use forgia_skeleton_template::{BoneClass, SkeletonTemplate, TemplateBone};
 
-
 /// Bone embedded sur le medial axis : position monde + rayon de la sphère
 /// médiale associée.
 #[derive(Debug, Clone)]
@@ -366,13 +365,11 @@ fn embed_one_chain(
 
     // Direction & longueur template chaîne (attach → terminal en template normalisé).
     let attach_template_pos = match chain.attach {
-        Some(attach_idx) => {
-            center_xz + template.bones[attach_idx].pos_vec3() * mesh_height
-        }
+        Some(attach_idx) => center_xz + template.bones[attach_idx].pos_vec3() * mesh_height,
         None => center_xz + template.bones[chain.bones[0]].pos_vec3() * mesh_height,
     };
-    let terminal_template_pos = center_xz
-        + template.bones[*chain.bones.last().unwrap()].pos_vec3() * mesh_height;
+    let terminal_template_pos =
+        center_xz + template.bones[*chain.bones.last().unwrap()].pos_vec3() * mesh_height;
     let chain_direction = (terminal_template_pos - attach_template_pos).normalize_or_zero();
     let chain_length = attach_template_pos.distance(terminal_template_pos);
 
@@ -425,27 +422,27 @@ fn embed_one_chain(
     let path_info: Option<(Vec<Vec3>, Vec<f32>, Vec<f32>, f32)> =
         match (attach_sphere_idx, terminal_sphere_idx) {
             (Some(a), Some(t)) if a != t => {
-                shortest_path_indices(graph.spheres.len(), &graph.edges, a, t).and_then(|path_idx| {
-                    if path_idx.len() < 2 {
-                        return None;
-                    }
-                    let centers: Vec<Vec3> = path_idx
-                        .iter()
-                        .map(|&i| graph.spheres[i].center)
-                        .collect();
-                    let radii: Vec<f32> =
-                        path_idx.iter().map(|&i| graph.spheres[i].radius).collect();
-                    // Cumul arc length along the path.
-                    let mut arc: Vec<f32> = vec![0.0; centers.len()];
-                    for i in 1..centers.len() {
-                        arc[i] = arc[i - 1] + centers[i - 1].distance(centers[i]);
-                    }
-                    let total = arc[arc.len() - 1];
-                    if total < 1e-6 {
-                        return None;
-                    }
-                    Some((centers, radii, arc, total))
-                })
+                shortest_path_indices(graph.spheres.len(), &graph.edges, a, t).and_then(
+                    |path_idx| {
+                        if path_idx.len() < 2 {
+                            return None;
+                        }
+                        let centers: Vec<Vec3> =
+                            path_idx.iter().map(|&i| graph.spheres[i].center).collect();
+                        let radii: Vec<f32> =
+                            path_idx.iter().map(|&i| graph.spheres[i].radius).collect();
+                        // Cumul arc length along the path.
+                        let mut arc: Vec<f32> = vec![0.0; centers.len()];
+                        for i in 1..centers.len() {
+                            arc[i] = arc[i - 1] + centers[i - 1].distance(centers[i]);
+                        }
+                        let total = arc[arc.len() - 1];
+                        if total < 1e-6 {
+                            return None;
+                        }
+                        Some((centers, radii, arc, total))
+                    },
+                )
             }
             _ => None,
         };
@@ -518,7 +515,11 @@ fn embed_one_chain(
                 // Head : X centré, Y et Z depuis la sphère terminale (entre dans le mesh tête).
                 let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
                 (
-                    Vec3::new(template_pos.x, terminal_sphere.center.y, terminal_sphere.center.z),
+                    Vec3::new(
+                        template_pos.x,
+                        terminal_sphere.center.y,
+                        terminal_sphere.center.z,
+                    ),
                     terminal_sphere.radius,
                 )
             } else {
@@ -531,7 +532,10 @@ fn embed_one_chain(
                 // Spine : Y depuis path (curvature anatomique), X/Z depuis
                 // template rescalé (centrage strict, pas de dérive latérale).
                 let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
-                (Vec3::new(template_pos.x, path_pos.y, template_pos.z), path_r)
+                (
+                    Vec3::new(template_pos.x, path_pos.y, template_pos.z),
+                    path_r,
+                )
             } else if is_spine_x_only {
                 // Head intermediate (rare) : X centré, Y/Z depuis path.
                 let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
@@ -626,7 +630,7 @@ fn find_terminal_sphere(
         let to_sphere_len = to_sphere.length().max(0.001);
         let to_sphere_dir = to_sphere / to_sphere_len;
         let cos_angle = to_sphere_dir.dot(direction); // -1..1
-        // Score = distance_to_target + length_penalty + alignment_penalty
+                                                      // Score = distance_to_target + length_penalty + alignment_penalty
         let dist_to_target = s.center.distance(target);
         let length_penalty = 2.0 * (to_sphere_len - chain_length).abs();
         let alignment_penalty = chain_length * (1.0 - cos_angle); // weight ~chain_length
@@ -687,7 +691,7 @@ fn find_best_sphere(
         let to_sphere_len = to_sphere.length().max(0.001);
         let to_sphere_dir = to_sphere / to_sphere_len;
         let cos_angle = to_sphere_dir.dot(expected_dir); // -1..1
-        // Distance pénalisée par mauvais alignement (cos -1 ajoute 2*weight au score)
+                                                         // Distance pénalisée par mauvais alignement (cos -1 ajoute 2*weight au score)
         let distance = s.center.distance(target);
         let score = distance + alignment_weight * (1.0 - cos_angle);
         if score < best_score {
@@ -737,13 +741,15 @@ mod tests {
         let hip = rescaled.bones.iter().find(|b| b.name == "hip").unwrap();
         assert!(
             (hip.pos[1] - 0.42).abs() < 0.01,
-            "hip y should be 0.42, got {}", hip.pos[1]
+            "hip y should be 0.42, got {}",
+            hip.pos[1]
         );
 
         let head = rescaled.bones.iter().find(|b| b.name == "head").unwrap();
         assert!(
             (head.pos[1] - 0.95).abs() < 0.01,
-            "head y should be 0.95, got {}", head.pos[1]
+            "head y should be 0.95, got {}",
+            head.pos[1]
         );
 
         // Arm tip étendu : forearm_L pos.x devrait être négatif et plus large
@@ -757,7 +763,8 @@ mod tests {
             .fold(0.0, f32::max);
         assert!(
             max_arm_x > 0.20,
-            "arm scale should extend arm bones (got max |x|={})", max_arm_x
+            "arm scale should extend arm bones (got max |x|={})",
+            max_arm_x
         );
     }
 
@@ -769,7 +776,8 @@ mod tests {
         let tail4 = rescaled.bones.iter().find(|b| b.name == "tail_04").unwrap();
         assert!(
             tail4.pos[2] < -0.30,
-            "tail_04 z must stay extended back (got {})", tail4.pos[2]
+            "tail_04 z must stay extended back (got {})",
+            tail4.pos[2]
         );
     }
 
@@ -885,6 +893,7 @@ mod tests {
                 pos: [0.0, 0.5, 0.0],
                 class: BoneClass::Other,
             }],
+            stance_offsets: Default::default(),
         };
         // bounds : center_xz = (0.5, 0, 0.5). target_world = (0.5, 0.5, 0.5).
         // Place la sphère là pour snap_distance = 0.

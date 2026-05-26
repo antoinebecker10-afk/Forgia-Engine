@@ -42,9 +42,16 @@ fn spawn_on_hit(
         };
 
         commands.spawn((
-            FloatingNumber { ttl: 1.0, initial_ttl: 1.0, vel_y },
+            FloatingNumber {
+                ttl: 1.0,
+                initial_ttl: 1.0,
+                vel_y,
+            },
             Text2d::new(format!("{:.0}", ev.damage)),
-            TextFont { font_size, ..default() },
+            TextFont {
+                font_size,
+                ..default()
+            },
             TextColor(color),
             Transform::from_translation(ev.hit_world_pos + Vec3::Y * 0.1),
             GlobalTransform::default(),

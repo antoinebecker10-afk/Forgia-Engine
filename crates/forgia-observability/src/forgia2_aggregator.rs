@@ -122,10 +122,7 @@ fn compose_aggregate(
 /// Système 1Hz — écrit forgia2_combat.json + forgia2_arena.json.
 /// Run en `GameSet::Sensors`, mode-gated en `GameMode::Fps` (les 7 sources Tier 1
 /// sont toutes FPS-spécifiques, inutile de tourner en RPG).
-pub fn sys_write_forgia2_aggregates(
-    time: Res<Time>,
-    mut state: ResMut<Forgia2AggregatorState>,
-) {
+pub fn sys_write_forgia2_aggregates(time: Res<Time>, mut state: ResMut<Forgia2AggregatorState>) {
     let now = time.elapsed_secs();
     if now - state.last_write_secs < 1.0 {
         return;
@@ -182,7 +179,10 @@ mod tests {
         let (_, severity, next_step) = compose_aggregate("test", 0.0, fake);
         assert_eq!(severity, "critical");
         assert!(!next_step.is_empty());
-        assert!(next_step.len() > 10, "next_step doit être actionnable, pas un mot");
+        assert!(
+            next_step.len() > 10,
+            "next_step doit être actionnable, pas un mot"
+        );
     }
 
     #[test]

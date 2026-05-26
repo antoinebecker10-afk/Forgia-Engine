@@ -122,7 +122,9 @@ pub(crate) fn ingest_damage_for_player(
     q_health: Query<&Health, With<Player>>,
     q_attacker_tf: Query<&GlobalTransform>,
 ) {
-    let Ok((player_entity, player_tf)) = q_player.single() else { return };
+    let Ok((player_entity, player_tf)) = q_player.single() else {
+        return;
+    };
     let Ok(cam_tf) = q_cam.single() else { return };
     let max_hp = q_health.single().map(|h| h.max).unwrap_or(100.0);
     let fwd = cam_tf.forward().as_vec3();
@@ -133,7 +135,9 @@ pub(crate) fn ingest_damage_for_player(
         if hit.target != player_entity {
             continue;
         }
-        let Some(attacker) = hit.attacker else { continue };
+        let Some(attacker) = hit.attacker else {
+            continue;
+        };
         if attacker == player_entity {
             // Self-damage (fall, splash propre) : skip.
             continue;

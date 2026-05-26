@@ -70,8 +70,7 @@ impl MaterialFader {
 
     /// Alpha actuel calculé depuis progress.
     pub fn current_alpha(&self) -> f32 {
-        self.alpha_opaque
-            + (self.alpha_target - self.alpha_opaque) * self.progress.clamp(0.0, 1.0)
+        self.alpha_opaque + (self.alpha_target - self.alpha_opaque) * self.progress.clamp(0.0, 1.0)
     }
 }
 
@@ -178,16 +177,15 @@ pub struct MeshFaderPlugin;
 
 impl Plugin for MeshFaderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MeshFaderDebugTimer>()
-            .add_systems(
-                Update,
-                (
-                    clone_material_on_fader_add,
-                    apply_material_fader_alpha,
-                    mesh_fader_debug_sensor,
-                )
-                    .chain(),
-            );
+        app.init_resource::<MeshFaderDebugTimer>().add_systems(
+            Update,
+            (
+                clone_material_on_fader_add,
+                apply_material_fader_alpha,
+                mesh_fader_debug_sensor,
+            )
+                .chain(),
+        );
     }
 }
 

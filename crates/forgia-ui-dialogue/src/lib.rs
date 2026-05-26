@@ -9,9 +9,7 @@
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
-use forgia_dialogue::{
-    ChooseDialogueOption, DialogueRegistry, DialogueSession, EndDialogue,
-};
+use forgia_dialogue::{ChooseDialogueOption, DialogueRegistry, DialogueSession, EndDialogue};
 
 pub mod prelude {
     pub use crate::ForgiaUiDialoguePlugin;
@@ -33,7 +31,9 @@ fn render_dialogue(
     mut end: MessageWriter<EndDialogue>,
 ) {
     let Ok(ctx) = contexts.ctx_mut() else { return };
-    let Some((player, session)) = sessions.iter().next() else { return };
+    let Some((player, session)) = sessions.iter().next() else {
+        return;
+    };
 
     // Lookup tree + node
     let (speaker, line, choices): (String, String, Vec<(usize, String)>) =

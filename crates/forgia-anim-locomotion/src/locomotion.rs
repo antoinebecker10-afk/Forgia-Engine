@@ -12,9 +12,7 @@ use forgia_anim_debug::{AnimLayerStats, AnimTimer};
 use forgia_genome_core::Genome;
 use forgia_rig_topology::{analyze_rig_topology, RigTopology};
 use forgia_secondary_motion::{SpringBone, SpringBoneChain};
-use forgia_skeleton_template::{
-    SkeletonTemplate, SkeletonTemplateId, SkeletonTemplateRegistry,
-};
+use forgia_skeleton_template::{SkeletonTemplate, SkeletonTemplateId, SkeletonTemplateRegistry};
 
 /// Marker à insérer sur le character qui doit recevoir l'animation procédurale.
 /// forgia-rpg ajoute ce marker sur `RexCharacter` au spawn.
@@ -304,7 +302,12 @@ pub fn attach_locomotion_bones(
             for diag in topo.diagnostics.iter().take(60) {
                 info!(
                     "  bone '{}' depth={} pos=({:.2}, {:.2}, {:.2}) children={}",
-                    diag.name, diag.depth, diag.local_pos.x, diag.local_pos.y, diag.local_pos.z, diag.child_count
+                    diag.name,
+                    diag.depth,
+                    diag.local_pos.x,
+                    diag.local_pos.y,
+                    diag.local_pos.z,
+                    diag.child_count
                 );
             }
         }
@@ -437,7 +440,10 @@ pub fn attach_locomotion_bones(
 
             // Sensor : dump bind euler + translations
             let tx_of = |opt_e: Option<Entity>| {
-                opt_e.and_then(|e| transforms.get(e).ok()).map(|t| t.translation).unwrap_or(Vec3::ZERO)
+                opt_e
+                    .and_then(|e| transforms.get(e).ok())
+                    .map(|t| t.translation)
+                    .unwrap_or(Vec3::ZERO)
             };
             let fmt_bone = |b: &BonePose, child_e: Option<Entity>| {
                 let (x, y, z) = b.bind.to_euler(EulerRot::XYZ);
@@ -555,8 +561,14 @@ pub fn procedural_locomotion(
         slerp_to_stance(&mut bones, &b.clavicle_l, stance.clavicle_l, 0.15);
         slerp_to_stance(&mut bones, &b.clavicle_r, stance.clavicle_r, 0.15);
         for bone in [
-            &b.forearm_l, &b.forearm_r,
-            &b.left_leg, &b.right_leg, &b.shin_l, &b.shin_r, &b.foot_l, &b.foot_r,
+            &b.forearm_l,
+            &b.forearm_r,
+            &b.left_leg,
+            &b.right_leg,
+            &b.shin_l,
+            &b.shin_r,
+            &b.foot_l,
+            &b.foot_r,
             &b.hip,
         ] {
             slerp_to_bind(&mut bones, bone, 0.15);
@@ -569,8 +581,7 @@ pub fn procedural_locomotion(
 
     // Walk cycle anatomique
     let tunables = crate::proc_walk::GaitTunables::for_speed(speed);
-    state.gait_phase =
-        crate::proc_walk::update_gait_phase(state.gait_phase, speed, dt, &tunables);
+    state.gait_phase = crate::proc_walk::update_gait_phase(state.gait_phase, speed, dt, &tunables);
     let gait = state.gait_phase;
     let speed_factor =
         ((speed - IDLE_SPEED_THRESHOLD) / crate::proc_walk::SPEED_WALK_PEAK_M_S).clamp(0.0, 1.2);
@@ -589,8 +600,18 @@ pub fn procedural_locomotion(
     let (arm_l_pitch, elbow_l) =
         crate::proc_walk::arm_pose((gait + 0.5).rem_euclid(1.0), &tunables);
     let (arm_r_pitch, elbow_r) = crate::proc_walk::arm_pose(gait, &tunables);
-    compose_stance_swing(&mut bones, &b.left_arm, stance.arm_l, arm_l_pitch * speed_factor);
-    compose_stance_swing(&mut bones, &b.right_arm, stance.arm_r, arm_r_pitch * speed_factor);
+    compose_stance_swing(
+        &mut bones,
+        &b.left_arm,
+        stance.arm_l,
+        arm_l_pitch * speed_factor,
+    );
+    compose_stance_swing(
+        &mut bones,
+        &b.right_arm,
+        stance.arm_r,
+        arm_r_pitch * speed_factor,
+    );
     // P2c : clavicle stance (no swing pendant walk — la clavicle est statique
     // sur la pose game, seule l'arm pitch fait l'oscillation walk cycle).
     slerp_to_stance(&mut bones, &b.clavicle_l, stance.clavicle_l, 0.25);
@@ -602,9 +623,8 @@ pub fn procedural_locomotion(
         crate::proc_walk::pelvic_pose(gait, speed_factor, &tunables);
     if let Some(e) = b.hip.entity {
         if let Ok(mut tf) = bones.get_mut(e) {
-            tf.rotation = b.hip.bind
-                * Quat::from_rotation_y(pelvic_yaw)
-                * Quat::from_rotation_z(pelvic_roll);
+            tf.rotation =
+                b.hip.bind * Quat::from_rotation_y(pelvic_yaw) * Quat::from_rotation_z(pelvic_roll);
         }
     }
 
@@ -700,10 +720,7 @@ pub fn apply_stance_offsets_from_template(
     registry: Res<SkeletonTemplateRegistry>,
     assets: Res<Assets<Genome<SkeletonTemplate>>>,
     mut asset_events: MessageReader<AssetEvent<Genome<SkeletonTemplate>>>,
-    q_targets: Query<
-        (Entity, &LocomotionTemplate, Option<&StanceOffsets>),
-        With<LocomotionTarget>,
-    >,
+    q_targets: Query<(Entity, &LocomotionTemplate, Option<&StanceOffsets>), With<LocomotionTarget>>,
     mut dirty: Local<bool>,
 ) {
     // Détecte hot-reload OR premier load
@@ -896,9 +913,8 @@ pub fn write_walk_pose_sensor(
 
     let speed = state.speed;
     let gait = state.gait_phase;
-    let speed_factor = ((speed - IDLE_SPEED_THRESHOLD)
-        / crate::proc_walk::SPEED_WALK_PEAK_M_S)
-        .clamp(0.0, 1.2);
+    let speed_factor =
+        ((speed - IDLE_SPEED_THRESHOLD) / crate::proc_walk::SPEED_WALK_PEAK_M_S).clamp(0.0, 1.2);
     let snap = crate::proc_walk::WalkPoseSnapshot::from_gait(gait, speed, speed_factor);
 
     let is_moving = speed > IDLE_SPEED_THRESHOLD;

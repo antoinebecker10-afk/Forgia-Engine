@@ -116,13 +116,21 @@ pub fn text_with_outline(
     outline_thickness: f32,
 ) {
     let offsets: [(f32, f32); 8] = [
-        (-1.0, -1.0), (0.0, -1.0), (1.0, -1.0),
-        (-1.0,  0.0),               (1.0,  0.0),
-        (-1.0,  1.0), (0.0,  1.0), (1.0,  1.0),
+        (-1.0, -1.0),
+        (0.0, -1.0),
+        (1.0, -1.0),
+        (-1.0, 0.0),
+        (1.0, 0.0),
+        (-1.0, 1.0),
+        (0.0, 1.0),
+        (1.0, 1.0),
     ];
     for (dx, dy) in offsets {
         painter.text(
-            Pos2::new(pos.x + dx * outline_thickness, pos.y + dy * outline_thickness),
+            Pos2::new(
+                pos.x + dx * outline_thickness,
+                pos.y + dy * outline_thickness,
+            ),
             anchor,
             text,
             font.clone(),

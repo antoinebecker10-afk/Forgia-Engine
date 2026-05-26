@@ -246,7 +246,10 @@ mod tests {
             half_width: 1.5,
         };
         let d2 = seg.distance_squared_to(Vec2::new(5.0, 3.0));
-        assert!((d2 - 9.0).abs() < 1e-3, "perpendicular distance² should be 9, got {d2}");
+        assert!(
+            (d2 - 9.0).abs() < 1e-3,
+            "perpendicular distance² should be 9, got {d2}"
+        );
     }
 
     #[test]

@@ -49,15 +49,29 @@ pub struct BiomeEnemyModifiers {
 
 impl Default for BiomeEnemyModifiers {
     fn default() -> Self {
-        Self { hp_mult: 1.0, speed_mult: 1.0, dmg_mult: 1.0 }
+        Self {
+            hp_mult: 1.0,
+            speed_mult: 1.0,
+            dmg_mult: 1.0,
+        }
     }
 }
 
-fn default_one() -> f32 { 1.0 }
-fn default_grass_density() -> u32 { 200 }
-fn default_grass_height_min() -> f32 { 0.5 }
-fn default_grass_height_max() -> f32 { 1.2 }
-fn default_grass_color() -> [f32; 3] { [0.25, 0.55, 0.15] }
+fn default_one() -> f32 {
+    1.0
+}
+fn default_grass_density() -> u32 {
+    200
+}
+fn default_grass_height_min() -> f32 {
+    0.5
+}
+fn default_grass_height_max() -> f32 {
+    1.2
+}
+fn default_grass_color() -> [f32; 3] {
+    [0.25, 0.55, 0.15]
+}
 
 // ─────────────────────────── BiomeGrassConfig ───────────────────────────
 
@@ -89,10 +103,18 @@ impl Default for BiomeGrassConfig {
 
 // ─────────────────────────── BiomeRoadConfig ───────────────────────────
 
-fn default_road_width_mult() -> f32 { 1.0 }
-fn default_road_depression_mult() -> f32 { 1.0 }
-fn default_road_edge_noise() -> f32 { 1.0 }
-fn default_road_vegetation_encroachment() -> f32 { 0.0 }
+fn default_road_width_mult() -> f32 {
+    1.0
+}
+fn default_road_depression_mult() -> f32 {
+    1.0
+}
+fn default_road_edge_noise() -> f32 {
+    1.0
+}
+fn default_road_vegetation_encroachment() -> f32 {
+    0.0
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BiomeRoadConfig {
@@ -202,8 +224,12 @@ pub fn load_all_biome_specs(dir: &Path) -> Vec<BiomeSpec> {
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "toml") {
             match load_biome_spec(&path) {
-                Ok(spec) => { specs.push(spec); }
-                Err(e) => { bevy::log::warn!("Skipping biome spec: {e}"); }
+                Ok(spec) => {
+                    specs.push(spec);
+                }
+                Err(e) => {
+                    bevy::log::warn!("Skipping biome spec: {e}");
+                }
             }
         }
     }
@@ -226,10 +252,17 @@ mod tests {
     fn grass_config_default_values_are_sane() {
         let g = BiomeGrassConfig::default();
         assert!(g.density > 0);
-        assert!(g.height_min > 0.0 && g.height_min < g.height_max,
-                "height_min {} must be < height_max {}", g.height_min, g.height_max);
-        assert!(g.color.iter().all(|c| (0.0..=1.0).contains(c)),
-                "grass color {:?} must be in [0, 1]", g.color);
+        assert!(
+            g.height_min > 0.0 && g.height_min < g.height_max,
+            "height_min {} must be < height_max {}",
+            g.height_min,
+            g.height_max
+        );
+        assert!(
+            g.color.iter().all(|c| (0.0..=1.0).contains(c)),
+            "grass color {:?} must be in [0, 1]",
+            g.color
+        );
         assert!(g.wind_sway >= 0.0);
     }
 

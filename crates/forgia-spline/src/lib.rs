@@ -214,12 +214,8 @@ mod tests {
 
     #[test]
     fn sample_empty_for_zero_interval() {
-        let samples = sample_bezier_segment_with_interval(
-            Vec2::ZERO,
-            Vec2::ZERO,
-            Vec2::new(10.0, 0.0),
-            0.0,
-        );
+        let samples =
+            sample_bezier_segment_with_interval(Vec2::ZERO, Vec2::ZERO, Vec2::new(10.0, 0.0), 0.0);
         assert!(samples.is_empty());
     }
 

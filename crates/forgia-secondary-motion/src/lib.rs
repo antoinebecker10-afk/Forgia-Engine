@@ -40,8 +40,8 @@
 use bevy::prelude::*;
 use bevy::transform::TransformSystems;
 
-pub mod spring_bone;
 pub mod solver;
+pub mod spring_bone;
 
 pub use spring_bone::{SpringBone, SpringBoneChain, SpringBoneState};
 
@@ -83,11 +83,14 @@ mod tests {
         app.add_plugins(bevy::transform::TransformPlugin);
         app.add_plugins(ForgiaSecondaryMotionPlugin);
 
-        let root = app.world_mut().spawn((
-            Transform::default(),
-            GlobalTransform::default(),
-            SpringBoneChain::default(),
-        )).id();
+        let root = app
+            .world_mut()
+            .spawn((
+                Transform::default(),
+                GlobalTransform::default(),
+                SpringBoneChain::default(),
+            ))
+            .id();
 
         app.update();
 

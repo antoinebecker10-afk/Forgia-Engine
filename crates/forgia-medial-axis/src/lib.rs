@@ -406,7 +406,9 @@ mod tests {
         assert!(
             d < 0.40,
             "largest sphere center {} should be near cube center {} (got d={:.3})",
-            largest.center, center, d
+            largest.center,
+            center,
+            d
         );
         // Rayon de la plus grosse sphère ≈ 0.5 (rayon inscrit dans le cube)
         assert!(

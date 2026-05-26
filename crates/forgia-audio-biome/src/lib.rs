@@ -1,4 +1,4 @@
-﻿//! # forgia-audio-biome
+//! # forgia-audio-biome
 //!
 //! Ambient audio par biome — joue 1 loop OGG selon le biome courant du joueur.
 //!
@@ -89,16 +89,22 @@ fn update_biome_ambient(
 ) {
     *frame_counter = frame_counter.wrapping_add(1);
     // 1 check / 30 frames (~0.5s) — biome change pas critique per-frame.
-    if !frame_counter.is_multiple_of(30) { return; }
+    if !frame_counter.is_multiple_of(30) {
+        return;
+    }
 
     let Some(biome_map) = biome_map else { return };
-    let Some(player_tf) = player_q.iter().next() else { return };
+    let Some(player_tf) = player_q.iter().next() else {
+        return;
+    };
     let off = offset.map(|o| (o.x, o.z)).unwrap_or((0.0, 0.0));
 
     let p = player_tf.translation;
     let biome = biome_map.biome_at(p.x + off.0, p.z + off.1);
 
-    if state.current == Some(biome) { return; }
+    if state.current == Some(biome) {
+        return;
+    }
 
     // Stop l'instance précédente (pas de fade — V2 future).
     if let Some(handle) = state.instance.take() {
@@ -113,7 +119,10 @@ fn update_biome_ambient(
 
     state.current = Some(biome);
     state.instance = Some(handle);
-    info!("[forgia-audio-biome] Switched ambient → {:?} ({})", biome, path);
+    info!(
+        "[forgia-audio-biome] Switched ambient → {:?} ({})",
+        biome, path
+    );
 }
 
 fn stop_biome_ambient(

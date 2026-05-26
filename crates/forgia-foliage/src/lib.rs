@@ -17,10 +17,11 @@
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use forgia_core::prelude::*;
 use forgia_asset_registry::{
     target_size_for, AssetCategory, AssetQuery, AssetRegistry, AssetSeason, NeedsAssetCalibrate,
 };
+use forgia_core::prelude::*;
+use forgia_streaming::FoliageCoverageReport;
 use forgia_terrain::{
     sampling::poisson_disk_sample, BiomeMap, BiomeType, ChunkCoord, ChunkLod, PathNetwork,
     TerrainConfig, CHUNK_X, CHUNK_Z,
@@ -28,7 +29,9 @@ use forgia_terrain::{
 use std::collections::HashMap;
 
 pub mod material_override;
-pub use material_override::{BarkOverrideConfig, BarkTextures, NeedsTrunkOverride};
+pub use material_override::{
+    BarkOverrideConfig, BarkTextures, FoliageFallbackDiagnostic, NeedsTrunkOverride,
+};
 
 pub mod prelude {
     pub use crate::{
@@ -104,8 +107,8 @@ impl TreeVariant {
     pub fn params(self) -> (f32, f32, f32, f32) {
         match self {
             Self::Standard => (0.15, 1.25, 1.4, 1.6),
-            Self::TallThin => (0.12, 2.0, 1.0, 2.3),  // pin élancé
-            Self::WideLow  => (0.22, 0.9, 1.8, 1.1),  // touffu bas
+            Self::TallThin => (0.12, 2.0, 1.0, 2.3), // pin élancé
+            Self::WideLow => (0.22, 0.9, 1.8, 1.1),  // touffu bas
         }
     }
     pub fn from_index(i: usize) -> Self {
@@ -153,21 +156,21 @@ impl Plugin for ForgiaFoliagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VegetationManager>()
             .init_resource::<BarkOverrideConfig>()
+            .init_resource::<FoliageFallbackDiagnostic>()
             .add_systems(
                 Startup,
-                (
-                    init_proc_meshes,
-                    material_override::preload_bark_textures,
-                ),
+                (init_proc_meshes, material_override::preload_bark_textures),
             )
             .add_systems(
                 Update,
                 (
                     populate_new_chunks,
                     material_override::apply_trunk_bark_override,
+                    material_override::write_foliage_fallback_sensor,
                     despawn_far_lod_vegetation,
                     despawn_unloaded_chunks,
                     write_vegetation_sensor,
+                    write_foliage_coverage_report,
                 )
                     .chain()
                     .in_set(GameSet::Movement)
@@ -207,13 +210,20 @@ fn populate_new_chunks(
     q_chunks: Query<(Entity, &ChunkCoord, Option<&ChunkLod>)>,
 ) {
     let (Some(biome_map), Some(terrain_cfg), Some(rpg_offset)) =
-        (biome_map, terrain_cfg, rpg_offset) else { return };
+        (biome_map, terrain_cfg, rpg_offset)
+    else {
+        return;
+    };
 
     // Skip si le registry n'a pas encore scanné (1ère frame avant Startup).
-    if registry.is_empty() { return }
+    if registry.is_empty() {
+        return;
+    }
 
     for (chunk_entity, coord, lod) in &q_chunks {
-        if veg.chunk_entities.contains_key(coord) { continue; }
+        if veg.chunk_entities.contains_key(coord) {
+            continue;
+        }
         let lod_val = lod.copied().unwrap_or(ChunkLod::Lod0);
         // Vegetation sur LOD0 (full) + LOD1 (clairsemé ×0.2). LOD2 = pas d'arbres
         // (mega-tiles plates, distance > 320 m). Pattern AAA mid-distance fade-out.
@@ -235,19 +245,16 @@ fn populate_new_chunks(
         let spacing = biome_min_spacing(biome) / density_factor.sqrt();
         let seed = derive_chunk_seed(coord, terrain_cfg.seed);
 
-        let pts = poisson_disk_sample(
-            CHUNK_X as f32,
-            CHUNK_Z as f32,
-            spacing,
-            seed,
-            30,
-        );
+        let pts = poisson_disk_sample(CHUNK_X as f32, CHUNK_Z as f32, spacing, seed, 30);
 
         // Query AssetRegistry pour arbres compatibles avec ce biome.
         // Bonus visuel : pour Forest/Plains, on inclut les arbres rouges autumn
         // pour donner une variation visuelle marquée (env. 30% des picks).
         let trees_all: Vec<&forgia_asset_registry::AssetEntry> = registry.query(
-            &AssetQuery::new().category(AssetCategory::Tree).biome(biome).alive(),
+            &AssetQuery::new()
+                .category(AssetCategory::Tree)
+                .biome(biome)
+                .alive(),
         );
         let trees_autumn: Vec<&forgia_asset_registry::AssetEntry> = registry.query(
             &AssetQuery::new()
@@ -256,7 +263,9 @@ fn populate_new_chunks(
                 .season(AssetSeason::Autumn)
                 .alive(),
         );
-        if trees_all.is_empty() { continue; }
+        if trees_all.is_empty() {
+            continue;
+        }
 
         let mut spawned: Vec<Entity> = Vec::with_capacity(target.min(pts.len()));
         for (i, (lx, lz)) in pts.iter().take(target).enumerate() {
@@ -267,14 +276,17 @@ fn populate_new_chunks(
             // Story-447 fix lévitation : foliage Y doit utiliser FlattenZones aussi,
             // sinon les arbres en bordure village (zone falloff) flottent au-dessus
             // du mesh leveled. Pure post-process raw → flatten-sampled.
-            let raw_h = forgia_terrain::heightmap_at(wx + rpg_offset.x, wz + rpg_offset.z, &terrain_cfg);
+            let raw_h =
+                forgia_terrain::heightmap_at(wx + rpg_offset.x, wz + rpg_offset.z, &terrain_cfg);
             let h = match flatten_zones.as_deref() {
                 Some(zones) => zones.sample(wx, wz, raw_h),
                 None => raw_h,
             };
 
             // Skip si sous le sea_level (un poil de marge cosmétique).
-            if h < terrain_cfg.sea_level + 0.3 { continue; }
+            if h < terrain_cfg.sea_level + 0.3 {
+                continue;
+            }
 
             // Skip si trop proche d'un PathSample (sentier dégagé). Buffer =
             // road half_width + 4m extra pour clairière nette autour du chemin
@@ -285,7 +297,9 @@ fn populate_new_chunks(
                     let buf = s.tier.half_width() + 4.0;
                     p.distance_squared(s.pos) < buf * buf
                 });
-                if too_close { continue; }
+                if too_close {
+                    continue;
+                }
             }
 
             // Skip si à l'intérieur du disque d'exclusion village (gameplay
@@ -303,19 +317,22 @@ fn populate_new_chunks(
                 .wrapping_add((coord.z as u32).wrapping_mul(17));
             // 30% chance autumn si dispo (Forest/Plains/Jungle).
             let use_autumn = !trees_autumn.is_empty() && (hash % 100) < 30;
-            let pool: &Vec<&forgia_asset_registry::AssetEntry> =
-                if use_autumn { &trees_autumn } else { &trees_all };
+            let pool: &Vec<&forgia_asset_registry::AssetEntry> = if use_autumn {
+                &trees_autumn
+            } else {
+                &trees_all
+            };
             let entry = pool[(hash as usize) % pool.len()];
 
             // Variation visuelle utilisateur (jitter 0.85-1.15) appliqué EN PLUS
             // du scale de calibration auto-mesuré.
-            let user_scale = 0.85
-                + ((hash.wrapping_mul(2_654_435_761) as f32) / u32::MAX as f32) * 0.3;
-            let yaw = (hash.wrapping_mul(0x9E37_79B1) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
+            let user_scale =
+                0.85 + ((hash.wrapping_mul(2_654_435_761) as f32) / u32::MAX as f32) * 0.3;
+            let yaw =
+                (hash.wrapping_mul(0x9E37_79B1) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
 
-            let scene_handle: Handle<Scene> = asset_server.load(
-                bevy::asset::AssetPath::from(entry.path.clone()).with_label("Scene0")
-            );
+            let scene_handle: Handle<Scene> = asset_server
+                .load(bevy::asset::AssetPath::from(entry.path.clone()).with_label("Scene0"));
 
             // 2 cas selon que le GLB a déjà été mesuré :
             //   - measured connue → scale immédiat = target / measured × user_scale
@@ -346,9 +363,14 @@ fn populate_new_chunks(
                 // future : générer le Collider depuis l'AABB après calibration.
                 Collider::cylinder(1.5, 0.3),
                 VegetationTree,
-                Name::new(format!("Tree_{}_{}_{}_{i}", entry.species, coord.x, coord.z)),
+                Name::new(format!(
+                    "Tree_{}_{}_{}_{i}",
+                    entry.species, coord.x, coord.z
+                )),
             ));
-            if let Some(n) = needs_calib { ec.insert(n); }
+            if let Some(n) = needs_calib {
+                ec.insert(n);
+            }
             // Si l'override bark est actif, marquer cet arbre pour traitement trunk.
             if cfg.enabled && entry.category == AssetCategory::Tree {
                 ec.insert(NeedsTrunkOverride::default());
@@ -380,7 +402,9 @@ fn despawn_far_lod_vegetation(
     q_far_chunks: Query<(&ChunkCoord, &ChunkLod), Changed<ChunkLod>>,
 ) {
     for (coord, lod) in &q_far_chunks {
-        if !matches!(lod, ChunkLod::Lod2) { continue; }
+        if !matches!(lod, ChunkLod::Lod2) {
+            continue;
+        }
         if let Some(entities) = veg.chunk_entities.remove(coord) {
             let count = entities.len();
             for e in entities {
@@ -388,7 +412,9 @@ fn despawn_far_lod_vegetation(
                 // flush — pas d'erreur "entity invalid" si command queue
                 // contient déjà un despawn de la même entité (concurrent path
                 // via despawn_unloaded_chunks ou recursive cascade chunk).
-                if let Ok(mut ec) = commands.get_entity(e) { ec.try_despawn(); }
+                if let Ok(mut ec) = commands.get_entity(e) {
+                    ec.try_despawn();
+                }
             }
             veg.total_trees = veg.total_trees.saturating_sub(count);
         }
@@ -403,7 +429,9 @@ fn despawn_unloaded_chunks(
     mut removed: RemovedComponents<ChunkCoord>,
     chunks_alive: Query<&ChunkCoord>,
 ) {
-    if removed.is_empty() { return; }
+    if removed.is_empty() {
+        return;
+    }
     // Rebuild set des chunks vivants → ce qui manque dans veg.chunk_entities est mort.
     let alive: std::collections::HashSet<ChunkCoord> = chunks_alive.iter().copied().collect();
     let to_remove: Vec<ChunkCoord> = veg
@@ -459,7 +487,9 @@ fn write_vegetation_sensor(
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
-    if now - *last_write < SENSOR_INTERVAL_S { return; }
+    if now - *last_write < SENSOR_INTERVAL_S {
+        return;
+    }
     *last_write = now;
 
     let dist: String = veg
@@ -481,6 +511,29 @@ fn write_vegetation_sensor(
         now, veg.chunk_entities.len(), veg.total_trees, dist, trunk_json,
     );
     let _ = std::fs::write("forgia_vegetation.json", json);
+}
+
+/// Story-502-B : producteur du `FoliageCoverageReport` côté foliage.
+/// Update toutes les frames (sensor côté streaming throttle à 1Hz par défaut).
+/// `chunks_loaded` = nombre de chunks éligibles à recevoir foliage (LOD0+LOD1 ;
+/// LOD2 exclu car mega-tile plate, populate_new_chunks `continue` dessus).
+/// `chunks_with_veg` = nb chunks effectivement passés dans populate (clé dans
+/// `veg.chunk_entities`). Le delta = chunks "loaded sans veg" → couvert par
+/// le sensor severity du crate streaming.
+fn write_foliage_coverage_report(
+    veg: Res<VegetationManager>,
+    q_chunks: Query<(&ChunkCoord, Option<&ChunkLod>)>,
+    mut report: ResMut<FoliageCoverageReport>,
+) {
+    let mut eligible = 0u32;
+    for (_, lod) in &q_chunks {
+        let l = lod.copied().unwrap_or(ChunkLod::Lod0);
+        if !matches!(l, ChunkLod::Lod2) {
+            eligible = eligible.saturating_add(1);
+        }
+    }
+    report.chunks_loaded = eligible;
+    report.chunks_with_veg = veg.chunk_entities.len() as u32;
 }
 
 #[cfg(test)]

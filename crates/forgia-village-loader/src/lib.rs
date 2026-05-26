@@ -170,7 +170,11 @@ fn sample_terrain_y(
     cfg: &TerrainConfig,
     flatten_zones: Option<&FlattenZones>,
 ) -> f32 {
-    let raw_y = heightmap_at(world_xz.x + sample_offset.x, world_xz.y + sample_offset.y, cfg);
+    let raw_y = heightmap_at(
+        world_xz.x + sample_offset.x,
+        world_xz.y + sample_offset.y,
+        cfg,
+    );
     match flatten_zones {
         Some(z) => z.sample(world_xz.x, world_xz.y, raw_y),
         None => raw_y,
@@ -190,7 +194,9 @@ fn process_village_request(
     // Gating: must have both request and terrain config (terrain plugin Startup).
     let Some(request) = request else { return };
     // Request present — at minimum we're Pending until TerrainConfig arrives.
-    stats.status.store(VillageStatus::Pending as u8, Ordering::Relaxed);
+    stats
+        .status
+        .store(VillageStatus::Pending as u8, Ordering::Relaxed);
     let Some(terrain_cfg) = terrain_cfg else {
         // BUG-441-01 fix : signaler une seule fois si terrain absent malgré
         // request présente. Si jamais ça reste comme ça > 5s, Antoine voit le
@@ -217,7 +223,9 @@ fn process_village_request(
                 request.toml_path, e
             );
             stats.missing_assets.fetch_add(1, Ordering::Relaxed);
-            stats.status.store(VillageStatus::Error as u8, Ordering::Relaxed);
+            stats
+                .status
+                .store(VillageStatus::Error as u8, Ordering::Relaxed);
             // Consume request so we don't spam.
             commands.remove_resource::<LoadVillageRequest>();
             return;
@@ -264,10 +272,17 @@ fn process_village_request(
             &mut commands,
             &asset_server,
             &prefab_stats,
-            PrefabSpawn::new(path, Vec3::new(world_xz.x, y_terrain + def.ramparts.y_offset + RAMPART_Y_OFFSET, world_xz.y))
-                .with_yaw_deg(piece.yaw_deg)
-                .with_scale_vec3(wall_scale)
-                .with_name(format!("Rampart_{piece_name}_{}", ramparts_count)),
+            PrefabSpawn::new(
+                path,
+                Vec3::new(
+                    world_xz.x,
+                    y_terrain + def.ramparts.y_offset + RAMPART_Y_OFFSET,
+                    world_xz.y,
+                ),
+            )
+            .with_yaw_deg(piece.yaw_deg)
+            .with_scale_vec3(wall_scale)
+            .with_name(format!("Rampart_{piece_name}_{}", ramparts_count)),
             VillageMarker,
         );
         // Static collider auto-derived from the loaded scene meshes.
@@ -314,7 +329,11 @@ fn process_village_request(
             )
             .with_yaw_deg(b.yaw_deg)
             .with_scale(b.scale * def.meta.unit_scale)
-            .with_name(b.label.clone().unwrap_or_else(|| format!("{}_{idx}", b.piece))),
+            .with_name(
+                b.label
+                    .clone()
+                    .unwrap_or_else(|| format!("{}_{idx}", b.piece)),
+            ),
             VillageMarker,
         );
         commands.entity(e).insert((
@@ -365,8 +384,12 @@ fn process_village_request(
     );
 
     // Update stats + emit result.
-    stats.buildings_loaded.store(buildings_count, Ordering::Relaxed);
-    stats.ramparts_pieces.store(ramparts_count, Ordering::Relaxed);
+    stats
+        .buildings_loaded
+        .store(buildings_count, Ordering::Relaxed);
+    stats
+        .ramparts_pieces
+        .store(ramparts_count, Ordering::Relaxed);
     stats.roads_count.store(roads_count_u, Ordering::Relaxed);
     if let Ok(mut lock) = stats.village_id.lock() {
         *lock = Some(def.meta.id.clone());
@@ -375,7 +398,9 @@ fn process_village_request(
         *lock = Some(spawn_position);
     }
 
-    stats.status.store(VillageStatus::Loaded as u8, Ordering::Relaxed);
+    stats
+        .status
+        .store(VillageStatus::Loaded as u8, Ordering::Relaxed);
 
     info!(
         target: "forgia_village_loader",
@@ -466,7 +491,9 @@ fn process_village_genome_request(
     mut warned_no_terrain: Local<bool>,
 ) {
     let Some(request) = request else { return };
-    stats.status.store(VillageStatus::Pending as u8, Ordering::Relaxed);
+    stats
+        .status
+        .store(VillageStatus::Pending as u8, Ordering::Relaxed);
     let Some(terrain_cfg) = terrain_cfg else {
         if !*warned_no_terrain {
             warn!(
@@ -490,7 +517,9 @@ fn process_village_genome_request(
                 request.genome_path, e
             );
             stats.missing_assets.fetch_add(1, Ordering::Relaxed);
-            stats.status.store(VillageStatus::Error as u8, Ordering::Relaxed);
+            stats
+                .status
+                .store(VillageStatus::Error as u8, Ordering::Relaxed);
             commands.remove_resource::<LoadVillageGenomeRequest>();
             return;
         }
@@ -514,7 +543,9 @@ fn process_village_genome_request(
                 "[village-genome] generator failed for '{}' — {} — next: vérifier parameters genome (bounding_radius, density, target_count)",
                 genome.meta.id, e
             );
-            stats.status.store(VillageStatus::Error as u8, Ordering::Relaxed);
+            stats
+                .status
+                .store(VillageStatus::Error as u8, Ordering::Relaxed);
             commands.remove_resource::<LoadVillageGenomeRequest>();
             return;
         }
@@ -614,7 +645,9 @@ fn process_village_genome_request(
     }
 
     // 6. Update stats + publish result.
-    stats.buildings_loaded.store(buildings_count, Ordering::Relaxed);
+    stats
+        .buildings_loaded
+        .store(buildings_count, Ordering::Relaxed);
     stats.ramparts_pieces.store(0, Ordering::Relaxed); // V1 procgen has no ramparts
     stats.roads_count.store(roads_count, Ordering::Relaxed);
     if let Ok(mut lock) = stats.village_id.lock() {
@@ -623,7 +656,9 @@ fn process_village_genome_request(
     if let Ok(mut lock) = stats.spawn_pos.lock() {
         *lock = Some(spawn_position);
     }
-    stats.status.store(VillageStatus::Loaded as u8, Ordering::Relaxed);
+    stats
+        .status
+        .store(VillageStatus::Loaded as u8, Ordering::Relaxed);
 
     info!(
         target: "forgia_village_loader",
@@ -673,7 +708,9 @@ pub fn cleanup_village(
     stats.ramparts_pieces.store(0, Ordering::Relaxed);
     stats.roads_count.store(0, Ordering::Relaxed);
     stats.missing_assets.store(0, Ordering::Relaxed);
-    stats.status.store(VillageStatus::Idle as u8, Ordering::Relaxed);
+    stats
+        .status
+        .store(VillageStatus::Idle as u8, Ordering::Relaxed);
     if let Ok(mut lock) = stats.village_id.lock() {
         *lock = None;
     }
@@ -769,8 +806,16 @@ fn village_debug_gizmos(
     // Spawn position — small cross + label position.
     let sp = v.spawn_position;
     let magenta = Color::srgb(1.0, 0.2, 1.0);
-    gizmos.line(sp + Vec3::new(-0.5, 0.0, 0.0), sp + Vec3::new(0.5, 0.0, 0.0), magenta);
-    gizmos.line(sp + Vec3::new(0.0, 0.0, -0.5), sp + Vec3::new(0.0, 0.0, 0.5), magenta);
+    gizmos.line(
+        sp + Vec3::new(-0.5, 0.0, 0.0),
+        sp + Vec3::new(0.5, 0.0, 0.0),
+        magenta,
+    );
+    gizmos.line(
+        sp + Vec3::new(0.0, 0.0, -0.5),
+        sp + Vec3::new(0.0, 0.0, 0.5),
+        magenta,
+    );
     gizmos.line(sp, sp + Vec3::new(0.0, 1.5, 0.0), magenta);
 }
 
@@ -791,10 +836,7 @@ fn write_village_debug_sensor(
 
     let Some(v) = village else {
         // Pas de village = sensor minimal, status only (cohérent post-cleanup).
-        let json = format!(
-            "{{\"timestamp_secs\":{:.1},\"village\":null}}",
-            now
-        );
+        let json = format!("{{\"timestamp_secs\":{:.1},\"village\":null}}", now);
         let _ = std::fs::write("forgia_village_debug.json", json);
         return;
     };

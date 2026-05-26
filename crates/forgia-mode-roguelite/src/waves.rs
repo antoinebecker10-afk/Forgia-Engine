@@ -25,8 +25,8 @@ use forgia_core::prelude::*;
 use forgia_combat::Health;
 use forgia_damage::Mortal;
 use forgia_mode_fps_arena::TargetCube;
-use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
+use rand_xoshiro::Xoshiro256StarStar;
 
 pub const WAVES_TOTAL: u8 = 3;
 pub const BREAK_SECS: f32 = 3.0;
@@ -104,8 +104,7 @@ pub fn spawn_wave_enemies(
             perceptual_roughness: 0.55,
             ..default()
         });
-        let yaw0 =
-            (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * std::f32::consts::TAU;
+        let yaw0 = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * std::f32::consts::TAU;
         for i in 0..*count {
             let theta = yaw0 + (i as f32 / *count as f32) * std::f32::consts::TAU;
             let x = ring_radius * theta.cos();
@@ -136,7 +135,10 @@ pub fn spawn_wave_enemies(
                 ))
                 .id();
             commands.spawn((
-                Name::new(format!("RogueliteEnemy_W{wave}_{}_{i}_collider", archetype.label())),
+                Name::new(format!(
+                    "RogueliteEnemy_W{wave}_{}_{i}_collider",
+                    archetype.label()
+                )),
                 ChildOf(parent),
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(mat.clone()),
@@ -194,7 +196,12 @@ pub fn sys_wave_orchestrator(
             wave.current_wave += 1;
             wave.in_break = false;
             wave.break_secs_left = 0.0;
-            spawn_wave_enemies(&mut commands, &mut meshes, &mut materials, wave.current_wave);
+            spawn_wave_enemies(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                wave.current_wave,
+            );
         }
     }
 }
@@ -207,10 +214,7 @@ pub struct BossEnraged;
 /// Idempotent : `Without<BossEnraged>` filtre évite re-trigger.
 pub fn sys_boss_enrage(
     mut commands: Commands,
-    mut q_boss: Query<
-        (Entity, &Health, &EnemyArchetype, &mut ArenaBot),
-        Without<BossEnraged>,
-    >,
+    mut q_boss: Query<(Entity, &Health, &EnemyArchetype, &mut ArenaBot), Without<BossEnraged>>,
 ) {
     for (entity, health, archetype, mut bot) in &mut q_boss {
         if *archetype != EnemyArchetype::Boss {

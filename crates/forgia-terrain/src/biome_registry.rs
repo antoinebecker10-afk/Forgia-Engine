@@ -10,8 +10,8 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+use crate::biome_spec::{load_all_biome_specs, BiomeRoadConfig, BiomeSpec};
 use crate::biomes::BiomeType;
-use crate::biome_spec::{BiomeRoadConfig, BiomeSpec, load_all_biome_specs};
 
 // ─────────────────────────── BiomeRegistry ───────────────────────────
 
@@ -34,7 +34,10 @@ impl BiomeRegistry {
             }
         }
 
-        info!("BiomeRegistry: loaded {} biome specs from TOML", specs.len());
+        info!(
+            "BiomeRegistry: loaded {} biome specs from TOML",
+            specs.len()
+        );
         Self { specs }
     }
 
@@ -87,16 +90,16 @@ impl BiomeRegistry {
             }
         }
         match biome {
-            BiomeType::Plains   => (115, 166, 64),
-            BiomeType::Forest   => (51, 107, 38),
-            BiomeType::Desert   => (199, 173, 107),
+            BiomeType::Plains => (115, 166, 64),
+            BiomeType::Forest => (51, 107, 38),
+            BiomeType::Desert => (199, 173, 107),
             BiomeType::Mountain => (133, 128, 122),
-            BiomeType::Swamp    => (77, 97, 56),
-            BiomeType::Tundra   => (209, 224, 235),
-            BiomeType::Savanna  => (184, 166, 89),
-            BiomeType::Jungle   => (25, 89, 20),
+            BiomeType::Swamp => (77, 97, 56),
+            BiomeType::Tundra => (209, 224, 235),
+            BiomeType::Savanna => (184, 166, 89),
+            BiomeType::Jungle => (25, 89, 20),
             BiomeType::Volcanic => (64, 46, 38),
-            BiomeType::Canyon   => (173, 107, 64),
+            BiomeType::Canyon => (173, 107, 64),
         }
     }
 
@@ -109,25 +112,31 @@ impl BiomeRegistry {
             );
         }
         match biome {
-            BiomeType::Plains   => (1.0, 1.0, 1.0),
-            BiomeType::Forest   => (1.1, 0.9, 1.1),
-            BiomeType::Desert   => (0.8, 1.2, 0.9),
+            BiomeType::Plains => (1.0, 1.0, 1.0),
+            BiomeType::Forest => (1.1, 0.9, 1.1),
+            BiomeType::Desert => (0.8, 1.2, 0.9),
             BiomeType::Mountain => (1.3, 0.8, 1.2),
-            BiomeType::Swamp    => (1.0, 0.7, 1.3),
-            BiomeType::Tundra   => (0.9, 1.1, 1.0),
-            BiomeType::Savanna  => (0.9, 1.1, 0.8),
-            BiomeType::Jungle   => (1.2, 0.8, 1.2),
+            BiomeType::Swamp => (1.0, 0.7, 1.3),
+            BiomeType::Tundra => (0.9, 1.1, 1.0),
+            BiomeType::Savanna => (0.9, 1.1, 0.8),
+            BiomeType::Jungle => (1.2, 0.8, 1.2),
             BiomeType::Volcanic => (1.4, 0.9, 1.5),
-            BiomeType::Canyon   => (1.1, 1.0, 1.1),
+            BiomeType::Canyon => (1.1, 1.0, 1.1),
         }
     }
 
     pub fn spawn_weight(&self, biome: BiomeType) -> f32 {
-        self.specs.get(&biome).map(|s| s.spawn_weight).unwrap_or(1.0)
+        self.specs
+            .get(&biome)
+            .map(|s| s.spawn_weight)
+            .unwrap_or(1.0)
     }
 
     pub fn height_mult_for(&self, biome: BiomeType) -> f32 {
-        self.specs.get(&biome).and_then(|s| s.height_mult).unwrap_or(1.0)
+        self.specs
+            .get(&biome)
+            .and_then(|s| s.height_mult)
+            .unwrap_or(1.0)
     }
 
     pub fn lacunarity_for(&self, biome: BiomeType) -> Option<f32> {
@@ -218,16 +227,15 @@ pub fn biome_registry_reload_system(
     mut commands: Commands,
     _request: Option<Res<BiomeRegistryReloadRequest>>,
 ) {
-    if _request.is_none() { return; }
+    if _request.is_none() {
+        return;
+    }
     commands.remove_resource::<BiomeRegistryReloadRequest>();
     commands.insert_resource(BiomeRegistry::load());
     info!("BiomeRegistry: hot-reloaded from TOML files");
 }
 
-pub fn biome_hotreload_input_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut commands: Commands,
-) {
+pub fn biome_hotreload_input_system(keyboard: Res<ButtonInput<KeyCode>>, mut commands: Commands) {
     if keyboard.pressed(KeyCode::ShiftLeft) && keyboard.just_pressed(KeyCode::F12) {
         commands.insert_resource(BiomeRegistryReloadRequest);
         info!("Biome hot-reload requested (Shift+F12)");
@@ -239,18 +247,29 @@ mod tests {
     use super::*;
 
     const ALL_BIOMES: [BiomeType; 10] = [
-        BiomeType::Plains, BiomeType::Forest, BiomeType::Desert,
-        BiomeType::Mountain, BiomeType::Swamp, BiomeType::Tundra,
-        BiomeType::Savanna, BiomeType::Jungle, BiomeType::Volcanic,
+        BiomeType::Plains,
+        BiomeType::Forest,
+        BiomeType::Desert,
+        BiomeType::Mountain,
+        BiomeType::Swamp,
+        BiomeType::Tundra,
+        BiomeType::Savanna,
+        BiomeType::Jungle,
+        BiomeType::Volcanic,
         BiomeType::Canyon,
     ];
 
     #[test]
     fn biome_type_from_id_covers_all_canonical_ids() {
-        let ids = ["plains", "forest", "desert", "mountain", "swamp",
-                   "tundra", "savanna", "jungle", "volcanic", "canyon"];
+        let ids = [
+            "plains", "forest", "desert", "mountain", "swamp", "tundra", "savanna", "jungle",
+            "volcanic", "canyon",
+        ];
         for id in ids {
-            assert!(biome_type_from_id(id).is_some(), "canonical id {id} must map to a BiomeType");
+            assert!(
+                biome_type_from_id(id).is_some(),
+                "canonical id {id} must map to a BiomeType"
+            );
         }
     }
 
@@ -289,12 +308,21 @@ mod tests {
         let reg = BiomeRegistry::default();
         for b in ALL_BIOMES {
             let rc = reg.road_config(b);
-            assert!(rc.width_mult > 0.0 && rc.width_mult.is_finite(),
-                    "{b:?}: width_mult {} must be > 0", rc.width_mult);
-            assert!(rc.depression_mult >= 0.0 && rc.depression_mult.is_finite(),
-                    "{b:?}: depression_mult {}", rc.depression_mult);
-            assert!((0.0..=1.0).contains(&rc.vegetation_encroachment),
-                    "{b:?}: vegetation_encroachment {} outside [0, 1]", rc.vegetation_encroachment);
+            assert!(
+                rc.width_mult > 0.0 && rc.width_mult.is_finite(),
+                "{b:?}: width_mult {} must be > 0",
+                rc.width_mult
+            );
+            assert!(
+                rc.depression_mult >= 0.0 && rc.depression_mult.is_finite(),
+                "{b:?}: depression_mult {}",
+                rc.depression_mult
+            );
+            assert!(
+                (0.0..=1.0).contains(&rc.vegetation_encroachment),
+                "{b:?}: vegetation_encroachment {} outside [0, 1]",
+                rc.vegetation_encroachment
+            );
         }
     }
 
@@ -303,9 +331,18 @@ mod tests {
         let reg = BiomeRegistry::default();
         for b in ALL_BIOMES {
             let (hp, speed, dmg) = reg.enemy_modifiers(b);
-            assert!((0.5..=2.0).contains(&hp), "{b:?}: hp_mult {hp} outside [0.5, 2.0]");
-            assert!((0.5..=2.0).contains(&speed), "{b:?}: speed_mult {speed} outside [0.5, 2.0]");
-            assert!((0.5..=2.0).contains(&dmg), "{b:?}: dmg_mult {dmg} outside [0.5, 2.0]");
+            assert!(
+                (0.5..=2.0).contains(&hp),
+                "{b:?}: hp_mult {hp} outside [0.5, 2.0]"
+            );
+            assert!(
+                (0.5..=2.0).contains(&speed),
+                "{b:?}: speed_mult {speed} outside [0.5, 2.0]"
+            );
+            assert!(
+                (0.5..=2.0).contains(&dmg),
+                "{b:?}: dmg_mult {dmg} outside [0.5, 2.0]"
+            );
         }
     }
 

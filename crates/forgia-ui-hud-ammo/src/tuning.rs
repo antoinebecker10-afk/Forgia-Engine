@@ -189,6 +189,9 @@ pub fn sync_ammo_hud_tuning(
     }
     if let Some(genome) = assets.get(&handle.0) {
         *tuning = genome.data.clone();
-        info!("[ammo-hud] tuning genome synced (counter {}px, slot {}px)", tuning.counter_font_main, tuning.slot_box_w);
+        info!(
+            "[ammo-hud] tuning genome synced (counter {}px, slot {}px)",
+            tuning.counter_font_main, tuning.slot_box_w
+        );
     }
 }

@@ -1,0 +1,23 @@
+{
+  "timestamp_secs": 1779560302,
+  "baseline_date": "2026-05-23",
+  "stories_applied": ["story-512", "story-513"],
+  "crates_count": 167,
+  "crates_count_baseline": 266,
+  "crates_count_baseline_audit_doc": 264,
+  "baseline_delta_explanation": "Audit doc 2026-05-23 comptait 264 crates; baseline reelle au demarrage story-512 etait 266. Story-512 -55 (266->211). Story-513 -44 net (211->167, supprime 45 forgia-pp-*, ajoute 1 forgia-postprocess).",
+  "crates_purged_story_512": 55,
+  "crates_purged_net_story_513": 44,
+  "crates_purged_cumulative": 99,
+  "total_loc_rust_estimate": 54500,
+  "loc_pp_before": 2340,
+  "loc_pp_after": 254,
+  "loc_pp_reduction_pct": 89.1,
+  "scaffolds_lt50_loc": 50,
+  "scaffolds_baseline": 145,
+  "scaffolds_purged_pct_of_total": 65.5,
+  "ratio_loc_per_crate": 326,
+  "industry_target_ratio_min": 1500,
+  "industry_target_ratio_max": 5000,
+  "next_step": "story-514 split forgia-core god-object (Enterprise), story-515 xtask story-gate ratchet"
+}

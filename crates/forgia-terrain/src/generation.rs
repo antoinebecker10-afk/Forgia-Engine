@@ -19,24 +19,27 @@
 
 use bevy::prelude::*;
 
-mod redistribution;
-mod noise;
-mod erosion;
-mod droplet;
 mod caves;
+mod droplet;
+mod erosion;
 mod heightmap;
+mod noise;
+mod redistribution;
 // W1 — chunk_sdf désactivé : pipeline voxel/SDF non utilisé en heightmap-grid path.
 // Réactiver quand pipeline_diag.rs sera porté V1 (story-future).
 // mod chunk_sdf;
 mod island_mask;
 
 // Re-export API publique du split (callers externes : forgia-game + siblings).
-pub use droplet::HydroErosionParams;
-pub use caves::{carve_cave_worms, carve_village_caves, CaveWormParams};
-pub use island_mask::{island_mask_at, IslandMaskParams};
 #[allow(unused_imports)]
 pub(crate) use caves::carve_sphere; // used by cave_network.rs full V1 port (dormant W1)
-pub use heightmap::{heightmap_at, heightmap_at_gen, heightmap_at_gen_ext, heightmap_at_gen_ext_fast, procedural_sdf_at};
+pub use caves::{carve_cave_worms, carve_village_caves, CaveWormParams};
+pub use droplet::HydroErosionParams;
+pub use heightmap::{
+    heightmap_at, heightmap_at_gen, heightmap_at_gen_ext, heightmap_at_gen_ext_fast,
+    procedural_sdf_at,
+};
+pub use island_mask::{island_mask_at, IslandMaskParams};
 // pub use chunk_sdf::{generate_chunk, generate_chunk_lod, generate_initial_chunks, GenDetail};
 
 // ─────────────────────────── Noise Layer System ───────────────────────────
@@ -153,7 +156,8 @@ impl CastleFootprint {
         if norm_dist <= CASTLE_FLAT_FRACTION {
             1.0
         } else {
-            let t = ((norm_dist - CASTLE_FLAT_FRACTION) / (1.0 - CASTLE_FLAT_FRACTION)).clamp(0.0, 1.0);
+            let t =
+                ((norm_dist - CASTLE_FLAT_FRACTION) / (1.0 - CASTLE_FLAT_FRACTION)).clamp(0.0, 1.0);
             let s = 1.0 - t;
             s * s * (3.0 - 2.0 * s)
         }
@@ -165,7 +169,11 @@ mod tests {
     use super::*;
 
     fn fp() -> CastleFootprint {
-        CastleFootprint { center: Vec2::ZERO, radius: 100.0, target_height: 42.0 }
+        CastleFootprint {
+            center: Vec2::ZERO,
+            radius: 100.0,
+            target_height: 42.0,
+        }
     }
 
     #[test]
@@ -182,7 +190,10 @@ mod tests {
     #[test]
     fn influence_inside_outer_ring_is_some_above_one() {
         let inf = fp().influence(110.0, 0.0).expect("inside outer ring");
-        assert!(inf > 1.0 && inf < 1.2, "expected 1.0 < inf < 1.2 at dist 110/r100, got {inf}");
+        assert!(
+            inf > 1.0 && inf < 1.2,
+            "expected 1.0 < inf < 1.2 at dist 110/r100, got {inf}"
+        );
     }
 
     #[test]
@@ -203,7 +214,10 @@ mod tests {
         let c = CastleFootprint::flatten_blend(1.00);
         assert!(a > b, "expected decreasing: a={a} b={b}");
         assert!(b > c, "expected decreasing: b={b} c={c}");
-        assert!((c - 0.0).abs() < 1e-4, "blend at norm_dist=1.0 should be ~0, got {c}");
+        assert!(
+            (c - 0.0).abs() < 1e-4,
+            "blend at norm_dist=1.0 should be ~0, got {c}"
+        );
     }
 
     #[test]

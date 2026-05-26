@@ -16,19 +16,16 @@ use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 // Story-490 — DamageKind + DeathEvent pour bridge V7 damage pipeline (despawn_dead_cubes triggers DeathEvent before despawn → Roguelite observers loot/defeat fire correctement).
-use forgia_damage::{DamageKind, DeathEvent};
 use forgia_combat::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponFireCooldown};
 use forgia_core::prelude::*;
 use forgia_crosshair::CrosshairTuning;
+use forgia_damage::{DamageKind, DeathEvent};
 use forgia_effects::prelude::{
-    spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources,
-    WeaponVfxEffects,
+    spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources, WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
-use forgia_juice_camera_shake::{
-    CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse,
-};
+use forgia_juice_camera_shake::{CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
 use forgia_juice_fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
 use forgia_juice_hit_stop::HitStopState;
 use forgia_juice_recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
@@ -46,8 +43,8 @@ pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
 mod score;
 
 pub mod prelude {
-    pub use crate::ForgiaFpsPlugin;
     pub use crate::score::{ArenaScore, ArenaScorePlugin, ScoreboardVisible};
+    pub use crate::ForgiaFpsPlugin;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -216,7 +213,9 @@ impl JuiceWriters<'_> {
     /// `seed` pour PRNG yaw (pseudo-déterministe par tir).
     pub fn emit_from_genome(&mut self, e: &ViewmodelGenomeEntry, seed: u32) {
         if e.shake_trauma > 0.0 {
-            self.shake.write(ShakeImpulse { trauma: e.shake_trauma });
+            self.shake.write(ShakeImpulse {
+                trauma: e.shake_trauma,
+            });
         }
         if e.recoil_pitch_deg.abs() > 0.001 || e.recoil_yaw_random_deg.abs() > 0.001 {
             let yaw_signed = (pseudo_rand(seed) - 0.5) * 2.0 * e.recoil_yaw_random_deg;
@@ -226,7 +225,9 @@ impl JuiceWriters<'_> {
             });
         }
         if e.fov_punch_deg.abs() > 0.01 {
-            self.fov_punch.write(FovPunchImpulse { peak_deg: e.fov_punch_deg });
+            self.fov_punch.write(FovPunchImpulse {
+                peak_deg: e.fov_punch_deg,
+            });
         }
     }
 }
@@ -382,10 +383,7 @@ fn find_health_ancestor(
 }
 
 /// Despawn les cubes morts (HP=0). Système séparé chained après fire.
-fn despawn_dead_cubes(
-    mut commands: Commands,
-    q: Query<(Entity, &Health), With<TargetCube>>,
-) {
+fn despawn_dead_cubes(mut commands: Commands, q: Query<(Entity, &Health), With<TargetCube>>) {
     for (entity, hp) in &q {
         if hp.is_dead() {
             // Story-490 — bridge V7 damage pipeline. Trigger DeathEvent AVANT
@@ -402,7 +400,10 @@ fn despawn_dead_cubes(
             if let Ok(mut ec) = commands.get_entity(entity) {
                 ec.try_despawn();
             }
-            info!("[death] cube {:?} despawned (HP=0) + DeathEvent fired", entity);
+            info!(
+                "[death] cube {:?} despawned (HP=0) + DeathEvent fired",
+                entity
+            );
         }
     }
 }
@@ -412,10 +413,7 @@ fn despawn_dead_cubes(
 // ════════════════════════════════════════════════════════════════════════════
 
 /// Switch arme via Digit1-4 (Pépin / Bourrasque / Madame Lenoir / Boucherie).
-fn weapon_select_system(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut equipped: ResMut<EquippedWeapons>,
-) {
+fn weapon_select_system(keys: Res<ButtonInput<KeyCode>>, mut equipped: ResMut<EquippedWeapons>) {
     let new_idx: Option<usize> = if keys.just_pressed(KeyCode::Digit1) {
         Some(0)
     } else if keys.just_pressed(KeyCode::Digit2) {
@@ -501,7 +499,11 @@ fn fire_weapon_minimal(
     let mut burst_will_terminate = false;
     if let Some(burst) = timing.burst_state.as_mut() {
         burst_active = true;
-        if burst.interval_timer.tick(timing.time.delta()).just_finished() {
+        if burst
+            .interval_timer
+            .tick(timing.time.delta())
+            .just_finished()
+        {
             burst_fires_now = true;
             burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
             if burst.shots_remaining == 0 {
@@ -587,19 +589,21 @@ fn fire_weapon_minimal(
     let gun_off_z = entry
         .map(|e| lerp(e.offset_z, e.ads_offset_z))
         .unwrap_or(-1.30);
-    let viewmodel_scale = entry
-        .map(|e| lerp(1.0, e.ads_scale_factor))
-        .unwrap_or(1.0);
+    let viewmodel_scale = entry.map(|e| lerp(1.0, e.ads_scale_factor)).unwrap_or(1.0);
     let barrel_len = barrel_len_base * viewmodel_scale;
     let forward_dist = (-gun_off_z) + barrel_len;
     let cam_right_v = cam_tf.right().as_vec3();
     let cam_up_v = cam_tf.up().as_vec3();
-    let barrel_tip = origin
-        + direction * forward_dist
-        + cam_right_v * gun_off_x
-        + cam_up_v * gun_off_y;
+    let barrel_tip =
+        origin + direction * forward_dist + cam_right_v * gun_off_x + cam_up_v * gun_off_y;
     if let Some(vfx) = weapon_vfx.as_deref() {
-        spawn_muzzle_flash(&mut commands, vfx, barrel_tip, direction, &ammo.equipped.current);
+        spawn_muzzle_flash(
+            &mut commands,
+            vfx,
+            barrel_tip,
+            direction,
+            &ammo.equipped.current,
+        );
     }
 
     let range = entry.map(|e| e.range).unwrap_or(100.0);
@@ -676,12 +680,9 @@ fn fire_weapon_minimal(
         // Sensor categorization (BUG-RUN-1 fix story-455 — walk ChildOf vers Health).
         let target_ancestor = match hit_result {
             None => None,
-            Some((entity, _)) => find_health_ancestor(
-                entity,
-                &hitscan_ctx.q_child_of,
-                &hit_ctx.health,
-                8,
-            ),
+            Some((entity, _)) => {
+                find_health_ancestor(entity, &hitscan_ctx.q_child_of, &hit_ctx.health, 8)
+            }
         };
         let (sensor_category, sensor_hit_idx, sensor_name, sensor_toi) = match hit_result {
             None => (HitscanCategory::Miss, None, None, None),
@@ -776,7 +777,10 @@ fn fire_weapon_minimal(
             restore_speed: 1.0,
         });
     } else {
-        info!("[fire] miss ({} pellets, {:?})", pellets, ammo.equipped.current);
+        info!(
+            "[fire] miss ({} pellets, {:?})",
+            pellets, ammo.equipped.current
+        );
     }
 }
 
@@ -875,7 +879,12 @@ mod tests {
     fn pseudo_rand_in_unit_range() {
         for seed in [1u32, 42, 12345, u32::MAX / 2] {
             let v = pseudo_rand(seed);
-            assert!((0.0..1.0).contains(&v), "pseudo_rand({}) = {} hors [0,1)", seed, v);
+            assert!(
+                (0.0..1.0).contains(&v),
+                "pseudo_rand({}) = {} hors [0,1)",
+                seed,
+                v
+            );
         }
     }
 
@@ -892,7 +901,9 @@ mod tests {
             interval_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
         };
         assert!(!burst.interval_timer.just_finished());
-        burst.interval_timer.tick(std::time::Duration::from_millis(60));
+        burst
+            .interval_timer
+            .tick(std::time::Duration::from_millis(60));
         assert!(burst.interval_timer.just_finished());
         burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
         assert_eq!(burst.shots_remaining, 2);
@@ -973,38 +984,74 @@ mod tests {
 
     #[test]
     fn dispatch_auto_uses_held_only() {
-        assert_eq!(dispatch_fire_trigger("auto", true, false, false, false), (true, false));
-        assert_eq!(dispatch_fire_trigger("auto", false, true, false, false), (false, false));
+        assert_eq!(
+            dispatch_fire_trigger("auto", true, false, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("auto", false, true, false, false),
+            (false, false)
+        );
     }
 
     #[test]
     fn dispatch_semi_uses_just_pressed_only() {
-        assert_eq!(dispatch_fire_trigger("semi", false, true, false, false), (true, false));
-        assert_eq!(dispatch_fire_trigger("semi", true, false, false, false), (false, false));
+        assert_eq!(
+            dispatch_fire_trigger("semi", false, true, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("semi", true, false, false, false),
+            (false, false)
+        );
     }
 
     #[test]
     fn dispatch_pump_behaves_like_semi() {
-        assert_eq!(dispatch_fire_trigger("pump", false, true, false, false), (true, false));
-        assert_eq!(dispatch_fire_trigger("pump", true, false, false, false), (false, false));
+        assert_eq!(
+            dispatch_fire_trigger("pump", false, true, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("pump", true, false, false, false),
+            (false, false)
+        );
     }
 
     #[test]
     fn dispatch_burst_starts_on_just_pressed() {
-        assert_eq!(dispatch_fire_trigger("burst", false, true, false, false), (true, true));
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, true, false, false),
+            (true, true)
+        );
     }
 
     #[test]
     fn dispatch_burst_follows_timer_when_active() {
-        assert_eq!(dispatch_fire_trigger("burst", false, false, true, true), (true, false));
-        assert_eq!(dispatch_fire_trigger("burst", false, false, true, false), (false, false));
-        assert_eq!(dispatch_fire_trigger("burst", false, true, true, false), (false, false));
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, false, true, true),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, false, true, false),
+            (false, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, true, true, false),
+            (false, false)
+        );
     }
 
     #[test]
     fn dispatch_unknown_mode_fallbacks_semi() {
-        assert_eq!(dispatch_fire_trigger("railgun", false, true, false, false), (true, false));
-        assert_eq!(dispatch_fire_trigger("railgun", true, false, false, false), (false, false));
+        assert_eq!(
+            dispatch_fire_trigger("railgun", false, true, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("railgun", true, false, false, false),
+            (false, false)
+        );
     }
 
     #[test]

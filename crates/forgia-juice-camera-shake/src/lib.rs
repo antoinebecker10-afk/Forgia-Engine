@@ -37,8 +37,8 @@ impl Default for CameraShake {
     fn default() -> Self {
         Self {
             trauma: 0.0,
-            decay: 10.0,           // ~100ms full decay — plus rapide = moins de cumul auto-fire
-            max_rotation: 0.014,   // ~0.8° max amplitude (anti eye-strain, downscaled de 1.5°)
+            decay: 10.0, // ~100ms full decay — plus rapide = moins de cumul auto-fire
+            max_rotation: 0.014, // ~0.8° max amplitude (anti eye-strain, downscaled de 1.5°)
             seed: 0,
         }
     }
@@ -105,10 +105,7 @@ impl Plugin for ForgiaJuiceCameraShakePlugin {
     }
 }
 
-fn consume_impulses(
-    mut events: MessageReader<ShakeImpulse>,
-    mut cams: Query<&mut CameraShake>,
-) {
+fn consume_impulses(mut events: MessageReader<ShakeImpulse>, mut cams: Query<&mut CameraShake>) {
     for ev in events.read() {
         for mut s in &mut cams {
             s.trauma = (s.trauma + ev.trauma).clamp(0.0, 1.0);
@@ -216,7 +213,10 @@ mod tests {
     fn camera_shake_default_sane() {
         let s = CameraShake::default();
         assert_eq!(s.trauma, 0.0);
-        assert!(s.decay >= 4.0 && s.decay <= 16.0, "decay AAA range 60-250ms");
+        assert!(
+            s.decay >= 4.0 && s.decay <= 16.0,
+            "decay AAA range 60-250ms"
+        );
         // max_rotation < 0.05 rad (~3°) hard upper bound anti-nausée.
         assert!(s.max_rotation > 0.0 && s.max_rotation < 0.05);
     }

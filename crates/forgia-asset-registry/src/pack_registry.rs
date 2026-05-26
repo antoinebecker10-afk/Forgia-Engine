@@ -203,7 +203,8 @@ pub(crate) fn write_pack_registry_sensor(
                 missing_names.join(", ")
             )
         } else {
-            "Create assets/packs.toml — see story-449 for schema, or run an existing template".to_string()
+            "Create assets/packs.toml — see story-449 for schema, or run an existing template"
+                .to_string()
         };
         let health = format!(
             r#"{{
@@ -263,20 +264,18 @@ mod tests {
                 schema_version: 1,
                 default_install_root: "assets/models-v1/packs".into(),
             },
-            packs: vec![
-                PackEntry {
-                    name: "kaykit-medieval".into(),
-                    version: "1.0".into(),
-                    source_page: "https://example.com".into(),
-                    download_url: "https://example.com/m.zip".into(),
-                    sha256: None,
-                    size_bytes: None,
-                    install_dir: "kaykit-medieval".into(),
-                    license: "CC0-1.0".into(),
-                    kit_type: "medieval".into(),
-                    strip_prefix: String::new(),
-                },
-            ],
+            packs: vec![PackEntry {
+                name: "kaykit-medieval".into(),
+                version: "1.0".into(),
+                source_page: "https://example.com".into(),
+                download_url: "https://example.com/m.zip".into(),
+                sha256: None,
+                size_bytes: None,
+                install_dir: "kaykit-medieval".into(),
+                license: "CC0-1.0".into(),
+                kit_type: "medieval".into(),
+                strip_prefix: String::new(),
+            }],
         }
     }
 

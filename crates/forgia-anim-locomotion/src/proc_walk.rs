@@ -278,7 +278,11 @@ mod tests {
             "thigh at end-stance must be backward (-amp), got {}",
             thigh
         );
-        assert!(knee.abs() < 1e-4, "knee toujours tendu fin de stance, got {}", knee);
+        assert!(
+            knee.abs() < 1e-4,
+            "knee toujours tendu fin de stance, got {}",
+            knee
+        );
     }
 
     #[test]
@@ -291,11 +295,7 @@ mod tests {
             "knee must be significantly bent mid-swing, got {}",
             knee
         );
-        assert!(
-            ankle > 0.10,
-            "ankle dorsi-flex mid-swing, got {}",
-            ankle
-        );
+        assert!(ankle > 0.10, "ankle dorsi-flex mid-swing, got {}", ankle);
     }
 
     #[test]
@@ -362,7 +362,12 @@ mod tests {
         for i in 0..50 {
             let gait = i as f32 / 50.0;
             let (_, _, bob) = pelvic_pose(gait, 1.0, &t);
-            assert!(bob >= 0.0, "bob_y must be ≥ 0 (got {} at gait={})", bob, gait);
+            assert!(
+                bob >= 0.0,
+                "bob_y must be ≥ 0 (got {} at gait={})",
+                bob,
+                gait
+            );
         }
     }
 
@@ -387,7 +392,14 @@ mod tests {
         let t1 = tail_segment_yaw(1, 4, pelvic_yaw).abs();
         let t2 = tail_segment_yaw(2, 4, pelvic_yaw).abs();
         let t3 = tail_segment_yaw(3, 4, pelvic_yaw).abs();
-        assert!(t0 < t1 && t1 < t2 && t2 < t3, "tail amplitudes increasing: {} {} {} {}", t0, t1, t2, t3);
+        assert!(
+            t0 < t1 && t1 < t2 && t2 < t3,
+            "tail amplitudes increasing: {} {} {} {}",
+            t0,
+            t1,
+            t2,
+            t3
+        );
         // Et opposé au bassin
         assert!(tail_segment_yaw(0, 4, pelvic_yaw) * pelvic_yaw < 0.0);
     }
@@ -403,7 +415,10 @@ mod tests {
             run.stance_frac
         );
         assert!(run.amp_thigh > walk.amp_thigh, "run has bigger thigh swing");
-        assert!(run.knee_flex_peak > walk.knee_flex_peak, "run knees plient plus");
+        assert!(
+            run.knee_flex_peak > walk.knee_flex_peak,
+            "run knees plient plus"
+        );
     }
 
     #[test]

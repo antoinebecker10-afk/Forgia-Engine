@@ -27,6 +27,7 @@ forgia-foliage = { workspace = true }
 forgia-water = { workspace = true }
 forgia-audio-core = { workspace = true }
 forgia-audio-biome = { workspace = true }
+forgia-audio-voicelines = { workspace = true }
 forgia-asset-registry = { workspace = true }
 forgia-streaming = { workspace = true }
 forgia-fps = { workspace = true }

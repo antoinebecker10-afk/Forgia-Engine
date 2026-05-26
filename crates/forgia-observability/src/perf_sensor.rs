@@ -44,10 +44,11 @@ pub fn sys_write_perf_sensor(
         .get(&FrameTimeDiagnosticsPlugin::FRAME_TIME)
         .map(|ft| {
             let avg = ft.average().unwrap_or(0.0);
-            let (mn, mx, n) = ft.values().fold(
-                (f64::MAX, 0.0_f64, 0usize),
-                |(mn, mx, n), v| (mn.min(*v), mx.max(*v), n + 1),
-            );
+            let (mn, mx, n) = ft
+                .values()
+                .fold((f64::MAX, 0.0_f64, 0usize), |(mn, mx, n), v| {
+                    (mn.min(*v), mx.max(*v), n + 1)
+                });
             (avg, if n > 0 { mn } else { 0.0 }, mx, n)
         })
         .unwrap_or((0.0, 0.0, 0.0, 0));

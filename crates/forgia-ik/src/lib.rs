@@ -34,7 +34,7 @@
 use bevy::prelude::*;
 
 pub mod prelude {
-    pub use crate::{ForgiaIkPlugin, TwoBoneIkInput, TwoBoneIkOutput, two_bone_ik};
+    pub use crate::{two_bone_ik, ForgiaIkPlugin, TwoBoneIkInput, TwoBoneIkOutput};
 }
 
 pub struct ForgiaIkPlugin;

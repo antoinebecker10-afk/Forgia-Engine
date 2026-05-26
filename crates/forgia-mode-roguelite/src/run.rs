@@ -19,8 +19,8 @@ use forgia_damage::DeathEvent;
 // TODO(story-471..479): PickupAnimState + PickupKind supprimés de forgia_loot_tables
 use forgia_loot_tables::{Pickup, PickupCollector};
 use forgia_player::Player;
-use rand_xoshiro::Xoshiro256StarStar;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
+use rand_xoshiro::Xoshiro256StarStar;
 
 /// SubState de `GameMode::Roguelite` — flow de la run en cours.
 #[derive(SubStates, Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -76,8 +76,8 @@ impl RunSeed {
 
     /// Dérivation déterministe par encounter dans un stage.
     pub fn encounter_seed(&self, stage: u8, encounter_idx: u32) -> u64 {
-        let mixed = self.stage_seed(stage)
-            ^ u64::from(encounter_idx).wrapping_mul(0xBF58476D1CE4E5B9);
+        let mixed =
+            self.stage_seed(stage) ^ u64::from(encounter_idx).wrapping_mul(0xBF58476D1CE4E5B9);
         let mut rng = Xoshiro256StarStar::seed_from_u64(mixed);
         rng.next_u64()
     }
@@ -205,7 +205,6 @@ pub fn sys_spawn_roguelite_scene(
     crate::stations::spawn_stations(&mut commands, &mut meshes, &mut materials);
 }
 
-
 /// V7 M3 step 4 (2026-05-20) — Observer DeathEvent ciblant le Player → Defeat.
 ///
 /// Pipeline : bot tire (BotShootConfig) → `apply_damage` mute Health → trigger
@@ -283,8 +282,8 @@ pub fn obs_roguelite_enemy_death(
 
     // Seed pseudo-deterministic from time + entity bits (cheap xorshift).
     let entity_seed: u64 = target.to_bits();
-    let mut seed = (time.elapsed_secs_f64() * 1000.0) as u64
-        ^ entity_seed.wrapping_mul(2_654_435_761);
+    let mut seed =
+        (time.elapsed_secs_f64() * 1000.0) as u64 ^ entity_seed.wrapping_mul(2_654_435_761);
     seed ^= seed << 13;
     seed ^= seed >> 7;
     seed ^= seed << 17;
@@ -340,7 +339,12 @@ pub fn obs_roguelite_enemy_death(
     });
     let halo_mat = materials.add(StandardMaterial {
         base_color: Color::srgba(color.0 * 0.6, color.1 * 0.6, color.2 * 0.6, 0.30),
-        emissive: LinearRgba::new(emissive.red * 0.5, emissive.green * 0.5, emissive.blue * 0.5, 1.0),
+        emissive: LinearRgba::new(
+            emissive.red * 0.5,
+            emissive.green * 0.5,
+            emissive.blue * 0.5,
+            1.0,
+        ),
         alpha_mode: AlphaMode::Blend,
         cull_mode: None,
         unlit: true,
@@ -454,10 +458,7 @@ pub fn sys_start_run(
     }
 }
 
-pub fn sys_end_run(
-    mut events: MessageReader<EndRunEvent>,
-    mut next: ResMut<NextState<RunState>>,
-) {
+pub fn sys_end_run(mut events: MessageReader<EndRunEvent>, mut next: ResMut<NextState<RunState>>) {
     for ev in events.read() {
         let state = match ev.result {
             RunResult::Victory => RunState::Victory,
@@ -517,25 +518,11 @@ mod tests {
         assert_eq!(stage_id_for_depth(0, true), "crypts_of_anvil");
     }
 
-    #[test]
-    fn parse_music_state_combat_variants() {
-        use forgia_audio_music_state::MusicState;
-        assert_eq!(parse_music_state("combat"), Some(MusicState::Combat));
-        assert_eq!(parse_music_state("combat_intense"), Some(MusicState::Combat));
-        assert_eq!(parse_music_state("combat_default"), Some(MusicState::Combat));
-        assert_eq!(parse_music_state("COMBAT"), Some(MusicState::Combat));
-        assert_eq!(parse_music_state("  Combat_Intense  "), Some(MusicState::Combat));
-    }
-
-    #[test]
-    fn parse_music_state_all_known_states() {
-        use forgia_audio_music_state::MusicState;
-        assert_eq!(parse_music_state("lobby"), Some(MusicState::Lobby));
-        assert_eq!(parse_music_state("explore"), Some(MusicState::Explore));
-        assert_eq!(parse_music_state("boss"), Some(MusicState::Boss));
-        assert_eq!(parse_music_state("victory"), Some(MusicState::Victory));
-        assert_eq!(parse_music_state("defeat"), Some(MusicState::Defeat));
-    }
+    // TODO(story-471..479) : tests parse_music_state_combat_variants +
+    // parse_music_state_all_known_states supprimés car forgia_audio_music_state
+    // ::MusicState n'existe plus (scaffold vide post-refactor). parse_music_state
+    // est stub Option<()> retournant None (cf src/run.rs:165-169). À ré-instaurer
+    // quand l'enum MusicState sera re-implémentée.
 
     #[test]
     fn parse_music_state_unknown_returns_none() {

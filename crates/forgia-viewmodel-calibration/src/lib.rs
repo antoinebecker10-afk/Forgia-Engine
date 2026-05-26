@@ -21,8 +21,8 @@
 use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
-use forgia_viewmodel::WeaponViewmodel;
 use forgia_player::prelude::FpsCamera;
+use forgia_viewmodel::WeaponViewmodel;
 use std::collections::HashMap;
 use std::fs;
 
@@ -129,8 +129,7 @@ pub fn viewmodel_calibration_sensor(
         local_euler.2.to_degrees(),
     ];
 
-    let (interpretation, suggested_y) =
-        interpret(angle_deg, barrel_dir, cam_forward, applied[1]);
+    let (interpretation, suggested_y) = interpret(angle_deg, barrel_dir, cam_forward, applied[1]);
 
     let measurement = WeaponMeasurement {
         mesh_local_size: [size.x, size.y, size.z],
@@ -259,15 +258,25 @@ fn write_json(store: &CalibrationStore) {
     }}"#,
             weapon_label,
             weapon_toml_key(w),
-            m.mesh_local_size[0], m.mesh_local_size[1], m.mesh_local_size[2],
-            m.mesh_aabb_min[0], m.mesh_aabb_min[1], m.mesh_aabb_min[2],
-            m.mesh_aabb_max[0], m.mesh_aabb_max[1], m.mesh_aabb_max[2],
+            m.mesh_local_size[0],
+            m.mesh_local_size[1],
+            m.mesh_local_size[2],
+            m.mesh_aabb_min[0],
+            m.mesh_aabb_min[1],
+            m.mesh_aabb_min[2],
+            m.mesh_aabb_max[0],
+            m.mesh_aabb_max[1],
+            m.mesh_aabb_max[2],
             m.principal_axis_local,
             m.applied_transform_local_euler_deg[0],
             m.applied_transform_local_euler_deg[1],
             m.applied_transform_local_euler_deg[2],
-            m.barrel_direction_world[0], m.barrel_direction_world[1], m.barrel_direction_world[2],
-            m.cam_forward_world[0], m.cam_forward_world[1], m.cam_forward_world[2],
+            m.barrel_direction_world[0],
+            m.barrel_direction_world[1],
+            m.barrel_direction_world[2],
+            m.cam_forward_world[0],
+            m.cam_forward_world[1],
+            m.cam_forward_world[2],
             m.angle_barrel_to_cam_forward_deg,
             m.interpretation,
             suggested,

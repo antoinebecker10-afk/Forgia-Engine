@@ -31,7 +31,9 @@ pub struct Landmark {
 }
 
 impl Landmark {
-    pub fn is_detached(&self) -> bool { false }
+    pub fn is_detached(&self) -> bool {
+        false
+    }
     pub fn world_pos(&self, map_size: f32) -> Vec3 {
         Vec3::new(self.x * map_size, 0.0, self.z * map_size)
     }

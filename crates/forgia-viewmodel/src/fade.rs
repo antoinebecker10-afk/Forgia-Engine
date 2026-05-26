@@ -40,10 +40,8 @@ pub struct ScopeGlassFader;
 pub struct ViewmodelBodyFader;
 
 /// Patterns Name nodes considérés comme "scope / viseur" (case-insensitive).
-const SCOPE_GLASS_PATTERNS: &[&str] = &[
-    "lens", "glass", "optic", "reticle",
-    "scope", "sight", "dot",
-];
+const SCOPE_GLASS_PATTERNS: &[&str] =
+    &["lens", "glass", "optic", "reticle", "scope", "sight", "dot"];
 
 /// Sockets / placeholders à EXCLURE (faux positifs : SOCKET_Sight_Front_Default).
 const EXCLUDE_PATTERNS: &[&str] = &[
@@ -85,7 +83,10 @@ pub fn identify_viewmodel_faders(
         let mut body_count = 0;
 
         while let Some(e) = stack.pop() {
-            let name_str = q_name.get(e).map(|n| n.as_str().to_string()).unwrap_or_default();
+            let name_str = q_name
+                .get(e)
+                .map(|n| n.as_str().to_string())
+                .unwrap_or_default();
             if !name_str.is_empty() {
                 all_names.push(name_str.clone());
             }
@@ -121,7 +122,10 @@ pub fn identify_viewmodel_faders(
             scope_count, body_count, body_fade_enabled, body_alpha, scope_alpha, all_names.len()
         );
         if scope_count == 0 {
-            info!("[forgia-viewmodel/fade] aucun scope match parmi : {:?}", all_names);
+            info!(
+                "[forgia-viewmodel/fade] aucun scope match parmi : {:?}",
+                all_names
+            );
         }
     }
 }

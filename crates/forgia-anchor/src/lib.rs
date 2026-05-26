@@ -2,7 +2,7 @@
 //!
 //! Story-483 V7 P0 (NEW crate). Mode-agnostic spawn-zone markers consumed by
 //! `forgia-stage-arena`, `forgia-mode-roguelite`, `forgia-mode-fps-arena` (M4),
-//! `forgia-mode-rpg-openworld` (POI signposts), etc.
+//! `forgia-rpg` (POI signposts), etc.
 //!
 //! Pattern :
 //! - `AnchorPoint` Component porte `kind: AnchorKind` + `slot_index: u32`
@@ -201,10 +201,7 @@ impl AnchorStats {
     }
 
     pub fn total(&self) -> u32 {
-        self.counts
-            .iter()
-            .map(|a| a.load(Ordering::Relaxed))
-            .sum()
+        self.counts.iter().map(|a| a.load(Ordering::Relaxed)).sum()
     }
 }
 

@@ -82,14 +82,21 @@ pub struct BotAiSensor {
 /// Filter exclut le bot lui-même via predicate (anti self-hit).
 #[allow(clippy::too_many_arguments)]
 pub fn bot_los_check(
-    mut bots: Query<(Entity, &mut ArenaBot, &GlobalTransform, &crate::BotShootConfig)>,
+    mut bots: Query<(
+        Entity,
+        &mut ArenaBot,
+        &GlobalTransform,
+        &crate::BotShootConfig,
+    )>,
     targets: Query<(Entity, &GlobalTransform), With<BotTarget>>,
     rapier: ReadRapierContext,
     tuning: Res<TacticalTuning>,
     time: Res<Time>,
     mut sensor: ResMut<BotAiSensor>,
 ) {
-    let Some((target_entity, target_tf)) = targets.iter().next() else { return };
+    let Some((target_entity, target_tf)) = targets.iter().next() else {
+        return;
+    };
     let Ok(ctx) = rapier.single() else { return };
     let dt = time.delta_secs();
     let check_interval = 1.0 / tuning.los_check_hz.max(0.1);
@@ -139,7 +146,9 @@ pub fn bot_los_check(
         // Transition false → true : démarrer grace window (reaction time AAA).
         if !bot.has_los && new_los {
             let grace = if bot.alerted {
-                tuning.los_grace_secs.min(tuning.gunshot_alert_los_grace_secs)
+                tuning
+                    .los_grace_secs
+                    .min(tuning.gunshot_alert_los_grace_secs)
             } else {
                 tuning.los_grace_secs
             };
@@ -181,8 +190,8 @@ pub fn bot_perception_alert(
         // Source du bruit = position du player tirant (proxy : si attacker = player,
         // le tir part du player). Pas le hit_world_pos (ça c'est la cible).
         let _ = hit; // dummy : ici on déclenche alert sur n'importe quel tir player.
-        // Filter : on alerte sur tous les CombatHitEvent (proxy "player a tiré").
-        // Pourrait être affiné via une dedicated WeaponFiredEvent — out of scope phase 4.
+                     // Filter : on alerte sur tous les CombatHitEvent (proxy "player a tiré").
+                     // Pourrait être affiné via une dedicated WeaponFiredEvent — out of scope phase 4.
         for (mut bot, bot_tf) in &mut bots {
             if bot.state == BotState::Dead {
                 continue;
@@ -191,8 +200,7 @@ pub fn bot_perception_alert(
             if d <= tuning.gunshot_alert_radius_m && !bot.alerted {
                 bot.alerted = true;
                 bot.alert_left = tuning.alert_duration_secs;
-                sensor.alerts_triggered_session =
-                    sensor.alerts_triggered_session.saturating_add(1);
+                sensor.alerts_triggered_session = sensor.alerts_triggered_session.saturating_add(1);
             }
         }
     }
@@ -237,7 +245,13 @@ fn pick_avoid_direction(
     let filter = QueryFilter::default().predicate(&predicate);
     let cast = |d: Vec3| -> f32 {
         rapier
-            .cast_ray(origin + Vec3::Y * 0.5, d.normalize_or_zero(), max_dist, true, filter)
+            .cast_ray(
+                origin + Vec3::Y * 0.5,
+                d.normalize_or_zero(),
+                max_dist,
+                true,
+                filter,
+            )
             .map(|(_, t)| t)
             .unwrap_or(max_dist)
     };
@@ -269,7 +283,9 @@ pub fn bot_tactical_movement(
     tuning: Res<TacticalTuning>,
     time: Res<Time>,
 ) {
-    let Some(target_tf) = targets.iter().next() else { return };
+    let Some(target_tf) = targets.iter().next() else {
+        return;
+    };
     let target_pos = target_tf.translation;
     let Ok(ctx) = rapier.single() else { return };
     let dt = time.delta_secs();
@@ -358,9 +374,18 @@ pub fn write_bot_ai_sensor(
     sensor.bots_attacking = attacking;
     let json = format!(
         r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
-        now, alive, with_los, in_grace, alerted, chasing, attacking,
-        sensor.los_checks_session, sensor.alerts_triggered_session,
-        tuning.los_check_hz, tuning.strafe_amplitude_m, tuning.gunshot_alert_radius_m,
+        now,
+        alive,
+        with_los,
+        in_grace,
+        alerted,
+        chasing,
+        attacking,
+        sensor.los_checks_session,
+        sensor.alerts_triggered_session,
+        tuning.los_check_hz,
+        tuning.strafe_amplitude_m,
+        tuning.gunshot_alert_radius_m,
         tuning.los_lost_grace_secs,
     );
     let _ = std::fs::write("forgia_bot_ai.json", json);

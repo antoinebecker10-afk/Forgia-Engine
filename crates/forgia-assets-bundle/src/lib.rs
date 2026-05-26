@@ -303,9 +303,7 @@ impl PackLockfile {
             if !seen.insert(&entry.name) {
                 return Err(ManifestError::DuplicatePack(entry.name.clone()));
             }
-            if entry.sha256.len() != 64
-                || !entry.sha256.chars().all(|c| c.is_ascii_hexdigit())
-            {
+            if entry.sha256.len() != 64 || !entry.sha256.chars().all(|c| c.is_ascii_hexdigit()) {
                 return Err(ManifestError::InvalidSha256 {
                     name: entry.name.clone(),
                     len: entry.sha256.len(),
@@ -487,7 +485,13 @@ file_count = 1
     fn empty_field_rejected() {
         let bad = MINIMAL_MANIFEST.replace(r#"license = "CC0-1.0""#, r#"license = """#);
         let err = PackManifest::parse(&bad).unwrap_err();
-        matches!(err, ManifestError::EmptyField { field: "license", .. });
+        matches!(
+            err,
+            ManifestError::EmptyField {
+                field: "license",
+                ..
+            }
+        );
     }
 
     #[test]

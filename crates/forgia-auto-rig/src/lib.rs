@@ -31,16 +31,16 @@ use bevy::prelude::*;
 use forgia_core::prelude::GameSet;
 
 mod anatomy_detect;
-mod skinning;
 mod debug_gizmos;
 mod pinocchio_pipeline;
+mod skinning;
 
 pub use anatomy_detect::{detect_landmarks_from_vertices, MeshLandmarks};
+pub use debug_gizmos::{draw_rig_gizmos, AutoRigGizmosConfig};
+pub use pinocchio_pipeline::{auto_rig_pinocchio_v1, auto_rig_to_skeleton_template_id};
 pub use skinning::{
     inject_skinning_for_rigged_meshes, BoneEntity, SkinningConfig, SkinningInjected,
 };
-pub use debug_gizmos::{draw_rig_gizmos, AutoRigGizmosConfig};
-pub use pinocchio_pipeline::{auto_rig_pinocchio_v1, auto_rig_to_skeleton_template_id};
 
 pub mod prelude {
     pub use crate::{
@@ -229,7 +229,11 @@ pub fn write_auto_rig_sensor(
     } else if rigged_count > 0 {
         ("ok", "rigged", "")
     } else {
-        ("ok", "no_target", "Aucune entité NeedsAutoRig — pipeline en attente (mode RPG pas entré ?)")
+        (
+            "ok",
+            "no_target",
+            "Aucune entité NeedsAutoRig — pipeline en attente (mode RPG pas entré ?)",
+        )
     };
     let last_template_str = stats
         .last_template
@@ -316,8 +320,12 @@ pub fn write_auto_rig_sensor(
         stats.last_mesh_height,
         stats.last_rigged_at_secs,
         // debug block
-        stats.last_aabb_min.x, stats.last_aabb_min.y, stats.last_aabb_min.z,
-        stats.last_aabb_max.x, stats.last_aabb_max.y, stats.last_aabb_max.z,
+        stats.last_aabb_min.x,
+        stats.last_aabb_min.y,
+        stats.last_aabb_min.z,
+        stats.last_aabb_max.x,
+        stats.last_aabb_max.y,
+        stats.last_aabb_max.z,
         stats.last_mesh3d_count,
         stats.last_total_mesh_vertices,
         stats.last_spine_scale,
@@ -397,4 +405,3 @@ impl Plugin for ForgiaAutoRigPlugin {
 }
 
 // ── Tests headless ──────────────────────────────────────────────────────────
-

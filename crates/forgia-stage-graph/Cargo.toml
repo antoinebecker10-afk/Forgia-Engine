@@ -1,0 +1,15 @@
+[package]
+name = "forgia-stage-graph"
+version = "0.1.0"
+edition = "2021"
+description = "Roguelite stage graph (Slay-the-Spire DAG / Hades branching choices). Deterministic seeded RNG. Story-473 V7 P0."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

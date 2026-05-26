@@ -149,8 +149,7 @@ pub fn analyze_rig_topology(
         // Leg : en dessous du root (-Y), latéralisé (|X|>0.05), peu profond dans
         // la hiérarchie (depth 1..4 typique pour la cuisse).
         if y_norm < -0.05 && x_norm.abs() > 0.03 && b.depth <= 5 {
-            let score = (-y_norm) * 2.0 + x_norm.abs() * 3.0
-                - (b.depth as f32) * 0.05
+            let score = (-y_norm) * 2.0 + x_norm.abs() * 3.0 - (b.depth as f32) * 0.05
                 + name_boost(&lower, &["thigh", "upleg", "leg", "_l_", "_r_", "hip"]);
             if x_norm > 0.0 {
                 update_best(&mut right_leg_best, b.entity, score);
@@ -171,10 +170,10 @@ pub fn analyze_rig_topology(
                 || lower.contains("hand")
                 || lower.contains("wrist");
             let forearm_penalty = if is_forearm_name { -4.0 } else { 0.0 };
-            let upper_boost = name_boost(&lower, &["shoulder", "clavicle", "upper_arm", "upperarm"]);
+            let upper_boost =
+                name_boost(&lower, &["shoulder", "clavicle", "upper_arm", "upperarm"]);
             let arm_match = name_boost(&lower, &["arm"]);
-            let score = y_norm + x_norm.abs() * 4.0
-                - (b.depth as f32) * 0.1
+            let score = y_norm + x_norm.abs() * 4.0 - (b.depth as f32) * 0.1
                 + arm_match
                 + upper_boost
                 + forearm_penalty;
@@ -187,16 +186,15 @@ pub fn analyze_rig_topology(
 
         // Spine : sur l'axe vertical central (|X|<0.05), au-dessus root, depth 1..3.
         if y_norm > 0.0 && x_norm.abs() < 0.08 && b.depth <= 4 {
-            let score =
-                y_norm * 2.0 - x_norm.abs() * 10.0 - (b.depth as f32) * 0.1
-                    + name_boost(&lower, &["spine", "torso", "chest", "back"]);
+            let score = y_norm * 2.0 - x_norm.abs() * 10.0 - (b.depth as f32) * 0.1
+                + name_boost(&lower, &["spine", "torso", "chest", "back"]);
             update_best(&mut spine_best, b.entity, score);
         }
 
         // Head : haut du squelette (y_norm fort), central, profondeur élevée.
         if y_norm > 0.4 && x_norm.abs() < 0.1 {
-            let score = y_norm * 3.0 - x_norm.abs() * 5.0
-                + name_boost(&lower, &["head", "neck", "skull"]);
+            let score =
+                y_norm * 3.0 - x_norm.abs() * 5.0 + name_boost(&lower, &["head", "neck", "skull"]);
             update_best(&mut head_best, b.entity, score);
         }
 
@@ -365,7 +363,10 @@ mod tests {
         // Premier passage : spawn toutes les entités avec Transform + Name.
         for (name, _parent, pos) in &bones {
             let e = world
-                .spawn((Transform::from_translation(*pos), Name::new(name.to_string())))
+                .spawn((
+                    Transform::from_translation(*pos),
+                    Name::new(name.to_string()),
+                ))
                 .id();
             by_name.insert(name.to_string(), e);
         }
@@ -404,11 +405,31 @@ mod tests {
             ("Armature", Some("SceneRoot"), Vec3::ZERO),
             ("Hips", Some("Armature"), Vec3::ZERO),
             ("mixamorig:Spine", Some("Hips"), Vec3::new(0.0, 0.5, 0.0)),
-            ("mixamorig:LeftUpLeg", Some("Hips"), Vec3::new(-0.15, -0.4, 0.0)),
-            ("mixamorig:RightUpLeg", Some("Hips"), Vec3::new(0.15, -0.4, 0.0)),
-            ("mixamorig:LeftArm", Some("mixamorig:Spine"), Vec3::new(-0.25, 0.3, 0.0)),
-            ("mixamorig:RightArm", Some("mixamorig:Spine"), Vec3::new(0.25, 0.3, 0.0)),
-            ("mixamorig:Head", Some("mixamorig:Spine"), Vec3::new(0.0, 0.4, 0.0)),
+            (
+                "mixamorig:LeftUpLeg",
+                Some("Hips"),
+                Vec3::new(-0.15, -0.4, 0.0),
+            ),
+            (
+                "mixamorig:RightUpLeg",
+                Some("Hips"),
+                Vec3::new(0.15, -0.4, 0.0),
+            ),
+            (
+                "mixamorig:LeftArm",
+                Some("mixamorig:Spine"),
+                Vec3::new(-0.25, 0.3, 0.0),
+            ),
+            (
+                "mixamorig:RightArm",
+                Some("mixamorig:Spine"),
+                Vec3::new(0.25, 0.3, 0.0),
+            ),
+            (
+                "mixamorig:Head",
+                Some("mixamorig:Spine"),
+                Vec3::new(0.0, 0.4, 0.0),
+            ),
         ]);
         let topo = analyze(&b);
         assert!(topo.is_usable());

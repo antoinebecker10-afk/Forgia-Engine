@@ -53,8 +53,7 @@ impl Plugin for ForgiaLootTablesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Souls>().add_systems(
             Update,
-            (sys_tick_pickup_lifetime, sys_collect_pickups)
-                .in_set(GameSet::Effects),
+            (sys_tick_pickup_lifetime, sys_collect_pickups).in_set(GameSet::Effects),
         );
     }
 }
