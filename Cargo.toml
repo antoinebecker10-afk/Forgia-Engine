@@ -57,7 +57,6 @@ members = [
     "crates/forgia-village-loader",
     "crates/forgia-water",
     "crates/forgia-weapon-hitscan",
-    "crates/forgia-websocket",
     "crates/forgia-rpg-data",
     "crates/forgia-qa-core",
     "crates/forgia-qa-replay",
@@ -180,7 +179,6 @@ forgia-village-kit = { path = "crates/forgia-village-kit" }
 forgia-village-loader = { path = "crates/forgia-village-loader" }
 forgia-water = { path = "crates/forgia-water" }
 forgia-weapon-hitscan = { path = "crates/forgia-weapon-hitscan" }
-forgia-websocket = { path = "crates/forgia-websocket" }
 forgia-rpg-data = { path = "crates/forgia-rpg-data" }
 forgia-qa-core = { path = "crates/forgia-qa-core" }
 forgia-qa-replay = { path = "crates/forgia-qa-replay" }
