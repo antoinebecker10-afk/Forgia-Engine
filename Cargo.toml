@@ -79,7 +79,6 @@ members = [
     "crates/forgia-skeleton-embedder",
     "crates/forgia-skeleton-template",
     "crates/forgia-meshy-import",
-    "crates/forgia-mod-outline",
     "crates/forgia-mode-fps-arena",
     "crates/forgia-mode-roguelite",
     "crates/forgia-navigator",
@@ -286,7 +285,6 @@ forgia-medial-axis = { path = "crates/forgia-medial-axis" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
 forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
 forgia-meshy-import = { path = "crates/forgia-meshy-import" }
-forgia-mod-outline = { path = "crates/forgia-mod-outline" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
 forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
 forgia-navigator = { path = "crates/forgia-navigator" }

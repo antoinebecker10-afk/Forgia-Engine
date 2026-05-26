@@ -58,7 +58,6 @@ allowed = [
     "forgia-juice-hit-stop",
     "forgia-juice-recoil",
     "forgia-meshy-import",
-    "forgia-mod-outline",
     "forgia-navigator",
     "forgia-physics",
     "forgia-player-fps",
