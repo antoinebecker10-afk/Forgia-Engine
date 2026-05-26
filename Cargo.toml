@@ -18,7 +18,6 @@ members = [
     "crates/forgia-core",
     "crates/forgia-crosshair",
     "crates/forgia-damage",
-    "crates/forgia-dialogue",
     "crates/forgia-enemy-nameplate",
     "crates/forgia-effects",
     "crates/forgia-foliage",
@@ -27,11 +26,9 @@ members = [
     "crates/forgia-genome-core",
     "crates/forgia-ik",
     "crates/forgia-input",
-    "crates/forgia-inventory",
     "crates/forgia-juice-lib",
     "crates/forgia-juice-screen-flash",
     "crates/forgia-level-presets",
-    "crates/forgia-loot-tables",
     "crates/forgia-mesh-voxelizer",
     "crates/forgia-medial-axis",
     "crates/forgia-skeleton-embedder",
@@ -42,7 +39,6 @@ members = [
     "crates/forgia-player",
     "crates/forgia-postprocess",
     "crates/forgia-prefab",
-    "crates/forgia-quests",
     "crates/forgia-rng",
     "crates/forgia-rpg",
     "crates/forgia-secondary-motion",
@@ -62,7 +58,7 @@ members = [
     "crates/forgia-water",
     "crates/forgia-weapon-hitscan",
     "crates/forgia-websocket",
-    "crates/forgia-xp-curves",
+    "crates/forgia-rpg-data",
     "crates/forgia-qa-core",
     "crates/forgia-qa-replay",
     "crates/forgia-qa-harness",
@@ -145,7 +141,6 @@ forgia-combat = { path = "crates/forgia-combat" }
 forgia-core = { path = "crates/forgia-core" }
 forgia-crosshair = { path = "crates/forgia-crosshair" }
 forgia-damage = { path = "crates/forgia-damage" }
-forgia-dialogue = { path = "crates/forgia-dialogue" }
 forgia-enemy-nameplate = { path = "crates/forgia-enemy-nameplate" }
 forgia-effects = { path = "crates/forgia-effects" }
 forgia-foliage = { path = "crates/forgia-foliage" }
@@ -154,11 +149,9 @@ forgia-game = { path = "crates/forgia-game" }
 forgia-genome-core = { path = "crates/forgia-genome-core" }
 forgia-ik = { path = "crates/forgia-ik" }
 forgia-input = { path = "crates/forgia-input" }
-forgia-inventory = { path = "crates/forgia-inventory" }
 forgia-juice-lib = { path = "crates/forgia-juice-lib" }
 forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
 forgia-level-presets = { path = "crates/forgia-level-presets" }
-forgia-loot-tables = { path = "crates/forgia-loot-tables" }
 forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
 forgia-medial-axis = { path = "crates/forgia-medial-axis" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
@@ -169,7 +162,6 @@ forgia-observability = { path = "crates/forgia-observability" }
 forgia-player = { path = "crates/forgia-player" }
 forgia-postprocess = { path = "crates/forgia-postprocess" }
 forgia-prefab = { path = "crates/forgia-prefab" }
-forgia-quests = { path = "crates/forgia-quests" }
 forgia-rng = { path = "crates/forgia-rng" }
 forgia-rpg = { path = "crates/forgia-rpg" }
 forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
@@ -189,7 +181,7 @@ forgia-village-loader = { path = "crates/forgia-village-loader" }
 forgia-water = { path = "crates/forgia-water" }
 forgia-weapon-hitscan = { path = "crates/forgia-weapon-hitscan" }
 forgia-websocket = { path = "crates/forgia-websocket" }
-forgia-xp-curves = { path = "crates/forgia-xp-curves" }
+forgia-rpg-data = { path = "crates/forgia-rpg-data" }
 forgia-qa-core = { path = "crates/forgia-qa-core" }
 forgia-qa-replay = { path = "crates/forgia-qa-replay" }
 forgia-qa-harness = { path = "crates/forgia-qa-harness" }

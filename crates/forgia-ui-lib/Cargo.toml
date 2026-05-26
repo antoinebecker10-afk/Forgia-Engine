@@ -16,4 +16,4 @@ forgia-damage = { workspace = true }
 forgia-mode-fps-arena = { workspace = true }
 forgia-player = { workspace = true }
 forgia-genome-core = { workspace = true }
-forgia-dialogue = { workspace = true }
+forgia-rpg-data = { workspace = true }

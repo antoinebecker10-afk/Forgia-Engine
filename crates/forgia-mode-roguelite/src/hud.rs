@@ -16,7 +16,7 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
-use forgia_loot_tables::Souls;
+use forgia_rpg_data::loot_tables::Souls;
 use forgia_ui_lib::style::*;
 
 use crate::enemies::EnemyArchetype;

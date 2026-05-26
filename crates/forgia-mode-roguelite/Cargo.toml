@@ -20,7 +20,7 @@ forgia-combat = { workspace = true }
 # Story-470 M2 fix — TargetCube marker requis par HitApplyCtx + despawn_dead_cubes (forgia-fps)
 forgia-mode-fps-arena = { workspace = true }
 # Story-470 M2 step 3 — drop loot on death + Souls currency
-forgia-loot-tables = { workspace = true }
+forgia-rpg-data = { workspace = true }
 # Player marker requis pour tag PickupCollector
 forgia-player = { workspace = true }
 # Story-470 V7 M1 — RunSeed déterministe (host-authoritative, choix audit §0.2)

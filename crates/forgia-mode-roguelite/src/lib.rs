@@ -46,8 +46,8 @@ pub struct ForgiaModeRoguelitePlugin;
 impl Plugin for ForgiaModeRoguelitePlugin {
     fn build(&self, app: &mut App) {
         // M2 step 3 — Souls Resource + Pickup collection systems.
-        if !app.is_plugin_added::<forgia_loot_tables::ForgiaLootTablesPlugin>() {
-            app.add_plugins(forgia_loot_tables::ForgiaLootTablesPlugin);
+        if !app.is_plugin_added::<forgia_rpg_data::loot_tables::ForgiaLootTablesPlugin>() {
+            app.add_plugins(forgia_rpg_data::loot_tables::ForgiaLootTablesPlugin);
         }
         // V7 M3 step 2 — node-driven run loop (StageGraph Slay-the-Spire ratios).
         if !app.is_plugin_added::<forgia_stage::graph::ForgiaStageGraphPlugin>() {

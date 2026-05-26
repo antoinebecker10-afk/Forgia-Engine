@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 use forgia_audio::prelude::AudioSampleOffset;
 use forgia_core::prelude::*;
-use forgia_dialogue::{
+use forgia_rpg_data::dialogue::{
     DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueTree,
     NodeId, StartDialogue,
 };

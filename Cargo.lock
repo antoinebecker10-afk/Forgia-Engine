@@ -3240,15 +3240,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-dialogue"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
-]
-
-[[package]]
 name = "forgia-effects"
 version = "0.1.0"
 dependencies = [
@@ -3327,7 +3318,6 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
- "forgia-dialogue",
  "forgia-effects",
  "forgia-enemy-nameplate",
  "forgia-foliage",
@@ -3342,6 +3332,7 @@ dependencies = [
  "forgia-qa-core",
  "forgia-qa-replay",
  "forgia-rpg",
+ "forgia-rpg-data",
  "forgia-secondary-motion",
  "forgia-streaming",
  "forgia-terrain",
@@ -3387,15 +3378,6 @@ dependencies = [
  "bevy",
  "forgia-core",
  "leafwing-input-manager",
-]
-
-[[package]]
-name = "forgia-inventory"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
 ]
 
 [[package]]
@@ -3449,15 +3431,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-loot-tables"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
-]
-
-[[package]]
 name = "forgia-medial-axis"
 version = "0.1.0"
 dependencies = [
@@ -3498,9 +3471,9 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
- "forgia-loot-tables",
  "forgia-mode-fps-arena",
  "forgia-player",
+ "forgia-rpg-data",
  "forgia-stage",
  "forgia-ui-lib",
  "rand_xoshiro",
@@ -3618,15 +3591,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-quests"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
-]
-
-[[package]]
 name = "forgia-rig-topology"
 version = "0.1.0"
 dependencies = [
@@ -3653,7 +3617,6 @@ dependencies = [
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
- "forgia-dialogue",
  "forgia-foliage",
  "forgia-genome-village",
  "forgia-ik",
@@ -3661,6 +3624,7 @@ dependencies = [
  "forgia-player",
  "forgia-prefab",
  "forgia-rig-topology",
+ "forgia-rpg-data",
  "forgia-secondary-motion",
  "forgia-skeleton-template",
  "forgia-streaming",
@@ -3669,6 +3633,15 @@ dependencies = [
  "forgia-village-loader",
  "leafwing-input-manager",
  "noise",
+]
+
+[[package]]
+name = "forgia-rpg-data"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-core",
+ "serde",
 ]
 
 [[package]]
@@ -3779,10 +3752,10 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
- "forgia-dialogue",
  "forgia-genome-core",
  "forgia-mode-fps-arena",
  "forgia-player",
+ "forgia-rpg-data",
  "serde",
  "toml",
 ]
@@ -3868,15 +3841,6 @@ dependencies = [
  "serde_json",
  "tungstenite",
  "url",
-]
-
-[[package]]
-name = "forgia-xp-curves"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
-use forgia_dialogue::{ChooseDialogueOption, DialogueRegistry, DialogueSession, EndDialogue};
+use forgia_rpg_data::dialogue::{ChooseDialogueOption, DialogueRegistry, DialogueSession, EndDialogue};
 
 pub mod prelude {
     pub use super::ForgiaUiDialoguePlugin;

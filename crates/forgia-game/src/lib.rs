@@ -68,7 +68,7 @@ pub fn run_game() -> AppExit {
     ));
 
     // 6. Cross-mode systems (utilisés par forgia-rpg, requis init_resource avant Startup)
-    app.add_plugins(forgia_dialogue::ForgiaDialoguePlugin);
+    app.add_plugins(forgia_rpg_data::dialogue::ForgiaDialoguePlugin);
 
     // 7. Mode-specific plugins (run_if interne par GameMode)
     app.add_plugins((

@@ -11,7 +11,7 @@
 use crate::run::{RunSeed, RunState};
 use crate::waves::{RogueliteWave, WAVES_TOTAL};
 use bevy::prelude::*;
-use forgia_loot_tables::Souls;
+use forgia_rpg_data::loot_tables::Souls;
 
 /// Telemetry runtime — incrémentée chaque frame par `sys_update_roguelite_telemetry`.
 #[derive(Resource, Default, Debug, Clone)]

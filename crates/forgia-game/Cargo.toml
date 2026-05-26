@@ -35,7 +35,7 @@ forgia-fps = { workspace = true }
 forgia-viewmodel = { workspace = true }
 forgia-rpg = { workspace = true }
 forgia-mode-roguelite = { workspace = true }
-forgia-dialogue = { workspace = true }
+forgia-rpg-data = { workspace = true }
 forgia-ui = { workspace = true }
 forgia-ui-lib = { workspace = true }
 forgia-killfeed = { workspace = true }

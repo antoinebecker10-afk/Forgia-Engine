@@ -17,7 +17,7 @@ use forgia_core::prelude::*;
 use forgia_combat::prelude::{EquippedWeapons, WeaponType};
 use forgia_damage::DeathEvent;
 // TODO(story-471..479): PickupAnimState + PickupKind supprimés de forgia_loot_tables
-use forgia_loot_tables::{Pickup, PickupCollector};
+use forgia_rpg_data::loot_tables::{Pickup, PickupCollector};
 use forgia_player::Player;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;

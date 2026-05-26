@@ -16,7 +16,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody, Sensor};
 use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::*;
-use forgia_loot_tables::PickupCollector;
+use forgia_rpg_data::loot_tables::PickupCollector;
 
 /// HP rendus par une heal station active.
 pub const HEAL_AMOUNT: f32 = 30.0;
