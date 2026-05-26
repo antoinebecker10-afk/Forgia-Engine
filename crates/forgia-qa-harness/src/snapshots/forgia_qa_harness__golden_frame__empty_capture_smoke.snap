@@ -1,0 +1,11 @@
+---
+source: forgia-qa-harness/src/golden_frame.rs
+expression: self
+---
+{
+  "sensors": {
+    "forgia_smoke": null
+  },
+  "health_alerts": [],
+  "final_state": null
+}

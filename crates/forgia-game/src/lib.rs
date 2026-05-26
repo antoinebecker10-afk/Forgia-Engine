@@ -52,6 +52,11 @@ pub fn run_game() -> AppExit {
         forgia_juice_screen_flash::prelude::ForgiaJuiceScreenFlashPlugin,
         forgia_ui_lib::pause_menu::prelude::ForgiaUiPauseMenuPlugin,
         forgia_observability::prelude::ForgiaObservabilityPlugin,
+        // Story-521 port V1 QA : bus BugReport + replay (recorder+player).
+        // forgia-qa-harness + autopilot sont des frameworks de test (TestApp),
+        // pas wirés runtime — usage via cargo test.
+        forgia_qa_core::ForgiaQaCorePlugin,
+        forgia_qa_replay::ForgiaQaReplayPlugin,
     ));
 
     // 5b. Story-457 (2026-05-19) — damage types + nameplate (split du bloc 5

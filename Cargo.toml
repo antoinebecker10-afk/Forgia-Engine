@@ -74,6 +74,10 @@ members = [
     "crates/forgia-weapon-hitscan",
     "crates/forgia-websocket",
     "crates/forgia-xp-curves",
+    "crates/forgia-qa-core",
+    "crates/forgia-qa-replay",
+    "crates/forgia-qa-harness",
+    "crates/forgia-qa-autopilot",
     "xtask",
 ]
 
@@ -130,6 +134,7 @@ serde_json = "1.0"
 toml = "0.8"
 ron = "0.8"
 thiserror = "2.0"
+ulid = { version = "1.1", features = ["serde"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 
 # Internal crates (paths) — auto-généré, 237 crates, ne pas éditer manuellement.
@@ -207,6 +212,10 @@ forgia-water = { path = "crates/forgia-water" }
 forgia-weapon-hitscan = { path = "crates/forgia-weapon-hitscan" }
 forgia-websocket = { path = "crates/forgia-websocket" }
 forgia-xp-curves = { path = "crates/forgia-xp-curves" }
+forgia-qa-core = { path = "crates/forgia-qa-core" }
+forgia-qa-replay = { path = "crates/forgia-qa-replay" }
+forgia-qa-harness = { path = "crates/forgia-qa-harness" }
+forgia-qa-autopilot = { path = "crates/forgia-qa-autopilot" }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Root package — Renzora-style. `cargo run` from workspace root launches game.
