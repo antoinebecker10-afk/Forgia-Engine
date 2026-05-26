@@ -9,7 +9,7 @@
 use bevy::prelude::*;
 
 pub mod prelude {
-    pub use crate::{ForgiaJuiceHitStopPlugin, HitStopState};
+    pub use super::{ForgiaJuiceHitStopPlugin, HitStopState};
 }
 
 /// Resource éphémère : insérée par un caller (fire system) pour déclencher

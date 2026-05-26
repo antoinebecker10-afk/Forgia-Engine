@@ -154,7 +154,7 @@ fn tick_fov_state(time: Res<Time>, mut state: ResMut<FovPunchState>) {
 }
 
 pub mod prelude {
-    pub use crate::{
+    pub use super::{
         ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchIntensity, FovPunchState,
         FovPunchTuning,
     };

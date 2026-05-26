@@ -19,7 +19,7 @@ use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::GameMode;
 use forgia_genome_core::Genome;
 use forgia_input::prelude::MouseSensitivityMultiplier;
-use forgia_juice_fov_punch::FovPunchState;
+use forgia_juice_lib::fov_punch::FovPunchState;
 use forgia_player::prelude::{FpsCamera, MovementSpeedMultiplier};
 use forgia_ui::prelude::CrosshairMode;
 

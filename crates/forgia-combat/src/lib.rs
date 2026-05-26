@@ -47,7 +47,7 @@ pub mod prelude {
     };
     pub use crate::{ForgiaCombatPlugin, Health};
     // HitStopState : migré vers forgia-juice-hit-stop (Tier 1D 2026-05-17).
-    // Importer directement : `use forgia_juice_hit_stop::HitStopState;`
+    // Importer directement : `use forgia_juice_lib::hit_stop::HitStopState;`
 }
 
 // =============================================================================
@@ -127,12 +127,12 @@ pub struct ForgiaCombatPlugin;
 impl Plugin for ForgiaCombatPlugin {
     fn build(&self, app: &mut App) {
         // Hit-stop time pause — crate dédié (règle fine-grained-crates).
-        if !app.is_plugin_added::<forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin>() {
-            app.add_plugins(forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin);
+        if !app.is_plugin_added::<forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin>() {
+            app.add_plugins(forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin);
         }
         // Recoil data (WeaponRecoilImpulse Message + WeaponRecoilDebt Resource) — crate dédié.
-        if !app.is_plugin_added::<forgia_juice_recoil::ForgiaJuiceRecoilPlugin>() {
-            app.add_plugins(forgia_juice_recoil::ForgiaJuiceRecoilPlugin);
+        if !app.is_plugin_added::<forgia_juice_lib::recoil::ForgiaJuiceRecoilPlugin>() {
+            app.add_plugins(forgia_juice_lib::recoil::ForgiaJuiceRecoilPlugin);
         }
         app.init_resource::<PlayerScore>()
             .init_resource::<PlayerLevel>()
@@ -160,7 +160,7 @@ impl Plugin for ForgiaCombatPlugin {
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
-                    // hitstop_tick_system : wired par forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
+                    // hitstop_tick_system : wired par forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
                 ),
             );
         // TODO: wire weapon_fire_system, doom_projectile_system, melee_attack_system,

@@ -13,7 +13,7 @@
 use bevy::prelude::*;
 
 pub mod prelude {
-    pub use crate::{ForgiaJuiceRecoilPlugin, WeaponRecoilDebt, WeaponRecoilImpulse};
+    pub use super::{ForgiaJuiceRecoilPlugin, WeaponRecoilDebt, WeaponRecoilImpulse};
 }
 
 /// Impulse de recoil émis par le système de tir (1 par fire confirmé).

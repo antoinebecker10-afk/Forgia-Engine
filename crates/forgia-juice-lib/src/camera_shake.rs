@@ -194,7 +194,7 @@ pub fn apply_shake(
 }
 
 pub mod prelude {
-    pub use crate::{
+    pub use super::{
         CameraShake, CameraShakeIntensity, CameraShakeTuning, ForgiaJuiceCameraShakePlugin,
         ShakeImpulse,
     };

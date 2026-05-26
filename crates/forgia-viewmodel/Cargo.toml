@@ -15,7 +15,6 @@ forgia-combat = { workspace = true }
 forgia-genome-core = { workspace = true }
 forgia-player = { workspace = true }
 forgia-mesh-fader = { workspace = true }
-forgia-juice-camera-shake = { workspace = true }
-forgia-juice-fov-punch = { workspace = true }
+forgia-juice-lib = { workspace = true }
 forgia-input = { workspace = true }
 forgia-ui = { workspace = true }
