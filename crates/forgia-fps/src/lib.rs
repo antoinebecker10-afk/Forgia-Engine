@@ -25,10 +25,10 @@ use forgia_effects::prelude::{
     spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources, WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
-use forgia_juice_camera_shake::{CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
-use forgia_juice_fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
-use forgia_juice_hit_stop::HitStopState;
-use forgia_juice_recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
+use forgia_juice_lib::camera_shake::{CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
+use forgia_juice_lib::fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
+use forgia_juice_lib::hit_stop::HitStopState;
+use forgia_juice_lib::recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
 use forgia_mode_fps_arena::TargetCube;
 use forgia_player::prelude::MouseLookTuning;
 use forgia_player::prelude::*;

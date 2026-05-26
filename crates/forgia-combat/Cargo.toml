@@ -13,8 +13,7 @@ bevy_rapier3d = { workspace = true }
 leafwing-input-manager = { workspace = true }
 forgia-core = { workspace = true }
 forgia-damage = { workspace = true }
-forgia-juice-hit-stop = { workspace = true }
-forgia-juice-recoil = { workspace = true }
+forgia-juice-lib = { workspace = true }
 # forgia-assets = { workspace = true }    # TODO: uncomment when GameAssets V2 ported
 # forgia-player = { workspace = true }    # TODO: uncomment when Player/FpsCamera/GoblinGuard ported
 # forgia-effects = { workspace = true }   # TODO: circular dep risk — combat_juice events only; re-evaluate

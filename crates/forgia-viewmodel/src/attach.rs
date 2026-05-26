@@ -13,7 +13,7 @@ use bevy::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_core::prelude::GameMode;
 use forgia_genome_core::Genome;
-use forgia_juice_camera_shake::{CameraShake, CameraShakeTuning};
+use forgia_juice_lib::camera_shake::{CameraShake, CameraShakeTuning};
 use forgia_player::prelude::FpsCamera;
 
 use crate::calibration::{viewmodel_fallback_scale, viewmodel_target_size, viewmodel_transform};

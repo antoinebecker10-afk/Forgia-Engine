@@ -59,7 +59,7 @@ pub struct PrevHealth(pub f32);
 
 // HitStopState : migré vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
 // Migration legacy re-export retirée 2026-05-18 — consommateurs DOIVENT importer direct :
-//   use forgia_juice_hit_stop::HitStopState;
+//   use forgia_juice_lib::hit_stop::HitStopState;
 
 #[derive(Resource, Default)]
 pub struct CameraTrauma {
@@ -125,7 +125,7 @@ pub fn setup_hit_flash_cache(
 // pub fn combat_juice_event_system(...) { ... }
 
 // hitstop_tick_system : extrait vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
-// Wiring : `forgia_juice_hit_stop::ForgiaJuiceHitStopPlugin` ajouté idempotent dans `ForgiaCombatPlugin`.
+// Wiring : `forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin` ajouté idempotent dans `ForgiaCombatPlugin`.
 
 pub fn trauma_decay_system(time: Res<Time>, mut trauma: ResMut<CameraTrauma>) {
     if trauma.trauma > 0.001 {
@@ -183,8 +183,8 @@ pub fn hit_flash_tick_system(
 // Event-driven : `weapon_fire_system` Ã©met `WeaponRecoilImpulse`, lu ici.
 
 // WeaponRecoilImpulse + WeaponRecoilDebt : extraits vers `forgia-juice-recoil` (Tier 1E, 2026-05-17).
-// Re-export backward compat (prelude). Preferer `forgia_juice_recoil::*` direct dans le nouveau code.
-pub use forgia_juice_recoil::{WeaponRecoilDebt, WeaponRecoilImpulse};
+// Re-export backward compat (prelude). Preferer `forgia_juice_lib::recoil::*` direct dans le nouveau code.
+pub use forgia_juice_lib::recoil::{WeaponRecoilDebt, WeaponRecoilImpulse};
 
 // TODO: weapon_recoil_system requires CameraState + FpsCamera (forgia-camera-fps)
 //       + WeaponRecoilImpulse MessageReader (Bevy 0.18 message API)

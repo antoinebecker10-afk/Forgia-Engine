@@ -31,10 +31,7 @@ members = [
     "crates/forgia-ik",
     "crates/forgia-input",
     "crates/forgia-inventory",
-    "crates/forgia-juice-camera-shake",
-    "crates/forgia-juice-fov-punch",
-    "crates/forgia-juice-hit-stop",
-    "crates/forgia-juice-recoil",
+    "crates/forgia-juice-lib",
     "crates/forgia-juice-screen-flash",
     "crates/forgia-level-presets",
     "crates/forgia-loot-tables",
@@ -169,10 +166,7 @@ forgia-hitmarker = { path = "crates/forgia-hitmarker" }
 forgia-ik = { path = "crates/forgia-ik" }
 forgia-input = { path = "crates/forgia-input" }
 forgia-inventory = { path = "crates/forgia-inventory" }
-forgia-juice-camera-shake = { path = "crates/forgia-juice-camera-shake" }
-forgia-juice-fov-punch = { path = "crates/forgia-juice-fov-punch" }
-forgia-juice-hit-stop = { path = "crates/forgia-juice-hit-stop" }
-forgia-juice-recoil = { path = "crates/forgia-juice-recoil" }
+forgia-juice-lib = { path = "crates/forgia-juice-lib" }
 forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
 forgia-level-presets = { path = "crates/forgia-level-presets" }
 forgia-loot-tables = { path = "crates/forgia-loot-tables" }

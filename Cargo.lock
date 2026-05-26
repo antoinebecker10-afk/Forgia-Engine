@@ -3218,8 +3218,7 @@ dependencies = [
  "bevy_rapier3d",
  "forgia-core",
  "forgia-damage",
- "forgia-juice-hit-stop",
- "forgia-juice-recoil",
+ "forgia-juice-lib",
  "leafwing-input-manager",
 ]
 
@@ -3320,10 +3319,7 @@ dependencies = [
  "forgia-effects",
  "forgia-genome-core",
  "forgia-input",
- "forgia-juice-camera-shake",
- "forgia-juice-fov-punch",
- "forgia-juice-hit-stop",
- "forgia-juice-recoil",
+ "forgia-juice-lib",
  "forgia-mesh-fader",
  "forgia-mode-fps-arena",
  "forgia-player",
@@ -3434,35 +3430,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-juice-camera-shake"
+name = "forgia-juice-lib"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_hanabi",
  "forgia-core",
-]
-
-[[package]]
-name = "forgia-juice-fov-punch"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_hanabi",
- "forgia-core",
-]
-
-[[package]]
-name = "forgia-juice-hit-stop"
-version = "0.1.0"
-dependencies = [
- "bevy",
-]
-
-[[package]]
-name = "forgia-juice-recoil"
-version = "0.1.0"
-dependencies = [
- "bevy",
+ "serde",
 ]
 
 [[package]]
@@ -3893,8 +3866,7 @@ dependencies = [
  "forgia-core",
  "forgia-genome-core",
  "forgia-input",
- "forgia-juice-camera-shake",
- "forgia-juice-fov-punch",
+ "forgia-juice-lib",
  "forgia-mesh-fader",
  "forgia-player",
  "forgia-ui",
