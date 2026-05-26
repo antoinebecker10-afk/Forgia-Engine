@@ -907,14 +907,15 @@ mod tests {
             ),
         );
         // Mirroring assets/genomes/roguelite_stages.toml crypts_of_anvil
+        // Phase 1 fullness (2026-05-26) : counts bumpés 6→12 et 2→4.
         let palette = vec![
             ModulePaletteEntry {
                 id: "cover_low_cluster".into(),
-                count: 6,
+                count: 12,
             },
             ModulePaletteEntry {
                 id: "cover_high_wall".into(),
-                count: 2,
+                count: 4,
             },
             ModulePaletteEntry {
                 id: "sniper_perch".into(),
@@ -928,19 +929,19 @@ mod tests {
         // 5 seeds — robustesse multi-run replay
         for seed in [1u64, 42, 9876, 12345, 99999] {
             let placements = place_modules(
-                80.0,
+                90.0,
                 &modules,
                 &palette,
-                Vec3::new(0.0, 0.0, -76.0),
-                Some(Vec3::new(0.0, 0.0, 76.0)),
+                Vec3::new(0.0, 0.0, -85.0),
+                Some(Vec3::new(0.0, 0.0, 85.0)),
                 seed,
             );
             let cover_low = count_by_kind(&placements, ModuleKind::CoverCluster);
             let sniper = count_by_kind(&placements, ModuleKind::SniperPerch);
             let melee = count_by_kind(&placements, ModuleKind::MeleePit);
             assert_eq!(
-                cover_low, 6,
-                "AC6 cover_low shortfall on seed {} : got {}/6",
+                cover_low, 12,
+                "AC6 cover_low shortfall on seed {} : got {}/12",
                 seed, cover_low
             );
             assert!(sniper >= 1, "AC6 sniper shortfall on seed {}", seed);
@@ -996,14 +997,15 @@ mod tests {
             ),
         );
 
+        // Phase 1 fullness (2026-05-26) : crypts 12/4, forge 8/2 (counts ×2).
         let crypts_palette = vec![
             ModulePaletteEntry {
                 id: "cover_low_cluster".into(),
-                count: 6,
+                count: 12,
             },
             ModulePaletteEntry {
                 id: "cover_high_wall".into(),
-                count: 2,
+                count: 4,
             },
             ModulePaletteEntry {
                 id: "sniper_perch".into(),
@@ -1017,11 +1019,11 @@ mod tests {
         let forge_palette = vec![
             ModulePaletteEntry {
                 id: "cover_low_cluster".into(),
-                count: 4,
+                count: 8,
             },
             ModulePaletteEntry {
                 id: "cover_high_wall".into(),
-                count: 1,
+                count: 2,
             },
             ModulePaletteEntry {
                 id: "melee_pit".into(),
