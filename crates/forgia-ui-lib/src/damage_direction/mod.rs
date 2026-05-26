@@ -194,7 +194,9 @@ pub(crate) fn draw_damage_arcs(
     arcs: Res<DamageArcsState>,
     tuning: Res<DamageDirTuning>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         return;
     }
     if arcs.arcs.is_empty() {

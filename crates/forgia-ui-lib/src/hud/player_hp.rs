@@ -19,7 +19,9 @@ pub(crate) fn draw_player_hp(
     game_mode: Res<State<GameMode>>,
     q_player: Query<&DamageHealth>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         return;
     }
     let Ok(health) = q_player.single() else {

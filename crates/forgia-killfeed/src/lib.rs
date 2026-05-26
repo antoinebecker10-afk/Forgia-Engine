@@ -204,7 +204,9 @@ pub(crate) fn draw_killfeed(
     tuning: Res<KillfeedTuning>,
     time: Res<Time>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         return;
     }
     if feed.entries.is_empty() {
@@ -339,7 +341,9 @@ pub(crate) fn draw_multikill_banner(
     tuning: Res<KillfeedTuning>,
     time: Res<Time>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         return;
     }
     let Some(banner) = &streak.banner_text else {

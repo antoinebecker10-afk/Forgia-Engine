@@ -89,7 +89,9 @@ pub(crate) fn draw_ammo_counter(
     time: Res<Time>,
     mut cache: Local<DrawCache>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         return;
     }
     let Ok(ctx) = contexts.ctx_mut() else { return };
@@ -234,7 +236,9 @@ pub(crate) fn draw_slot_strip(
     tuning: Res<AmmoHudTuning>,
     mut cache: Local<DrawCache>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         return;
     }
     if equipped.slots.is_empty() {
