@@ -19,7 +19,7 @@ use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::{FpsCamera, Player};
-use forgia_ui_style::*;
+use crate::style::*;
 use std::collections::VecDeque;
 use std::fs;
 
@@ -28,7 +28,7 @@ mod tuning;
 pub use tuning::DamageDirTuning;
 
 pub mod prelude {
-    pub use crate::{DamageDirTuning, ForgiaUiDamageDirectionPlugin};
+    pub use super::{DamageDirTuning, ForgiaUiDamageDirectionPlugin};
 }
 
 // ─── State ─────────────────────────────────────────────────────────────

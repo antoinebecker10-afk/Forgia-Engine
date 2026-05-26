@@ -17,12 +17,12 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_player::{FpsCamera, MouseLookTuning};
-use forgia_ui_style::*;
+use crate::style::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
 pub mod prelude {
-    pub use crate::{ForgiaUiPauseMenuPlugin, PauseMenuState, UserSettings};
+    pub use super::{ForgiaUiPauseMenuPlugin, PauseMenuState, UserSettings};
 }
 
 const USER_SETTINGS_PATH: &str = "assets/user_settings.toml";

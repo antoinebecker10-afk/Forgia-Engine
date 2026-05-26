@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use forgia_combat::weapons::EquippedWeapons;
 use std::fs;
 
-use crate::tuning::AmmoHudTuning;
+use super::tuning::AmmoHudTuning;
 
 #[derive(Resource, Default)]
 pub struct AmmoHudSensor {

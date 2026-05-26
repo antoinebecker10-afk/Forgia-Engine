@@ -143,6 +143,7 @@ pub fn text_with_outline(
 /// Arc circular (utilisé pour reload progress autour d'une icône, ou damage direction).
 /// `progress` ∈ [0, 1] = fraction de l'arc remplie depuis l'angle de départ.
 /// Source : pattern AAA CoD reload progress ring autour icône arme.
+#[allow(clippy::too_many_arguments)]
 pub fn arc_stroke(
     painter: &egui::Painter,
     center: Pos2,

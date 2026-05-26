@@ -19,7 +19,7 @@ use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::Player;
-use forgia_ui_style::*;
+use forgia_ui_lib::style::*;
 use std::collections::VecDeque;
 use std::fs;
 

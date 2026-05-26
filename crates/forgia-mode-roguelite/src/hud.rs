@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_loot_tables::Souls;
-use forgia_ui_style::*;
+use forgia_ui_lib::style::*;
 
 use crate::run::{RunState, StartRunEvent};
 use crate::waves::RogueliteWave;

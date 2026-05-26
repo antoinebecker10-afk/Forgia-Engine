@@ -113,13 +113,8 @@ members = [
     "crates/forgia-time",
     "crates/forgia-trails",
     "crates/forgia-ui",
-    "crates/forgia-ui-dialogue",
-    "crates/forgia-ui-hud",
-    "crates/forgia-ui-style",
-    "crates/forgia-ui-hud-ammo",
+    "crates/forgia-ui-lib",
     "crates/forgia-killfeed",
-    "crates/forgia-ui-damage-direction",
-    "crates/forgia-ui-pause-menu",
     "crates/forgia-underwater",
     "crates/forgia-vfx-tracers",
     "crates/forgia-viewmodel",
@@ -305,13 +300,8 @@ forgia-terrain = { path = "crates/forgia-terrain" }
 forgia-time = { path = "crates/forgia-time" }
 forgia-trails = { path = "crates/forgia-trails" }
 forgia-ui = { path = "crates/forgia-ui" }
-forgia-ui-dialogue = { path = "crates/forgia-ui-dialogue" }
-forgia-ui-hud = { path = "crates/forgia-ui-hud" }
-forgia-ui-style = { path = "crates/forgia-ui-style" }
-forgia-ui-hud-ammo = { path = "crates/forgia-ui-hud-ammo" }
+forgia-ui-lib = { path = "crates/forgia-ui-lib" }
 forgia-killfeed = { path = "crates/forgia-killfeed" }
-forgia-ui-damage-direction = { path = "crates/forgia-ui-damage-direction" }
-forgia-ui-pause-menu = { path = "crates/forgia-ui-pause-menu" }
 forgia-underwater = { path = "crates/forgia-underwater" }
 forgia-vfx-tracers = { path = "crates/forgia-vfx-tracers" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }

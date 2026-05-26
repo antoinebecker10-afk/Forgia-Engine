@@ -3503,10 +3503,7 @@ dependencies = [
  "forgia-streaming",
  "forgia-terrain",
  "forgia-ui",
- "forgia-ui-damage-direction",
- "forgia-ui-hud",
- "forgia-ui-hud-ammo",
- "forgia-ui-pause-menu",
+ "forgia-ui-lib",
  "forgia-viewmodel-calibration",
  "forgia-village-loader",
  "forgia-water",
@@ -3747,7 +3744,7 @@ dependencies = [
  "forgia-core",
  "forgia-genome-core",
  "forgia-player",
- "forgia-ui-style",
+ "forgia-ui-lib",
  "serde",
 ]
 
@@ -3761,7 +3758,7 @@ dependencies = [
  "forgia-core",
  "forgia-genome-core",
  "forgia-player",
- "forgia-ui-style",
+ "forgia-ui-lib",
  "serde",
 ]
 
@@ -3861,7 +3858,7 @@ dependencies = [
  "forgia-player",
  "forgia-stage-arena",
  "forgia-stage-graph",
- "forgia-ui-style",
+ "forgia-ui-lib",
  "rand_xoshiro",
 ]
 
@@ -4237,31 +4234,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-ui-damage-direction"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-combat",
- "forgia-core",
- "forgia-genome-core",
- "forgia-player",
- "forgia-ui-style",
- "serde",
-]
-
-[[package]]
-name = "forgia-ui-dialogue"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
- "forgia-dialogue",
-]
-
-[[package]]
-name = "forgia-ui-hud"
+name = "forgia-ui-lib"
 version = "0.1.0"
 dependencies = [
  "bevy",
@@ -4269,41 +4242,12 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
- "forgia-mode-fps-arena",
- "forgia-ui-style",
-]
-
-[[package]]
-name = "forgia-ui-hud-ammo"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-combat",
- "forgia-core",
+ "forgia-dialogue",
  "forgia-genome-core",
- "forgia-ui-style",
- "serde",
-]
-
-[[package]]
-name = "forgia-ui-pause-menu"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_egui",
- "forgia-core",
+ "forgia-mode-fps-arena",
  "forgia-player",
- "forgia-ui-style",
  "serde",
  "toml",
-]
-
-[[package]]
-name = "forgia-ui-style"
-version = "0.1.0"
-dependencies = [
- "bevy_egui",
 ]
 
 [[package]]

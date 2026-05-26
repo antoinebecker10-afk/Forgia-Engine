@@ -29,7 +29,7 @@ use forgia_combat::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType, ARENA_V1_WEAPONS};
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
-use forgia_ui_style::*;
+use crate::style::*;
 
 mod sensor;
 mod tuning;
@@ -38,7 +38,7 @@ pub use sensor::AmmoHudSensor;
 pub use tuning::AmmoHudTuning;
 
 pub mod prelude {
-    pub use crate::{AmmoHudSensor, AmmoHudTuning, ForgiaUiHudAmmoPlugin};
+    pub use super::{AmmoHudSensor, AmmoHudTuning, ForgiaUiHudAmmoPlugin};
 }
 
 // ─── Helpers Display ────────────────────────────────────────────────────

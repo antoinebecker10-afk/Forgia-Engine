@@ -12,7 +12,7 @@ use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_dialogue::{ChooseDialogueOption, DialogueRegistry, DialogueSession, EndDialogue};
 
 pub mod prelude {
-    pub use crate::ForgiaUiDialoguePlugin;
+    pub use super::ForgiaUiDialoguePlugin;
 }
 
 pub struct ForgiaUiDialoguePlugin;

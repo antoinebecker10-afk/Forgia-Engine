@@ -14,5 +14,5 @@ forgia-core = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-player = { workspace = true }
 forgia-genome-core = { workspace = true }
-forgia-ui-style = { workspace = true }
+forgia-ui-lib = { workspace = true }
 serde = { workspace = true }

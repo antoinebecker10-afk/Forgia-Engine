@@ -27,7 +27,7 @@ forgia-player = { workspace = true }
 rand_xoshiro = "0.7"
 # Story-470 V7 M2.5 — HUD Roguelite (Wave/Souls + Defeat/Victory overlays).
 bevy_egui = { workspace = true }
-forgia-ui-style = { workspace = true }
+forgia-ui-lib = { workspace = true }
 # Story-470 V7 M3 step 2 (2026-05-20) — StageGraph node-driven run loop.
 forgia-stage-graph = { workspace = true }
 # Story-481 Tier 1.5 (2026-05-20) — émettre BarkEvent sur kill ennemi.
