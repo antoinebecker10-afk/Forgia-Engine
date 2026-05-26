@@ -135,6 +135,10 @@ pub fn spawn_wave_enemies(
                 ))
                 .id();
             // Body collider (capsule), classified HitZone::Body par défaut.
+            // Story-517 fix : Sensor → player KCC passe à travers (no contact force)
+            // mais raycast hitscan le détecte toujours (QueryFilter::default n'exclut
+            // pas les sensors). Permet au joueur de traverser les ennemis en combat
+            // rapproché tout en gardant le hitscan body-zone fonctionnel.
             commands.spawn((
                 Name::new(format!(
                     "RogueliteEnemy_W{wave}_{}_{i}_body",
@@ -143,6 +147,7 @@ pub fn spawn_wave_enemies(
                 ChildOf(parent),
                 Transform::default(),
                 Collider::capsule_y(stats.capsule_half_height, stats.capsule_radius),
+                Sensor,
             ));
             // Visual KayKit Skeleton SceneRoot (story-517 — remplace Capsule3d).
             commands.spawn((
