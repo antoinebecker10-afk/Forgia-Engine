@@ -3,15 +3,6 @@ resolver = "2"
 members = [
     ".",
     "crates/forgia-ai-arena-bot",
-    "crates/forgia-ai-blackboard",
-    "crates/forgia-ai-bt",
-    "crates/forgia-ai-flocking",
-    "crates/forgia-ai-formation",
-    "crates/forgia-ai-goap",
-    "crates/forgia-ai-navmesh",
-    "crates/forgia-ai-perception",
-    "crates/forgia-ai-state-machine",
-    "crates/forgia-ai-utility",
     "crates/forgia-analytics",
     "crates/forgia-anchor",
     "crates/forgia-anim-debug",
@@ -19,7 +10,6 @@ members = [
     "crates/forgia-rig-topology",
     "crates/forgia-animation-blend",
     "crates/forgia-animation-mixamo",
-    "crates/forgia-anticheat",
     "crates/forgia-app-state",
     "crates/forgia-armor",
     "crates/forgia-asset-atlas-packer",
@@ -39,7 +29,6 @@ members = [
     "crates/forgia-audio-voicelines",
     "crates/forgia-camera-fps",
     "crates/forgia-camera-orbit",
-    "crates/forgia-cloth",
     "crates/forgia-coedit-crdt",
     "crates/forgia-combat",
     "crates/forgia-core",
@@ -84,19 +73,16 @@ members = [
     "crates/forgia-level-presets",
     "crates/forgia-loot-tables",
     "crates/forgia-manifest",
-    "crates/forgia-marketplace-client",
     "crates/forgia-mesh-fader",
     "crates/forgia-mesh-voxelizer",
     "crates/forgia-medial-axis",
     "crates/forgia-skeleton-embedder",
     "crates/forgia-skeleton-template",
     "crates/forgia-meshy-import",
-    "crates/forgia-mod-outline",
     "crates/forgia-mode-fps-arena",
     "crates/forgia-mode-roguelite",
     "crates/forgia-navigator",
     "crates/forgia-observability",
-    "crates/forgia-oxr",
     "crates/forgia-physics",
     "crates/forgia-player",
     "crates/forgia-player-fps",
@@ -106,12 +92,10 @@ members = [
     "crates/forgia-postprocess",
     "crates/forgia-prefab",
     "crates/forgia-quests",
-    "crates/forgia-ragdoll",
     "crates/forgia-ribbons",
     "crates/forgia-rng",
     "crates/forgia-rpg",
     "crates/forgia-scene",
-    "crates/forgia-scripting-luau",
     "crates/forgia-secondary-motion",
     "crates/forgia-sensors",
     "crates/forgia-shape-library",
@@ -122,7 +106,6 @@ members = [
     "crates/forgia-stage-arena",
     "crates/forgia-stage-graph",
     "crates/forgia-status-effects",
-    "crates/forgia-steam",
     "crates/forgia-streaming",
     "crates/forgia-system-sets",
     "crates/forgia-telemetry-funnel",
@@ -148,9 +131,6 @@ members = [
     "crates/forgia-ui-pause-menu",
     "crates/forgia-ui-tooltip",
     "crates/forgia-underwater",
-    "crates/forgia-vfx-decals",
-    "crates/forgia-vfx-hanabi",
-    "crates/forgia-vfx-impact-library",
     "crates/forgia-vfx-tracers",
     "crates/forgia-viewmodel",
     "crates/forgia-viewmodel-calibration",
@@ -229,15 +209,6 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "cloc
 # Pour ajouter une crate : éditer [workspace] members + cd & créer crate, puis re-générer cette section via xtask.
 
 forgia-ai-arena-bot = { path = "crates/forgia-ai-arena-bot" }
-forgia-ai-blackboard = { path = "crates/forgia-ai-blackboard" }
-forgia-ai-bt = { path = "crates/forgia-ai-bt" }
-forgia-ai-flocking = { path = "crates/forgia-ai-flocking" }
-forgia-ai-formation = { path = "crates/forgia-ai-formation" }
-forgia-ai-goap = { path = "crates/forgia-ai-goap" }
-forgia-ai-navmesh = { path = "crates/forgia-ai-navmesh" }
-forgia-ai-perception = { path = "crates/forgia-ai-perception" }
-forgia-ai-state-machine = { path = "crates/forgia-ai-state-machine" }
-forgia-ai-utility = { path = "crates/forgia-ai-utility" }
 forgia-analytics = { path = "crates/forgia-analytics" }
 forgia-anchor = { path = "crates/forgia-anchor" }
 forgia-anim-debug = { path = "crates/forgia-anim-debug" }
@@ -245,7 +216,6 @@ forgia-anim-locomotion = { path = "crates/forgia-anim-locomotion" }
 forgia-rig-topology = { path = "crates/forgia-rig-topology" }
 forgia-animation-blend = { path = "crates/forgia-animation-blend" }
 forgia-animation-mixamo = { path = "crates/forgia-animation-mixamo" }
-forgia-anticheat = { path = "crates/forgia-anticheat" }
 forgia-app-state = { path = "crates/forgia-app-state" }
 forgia-armor = { path = "crates/forgia-armor" }
 forgia-asset-atlas-packer = { path = "crates/forgia-asset-atlas-packer" }
@@ -265,7 +235,6 @@ forgia-audio-occlusion = { path = "crates/forgia-audio-occlusion" }
 forgia-audio-voicelines = { path = "crates/forgia-audio-voicelines" }
 forgia-camera-fps = { path = "crates/forgia-camera-fps" }
 forgia-camera-orbit = { path = "crates/forgia-camera-orbit" }
-forgia-cloth = { path = "crates/forgia-cloth" }
 forgia-coedit-crdt = { path = "crates/forgia-coedit-crdt" }
 forgia-combat = { path = "crates/forgia-combat" }
 forgia-core = { path = "crates/forgia-core" }
@@ -310,19 +279,16 @@ forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
 forgia-level-presets = { path = "crates/forgia-level-presets" }
 forgia-loot-tables = { path = "crates/forgia-loot-tables" }
 forgia-manifest = { path = "crates/forgia-manifest" }
-forgia-marketplace-client = { path = "crates/forgia-marketplace-client" }
 forgia-mesh-fader = { path = "crates/forgia-mesh-fader" }
 forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
 forgia-medial-axis = { path = "crates/forgia-medial-axis" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
 forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
 forgia-meshy-import = { path = "crates/forgia-meshy-import" }
-forgia-mod-outline = { path = "crates/forgia-mod-outline" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
 forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
 forgia-navigator = { path = "crates/forgia-navigator" }
 forgia-observability = { path = "crates/forgia-observability" }
-forgia-oxr = { path = "crates/forgia-oxr" }
 forgia-physics = { path = "crates/forgia-physics" }
 forgia-player = { path = "crates/forgia-player" }
 forgia-player-fps = { path = "crates/forgia-player-fps" }
@@ -332,12 +298,10 @@ forgia-player-vehicle-control = { path = "crates/forgia-player-vehicle-control" 
 forgia-postprocess = { path = "crates/forgia-postprocess" }
 forgia-prefab = { path = "crates/forgia-prefab" }
 forgia-quests = { path = "crates/forgia-quests" }
-forgia-ragdoll = { path = "crates/forgia-ragdoll" }
 forgia-ribbons = { path = "crates/forgia-ribbons" }
 forgia-rng = { path = "crates/forgia-rng" }
 forgia-rpg = { path = "crates/forgia-rpg" }
 forgia-scene = { path = "crates/forgia-scene" }
-forgia-scripting-luau = { path = "crates/forgia-scripting-luau" }
 forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
 forgia-sensors = { path = "crates/forgia-sensors" }
 forgia-shape-library = { path = "crates/forgia-shape-library" }
@@ -348,7 +312,6 @@ forgia-spline = { path = "crates/forgia-spline" }
 forgia-stage-arena = { path = "crates/forgia-stage-arena" }
 forgia-stage-graph = { path = "crates/forgia-stage-graph" }
 forgia-status-effects = { path = "crates/forgia-status-effects" }
-forgia-steam = { path = "crates/forgia-steam" }
 forgia-streaming = { path = "crates/forgia-streaming" }
 forgia-system-sets = { path = "crates/forgia-system-sets" }
 forgia-telemetry-funnel = { path = "crates/forgia-telemetry-funnel" }
@@ -374,9 +337,6 @@ forgia-ui-damage-direction = { path = "crates/forgia-ui-damage-direction" }
 forgia-ui-pause-menu = { path = "crates/forgia-ui-pause-menu" }
 forgia-ui-tooltip = { path = "crates/forgia-ui-tooltip" }
 forgia-underwater = { path = "crates/forgia-underwater" }
-forgia-vfx-decals = { path = "crates/forgia-vfx-decals" }
-forgia-vfx-hanabi = { path = "crates/forgia-vfx-hanabi" }
-forgia-vfx-impact-library = { path = "crates/forgia-vfx-impact-library" }
 forgia-vfx-tracers = { path = "crates/forgia-vfx-tracers" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
 forgia-viewmodel-calibration = { path = "crates/forgia-viewmodel-calibration" }
