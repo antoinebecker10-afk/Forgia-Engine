@@ -3,48 +3,31 @@ resolver = "2"
 members = [
     ".",
     "crates/forgia-ai-arena-bot",
-    "crates/forgia-analytics",
     "crates/forgia-anchor",
     "crates/forgia-anim-debug",
     "crates/forgia-anim-locomotion",
     "crates/forgia-rig-topology",
-    "crates/forgia-animation-blend",
-    "crates/forgia-animation-mixamo",
-    "crates/forgia-app-state",
-    "crates/forgia-armor",
-    "crates/forgia-asset-atlas-packer",
     "crates/forgia-asset-cdn",
-    "crates/forgia-asset-lod-generator",
     "crates/forgia-asset-registry",
     "crates/forgia-auto-rig",
     "crates/forgia-assets",
     "crates/forgia-assets-bundle",
     "crates/forgia-audio-biome",
     "crates/forgia-audio-core",
-    "crates/forgia-camera-fps",
     "crates/forgia-camera-orbit",
-    "crates/forgia-coedit-crdt",
     "crates/forgia-combat",
     "crates/forgia-core",
-    "crates/forgia-crafting",
     "crates/forgia-crosshair",
     "crates/forgia-damage",
     "crates/forgia-damage-numbers",
     "crates/forgia-dialogue",
     "crates/forgia-enemy-nameplate",
     "crates/forgia-effects",
-    "crates/forgia-equipment",
-    "crates/forgia-events-bus",
     "crates/forgia-foliage",
-    "crates/forgia-founders-pass",
     "crates/forgia-fps",
     "crates/forgia-game",
-    "crates/forgia-gauge",
     "crates/forgia-genome-core",
-    "crates/forgia-genome-registry",
-    "crates/forgia-grid",
     "crates/forgia-hitmarker",
-    "crates/forgia-hyworld-import",
     "crates/forgia-ik",
     "crates/forgia-input",
     "crates/forgia-inventory",
@@ -61,44 +44,25 @@ members = [
     "crates/forgia-medial-axis",
     "crates/forgia-skeleton-embedder",
     "crates/forgia-skeleton-template",
-    "crates/forgia-meshy-import",
     "crates/forgia-mode-fps-arena",
     "crates/forgia-mode-roguelite",
-    "crates/forgia-navigator",
     "crates/forgia-observability",
-    "crates/forgia-physics",
     "crates/forgia-player",
-    "crates/forgia-player-fps",
-    "crates/forgia-player-platformer",
-    "crates/forgia-player-tp",
-    "crates/forgia-player-vehicle-control",
     "crates/forgia-postprocess",
     "crates/forgia-prefab",
     "crates/forgia-quests",
-    "crates/forgia-ribbons",
     "crates/forgia-rng",
     "crates/forgia-rpg",
-    "crates/forgia-scene",
     "crates/forgia-secondary-motion",
     "crates/forgia-sensors",
-    "crates/forgia-shape-library",
-    "crates/forgia-signals",
-    "crates/forgia-silk",
-    "crates/forgia-skill-tree",
     "crates/forgia-spline",
     "crates/forgia-stage-arena",
     "crates/forgia-stage-graph",
-    "crates/forgia-status-effects",
     "crates/forgia-streaming",
-    "crates/forgia-system-sets",
-    "crates/forgia-telemetry-funnel",
     "crates/forgia-terrain",
-    "crates/forgia-time",
-    "crates/forgia-trails",
     "crates/forgia-ui",
     "crates/forgia-ui-lib",
     "crates/forgia-killfeed",
-    "crates/forgia-underwater",
     "crates/forgia-vfx-tracers",
     "crates/forgia-viewmodel",
     "crates/forgia-viewmodel-calibration",
@@ -173,48 +137,31 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "cloc
 # Pour ajouter une crate : éditer [workspace] members + cd & créer crate, puis re-générer cette section via xtask.
 
 forgia-ai-arena-bot = { path = "crates/forgia-ai-arena-bot" }
-forgia-analytics = { path = "crates/forgia-analytics" }
 forgia-anchor = { path = "crates/forgia-anchor" }
 forgia-anim-debug = { path = "crates/forgia-anim-debug" }
 forgia-anim-locomotion = { path = "crates/forgia-anim-locomotion" }
 forgia-rig-topology = { path = "crates/forgia-rig-topology" }
-forgia-animation-blend = { path = "crates/forgia-animation-blend" }
-forgia-animation-mixamo = { path = "crates/forgia-animation-mixamo" }
-forgia-app-state = { path = "crates/forgia-app-state" }
-forgia-armor = { path = "crates/forgia-armor" }
-forgia-asset-atlas-packer = { path = "crates/forgia-asset-atlas-packer" }
 forgia-asset-cdn = { path = "crates/forgia-asset-cdn" }
-forgia-asset-lod-generator = { path = "crates/forgia-asset-lod-generator" }
 forgia-asset-registry = { path = "crates/forgia-asset-registry" }
 forgia-auto-rig = { path = "crates/forgia-auto-rig" }
 forgia-assets = { path = "crates/forgia-assets" }
 forgia-assets-bundle = { path = "crates/forgia-assets-bundle" }
 forgia-audio-biome = { path = "crates/forgia-audio-biome" }
 forgia-audio-core = { path = "crates/forgia-audio-core" }
-forgia-camera-fps = { path = "crates/forgia-camera-fps" }
 forgia-camera-orbit = { path = "crates/forgia-camera-orbit" }
-forgia-coedit-crdt = { path = "crates/forgia-coedit-crdt" }
 forgia-combat = { path = "crates/forgia-combat" }
 forgia-core = { path = "crates/forgia-core" }
-forgia-crafting = { path = "crates/forgia-crafting" }
 forgia-crosshair = { path = "crates/forgia-crosshair" }
 forgia-damage = { path = "crates/forgia-damage" }
 forgia-damage-numbers = { path = "crates/forgia-damage-numbers" }
 forgia-dialogue = { path = "crates/forgia-dialogue" }
 forgia-enemy-nameplate = { path = "crates/forgia-enemy-nameplate" }
 forgia-effects = { path = "crates/forgia-effects" }
-forgia-equipment = { path = "crates/forgia-equipment" }
-forgia-events-bus = { path = "crates/forgia-events-bus" }
 forgia-foliage = { path = "crates/forgia-foliage" }
-forgia-founders-pass = { path = "crates/forgia-founders-pass" }
 forgia-fps = { path = "crates/forgia-fps" }
 forgia-game = { path = "crates/forgia-game" }
-forgia-gauge = { path = "crates/forgia-gauge" }
 forgia-genome-core = { path = "crates/forgia-genome-core" }
-forgia-genome-registry = { path = "crates/forgia-genome-registry" }
-forgia-grid = { path = "crates/forgia-grid" }
 forgia-hitmarker = { path = "crates/forgia-hitmarker" }
-forgia-hyworld-import = { path = "crates/forgia-hyworld-import" }
 forgia-ik = { path = "crates/forgia-ik" }
 forgia-input = { path = "crates/forgia-input" }
 forgia-inventory = { path = "crates/forgia-inventory" }
@@ -231,44 +178,25 @@ forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
 forgia-medial-axis = { path = "crates/forgia-medial-axis" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
 forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
-forgia-meshy-import = { path = "crates/forgia-meshy-import" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
 forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
-forgia-navigator = { path = "crates/forgia-navigator" }
 forgia-observability = { path = "crates/forgia-observability" }
-forgia-physics = { path = "crates/forgia-physics" }
 forgia-player = { path = "crates/forgia-player" }
-forgia-player-fps = { path = "crates/forgia-player-fps" }
-forgia-player-platformer = { path = "crates/forgia-player-platformer" }
-forgia-player-tp = { path = "crates/forgia-player-tp" }
-forgia-player-vehicle-control = { path = "crates/forgia-player-vehicle-control" }
 forgia-postprocess = { path = "crates/forgia-postprocess" }
 forgia-prefab = { path = "crates/forgia-prefab" }
 forgia-quests = { path = "crates/forgia-quests" }
-forgia-ribbons = { path = "crates/forgia-ribbons" }
 forgia-rng = { path = "crates/forgia-rng" }
 forgia-rpg = { path = "crates/forgia-rpg" }
-forgia-scene = { path = "crates/forgia-scene" }
 forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
 forgia-sensors = { path = "crates/forgia-sensors" }
-forgia-shape-library = { path = "crates/forgia-shape-library" }
-forgia-signals = { path = "crates/forgia-signals" }
-forgia-silk = { path = "crates/forgia-silk" }
-forgia-skill-tree = { path = "crates/forgia-skill-tree" }
 forgia-spline = { path = "crates/forgia-spline" }
 forgia-stage-arena = { path = "crates/forgia-stage-arena" }
 forgia-stage-graph = { path = "crates/forgia-stage-graph" }
-forgia-status-effects = { path = "crates/forgia-status-effects" }
 forgia-streaming = { path = "crates/forgia-streaming" }
-forgia-system-sets = { path = "crates/forgia-system-sets" }
-forgia-telemetry-funnel = { path = "crates/forgia-telemetry-funnel" }
 forgia-terrain = { path = "crates/forgia-terrain" }
-forgia-time = { path = "crates/forgia-time" }
-forgia-trails = { path = "crates/forgia-trails" }
 forgia-ui = { path = "crates/forgia-ui" }
 forgia-ui-lib = { path = "crates/forgia-ui-lib" }
 forgia-killfeed = { path = "crates/forgia-killfeed" }
-forgia-underwater = { path = "crates/forgia-underwater" }
 forgia-vfx-tracers = { path = "crates/forgia-vfx-tracers" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
 forgia-viewmodel-calibration = { path = "crates/forgia-viewmodel-calibration" }
