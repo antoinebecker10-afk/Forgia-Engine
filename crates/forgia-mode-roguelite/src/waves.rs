@@ -129,6 +129,9 @@ pub fn spawn_wave_enemies(
                     Health::new(stats.hp),
                     Mortal,
                     enemies::arena_bot_for(*archetype),
+                    // Story-517 fix : ennemis n'avaient pas BotShootConfig → ne
+                    // tiraient pas. Damage + range différencié par archetype.
+                    enemies::bot_shoot_for(*archetype),
                 ))
                 .id();
             // Body collider (capsule), classified HitZone::Body par défaut.
@@ -150,9 +153,10 @@ pub fn spawn_wave_enemies(
                 ChildOf(parent),
                 SceneRoot(skeleton_handle.clone()),
                 // KayKit forward = +Z, Bevy parent yaw uses -Z → rotate PI.
-                // Y offset : KayKit pivot au sol → translate down par capsule
-                // half-height pour aligner avec centre capsule parent.
-                Transform::from_xyz(0.0, -stats.capsule_half_height, 0.0)
+                // Y offset : KayKit pivot au sol → translate down par
+                // (capsule_half_height + capsule_radius) pour aligner les
+                // pieds avec le BAS de la capsule parent (sinon lévitation).
+                Transform::from_xyz(0.0, -(stats.capsule_half_height + stats.capsule_radius), 0.0)
                     .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
                     .with_scale(Vec3::splat(scene_scale)),
             ));
