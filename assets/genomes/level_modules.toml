@@ -76,6 +76,56 @@ weight = 0.10
 anchor_kind = "cover_low"
 height_class = "Low"
 
+# Phase 1 fullness (2026-05-26) — wire 8 GLB inferno orphelins commit 998098f
+# Rochers naturels + landmarks bas : densité +60% sans nouveau ModuleKind.
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockBig_001.glb"
+weight = 0.07
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockBig_003.glb"
+weight = 0.07
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockBig_004.glb"
+weight = 0.07
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Crag_001.glb"
+weight = 0.06
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Crag_003.glb"
+weight = 0.06
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockMid_003.glb"
+weight = 0.05
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/PedestalBig_001.glb"
+weight = 0.04
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/WellSmall_001.glb"
+weight = 0.04
+anchor_kind = "cover_low"
+height_class = "Low"
+
 # ──────────────────────────────────────────────────────────────────────────────
 # cover_high_wall — pillars / wall sections, full body conceal, blocks LoS
 # ──────────────────────────────────────────────────────────────────────────────
@@ -115,6 +165,20 @@ height_class = "High"
 [[modules.cover_high_wall.prop_palette]]
 prefab = "models/environment/inferno/ColumnBigBroken_002.glb"
 weight = 0.20
+anchor_kind = "cover_high"
+height_class = "High"
+
+# Phase 1 fullness (2026-05-26) — landmarks identity Crypts (canon bible v1).
+# Hauts cover qui racontent l'histoire forge abandonnée : statue garde + chest géant.
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/StatueKnight_002.glb"
+weight = 0.10
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ChestBig_001.glb"
+weight = 0.08
 anchor_kind = "cover_high"
 height_class = "High"
 
