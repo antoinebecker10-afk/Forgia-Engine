@@ -1,10 +1,12 @@
 # Story-513 — Fusion 45 `forgia-pp-*` → 1 `forgia-postprocess`
 
-**Status** : DRAFT
+**Status** : DONE (mergée 2026-05-26 via PR #1, fusion 45→1 livrée, macro `define_simple_pp_effect!` réutilisable)
 **BMAD Scale** : Standard (>3 fichiers, bounded scope, suppression + creation 1 crate)
 **Created** : 2026-05-23
-**Branch** : `cleanup/workspace-purge-vague-1-4` (continue from story-512)
+**Closed** : 2026-05-26
+**Branch** : `cleanup/workspace-purge-vague-1-4` (deleted post-merge)
 **Predecessor** : story-512 (DONE, PR #1)
+**Result** : 45 forgia-pp-* fusionnées dans forgia-postprocess (-89% LOC pp, pattern macro `define_simple_pp_effect!`)
 
 ---
 

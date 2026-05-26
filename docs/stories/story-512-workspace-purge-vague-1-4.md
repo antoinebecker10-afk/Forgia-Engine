@@ -1,10 +1,12 @@
 # Story-512 — Workspace Purge Vagues 1 & 4 (cleanup stubs + modes inutilisés)
 
-**Status** : DRAFT
+**Status** : DONE (mergée 2026-05-26 via PR #1, admin override car 2 fails CI connus = clippy strict + cargo test scaffold orphelin)
 **BMAD Scale** : Standard (>3 fichiers mais bounded scope, suppression sèche)
 **Created** : 2026-05-23
+**Closed** : 2026-05-26
 **Owner** : Antoine + Claude
-**Branch** : `cleanup/workspace-purge-vague-1-4`
+**Branch** : `cleanup/workspace-purge-vague-1-4` (deleted post-merge)
+**Result** : 266 → 211 crates (-55), Cargo.lock -2514 lignes
 
 ---
 
