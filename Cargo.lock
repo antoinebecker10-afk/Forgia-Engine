@@ -3347,7 +3347,7 @@ dependencies = [
  "forgia-terrain",
  "forgia-ui",
  "forgia-ui-lib",
- "forgia-viewmodel-calibration",
+ "forgia-viewmodel",
  "forgia-village-loader",
  "forgia-water",
 ]
@@ -3813,17 +3813,6 @@ dependencies = [
  "forgia-player",
  "forgia-ui",
  "serde",
-]
-
-[[package]]
-name = "forgia-viewmodel-calibration"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-combat",
- "forgia-core",
- "forgia-player",
- "forgia-viewmodel",
 ]
 
 [[package]]

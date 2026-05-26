@@ -32,7 +32,7 @@ forgia-qa-replay = { workspace = true }
 forgia-asset-registry = { workspace = true }
 forgia-streaming = { workspace = true }
 forgia-fps = { workspace = true }
-forgia-viewmodel-calibration = { workspace = true }
+forgia-viewmodel = { workspace = true }
 forgia-rpg = { workspace = true }
 forgia-mode-roguelite = { workspace = true }
 forgia-dialogue = { workspace = true }

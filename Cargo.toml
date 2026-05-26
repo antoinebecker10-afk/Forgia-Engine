@@ -55,7 +55,6 @@ members = [
     "crates/forgia-ui-lib",
     "crates/forgia-killfeed",
     "crates/forgia-viewmodel",
-    "crates/forgia-viewmodel-calibration",
     "crates/forgia-genome-village",
     "crates/forgia-procgen-graph",
     "crates/forgia-village-generator",
@@ -184,7 +183,6 @@ forgia-ui = { path = "crates/forgia-ui" }
 forgia-ui-lib = { path = "crates/forgia-ui-lib" }
 forgia-killfeed = { path = "crates/forgia-killfeed" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
-forgia-viewmodel-calibration = { path = "crates/forgia-viewmodel-calibration" }
 forgia-genome-village = { path = "crates/forgia-genome-village" }
 forgia-procgen-graph = { path = "crates/forgia-procgen-graph" }
 forgia-village-generator = { path = "crates/forgia-village-generator" }

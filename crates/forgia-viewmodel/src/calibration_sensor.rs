@@ -1,12 +1,14 @@
-//! forgia-viewmodel-calibration
+//! Cumulative per-weapon viewmodel orientation sensor.
 //!
-//! Sensor cumulatif d'orientation viewmodel **par arme**.
+//! Fused from `forgia-viewmodel-calibration` (2026-05-26) — was 1-consumer
+//! (forgia-game) and only depended on this crate. Module name `calibration_sensor`
+//! to avoid clash with existing `calibration` module (pure helpers).
 //!
 //! Le sensor V1 (`forgia-fps::viewmodel_debug`) ne mesure qu'une arme à la fois
 //! (celle équipée). Pour calibrer les 4 armes V1 Arena (Pépin / Bourrasque /
 //! Madame Lenoir / Boucherie), il fallait cycler manuellement et lire le JSON 4x.
 //!
-//! Ce crate :
+//! Ce module :
 //! 1. Maintient `CalibrationStore`: `HashMap<WeaponType, WeaponMeasurement>`.
 //! 2. Mesure à chaque tick (1Hz) + sur changement d'arme.
 //! 3. Écrit `forgia_viewmodel_calibration.json` cumulatif (toutes armes vues).
@@ -18,11 +20,11 @@
 //! Story-384 : Quality Gate observability. Concept-first §3 étape 0 : framework
 //! (sensor) + definition (TOML patches après mesure). Aucun fix spéculatif.
 
+use crate::WeaponViewmodel;
 use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_player::prelude::FpsCamera;
-use forgia_viewmodel::WeaponViewmodel;
 use std::collections::HashMap;
 use std::fs;
 

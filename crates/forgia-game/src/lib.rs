@@ -75,7 +75,7 @@ pub fn run_game() -> AppExit {
         forgia_asset_registry::prelude::ForgiaAssetRegistryPlugin,
         forgia_streaming::ForgiaStreamingPlugin, // story-450 chunk streaming foundation
         forgia_fps::prelude::ForgiaFpsPlugin,
-        forgia_viewmodel_calibration::ForgiaViewmodelCalibrationPlugin,
+        forgia_viewmodel::calibration_sensor::ForgiaViewmodelCalibrationPlugin,
         forgia_rpg::prelude::ForgiaRpgPlugin,
         forgia_mode_roguelite::prelude::ForgiaModeRoguelitePlugin,
         forgia_terrain::prelude::ForgiaTerrainPlugin,

@@ -36,6 +36,7 @@ use bevy::prelude::*;
 
 pub mod attach;
 pub mod calibration;
+pub mod calibration_sensor;
 pub mod fade;
 pub mod genome;
 pub mod pose;
