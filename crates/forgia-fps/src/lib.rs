@@ -687,8 +687,22 @@ fn fire_weapon_minimal(
         let (sensor_category, sensor_hit_idx, sensor_name, sensor_toi) = match hit_result {
             None => (HitscanCategory::Miss, None, None, None),
             Some((entity, toi)) => {
+                // Story-517 fix : différencier HitZoneHead vs HitZoneBody dans le
+                // sensor log. Avant ce fix le code écrivait toujours Body même
+                // quand le ray touchait le head_proxy sphere (tagué HitZoneTag(Head)).
+                // Le damage multiplier était déjà appliqué correctement via q_zone,
+                // mais le sensor cosmétique mentait. Maintenant cohérent.
                 let cat = if target_ancestor.is_some() {
-                    HitscanCategory::HitZoneBody
+                    let zone = hitscan_ctx
+                        .q_zone
+                        .get(entity)
+                        .map(|t| t.0)
+                        .unwrap_or(forgia_damage::HitZone::Body);
+                    if zone == forgia_damage::HitZone::Head {
+                        HitscanCategory::HitZoneHead
+                    } else {
+                        HitscanCategory::HitZoneBody
+                    }
                 } else {
                     HitscanCategory::BlockerNonZone
                 };
