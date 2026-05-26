@@ -1,0 +1,18 @@
+# Forgia capability manifest — consumed by AI assembly agent.
+# Schema v1.
+
+name = "forgia-audio"
+category = "audio"
+intent = "Audio foundation (bevy_kira_audio wrapper) + biome ambient — fused"
+version = "0.1.0"
+status = "wip"   # stub | wip | ready | stable
+
+genes = []
+
+emits = []
+
+consumes = []
+
+sensor = "forgia2_audio.json"
+
+depends = ["forgia-core", "forgia-terrain", "bevy_kira_audio"]

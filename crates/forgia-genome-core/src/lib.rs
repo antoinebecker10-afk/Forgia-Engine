@@ -13,6 +13,8 @@ use bevy::prelude::*;
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 
+pub mod manifest;
+
 /// Generic typed genome asset. `T` is the user-defined Serde struct.
 #[derive(Asset, TypePath)]
 pub struct Genome<T: Send + Sync + 'static + TypePath> {

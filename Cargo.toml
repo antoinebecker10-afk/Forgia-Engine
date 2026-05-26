@@ -12,8 +12,7 @@ members = [
     "crates/forgia-auto-rig",
     "crates/forgia-assets",
     "crates/forgia-assets-bundle",
-    "crates/forgia-audio-biome",
-    "crates/forgia-audio-core",
+    "crates/forgia-audio",
     "crates/forgia-camera-orbit",
     "crates/forgia-combat",
     "crates/forgia-core",
@@ -33,7 +32,6 @@ members = [
     "crates/forgia-juice-screen-flash",
     "crates/forgia-level-presets",
     "crates/forgia-loot-tables",
-    "crates/forgia-manifest",
     "crates/forgia-mesh-voxelizer",
     "crates/forgia-medial-axis",
     "crates/forgia-skeleton-embedder",
@@ -143,8 +141,7 @@ forgia-asset-registry = { path = "crates/forgia-asset-registry" }
 forgia-auto-rig = { path = "crates/forgia-auto-rig" }
 forgia-assets = { path = "crates/forgia-assets" }
 forgia-assets-bundle = { path = "crates/forgia-assets-bundle" }
-forgia-audio-biome = { path = "crates/forgia-audio-biome" }
-forgia-audio-core = { path = "crates/forgia-audio-core" }
+forgia-audio = { path = "crates/forgia-audio" }
 forgia-camera-orbit = { path = "crates/forgia-camera-orbit" }
 forgia-combat = { path = "crates/forgia-combat" }
 forgia-core = { path = "crates/forgia-core" }
@@ -164,7 +161,6 @@ forgia-juice-lib = { path = "crates/forgia-juice-lib" }
 forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
 forgia-level-presets = { path = "crates/forgia-level-presets" }
 forgia-loot-tables = { path = "crates/forgia-loot-tables" }
-forgia-manifest = { path = "crates/forgia-manifest" }
 forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
 forgia-medial-axis = { path = "crates/forgia-medial-axis" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }

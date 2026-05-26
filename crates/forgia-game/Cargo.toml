@@ -24,8 +24,7 @@ forgia-effects = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-foliage = { workspace = true }
 forgia-water = { workspace = true }
-forgia-audio-core = { workspace = true }
-forgia-audio-biome = { workspace = true }
+forgia-audio = { workspace = true }
 # Story-521 port V1 QA (bus BugReport + replay session). Harness + autopilot
 # référencés via dev-deps si on veut tests intégrés plus tard.
 forgia-qa-core = { workspace = true }

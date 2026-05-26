@@ -13,7 +13,7 @@
 //! W2 : streaming N chunks autour joueur. W3 : Voronoi 10 biomes. W4 : preset_island.
 
 use bevy::prelude::*;
-use forgia_audio_biome::prelude::AudioSampleOffset;
+use forgia_audio::prelude::AudioSampleOffset;
 use forgia_core::prelude::*;
 use forgia_dialogue::{
     DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueTree,

@@ -1,5 +1,9 @@
-//! forgia-manifest — Parse `manifest.toml` from every crate to build a
-//! capability index for AI assembly agents.
+//! Capability discovery — parse `manifest.toml` from every crate to build an
+//! index for AI assembly agents.
+//!
+//! Fused from `forgia-manifest` (2026-05-26) — was a 0-consumer scaffold; folded
+//! here because both this module and the genome loader share TOML/serde
+//! foundations and address the data layer.
 //!
 //! Each Forgia crate ships a `manifest.toml` declaring :
 //! - `name`, `category`, `intent`, `version`, `status`
@@ -118,7 +122,7 @@ impl Plugin for ForgiaManifestPlugin {
         let mut index = ManifestIndex::default();
         match scan_workspace(&self.crates_dir) {
             Ok(all) => index.all = all,
-            Err(e) => warn!("forgia-manifest: scan failed: {}", e),
+            Err(e) => warn!("forgia-genome-core::manifest: scan failed: {}", e),
         }
         app.insert_resource(index);
     }

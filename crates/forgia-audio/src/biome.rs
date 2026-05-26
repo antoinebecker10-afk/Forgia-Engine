@@ -1,21 +1,16 @@
-//! # forgia-audio-biome
+//! Biome ambient audio — joue 1 loop OGG selon le biome courant du joueur (RPG only).
 //!
-//! Ambient audio par biome — joue 1 loop OGG selon le biome courant du joueur.
-//!
-//! V2 vertical slice : assets V1 high-quality dispo via junction `audio-v1/`.
+//! V2 vertical slice : assets V1 high-quality via junction `audio-v1/`.
 //! Mapping `BiomeType → asset_path`. Système Update détecte changement de biome
 //! (via `BiomeMap.biome_at(player_pos + AudioSampleOffset)`), stop l'ancien et
 //! démarre le nouveau. Pas de crossfade (V2 future).
 
 use bevy::prelude::*;
 use bevy_kira_audio::{AudioApp, AudioChannel, AudioControl, AudioInstance, AudioSource};
-use forgia_audio_core::ForgiaAudioCorePlugin;
 use forgia_core::prelude::*;
 use forgia_terrain::{BiomeMap, BiomeType};
 
-pub mod prelude {
-    pub use crate::{AudioSampleOffset, ForgiaAudioBiomePlugin};
-}
+use crate::ForgiaAudioCorePlugin;
 
 /// Channel dédié pour ambient biome — découplé du music/sfx.
 #[derive(Resource)]
@@ -120,7 +115,7 @@ fn update_biome_ambient(
     state.current = Some(biome);
     state.instance = Some(handle);
     info!(
-        "[forgia-audio-biome] Switched ambient → {:?} ({})",
+        "[forgia-audio::biome] Switched ambient → {:?} ({})",
         biome, path
     );
 }

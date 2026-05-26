@@ -3169,23 +3169,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-audio-biome"
+name = "forgia-audio"
 version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_kira_audio",
- "forgia-audio-core",
  "forgia-core",
  "forgia-terrain",
-]
-
-[[package]]
-name = "forgia-audio-core"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_kira_audio",
- "forgia-core",
 ]
 
 [[package]]
@@ -3332,8 +3322,7 @@ dependencies = [
  "forgia-anim-debug",
  "forgia-asset-registry",
  "forgia-assets",
- "forgia-audio-biome",
- "forgia-audio-core",
+ "forgia-audio",
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
@@ -3469,17 +3458,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forgia-manifest"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "forgia-core",
- "serde",
- "thiserror 2.0.18",
- "toml",
-]
-
-[[package]]
 name = "forgia-medial-axis"
 version = "0.1.0"
 dependencies = [
@@ -3536,7 +3514,7 @@ dependencies = [
  "bevy",
  "bevy_kira_audio",
  "forgia-ai-arena-bot",
- "forgia-audio-biome",
+ "forgia-audio",
  "forgia-core",
  "forgia-enemy-nameplate",
  "forgia-input",
@@ -3671,7 +3649,7 @@ dependencies = [
  "forgia-anim-debug",
  "forgia-anim-locomotion",
  "forgia-assets",
- "forgia-audio-biome",
+ "forgia-audio",
  "forgia-auto-rig",
  "forgia-camera-orbit",
  "forgia-combat",

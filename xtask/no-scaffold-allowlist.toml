@@ -19,8 +19,8 @@ allowed = [
     "forgia-rng",
 
     # Baseline 2026-05-23 — 93 scaffolds restants (a purger dans stories 516+)
+    # forgia-audio-core removed 2026-05-26 (fused into forgia-audio with biome)
     "forgia-assets",
-    "forgia-audio-core",
     "forgia-juice-hit-stop",
     "forgia-juice-recoil",
     "forgia-sensors",

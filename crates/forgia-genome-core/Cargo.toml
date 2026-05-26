@@ -13,3 +13,6 @@ forgia-core = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 thiserror = { workspace = true }
+
+# manifest module fused 2026-05-26 (forgia-manifest absorbed, was 0-consumer scaffold)
+

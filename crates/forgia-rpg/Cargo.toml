@@ -18,7 +18,7 @@ forgia-player = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-foliage = { workspace = true }
-forgia-audio-biome = { workspace = true }
+forgia-audio = { workspace = true }
 forgia-ui = { workspace = true }
 forgia-dialogue = { workspace = true }
 forgia-camera-orbit = { workspace = true }

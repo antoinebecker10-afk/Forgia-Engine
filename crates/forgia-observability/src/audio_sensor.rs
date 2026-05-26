@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 use bevy_kira_audio::{AudioInstance, PlaybackState};
-use forgia_audio_biome::BiomeAmbientState;
+use forgia_audio::biome::BiomeAmbientState;
 
 /// Pur — extrait pour tests headless.
 pub fn severity_for_audio(active_instances: usize) -> (&'static str, &'static str) {
