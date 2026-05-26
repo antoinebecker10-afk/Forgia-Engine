@@ -41,6 +41,8 @@ pub mod watchdog_sensor;
 // compare cross-runs → HealthAlert on drift (entity count / sensor missing /
 // player despawn).
 pub mod migration_baseline;
+pub mod player_state_sensor;
+pub mod lag_events_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -79,6 +81,8 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<lifecycle_sensor::LifecycleCounter>()
             .init_resource::<watchdog_sensor::GameTickCounter>()
             .init_resource::<migration_baseline::MigrationBaselineState>()
+            .init_resource::<player_state_sensor::PlayerStateAccum>()
+            .init_resource::<lag_events_sensor::LagEventsRing>()
             .insert_resource(RpgMonitorConfig::load_or_default());
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
@@ -98,7 +102,14 @@ impl Plugin for ForgiaObservabilityPlugin {
         app.add_observer(lifecycle_sensor::obs_arena_bot_removed);
 
         // Story-469 — watchdog tick counter en First (avant tous GameSets).
-        app.add_systems(First, watchdog_sensor::sys_update_tick_counter);
+        // Story-526 — lag_events ring buffer aussi en First (capture dt précis).
+        app.add_systems(
+            First,
+            (
+                watchdog_sensor::sys_update_tick_counter,
+                lag_events_sensor::sys_track_lag_events,
+            ),
+        );
         // Story-453 : préchargement critical assets handles OnEnter/OnExit Rpg.
         asset_handles::register(app);
         // Sensor health cross-mode : tourne en tout état (pas de run_if mode-gate).
@@ -114,6 +125,7 @@ impl Plugin for ForgiaObservabilityPlugin {
                 .in_set(GameSet::Sensors),
         );
         // Story-469 V5 Session C — lifecycle / watchdog / audio / input / sensor_health.
+        // Story-526 — player_state (movement + KCC collision) + lag_events writer.
         app.add_systems(
             Update,
             (
@@ -122,6 +134,9 @@ impl Plugin for ForgiaObservabilityPlugin {
                 audio_sensor::sys_write_audio_sensor,
                 input_sensor::sys_track_input_accum,
                 sensor_health_sensor::sys_write_sensor_health,
+                player_state_sensor::sys_track_player_state,
+                player_state_sensor::sys_write_player_state_sensor,
+                lag_events_sensor::sys_write_lag_events_sensor,
             )
                 .in_set(GameSet::Sensors),
         );
