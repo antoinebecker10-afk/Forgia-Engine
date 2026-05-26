@@ -19,7 +19,6 @@ forgia-input = { workspace = true }
 forgia-player = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-damage = { workspace = true }
-forgia-damage-numbers = { workspace = true }
 forgia-enemy-nameplate = { workspace = true }
 forgia-effects = { workspace = true }
 forgia-terrain = { workspace = true }

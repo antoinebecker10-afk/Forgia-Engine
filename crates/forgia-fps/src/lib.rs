@@ -283,8 +283,8 @@ pub struct ForgiaFpsPlugin;
 impl Plugin for ForgiaFpsPlugin {
     fn build(&self, app: &mut App) {
         // MeshFaderPlugin (idempotent — plusieurs crates peuvent l'utiliser).
-        if !app.is_plugin_added::<forgia_mesh_fader::MeshFaderPlugin>() {
-            app.add_plugins(forgia_mesh_fader::MeshFaderPlugin);
+        if !app.is_plugin_added::<forgia_effects::mesh_fader::MeshFaderPlugin>() {
+            app.add_plugins(forgia_effects::mesh_fader::MeshFaderPlugin);
         }
         // Arena spawn/cleanup + clouds.
         if !app.is_plugin_added::<forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin>() {

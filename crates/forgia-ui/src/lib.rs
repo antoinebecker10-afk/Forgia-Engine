@@ -18,14 +18,14 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 // Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
 pub use forgia_crosshair::CrosshairMode;
-pub use forgia_hitmarker::HitmarkerState;
+pub use forgia_effects::hitmarker::HitmarkerState;
 
 pub mod prelude {
     pub use crate::ForgiaUiPlugin;
     /// Re-export backward compat — préférer `forgia_crosshair::CrosshairMode` direct.
     pub use forgia_crosshair::CrosshairMode;
-    /// Re-export backward compat — préférer `forgia_hitmarker::HitmarkerState` direct.
-    pub use forgia_hitmarker::HitmarkerState;
+    /// Re-export backward compat — préférer `forgia_effects::hitmarker::HitmarkerState` direct.
+    pub use forgia_effects::hitmarker::HitmarkerState;
 }
 
 pub struct ForgiaUiPlugin;
@@ -39,8 +39,8 @@ impl Plugin for ForgiaUiPlugin {
         if !app.is_plugin_added::<forgia_crosshair::ForgiaCrosshairPlugin>() {
             app.add_plugins(forgia_crosshair::ForgiaCrosshairPlugin);
         }
-        if !app.is_plugin_added::<forgia_hitmarker::ForgiaHitmarkerPlugin>() {
-            app.add_plugins(forgia_hitmarker::ForgiaHitmarkerPlugin);
+        if !app.is_plugin_added::<forgia_effects::hitmarker::ForgiaHitmarkerPlugin>() {
+            app.add_plugins(forgia_effects::hitmarker::ForgiaHitmarkerPlugin);
         }
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.

@@ -13,7 +13,7 @@ use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod prelude {
-    pub use crate::{ForgiaHitmarkerPlugin, HitmarkerState};
+    pub use super::{ForgiaHitmarkerPlugin, HitmarkerState};
 }
 
 const HITMARKER_DURATION: f32 = 0.22;

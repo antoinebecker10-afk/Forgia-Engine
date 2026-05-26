@@ -70,8 +70,8 @@ pub struct ForgiaViewmodelPlugin;
 impl Plugin for ForgiaViewmodelPlugin {
     fn build(&self, app: &mut App) {
         // forgia-mesh-fader plugin (idempotent — d'autres crates peuvent l'utiliser).
-        if !app.is_plugin_added::<forgia_mesh_fader::MeshFaderPlugin>() {
-            app.add_plugins(forgia_mesh_fader::MeshFaderPlugin);
+        if !app.is_plugin_added::<forgia_effects::mesh_fader::MeshFaderPlugin>() {
+            app.add_plugins(forgia_effects::mesh_fader::MeshFaderPlugin);
         }
         // Fix V5 Session C smoke test (commit 4f4506559) : Tier 2B extraction
         // (commit 6a45c6322) avait oublié d'enregistrer le type d'asset Genome<ViewmodelGenome>.

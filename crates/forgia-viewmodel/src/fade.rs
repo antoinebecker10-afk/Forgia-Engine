@@ -20,7 +20,7 @@ use bevy::prelude::*;
 use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::GameMode;
 use forgia_genome_core::Genome;
-use forgia_mesh_fader::MaterialFader;
+use forgia_effects::mesh_fader::MaterialFader;
 
 use crate::attach::WeaponViewmodel;
 use crate::genome::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle};

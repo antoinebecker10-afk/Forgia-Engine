@@ -16,6 +16,11 @@ use forgia_core::prelude::*;
 
 pub mod arena_feedback;
 pub mod weapon_vfx;
+// Story-523 fusion : 4 VFX-adjacent crates intégrées comme modules.
+pub mod damage_numbers;
+pub mod hitmarker;
+pub mod mesh_fader;
+pub mod vfx_tracers;
 
 // TODO: port from V1 effects/ — les modules suivants nécessitent des deps supplémentaires
 // pub mod fireball_vfx;   // needs forgia-player (Fireball, IceBolt, GoblinOnFire, etc.)
@@ -39,6 +44,11 @@ pub mod prelude {
         WeaponVfxEffects,
     };
     pub use crate::ForgiaEffectsPlugin;
+    // Story-523 re-exports des modules fusionnés.
+    pub use crate::damage_numbers::ForgiaDamageNumbersPlugin;
+    pub use crate::hitmarker::{ForgiaHitmarkerPlugin, HitmarkerState};
+    pub use crate::mesh_fader::{MaterialFader, MaterialFaderCloned, MeshFaderPlugin};
+    pub use crate::vfx_tracers::ForgiaVfxTracersPlugin;
 }
 
 pub struct ForgiaEffectsPlugin;

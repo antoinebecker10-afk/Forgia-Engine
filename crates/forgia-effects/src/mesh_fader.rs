@@ -19,7 +19,7 @@
 //!    set `AlphaMode::Blend`, et lerp l'alpha selon progress.
 //!
 //! ```ignore
-//! use forgia_mesh_fader::{MaterialFader, MeshFaderPlugin};
+//! use forgia_effects::mesh_fader::{MaterialFader, MeshFaderPlugin};
 //!
 //! app.add_plugins(MeshFaderPlugin);
 //!
@@ -190,5 +190,5 @@ impl Plugin for MeshFaderPlugin {
 }
 
 pub mod prelude {
-    pub use crate::{MaterialFader, MaterialFaderCloned, MeshFaderPlugin};
+    pub use super::{MaterialFader, MaterialFaderCloned, MeshFaderPlugin};
 }
