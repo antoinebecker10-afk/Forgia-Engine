@@ -63,7 +63,7 @@ pub fn run_game() -> AppExit {
     //     pour rester sous la limite tuple Bevy 15).
     app.add_plugins((
         forgia_damage::ForgiaDamagePlugin,
-        forgia_damage_numbers::ForgiaDamageNumbersPlugin,
+        forgia_effects::damage_numbers::ForgiaDamageNumbersPlugin,
         forgia_enemy_nameplate::prelude::ForgiaEnemyNameplatePlugin,
     ));
 

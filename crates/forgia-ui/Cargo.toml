@@ -15,5 +15,5 @@ forgia-core = { workspace = true }
 forgia-input = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-crosshair = { workspace = true }
-forgia-hitmarker = { workspace = true }
+forgia-effects = { workspace = true }
 forgia-mode-roguelite = { workspace = true }
