@@ -22,13 +22,57 @@ anchor_kinds_emitted = ["cover_low"]
 
 [[modules.cover_low_cluster.prop_palette]]
 prefab = "models/kaykit/dungeon/crates.glb"
-weight = 0.6
+weight = 0.20
 anchor_kind = "cover_low"
 height_class = "Low"
 
 [[modules.cover_low_cluster.prop_palette]]
 prefab = "models/kaykit/dungeon/barrel.glb"
-weight = 0.4
+weight = 0.15
+anchor_kind = "cover_low"
+height_class = "Low"
+
+# Bible v1 Crypts of Anvil — Inferno Donjon pack (CC0 GLB Bevy-ready)
+# Vases / caisses / rochers = props forge abandonnée
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Vase_001.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Vase_002.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Box_001.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockMid_001.glb"
+weight = 0.08
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockMid_002.glb"
+weight = 0.08
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Mound_005.glb"
+weight = 0.09
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Mound_008.glb"
+weight = 0.10
 anchor_kind = "cover_low"
 height_class = "Low"
 
@@ -45,13 +89,32 @@ anchor_kinds_emitted = ["cover_high"]
 
 [[modules.cover_high_wall.prop_palette]]
 prefab = "models/kaykit/dungeon/pillar.glb"
-weight = 0.7
+weight = 0.20
 anchor_kind = "cover_high"
 height_class = "High"
 
 [[modules.cover_high_wall.prop_palette]]
 prefab = "models/kaykit/dungeon/wall.glb"
-weight = 0.3
+weight = 0.15
+anchor_kind = "cover_high"
+height_class = "High"
+
+# Bible v1 Crypts of Anvil — colonnes brisées identity-defining ruines forges
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ColumnBig_001.glb"
+weight = 0.20
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ColumnBigBroken_001.glb"
+weight = 0.25
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ColumnBigBroken_002.glb"
+weight = 0.20
 anchor_kind = "cover_high"
 height_class = "High"
 
@@ -67,13 +130,19 @@ footprint_radius_m = 4.0
 allowed_biomes = ["Volcanic", "Plains"]
 anchor_kinds_emitted = ["sniper_perch"]
 
-# TODO story-485b — proxy `pillar_deco.glb` en attendant un vrai asset tower 6m
-# (KayKit Dungeon Pack ne contient pas de section tour walkable native).
-# Le sight-line solver classifie quand même ce module en height_class="Tall"
-# pour casser les LoS, mais visuellement c'est un pilier décoré, pas un perch.
+# Bible v1 Crypts of Anvil — "Perchoir du contremaître" (canon)
+# TowerBig_001 (Inferno Donjon CC0) résout le TODO story-485b — vraie tour
+# walkable 6m+. StairsMiddle_001 ajouté en variante (perchoir bas escalier).
+# Sight-line solver bénéficie d'un vrai height_class="Tall" volumétrique.
 [[modules.sniper_perch.prop_palette]]
-prefab = "models/kaykit/dungeon/pillar_deco.glb"
-weight = 1.0
+prefab = "models/environment/inferno/TowerBig_001.glb"
+weight = 0.6
+anchor_kind = "sniper_perch"
+height_class = "Tall"
+
+[[modules.sniper_perch.prop_palette]]
+prefab = "models/environment/inferno/StairsMiddle_001.glb"
+weight = 0.4
 anchor_kind = "sniper_perch"
 height_class = "Tall"
 
@@ -89,11 +158,24 @@ footprint_radius_m = 6.0
 allowed_biomes = ["Volcanic", "Plains"]
 anchor_kinds_emitted = ["melee_pit"]
 
-# Proxy `rubble.glb` — marqueur visuel ground-level zone brawl. KayKit Dungeon
-# n'a pas de "pit" descendant ; un vrai pit nécessiterait heightmap override
-# story-488 (verticality terrain). En attendant, rubble matérialise la zone.
+# Bible v1 Crypts of Anvil — "La fosse à mêlée" (canon)
+# CirclePlatformSmall_001 = sol rond délimité visuellement (cf bible
+# locations/crypts_of_anvil.md "sol rond"). Brazier en variante = fosse
+# entourée de braises forge (identity volcanique cartoon).
 [[modules.melee_pit.prop_palette]]
-prefab = "models/kaykit/dungeon/rubble.glb"
-weight = 1.0
+prefab = "models/environment/inferno/CirclePlatformSmall_001.glb"
+weight = 0.5
+anchor_kind = "melee_pit"
+height_class = "Low"
+
+[[modules.melee_pit.prop_palette]]
+prefab = "models/environment/inferno/Brazier_002.glb"
+weight = 0.3
+anchor_kind = "melee_pit"
+height_class = "Low"
+
+[[modules.melee_pit.prop_palette]]
+prefab = "models/environment/inferno/Brazier_004.glb"
+weight = 0.2
 anchor_kind = "melee_pit"
 height_class = "Low"
