@@ -143,7 +143,12 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         BotTarget,
         KinematicCharacterController {
             up: Vec3::Y,
-            offset: CharacterLength::Absolute(0.01),
+            // Story-540 (2026-05-27) — offset 0.01 → 0.05 : safety net contre
+            // penetration creep silencieuse vs trimesh GLB props (kcc_collisions
+            // restait à 0 et velocity tombait à 0). 0.05 = 5 cm de marge soft
+            // pour slide naturel ; ne dégrade pas le tunneling vu que les colliders
+            // statiques sont plus larges que 5 cm.
+            offset: CharacterLength::Absolute(0.05),
             slide: true,
             autostep: Some(CharacterAutostep {
                 max_height: CharacterLength::Absolute(0.3),

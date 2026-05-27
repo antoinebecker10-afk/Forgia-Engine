@@ -57,6 +57,21 @@ pub const MELEE_PIT_MAX_DIST_RATIO: f32 = 0.3;
 /// stages compacts <30m introduits (story-485 BUG-485-03).
 pub const SIGHTLINE_BREAK_PERP_M: f32 = 3.0;
 
+/// Demi-largeur du corridor de circulation Player↔Boss dans lequel **aucun
+/// module dart-throw n'est autorisé**. Garantit que le joueur peut avancer en
+/// ligne droite vers le boss sans se faire piéger entre props.
+///
+/// Story-540 (2026-05-27) — diag stuck KCC à (3.58, 1.12, -53.54) en Crypts of
+/// Anvil. Le solver `place_modules` dart-throwait des modules sur l'axe direct
+/// player→boss, créant des cages où le KCC se coinçait silencieusement
+/// (`kcc_collisions=0` mais `velocity=0`). Cette constante crée un keepout
+/// rectangulaire ; le 1er CoverHigh forcé reste exempté (sight-line break
+/// story-485) — il s'agit d'un obstacle unique contournable.
+///
+/// Joueur Collider = capsule radius 0.3 → 1.5 m laisse 1.2 m de marge de chaque
+/// côté pour autostep + slide naturel KCC.
+pub const CORRIDOR_KEEPOUT_HALF_WIDTH_M: f32 = 1.5;
+
 // ─── ModulePlacement ────────────────────────────────────────────────────────
 
 /// Résultat d'un placement individuel. Consumer (`spawn_stage_arena_on_request`
@@ -116,26 +131,56 @@ pub fn place_modules(
             continue; // unknown id — skip
         };
         for instance_idx in 0..entry.count {
+            // Story-540 : tous les modules sauf le 1er CoverHigh forcé respectent
+            // le corridor de circulation Player↔Boss. Le 1er CoverHigh est l'unique
+            // obstacle intentionnel sur l'axe (sight-line break story-485, obstacle
+            // contournable par player).
+            let is_sightline_anchor =
+                matches!(def.kind, ModuleKind::CoverWall) && sightline_break_pending && instance_idx == 0;
+            let respect_corridor = !is_sightline_anchor;
+
             let pos_opt = match def.kind {
-                ModuleKind::SniperPerch => {
-                    sample_edge(max_radius, &mut rng_state, player_xz, &placements, def)
-                }
-                ModuleKind::MeleePit => {
-                    sample_center(max_radius, &mut rng_state, player_xz, &placements, def)
-                }
-                ModuleKind::CoverWall if sightline_break_pending && instance_idx == 0 => {
+                ModuleKind::SniperPerch => sample_edge(
+                    max_radius,
+                    &mut rng_state,
+                    player_xz,
+                    boss_xz_opt,
+                    respect_corridor,
+                    &placements,
+                    def,
+                ),
+                ModuleKind::MeleePit => sample_center(
+                    max_radius,
+                    &mut rng_state,
+                    player_xz,
+                    boss_xz_opt,
+                    respect_corridor,
+                    &placements,
+                    def,
+                ),
+                ModuleKind::CoverWall if is_sightline_anchor => {
                     let mp = midpoint_player_boss(player_xz, boss_xz_opt.unwrap());
-                    if is_position_valid(mp, max_radius, player_xz, &placements, def) {
+                    if is_position_valid(
+                        mp,
+                        max_radius,
+                        player_xz,
+                        boss_xz_opt,
+                        false, // sight-line anchor exempté du corridor
+                        &placements,
+                        def,
+                    ) {
                         sightline_break_pending = false;
                         Some(mp)
                     } else {
-                        // fallback dart-throw près du midpoint
+                        // fallback dart-throw près du midpoint, toujours exempté
                         sample_near(
                             mp,
                             8.0,
                             max_radius,
                             &mut rng_state,
                             player_xz,
+                            boss_xz_opt,
+                            false,
                             &placements,
                             def,
                         )
@@ -144,7 +189,15 @@ pub fn place_modules(
                         })
                     }
                 }
-                _ => sample_dart_throw(max_radius, &mut rng_state, player_xz, &placements, def),
+                _ => sample_dart_throw(
+                    max_radius,
+                    &mut rng_state,
+                    player_xz,
+                    boss_xz_opt,
+                    respect_corridor,
+                    &placements,
+                    def,
+                ),
             };
 
             if let Some(pos) = pos_opt {
@@ -177,12 +230,22 @@ fn sample_dart_throw(
     max_radius: f32,
     rng: &mut u64,
     player_xz: Vec3,
+    boss_xz_opt: Option<Vec3>,
+    respect_corridor: bool,
     placed: &[ModulePlacement],
     def: &ModuleDef,
 ) -> Option<Vec3> {
     for _ in 0..MAX_PLACEMENT_ATTEMPTS {
         let p = random_disk_point(max_radius, rng);
-        if is_position_valid(p, max_radius, player_xz, placed, def) {
+        if is_position_valid(
+            p,
+            max_radius,
+            player_xz,
+            boss_xz_opt,
+            respect_corridor,
+            placed,
+            def,
+        ) {
             return Some(p);
         }
     }
@@ -194,13 +257,23 @@ fn sample_edge(
     max_radius: f32,
     rng: &mut u64,
     player_xz: Vec3,
+    boss_xz_opt: Option<Vec3>,
+    respect_corridor: bool,
     placed: &[ModulePlacement],
     def: &ModuleDef,
 ) -> Option<Vec3> {
     let min_dist = SNIPER_PERCH_MIN_DIST_RATIO * max_radius;
     for _ in 0..MAX_PLACEMENT_ATTEMPTS {
         let p = random_annulus_point(min_dist, max_radius, rng);
-        if is_position_valid(p, max_radius, player_xz, placed, def) {
+        if is_position_valid(
+            p,
+            max_radius,
+            player_xz,
+            boss_xz_opt,
+            respect_corridor,
+            placed,
+            def,
+        ) {
             return Some(p);
         }
     }
@@ -212,13 +285,23 @@ fn sample_center(
     max_radius: f32,
     rng: &mut u64,
     player_xz: Vec3,
+    boss_xz_opt: Option<Vec3>,
+    respect_corridor: bool,
     placed: &[ModulePlacement],
     def: &ModuleDef,
 ) -> Option<Vec3> {
     let max_dist = MELEE_PIT_MAX_DIST_RATIO * max_radius;
     for _ in 0..MAX_PLACEMENT_ATTEMPTS {
         let p = random_disk_point(max_dist, rng);
-        if is_position_valid(p, max_radius, player_xz, placed, def) {
+        if is_position_valid(
+            p,
+            max_radius,
+            player_xz,
+            boss_xz_opt,
+            respect_corridor,
+            placed,
+            def,
+        ) {
             return Some(p);
         }
     }
@@ -226,19 +309,31 @@ fn sample_center(
 }
 
 /// Sampling dans une zone autour d'un point cible (pour CoverHigh forced sight-line break).
+/// `respect_corridor` exposé pour cohérence — typiquement `false` quand utilisé
+/// pour le sight-line anchor (le 1er CoverHigh DOIT pouvoir être sur l'axe).
 fn sample_near(
     target: Vec3,
     radius: f32,
     max_radius: f32,
     rng: &mut u64,
     player_xz: Vec3,
+    boss_xz_opt: Option<Vec3>,
+    respect_corridor: bool,
     placed: &[ModulePlacement],
     def: &ModuleDef,
 ) -> Option<Vec3> {
     for _ in 0..MAX_PLACEMENT_ATTEMPTS {
         let offset = random_disk_point(radius, rng);
         let p = Vec3::new(target.x + offset.x, 0.0, target.z + offset.z);
-        if is_position_valid(p, max_radius, player_xz, placed, def) {
+        if is_position_valid(
+            p,
+            max_radius,
+            player_xz,
+            boss_xz_opt,
+            respect_corridor,
+            placed,
+            def,
+        ) {
             return Some(p);
         }
     }
@@ -248,10 +343,18 @@ fn sample_near(
 // ─── Validation (pure) ──────────────────────────────────────────────────────
 
 /// Check toutes les contraintes de placement pour `pos`.
+///
+/// `boss_xz_opt` + `respect_corridor` ajoutés story-540 (2026-05-27). Quand
+/// `respect_corridor == true` ET `boss_xz_opt == Some(_)`, la position est
+/// rejetée si elle (ou son footprint) intersecte le corridor de circulation
+/// Player↔Boss (`CORRIDOR_KEEPOUT_HALF_WIDTH_M`). Le 1er CoverHigh forcé sur
+/// le midpoint est exempté en appelant avec `respect_corridor: false`.
 fn is_position_valid(
     pos: Vec3,
     max_radius: f32,
     player_xz: Vec3,
+    boss_xz_opt: Option<Vec3>,
+    respect_corridor: bool,
     placed: &[ModulePlacement],
     def: &ModuleDef,
 ) -> bool {
@@ -266,6 +369,20 @@ fn is_position_valid(
     let dist_player = (dx * dx + dz * dz).sqrt();
     if dist_player < SPAWN_SAFETY_RADIUS_M {
         return false;
+    }
+    // Invariant 7 — corridor circulation Player↔Boss (story-540 anti-stuck KCC)
+    if respect_corridor {
+        if let Some(boss_xz) = boss_xz_opt {
+            if is_in_player_boss_corridor(
+                pos,
+                player_xz,
+                boss_xz,
+                CORRIDOR_KEEPOUT_HALF_WIDTH_M,
+                def.footprint_radius_m,
+            ) {
+                return false;
+            }
+        }
     }
     // Invariant 1 (cover spacing) + footprint exclusion
     for p in placed {
@@ -285,6 +402,44 @@ fn is_position_valid(
         }
     }
     true
+}
+
+/// True si `pos` (étendu de son `module_footprint`) intersecte le corridor
+/// rectangulaire entre `player` et `boss` (demi-largeur `half_width`).
+///
+/// Algorithme : projection de `pos - player` sur l'axe segment, puis check
+/// perpendiculaire. Hors-segment (t < 0 ou t > len) → pas dans le corridor.
+///
+/// Pure, déterministe, testable headless.
+pub fn is_in_player_boss_corridor(
+    pos: Vec3,
+    player: Vec3,
+    boss: Vec3,
+    half_width: f32,
+    module_footprint: f32,
+) -> bool {
+    let seg_x = boss.x - player.x;
+    let seg_z = boss.z - player.z;
+    let len_sq = seg_x * seg_x + seg_z * seg_z;
+    if len_sq < 1e-6 {
+        return false;
+    }
+    let len = len_sq.sqrt();
+    let dir_x = seg_x / len;
+    let dir_z = seg_z / len;
+    let dx = pos.x - player.x;
+    let dz = pos.z - player.z;
+    let t = dx * dir_x + dz * dir_z;
+    if t < 0.0 || t > len {
+        return false;
+    }
+    let perp_x = dx - t * dir_x;
+    let perp_z = dz - t * dir_z;
+    let perp = (perp_x * perp_x + perp_z * perp_z).sqrt();
+    // Le centre du module est à `perp` de l'axe. Son footprint occupe un disque
+    // de rayon `module_footprint` autour du centre. Le footprint touche le
+    // corridor si `perp - module_footprint < half_width`.
+    perp < half_width + module_footprint
 }
 
 // ─── Geometry helpers ───────────────────────────────────────────────────────
@@ -1074,5 +1229,154 @@ mod tests {
             crypts_sig, forge_sig,
             "AC7: forge_sanctum layout signature identique à crypts_of_anvil — perte d'identity spatiale"
         );
+    }
+
+    // ─── Story-540 — corridor circulation Player↔Boss ───────────────────────
+
+    /// Vérifie qu'aucun module **autre que le 1er CoverHigh forcé** n'a son
+    /// footprint dans le corridor de circulation player→boss. Garde-fou
+    /// anti-régression contre le stuck KCC du 2026-05-27.
+    #[test]
+    fn place_modules_clear_corridor_between_player_boss() {
+        let (modules, palette) = make_palette();
+        let extent = 90.0_f32;
+        let player = Vec3::new(0.0, 0.0, 0.0);
+        let boss = Vec3::new(0.0, 0.0, -extent * 0.7); // Crypts boss pos
+        // Itère sur plusieurs seeds pour pas dépendre d'un cas unique
+        for seed in [42u64, 7, 99, 1234, 0xDEAD_BEEF] {
+            let placements = place_modules(extent, &modules, &palette, player, Some(boss), seed);
+            assert!(
+                !placements.is_empty(),
+                "seed {seed}: solver n'a rien placé"
+            );
+
+            // Le 1er CoverWall (sight-line anchor) est exempté. On ne contrôle
+            // que les autres modules.
+            let mut first_coverwall_skipped = false;
+            for m in &placements {
+                if matches!(m.kind, ModuleKind::CoverWall) && !first_coverwall_skipped {
+                    first_coverwall_skipped = true;
+                    continue;
+                }
+                // Récupère le def pour le footprint
+                let def_key = match m.kind {
+                    ModuleKind::CoverCluster => "cover_low",
+                    ModuleKind::CoverWall => "cover_high",
+                    ModuleKind::SniperPerch => "sniper",
+                    ModuleKind::MeleePit => "pit",
+                    ModuleKind::FlankRoute => continue, // ignoré (pas dans palette test)
+                };
+                let footprint = modules
+                    .get(def_key)
+                    .map(|d| d.footprint_radius_m)
+                    .unwrap_or(1.5);
+                let in_corridor = is_in_player_boss_corridor(
+                    m.position,
+                    player,
+                    boss,
+                    CORRIDOR_KEEPOUT_HALF_WIDTH_M,
+                    footprint,
+                );
+                assert!(
+                    !in_corridor,
+                    "seed {seed}: module {:?} at {:?} (footprint={footprint}) intrude le corridor player→boss (half_width={CORRIDOR_KEEPOUT_HALF_WIDTH_M})",
+                    m.kind, m.position
+                );
+            }
+        }
+    }
+
+    /// Vérifie que le 1er CoverHigh forcé peut rester proche du midpoint exact
+    /// player↔boss (sight-line break story-485 préservé). Le shift latéral du
+    /// corridor ne le déloge pas — on appelle is_position_valid avec
+    /// respect_corridor=false pour ce module.
+    #[test]
+    fn place_modules_first_coverhigh_on_axis_when_boss_present() {
+        let (modules, palette) = make_palette();
+        let extent = 90.0_f32;
+        let player = Vec3::new(0.0, 0.0, 0.0);
+        let boss = Vec3::new(0.0, 0.0, -extent * 0.7);
+        let mid = midpoint_player_boss(player, boss);
+        for seed in [1u64, 2, 3, 7, 42] {
+            let placements = place_modules(extent, &modules, &palette, player, Some(boss), seed);
+            // Trouve le 1er CoverWall (le sight-line anchor)
+            let Some(first_high) = placements.iter().find(|m| matches!(m.kind, ModuleKind::CoverWall)) else {
+                panic!("seed {seed}: aucun CoverWall placé (palette devrait en avoir au moins 1)");
+            };
+            // Doit être proche du midpoint (sample_near fallback = 8m max)
+            let dx = first_high.position.x - mid.x;
+            let dz = first_high.position.z - mid.z;
+            let d = (dx * dx + dz * dz).sqrt();
+            assert!(
+                d <= 8.5,
+                "seed {seed}: 1er CoverWall à {d:.2}m du midpoint — sight-line anchor déplacé ?"
+            );
+        }
+    }
+
+    /// Helper `is_in_player_boss_corridor` — tests unitaires de la géométrie pure.
+    #[test]
+    fn corridor_helper_detects_on_axis() {
+        let player = Vec3::new(0.0, 0.0, 0.0);
+        let boss = Vec3::new(0.0, 0.0, -60.0);
+        // Point pile au milieu de l'axe, footprint 0 → dans corridor
+        assert!(is_in_player_boss_corridor(
+            Vec3::new(0.0, 0.0, -30.0),
+            player,
+            boss,
+            1.5,
+            0.0
+        ));
+        // Point lateral 2m de l'axe avec footprint 0 et half_width 1.5 → hors corridor
+        assert!(!is_in_player_boss_corridor(
+            Vec3::new(2.0, 0.0, -30.0),
+            player,
+            boss,
+            1.5,
+            0.0
+        ));
+        // Point lateral 2m avec footprint 1.5 → dans corridor (perp=2 < 1.5+1.5)
+        assert!(is_in_player_boss_corridor(
+            Vec3::new(2.0, 0.0, -30.0),
+            player,
+            boss,
+            1.5,
+            1.5
+        ));
+    }
+
+    #[test]
+    fn corridor_helper_ignores_off_segment() {
+        let player = Vec3::new(0.0, 0.0, 0.0);
+        let boss = Vec3::new(0.0, 0.0, -60.0);
+        // Au-delà du boss (t > len) → hors corridor
+        assert!(!is_in_player_boss_corridor(
+            Vec3::new(0.0, 0.0, -70.0),
+            player,
+            boss,
+            1.5,
+            0.0
+        ));
+        // Derrière le player (t < 0) → hors corridor
+        assert!(!is_in_player_boss_corridor(
+            Vec3::new(0.0, 0.0, 5.0),
+            player,
+            boss,
+            1.5,
+            0.0
+        ));
+    }
+
+    #[test]
+    fn corridor_helper_zero_length_returns_false() {
+        // Player et boss confondus → pas de corridor défini → false partout
+        let p = Vec3::ZERO;
+        assert!(!is_in_player_boss_corridor(
+            Vec3::new(1.0, 0.0, 1.0),
+            p,
+            p,
+            1.5,
+            0.0
+        ));
     }
 }
