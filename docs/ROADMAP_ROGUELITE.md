@@ -60,17 +60,43 @@ Cult of the Lamb (4,5M copies $90M revenue), Hadès, Death's Door : palette limi
 
 ---
 
-## Plan d'action prioritaire (7 items)
+## Plan d'action prioritaire (TIER 1 décomposé en 11 stories 2026-05-27)
 
-### TIER 1 — Story unique "concept tangible" (BMAD Standard)
+**Source GDD** : [docs/design/gdd-roguelite-v1.md](./design/gdd-roguelite-v1.md) (V1 senior GD review).
 
-| # | Tâche | Source consensus | Effort | Impact |
+### TIER 1 — 11 stories décomposées (BMAD Standard sauf 536 Enterprise)
+
+| # | Story | Mission GDD | Effort | Impact |
 |---|---|---|---|---|
-| **1** | **Wire 4 armes mécaniquement distinctes** : Pépin ricochet visible, Bourrasque knockback dust, Lenoir lifesteal red mist, Boucherie cleave AOE 2m | Doom + Worms + Hadès | **L** ~1 sem | ★★★★★ |
-| **2** | **6-8 Boons mécaniques data-driven TOML** (ricochet+, lifesteal, multishot, piercing, double-jump, slow-on-hit, vampire-radius, explosive). 1 boon choix entre 3 par wave (pattern Hadès) | Isaac + Hadès | **M** ~3j | ★★★★★ |
-| **3** | **Pop-up texte par arme sur events** (kill/miss/reload/low_hp) → utilise les 200 voicelines déjà écrites en floating text BD | EarthBound + Borderlands sans budget audio | **S** ~1j | ★★★★ |
+| 1 | [story-528 — FPS Feel Accessible](./stories/story-528-fps-feel-accessible.md) (aim assist + dash "bondir" + fatigue UI + hit feedback BD) | Mission 1 | 🟢 ~3-4j | ★★★★★ |
+| 2 | [story-529 — Boons Architecture + Coffre UI + 5 neutres](./stories/story-529-boons-architecture-coffre.md) | Mission 2.1 + 2.3 | 🟡 ~5j | ★★★★★ |
+| 3 | [story-530 — 24 Boons catalogue + 3 Anti-boons + 7 légendaires](./stories/story-530-boons-catalogue-anti-boons.md) | Mission 2.2 + 2.4 | 🟡 ~5j | ★★★★★ |
+| 4 | [story-531 — 🔫 Pépin moveset distinctive (jauge confiance)](./stories/story-531-pepin-moveset.md) | Mission 3 | 🟡 ~4j | ★★★★ |
+| 5 | [story-532 — 💨 Bourrasque moveset (knockback/tornade)](./stories/story-532-bourrasque-moveset.md) | Mission 3 | 🟡 ~4j | ★★★★ |
+| 6 | [story-533 — 🎩 Madame Lenoir moveset (précision/scope/coup d'œil)](./stories/story-533-lenoir-moveset.md) | Mission 3 | 🟡 ~4j | ★★★★ |
+| 7 | [story-534 — 🪓 Boucherie moveset (roquettes/ragdoll/salve)](./stories/story-534-boucherie-moveset.md) | Mission 3 | 🟡 ~4j | ★★★★ |
+| 8 | [story-535 — 6 ennemis FSM V1 + contre-strats](./stories/story-535-enemies-v1-fsm.md) | Mission 4.3 | 🟡 ~5j | ★★★★ |
+| 9 | [story-536 — Mid-boss + Boss final Forgeron Noir](./stories/story-536-bosses-mid-final.md) | Mission 4.4 | 🔴 ~7j | ★★★★★ |
+| 10 | [story-537 — Méta-progression hub évolutif + éclats persist](./stories/story-537-meta-progression-hub.md) | Mission 4.5 | 🟢 ~3j | ★★★★ |
+| 11 | [story-538 — Polish VFX biome Volcanic + popup BD voicelines](./stories/story-538-polish-vfx-popup-bd.md) | Mission 1.3 + 4.5 | 🟡 ~5j | ★★★★ |
 
-**Story bundle suggérée** : story-528 "Wire 4 personas as playable distinctive + Boons MVP + Pop-up text". 2-3 semaines, transforme le concept en gameplay tangible.
+**Total Tier 1 estimé** : **~50-54 jours solo Bevy** ≈ **10-11 semaines**.
+
+### Ordre d'exécution recommandé (dépendances)
+
+```
+story-528 (FPS feel foundation)
+    ↓
+story-535 (ennemis pour tester) ──┐
+    ↓                              ├──> story-531/532/533/534 (4 armes, ~parallèles ou seq)
+story-529 (boons arch + UI) ──────┘     ↓
+    ↓                                    story-538 (polish VFX + popup BD)
+story-530 (24 boons catalogue) ─────────┘
+    ↓
+story-536 (bosses, requiert armes + ennemis) ───────────────┐
+                                                              ↓
+                                                       story-537 (méta-prog, requiert boss final)
+```
 
 ### TIER 2 — Polish visuel (quick wins parallèles)
 
