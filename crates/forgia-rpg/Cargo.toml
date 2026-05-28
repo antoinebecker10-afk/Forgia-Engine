@@ -33,5 +33,6 @@ forgia-prefab = { workspace = true }
 forgia-village-loader = { workspace = true }
 forgia-genome-village = { workspace = true }
 forgia-streaming = { workspace = true }
+forgia-water = { workspace = true }
 noise = { workspace = true }
 leafwing-input-manager = { workspace = true }

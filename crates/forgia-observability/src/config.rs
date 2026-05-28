@@ -192,12 +192,14 @@ pub struct CriticalAssetsConfig {
 }
 
 fn default_asset_paths() -> Vec<String> {
-    // Story-453 : grass textures du TerrainSharedMaterial. Si l'une de ces
-    // 3 textures manque, le terrain rend sans diffuse/normal/roughness.
+    // Story-453 + fix 2026-05-28 : ex-paths "textures-v1/terrain/grass/*"
+    // supprimés (legacy V1 git-ignored depuis purge 184e091). Aligné sur
+    // `config/genomes/rpg_monitor.toml` qui pointe sur jolcham bark V2
+    // (textures réellement câblées via story-486 foliage trunk override).
     vec![
-        "textures-v1/terrain/grass/diff.jpg".to_string(),
-        "textures-v1/terrain/grass/normal.jpg".to_string(),
-        "textures-v1/terrain/grass/roughness.jpg".to_string(),
+        "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.jpg".to_string(),
+        "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_2k.jpg".to_string(),
+        "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.jpg".to_string(),
     ]
 }
 fn default_asset_min_uptime() -> f32 {
