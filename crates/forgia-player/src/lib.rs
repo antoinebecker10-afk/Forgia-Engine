@@ -2,9 +2,14 @@
 //!
 //! Player controller : KinematicCharacterController rapier + FpsCamera 1P + spawn/respawn.
 
+use bevy::asset::RenderAssetUsages;
 use bevy::core_pipeline::Skybox;
+use bevy::image::Image;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
+use bevy::render::render_resource::{
+    Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension,
+};
 use bevy_rapier3d::prelude::*;
 use forgia_ai_arena_bot::BotTarget;
 use forgia_combat::prelude::*;
@@ -49,12 +54,73 @@ impl Default for MouseLookTuning {
     }
 }
 
-// ── Skybox HDR (story-553) ──
-// KTX2 cubemap HDR Bevy-native, déposé V1 jamais wiré V2. Foundation pour
-// re-add stories 549/550/551 (HDR + Bloom + Tonemapping caméras).
-// Cf feedback_hdr_pipeline_needs_hdr_skybox_first.md.
-const SKYBOX_PATH: &str = "hdri/env-maps-v1/sky_skybox.ktx2";
-const SKYBOX_BRIGHTNESS: f32 = 500.0; // HDR — ajusté depuis 1000.0 LDR PNG
+// ── Skybox cartoon procedural (story-554 Phase 1) ──
+// Cubemap 256×256×6 généré au Startup. Gradient zénith→horizon par face.
+// Style cartoon Cult of the Lamb / Death's Door : palette Crypts of Anvil.
+// HDR-compat (sRGB sampling auto-linear), wire pour re-add stories 549/550/551.
+const SKYBOX_FACE_SIZE: u32 = 256;
+const SKYBOX_BRIGHTNESS: f32 = 500.0;
+
+/// Palette cartoon Crypts of Anvil (bible v1).
+/// Phase 2 : déplacer dans `config/genomes/biome_sky.toml` per-biome.
+const SKY_ZENITH_RGB: [u8; 3] = [61, 36, 102]; // #3D2466 deep violet
+const SKY_HORIZON_RGB: [u8; 3] = [255, 107, 53]; // #FF6B35 warm orange
+const SKY_GROUND_RGB: [u8; 3] = [42, 27, 61]; // #2A1B3D dark mauve
+
+/// Génère un cubemap procedural cartoon style.
+/// Order faces (wgpu convention) : +X, -X, +Y, -Y, +Z, -Z.
+/// - +Y (top) : solid zenith
+/// - -Y (bottom) : solid ground
+/// - sides : gradient vertical zenith (haut) → horizon (bas)
+fn generate_cartoon_skybox() -> Image {
+    let face_size = SKYBOX_FACE_SIZE as usize;
+    let total_pixels = face_size * face_size * 6;
+    let mut data = vec![0u8; total_pixels * 4];
+
+    for face in 0..6 {
+        for y in 0..face_size {
+            for x in 0..face_size {
+                let idx = (face * face_size * face_size + y * face_size + x) * 4;
+                let [r, g, b] = match face {
+                    2 => SKY_ZENITH_RGB, // +Y top
+                    3 => SKY_GROUND_RGB, // -Y bottom
+                    _ => {
+                        // Side face : t=0 en haut (zenith), t=1 en bas (horizon).
+                        let t = y as f32 / (face_size - 1) as f32;
+                        lerp_rgb(SKY_ZENITH_RGB, SKY_HORIZON_RGB, t)
+                    }
+                };
+                data[idx] = r;
+                data[idx + 1] = g;
+                data[idx + 2] = b;
+                data[idx + 3] = 255;
+            }
+        }
+    }
+
+    let mut img = Image::new(
+        Extent3d {
+            width: SKYBOX_FACE_SIZE,
+            height: SKYBOX_FACE_SIZE,
+            depth_or_array_layers: 6,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    img.texture_view_descriptor = Some(TextureViewDescriptor {
+        dimension: Some(TextureViewDimension::Cube),
+        ..default()
+    });
+    img
+}
+
+fn lerp_rgb(a: [u8; 3], b: [u8; 3], t: f32) -> [u8; 3] {
+    let t = t.clamp(0.0, 1.0);
+    let lerp = |x: u8, y: u8| (f32::from(x) * (1.0 - t) + f32::from(y) * t).round() as u8;
+    [lerp(a[0], b[0]), lerp(a[1], b[1]), lerp(a[2], b[2])]
+}
 
 #[derive(Resource)]
 struct SkyboxPending {
@@ -181,10 +247,15 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
     info!("[forgia-player] Player spawned at (0, 2, 0)");
 }
 
-/// Startup : load skybox HDR KTX2 cubemap (déjà natif cube, pas de reinterpret).
-fn load_skybox(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle: Handle<Image> = asset_server.load(SKYBOX_PATH);
+/// Startup : génère un cubemap cartoon procedural (story-554 Phase 1).
+/// L'image est ajoutée à `Assets<Image>` directement (pas de chargement disk).
+fn load_skybox(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let handle: Handle<Image> = images.add(generate_cartoon_skybox());
     commands.insert_resource(SkyboxPending { handle });
+    info!(
+        "[forgia-player] Skybox cartoon generated ({}x{}x6 RGBA8 sRGB)",
+        SKYBOX_FACE_SIZE, SKYBOX_FACE_SIZE
+    );
 }
 
 /// Update : attach Skybox Component sur FpsCamera/RpgOrbitCamera dès qu'elle existe.
