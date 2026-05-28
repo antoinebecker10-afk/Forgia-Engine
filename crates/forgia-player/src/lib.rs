@@ -2,7 +2,9 @@
 //!
 //! Player controller : KinematicCharacterController rapier + FpsCamera 1P + spawn/respawn.
 
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::core_pipeline::Skybox;
+use bevy::post_process::bloom::Bloom;
 use bevy::image::{ImageLoaderSettings, ImageSampler};
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
@@ -167,6 +169,10 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         children![(
             FpsCamera,
             Camera3d::default(),
+            // Story-549 : Bloom (auto-require Hdr en 0.18) + TonyMcMapface tonemapping.
+            // Signature Cult of the Lamb. Foundation materials emissive → story-551.
+            Bloom::NATURAL,
+            Tonemapping::TonyMcMapface,
             // Story-450 wave 5 phase 2c : étendre far plane à 2000m pour
             // couvrir LOD2_MAX_M=1500m + marge. Bevy default = 1000m
             // → LOD2 tiles 1000-1500m étaient clippées (gap horizon visible).
