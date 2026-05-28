@@ -3,9 +3,11 @@
 //! Player controller : KinematicCharacterController rapier + FpsCamera 1P + spawn/respawn.
 
 use bevy::asset::RenderAssetUsages;
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::core_pipeline::Skybox;
 use bevy::image::Image;
 use bevy::input::mouse::MouseMotion;
+use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::render_resource::{
     Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension,
@@ -233,6 +235,10 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         children![(
             FpsCamera,
             Camera3d::default(),
+            // Story-549 v2 : Bloom (auto-require Hdr en 0.18) + TonyMcMapface.
+            // Compat skybox cartoon procedural story-554 (RGBA8 sRGB → auto-linear).
+            Bloom::NATURAL,
+            Tonemapping::TonyMcMapface,
             // Story-450 wave 5 phase 2c : étendre far plane à 2000m pour
             // couvrir LOD2_MAX_M=1500m + marge. Bevy default = 1000m
             // → LOD2 tiles 1000-1500m étaient clippées (gap horizon visible).
