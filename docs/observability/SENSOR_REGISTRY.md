@@ -68,6 +68,7 @@
 | `forgia2_migration_baseline.json` | T0 | forgia-observability | `src/migration_baseline.rs:33` | once | baseline E1/E2 forgia_*→forgia2_* migration tracking | active |
 | `forgia2_perf.json` | T0 | forgia-observability | `src/perf_sensor.rs:73` | 1Hz | FPS, frame_time, smooth | active |
 | `forgia2_physics.json` | T0 | forgia-observability | `src/physics_sensor.rs` | 1Hz | rigid bodies par type, colliders, sensors, KCC, joints — story-540 KCC stuck, story-545 raycast self-hit | active |
+| `forgia2_rpg_player.json` | T0 | forgia-observability | `src/rpg_player_sensor.rs` | 1Hz | player ↔ biome/water — biome_current, is_swimming, depth_below_surface, head_above_water | active |
 | `forgia2_player_hp_diag.json` | T0 | forgia-ui-lib (hud/player_hp) | `src/hud/player_hp.rs:?` (WIP autre terminal 2026-05-28) | 1Hz | HP bar render skips, frames_skipped reasons | active-wip |
 | `forgia2_player_state.json` | T0 | forgia-observability | `src/player_state_sensor.rs:134` | 1Hz | player position, velocity, grounded, swim | active |
 | `forgia2_rex_bones.json` | T3 | forgia-anim-locomotion | `src/locomotion.rs:477` | event | Rex skeleton bind dump (story-482) | active |

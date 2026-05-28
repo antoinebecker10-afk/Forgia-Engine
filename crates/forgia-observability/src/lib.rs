@@ -45,6 +45,8 @@ pub mod player_state_sensor;
 pub mod lag_events_sensor;
 // Story-549 (suite session 2026-05-28) — Rapier blind spot.
 pub mod physics_sensor;
+// Story-553 — RPG player ↔ biome/water linkage.
+pub mod rpg_player_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -86,6 +88,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<player_state_sensor::PlayerStateAccum>()
             .init_resource::<lag_events_sensor::LagEventsRing>()
             .init_resource::<physics_sensor::PhysicsSensorState>()
+            .init_resource::<rpg_player_sensor::RpgPlayerSensorState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
@@ -143,10 +146,14 @@ impl Plugin for ForgiaObservabilityPlugin {
             )
                 .in_set(GameSet::Sensors),
         );
-        // Tuple Bevy limit — physics_sensor (story-549 session 2026-05-28) en groupe séparé.
+        // Tuple Bevy limit — physics_sensor (story-549) + rpg_player (story-553) en groupe séparé.
         app.add_systems(
             Update,
-            physics_sensor::sys_write_physics_sensor.in_set(GameSet::Sensors),
+            (
+                physics_sensor::sys_write_physics_sensor,
+                rpg_player_sensor::sys_write_rpg_player_sensor,
+            )
+                .in_set(GameSet::Sensors),
         );
         // Story-465 — forgia2 aggregator Tier 1 : combat + arena.
         // V7 M1 (story-470) : gate étendu Fps OU Roguelite — V7 réutilise le firing
