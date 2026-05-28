@@ -47,6 +47,8 @@ pub mod lag_events_sensor;
 pub mod physics_sensor;
 // Story-553 — RPG player ↔ biome/water linkage.
 pub mod rpg_player_sensor;
+// Story-554 — RPG quests state.
+pub mod quests_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -89,6 +91,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<lag_events_sensor::LagEventsRing>()
             .init_resource::<physics_sensor::PhysicsSensorState>()
             .init_resource::<rpg_player_sensor::RpgPlayerSensorState>()
+            .init_resource::<quests_sensor::QuestsSensorState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
@@ -146,12 +149,14 @@ impl Plugin for ForgiaObservabilityPlugin {
             )
                 .in_set(GameSet::Sensors),
         );
-        // Tuple Bevy limit — physics_sensor (story-549) + rpg_player (story-553) en groupe séparé.
+        // Tuple Bevy limit — physics_sensor (story-549) + rpg_player (story-553)
+        // + quests (story-554) en groupe séparé.
         app.add_systems(
             Update,
             (
                 physics_sensor::sys_write_physics_sensor,
                 rpg_player_sensor::sys_write_rpg_player_sensor,
+                quests_sensor::sys_write_quests_sensor,
             )
                 .in_set(GameSet::Sensors),
         );

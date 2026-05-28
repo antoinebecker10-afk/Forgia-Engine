@@ -20,6 +20,7 @@ forgia-enemy-nameplate = { workspace = true }
 forgia-mode-fps-arena = { workspace = true }
 forgia-audio = { workspace = true }
 forgia-input = { workspace = true }
+forgia-rpg-data = { workspace = true }
 bevy_kira_audio = "0.25"
 bevy_water = "0.18"
 leafwing-input-manager = "0.20"
