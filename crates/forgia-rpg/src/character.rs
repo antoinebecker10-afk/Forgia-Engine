@@ -24,8 +24,6 @@
 #![allow(dead_code)]
 
 use bevy::camera::primitives::Aabb;
-use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
@@ -177,10 +175,6 @@ pub(crate) fn spawn_rex_character(
             is_active: true,
             ..default()
         },
-        // Story-550 : HDR + Bloom + TonyMcMapface — cohérence cross-mode avec
-        // FpsCamera (story-549). Bloom auto-require Hdr en Bevy 0.18.
-        Bloom::NATURAL,
-        Tonemapping::TonyMcMapface,
         Transform::default(),
         OrbitCamera::new(player_entity),
         Name::new("RpgOrbitCamera"),
