@@ -15,6 +15,7 @@ pub struct SensorSnapshot {
     pub anim: AnimSlice,
     pub audio: AudioSlice,
     pub system: SystemSlice,
+    pub physics: PhysicsSlice,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -108,6 +109,21 @@ pub struct AudioSlice {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct PhysicsSlice {
+    // forgia2_physics
+    pub gravity_y: Option<f64>,
+    pub rigid_bodies_total: Option<i64>,
+    pub rigid_bodies_dynamic: Option<i64>,
+    pub rigid_bodies_kinematic_pos: Option<i64>,
+    pub rigid_bodies_kinematic_vel: Option<i64>,
+    pub rigid_bodies_fixed: Option<i64>,
+    pub colliders_total: Option<i64>,
+    pub colliders_sensor: Option<i64>,
+    pub kcc_count: Option<i64>,
+    pub joints_count: Option<i64>,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct SystemSlice {
     // forgia2_health
     pub health_severity: Option<String>,
@@ -136,7 +152,27 @@ pub fn read_all() -> SensorSnapshot {
     read_anim(&mut snap);
     read_audio(&mut snap);
     read_system(&mut snap);
+    read_physics(&mut snap);
     snap
+}
+
+fn read_physics(snap: &mut SensorSnapshot) {
+    if let Some(v) = read_json("forgia2_physics.json") {
+        snap.physics.gravity_y = v.get("gravity_y").and_then(|x| x.as_f64());
+        snap.physics.rigid_bodies_total = v.get("rigid_bodies_total").and_then(|x| x.as_i64());
+        snap.physics.rigid_bodies_dynamic = v.get("rigid_bodies_dynamic").and_then(|x| x.as_i64());
+        snap.physics.rigid_bodies_kinematic_pos = v
+            .get("rigid_bodies_kinematic_pos")
+            .and_then(|x| x.as_i64());
+        snap.physics.rigid_bodies_kinematic_vel = v
+            .get("rigid_bodies_kinematic_vel")
+            .and_then(|x| x.as_i64());
+        snap.physics.rigid_bodies_fixed = v.get("rigid_bodies_fixed").and_then(|x| x.as_i64());
+        snap.physics.colliders_total = v.get("colliders_total").and_then(|x| x.as_i64());
+        snap.physics.colliders_sensor = v.get("colliders_sensor").and_then(|x| x.as_i64());
+        snap.physics.kcc_count = v.get("kcc_count").and_then(|x| x.as_i64());
+        snap.physics.joints_count = v.get("joints_count").and_then(|x| x.as_i64());
+    }
 }
 
 fn read_json(path: &str) -> Option<Value> {

@@ -11,6 +11,7 @@ use std::collections::HashMap;
 pub mod anim;
 pub mod audio;
 pub mod combat;
+pub mod physics;
 pub mod player;
 pub mod system;
 pub mod terrain;
@@ -25,6 +26,7 @@ pub enum CategoryId {
     Terrain,
     Anim,
     Audio,
+    Physics,
 }
 
 impl CategoryId {
@@ -35,6 +37,7 @@ impl CategoryId {
         CategoryId::Terrain,
         CategoryId::Anim,
         CategoryId::Audio,
+        CategoryId::Physics,
     ];
 
     pub fn name(&self) -> &'static str {
@@ -45,6 +48,7 @@ impl CategoryId {
             CategoryId::Terrain => "Terrain",
             CategoryId::Anim => "Anim",
             CategoryId::Audio => "Audio",
+            CategoryId::Physics => "Physics",
         }
     }
 
@@ -56,6 +60,7 @@ impl CategoryId {
             CategoryId::Terrain => 4,
             CategoryId::Anim => 5,
             CategoryId::Audio => 6,
+            CategoryId::Physics => 7,
         }
     }
 }
@@ -83,6 +88,7 @@ impl Default for CategoryRegistry {
         categories.insert(CategoryId::Terrain, Box::new(terrain::TerrainCategory));
         categories.insert(CategoryId::Anim, Box::new(anim::AnimCategory));
         categories.insert(CategoryId::Audio, Box::new(audio::AudioCategory));
+        categories.insert(CategoryId::Physics, Box::new(physics::PhysicsCategory));
         Self { categories }
     }
 }
