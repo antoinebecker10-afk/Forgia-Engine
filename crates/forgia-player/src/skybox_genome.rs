@@ -76,9 +76,14 @@ pub struct SkyPaletteGenome {
 impl SkyPaletteGenome {
     /// Renvoie la palette pour `biome_id`, fallback "default", fallback
     /// `SkyPalette::default()` si même "default" est absent.
+    ///
+    /// Lookup case-insensitive : `StageLoadResult.biome` peut être en
+    /// CamelCase (e.g. "Volcanic" depuis l'enum BiomeType) alors que les
+    /// clés TOML sont en snake_case lowercase ("volcanic").
     pub fn palette_for(&self, biome_id: &str) -> SkyPalette {
+        let key = biome_id.to_ascii_lowercase();
         self.palettes
-            .get(biome_id)
+            .get(key.as_str())
             .copied()
             .or_else(|| self.palettes.get("default").copied())
             .unwrap_or_default()
@@ -146,12 +151,13 @@ fn sync_palette_from_genome(
     let Some(g) = assets.get(&handle.0) else {
         return;
     };
-    let biome_id = stage
+    let biome_id_raw = stage
         .as_ref()
         .map(|s| s.biome.as_str())
         .filter(|s| !s.is_empty())
         .unwrap_or("default");
-    let new_palette = g.data.palette_for(biome_id);
+    let biome_id = biome_id_raw.to_ascii_lowercase();
+    let new_palette = g.data.palette_for(&biome_id);
     current.0 = new_palette;
     info!(
         "[forgia-player] Skybox palette loaded from genome ({} biomes, applied '{biome_id}')",
@@ -172,17 +178,17 @@ fn track_stage_biome(
     if !stage.is_changed() {
         return;
     }
-    let biome_id = stage.biome.as_str();
-    if biome_id.is_empty() || biome_id == last_biome.as_str() {
+    let biome_id = stage.biome.to_ascii_lowercase();
+    if biome_id.is_empty() || biome_id == *last_biome {
         return;
     }
     let Some(handle) = handle else { return };
     let Some(g) = assets.get(&handle.0) else {
         return; // genome pas encore loaded, sync_palette_from_genome appliquera plus tard
     };
-    let new_palette = g.data.palette_for(biome_id);
+    let new_palette = g.data.palette_for(&biome_id);
     current.0 = new_palette;
-    *last_biome = biome_id.to_string();
+    *last_biome = biome_id.clone();
     info!("[forgia-player] Palette switched to biome '{biome_id}'");
 }
 
