@@ -29,6 +29,7 @@ fn main() {
             0
         }
         "verify-sensors-format" => verify_sensors_format(),
+        "sensor-audit" => sensor_audit(&args),
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
         _ => {
@@ -48,6 +49,7 @@ fn print_help() {
     println!("  schedule-dump            Dump Bevy schedule for GameSet audit");
     println!("  baseline-e1-e2           Regenerate asset_load_whitelist.txt baseline");
     println!("  verify-sensors-format    Validate forgia2_*.json canonical sensors");
+    println!("  sensor-audit [--strict]  Cross-check sensor producers (crates/**/*.rs) vs docs/observability/SENSOR_REGISTRY.md");
     println!("  story-gate [--all-done|--story <id>]   Verify DONE stories claims vs git/code");
     println!("  no-scaffold [--fix]      Fail if any crate is a scaffold (<50 effective LOC or >80% TODO comments). Allowlist in xtask/no-scaffold-allowlist.toml.");
 }
@@ -642,3 +644,214 @@ fn walk_loc_and_todo(p: &Path, effective: &mut usize, todo: &mut usize) {
         }
     }
 }
+
+// ─────────────────────────── sensor-audit (story-546) ───────────────────────────
+//
+// Cross-check : tous les `"forgia*.json"` écrits dans crates/**/*.rs DOIVENT être
+// déclarés dans docs/observability/SENSOR_REGISTRY.md. Et vice versa.
+//
+// Modes :
+//   default : report orphans (produit, non-déclaré) + duplicates ; exit 1 si orphans > 0
+//   --strict : report aussi missing (déclaré, jamais produit) ; exit 1 si total > 0
+//
+// Origine : story-546 (2026-05-28). Motivé par story-545 (diagnostic player invincible
+// ralenti par dispersion ~72 sensors sur 25+ crates sans index).
+
+fn sensor_audit(args: &[String]) -> i32 {
+    let strict = args.iter().any(|a| a == "--strict");
+
+    let registry_path = Path::new("docs/observability/SENSOR_REGISTRY.md");
+    let registry_content = match fs::read_to_string(registry_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "[xtask] sensor-audit: FAIL — cannot read {}: {e}",
+                registry_path.display()
+            );
+            return 1;
+        }
+    };
+
+    let declared = parse_registry_filenames(&registry_content);
+    let (produced, duplicates) = scan_sensor_producers(Path::new("crates"));
+
+    let orphans: Vec<&String> = produced
+        .keys()
+        .filter(|n| !declared.contains(*n))
+        .collect();
+    let missing: Vec<&String> = declared
+        .iter()
+        .filter(|n| !produced.contains_key(*n))
+        .collect();
+
+    println!("[xtask] sensor-audit — story-546");
+    println!("  declared in registry : {}", declared.len());
+    println!("  produced in code     : {}", produced.len());
+    println!("  duplicate writers    : {}", duplicates.len());
+    println!("  orphans (produced, not declared)  : {}", orphans.len());
+    println!("  missing  (declared, not produced) : {}", missing.len());
+
+    if !duplicates.is_empty() {
+        println!();
+        println!("Duplicate writers (status=duplicate-writer in registry expected) :");
+        for (name, sites) in &duplicates {
+            println!("  - {name} ({} writers):", sites.len());
+            for s in sites {
+                println!("      {s}");
+            }
+        }
+    }
+
+    if !orphans.is_empty() {
+        println!();
+        println!("Orphans — add to SENSOR_REGISTRY.md :");
+        let mut sorted: Vec<&&String> = orphans.iter().collect();
+        sorted.sort();
+        for o in sorted {
+            if let Some(sites) = produced.get(*o) {
+                println!("  - {o}");
+                for s in sites {
+                    println!("      {s}");
+                }
+            }
+        }
+    }
+
+    if strict && !missing.is_empty() {
+        println!();
+        println!("Missing — declared in registry but no producer found in crates/ :");
+        let mut sorted: Vec<&&String> = missing.iter().collect();
+        sorted.sort();
+        for m in sorted {
+            println!("  - {m}");
+        }
+    }
+
+    let fail = !orphans.is_empty() || (strict && !missing.is_empty());
+    if fail {
+        eprintln!();
+        eprintln!("[xtask] sensor-audit: FAIL");
+        1
+    } else {
+        println!();
+        println!("[xtask] sensor-audit: OK");
+        0
+    }
+}
+
+/// Parse les filenames `forgia*.json` listés dans le registry (markdown table).
+/// Look-up des occurrences `` `forgia*_*.json` `` (backticks inline-code).
+fn parse_registry_filenames(content: &str) -> std::collections::HashSet<String> {
+    let mut set = std::collections::HashSet::new();
+    // Match `forgia*.json` ou `forgia2_*.json` à l'intérieur de backticks markdown.
+    for line in content.lines() {
+        let mut rest = line;
+        while let Some(start) = rest.find('`') {
+            rest = &rest[start + 1..];
+            let Some(end) = rest.find('`') else { break };
+            let inner = &rest[..end];
+            if inner.starts_with("forgia")
+                && inner.ends_with(".json")
+                && !inner.contains(' ')
+                && !inner.contains('*')
+                && !inner.contains('{')
+            {
+                set.insert(inner.to_string());
+            }
+            rest = &rest[end + 1..];
+        }
+    }
+    set
+}
+
+/// Scan récursif `crates/` pour tout literal `"forgiaX_*.json"` et retourne
+/// (sensor_name → liste de `path:line`) + duplicates (≥2 producteurs).
+#[allow(clippy::type_complexity)]
+fn scan_sensor_producers(
+    root: &Path,
+) -> (
+    std::collections::BTreeMap<String, Vec<String>>,
+    std::collections::BTreeMap<String, Vec<String>>,
+) {
+    let mut producers: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+
+    fn visit(
+        dir: &Path,
+        producers: &mut std::collections::BTreeMap<String, Vec<String>>,
+    ) -> std::io::Result<()> {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                // Skip target/ et tests/ pour bruit
+                let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                if name == "target" || name == "tests" {
+                    continue;
+                }
+                visit(&path, producers)?;
+            } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                let Ok(content) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                let lines: Vec<&str> = content.lines().collect();
+                for (idx, line) in lines.iter().enumerate() {
+                    let trimmed = line.trim_start();
+                    if trimmed.starts_with("//") || trimmed.starts_with("///") {
+                        continue;
+                    }
+                    // Write context detection : literal counts as a write only if
+                    // `fs::write` / `write_all` / `serde_json::to_string` apparait
+                    // dans une fenêtre de 3 lignes (line + 2 suivantes).
+                    let window_end = (idx + 3).min(lines.len());
+                    let window = lines[idx..window_end].join(" ");
+                    let is_write_ctx = window.contains("fs::write")
+                        || window.contains(".write_all")
+                        || window.contains("write_atomic")
+                        || window.contains("serde_json::to_string");
+                    if !is_write_ctx {
+                        continue;
+                    }
+                    extract_sensor_literals(line, &path, idx + 1, producers);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    let _ = visit(root, &mut producers);
+
+    let duplicates: std::collections::BTreeMap<String, Vec<String>> = producers
+        .iter()
+        .filter(|(_, v)| v.len() >= 2)
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+
+    (producers, duplicates)
+}
+
+fn extract_sensor_literals(
+    line: &str,
+    path: &Path,
+    lineno: usize,
+    out: &mut std::collections::BTreeMap<String, Vec<String>>,
+) {
+    let mut rest = line;
+    while let Some(start) = rest.find('"') {
+        rest = &rest[start + 1..];
+        let Some(end) = rest.find('"') else { break };
+        let inner = &rest[..end];
+        if inner.starts_with("forgia")
+            && inner.ends_with(".json")
+            && !inner.contains(' ')
+            && !inner.contains('/')
+            && !inner.contains('\\')
+            && !inner.contains("{}")
+        {
+            let site = format!("{}:{lineno}", path.display());
+            out.entry(inner.to_string()).or_default().push(site);
+        }
+        rest = &rest[end + 1..];
+    }
+}
+
