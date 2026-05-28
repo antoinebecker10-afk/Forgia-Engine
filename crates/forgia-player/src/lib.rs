@@ -3,10 +3,8 @@
 //! Player controller : KinematicCharacterController rapier + FpsCamera 1P + spawn/respawn.
 
 use bevy::core_pipeline::Skybox;
-use bevy::image::{ImageLoaderSettings, ImageSampler};
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
-use bevy::render::render_resource::{TextureViewDescriptor, TextureViewDimension};
 use bevy_rapier3d::prelude::*;
 use forgia_ai_arena_bot::BotTarget;
 use forgia_combat::prelude::*;
@@ -51,14 +49,16 @@ impl Default for MouseLookTuning {
     }
 }
 
-// ── Skybox cubemap (pattern V1 stacked PNG → reinterpret cube → attach Camera) ──
-const SKYBOX_PATH: &str = "hdri/sky_129_stacked.png";
-const SKYBOX_BRIGHTNESS: f32 = 1000.0; // V1 sky_skybox_brightness_day default
+// ── Skybox HDR (story-553) ──
+// KTX2 cubemap HDR Bevy-native, déposé V1 jamais wiré V2. Foundation pour
+// re-add stories 549/550/551 (HDR + Bloom + Tonemapping caméras).
+// Cf feedback_hdr_pipeline_needs_hdr_skybox_first.md.
+const SKYBOX_PATH: &str = "hdri/env-maps-v1/sky_skybox.ktx2";
+const SKYBOX_BRIGHTNESS: f32 = 500.0; // HDR — ajusté depuis 1000.0 LDR PNG
 
 #[derive(Resource)]
 struct SkyboxPending {
     handle: Handle<Image>,
-    reinterpreted: bool,
 }
 
 /// Player marker — entité joueur principale.
@@ -181,51 +181,24 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
     info!("[forgia-player] Player spawned at (0, 2, 0)");
 }
 
-/// Startup : load skybox PNG stacked (sera reinterpreted en cube par attach_skybox_to_camera).
-/// Settings linear filter pour transitions cube faces lisses (V1 default).
+/// Startup : load skybox HDR KTX2 cubemap (déjà natif cube, pas de reinterpret).
 fn load_skybox(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle: Handle<Image> =
-        asset_server.load_with_settings(SKYBOX_PATH, |s: &mut ImageLoaderSettings| {
-            s.sampler = ImageSampler::linear();
-        });
-    commands.insert_resource(SkyboxPending {
-        handle,
-        reinterpreted: false,
-    });
+    let handle: Handle<Image> = asset_server.load(SKYBOX_PATH);
+    commands.insert_resource(SkyboxPending { handle });
 }
 
-/// Update : (1) reinterpret stacked 2D → cubemap array (6 faces) une fois loaded.
-///          (2) attach Skybox Component sur FpsCamera dès qu'elle existe.
+/// Update : attach Skybox Component sur FpsCamera/RpgOrbitCamera dès qu'elle existe.
+/// Story-553 : KTX2 cubemap HDR natif — plus de phase reinterpret.
 fn attach_skybox_to_camera(
     mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    pending: Option<ResMut<SkyboxPending>>,
+    pending: Option<Res<SkyboxPending>>,
     // Story 2026-05-17 : query relaxée à toute Camera3d sans Skybox (couvre
     // RpgOrbitCamera RPG en plus de FpsCamera FPS). MenuCamera2d est Camera2d
     // donc exclue naturellement.
     q_cam: Query<Entity, (With<Camera3d>, Without<Skybox>)>,
 ) {
-    let Some(mut pending) = pending else { return };
+    let Some(pending) = pending else { return };
 
-    // Phase 1 : reinterpret stacked → cube une fois
-    if !pending.reinterpreted {
-        let Some(image) = images.get_mut(&pending.handle) else {
-            return;
-        };
-        if let Err(e) = image.reinterpret_stacked_2d_as_array(6) {
-            warn!("[forgia-player] Skybox reinterpret failed: {e}");
-            commands.remove_resource::<SkyboxPending>();
-            return;
-        }
-        image.texture_view_descriptor = Some(TextureViewDescriptor {
-            dimension: Some(TextureViewDimension::Cube),
-            ..default()
-        });
-        pending.reinterpreted = true;
-        info!("[forgia-player] Skybox reinterpreted as cubemap (6 faces)");
-    }
-
-    // Phase 2 : attach sur FpsCamera (Player peut spawn plus tard)
     let mut attached = 0;
     for cam_entity in q_cam.iter() {
         commands.entity(cam_entity).insert(Skybox {
@@ -236,8 +209,7 @@ fn attach_skybox_to_camera(
         attached += 1;
     }
     if attached > 0 {
-        info!("[forgia-player] Skybox attached to {attached} Camera3d(s)");
-        // Resource conservée : nouvelles cameras (FPS reload / RPG OrbitCamera) re-attachées.
+        info!("[forgia-player] Skybox HDR attached to {attached} Camera3d(s)");
     }
 }
 
