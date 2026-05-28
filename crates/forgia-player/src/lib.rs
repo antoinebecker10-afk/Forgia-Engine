@@ -19,6 +19,7 @@ use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
 
 pub mod dash;
+pub mod skybox_genome;
 
 pub mod prelude {
     pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
@@ -57,25 +58,21 @@ impl Default for MouseLookTuning {
     }
 }
 
-// ── Skybox cartoon procedural (story-554 Phase 1) ──
-// Cubemap 256×256×6 généré au Startup. Gradient zénith→horizon par face.
-// Style cartoon Cult of the Lamb / Death's Door : palette Crypts of Anvil.
-// HDR-compat (sRGB sampling auto-linear), wire pour re-add stories 549/550/551.
+// ── Skybox cartoon procedural ──
+// Story-554 Phase 1 : cubemap 256×256×6 généré au Startup, palette hardcodée.
+// Story-555 Phase 2 : palette data-driven via `assets/genomes/biome_sky.toml`
+//   + hot-reload Shift+F12 + auto-switch per-biome via StageLoadResult.
+// HDR-compat (sRGB sampling auto-linear).
 const SKYBOX_FACE_SIZE: u32 = 256;
-const SKYBOX_BRIGHTNESS: f32 = 500.0;
+pub(crate) const SKYBOX_BRIGHTNESS: f32 = 500.0;
 
-/// Palette cartoon Crypts of Anvil (bible v1).
-/// Phase 2 : déplacer dans `config/genomes/biome_sky.toml` per-biome.
-const SKY_ZENITH_RGB: [u8; 3] = [61, 36, 102]; // #3D2466 deep violet
-const SKY_HORIZON_RGB: [u8; 3] = [255, 107, 53]; // #FF6B35 warm orange
-const SKY_GROUND_RGB: [u8; 3] = [42, 27, 61]; // #2A1B3D dark mauve
-
-/// Génère un cubemap procedural cartoon style.
+/// Génère un cubemap procedural cartoon style depuis une [`SkyPalette`].
+///
 /// Order faces (wgpu convention) : +X, -X, +Y, -Y, +Z, -Z.
 /// - +Y (top) : solid zenith
 /// - -Y (bottom) : solid ground
 /// - sides : gradient vertical zenith (haut) → horizon (bas)
-fn generate_cartoon_skybox() -> Image {
+pub(crate) fn generate_cartoon_skybox(palette: &skybox_genome::SkyPalette) -> Image {
     let face_size = SKYBOX_FACE_SIZE as usize;
     let total_pixels = face_size * face_size * 6;
     let mut data = vec![0u8; total_pixels * 4];
@@ -85,12 +82,12 @@ fn generate_cartoon_skybox() -> Image {
             for x in 0..face_size {
                 let idx = (face * face_size * face_size + y * face_size + x) * 4;
                 let [r, g, b] = match face {
-                    2 => SKY_ZENITH_RGB, // +Y top
-                    3 => SKY_GROUND_RGB, // -Y bottom
+                    2 => palette.zenith_rgb, // +Y top
+                    3 => palette.ground_rgb, // -Y bottom
                     _ => {
                         // Side face : t=0 en haut (zenith), t=1 en bas (horizon).
                         let t = y as f32 / (face_size - 1) as f32;
-                        lerp_rgb(SKY_ZENITH_RGB, SKY_HORIZON_RGB, t)
+                        lerp_rgb(palette.zenith_rgb, palette.horizon_rgb, t)
                     }
                 };
                 data[idx] = r;
@@ -172,6 +169,7 @@ impl Plugin for ForgiaPlayerPlugin {
             .init_resource::<dash::DashTuning>()
             .init_resource::<dash::DashTapDetector>()
             .add_message::<dash::DashUsedEvent>()
+            .add_plugins(skybox_genome::SkyboxGenomePlugin)
             .add_systems(Startup, load_skybox)
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
@@ -263,10 +261,13 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
 /// Startup : génère un cubemap cartoon procedural (story-554 Phase 1).
 /// L'image est ajoutée à `Assets<Image>` directement (pas de chargement disk).
 fn load_skybox(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
-    let handle: Handle<Image> = images.add(generate_cartoon_skybox());
+    // Boot avec palette default (Crypts) — sera resync par
+    // skybox_genome::sync_palette_from_genome dès que le TOML est loaded.
+    let palette = skybox_genome::SkyPalette::default();
+    let handle: Handle<Image> = images.add(generate_cartoon_skybox(&palette));
     commands.insert_resource(SkyboxPending { handle });
     info!(
-        "[forgia-player] Skybox cartoon generated ({}x{}x6 RGBA8 sRGB)",
+        "[forgia-player] Skybox cartoon bootstrap ({}x{}x6 RGBA8 sRGB) — default palette",
         SKYBOX_FACE_SIZE, SKYBOX_FACE_SIZE
     );
 }
