@@ -43,14 +43,17 @@ use std::collections::HashMap;
 
 pub mod bindings;
 pub mod categories;
+pub mod console;
 pub mod snapshot;
 
 use bindings::{DebugAction, DebugBindings};
 use categories::CategoryRegistry;
+use console::ConsoleState;
 
 pub mod prelude {
     pub use crate::bindings::{DebugAction, DebugBindings};
     pub use crate::categories::{CategoryId, CategoryRegistry, DebugCategory};
+    pub use crate::console::{ConsoleEvent, ConsoleState};
     pub use crate::{DebugOverlayState, ForgiaDebugPlugin};
 }
 
@@ -89,13 +92,17 @@ impl Plugin for ForgiaDebugPlugin {
         app.init_resource::<DebugBindings>()
             .init_resource::<DebugOverlayState>()
             .init_resource::<CategoryRegistry>()
+            .init_resource::<ConsoleState>()
             .init_resource::<snapshot::SensorSnapshot>()
+            .add_message::<console::ConsoleEvent>()
             .add_systems(
                 Update,
                 (
                     handle_bindings_system,
                     poll_sensors_system.after(handle_bindings_system),
                     draw_overlay_system.after(poll_sensors_system),
+                    console::console_history_navigation_system.after(handle_bindings_system),
+                    console::draw_console_system.after(handle_bindings_system),
                 ),
             );
     }
@@ -105,6 +112,7 @@ fn handle_bindings_system(
     keys: Res<ButtonInput<KeyCode>>,
     bindings: Res<DebugBindings>,
     mut state: ResMut<DebugOverlayState>,
+    mut console: ResMut<ConsoleState>,
 ) {
     for key in keys.get_just_pressed() {
         match bindings.action_for(*key) {
@@ -112,8 +120,15 @@ fn handle_bindings_system(
                 state.master_visible = !state.master_visible;
             }
             Some(DebugAction::ToggleCategory(cat)) => {
+                // Skip Digit1-6 if console is focused (console captures input).
+                if console.has_focus() {
+                    continue;
+                }
                 let v = state.categories_visible.entry(cat).or_insert(false);
                 *v = !*v;
+            }
+            Some(DebugAction::ToggleConsole) => {
+                console::toggle_console(&mut console);
             }
             None => {}
         }

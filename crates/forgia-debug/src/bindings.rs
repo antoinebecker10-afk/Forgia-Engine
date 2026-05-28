@@ -14,6 +14,8 @@ pub enum DebugAction {
     ToggleMaster,
     /// 1-6 numpad / digit keys — toggle category visibility.
     ToggleCategory(CategoryId),
+    /// Backquote (~) / F1 — toggle runtime console (story-548).
+    ToggleConsole,
 }
 
 /// Resource de binding key → action. Modifiable runtime.
@@ -34,6 +36,9 @@ impl Default for DebugBindings {
         bindings.insert(KeyCode::Digit4, DebugAction::ToggleCategory(CategoryId::Terrain));
         bindings.insert(KeyCode::Digit5, DebugAction::ToggleCategory(CategoryId::Anim));
         bindings.insert(KeyCode::Digit6, DebugAction::ToggleCategory(CategoryId::Audio));
+        // Console runtime (story-548).
+        bindings.insert(KeyCode::Backquote, DebugAction::ToggleConsole);
+        bindings.insert(KeyCode::F1, DebugAction::ToggleConsole);
         Self { bindings }
     }
 }
