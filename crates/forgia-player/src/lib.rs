@@ -3,11 +3,9 @@
 //! Player controller : KinematicCharacterController rapier + FpsCamera 1P + spawn/respawn.
 
 use bevy::asset::RenderAssetUsages;
-use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::core_pipeline::Skybox;
 use bevy::image::Image;
 use bevy::input::mouse::MouseMotion;
-use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::render_resource::{
     Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension,
@@ -20,7 +18,10 @@ use forgia_damage::{Health as DamageHealth, Mortal};
 use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
 
+pub mod dash;
+
 pub mod prelude {
+    pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
     pub use crate::{
         CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning, MovementSpeedMultiplier, Player,
     };
@@ -168,6 +169,9 @@ impl Plugin for ForgiaPlayerPlugin {
         app.init_resource::<CameraMode>()
             .init_resource::<MovementSpeedMultiplier>()
             .init_resource::<MouseLookTuning>()
+            .init_resource::<dash::DashTuning>()
+            .init_resource::<dash::DashTapDetector>()
+            .add_message::<dash::DashUsedEvent>()
             .add_systems(Startup, load_skybox)
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
@@ -181,7 +185,13 @@ impl Plugin for ForgiaPlayerPlugin {
                 (
                     mouse_look,
                     weapon_recoil_apply,
+                    // Dash phase 1 : input AVANT player_movement (consume Jump),
+                    // motion APRÈS pour écraser horizontal KCC tout en préservant
+                    // le vertical_step calculé par player_movement (gravité/jump).
+                    dash::dash_input_system,
                     player_movement,
+                    dash::dash_motion_system,
+                    dash::dash_recharge_system,
                     player_floor_safety_net,
                 )
                     .chain()
@@ -231,14 +241,11 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         },
         ActionState::<PlayerAction>::default(),
         map,
+        dash::DashState::new(dash::DashTuning::default().max_charges),
         Name::new("Player"),
         children![(
             FpsCamera,
             Camera3d::default(),
-            // Story-549 v2 : Bloom (auto-require Hdr en 0.18) + TonyMcMapface.
-            // Compat skybox cartoon procedural story-554 (RGBA8 sRGB → auto-linear).
-            Bloom::NATURAL,
-            Tonemapping::TonyMcMapface,
             // Story-450 wave 5 phase 2c : étendre far plane à 2000m pour
             // couvrir LOD2_MAX_M=1500m + marge. Bevy default = 1000m
             // → LOD2 tiles 1000-1500m étaient clippées (gap horizon visible).
