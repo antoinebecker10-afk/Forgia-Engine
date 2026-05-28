@@ -49,6 +49,8 @@ pub mod physics_sensor;
 pub mod rpg_player_sensor;
 // Story-554 — RPG quests state.
 pub mod quests_sensor;
+// Story-555 — RPG inventory + LOCK-INV-1 audit.
+pub mod inventory_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -92,6 +94,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<physics_sensor::PhysicsSensorState>()
             .init_resource::<rpg_player_sensor::RpgPlayerSensorState>()
             .init_resource::<quests_sensor::QuestsSensorState>()
+            .init_resource::<inventory_sensor::InventorySensorState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
@@ -157,6 +160,7 @@ impl Plugin for ForgiaObservabilityPlugin {
                 physics_sensor::sys_write_physics_sensor,
                 rpg_player_sensor::sys_write_rpg_player_sensor,
                 quests_sensor::sys_write_quests_sensor,
+                inventory_sensor::sys_write_inventory_sensor,
             )
                 .in_set(GameSet::Sensors),
         );

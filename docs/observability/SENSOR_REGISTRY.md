@@ -70,6 +70,7 @@
 | `forgia2_physics.json` | T0 | forgia-observability | `src/physics_sensor.rs` | 1Hz | rigid bodies par type, colliders, sensors, KCC, joints — story-540 KCC stuck, story-545 raycast self-hit | active |
 | `forgia2_rpg_player.json` | T0 | forgia-observability | `src/rpg_player_sensor.rs` | 1Hz | player ↔ biome/water — biome_current, is_swimming, depth_below_surface, head_above_water | active |
 | `forgia2_quests.json` | T0 | forgia-observability | `src/quests_sensor.rs` | 1Hz | QuestCatalogue total + QuestLog active/completed/turned_in/failed counts + top 10 active quests avec completion_percent | active |
+| `forgia2_inventory.json` | T0 | forgia-observability | `src/inventory_sensor.rs` | 1Hz | LOCK-INV-1 audit (capacity≤80) + slots_used/free + is_full + top 5 items (id/count/max_stack) | active |
 | `forgia2_player_hp_diag.json` | T0 | forgia-ui-lib (hud/player_hp) | `src/hud/player_hp.rs:?` (WIP autre terminal 2026-05-28) | 1Hz | HP bar render skips, frames_skipped reasons | active-wip |
 | `forgia2_player_state.json` | T0 | forgia-observability | `src/player_state_sensor.rs:134` | 1Hz | player position, velocity, grounded, swim | active |
 | `forgia2_rex_bones.json` | T3 | forgia-anim-locomotion | `src/locomotion.rs:477` | event | Rex skeleton bind dump (story-482) | active |
