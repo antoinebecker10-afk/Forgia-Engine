@@ -18,6 +18,13 @@ pub mod prelude {
 /// Hauteur monde de la nappe d'eau (matche `forgia-rpg::RPG_SEA_LEVEL`).
 const SEA_LEVEL: f32 = 4.0;
 
+const SENSOR_PATH: &str = "forgia_water.json";
+
+#[derive(Resource, Default)]
+struct WaterSensorState {
+    last_write_secs: f32,
+}
+
 pub struct ForgiaWaterPlugin;
 
 impl Plugin for ForgiaWaterPlugin {
@@ -26,10 +33,68 @@ impl Plugin for ForgiaWaterPlugin {
             height: SEA_LEVEL,
             ..default()
         })
+        .init_resource::<WaterSensorState>()
         .add_plugins(WaterPlugin)
         .add_systems(Update, hide_water_on_spawn)
+        .add_systems(Update, sys_write_water_sensor.in_set(GameSet::Sensors))
         .add_systems(OnEnter(GameMode::Rpg), show_water)
         .add_systems(OnExit(GameMode::Rpg), hide_water);
+    }
+}
+
+/// Story-552 — comble observability-required violation (V1 25 genes water_advanced,
+/// V2 hardcode SEA_LEVEL=4.0, 0 sensor producteur jusqu'ici).
+///
+/// Schema T1 normalisé `{id, severity, next_step, ...}`. Severity `warn` si :
+/// - RPG mode + tile_count=0 → WaterPlugin pas initialisé
+/// - RPG mode + visible_count=0 → tiles cachés alors qu'on devrait nager
+fn sys_write_water_sensor(
+    time: Res<Time>,
+    settings: Res<WaterSettings>,
+    state: Res<State<GameMode>>,
+    q_tiles: Query<&Visibility, With<WaterTiles>>,
+    mut sensor_state: ResMut<WaterSensorState>,
+) {
+    let now = time.elapsed_secs();
+    if now - sensor_state.last_write_secs < 1.0 {
+        return;
+    }
+    sensor_state.last_write_secs = now;
+
+    let tile_count = q_tiles.iter().count() as u32;
+    let visible_count = q_tiles
+        .iter()
+        .filter(|v| matches!(**v, Visibility::Visible | Visibility::Inherited))
+        .count() as u32;
+    let game_mode = format!("{:?}", state.get());
+    let is_rpg = *state.get() == GameMode::Rpg;
+
+    let (severity, next_step) = if is_rpg && tile_count == 0 {
+        (
+            "warn",
+            "WATER ZERO in RPG mode — WaterPlugin pas initialisé, swim impossible",
+        )
+    } else if is_rpg && visible_count == 0 {
+        (
+            "warn",
+            "Water tiles hidden in RPG mode — show_water OnEnter(Rpg) failed",
+        )
+    } else if !is_rpg && visible_count > 0 {
+        (
+            "warn",
+            "Water visible hors RPG — hide_water_on_spawn raté, scène noyée",
+        )
+    } else {
+        ("ok", "")
+    };
+
+    let json = format!(
+        r#"{{"id":"water","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"sea_level":{:.3},"tile_count":{tile_count},"visible_count":{visible_count},"game_mode":"{game_mode}"}}"#,
+        now, settings.height,
+    );
+
+    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+        warn!("[forgia-water] sensor write failed: {e}");
     }
 }
 

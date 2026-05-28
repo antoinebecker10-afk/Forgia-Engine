@@ -88,7 +88,7 @@
 | Filename | Hypothèse | Action |
 |---|---|---|
 | `forgia_voicelines.json` | Producer supprimé lors fusion `forgia-audio-voicelines` → scaffold vide (cf MEMORY) | Vérifier : sensor stale OU producteur résiduel |
-| `forgia_water.json` | Système water sans observabilité (cf `observability-required.md` §"NON CONFORMES") | Adresser dans story water-observability |
+| `forgia_water.json` | ~~Système water sans observabilité~~ → **Story-552 (2026-05-28) writer ajouté dans forgia-water/lib.rs** | RÉSOLU |
 | `forgia_music_state.json` | Probablement écrit par audio_sensor (chemin indirect) | Tracer via cargo expand |
 | `forgia_rex_bones_entry_{1..4}_{bind,live}.json` | Snapshots indexés statiques | Documenter ou archiver |
 
