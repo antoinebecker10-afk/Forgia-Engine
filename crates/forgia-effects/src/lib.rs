@@ -15,7 +15,6 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod arena_feedback;
-pub mod brazier_emissive;
 pub mod weapon_vfx;
 // Story-523 fusion : 4 VFX-adjacent crates intégrées comme modules.
 pub mod damage_numbers;
@@ -45,8 +44,6 @@ pub mod prelude {
         WeaponVfxEffects,
     };
     pub use crate::ForgiaEffectsPlugin;
-    // Story-551 — Brazier emissive HDR.
-    pub use crate::brazier_emissive::{BrazierEmissive, BrazierEmissivePlugin};
     // Story-523 re-exports des modules fusionnés.
     pub use crate::damage_numbers::ForgiaDamageNumbersPlugin;
     pub use crate::hitmarker::{ForgiaHitmarkerPlugin, HitmarkerState};
@@ -64,7 +61,6 @@ impl Plugin for ForgiaEffectsPlugin {
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
             .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
             .add_plugins(arena_feedback::ArenaFeedbackPlugin)
-            .add_plugins(brazier_emissive::BrazierEmissivePlugin)
             .add_systems(
                 Update,
                 (
