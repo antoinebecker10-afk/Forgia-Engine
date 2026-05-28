@@ -18,6 +18,7 @@ members = [
     "crates/forgia-core",
     "crates/forgia-crosshair",
     "crates/forgia-damage",
+    "crates/forgia-debug",
     "crates/forgia-enemy-nameplate",
     "crates/forgia-effects",
     "crates/forgia-foliage",
@@ -158,6 +159,7 @@ forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
 forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
 forgia-observability = { path = "crates/forgia-observability" }
+forgia-debug = { path = "crates/forgia-debug" }
 forgia-player = { path = "crates/forgia-player" }
 forgia-postprocess = { path = "crates/forgia-postprocess" }
 forgia-prefab = { path = "crates/forgia-prefab" }
