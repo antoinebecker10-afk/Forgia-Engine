@@ -16,6 +16,7 @@ use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
+use forgia_input::prelude::InputBlockers;
 // Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
 pub use forgia_crosshair::CrosshairMode;
 pub use forgia_effects::hitmarker::HitmarkerState;
@@ -50,6 +51,25 @@ impl Plugin for ForgiaUiPlugin {
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
             .add_systems(OnEnter(AppMode::Paused), (release_cursor, pause_time))
             .add_systems(OnExit(AppMode::Paused), resume_time)
+            // Story-528 follow-up — Roguelite Defeat/Victory : cursor libre pour
+            // cliquer "Nouvelle Run" / "Retour Menu" du defeat_overlay. Sans ça,
+            // mouse_look continue de pivoter la caméra pendant l'écran fin de run.
+            .add_systems(
+                OnEnter(forgia_mode_roguelite::RunState::Defeat),
+                (release_cursor, block_look_on),
+            )
+            .add_systems(
+                OnEnter(forgia_mode_roguelite::RunState::Victory),
+                (release_cursor, block_look_on),
+            )
+            .add_systems(
+                OnExit(forgia_mode_roguelite::RunState::Defeat),
+                (grab_cursor, block_look_off),
+            )
+            .add_systems(
+                OnExit(forgia_mode_roguelite::RunState::Victory),
+                (grab_cursor, block_look_off),
+            )
             // Story-455 Phase G — paused_overlay_ui retiré (remplacé par forgia-ui-pause-menu
             // cliquable Resume / Settings / Quit). Le handler ESC/Q reste ici (escape_handler).
             .add_systems(EguiPrimaryContextPass, main_menu_ui)
@@ -286,6 +306,21 @@ fn grab_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
     } else {
         warn!("[forgia-ui] grab_cursor: PrimaryWindow CursorOptions not found");
     }
+}
+
+/// Story-528 follow-up — bloque mouse_look + block fire pendant Roguelite
+/// Defeat/Victory pour que la souris puisse cliquer les boutons end-of-run
+/// sans pivoter la caméra ni tirer.
+fn block_look_on(mut blockers: ResMut<InputBlockers>) {
+    blockers.block_look = true;
+    blockers.block_fire = true;
+    info!("[forgia-ui] InputBlockers: look+fire ON (Roguelite end-of-run)");
+}
+
+fn block_look_off(mut blockers: ResMut<InputBlockers>) {
+    blockers.block_look = false;
+    blockers.block_fire = false;
+    info!("[forgia-ui] InputBlockers: look+fire OFF");
 }
 
 /// Release cursor (visible + free) quand on entre Menu.

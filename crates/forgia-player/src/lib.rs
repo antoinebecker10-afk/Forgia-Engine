@@ -313,7 +313,15 @@ fn mouse_look(
     tuning: Res<MouseLookTuning>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     game_mode: Res<State<GameMode>>,
+    blockers: Res<InputBlockers>,
 ) {
+    // Story-528 follow-up — bloque rotation cam pendant Roguelite Defeat/Victory
+    // (forgia-ui set block_look=true OnEnter). Sans ça, mouse_look pivote la cam
+    // pendant que le user vise les boutons "Nouvelle Run" / "Retour Menu".
+    if blockers.block_look {
+        for _ in motion.read() {}
+        return;
+    }
     let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
         return;
     };
