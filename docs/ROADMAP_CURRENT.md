@@ -3,8 +3,42 @@
 > **Source de vérité unique** pour l'état des vagues V2 et la priorisation BMAD.
 > Mise à jour à chaque livraison story ou à la commande "Memorise" (CLAUDE.md §11).
 >
-> **Dernière révision** : 2026-05-19 — V5 Session B DONE (story-467) : 3 sensors perf/entities/memory livrés, 7/13 canoniques validés xtask. Cleanup hygiène (E) idem.
-> **HEAD courant** : `063a58999` (Session B + cleanup non commités, prêts à commit).
+> **Dernière révision** : 2026-05-28 — Observability overhaul (10 commits pushés) + Roguelite pivot bible v1 + Workspace cleanup 266→167 crates.
+> **HEAD courant** : `17b5743` (3 quick-fixes RPG dette audit). 9 fichiers non-commit (autre terminal actif sur forgia-mode-roguelite + ai-arena-bot).
+
+---
+
+## 📌 SYNTHÈSE 2026-05-28
+
+| Axe | État |
+|---|---|
+| **V2 Rewrite vagues V1-V6** | ✅ DONE (cf. tables ci-dessous) |
+| **V7 Roguelite M1 fondations** | ✅ DONE 2026-05-19 (story-470) |
+| **V7 Roguelite M2 playable e2e** | ✅ DONE 2026-05-22 (3 waves + victory sensor confirmé) |
+| **Workspace cleanup** | ✅ 266→167 crates -37% (2026-05-23 PR #1), puis 69→67 (audio+genome fusions 2026-05-26 non commit) |
+| **Roguelite bible v1 + roadmap dédiée** | ✅ 2026-05-26 — voir [`ROADMAP_ROGUELITE.md`](./ROADMAP_ROGUELITE.md) (source de vérité Roguelite) |
+| **Observability overhaul** | ✅ 2026-05-28 — 10 commits, sensor registry 64 sensors, xtask gate, forgia-debug crate, console, sensors physics/water/rpg_player/quests/inventory/npcs (couverture RPG 60→90%) |
+| **HDR/Bloom pipeline** | ⚠️ revert (stories 549-551) — skybox LDR incompat → écran noir. Story-553 skybox HDR PolyHaven foundation re-add en cours (`831dc20`). |
+| **Plugin wiring P0/P1** | 🟡 stories 542-545 DRAFT (double-add guard, rpg-data subplugins, orphan crates, bot raycast self-hit) |
+
+### Prochaine cible majeure
+
+**Roguelite Tier 1 (11 stories décomposées 528-538)** — voir [`ROADMAP_ROGUELITE.md`](./ROADMAP_ROGUELITE.md). Ordre dépendances : 528 (FPS feel) → 535 (ennemis) → 529 (boons arch) → 530 (catalogue) → 531-534 (movesets 4 armes) → 538 (polish) → 536 (boss) → 537 (méta).
+
+Effort total estimé : **~50-54 jours solo** ≈ 10-11 semaines.
+
+### Backlog wiring (parallèle, indépendant Roguelite)
+
+- story-542 plugin double-add guard (P0)
+- story-543 rpg-data subplugins wire (P1)
+- story-544 orphan crates cleanup (P2)
+- story-545 bot raycast self-hit player invincible (P1)
+- story-553 skybox HDR PolyHaven (P1) — débloque re-add Bloom V2
+- PR #1 cleanup vagues 1+4 — vérifier merge status
+
+### ⚠️ Multi-terminal actif 2026-05-28
+
+9 fichiers M dans `forgia-mode-roguelite`, `forgia-ai-arena-bot`, `forgia-asset-registry`, `forgia-game`, `forgia-village-loader`, `forgia-ui-lib`. Toucher ces crates sans coord = conflit. Cf. `.claude/rules/multi-terminal-coordination.md` §3.
 
 ---
 

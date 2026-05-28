@@ -101,6 +101,8 @@ const CANONICAL_SENSORS: &[&str] = &[
     "forgia2_sensor_health.json",
     // V7 M1 (Story-470 DONE) — 13e sensor canonique, cible 13/13 atteinte
     "forgia2_roguelite_state.json",
+    // Story-528 phase 1 — FPS feel (dash uses, hit feedbacks, aim assist).
+    "forgia2_fps_feel.json",
 ];
 
 const VALID_SEVERITIES: &[&str] = &["ok", "warn", "critical", "info"];

@@ -41,8 +41,10 @@ mod ammo_systems;
 mod hitscan_sensor;
 pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
 mod score;
+pub mod aim_assist;
 
 pub mod prelude {
+    pub use crate::aim_assist::AimAssistTuning;
     pub use crate::score::{ArenaScore, ArenaScorePlugin, ScoreboardVisible};
     pub use crate::ForgiaFpsPlugin;
 }
@@ -117,6 +119,26 @@ pub struct FpsTuning {
     pub crosshair_hipfire: FtCrosshairHipfire,
     pub crosshair_ads_dot: FtCrosshairAdsDot,
     pub crosshair_sniper_overlay: FtCrosshairSniper,
+    // Story-528 AC1 — aim assist accessibility (Roblox kids + casual).
+    #[serde(default)]
+    pub aim_assist: FtAimAssist,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtAimAssist {
+    pub strength: f32,
+    pub max_angle_deg: f32,
+    pub engage_distance_m: f32,
+}
+
+impl Default for FtAimAssist {
+    fn default() -> Self {
+        Self {
+            strength: 0.5,
+            max_angle_deg: 5.0,
+            engage_distance_m: 50.0,
+        }
+    }
 }
 
 #[derive(Deserialize, Clone)]
@@ -309,6 +331,7 @@ impl Plugin for ForgiaFpsPlugin {
             .init_resource::<EquippedWeapons>()
             .init_resource::<LeftMouseState>()
             .init_resource::<HitscanSensorState>()
+            .init_resource::<aim_assist::AimAssistTuning>()
             .add_systems(Update, hitscan_sensor::write_hitscan_sensor)
             .init_asset::<Genome<FpsTuning>>()
             .register_asset_loader(GenomeLoader::<FpsTuning>::default())
@@ -324,6 +347,15 @@ impl Plugin for ForgiaFpsPlugin {
             //
             // Fix : sync system tourne en permanence (idempotent, no-op si handle absent).
             .add_systems(Update, ammo_systems::sync_ammo_slots_from_genome)
+            // Story-528 AC1 — aim assist : tourne dans GameSet::Camera (après mouse_look
+            // qui est en Update.chain() côté forgia-player, avant Combat). Gating cross-mode
+            // FPS + Roguelite — RPG est exclu (3P pas concerné).
+            .add_systems(
+                Update,
+                aim_assist::aim_assist_system
+                    .in_set(GameSet::Camera)
+                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+            )
             .add_systems(
                 Update,
                 (
@@ -819,11 +851,16 @@ fn sync_fps_tuning(
     mut ml_tuning: ResMut<MouseLookTuning>,
     mut ch_tuning: ResMut<CrosshairTuning>,
     mut ads_tuning: ResMut<AdsTuning>,
+    mut aa_tuning: ResMut<aim_assist::AimAssistTuning>,
 ) {
     let Some(g) = handle.as_deref().and_then(|h| assets.get(&h.0)) else {
         return;
     };
     let t = &g.data;
+    // Story-528 AC1 — aim assist hot-reload.
+    aa_tuning.strength = t.aim_assist.strength;
+    aa_tuning.max_angle_deg = t.aim_assist.max_angle_deg;
+    aa_tuning.engage_distance_m = t.aim_assist.engage_distance_m;
     // Camera shake
     cs_tuning.default_decay = t.camera_shake.default_decay;
     cs_tuning.default_max_rotation = t.camera_shake.default_max_rotation_rad;

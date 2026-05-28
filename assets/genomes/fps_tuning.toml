@@ -30,6 +30,15 @@ punch_attenuation = 0.7 # -70% fov_punch en ADS (precise aim protection)
 base_sensitivity = 0.002  # rad/pixel
 recoil_decay_per_sec = 8.0
 
+# Story-528 AC1 — accessibility (Roblox kids + casual + femmes 20-35).
+# strength = 0.0 = off / 0.5 = default / 1.0 = max drag.
+# max_angle_deg = demi-cône d'engagement frontal.
+# engage_distance_m = portée max.
+[aim_assist]
+strength = 0.5
+max_angle_deg = 5.0
+engage_distance_m = 50.0
+
 [crosshair_hipfire]
 cross_len = 7.0
 cross_stroke = 2.0

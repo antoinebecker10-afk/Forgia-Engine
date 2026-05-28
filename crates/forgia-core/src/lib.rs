@@ -9,9 +9,25 @@
 use bevy::prelude::*;
 
 pub mod prelude {
+    pub use crate::fps_feel::FpsFeelMetrics;
     pub use crate::states::{AppMode, GameMode, WorldMode};
     pub use crate::system_set::GameSet;
     pub use crate::ForgiaCorePlugin;
+}
+
+pub mod fps_feel {
+    use bevy::prelude::*;
+
+    /// Resource counters FPS feel — Story-528 phase 1.
+    /// Producteurs : forgia-player (dash), forgia-effects (hit feedbacks),
+    /// forgia-fps (aim assist). Lecteur : forgia-observability fps_feel_sensor.
+    /// Placée ici (foundation DAG-libre) pour éviter cycle observability ↔ player.
+    #[derive(Resource, Default)]
+    pub struct FpsFeelMetrics {
+        pub dash_uses_total: u64,
+        pub hit_feedbacks_total: u64,
+        pub aim_assist_engagements_total: u64,
+    }
 }
 
 pub mod states {
@@ -83,6 +99,7 @@ impl Plugin for ForgiaCorePlugin {
         app.init_state::<states::AppMode>()
             .init_state::<states::GameMode>()
             .init_state::<states::WorldMode>()
+            .init_resource::<fps_feel::FpsFeelMetrics>()
             .configure_sets(
                 Update,
                 (
