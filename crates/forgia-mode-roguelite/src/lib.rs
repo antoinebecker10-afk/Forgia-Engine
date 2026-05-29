@@ -26,6 +26,7 @@ pub mod hud;
 pub mod run;
 pub mod sensor;
 pub mod stations;
+pub mod toon_config;
 pub mod waves;
 
 pub use enemies::{EnemyArchetype, EnemyStats};
@@ -57,6 +58,44 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         if !app.is_plugin_added::<forgia_stage::ForgiaStageArenaPlugin>() {
             app.add_plugins(forgia_stage::ForgiaStageArenaPlugin);
         }
+        // Story-544 close (2026-05-29) — toon cel-shading + Sobel outline pour
+        // direction cartoon bible v1. Genome-driven via roguelite_toon.toml
+        // (hot-reload mtime 1Hz). Attaché OnEnter Roguelite, retiré OnExit.
+        if !app.is_plugin_added::<forgia_postprocess::toon::ForgiaPpToonPlugin>() {
+            app.add_plugins(forgia_postprocess::toon::ForgiaPpToonPlugin);
+        }
+        // OUTLINE — désactivé 2026-05-29 (root cause crash : wgpu panic
+        // "SurfaceAcquireSemaphores still in use by SurfaceTexture"). Toon et
+        // Outline déclarent les mêmes node_edges (Tonemapping → X → EndMainPass)
+        // → render graph crée deux passes parallèles sur la même surface
+        // texture. Fix futur : modifier OutlineSettings::node_edges pour insérer
+        // APRÈS ToonSettings::node_label() au lieu de Tonemapping.
+        // if !app.is_plugin_added::<forgia_postprocess::outline::ForgiaPpOutlinePlugin>() {
+        //     app.add_plugins(forgia_postprocess::outline::ForgiaPpOutlinePlugin);
+        // }
+        app.add_systems(Startup, toon_config::sys_init_toon_genome);
+        app.add_systems(
+            OnEnter(GameMode::Roguelite),
+            toon_config::sys_force_apply_toon_settings,
+        );
+        app.add_systems(
+            Update,
+            (
+                toon_config::sys_hot_reload_toon_genome,
+                toon_config::sys_apply_toon_settings,
+            )
+                .chain()
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            OnExit(GameMode::Roguelite),
+            toon_config::sys_detach_toon_from_cameras,
+        );
+        app.add_systems(
+            Update,
+            toon_config::sys_write_toon_sensor.in_set(GameSet::Sensors),
+        );
         // Observer drop pickup on enemy death (filtré par EnemyArchetype).
         app.add_observer(run::obs_roguelite_enemy_death);
         // V7 M3 step 4 — Defeat trigger sur Player HP=0 (DeathEvent target==Player).

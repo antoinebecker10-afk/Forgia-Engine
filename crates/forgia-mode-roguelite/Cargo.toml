@@ -30,3 +30,9 @@ bevy_egui = { workspace = true }
 forgia-ui-lib = { workspace = true }
 # Story-470 V7 M3 step 2 (2026-05-20) — StageGraph node-driven run loop.
 forgia-stage = { workspace = true }
+# Story-544 (2026-05-27 → close 2026-05-29) — toon cel-shading + Sobel outline
+# post-process pour direction cartoon bible v1 (réf reference_bible_forgia_roguelite_v1.md).
+forgia-postprocess = { workspace = true }
+# Story-544 close — TOML genome parsing for hot-reload toon config.
+serde = { workspace = true }
+toml = { workspace = true }

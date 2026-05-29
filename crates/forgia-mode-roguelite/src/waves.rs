@@ -187,6 +187,14 @@ pub fn spawn_wave_enemies(
 
 /// Tourne chaque frame en GameMode::Roguelite. Update bots_alive et orchestre
 /// les transitions de vague.
+///
+/// 2026-05-29 — `seen_alive` Local<bool> gate anti-race :
+/// `Commands.spawn()` est différé jusqu'au prochain ApplyDeferred. Si l'ordre
+/// de schedule fait tourner orchestrator AVANT que les spawns de `sys_start_run`
+/// (même frame) soient flushés, `Query<&ArenaBot>::iter().count() == 0` →
+/// break déclenché à tort → wave 1 cleared instantanément (log montrait
+/// `Wave 1 spawned` puis `Wave 1 cleared` à 78µs d'écart). Le gate exige
+/// d'avoir VU au moins 1 frame avec `alive > 0` avant de pouvoir clear.
 pub fn sys_wave_orchestrator(
     time: Res<Time>,
     mut wave: ResMut<RogueliteWave>,
@@ -196,16 +204,21 @@ pub fn sys_wave_orchestrator(
     asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
     mut end_run: MessageWriter<EndRunEvent>,
+    mut seen_alive: Local<bool>,
 ) {
     let alive = q_bots.iter().count() as u32;
     wave.bots_alive = alive;
+
+    if alive > 0 {
+        *seen_alive = true;
+    }
 
     // Victory déjà émise → no-op (évite spam events).
     if wave.victory_emitted {
         return;
     }
 
-    if alive == 0 && !wave.in_break {
+    if alive == 0 && *seen_alive && !wave.in_break {
         // Vague nettoyée — démarre break ou victory.
         if wave.current_wave >= WAVES_TOTAL {
             wave.victory_emitted = true;
@@ -237,6 +250,8 @@ pub fn sys_wave_orchestrator(
                 &asset_server,
                 wave.current_wave,
             );
+            // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.
+            *seen_alive = false;
         }
     }
 }

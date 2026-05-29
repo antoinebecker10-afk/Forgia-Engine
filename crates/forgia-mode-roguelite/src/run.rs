@@ -414,8 +414,20 @@ pub fn sys_start_run(
     asset_server: Res<AssetServer>,
     stage_graph_config: Res<forgia_stage::graph::RunGraphConfig>,
     mut wave: ResMut<crate::waves::RogueliteWave>,
+    q_existing_enemies: Query<Entity, With<forgia_ai_arena_bot::ArenaBot>>,
 ) {
+    // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
+    // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
+    // dans la même frame (1 fired par auto_start_run_on_enter, 1 résiduel
+    // d'une session précédente non drainé entre transitions GameMode).
+    // Effet : 2× wave 1 spawn = 16 enemies au lieu de 8 + 2 seeds qui s'écrasent.
+    let mut first = true;
     for ev in events.read() {
+        if !first {
+            warn!("[roguelite] sys_start_run — extra StartRunEvent ignored (anti double-spawn)");
+            continue;
+        }
+        first = false;
         let seed = ev.seed.unwrap_or_else(default_seed_from_clock);
         let graph = forgia_stage::graph::generate_run_graph(&stage_graph_config, seed);
         let total_stages = graph.total_stages;
@@ -423,6 +435,23 @@ pub fn sys_start_run(
 
         // Reset RogueliteWave (run repeatable depuis Lobby).
         *wave = crate::waves::RogueliteWave::default();
+
+        // Bug-leak bots (diag 2026-05-29) — despawn TOUS les ennemis survivants
+        // avant de spawner la nouvelle wave 1. Sans ça, chaque restart de run
+        // (Lobby→InRun, Defeat→relance) ré-empile 8 ennemis SANS nettoyer les
+        // précédents : `DespawnOnExit(GameMode::Roguelite)` ne tire pas car on reste
+        // DANS le mode Roguelite. Observé : `bots_alive: 51` en wave 1 (attendu 8)
+        // → 51 capsules IA + skeletons + raycasts LOS → stutters frame
+        // (`forgia2_lag_events.json`) ressentis comme freeze. `despawn()` Bevy 0.18
+        // cascade aux enfants (body collider + visual + head proxy).
+        let mut purged = 0_u32;
+        for e in &q_existing_enemies {
+            commands.entity(e).despawn();
+            purged += 1;
+        }
+        if purged > 0 {
+            info!("[roguelite] sys_start_run — purged {purged} stale enemies before wave 1 (anti-leak)");
+        }
 
         // V7 M3 step 4 — Reset Player HP au max au start (sinon HP=0 sticky après Defeat).
         commands.queue(|world: &mut World| {

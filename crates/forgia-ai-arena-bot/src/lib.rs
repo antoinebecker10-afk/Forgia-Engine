@@ -6,6 +6,7 @@
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use forgia_core::prelude::GameMode;
 use forgia_damage::{DamageEvent, DamageKind, DeathEvent, ForgiaDamagePlugin, Health, Mortal};
 
 pub mod tactical;
@@ -277,6 +278,7 @@ fn bot_shoot_at_target(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut damage_events: MessageWriter<DamageEvent>,
+    q_child_of: Query<&ChildOf>,
 ) {
     let Some((target_entity, target_tf)) = targets.iter().next() else {
         return;
@@ -326,15 +328,32 @@ fn bot_shoot_at_target(
             continue;
         }
 
-        // Exclure soi-même (le bot) du raycast pour éviter self-hit.
-        let predicate = |e: Entity| e != bot_entity;
-        let filter = QueryFilter::default().predicate(&predicate);
+        // Story-545 (2026-05-27) — self-hit fix : `exclude_rigid_body` traverse
+        // toute la chaîne collider→RigidBody (vs predicate root-only). Nécessaire
+        // pour Roguelite enemies SceneRoot KayKit Skeleton avec child collider.
+        let filter = QueryFilter::default().exclude_rigid_body(bot_entity);
         let hit = ctx.cast_ray(origin, shot_dir, config.range, true, filter);
 
         let hit_dist = if let Some((hit_entity, toi)) = hit {
-            // On considère un hit valide même si on touche un enfant du player
-            // (capsule collider directement sur player, OK)
-            if hit_entity == target_entity {
+            // Story-545 — walk ChildOf max 4 niveaux pour matcher target_entity
+            // sur ancestor (Player root). Pattern miroir forgia-fps:find_health_ancestor.
+            let mut current = hit_entity;
+            let mut matched = current == target_entity;
+            for _ in 0..4 {
+                if matched {
+                    break;
+                }
+                match q_child_of.get(current) {
+                    Ok(co) => {
+                        current = co.parent();
+                        if current == target_entity {
+                            matched = true;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            if matched {
                 damage_events.write(DamageEvent {
                     target: target_entity,
                     source: Some(bot_entity),
@@ -424,25 +443,48 @@ fn bot_tracer_lifetime(
 /// Trigger automatique via `commands.trigger(DeathEvent)` côté forgia-damage.
 /// Évite le polling 1×/frame du `MessageReader`. Pattern recommandé pour les
 /// events one-shot per-entity (cf bevy_ecs::event::EntityEvent docs 0.18).
+///
+/// 2026-05-29 — gate cross-mode via Option<Res<State<GameMode>>> (pattern
+/// canonique memory [[reference_observer_cross_mode_gate_via_state_read]],
+/// Bevy 0.18 Observer ne supporte pas `.run_if()`). En Roguelite : despawn
+/// l'ennemi mais ne queue PAS de respawn (chaque wave a un compte fixé par
+/// `wave_composition`, respawn auto ferait fuiter le compteur `bots_alive`
+/// → wave bloquée).
 fn on_bot_death(
     event: On<DeathEvent>,
     mut commands: Commands,
     bots: Query<(&Transform, Option<&BotSpawnPoint>), With<ArenaBot>>,
     mut pending: ResMut<PendingRespawns>,
+    game_mode: Option<Res<State<GameMode>>>,
 ) {
     let target = event.target;
     let Ok((xf, spawn)) = bots.get(target) else {
         return;
     };
-    let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
-    let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
-    pending.queue.push((delay, pos));
+    let is_roguelite = matches!(game_mode.as_deref().map(|s| s.get()), Some(GameMode::Roguelite));
+    if !is_roguelite {
+        let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
+        let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
+        pending.queue.push((delay, pos));
+    }
+    let _ = xf;
     if let Ok(mut ec) = commands.get_entity(target) {
         ec.try_despawn();
     }
 }
 
-fn tick_respawns(time: Res<Time>, mut pending: ResMut<PendingRespawns>, mut commands: Commands) {
+fn tick_respawns(
+    time: Res<Time>,
+    mut pending: ResMut<PendingRespawns>,
+    mut commands: Commands,
+    game_mode: Option<Res<State<GameMode>>>,
+) {
+    // 2026-05-29 — en Roguelite, drain la queue sans respawn. Garde-fou si des
+    // respawns avaient été queuées avant entrée mode (race OnEnter vs ticks).
+    if matches!(game_mode.as_deref().map(|s| s.get()), Some(GameMode::Roguelite)) {
+        pending.queue.clear();
+        return;
+    }
     let dt = time.delta_secs();
     let mut ready = Vec::new();
     pending.queue.retain_mut(|(t, pos)| {
