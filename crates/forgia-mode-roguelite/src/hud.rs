@@ -547,23 +547,155 @@ pub fn draw_enemy_archetype_labels(
     }
 }
 
+/// Story-558 P3 (2026-05-29) — banner telegraph boss enrage. time_left
+/// décompté chaque frame. Set par `sys_track_boss_enrage_banner` sur event.
+#[derive(Resource, Default, Debug)]
+pub struct BossEnrageBannerState {
+    pub time_left: f32,
+}
+
+const BOSS_ENRAGE_BANNER_DURATION: f32 = 2.5;
+
+/// Tick state + apply CameraTrauma punch sur fire de l'event.
+pub(crate) fn sys_track_boss_enrage_banner(
+    time: Res<Time>,
+    mut events: MessageReader<crate::waves::BossEnrageTriggeredEvent>,
+    mut state: ResMut<BossEnrageBannerState>,
+    mut trauma: ResMut<forgia_combat::combat_juice::CameraTrauma>,
+) {
+    let mut triggered = false;
+    for _ in events.read() {
+        triggered = true;
+    }
+    if triggered {
+        state.time_left = BOSS_ENRAGE_BANNER_DURATION;
+        // Vlambeer juice — camera shake punch fort (audit §6).
+        trauma.add(0.65);
+    } else {
+        let dt = time.delta_secs();
+        state.time_left = (state.time_left - dt).max(0.0);
+    }
+}
+
+/// Banner top-center "⚒ FORGE EN COLÈRE !" — fade in/out + scale pop.
+pub(crate) fn draw_boss_enrage_banner(
+    mut contexts: EguiContexts,
+    state: Res<BossEnrageBannerState>,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+) {
+    if state.time_left <= 0.0 {
+        return;
+    }
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+    let lifetime_t = 1.0 - (state.time_left / BOSS_ENRAGE_BANNER_DURATION);
+    // Fade in 1st 15%, hold middle 70%, fade out last 15%.
+    let alpha = if lifetime_t < 0.15 {
+        lifetime_t / 0.15
+    } else if lifetime_t > 0.85 {
+        ((1.0 - lifetime_t) / 0.15).max(0.0)
+    } else {
+        1.0
+    };
+    // Pop scale ease-out-back sur intro 200ms.
+    let pop_t = (lifetime_t / 0.10).min(1.0);
+    let pop_scale = if pop_t < 1.0 {
+        let x = pop_t - 1.0;
+        const C1: f32 = 1.70158;
+        const C3: f32 = C1 + 1.0;
+        1.0 + C3 * x * x * x + C1 * x * x
+    } else {
+        1.0
+    };
+
+    egui::Area::new(egui::Id::new("forgia_roguelite_boss_enrage_banner"))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 96.0))
+        .show(ctx, |ui| {
+            let banner_w = 540.0 * pop_scale;
+            let banner_h = 84.0 * pop_scale;
+            let (_, response) =
+                ui.allocate_exact_size(egui::vec2(banner_w, banner_h), egui::Sense::hover());
+            let rect = response.rect;
+            let painter = ui.painter_at(rect);
+            // Shadow stack
+            for (i, alpha_mul) in [80u8, 50u8, 25u8].iter().enumerate() {
+                let off = egui::vec2(6.0 * (i + 1) as f32, 6.0 * (i + 1) as f32);
+                painter.rect_filled(
+                    rect.translate(off),
+                    14.0,
+                    egui::Color32::from_black_alpha((f32::from(*alpha_mul) * alpha) as u8),
+                );
+            }
+            // Fond braise + border or épais.
+            let fill = egui::Color32::from_rgba_unmultiplied(231, 76, 60, (alpha * 240.0) as u8);
+            let stroke_color =
+                egui::Color32::from_rgba_unmultiplied(244, 196, 48, (alpha * 255.0) as u8);
+            painter.rect_filled(rect, 14.0, fill);
+            painter.rect_stroke(
+                rect,
+                14.0,
+                egui::Stroke::new(5.0, stroke_color),
+                egui::StrokeKind::Inside,
+            );
+            // Text "⚒ FORGE EN COLÈRE !" creme outline noir.
+            let text_color =
+                egui::Color32::from_rgba_unmultiplied(255, 244, 220, (alpha * 255.0) as u8);
+            let outline =
+                egui::Color32::from_rgba_unmultiplied(43, 24, 16, (alpha * 255.0) as u8);
+            let size = 36.0 * pop_scale;
+            let pos = rect.center();
+            for dx in [-2.0_f32, 0.0, 2.0] {
+                for dy in [-2.0_f32, 0.0, 2.0] {
+                    if dx == 0.0 && dy == 0.0 {
+                        continue;
+                    }
+                    painter.text(
+                        pos + egui::vec2(dx, dy),
+                        egui::Align2::CENTER_CENTER,
+                        "⚒  FORGE EN COLÈRE !",
+                        egui::FontId::proportional(size),
+                        outline,
+                    );
+                }
+            }
+            painter.text(
+                pos,
+                egui::Align2::CENTER_CENTER,
+                "⚒  FORGE EN COLÈRE !",
+                egui::FontId::proportional(size),
+                text_color,
+            );
+        });
+}
+
 pub struct RogueliteHudPlugin;
 
 impl Plugin for RogueliteHudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            EguiPrimaryContextPass,
-            (
-                draw_wave_counter,
-                draw_souls_counter,
-                draw_portal_overlay,
-                draw_defeat_overlay,
-                draw_victory_overlay,
-                draw_bark_bubble,
-                draw_stage_notification,
-                draw_enemy_archetype_labels,
-            ),
-        );
+        app.init_resource::<BossEnrageBannerState>()
+            .add_systems(
+                Update,
+                sys_track_boss_enrage_banner
+                    .in_set(GameSet::Effects)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            .add_systems(
+                EguiPrimaryContextPass,
+                (
+                    draw_wave_counter,
+                    draw_souls_counter,
+                    draw_portal_overlay,
+                    draw_defeat_overlay,
+                    draw_victory_overlay,
+                    draw_bark_bubble,
+                    draw_stage_notification,
+                    draw_enemy_archetype_labels,
+                    draw_boss_enrage_banner,
+                ),
+            );
     }
 }
 

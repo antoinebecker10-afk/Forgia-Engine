@@ -284,11 +284,19 @@ pub fn sys_wave_orchestrator(
 #[derive(Component, Default)]
 pub struct BossEnraged;
 
-/// Détecte boss à ≤50% HP → insert BossEnraged + boost stats AI runtime.
+/// Story-558 P3 (2026-05-29) — Message fired par sys_boss_enrage au moment
+/// du trigger (transition Without<BossEnraged> → With). Consommé par UI
+/// banner + camera shake punch.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct BossEnrageTriggeredEvent;
+
+/// Détecte boss à ≤50% HP → insert BossEnraged + boost stats AI runtime +
+/// fire `BossEnrageTriggeredEvent` (P3 telegraph visuel).
 /// Idempotent : `Without<BossEnraged>` filtre évite re-trigger.
 pub fn sys_boss_enrage(
     mut commands: Commands,
     mut q_boss: Query<(Entity, &Health, &EnemyArchetype, &mut ArenaBot), Without<BossEnraged>>,
+    mut enrage_w: MessageWriter<BossEnrageTriggeredEvent>,
 ) {
     for (entity, health, archetype, mut bot) in &mut q_boss {
         if *archetype != EnemyArchetype::Boss {
@@ -308,6 +316,8 @@ pub fn sys_boss_enrage(
             if let Ok(mut ec) = commands.get_entity(entity) {
                 ec.insert(BossEnraged);
             }
+            // P3 telegraph — fire event consommé par UI banner + camera shake.
+            enrage_w.write(BossEnrageTriggeredEvent);
             info!(
                 "[roguelite] BOSS ENRAGED — phase 2 (HP {:.0}%, speed {:.1}, cooldown {:.2}s)",
                 fraction * 100.0,

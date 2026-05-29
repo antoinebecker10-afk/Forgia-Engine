@@ -41,6 +41,19 @@ impl Health {
 #[derive(Component, Default)]
 pub struct Mortal;
 
+/// Story-558 Phase 4b (2026-05-29) — réduit le `DamageEvent.amount` final
+/// avant soustraction Health. `reduction` ∈ [0..1] = fraction de dégâts
+/// évitée. Inséré et maintenu par `forgia-mode-roguelite` sur le Player
+/// quand des boons `damage_reduction` sont actifs (e.g. Bénédiction de
+/// l'Enclume = 0.10 = -10% dégâts subis).
+///
+/// Pattern cross-crate clean : forgia-damage reste agnostique du concept
+/// "Player" (lookup générique sur le component, no dep inversion).
+#[derive(Component, Default, Debug, Clone, Copy)]
+pub struct HealthGuard {
+    pub reduction: f32,
+}
+
 #[derive(Message, Debug, Clone, Copy)]
 pub struct DamageEvent {
     pub target: Entity,
@@ -231,6 +244,7 @@ fn sync_hit_feedback(
 fn apply_damage(
     mut events: MessageReader<DamageEvent>,
     mut healths: Query<&mut Health>,
+    guards: Query<&HealthGuard>,
     mut applied: MessageWriter<DamageAppliedEvent>,
     mut commands: Commands,
 ) {
@@ -241,12 +255,21 @@ fn apply_damage(
         if !hp.is_alive() {
             continue;
         }
-        hp.current = (hp.current - ev.amount).max(0.0);
+        // Story-558 Phase 4b (2026-05-29) — HealthGuard component (forgia-mode-roguelite
+        // l'insère sur Player avec reduction = combat_mods.damage_reduction).
+        // Réduit `amount` final avant soustraction Health. Cumul multiplicatif
+        // si plusieurs guards (rare — actuellement 1 sur Player Roguelite).
+        let reduction = guards
+            .get(ev.target)
+            .map(|g| g.reduction.clamp(0.0, 1.0))
+            .unwrap_or(0.0);
+        let effective_amount = ev.amount * (1.0 - reduction);
+        hp.current = (hp.current - effective_amount).max(0.0);
         let is_kill = hp.current <= 0.0;
         applied.write(DamageAppliedEvent {
             target: ev.target,
             source: ev.source,
-            amount: ev.amount,
+            amount: effective_amount,
             zone: HitZone::Body,
             kind: ev.kind,
             final_hp: hp.current,

@@ -16,15 +16,23 @@ use bevy::prelude::*;
 /// - `damage_mul` : multiplie `effective_dmg` dans forgia-fps hit system.
 /// - `fire_rate_mul` : multiplie le taux de tir (cooldown divisé).
 /// - `damage_reduction` : 0..1, fraction de dégâts évitée sur Player
-///   (lue par forgia-damage::apply_damage ; Phase 4b).
+///   (lue par forgia-damage::apply_damage via HealthGuard component).
+/// - `crit_chance` (Phase 4b) : 0..1, probabilité crit (×2 damage) par tir.
+/// - `headshot_bonus_mul` (Phase 4b) : multiplier additif appliqué au
+///   `zone_mul` quand HitZone::Head (ex: +0.5 = headshot 1.5× plus fort).
+/// - `knockback_strength` (Phase 4b) : impulse appliqué sur enemy au hit.
+/// - `chain_extra_targets` (Phase 4b) : N raycasts cascade après 1er hit.
 ///
-/// Default neutre (= no-op) : `damage_mul=1.0, fire_rate_mul=1.0,
-/// damage_reduction=0.0`. Recompute idempotent par les modes qui mutent.
+/// Default neutre (= no-op). Recompute idempotent par les modes qui mutent.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct PlayerCombatMods {
     pub damage_mul: f32,
     pub fire_rate_mul: f32,
     pub damage_reduction: f32,
+    pub crit_chance: f32,
+    pub headshot_bonus_mul: f32,
+    pub knockback_strength: f32,
+    pub chain_extra_targets: u32,
 }
 
 impl Default for PlayerCombatMods {
@@ -33,6 +41,10 @@ impl Default for PlayerCombatMods {
             damage_mul: 1.0,
             fire_rate_mul: 1.0,
             damage_reduction: 0.0,
+            crit_chance: 0.0,
+            headshot_bonus_mul: 0.0,
+            knockback_strength: 0.0,
+            chain_extra_targets: 0,
         }
     }
 }
@@ -54,6 +66,10 @@ mod tests {
         assert_eq!(m.damage_mul, 1.0);
         assert_eq!(m.fire_rate_mul, 1.0);
         assert_eq!(m.damage_reduction, 0.0);
+        assert_eq!(m.crit_chance, 0.0);
+        assert_eq!(m.headshot_bonus_mul, 0.0);
+        assert_eq!(m.knockback_strength, 0.0);
+        assert_eq!(m.chain_extra_targets, 0);
     }
 
     #[test]
@@ -62,10 +78,18 @@ mod tests {
             damage_mul: 2.5,
             fire_rate_mul: 1.5,
             damage_reduction: 0.4,
+            crit_chance: 0.3,
+            headshot_bonus_mul: 0.5,
+            knockback_strength: 25.0,
+            chain_extra_targets: 3,
         };
         m.reset();
         assert_eq!(m.damage_mul, 1.0);
         assert_eq!(m.fire_rate_mul, 1.0);
         assert_eq!(m.damage_reduction, 0.0);
+        assert_eq!(m.crit_chance, 0.0);
+        assert_eq!(m.headshot_bonus_mul, 0.0);
+        assert_eq!(m.knockback_strength, 0.0);
+        assert_eq!(m.chain_extra_targets, 0);
     }
 }

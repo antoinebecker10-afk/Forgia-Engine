@@ -25,6 +25,7 @@ pub mod boons_apply;
 pub mod coffre_sensor;
 pub mod enemies;
 pub mod hud;
+pub mod kill_popup;
 pub mod run;
 pub mod sensor;
 pub mod stations;
@@ -65,13 +66,23 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.init_resource::<boons_apply::HealOnKillCumul>();
         app.add_systems(
             Update,
-            boons_apply::sys_recompute_boon_mods
+            (
+                boons_apply::sys_recompute_boon_mods,
+                boons_apply::sys_sync_player_health_guard,
+                // Phase 4b — knockback + chain consomment CombatHitEvent.
+                boons_apply::sys_apply_knockback_on_hit,
+                boons_apply::sys_apply_chain_targets,
+            )
+                .chain()
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
         );
         app.add_systems(
             OnExit(GameMode::Roguelite),
-            boons_apply::sys_reset_boon_mods,
+            (
+                boons_apply::sys_reset_boon_mods,
+                boons_apply::sys_remove_player_health_guard,
+            ),
         );
         app.add_observer(boons_apply::obs_heal_on_kill);
         // Story-558 Phase 6 — sensor forgia2_coffre.json 1Hz
@@ -161,6 +172,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
+            // P3 — telegraph boss enrage (UI banner + camera shake punch).
+            .add_message::<waves::BossEnrageTriggeredEvent>()
             .add_systems(OnEnter(GameMode::Roguelite), run::sys_spawn_roguelite_scene)
             // Story-483 V7 P2 — Stage dispatch sur transition RunState
             // (Lobby/InRun/Boss). Insère StageLoadRequest avec stage_id dérivé.
@@ -213,6 +226,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                     .run_if(in_state(GameMode::Roguelite)),
             )
             .add_plugins(hud::RogueliteHudPlugin)
+            // Story-558 P2 Vlambeer juice — kill popup cartoon par archetype.
+            .add_plugins(kill_popup::RogueliteKillPopupPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").
             // Telemetry tick counter en First pour capturer chaque frame.
             .add_systems(First, sensor::sys_update_roguelite_telemetry)

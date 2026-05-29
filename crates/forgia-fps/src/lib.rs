@@ -775,9 +775,31 @@ fn fire_weapon_minimal(
 
                 if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
                     let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
-                    // Story-558 Phase 4 — boons damage_mul appliqué au damage final.
-                    let effective_dmg =
-                        damage * falloff_mul * zone_mul * hitscan_ctx.combat_mods.damage_mul;
+                    // Story-558 Phase 4 — damage_mul appliqué au damage final.
+                    // Phase 4b — headshot_bonus_mul ajouté à zone_mul si Head zone,
+                    // crit_chance roll RNG cheap (xorshift via time) ×2 damage si proc.
+                    let head_bonus = if zone == forgia_damage::HitZone::Head {
+                        hitscan_ctx.combat_mods.headshot_bonus_mul
+                    } else {
+                        0.0
+                    };
+                    let effective_zone = zone_mul + head_bonus;
+                    let crit_seed = (timing.time.elapsed_secs() * 1000.0) as u32
+                        ^ (toi.to_bits()).rotate_left(13);
+                    let crit_roll = (crit_seed % 10_000) as f32 / 10_000.0;
+                    let crit_mul = if crit_roll < hitscan_ctx.combat_mods.crit_chance {
+                        2.0
+                    } else {
+                        1.0
+                    };
+                    let effective_dmg = damage
+                        * falloff_mul
+                        * effective_zone
+                        * hitscan_ctx.combat_mods.damage_mul
+                        * crit_mul;
+                    if crit_mul > 1.0 {
+                        info!("[fire] CRIT! dmg ×2");
+                    }
                     hp.current = (hp.current - effective_dmg).max(0.0);
                     let dead = hp.is_dead();
                     let new_hp = hp.current;
