@@ -26,6 +26,7 @@
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_rng::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -188,6 +189,177 @@ pub struct BoonAppliedEvent {
     pub boon_id: BoonId,
 }
 
+/// Phase 2 — UI handshake state for the Coffre du Forgeron.
+///
+/// Set `is_open=true` by sending [`OpenCoffreRequest`]; the apply system rolls
+/// `candidates` and the UI (`forgia-ui-lib::hud::coffre_forgeron`) draws cards.
+/// User click emits [`CoffrePickedEvent`] which closes the session and applies
+/// the boon.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct CoffreSession {
+    pub is_open: bool,
+    /// Rolled candidates this round (typically 3).
+    pub candidates: Vec<BoonId>,
+    /// Tag-line shown above the cards (Maître Forgeron persona).
+    pub maitre_voiceline: String,
+    /// Source label for sensor / debug ("wave_clear" | "mid_boss" | "boss_final").
+    pub source: String,
+}
+
+/// Request to open the Coffre. Carries the source so the apply system can
+/// roll with the right pool (e.g. mid-boss = +1 candidate, boss = guaranteed
+/// legendary). Phase 2 ignores `extra_candidates` / `force_legendary` and rolls
+/// `count` uniformly from eligible pool.
+#[derive(Message, Debug, Clone)]
+pub struct OpenCoffreRequest {
+    pub source: String,
+    pub count: usize,
+}
+
+impl OpenCoffreRequest {
+    pub fn wave_clear() -> Self {
+        Self {
+            source: "wave_clear".into(),
+            count: 3,
+        }
+    }
+}
+
+/// User picked one of the candidates (UI emits this on card click).
+#[derive(Message, Debug, Clone)]
+pub struct CoffrePickedEvent {
+    pub boon_id: BoonId,
+}
+
+/// Pure rolling logic. Extracted from systems for testability.
+///
+/// Rules:
+/// - **Legendary filter** : a legendary boon is eligible only if its id is in
+///   `active.unlocked_legendary`.
+/// - **No duplicates** within a single roll.
+/// - **Uniform** pick from the eligible pool (rarity weighting can come later).
+/// - Returns at most `count` candidates; fewer if eligible pool is small.
+///
+/// `next_index(upper)` is a `0..upper` RNG injection so tests can use a fake.
+pub fn roll_candidates(
+    catalogue: &BoonsCatalogue,
+    active: &ActiveBoons,
+    count: usize,
+    mut next_index: impl FnMut(usize) -> usize,
+) -> Vec<BoonId> {
+    let mut pool: Vec<&BoonDef> = catalogue
+        .entries
+        .iter()
+        .filter(|b| match b.rarity {
+            BoonRarity::Legendary => active.unlocked_legendary.contains(&b.id),
+            _ => true,
+        })
+        .collect();
+    let mut out: Vec<BoonId> = Vec::with_capacity(count);
+    while out.len() < count && !pool.is_empty() {
+        let upper = pool.len();
+        let idx = next_index(upper) % upper.max(1);
+        let picked = pool.swap_remove(idx);
+        out.push(picked.id.clone());
+    }
+    out
+}
+
+/// Wraps a [`Rng`] into the `next_index` closure shape used by [`roll_candidates`].
+pub fn rng_next_index(rng: &mut Rng) -> impl FnMut(usize) -> usize + '_ {
+    move |upper: usize| {
+        if upper == 0 {
+            0
+        } else {
+            rng.range_usize(0, upper)
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct CoffreRng(pub Rng);
+
+impl Default for CoffreRng {
+    fn default() -> Self {
+        // Seeded post-startup by mode-roguelite (RunSeed). Default seed for
+        // unit testing / unwired Phase 1.
+        Self(Rng::new(0xC0FF_EEBE_EF00_0000))
+    }
+}
+
+/// Consume [`OpenCoffreRequest`] : roll candidates and open the session.
+pub fn sys_handle_open_coffre(
+    mut requests: MessageReader<OpenCoffreRequest>,
+    catalogue: Res<BoonsCatalogue>,
+    active: Res<ActiveBoons>,
+    mut session: ResMut<CoffreSession>,
+    mut rng: ResMut<CoffreRng>,
+) {
+    for req in requests.read() {
+        if session.is_open {
+            // Stale request while session already open — ignore.
+            continue;
+        }
+        let mut idx_fn = rng_next_index(&mut rng.0);
+        let candidates = roll_candidates(&catalogue, &active, req.count, &mut idx_fn);
+        if candidates.is_empty() {
+            warn!(
+                "[boons] coffre open '{}' but eligible pool empty ({} entries)",
+                req.source,
+                catalogue.entries.len()
+            );
+            continue;
+        }
+        session.is_open = true;
+        session.candidates = candidates;
+        session.maitre_voiceline = "Choisis bien !".into();
+        session.source = req.source.clone();
+        info!(
+            "[boons] coffre opened (source={}, {} candidates)",
+            session.source,
+            session.candidates.len()
+        );
+    }
+}
+
+/// Consume [`CoffrePickedEvent`] : apply boon, emit [`BoonAppliedEvent`],
+/// close session, increment session counter.
+pub fn sys_handle_coffre_pick(
+    mut picks: MessageReader<CoffrePickedEvent>,
+    catalogue: Res<BoonsCatalogue>,
+    mut active: ResMut<ActiveBoons>,
+    mut session: ResMut<CoffreSession>,
+    mut applied: MessageWriter<BoonAppliedEvent>,
+) {
+    for pick in picks.read() {
+        let Some(def) = catalogue.find(&pick.boon_id) else {
+            warn!("[boons] picked id {:?} not in catalogue — ignored", pick.boon_id);
+            continue;
+        };
+        if session.is_open && !session.candidates.contains(&pick.boon_id) {
+            warn!(
+                "[boons] picked id {:?} not in session candidates — applying anyway",
+                pick.boon_id
+            );
+        }
+        active.apply(def, &catalogue);
+        active.total_choices_this_session = active.total_choices_this_session.saturating_add(1);
+        applied.write(BoonAppliedEvent {
+            boon_id: pick.boon_id.clone(),
+        });
+        info!(
+            "[boons] applied {:?} (active count {}, choices {})",
+            pick.boon_id,
+            active.active.len(),
+            active.total_choices_this_session
+        );
+        session.is_open = false;
+        session.candidates.clear();
+        session.maitre_voiceline.clear();
+        session.source.clear();
+    }
+}
+
 #[derive(Resource)]
 pub struct BoonsCatalogueHandle(pub Handle<Genome<BoonsCatalogue>>);
 
@@ -229,22 +401,33 @@ pub fn sync_boons_catalogue(
     }
 }
 
-/// Phase 1 plugin : Resources + Asset loader + Event registration.
+/// Boons plugin : Resources + Asset loader + Events + apply systems.
 ///
-/// Phase 2 (apply systems, UI Coffre) will plug into `ForgiaBoonsApplyPlugin`
-/// in `forgia-mode-roguelite`. Wiring is deferred while the other terminal
-/// holds `forgia-mode-roguelite/src/lib.rs`.
+/// Phase 3 (later) — gameplay consumers of `BoonAppliedEvent` (weapon stat
+/// mutation) live in `forgia-fps` / `forgia-mode-roguelite`. The trigger
+/// (`OpenCoffreRequest` on wave clear) lives in `forgia-mode-roguelite`.
 pub struct ForgiaBoonsPlugin;
 
 impl Plugin for ForgiaBoonsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BoonsCatalogue>()
             .init_resource::<ActiveBoons>()
+            .init_resource::<CoffreSession>()
+            .init_resource::<CoffreRng>()
             .add_message::<BoonAppliedEvent>()
+            .add_message::<OpenCoffreRequest>()
+            .add_message::<CoffrePickedEvent>()
             .init_asset::<Genome<BoonsCatalogue>>()
             .register_asset_loader(GenomeLoader::<BoonsCatalogue>::default())
             .add_systems(Startup, load_boons_catalogue)
-            .add_systems(Update, sync_boons_catalogue);
+            .add_systems(
+                Update,
+                (
+                    sync_boons_catalogue,
+                    sys_handle_open_coffre,
+                    sys_handle_coffre_pick,
+                ),
+            );
     }
 }
 
@@ -405,6 +588,95 @@ effect = { kind = "damage_mul", factor = 1.15 }
         assert_eq!(cat.entries.len(), 2);
         assert_eq!(cat.entries[0].rarity, BoonRarity::Common);
         assert_eq!(cat.entries[1].tags[0], BoonTag::Fire);
+    }
+
+    fn fake_seq(seq: Vec<usize>) -> impl FnMut(usize) -> usize {
+        let mut iter = seq.into_iter();
+        move |upper: usize| iter.next().unwrap_or(0) % upper.max(1)
+    }
+
+    #[test]
+    fn roll_excludes_locked_legendaries() {
+        let cat = BoonsCatalogue {
+            entries: vec![
+                def("c1", BoonRarity::Common, &[]),
+                def("c2", BoonRarity::Common, &[]),
+                def("l1", BoonRarity::Legendary, &[BoonTag::Fire]),
+            ],
+        };
+        let active = ActiveBoons::default();
+        // Force any RNG output — pool should be 2 commons only.
+        let out = roll_candidates(&cat, &active, 3, fake_seq(vec![0, 0, 0, 0]));
+        assert_eq!(out.len(), 2, "legendary locked → pool=2 → only 2 picks");
+        for id in &out {
+            assert_ne!(id.0, "l1", "locked legendary must never appear");
+        }
+    }
+
+    #[test]
+    fn roll_includes_unlocked_legendaries() {
+        let leg = def("l1", BoonRarity::Legendary, &[BoonTag::Fire]);
+        let cat = BoonsCatalogue {
+            entries: vec![
+                def("c1", BoonRarity::Common, &[]),
+                def("c2", BoonRarity::Common, &[]),
+                leg.clone(),
+            ],
+        };
+        let active = ActiveBoons {
+            unlocked_legendary: vec![leg.id.clone()],
+            ..Default::default()
+        };
+        let out = roll_candidates(&cat, &active, 3, fake_seq(vec![2, 0, 0]));
+        assert_eq!(out.len(), 3);
+        assert!(out.iter().any(|id| id.0 == "l1"));
+    }
+
+    #[test]
+    fn roll_no_duplicates() {
+        let cat = BoonsCatalogue {
+            entries: vec![
+                def("a", BoonRarity::Common, &[]),
+                def("b", BoonRarity::Common, &[]),
+                def("c", BoonRarity::Common, &[]),
+            ],
+        };
+        let active = ActiveBoons::default();
+        // Force same index every time — swap_remove ensures no repeat anyway.
+        let out = roll_candidates(&cat, &active, 3, |_| 0);
+        let mut sorted = out.iter().map(|id| id.0.clone()).collect::<Vec<_>>();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 3, "no duplicate ids within a single roll");
+    }
+
+    #[test]
+    fn roll_returns_short_when_pool_smaller() {
+        let cat = BoonsCatalogue {
+            entries: vec![def("only", BoonRarity::Common, &[])],
+        };
+        let active = ActiveBoons::default();
+        let out = roll_candidates(&cat, &active, 3, |_| 0);
+        assert_eq!(out.len(), 1);
+    }
+
+    #[test]
+    fn roll_empty_pool_returns_empty() {
+        let cat = BoonsCatalogue::default();
+        let active = ActiveBoons::default();
+        let out = roll_candidates(&cat, &active, 3, |_| 0);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn rng_next_index_deterministic_with_seed() {
+        let mut rng_a = Rng::new(42);
+        let mut rng_b = Rng::new(42);
+        let mut f_a = rng_next_index(&mut rng_a);
+        let mut f_b = rng_next_index(&mut rng_b);
+        for _ in 0..16 {
+            assert_eq!(f_a(7), f_b(7), "same seed → same sequence");
+        }
     }
 
     #[test]

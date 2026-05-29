@@ -12,6 +12,7 @@ use bevy::prelude::*;
 // `forgia-enemy-nameplate` (3D billboard world-space, custom Material possible).
 // L'egui screen-space ne pouvait pas occluder derrière les murs ni gérer
 // les distances en world units.
+mod coffre_forgeron;
 mod energy;
 mod player_hp;
 mod wave_counter;
@@ -31,6 +32,11 @@ impl Plugin for ForgiaUiHudPlugin {
             player_hp::PlayerHpPlugin,
             wave_counter::WaveCounterPlugin,
             energy::EnergyOverlayPlugin,
+            // Story-529 Phase 2 — Coffre du Forgeron (3 cartes boons après wave clear).
+            // Gated GameMode::Roguelite + CoffreSession::is_open. Sans CoffreSession
+            // Resource (ForgiaBoonsPlugin pas wiré), system early-return silencieux
+            // après refactor — voir Phase 3.
+            coffre_forgeron::CoffreForgeronPlugin,
         ));
     }
 }
