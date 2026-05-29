@@ -115,6 +115,32 @@ pub struct BoonDef {
     /// `None` (or omitted) = applies to all weapons. Otherwise restrict by weapon id.
     #[serde(default)]
     pub weapon_filter: Option<Vec<String>>,
+    /// Story-558 Phase 2 (2026-05-29) — coût en Souls pour acheter ce boon au
+    /// Coffre du Forgeron. Si omis dans le TOML, fallback via `default_souls_cost`
+    /// (rarity-based : Common=20, Uncommon=40, Legendary=80) pour migration douce.
+    /// Pattern Hadès Charon merchant + RoR2 chest.
+    #[serde(default)]
+    pub souls_cost: Option<u32>,
+}
+
+impl BoonDef {
+    /// Coût final en Souls : `souls_cost` du TOML si défini, sinon défaut par rarity.
+    /// Story-558 AC3 — defaults proposés Common=20, Uncommon=40, Legendary=80.
+    pub fn effective_souls_cost(&self) -> u32 {
+        self.souls_cost.unwrap_or_else(|| default_souls_cost(self.rarity))
+    }
+}
+
+/// Coût par défaut basé sur la rareté quand `souls_cost` est omis du TOML.
+/// Calibré sur drop economy : Tank=5, Sniper=3, Runner=2, Boss=40.
+/// Common = ~4 Tank kills, Legendary = ~16 Tank kills + Boss.
+pub fn default_souls_cost(rarity: BoonRarity) -> u32 {
+    match rarity {
+        BoonRarity::Common => 20,
+        BoonRarity::Uncommon => 40,
+        BoonRarity::Rare => 60,
+        BoonRarity::Legendary => 80,
+    }
 }
 
 /// TOML-loaded catalogue. Resource (init_resource → Default empty) AND Asset
@@ -324,12 +350,18 @@ pub fn sys_handle_open_coffre(
 
 /// Consume [`CoffrePickedEvent`] : apply boon, emit [`BoonAppliedEvent`],
 /// close session, increment session counter.
+///
+/// Story-558 Phase 3 (2026-05-29) — décrémente `Souls.current` du coût du boon.
+/// Pick refusé silencieusement si `Souls < effective_souls_cost()` (UI doit
+/// gate avant, defense-in-depth). Si le pick n'est pas dans `session.candidates`
+/// (debug/cheat tools), warn mais applique quand même au prix indiqué.
 pub fn sys_handle_coffre_pick(
     mut picks: MessageReader<CoffrePickedEvent>,
     catalogue: Res<BoonsCatalogue>,
     mut active: ResMut<ActiveBoons>,
     mut session: ResMut<CoffreSession>,
     mut applied: MessageWriter<BoonAppliedEvent>,
+    mut souls: Option<ResMut<crate::loot_tables::Souls>>,
 ) {
     for pick in picks.read() {
         let Some(def) = catalogue.find(&pick.boon_id) else {
@@ -340,6 +372,21 @@ pub fn sys_handle_coffre_pick(
             warn!(
                 "[boons] picked id {:?} not in session candidates — applying anyway",
                 pick.boon_id
+            );
+        }
+        let cost = def.effective_souls_cost();
+        if let Some(souls) = souls.as_deref_mut() {
+            if souls.current < cost {
+                warn!(
+                    "[boons] pick {:?} REFUSED : souls {} < cost {}",
+                    pick.boon_id, souls.current, cost
+                );
+                continue;
+            }
+            souls.current = souls.current.saturating_sub(cost);
+            info!(
+                "[boons] spent {} souls on {:?} (remaining {})",
+                cost, pick.boon_id, souls.current
             );
         }
         active.apply(def, &catalogue);
@@ -444,6 +491,7 @@ mod tests {
             tags: tags.to_vec(),
             rarity,
             weapon_filter: None,
+            souls_cost: None,
         }
     }
 
@@ -696,5 +744,98 @@ effect = { kind = "damage_mul", factor = 1.15 }
         // AC5 : au moins 1 légendaire par tag clé pour valider unlock paths.
         let legendary = cat.count_by_rarity(BoonRarity::Legendary);
         assert!(legendary >= 1, "needs >=1 legendary boon for AC5 unlock");
+    }
+
+    // ─── Story-558 Phase 2 — souls_cost ────────────────────────────────────
+
+    #[test]
+    fn default_souls_cost_rarity_scaling() {
+        assert_eq!(default_souls_cost(BoonRarity::Common), 20);
+        assert_eq!(default_souls_cost(BoonRarity::Uncommon), 40);
+        assert_eq!(default_souls_cost(BoonRarity::Rare), 60);
+        assert_eq!(default_souls_cost(BoonRarity::Legendary), 80);
+        assert!(
+            default_souls_cost(BoonRarity::Common) < default_souls_cost(BoonRarity::Legendary),
+            "rarity progression doit être strictement croissante"
+        );
+    }
+
+    #[test]
+    fn effective_souls_cost_uses_toml_when_set() {
+        let def = BoonDef {
+            id: BoonId("test".into()),
+            name: "Test".into(),
+            voiceline_preview: String::new(),
+            effect: BoonEffectKind::DamageMul { factor: 1.0 },
+            tags: vec![],
+            rarity: BoonRarity::Common,
+            weapon_filter: None,
+            souls_cost: Some(42),
+        };
+        assert_eq!(def.effective_souls_cost(), 42);
+    }
+
+    #[test]
+    fn effective_souls_cost_falls_back_to_rarity_default() {
+        let def = BoonDef {
+            id: BoonId("test".into()),
+            name: "Test".into(),
+            voiceline_preview: String::new(),
+            effect: BoonEffectKind::DamageMul { factor: 1.0 },
+            tags: vec![],
+            rarity: BoonRarity::Legendary,
+            weapon_filter: None,
+            souls_cost: None,
+        };
+        assert_eq!(def.effective_souls_cost(), 80);
+    }
+
+    #[test]
+    fn production_boons_all_have_explicit_souls_cost() {
+        // Guard story-558 Phase 2 — chaque boon prod doit avoir un coût TOML
+        // explicite (pas de fallback default). Évite drift quand on ajoute un
+        // nouveau boon sans réfléchir au prix.
+        let manifest = env!("CARGO_MANIFEST_DIR");
+        let path = std::path::Path::new(manifest)
+            .join("../../assets/genomes/roguelite_boons.toml");
+        let s = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let cat: BoonsCatalogue =
+            toml::from_str(&s).unwrap_or_else(|e| panic!("parse: {e}"));
+        for b in &cat.entries {
+            assert!(
+                b.souls_cost.is_some(),
+                "boon {:?} ({}): souls_cost manquant dans TOML",
+                b.id, b.name
+            );
+        }
+    }
+
+    #[test]
+    fn production_boons_souls_cost_respects_rarity_ordering() {
+        // Common ≤ Uncommon ≤ Rare ≤ Legendary (par TOML actuel).
+        let manifest = env!("CARGO_MANIFEST_DIR");
+        let path = std::path::Path::new(manifest)
+            .join("../../assets/genomes/roguelite_boons.toml");
+        let s = std::fs::read_to_string(&path).unwrap();
+        let cat: BoonsCatalogue = toml::from_str(&s).unwrap();
+        let max_common = cat
+            .entries
+            .iter()
+            .filter(|b| b.rarity == BoonRarity::Common)
+            .filter_map(|b| b.souls_cost)
+            .max()
+            .unwrap_or(0);
+        let min_legendary = cat
+            .entries
+            .iter()
+            .filter(|b| b.rarity == BoonRarity::Legendary)
+            .filter_map(|b| b.souls_cost)
+            .min()
+            .unwrap_or(u32::MAX);
+        assert!(
+            max_common < min_legendary,
+            "max Common cost ({max_common}) doit être < min Legendary cost ({min_legendary})"
+        );
     }
 }

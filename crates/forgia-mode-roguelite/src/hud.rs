@@ -167,6 +167,8 @@ pub(crate) fn draw_defeat_overlay(
     mut start_run: MessageWriter<StartRunEvent>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut next_app: ResMut<NextState<AppMode>>,
+    // Story-558 Phase 5 — résumé carry-over Souls.
+    last_defeat: Res<crate::run::LastDefeatSummary>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -182,42 +184,72 @@ pub(crate) fn draw_defeat_overlay(
     egui::Area::new(egui::Id::new("forgia_roguelite_defeat"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
+            // Story-558 Phase 7 — overlay cartoon kid-friendly :
+            // fond bois clair (pas noir grimdark) + border or 5px + shadow stack.
+            // Anti-pattern documenté audit §8 : punition cosmétique Defeat = décourage.
             egui::Frame::new()
-                .fill(egui::Color32::from_black_alpha(220))
+                .fill(FORGE_BOIS_CLAIR)
                 .inner_margin(egui::Margin::symmetric(80, 48))
-                .corner_radius(egui::CornerRadius::same(10))
-                .stroke(egui::Stroke::new(3.0, C_HP_LOW))
+                .corner_radius(egui::CornerRadius::same(20))
+                .stroke(egui::Stroke::new(5.0, FORGE_OR))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.add_space(4.0);
+                        // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
+                        // (bible v1 — vocab CE2, vocabulaire poétique enfants).
                         ui.heading(
-                            egui::RichText::new("DEFEAT")
-                                .size(72.0)
-                                .color(C_HP_LOW)
+                            egui::RichText::new("LA FORGE T'A BRISÉ")
+                                .size(56.0)
+                                .color(FORGE_BRAISE)
                                 .strong(),
                         );
-                        ui.add_space(24.0);
+                        ui.add_space(18.0);
+                        // Encouragement (anti "Game Over" dépressif)
                         ui.label(
-                            egui::RichText::new("La forge t'a brisé.")
-                                .size(20.0)
-                                .color(C_TEXT_MUTED),
+                            egui::RichText::new("Mais le marteau t'attend.")
+                                .size(22.0)
+                                .italics()
+                                .color(FORGE_CHARBON),
                         );
-                        ui.add_space(32.0);
+                        // Story-558 AC8 — message carry-over encourageant.
+                        if last_defeat.souls_before > 0 {
+                            ui.add_space(20.0);
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Tu gardes ◇ {} de ta forge précédente.",
+                                    last_defeat.souls_kept
+                                ))
+                                .size(20.0)
+                                .strong()
+                                .color(FORGE_CHARBON)
+                                .background_color(FORGE_OR),
+                            );
+                        }
+                        ui.add_space(36.0);
 
-                        let btn = |ui: &mut egui::Ui, label: &str| -> bool {
-                            ui.add(
-                                egui::Button::new(egui::RichText::new(label).size(22.0))
-                                    .min_size(egui::vec2(260.0, 46.0)),
-                            )
-                            .clicked()
-                        };
+                        let cartoon_btn =
+                            |ui: &mut egui::Ui, label: &str, fill: egui::Color32| -> bool {
+                                ui.add(
+                                    egui::Button::new(
+                                        egui::RichText::new(label)
+                                            .size(22.0)
+                                            .strong()
+                                            .color(FORGE_CHARBON),
+                                    )
+                                    .fill(fill)
+                                    .stroke(egui::Stroke::new(4.0, FORGE_CHARBON))
+                                    .corner_radius(egui::CornerRadius::same(14))
+                                    .min_size(egui::vec2(280.0, 52.0)),
+                                )
+                                .clicked()
+                            };
 
-                        if btn(ui, "↻ Nouvelle Run") {
+                        if cartoon_btn(ui, "↻  REFORGER", FORGE_OR) {
                             info!("[roguelite-hud] Defeat → Nouvelle Run");
                             start_run.write(StartRunEvent { seed: None });
                         }
-                        ui.add_space(8.0);
-                        if btn(ui, "✕ Retour au Menu") {
+                        ui.add_space(10.0);
+                        if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD) {
                             info!("[roguelite-hud] Defeat → Menu");
                             next_app.set(AppMode::Menu);
                             next_game.set(GameMode::None);

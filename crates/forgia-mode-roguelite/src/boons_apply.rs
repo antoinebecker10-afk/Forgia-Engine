@@ -1,0 +1,177 @@
+//! boons_apply.rs — Story-558 Phase 4 (2026-05-29).
+//!
+//! Lit `ActiveBoons` (forgia-rpg-data) + `BoonsCatalogue` et mute la Resource
+//! globale `PlayerCombatMods` (forgia-combat) consommée par forgia-fps fire
+//! system. Heal-on-kill géré séparément via DeathEvent observer.
+//!
+//! Scope Phase 4 (3 effets sur 7) :
+//! - `DamageMul { factor }` → `combat_mods.damage_mul *= factor` (cumul multiplicatif)
+//! - `FireRateMul { factor }` → `combat_mods.fire_rate_mul *= factor`
+//! - `HealOnKill { hp }` → cumul stack, appliqué via observer
+//!
+//! Reportés Phase 4b (besoin hit_ctx + crit roll + hitscan chain mod) :
+//! - `DamageReduction`, `ChainTargets`, `Knockback`, `FlatBonus` (crit/headshot)
+
+use bevy::prelude::*;
+use forgia_combat::combat_mods::PlayerCombatMods;
+use forgia_damage::{DeathEvent, Health};
+use forgia_player::Player;
+use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonsCatalogue};
+
+/// Cumul des effets HealOnKill actifs (somme des `hp` per kill).
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct HealOnKillCumul {
+    pub hp_per_kill: f32,
+}
+
+/// Recompute `PlayerCombatMods` + `HealOnKillCumul` quand `ActiveBoons` change.
+/// Reset à neutre puis cumul multiplicatif (damage/fire_rate) et additif (heal).
+pub fn sys_recompute_boon_mods(
+    active: Res<ActiveBoons>,
+    catalogue: Res<BoonsCatalogue>,
+    mut mods: ResMut<PlayerCombatMods>,
+    mut heal: ResMut<HealOnKillCumul>,
+) {
+    if !active.is_changed() && !catalogue.is_changed() {
+        return;
+    }
+    let mut new_mods = PlayerCombatMods::default();
+    let mut new_heal = 0.0_f32;
+    for id in &active.active {
+        let Some(def) = catalogue.find(id) else {
+            continue;
+        };
+        match def.effect {
+            BoonEffectKind::DamageMul { factor } => new_mods.damage_mul *= factor,
+            BoonEffectKind::FireRateMul { factor } => new_mods.fire_rate_mul *= factor,
+            BoonEffectKind::HealOnKill { hp } => new_heal += hp,
+            _ => {
+                // Phase 4b — DamageReduction, ChainTargets, Knockback, FlatBonus
+                // pas encore wired aux systems consommateurs.
+            }
+        }
+    }
+    *mods = new_mods;
+    heal.hp_per_kill = new_heal;
+    info!(
+        "[boons] mods recomputed — damage×{:.2} fire_rate×{:.2} heal_on_kill={:.1}/kill (active {})",
+        mods.damage_mul,
+        mods.fire_rate_mul,
+        heal.hp_per_kill,
+        active.active.len()
+    );
+}
+
+/// OnExit Roguelite — reset Mods + heal cumul à neutre.
+/// Évite que les boons d'une run Roguelite polluent Arena/RPG.
+pub fn sys_reset_boon_mods(
+    mut mods: ResMut<PlayerCombatMods>,
+    mut heal: ResMut<HealOnKillCumul>,
+) {
+    mods.reset();
+    heal.hp_per_kill = 0.0;
+}
+
+/// Observer DeathEvent — si target = enemy Roguelite (a `EnemyArchetype`),
+/// soigne le Player de `HealOnKillCumul.hp_per_kill`. Capped à `Health.max`.
+pub fn obs_heal_on_kill(
+    event: On<DeathEvent>,
+    enemies_q: Query<&crate::enemies::EnemyArchetype>,
+    mut q_player_hp: Query<&mut Health, With<Player>>,
+    heal: Res<HealOnKillCumul>,
+) {
+    if heal.hp_per_kill <= 0.0 {
+        return;
+    }
+    if enemies_q.get(event.target).is_err() {
+        return;
+    }
+    let Ok(mut hp) = q_player_hp.single_mut() else {
+        return;
+    };
+    let before = hp.current;
+    hp.current = (hp.current + heal.hp_per_kill).min(hp.max);
+    let healed = hp.current - before;
+    if healed > 0.0 {
+        info!(
+            "[boons] heal_on_kill +{:.1} HP ({:.1} → {:.1})",
+            healed, before, hp.current
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forgia_rpg_data::boons::{BoonDef, BoonId, BoonRarity};
+
+    fn def(id: &str, effect: BoonEffectKind) -> BoonDef {
+        BoonDef {
+            id: BoonId(id.into()),
+            name: id.into(),
+            voiceline_preview: String::new(),
+            effect,
+            tags: vec![],
+            rarity: BoonRarity::Common,
+            weapon_filter: None,
+            souls_cost: None,
+        }
+    }
+
+    #[test]
+    fn damage_mul_stacks_multiplicatively() {
+        let mut cat = BoonsCatalogue::default();
+        cat.entries
+            .push(def("a", BoonEffectKind::DamageMul { factor: 1.15 }));
+        cat.entries
+            .push(def("b", BoonEffectKind::DamageMul { factor: 1.75 }));
+        let mut active = ActiveBoons::default();
+        active.active.push(BoonId("a".into()));
+        active.active.push(BoonId("b".into()));
+        // simulate inline
+        let mut mods = PlayerCombatMods::default();
+        for id in &active.active {
+            let d = cat.find(id).unwrap();
+            if let BoonEffectKind::DamageMul { factor } = d.effect {
+                mods.damage_mul *= factor;
+            }
+        }
+        assert!((mods.damage_mul - 1.15 * 1.75).abs() < 1e-5);
+    }
+
+    #[test]
+    fn heal_on_kill_cumul_sums() {
+        let mut cat = BoonsCatalogue::default();
+        cat.entries
+            .push(def("a", BoonEffectKind::HealOnKill { hp: 5.0 }));
+        cat.entries
+            .push(def("b", BoonEffectKind::HealOnKill { hp: 3.0 }));
+        let mut active = ActiveBoons::default();
+        active.active.push(BoonId("a".into()));
+        active.active.push(BoonId("b".into()));
+        let mut heal = 0.0_f32;
+        for id in &active.active {
+            let d = cat.find(id).unwrap();
+            if let BoonEffectKind::HealOnKill { hp } = d.effect {
+                heal += hp;
+            }
+        }
+        assert_eq!(heal, 8.0);
+    }
+
+    #[test]
+    fn no_boons_means_neutral_mods() {
+        let cat = BoonsCatalogue::default();
+        let active = ActiveBoons::default();
+        let mut mods = PlayerCombatMods::default();
+        for id in &active.active {
+            if let Some(d) = cat.find(id) {
+                if let BoonEffectKind::DamageMul { factor } = d.effect {
+                    mods.damage_mul *= factor;
+                }
+            }
+        }
+        assert_eq!(mods.damage_mul, 1.0);
+        assert_eq!(mods.fire_rate_mul, 1.0);
+    }
+}

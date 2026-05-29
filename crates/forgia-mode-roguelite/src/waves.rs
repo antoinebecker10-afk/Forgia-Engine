@@ -17,6 +17,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody, Sensor};
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_core::prelude::*;
+use forgia_rpg_data::boons::OpenCoffreRequest;
 // Story-490 — Health type swap forgia_damage → forgia_combat pour matcher la
 // query `find_health_ancestor` de forgia-fps hitscan (qui scanne
 // `Query<&mut forgia_combat::Health, With<TargetCube>>`). Sans ce swap, type
@@ -29,7 +30,12 @@ use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 
 pub const WAVES_TOTAL: u8 = 3;
-pub const BREAK_SECS: f32 = 3.0;
+// Story-558 Phase 1 (2026-05-29) — break 3.0 → 15.0s.
+// 15s = window prep ammo/heal + Coffre du Forgeron (Phase 3) + HP reset (AC10).
+// Best practice industry (audit roguelite-engagement-2026-05-29 §1) : break
+// court (3s) ne laisse pas le temps de respirer pour cible enfants/femmes ;
+// 15s = sweet spot Hadès Chamber transition.
+pub const BREAK_SECS: f32 = 15.0;
 const WAVE_BASE_SEED: u64 = 0xC0FF_EE51_C0BA_1700;
 
 #[derive(Resource, Debug, Clone)]
@@ -195,6 +201,7 @@ pub fn spawn_wave_enemies(
 /// break déclenché à tort → wave 1 cleared instantanément (log montrait
 /// `Wave 1 spawned` puis `Wave 1 cleared` à 78µs d'écart). Le gate exige
 /// d'avoir VU au moins 1 frame avec `alive > 0` avant de pouvoir clear.
+#[allow(clippy::too_many_arguments)]
 pub fn sys_wave_orchestrator(
     time: Res<Time>,
     mut wave: ResMut<RogueliteWave>,
@@ -204,6 +211,7 @@ pub fn sys_wave_orchestrator(
     asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
     mut end_run: MessageWriter<EndRunEvent>,
+    mut open_coffre: MessageWriter<OpenCoffreRequest>,
     mut seen_alive: Local<bool>,
 ) {
     let alive = q_bots.iter().count() as u32;
@@ -230,8 +238,24 @@ pub fn sys_wave_orchestrator(
         }
         wave.in_break = true;
         wave.break_secs_left = BREAK_SECS;
+        // Story-558 AC10 (2026-05-29) — HP restauré à 100% à l'entrée break.
+        // Pattern Hadès "Charon's Boon" : sanctuary moment + window prep.
+        // Bible cartoon : encourage risk-taking, pas de save-HP-for-next-wave.
+        // commands.queue car forgia_damage::Health pas accessible en SystemParam
+        // direct (cf miror pattern sys_start_run run.rs:446-451).
+        commands.queue(|world: &mut World| {
+            let mut q = world
+                .query_filtered::<&mut forgia_damage::Health, With<forgia_player::Player>>();
+            if let Ok(mut hp) = q.single_mut(world) {
+                hp.current = hp.max;
+            }
+        });
+        // Story-558 Phase 3 (2026-05-29) — ouvre le Coffre du Forgeron. UI
+        // (forgia-ui-lib::hud::coffre_forgeron) lit CoffreSession populée par
+        // sys_handle_open_coffre (forgia-rpg-data::boons).
+        open_coffre.write(OpenCoffreRequest::wave_clear());
         info!(
-            "[roguelite] Wave {} cleared — break {BREAK_SECS}s before wave {}",
+            "[roguelite] Wave {} cleared — break {BREAK_SECS}s before wave {} (HP restored, Coffre opened)",
             wave.current_wave,
             wave.current_wave + 1
         );

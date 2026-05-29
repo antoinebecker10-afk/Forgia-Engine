@@ -178,3 +178,61 @@ pub fn arc_stroke(
 fn polar(center: Pos2, r: f32, theta: f32) -> Pos2 {
     Pos2::new(center.x + r * theta.cos(), center.y + r * theta.sin())
 }
+
+// ─── Story-558 Phase 7 (2026-05-29) — Palette "Forge" cartoon kid-friendly ──
+//
+// Bible v1 cartoon family-friendly (Overwatch×Hadès×Borderlands, cible
+// enfants+femmes). Recherche industry 2024-2026 (Hadès UI, Cult of the Lamb
+// 4.5M ventes, NN/g, IxDF Disney 12 principes UI).
+//
+// Convergence : fond chaud saturé + accent doré + 1 chaud + 1 froid pour
+// respirer. À utiliser en Roguelite uniquement (Arena/RPG gardent palette HUD
+// standard ci-dessus).
+//
+// Référence : docs/audit/roguelite-engagement-audit-2026-05-29.md +
+// reference_bible_forgia_roguelite_v1.
+
+/// Background panels (parchemin / bois clair). Fond du Coffre du Forgeron.
+pub const FORGE_BOIS_CLAIR: Color32 = Color32::from_rgb(212, 165, 116);
+/// Or saffron — accents, souls counter, rare boons, CTA primary.
+pub const FORGE_OR: Color32 = Color32::from_rgb(244, 196, 48);
+/// Rouge braise — HP bar, damage, Defeat overlay.
+pub const FORGE_BRAISE: Color32 = Color32::from_rgb(231, 76, 60);
+/// Métal forgé — borders neutres.
+pub const FORGE_METAL_CHAUD: Color32 = Color32::from_rgb(168, 162, 158);
+/// Texte principal — haut contraste sur bois (ratio 7.8:1 vs FORGE_BOIS_CLAIR).
+pub const FORGE_CHARBON: Color32 = Color32::from_rgb(43, 24, 16);
+/// Texte sur fond sombre, highlights.
+pub const FORGE_CREME: Color32 = Color32::from_rgb(255, 244, 220);
+/// Healing, mana, qualité commune-plus.
+pub const FORGE_TEAL: Color32 = Color32::from_rgb(60, 174, 163);
+
+// Rarity colors — convention Hearthstone/Diablo (universellement lisible
+// enfants). Override des couleurs HUD générique pour le Coffre.
+pub const FORGE_RARITY_COMMON: Color32 = Color32::from_rgb(157, 157, 157);
+pub const FORGE_RARITY_UNCOMMON: Color32 = Color32::from_rgb(30, 255, 0);
+pub const FORGE_RARITY_RARE: Color32 = Color32::from_rgb(0, 112, 221);
+pub const FORGE_RARITY_EPIC: Color32 = Color32::from_rgb(163, 53, 238);
+pub const FORGE_RARITY_LEGENDARY: Color32 = Color32::from_rgb(255, 128, 0);
+
+/// Dessine un drop-shadow soft cartoon en empilant 3 rects offset+alpha
+/// décroissant derrière une zone. egui n'a pas de blur natif — approximation
+/// classique (cf egui discussions + Hadès dialogue boxes).
+///
+/// `offset` = direction shadow (typique `vec2(6.0, 6.0)`).
+pub fn cartoon_drop_shadow(
+    painter: &egui::Painter,
+    rect: Rect,
+    corner_radius: f32,
+    offset: egui::Vec2,
+) {
+    for (i, alpha) in [80u8, 50u8, 25u8].iter().enumerate() {
+        let factor = (i + 1) as f32;
+        let shadow_rect = rect.translate(offset * factor);
+        painter.rect_filled(
+            shadow_rect,
+            corner_radius,
+            Color32::from_black_alpha(*alpha),
+        );
+    }
+}

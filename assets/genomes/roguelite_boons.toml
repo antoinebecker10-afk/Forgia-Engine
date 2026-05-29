@@ -24,6 +24,11 @@
 #
 # AC2 — 1 boon par wave clear (3 stages × 3 waves = 9 occasions) + mid-boss.
 # AC5 — Légendaires d'exemple (1 par tag clé, unlockés via tag stack ≥3).
+#
+# Story-558 Phase 2 (2026-05-29) — souls_cost ajouté par boon.
+# Defaults rarity-based si omis : Common=20, Uncommon=40, Rare=60, Legendary=80.
+# Calibration drop economy : Tank=5, Sniper=3, Runner=2, Boss=40 souls.
+# Common pickable après ~4 Tank kills, Legendary après ~16 Tank + Boss.
 
 # ────────────────────────────────────────────────────────────────────────
 # Boons neutres (Common) — 5 minimum AC4
@@ -35,6 +40,7 @@ name = "Éclat d'âme nourrissant"
 voiceline_preview = "Petite bouchée d'énergie ! Miam."
 rarity = "common"
 tags = ["chaos"]
+souls_cost = 20
 effect = { kind = "heal_on_kill", hp = 5.0 }
 
 [[entries]]
@@ -43,6 +49,7 @@ name = "Métal chaud"
 voiceline_preview = "Ça brûle ! Touche pas trop fort."
 rarity = "common"
 tags = ["fire"]
+souls_cost = 20
 effect = { kind = "damage_mul", factor = 1.15 }
 
 [[entries]]
@@ -51,6 +58,7 @@ name = "Bénédiction de l'Enclume"
 voiceline_preview = "L'Enclume veille sur toi."
 rarity = "common"
 tags = ["precision"]
+souls_cost = 25
 effect = { kind = "damage_reduction", factor = 0.10 }
 
 [[entries]]
@@ -59,6 +67,7 @@ name = "Souffle du Maître"
 voiceline_preview = "Respire fort ! Tape plus vite."
 rarity = "common"
 tags = ["chaos"]
+souls_cost = 25
 effect = { kind = "fire_rate_mul", factor = 1.20 }
 
 [[entries]]
@@ -67,6 +76,7 @@ name = "Petit Champignon Lumineux"
 voiceline_preview = "Il brille, il guide tes coups."
 rarity = "common"
 tags = ["ricochet", "precision"]
+souls_cost = 20
 effect = { kind = "flat_bonus", stat = "crit_chance", amount = 0.10 }
 
 # ────────────────────────────────────────────────────────────────────────
@@ -79,6 +89,7 @@ name = "Tornade de Braise"
 voiceline_preview = "Tout brûle ! Recule, recule !"
 rarity = "legendary"
 tags = ["fire", "chaos"]
+souls_cost = 80
 effect = { kind = "damage_mul", factor = 1.75 }
 
 [[entries]]
@@ -87,6 +98,7 @@ name = "Œil de Madame Lenoir"
 voiceline_preview = "Vise. Respire. Bang."
 rarity = "legendary"
 tags = ["precision"]
+souls_cost = 70
 effect = { kind = "flat_bonus", stat = "headshot_mul", amount = 0.50 }
 
 [[entries]]
@@ -95,6 +107,7 @@ name = "Ouragan de Bourrasque"
 voiceline_preview = "Wouuush ! Ils valsent !"
 rarity = "legendary"
 tags = ["knockback", "chaos"]
+souls_cost = 70
 effect = { kind = "knockback", strength = 25.0 }
 
 [[entries]]
@@ -103,4 +116,5 @@ name = "Chaîne des Âmes"
 voiceline_preview = "Ça saute partout ! Joli."
 rarity = "legendary"
 tags = ["chain", "ricochet"]
+souls_cost = 80
 effect = { kind = "chain_targets", count = 3 }

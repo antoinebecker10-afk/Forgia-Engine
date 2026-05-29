@@ -489,13 +489,48 @@ pub fn sys_start_run(
     }
 }
 
-pub fn sys_end_run(mut events: MessageReader<EndRunEvent>, mut next: ResMut<NextState<RunState>>) {
+/// Story-558 AC8 (2026-05-29) — fraction des Souls gardée sur Defeat.
+/// 0.25 = anti "mort = rien" (Hadès narrative-reward pattern). Bible cartoon
+/// kid-friendly : encourage le retry plutôt que punir.
+pub const DEFEAT_SOULS_CARRYOVER: f32 = 0.25;
+
+/// État dernière run pour l'overlay Defeat (affiche montant gardé / perdu).
+/// Set par sys_end_run quand result == Defeat. Lu par hud::draw_defeat_overlay.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct LastDefeatSummary {
+    pub souls_before: u32,
+    pub souls_kept: u32,
+}
+
+pub fn sys_end_run(
+    mut events: MessageReader<EndRunEvent>,
+    mut next: ResMut<NextState<RunState>>,
+    mut souls: Option<ResMut<forgia_rpg_data::loot_tables::Souls>>,
+    mut last_defeat: ResMut<LastDefeatSummary>,
+) {
     for ev in events.read() {
         let state = match ev.result {
             RunResult::Victory => RunState::Victory,
             RunResult::Defeat => RunState::Defeat,
             RunResult::Abort => RunState::Lobby,
         };
+        // AC8 — carry-over 25% Souls sur Defeat. Victory garde 100% (récompense).
+        // Abort = pas de pénalité (pause UI).
+        if matches!(ev.result, RunResult::Defeat) {
+            if let Some(s) = souls.as_deref_mut() {
+                let before = s.current;
+                let kept = (before as f32 * DEFEAT_SOULS_CARRYOVER).round() as u32;
+                last_defeat.souls_before = before;
+                last_defeat.souls_kept = kept;
+                s.current = kept;
+                info!(
+                    "[roguelite] Defeat — carry-over {}/{} souls ({}% kept)",
+                    kept,
+                    before,
+                    (DEFEAT_SOULS_CARRYOVER * 100.0) as u32
+                );
+            }
+        }
         next.set(state);
         info!("[roguelite] Run ended — {:?}", ev.result);
     }
@@ -547,6 +582,45 @@ mod tests {
         assert_eq!(stage_id_for_depth(4, true), "crypts_of_anvil");
         assert_eq!(stage_id_for_depth(5, true), "crypts_of_anvil");
         assert_eq!(stage_id_for_depth(0, true), "crypts_of_anvil");
+    }
+
+    // Story-558 Phase 5 — carry-over math.
+
+    fn carryover(before: u32) -> u32 {
+        (before as f32 * DEFEAT_SOULS_CARRYOVER).round() as u32
+    }
+
+    #[test]
+    fn carryover_keeps_quarter() {
+        assert_eq!(carryover(100), 25);
+        assert_eq!(carryover(40), 10);
+    }
+
+    #[test]
+    fn carryover_rounds_correctly() {
+        // 47 * 0.25 = 11.75 → arrondi à 12
+        assert_eq!(carryover(47), 12);
+        // 46 * 0.25 = 11.50 → bankers round = 12 (round half-to-even f32)
+        // Selon Rust f32::round (round half-away-from-zero) → 12.
+        assert_eq!(carryover(46), 12);
+        // 45 * 0.25 = 11.25 → 11
+        assert_eq!(carryover(45), 11);
+    }
+
+    #[test]
+    fn carryover_zero_returns_zero() {
+        assert_eq!(carryover(0), 0);
+    }
+
+    #[test]
+    fn carryover_loses_three_quarters() {
+        // AC8 — joueur perd 75% mais garde 25% (encourager retry)
+        let before = 200_u32;
+        let kept = carryover(before);
+        let lost = before - kept;
+        assert!(lost > kept, "doit perdre plus que garder (1 - 0.25 > 0.25)");
+        assert_eq!(kept, 50);
+        assert_eq!(lost, 150);
     }
 
     // TODO(story-471..479) : tests parse_music_state_combat_variants +

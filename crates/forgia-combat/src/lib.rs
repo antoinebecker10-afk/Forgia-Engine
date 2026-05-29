@@ -17,6 +17,7 @@ use forgia_core::prelude::*;
 
 pub mod ammo;
 pub mod combat_juice;
+pub mod combat_mods;
 pub mod melee;
 pub mod sensor;
 pub mod weapons;
@@ -139,6 +140,11 @@ impl Plugin for ForgiaCombatPlugin {
             .init_resource::<sensor::CombatSensorCounters>()
             .init_resource::<weapons::EquippedWeapons>()
             .init_resource::<combat_juice::CameraTrauma>()
+            // Story-558 Phase 4 — PlayerCombatMods Resource (boons multipliers).
+            // Default neutre 1.0/1.0/0.0. Muté par forgia-mode-roguelite et lu
+            // par forgia-fps (damage_mul + fire_rate_mul) et forgia-damage
+            // (damage_reduction — Phase 4b).
+            .init_resource::<combat_mods::PlayerCombatMods>()
             .add_message::<combat_juice::CombatHitEvent>()
             .add_message::<ammo::AmmoChanged>()
             .add_systems(

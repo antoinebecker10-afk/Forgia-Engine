@@ -21,6 +21,8 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
+pub mod boons_apply;
+pub mod coffre_sensor;
 pub mod enemies;
 pub mod hud;
 pub mod run;
@@ -50,6 +52,41 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         if !app.is_plugin_added::<forgia_rpg_data::loot_tables::ForgiaLootTablesPlugin>() {
             app.add_plugins(forgia_rpg_data::loot_tables::ForgiaLootTablesPlugin);
         }
+        // Story-558 Phase 3 (2026-05-29) — wire ForgiaBoonsPlugin
+        // (Resources CoffreSession + ActiveBoons + BoonsCatalogue + events +
+        // sys_handle_open_coffre + sys_handle_coffre_pick + asset loader).
+        // Trigger OpenCoffreRequest sur transition into break vit dans
+        // waves::sys_wave_orchestrator.
+        if !app.is_plugin_added::<forgia_rpg_data::boons::ForgiaBoonsPlugin>() {
+            app.add_plugins(forgia_rpg_data::boons::ForgiaBoonsPlugin);
+        }
+        // Story-558 Phase 4 — Boons apply : recompute PlayerCombatMods +
+        // observer heal_on_kill.
+        app.init_resource::<boons_apply::HealOnKillCumul>();
+        app.add_systems(
+            Update,
+            boons_apply::sys_recompute_boon_mods
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            OnExit(GameMode::Roguelite),
+            boons_apply::sys_reset_boon_mods,
+        );
+        app.add_observer(boons_apply::obs_heal_on_kill);
+        // Story-558 Phase 6 — sensor forgia2_coffre.json 1Hz
+        app.init_resource::<coffre_sensor::CoffreSensorState>();
+        app.add_systems(
+            OnEnter(GameMode::Roguelite),
+            coffre_sensor::sys_reset_coffre_sensor_on_run_start,
+        );
+        app.add_systems(
+            Update,
+            (
+                coffre_sensor::sys_track_coffre_picks.in_set(GameSet::Effects),
+                coffre_sensor::sys_write_coffre_sensor.in_set(GameSet::Sensors),
+            ),
+        );
         // V7 M3 step 2 — node-driven run loop (StageGraph Slay-the-Spire ratios).
         if !app.is_plugin_added::<forgia_stage::graph::ForgiaStageGraphPlugin>() {
             app.add_plugins(forgia_stage::graph::ForgiaStageGraphPlugin);
@@ -119,6 +156,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
 
         app.init_resource::<sensor::RogueliteTelemetry>()
             .init_resource::<waves::RogueliteWave>()
+            // Story-558 Phase 5 — résumé Defeat (souls gardés / perdus).
+            .init_resource::<run::LastDefeatSummary>()
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()

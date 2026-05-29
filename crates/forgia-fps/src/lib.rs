@@ -280,6 +280,9 @@ pub struct HitscanCtx<'w, 's> {
     pub sensor: ResMut<'w, HitscanSensorState>,
     /// Story-457 — multiplicateurs damage par zone (genome-driven, hot-reload).
     pub feedback: Res<'w, forgia_damage::HitFeedback>,
+    /// Story-558 Phase 4 — boons multiplicateurs (damage_mul, fire_rate_mul,
+    /// damage_reduction). Default neutre 1.0/1.0/0.0 si pas de boon actif.
+    pub combat_mods: Res<'w, forgia_combat::combat_mods::PlayerCombatMods>,
 }
 
 /// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
@@ -588,7 +591,9 @@ fn fire_weapon_minimal(
     let direction = cam_tf.forward().as_vec3();
 
     // Cooldown depuis genome (fallback 0.1s = ModernAR 10 shots/s).
-    let cooldown_s = entry.map(|e| 1.0 / e.fire_rate.max(0.1)).unwrap_or(0.1);
+    // Story-558 Phase 4 — fire_rate_mul des boons divise le cooldown (clamp ≥0.1).
+    let fire_rate_mul = hitscan_ctx.combat_mods.fire_rate_mul.max(0.1);
+    let cooldown_s = entry.map(|e| 1.0 / e.fire_rate.max(0.1)).unwrap_or(0.1) / fire_rate_mul;
     // Burst : pas de cooldown standard entre les shots de la rafale (interval géré par BurstState).
     if !is_burst_mode {
         commands.insert_resource(WeaponFireCooldown {
@@ -770,7 +775,9 @@ fn fire_weapon_minimal(
 
                 if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
                     let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
-                    let effective_dmg = damage * falloff_mul * zone_mul;
+                    // Story-558 Phase 4 — boons damage_mul appliqué au damage final.
+                    let effective_dmg =
+                        damage * falloff_mul * zone_mul * hitscan_ctx.combat_mods.damage_mul;
                     hp.current = (hp.current - effective_dmg).max(0.0);
                     let dead = hp.is_dead();
                     let new_hp = hp.current;
