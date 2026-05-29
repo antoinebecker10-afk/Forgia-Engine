@@ -7,17 +7,19 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_damage::Health as DamageHealth;
+use forgia_player::Player;
 
 use crate::style::*;
 
-/// Marker query : on prend le PREMIER entity avec DamageHealth (= player V2).
-/// Pas de marker dédié pour éviter coupling cross-crate ; le player est seul à porter
-/// `DamageHealth` côté V2 actuellement.
+// Marker `With<Player>` requis : 2026-05-27 bug HP bar disparaît début vague suivante.
+// Les ArenaBots (forgia-ai-arena-bot) portent aussi `forgia_damage::Health` → query
+// sans filtre = Err(MultipleEntities) → single() fail → bar invisible.
+// Pattern miroir : forgia-mode-roguelite/src/run.rs:262 (déjà filtré With<Player>).
 pub(crate) fn draw_player_hp(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
-    q_player: Query<&DamageHealth>,
+    q_player: Query<&DamageHealth, With<Player>>,
 ) {
     if *app_state.get() != AppMode::InGame
         || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)

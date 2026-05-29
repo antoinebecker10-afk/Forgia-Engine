@@ -93,6 +93,7 @@ pub fn bot_los_check(
     tuning: Res<TacticalTuning>,
     time: Res<Time>,
     mut sensor: ResMut<BotAiSensor>,
+    q_child_of: Query<&ChildOf>,
 ) {
     let Some((target_entity, target_tf)) = targets.iter().next() else {
         return;
@@ -135,13 +136,34 @@ pub fn bot_los_check(
             continue;
         }
         let dir = to_target / dist;
-        // Exclure le bot pour anti self-hit ; tout autre hit = obstacle = pas de LOS.
-        let predicate = |e: Entity| e != bot_entity;
-        let filter = QueryFilter::default().predicate(&predicate);
+        // Story-545 (2026-05-27) — exclude_rigid_body traverse chaîne complète
+        // collider→RigidBody (vs predicate root-only). Fix Roguelite enemies
+        // skeleton child collider qui faisaient échouer le LOS sur self-hit.
+        let filter = QueryFilter::default().exclude_rigid_body(bot_entity);
         let hit = ctx.cast_ray(origin, dir, dist, true, filter);
         let new_los = match hit {
             None => true,
-            Some((hit_entity, _)) => hit_entity == target_entity,
+            Some((hit_entity, _)) => {
+                // Story-545 — walk ChildOf 4 niveaux pour résoudre target_entity
+                // sur ancestor (Player root vs child collider du capsule).
+                let mut current = hit_entity;
+                let mut matched = current == target_entity;
+                for _ in 0..4 {
+                    if matched {
+                        break;
+                    }
+                    match q_child_of.get(current) {
+                        Ok(co) => {
+                            current = co.parent();
+                            if current == target_entity {
+                                matched = true;
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+                matched
+            }
         };
         // Transition false → true : démarrer grace window (reaction time AAA).
         if !bot.has_los && new_los {

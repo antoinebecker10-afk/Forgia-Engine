@@ -40,6 +40,11 @@ pub struct ForgiaVillageLoaderPlugin;
 impl Plugin for ForgiaVillageLoaderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VillageStats>();
+        // Story-539 phase 1 (2026-05-27) — village pipeline est RPG-only par
+        // design (procgen OpenWorld villages). Gate sur GameMode::Rpg évite que
+        // les 5 systems tournent en Fps/Roguelite/Menu (early-return inutile
+        // mais coût query non-nul × 5 systems chaque frame). Sensor diag reste
+        // produit mais skip via le gate quand non-pertinent.
         app.add_systems(
             Update,
             (
@@ -49,7 +54,8 @@ impl Plugin for ForgiaVillageLoaderPlugin {
                 write_village_debug_sensor,
                 village_debug_gizmos,
             )
-                .chain(),
+                .chain()
+                .run_if(in_state(forgia_core::prelude::GameMode::Rpg)),
         );
     }
 }

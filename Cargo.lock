@@ -3240,6 +3240,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-debug"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "forgia-effects"
 version = "0.1.0"
 dependencies = [
@@ -3473,10 +3483,13 @@ dependencies = [
  "forgia-damage",
  "forgia-mode-fps-arena",
  "forgia-player",
+ "forgia-postprocess",
  "forgia-rpg-data",
  "forgia-stage",
  "forgia-ui-lib",
  "rand_xoshiro",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -3486,6 +3499,7 @@ dependencies = [
  "bevy",
  "bevy_kira_audio",
  "bevy_rapier3d",
+ "bevy_water",
  "forgia-ai-arena-bot",
  "forgia-audio",
  "forgia-core",
@@ -3493,6 +3507,8 @@ dependencies = [
  "forgia-input",
  "forgia-mode-fps-arena",
  "forgia-player",
+ "forgia-rpg",
+ "forgia-rpg-data",
  "forgia-terrain",
  "leafwing-input-manager",
  "serde",
@@ -3511,8 +3527,11 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
+ "forgia-genome-core",
  "forgia-input",
+ "forgia-stage",
  "leafwing-input-manager",
+ "serde",
 ]
 
 [[package]]
@@ -3632,6 +3651,7 @@ dependencies = [
  "forgia-terrain",
  "forgia-ui",
  "forgia-village-loader",
+ "forgia-water",
  "leafwing-input-manager",
  "noise",
 ]
@@ -3642,7 +3662,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-core",
+ "forgia-genome-core",
+ "forgia-rng",
  "serde",
+ "toml",
 ]
 
 [[package]]

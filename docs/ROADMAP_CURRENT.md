@@ -27,6 +27,21 @@
 
 Effort total estimé : **~50-54 jours solo** ≈ 10-11 semaines.
 
+### Story-528 — FPS Feel Accessible ✅ DONE 2026-05-28 (6/7 AC, commits `8f508ff`+`2595b30`+`12cf6de`)
+
+| AC | Statut | Notes |
+|---|---|---|
+| AC1 aim assist | ✅ | `forgia-fps::aim_assist` + genome hot-reload TOML strength/max_angle/distance |
+| AC2 hitbox 1.2× | 🟡 | HS detection déjà via HitZoneTag(Head). Capsule physique SKIP (forgia-ai-arena-bot M autre terminal) |
+| AC3 Dash "Pas de l'Apprenti" | ✅ | `forgia-player::dash` double-tap Espace 4m/0.25s, 2 charges, voiceline "Hop!" log |
+| AC4 fatigue Énergie + fade | ✅ | `forgia-ui-lib/hud/energy.rs` overlay non-destructif Roguelite (player_hp.rs M préservé) |
+| AC5 stars + flash | ✅ | `forgia-effects::hitmarker` extend cartoon ✨ jaunes + flash blanc 80ms |
+| AC6 HS POW! + DING | ✅ | hitmarker extend pop scale 1.5→1.0 outlined noir + DING log |
+| AC7 sensor `forgia2_fps_feel.json` | ✅ | `forgia-observability::fps_feel_sensor` 1Hz, 14e canonical |
+| **Bonus cursor fix** | ✅ | InputBlockers OnEnter(RunState::Defeat\|Victory) → cursor libre + mouse_look bloqué |
+
+Patterns canoniques shipés : [`reference_foundation_resource_anti_cycle`](../../../../Users/Antoi/.claude/projects/d--Forgia/memory/reference_foundation_resource_anti_cycle.md), [`reference_input_blockers_anti_cycle_pattern`](../../../../Users/Antoi/.claude/projects/d--Forgia/memory/reference_input_blockers_anti_cycle_pattern.md), [`reference_hud_overlay_non_destructive_cover_label`](../../../../Users/Antoi/.claude/projects/d--Forgia/memory/reference_hud_overlay_non_destructive_cover_label.md).
+
 ### Backlog wiring (parallèle, indépendant Roguelite)
 
 - story-542 plugin double-add guard (P0)

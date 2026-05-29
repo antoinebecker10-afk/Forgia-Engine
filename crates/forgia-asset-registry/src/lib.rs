@@ -383,11 +383,18 @@ pub struct ForgiaAssetRegistryPlugin;
 
 impl Plugin for ForgiaAssetRegistryPlugin {
     fn build(&self, app: &mut App) {
+        // Story-539 phase 1 (2026-05-27) — `calibrate_assets` itère sur les
+        // entités `NeedsAssetCalibrate` (posées uniquement par `forgia-foliage`
+        // qui est RPG-only). En Fps/Roguelite/Menu le query reste vide mais le
+        // system tick avec children query non-triviale. Gate `GameMode::Rpg`
+        // pour zéro coût hors RPG. `hot_reload_input` + `save_dirty_registry`
+        // restent cross-mode (utiles partout : hot-reload + persistence dirty).
         app.init_resource::<AssetRegistry>()
             .add_systems(Startup, populate_registry)
+            .add_systems(Update, (hot_reload_input, save_dirty_registry))
             .add_systems(
                 Update,
-                (hot_reload_input, calibrate_assets, save_dirty_registry),
+                calibrate_assets.run_if(in_state(forgia_core::prelude::GameMode::Rpg)),
             );
     }
 }
