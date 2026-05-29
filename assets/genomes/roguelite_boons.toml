@@ -1,0 +1,106 @@
+# Story-529 — Boons Catalogue (Mission 2 GDD)
+#
+# Hot-reload via Shift+F12 (Bevy Asset). Schema mirroirs
+# forgia-rpg-data::boons::BoonsCatalogue.
+#
+# Champs:
+#   id                 : string stable (sert de key Rust `BoonId`)
+#   name               : nom affiché (FR cartoon kid-friendly)
+#   voiceline_preview  : ligne <5s, vocab CE2 (anti-canon bible v1)
+#   rarity             : "common" | "uncommon" | "rare" | "legendary"
+#   tags               : ["fire" | "ricochet" | "knockback" | "chain" | "precision" | "chaos"]
+#                        3 tags identiques pendant la run → légendaire correspondant unlock
+#   weapon_filter      : Optional [string] des weapon_id éligibles, omettre = tous
+#   effect.kind        : "damage_mul" | "heal_on_kill" | "fire_rate_mul"
+#                      | "chain_targets" | "knockback" | "damage_reduction"
+#                      | "flat_bonus"
+#
+# AC4 Mission 2.3 — 5 boons neutres minimum :
+#   1. Éclat d'âme nourrissant   (heal on kill, chaos)
+#   2. Métal chaud               (damage_mul, fire)
+#   3. Bénédiction de l'Enclume  (damage_reduction, precision)
+#   4. Souffle du Maître         (fire_rate_mul, chaos)
+#   5. Petit Champignon Lumineux (flat_bonus crit_chance, ricochet)
+#
+# AC2 — 1 boon par wave clear (3 stages × 3 waves = 9 occasions) + mid-boss.
+# AC5 — Légendaires d'exemple (1 par tag clé, unlockés via tag stack ≥3).
+
+# ────────────────────────────────────────────────────────────────────────
+# Boons neutres (Common) — 5 minimum AC4
+# ────────────────────────────────────────────────────────────────────────
+
+[[entries]]
+id = "eclat_ame_nourrissant"
+name = "Éclat d'âme nourrissant"
+voiceline_preview = "Petite bouchée d'énergie ! Miam."
+rarity = "common"
+tags = ["chaos"]
+effect = { kind = "heal_on_kill", hp = 5.0 }
+
+[[entries]]
+id = "metal_chaud"
+name = "Métal chaud"
+voiceline_preview = "Ça brûle ! Touche pas trop fort."
+rarity = "common"
+tags = ["fire"]
+effect = { kind = "damage_mul", factor = 1.15 }
+
+[[entries]]
+id = "benediction_enclume"
+name = "Bénédiction de l'Enclume"
+voiceline_preview = "L'Enclume veille sur toi."
+rarity = "common"
+tags = ["precision"]
+effect = { kind = "damage_reduction", factor = 0.10 }
+
+[[entries]]
+id = "souffle_du_maitre"
+name = "Souffle du Maître"
+voiceline_preview = "Respire fort ! Tape plus vite."
+rarity = "common"
+tags = ["chaos"]
+effect = { kind = "fire_rate_mul", factor = 1.20 }
+
+[[entries]]
+id = "petit_champignon_lumineux"
+name = "Petit Champignon Lumineux"
+voiceline_preview = "Il brille, il guide tes coups."
+rarity = "common"
+tags = ["ricochet", "precision"]
+effect = { kind = "flat_bonus", stat = "crit_chance", amount = 0.10 }
+
+# ────────────────────────────────────────────────────────────────────────
+# Légendaires d'exemple (unlock via 3 tags identiques) — graines pour AC5
+# ────────────────────────────────────────────────────────────────────────
+
+[[entries]]
+id = "tornade_de_braise"
+name = "Tornade de Braise"
+voiceline_preview = "Tout brûle ! Recule, recule !"
+rarity = "legendary"
+tags = ["fire", "chaos"]
+effect = { kind = "damage_mul", factor = 1.75 }
+
+[[entries]]
+id = "oeil_de_lenoir"
+name = "Œil de Madame Lenoir"
+voiceline_preview = "Vise. Respire. Bang."
+rarity = "legendary"
+tags = ["precision"]
+effect = { kind = "flat_bonus", stat = "headshot_mul", amount = 0.50 }
+
+[[entries]]
+id = "ouragan_de_bourrasque"
+name = "Ouragan de Bourrasque"
+voiceline_preview = "Wouuush ! Ils valsent !"
+rarity = "legendary"
+tags = ["knockback", "chaos"]
+effect = { kind = "knockback", strength = 25.0 }
+
+[[entries]]
+id = "chaine_des_ames"
+name = "Chaîne des Âmes"
+voiceline_preview = "Ça saute partout ! Joli."
+rarity = "legendary"
+tags = ["chain", "ricochet"]
+effect = { kind = "chain_targets", count = 3 }

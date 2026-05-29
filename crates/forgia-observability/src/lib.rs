@@ -55,6 +55,8 @@ pub mod inventory_sensor;
 pub mod npcs_sensor;
 // Story-528 phase 1 — FPS feel (dash uses, hit feedbacks, aim assist engagements).
 pub mod fps_feel_sensor;
+// Story-529 Phase 1 — boons foundation (catalogue + active + tag unlocks).
+pub mod boons_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -101,6 +103,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<inventory_sensor::InventorySensorState>()
             .init_resource::<npcs_sensor::NpcsSensorState>()
             .init_resource::<fps_feel_sensor::FpsFeelSensorState>()
+            .init_resource::<boons_sensor::BoonsSensorState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
@@ -169,6 +172,7 @@ impl Plugin for ForgiaObservabilityPlugin {
                 inventory_sensor::sys_write_inventory_sensor,
                 npcs_sensor::sys_write_npcs_sensor,
                 fps_feel_sensor::sys_write_fps_feel_sensor,
+                boons_sensor::sys_write_boons_sensor,
             )
                 .in_set(GameSet::Sensors),
         );

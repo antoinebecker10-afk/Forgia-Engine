@@ -15,6 +15,7 @@
 //! Consommer via `forgia_rpg_data::dialogue::X`, `forgia_rpg_data::loot_tables::X`,
 //! etc.
 
+pub mod boons;
 pub mod dialogue;
 pub mod inventory;
 pub mod loot_tables;
