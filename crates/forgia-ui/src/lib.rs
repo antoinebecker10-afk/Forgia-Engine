@@ -70,6 +70,10 @@ impl Plugin for ForgiaUiPlugin {
                 OnExit(forgia_mode_roguelite::RunState::Victory),
                 (grab_cursor, block_look_off),
             )
+            // Story-558 Phase 7 follow-up (2026-05-29) — sync cursor avec
+            // CoffreSession.is_open : pendant le break Coffre, libérer la
+            // souris pour cliquer Skip/Reroll/cartes sans pivoter la caméra.
+            .add_systems(Update, sys_sync_cursor_with_coffre)
             // Story-455 Phase G — paused_overlay_ui retiré (remplacé par forgia-ui-pause-menu
             // cliquable Resume / Settings / Quit). Le handler ESC/Q reste ici (escape_handler).
             .add_systems(EguiPrimaryContextPass, main_menu_ui)
@@ -321,6 +325,45 @@ fn block_look_off(mut blockers: ResMut<InputBlockers>) {
     blockers.block_look = false;
     blockers.block_fire = false;
     info!("[forgia-ui] InputBlockers: look+fire OFF");
+}
+
+/// Story-558 Phase 7 follow-up (2026-05-29) — toggle cursor + InputBlockers
+/// selon `CoffreSession.is_open`. Quand le Coffre s'ouvre (fin de wave),
+/// libère la souris pour cliquer cartes/Skip/Reroll. Quand il se ferme
+/// (pick ou skip), re-grab pour reprendre l'aim FPS.
+///
+/// Tracked via `Local<bool>` (front montant/descendant) — évite spam each
+/// frame. Gated AppMode::InGame uniquement (pas perturber Menu/Paused).
+fn sys_sync_cursor_with_coffre(
+    app_state: Res<State<AppMode>>,
+    session: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
+    mut q_cursor: Query<&mut CursorOptions, With<PrimaryWindow>>,
+    mut blockers: ResMut<InputBlockers>,
+    mut was_open: Local<bool>,
+) {
+    if *app_state.get() != AppMode::InGame {
+        return;
+    }
+    let is_open = session.as_ref().is_some_and(|s| s.is_open);
+    if is_open == *was_open {
+        return;
+    }
+    *was_open = is_open;
+    if let Ok(mut opts) = q_cursor.single_mut() {
+        if is_open {
+            opts.grab_mode = CursorGrabMode::None;
+            opts.visible = true;
+            blockers.block_look = true;
+            blockers.block_fire = true;
+            info!("[forgia-ui] Coffre OPEN — cursor released, look+fire blocked");
+        } else {
+            opts.grab_mode = CursorGrabMode::Locked;
+            opts.visible = false;
+            blockers.block_look = false;
+            blockers.block_fire = false;
+            info!("[forgia-ui] Coffre CLOSED — cursor grabbed, look+fire unblocked");
+        }
+    }
 }
 
 /// Release cursor (visible + free) quand on entre Menu.

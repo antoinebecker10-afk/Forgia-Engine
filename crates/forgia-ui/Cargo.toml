@@ -17,3 +17,5 @@ forgia-combat = { workspace = true }
 forgia-crosshair = { workspace = true }
 forgia-effects = { workspace = true }
 forgia-mode-roguelite = { workspace = true }
+# Story-558 Phase 7 follow-up — CoffreSession Resource pour cursor toggle.
+forgia-rpg-data = { workspace = true }
