@@ -55,3 +55,14 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
+
+  ratchets:
+    name: Ratchets (Lock L1 asset-load)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Lock L1 : fail si les call-sites d'asset-load derivent au-dessus de la
+      # baseline par fichier (xtask/asset-load-allowlist.toml). story-528.
+      - run: cargo xtask asset-load

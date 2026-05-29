@@ -32,6 +32,7 @@ fn main() {
         "sensor-audit" => sensor_audit(&args),
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
+        "asset-load" => asset_load(&args),
         _ => {
             print_help();
             0
@@ -52,6 +53,7 @@ fn print_help() {
     println!("  sensor-audit [--strict]  Cross-check sensor producers (crates/**/*.rs) vs docs/observability/SENSOR_REGISTRY.md");
     println!("  story-gate [--all-done|--story <id>]   Verify DONE stories claims vs git/code");
     println!("  no-scaffold [--fix]      Fail if any crate is a scaffold (<50 effective LOC or >80% TODO comments). Allowlist in xtask/no-scaffold-allowlist.toml.");
+    println!("  asset-load [--fix]       Lock L1 ratchet : fail if asset-load call-sites drift above per-file baseline. Allowlist in xtask/asset-load-allowlist.toml.");
 }
 
 fn check_orphans() {
@@ -854,6 +856,214 @@ fn extract_sensor_literals(
             out.entry(inner.to_string()).or_default().push(site);
         }
         rest = &rest[end + 1..];
+    }
+}
+
+// ─────────────────────────── asset-load ratchet (story-528, Lock L1) ───────────────────────────
+//
+// Ratchet anti-drift sur les call-sites de chargement d'asset (GameAssets, Lock L1).
+// Cible V2 : <= 30 call-sites. Baseline 2026-05-29 = 69, figée PAR FICHIER dans
+// `xtask/asset-load-allowlist.toml`. Le ratchet FAIL si un fichier dépasse son budget
+// (régression : nouveau call-site ajouté) ou si un nouveau fichier charge des assets
+// sans entrée allowlist.
+//
+// Détection (receiver-agnostic, fidèle à l'intent L1 = budget de handles) :
+//   `.load(` / `.load::<T>(` / `.load_with_settings(` / `.load_folder(` avec parens
+//   NON-vides (exclut le faux-positif `.load()` dans un message d'erreur), hors lignes
+//   de commentaire, en EXCLUANT les genome configs (`genomes/`, `Genome<`, `.toml`) qui
+//   relèvent du pattern data-driven sanctionné, pas du budget de handles GameAssets.
+//
+// Usage : `cargo xtask asset-load`        → CI gate (exit 1 si drift)
+//         `cargo xtask asset-load --fix`  → régénère la baseline (à committer)
+
+const ASSET_LOAD_TARGET: usize = 30; // Cible V2 Lock L1
+
+fn asset_load(args: &[String]) -> i32 {
+    let fix = args.iter().any(|a| a == "--fix");
+
+    let crates_dir = Path::new("crates");
+    if !crates_dir.exists() {
+        eprintln!("ERROR: crates/ directory not found (run from workspace root)");
+        return 2;
+    }
+
+    let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    scan_asset_loads(crates_dir, &mut counts);
+    let total: usize = counts.values().sum();
+
+    if fix {
+        write_asset_load_allowlist(&counts, total);
+        println!(
+            "[xtask] asset-load --fix : baseline written ({} files, {total} call-sites)",
+            counts.len()
+        );
+        println!("  Target V2 (Lock L1) : <= {ASSET_LOAD_TARGET}. Current : {total}.");
+        return 0;
+    }
+
+    let budgets = load_asset_load_allowlist();
+    if budgets.is_empty() {
+        eprintln!("[xtask] asset-load: no baseline found.");
+        eprintln!("  Run `cargo xtask asset-load --fix` to generate xtask/asset-load-allowlist.toml.");
+        return 2;
+    }
+
+    let mut violations: Vec<String> = Vec::new();
+    for (file, n) in &counts {
+        match budgets.get(file) {
+            Some(max) if n <= max => {}
+            Some(max) => violations.push(format!(
+                "  ❌ {file} : {n} asset loads (budget {max}) — NEW call-site(s) added"
+            )),
+            None => violations.push(format!(
+                "  ❌ {file} : {n} asset loads (no allowlist entry) — new file loading assets"
+            )),
+        }
+    }
+
+    let baseline_total: usize = budgets.values().sum();
+
+    println!("[xtask] asset-load — Lock L1 ratchet (story-528)");
+    println!("  files loading assets : {}", counts.len());
+    println!(
+        "  total call-sites     : {total} (baseline {baseline_total}, target <= {ASSET_LOAD_TARGET})"
+    );
+
+    if violations.is_empty() {
+        println!("✅ asset-load : 0 violations (no drift vs baseline)");
+        if total < baseline_total {
+            println!(
+                "  ℹ️  total dropped {baseline_total} -> {total}. Run `cargo xtask asset-load --fix` to tighten the ratchet."
+            );
+        }
+        0
+    } else {
+        eprintln!("❌ asset-load : {} violation(s)", violations.len());
+        for v in &violations {
+            eprintln!("{v}");
+        }
+        eprintln!();
+        eprintln!("Fix : remove the new asset load(s), preload via forgia-assets::GameAssets,");
+        eprintln!("or (if legitimate) run `cargo xtask asset-load --fix` to rebaseline + commit.");
+        1
+    }
+}
+
+/// Scan récursif `crates/` et compte les call-sites d'asset-load par fichier
+/// (clé = path normalisé en forward-slash pour stabilité cross-platform).
+fn scan_asset_loads(root: &Path, counts: &mut std::collections::BTreeMap<String, usize>) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if name == "target" {
+                continue;
+            }
+            scan_asset_loads(&path, counts);
+        } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            let Ok(content) = fs::read_to_string(&path) else {
+                continue;
+            };
+            let n = content.lines().filter(|l| is_asset_load_line(l)).count();
+            if n > 0 {
+                let key = path.to_string_lossy().replace('\\', "/");
+                *counts.entry(key).or_default() += n;
+            }
+        }
+    }
+}
+
+/// Une ligne compte comme asset-load si elle appelle une des 4 formes de `.load`
+/// avec des parens non-vides, hors commentaire et hors genome config.
+fn is_asset_load_line(line: &str) -> bool {
+    let t = line.trim_start();
+    if t.starts_with("//") || t.starts_with("/*") || t.starts_with('*') {
+        return false;
+    }
+    // Genome config loads (Handle<Genome<T>> sur .toml) = pattern data-driven, pas un handle.
+    if line.contains("genomes/") || line.contains("Genome<") || line.contains(".toml") {
+        return false;
+    }
+    const FORMS: [&str; 4] = [
+        ".load(",
+        ".load_with_settings(",
+        ".load_folder(",
+        ".load::<",
+    ];
+    for form in FORMS {
+        let mut search = line;
+        while let Some(idx) = search.find(form) {
+            // rest pointe sur le '<' (forme ::<) ou sur le '(' (formes paren).
+            let rest = &search[idx + form.len() - 1..];
+            let open = if form == ".load::<" {
+                rest.find('(')
+            } else {
+                Some(0)
+            };
+            if let Some(p) = open {
+                let tail = &rest[p..];
+                if tail.starts_with('(') && !tail.starts_with("()") {
+                    return true;
+                }
+            }
+            search = &search[idx + form.len()..];
+        }
+    }
+    false
+}
+
+/// Parse `xtask/asset-load-allowlist.toml` → map (file → budget).
+/// Hand-rolled (cohérent avec load_no_scaffold_allowlist, évite la dep toml).
+fn load_asset_load_allowlist() -> std::collections::BTreeMap<String, usize> {
+    let mut out = std::collections::BTreeMap::new();
+    let path = Path::new("xtask/asset-load-allowlist.toml");
+    let Ok(content) = fs::read_to_string(path) else {
+        return out;
+    };
+    for line in content.lines() {
+        let t = line.trim();
+        if t.starts_with('#') || t.is_empty() || t.starts_with('[') {
+            continue;
+        }
+        if let Some((k, v)) = t.split_once('=') {
+            let key = k.trim().trim_matches('"').to_string();
+            if let Ok(n) = v.trim().parse::<usize>() {
+                if !key.is_empty() {
+                    out.insert(key, n);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Réécrit la baseline (trié par count décroissant puis nom).
+fn write_asset_load_allowlist(
+    counts: &std::collections::BTreeMap<String, usize>,
+    total: usize,
+) {
+    let mut s = String::new();
+    s.push_str("# asset-load-allowlist.toml — Lock L1 ratchet baseline (story-528)\n");
+    s.push_str("#\n");
+    s.push_str("# Per-file budget of asset-load call-sites. CI gate : `cargo xtask asset-load`.\n");
+    s.push_str("# Regenerate after removing loads : `cargo xtask asset-load --fix`.\n");
+    s.push_str(&format!(
+        "# Baseline total : {total} (target V2 Lock L1 : <= {ASSET_LOAD_TARGET}).\n"
+    ));
+    s.push_str("#\n");
+    s.push_str("# Detection : .load( / .load::<> / .load_with_settings( / .load_folder( with\n");
+    s.push_str("# non-empty parens, excluding genome configs (genomes/, Genome<, .toml).\n\n");
+    s.push_str("[budgets]\n");
+    let mut entries: Vec<(&String, &usize)> = counts.iter().collect();
+    entries.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+    for (file, n) in entries {
+        s.push_str(&format!("\"{file}\" = {n}\n"));
+    }
+    if let Err(e) = fs::write("xtask/asset-load-allowlist.toml", s) {
+        eprintln!("ERROR writing xtask/asset-load-allowlist.toml : {e}");
     }
 }
 
