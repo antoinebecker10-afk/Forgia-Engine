@@ -102,7 +102,11 @@ pub fn sys_write_roguelite_state(
     let souls_earned_run = meta.as_ref().map(|m| m.earned_run).unwrap_or(0);
     let run_timer_secs = timer.as_ref().map(|t| t.secs).unwrap_or(0.0);
     let shockwave_casts = shockwave.as_ref().map(|s| s.casts_total).unwrap_or(0);
-    let shockwave_cd = shockwave.as_ref().map(|s| s.cooldown_left).unwrap_or(0.0);
+    // Story-573 — cooldown PAR ARME : on expose le max restant (toutes armes).
+    let shockwave_cd = shockwave
+        .as_ref()
+        .map(|s| s.cooldowns.values().copied().fold(0.0_f32, f32::max))
+        .unwrap_or(0.0);
     let current_wave = wave.as_ref().map(|w| w.current_wave).unwrap_or(0);
     let bots_alive = wave.as_ref().map(|w| w.bots_alive).unwrap_or(0);
     let break_secs_left = wave.as_ref().map(|w| w.break_secs_left).unwrap_or(0.0);

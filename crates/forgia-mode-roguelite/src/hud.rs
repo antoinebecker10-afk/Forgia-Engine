@@ -964,6 +964,7 @@ pub(crate) fn draw_shockwave_indicator(
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
     ability: Res<crate::shockwave::ShockwaveAbility>,
+    equipped: Option<Res<EquippedWeapons>>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -987,14 +988,19 @@ pub(crate) fn draw_shockwave_indicator(
     use std::f32::consts::{FRAC_PI_2, TAU};
     const R: f32 = 30.0;
     let center = egui::pos2(screen.center().x, screen.max.y - 64.0);
-    let ready = ability.cooldown_left <= 0.0;
+    // Story-573 — cooldown PAR ARME + couleur persona (identité armes parlantes).
+    let current = equipped.as_ref().map(|e| e.current).unwrap_or_default();
+    let cd = ability.cooldowns.get(&current).copied().unwrap_or(0.0);
+    let max_cd = crate::shockwave::spell_max_cooldown(current);
+    let ready = cd <= 0.0;
+    let accent = speaker_color(crate::run::weapon_to_speaker(current));
 
     painter.circle_filled(center, R, C_BG_DARK);
     painter.circle_stroke(center, R, egui::Stroke::new(4.0, FORGE_CHARBON));
-    let ring = if ready { FORGE_OR } else { FORGE_METAL_CHAUD };
+    let ring = if ready { accent } else { FORGE_METAL_CHAUD };
     painter.circle_stroke(center, R, egui::Stroke::new(2.0, ring));
 
-    let f_color = if ready { FORGE_OR } else { C_TEXT_MUTED };
+    let f_color = if ready { accent } else { C_TEXT_MUTED };
     text_with_outline(
         &painter,
         center,
@@ -1006,8 +1012,7 @@ pub(crate) fn draw_shockwave_indicator(
     );
 
     if !ready {
-        let frac =
-            1.0 - (ability.cooldown_left / crate::shockwave::SHOCKWAVE_COOLDOWN).clamp(0.0, 1.0);
+        let frac = 1.0 - (cd / max_cd.max(0.01)).clamp(0.0, 1.0);
         arc_stroke(
             &painter,
             center,
@@ -1023,7 +1028,7 @@ pub(crate) fn draw_shockwave_indicator(
             &painter,
             egui::pos2(center.x, center.y + R + 12.0),
             egui::Align2::CENTER_CENTER,
-            &format!("{:.0}", ability.cooldown_left.ceil()),
+            &format!("{:.0}", cd.ceil()),
             egui::FontId::monospace(14.0),
             C_TEXT_MUTED,
             1.0,
