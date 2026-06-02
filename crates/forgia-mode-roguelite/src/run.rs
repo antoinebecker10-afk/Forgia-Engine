@@ -17,7 +17,9 @@ use forgia_core::prelude::*;
 use forgia_combat::prelude::{EquippedWeapons, WeaponType};
 use forgia_damage::DeathEvent;
 // TODO(story-471..479): PickupAnimState + PickupKind supprimés de forgia_loot_tables
-use forgia_rpg_data::loot_tables::{Pickup, PickupCollector};
+// Story-571 — l'Or in-run EST le `Souls` de forgia-rpg-data, importé `as Gold`
+// pour la clarté (la monnaie MÉTA persistante = `MetaSouls`, défini ici).
+use forgia_rpg_data::loot_tables::{Pickup, PickupCollector, Souls as Gold};
 use forgia_player::Player;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -415,6 +417,9 @@ pub fn sys_start_run(
     stage_graph_config: Res<forgia_stage::graph::RunGraphConfig>,
     mut wave: ResMut<crate::waves::RogueliteWave>,
     q_existing_enemies: Query<Entity, With<forgia_ai_arena_bot::ArenaBot>>,
+    // Story-571 — monnaies : reset Or (in-run), conserve Souls méta.
+    mut gold: Option<ResMut<Gold>>,
+    mut meta: ResMut<MetaSouls>,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -435,6 +440,15 @@ pub fn sys_start_run(
 
         // Reset RogueliteWave (run repeatable depuis Lobby).
         *wave = crate::waves::RogueliteWave::default();
+
+        // Story-571 — nouvelle run : l'Or (monnaie in-run) repart à 0. Les Souls
+        // méta NE sont PAS reset (persistantes) ; seul le compteur "gagné cette
+        // run" est remis à zéro pour le sensor.
+        if let Some(g) = gold.as_deref_mut() {
+            g.current = 0;
+            g.total_collected = 0;
+        }
+        meta.earned_run = 0;
 
         // Bug-leak bots (diag 2026-05-29) — despawn TOUS les ennemis survivants
         // avant de spawner la nouvelle wave 1. Sans ça, chaque restart de run
@@ -489,23 +503,48 @@ pub fn sys_start_run(
     }
 }
 
-/// Story-558 AC8 (2026-05-29) — fraction des Souls gardée sur Defeat.
-/// 0.25 = anti "mort = rien" (Hadès narrative-reward pattern). Bible cartoon
-/// kid-friendly : encourage le retry plutôt que punir.
-pub const DEFEAT_SOULS_CARRYOVER: f32 = 0.25;
+// ─── Économie double monnaie (story-571, 2026-06-02) ───────────────────────
+// Modèle Gunfire Reborn (décision canon user) :
+//  - **Or** = monnaie in-run = `Gold` (alias de `forgia_rpg_data::loot_tables::Souls`).
+//    Ramassée via pickups, dépensée au Coffre, PERDUE à 100% à la mort,
+//    reset à 0 au start de chaque run.
+//  - **Souls** = monnaie MÉTA persistante (`MetaSouls`). Gagnée en fin de
+//    wave/boss, JAMAIS dépensée pour l'instant (sink = hub story-569),
+//    CONSERVÉE à 100% à la mort. Reset uniquement à la fermeture du jeu
+//    (save/load = story-569, hors scope).
 
-/// État dernière run pour l'overlay Defeat (affiche montant gardé / perdu).
+/// Souls méta gagnés par wave régulière nettoyée.
+/// Const V1 — à externaliser en gene genome via story-566 (retargetée Or/Souls).
+pub const SOULS_PER_WAVE: u32 = 5;
+/// Bonus Souls méta pour la wave boss (finale).
+/// Const V1 — à externaliser en gene genome via story-566.
+pub const SOULS_PER_BOSS: u32 = 25;
+
+/// Monnaie MÉTA persistante (story-571). Distincte de l'Or in-run (`Gold`).
+/// Persiste entre les runs dans la session ; pas reset à la mort.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct MetaSouls {
+    /// Total persistant accumulé (jamais reset en session).
+    pub current: u32,
+    /// Gagné sur la run en cours (reset au start, exposé au sensor).
+    pub earned_run: u32,
+}
+
+/// État dernière run pour l'overlay Defeat (Or perdu / Souls conservées).
 /// Set par sys_end_run quand result == Defeat. Lu par hud::draw_defeat_overlay.
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct LastDefeatSummary {
-    pub souls_before: u32,
-    pub souls_kept: u32,
+    /// Or in-run perdu à la mort (= total de l'Or au moment du décès).
+    pub or_lost: u32,
+    /// Souls méta conservées (intégralement) malgré la défaite.
+    pub souls_persistent: u32,
 }
 
 pub fn sys_end_run(
     mut events: MessageReader<EndRunEvent>,
     mut next: ResMut<NextState<RunState>>,
-    mut souls: Option<ResMut<forgia_rpg_data::loot_tables::Souls>>,
+    mut gold: Option<ResMut<Gold>>,
+    meta: Res<MetaSouls>,
     mut last_defeat: ResMut<LastDefeatSummary>,
 ) {
     for ev in events.read() {
@@ -514,22 +553,19 @@ pub fn sys_end_run(
             RunResult::Defeat => RunState::Defeat,
             RunResult::Abort => RunState::Lobby,
         };
-        // AC8 — carry-over 25% Souls sur Defeat. Victory garde 100% (récompense).
-        // Abort = pas de pénalité (pause UI).
+        // Story-571 — Or in-run PERDU à 100% sur Defeat ; Souls méta conservées
+        // intégralement. Victory : l'Or sera reset au prochain run start (les
+        // Souls méta restent acquises). Abort = pause, pas de pénalité.
         if matches!(ev.result, RunResult::Defeat) {
-            if let Some(s) = souls.as_deref_mut() {
-                let before = s.current;
-                let kept = (before as f32 * DEFEAT_SOULS_CARRYOVER).round() as u32;
-                last_defeat.souls_before = before;
-                last_defeat.souls_kept = kept;
-                s.current = kept;
-                info!(
-                    "[roguelite] Defeat — carry-over {}/{} souls ({}% kept)",
-                    kept,
-                    before,
-                    (DEFEAT_SOULS_CARRYOVER * 100.0) as u32
-                );
+            if let Some(g) = gold.as_deref_mut() {
+                last_defeat.or_lost = g.current;
+                g.current = 0;
             }
+            last_defeat.souls_persistent = meta.current;
+            info!(
+                "[roguelite] Defeat — Or perdu={} ; Souls méta conservées={}",
+                last_defeat.or_lost, meta.current
+            );
         }
         next.set(state);
         info!("[roguelite] Run ended — {:?}", ev.result);
@@ -584,43 +620,16 @@ mod tests {
         assert_eq!(stage_id_for_depth(0, true), "crypts_of_anvil");
     }
 
-    // Story-558 Phase 5 — carry-over math.
-
-    fn carryover(before: u32) -> u32 {
-        (before as f32 * DEFEAT_SOULS_CARRYOVER).round() as u32
-    }
+    // Story-571 — l'ancien carry-over 25% (Souls) est supprimé : l'Or in-run
+    // est désormais perdu à 100% à la mort, les Souls méta conservées à 100%.
+    // Plus de math de fraction à tester.
 
     #[test]
-    fn carryover_keeps_quarter() {
-        assert_eq!(carryover(100), 25);
-        assert_eq!(carryover(40), 10);
-    }
-
-    #[test]
-    fn carryover_rounds_correctly() {
-        // 47 * 0.25 = 11.75 → arrondi à 12
-        assert_eq!(carryover(47), 12);
-        // 46 * 0.25 = 11.50 → bankers round = 12 (round half-to-even f32)
-        // Selon Rust f32::round (round half-away-from-zero) → 12.
-        assert_eq!(carryover(46), 12);
-        // 45 * 0.25 = 11.25 → 11
-        assert_eq!(carryover(45), 11);
-    }
-
-    #[test]
-    fn carryover_zero_returns_zero() {
-        assert_eq!(carryover(0), 0);
-    }
-
-    #[test]
-    fn carryover_loses_three_quarters() {
-        // AC8 — joueur perd 75% mais garde 25% (encourager retry)
-        let before = 200_u32;
-        let kept = carryover(before);
-        let lost = before - kept;
-        assert!(lost > kept, "doit perdre plus que garder (1 - 0.25 > 0.25)");
-        assert_eq!(kept, 50);
-        assert_eq!(lost, 150);
+    fn souls_earn_constants_sane() {
+        // Boss vaut plus qu'une wave régulière (incitation à finir la run).
+        assert!(SOULS_PER_BOSS > SOULS_PER_WAVE);
+        assert_eq!(SOULS_PER_WAVE, 5);
+        assert_eq!(SOULS_PER_BOSS, 25);
     }
 
     // TODO(story-471..479) : tests parse_music_state_combat_variants +

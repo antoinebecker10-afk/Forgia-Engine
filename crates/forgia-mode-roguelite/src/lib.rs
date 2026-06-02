@@ -167,8 +167,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
 
         app.init_resource::<sensor::RogueliteTelemetry>()
             .init_resource::<waves::RogueliteWave>()
-            // Story-558 Phase 5 — résumé Defeat (souls gardés / perdus).
+            // Story-558 Phase 5 — résumé Defeat (Or perdu / Souls conservées).
             .init_resource::<run::LastDefeatSummary>()
+            // Story-571 — monnaie MÉTA persistante (distincte de l'Or in-run).
+            .init_resource::<run::MetaSouls>()
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()

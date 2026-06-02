@@ -113,9 +113,9 @@ fn draw_coffre(
                             .color(FORGE_CHARBON),
                     );
                     ui.add_space(8.0);
-                    // AC3 — Souls counter doré sur bois (haut contraste).
+                    // Story-571 — le Coffre dépense l'OR (in-run), pas les Souls méta.
                     ui.label(
-                        egui::RichText::new(format!("◇  {souls_current} souls"))
+                        egui::RichText::new(format!("🪙  {souls_current} or"))
                             .size(20.0)
                             .strong()
                             .color(FORGE_CHARBON)

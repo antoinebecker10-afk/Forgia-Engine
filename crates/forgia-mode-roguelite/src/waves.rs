@@ -213,6 +213,8 @@ pub fn sys_wave_orchestrator(
     mut end_run: MessageWriter<EndRunEvent>,
     mut open_coffre: MessageWriter<OpenCoffreRequest>,
     mut seen_alive: Local<bool>,
+    // Story-571 — gain de Souls méta en fin de wave/boss (persistant).
+    mut meta: ResMut<crate::run::MetaSouls>,
 ) {
     let alive = q_bots.iter().count() as u32;
     wave.bots_alive = alive;
@@ -229,13 +231,22 @@ pub fn sys_wave_orchestrator(
     if alive == 0 && *seen_alive && !wave.in_break {
         // Vague nettoyée — démarre break ou victory.
         if wave.current_wave >= WAVES_TOTAL {
+            // Story-571 — bonus Souls méta pour le boss/finale (persistant).
+            meta.current = meta.current.saturating_add(crate::run::SOULS_PER_BOSS);
+            meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_BOSS);
             wave.victory_emitted = true;
             end_run.write(EndRunEvent {
                 result: RunResult::Victory,
             });
-            info!("[roguelite] All {WAVES_TOTAL} waves cleared — VICTORY");
+            info!(
+                "[roguelite] All {WAVES_TOTAL} waves cleared — VICTORY (+{} Souls méta boss)",
+                crate::run::SOULS_PER_BOSS
+            );
             return;
         }
+        // Story-571 — Souls méta pour une wave régulière nettoyée (persistant).
+        meta.current = meta.current.saturating_add(crate::run::SOULS_PER_WAVE);
+        meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_WAVE);
         wave.in_break = true;
         wave.break_secs_left = BREAK_SECS;
         // Story-558 AC10 (2026-05-29) — HP restauré à 100% à l'entrée break.
