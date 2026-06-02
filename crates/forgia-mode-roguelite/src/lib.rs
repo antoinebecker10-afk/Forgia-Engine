@@ -155,6 +155,13 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // run_state. Sans ça, l'utilisateur entre Roguelite, voit des bots mais
         // pas d'UI car sys_start_run n'est jamais déclenché.
         app.add_systems(OnEnter(GameMode::Roguelite), auto_start_run_on_enter);
+        // Chrono de run — tick pendant InRun/Boss (pause-safe).
+        app.add_systems(
+            Update,
+            run::sys_tick_run_timer
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         // V7 M2.5 — Tag PickupCollector en Update (PAS OnEnter) car Player spawn
         // par autre plugin (forgia-player::OnEnter AppMode::InGame), ordre cross-plugin
         // non garanti. Guard idempotent via `Without<PickupCollector>` (no-op après tag).
@@ -171,6 +178,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .init_resource::<run::LastDefeatSummary>()
             // Story-571 — monnaie MÉTA persistante (distincte de l'Or in-run).
             .init_resource::<run::MetaSouls>()
+            // Chrono de run (affiché sous la minimap).
+            .init_resource::<run::RunTimer>()
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()

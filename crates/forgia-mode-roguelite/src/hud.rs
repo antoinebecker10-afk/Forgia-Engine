@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 // Story-571 — Or in-run = `Gold` (alias de forgia-rpg-data Souls) ; Souls méta = `MetaSouls`.
-use crate::run::MetaSouls;
+use crate::run::{MetaSouls, RunTimer};
 use forgia_rpg_data::loot_tables::Souls as Gold;
 use forgia_ui_lib::style::*;
 
@@ -697,6 +697,7 @@ pub(crate) fn draw_minimap(
     run_state: Option<Res<State<RunState>>>,
     q_cam: Query<&GlobalTransform, With<FpsCamera>>,
     q_enemies: Query<(&GlobalTransform, &EnemyArchetype)>,
+    timer: Res<RunTimer>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -774,6 +775,18 @@ pub(crate) fn draw_minimap(
         FORGE_TEAL,
         egui::Stroke::new(2.0, FORGE_CHARBON),
     ));
+
+    // Chrono de run sous la minimap (style Gunfire « 6 min 43 s »).
+    let total = timer.secs.max(0.0) as u32;
+    text_with_outline(
+        &painter,
+        egui::pos2(center.x, center.y + RADIUS + 16.0),
+        egui::Align2::CENTER_CENTER,
+        &format!("{}:{:02}", total / 60, total % 60),
+        egui::FontId::monospace(18.0),
+        C_TEXT_LIGHT,
+        2.0,
+    );
 }
 
 pub struct RogueliteHudPlugin;

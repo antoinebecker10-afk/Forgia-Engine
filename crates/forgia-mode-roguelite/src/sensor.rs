@@ -12,7 +12,7 @@ use crate::run::{RunSeed, RunState};
 use crate::waves::{RogueliteWave, WAVES_TOTAL};
 use bevy::prelude::*;
 // Story-571 — Or in-run = `Gold` (alias forgia-rpg-data Souls) + Souls méta.
-use crate::run::MetaSouls;
+use crate::run::{MetaSouls, RunTimer};
 use forgia_rpg_data::loot_tables::Souls as Gold;
 
 /// Telemetry runtime — incrémentée chaque frame par `sys_update_roguelite_telemetry`.
@@ -80,6 +80,7 @@ pub fn sys_write_roguelite_state(
     tel: Res<RogueliteTelemetry>,
     gold: Option<Res<Gold>>,
     meta: Option<Res<MetaSouls>>,
+    timer: Option<Res<RunTimer>>,
     wave: Option<Res<RogueliteWave>>,
 ) {
     *accum += time.delta_secs();
@@ -97,6 +98,7 @@ pub fn sys_write_roguelite_state(
     let or_collected = gold.as_ref().map(|s| s.total_collected).unwrap_or(0);
     let souls_persistent = meta.as_ref().map(|m| m.current).unwrap_or(0);
     let souls_earned_run = meta.as_ref().map(|m| m.earned_run).unwrap_or(0);
+    let run_timer_secs = timer.as_ref().map(|t| t.secs).unwrap_or(0.0);
     let current_wave = wave.as_ref().map(|w| w.current_wave).unwrap_or(0);
     let bots_alive = wave.as_ref().map(|w| w.bots_alive).unwrap_or(0);
     let break_secs_left = wave.as_ref().map(|w| w.break_secs_left).unwrap_or(0.0);
@@ -104,7 +106,7 @@ pub fn sys_write_roguelite_state(
     let victory = wave.as_ref().map(|w| w.victory_emitted).unwrap_or(false);
 
     let json = format!(
-        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"current_wave":{current_wave},"waves_total":{WAVES_TOTAL},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"victory":{victory}}}"#,
+        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"run_timer_secs":{run_timer_secs:.1},"current_wave":{current_wave},"waves_total":{WAVES_TOTAL},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"victory":{victory}}}"#,
         time.elapsed_secs(),
         tel.tick_count,
         tel.time_in_state_secs,

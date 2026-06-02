@@ -420,6 +420,7 @@ pub fn sys_start_run(
     // Story-571 — monnaies : reset Or (in-run), conserve Souls méta.
     mut gold: Option<ResMut<Gold>>,
     mut meta: ResMut<MetaSouls>,
+    mut run_timer: ResMut<RunTimer>,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -449,6 +450,8 @@ pub fn sys_start_run(
             g.total_collected = 0;
         }
         meta.earned_run = 0;
+        // Chrono de run remis à zéro.
+        run_timer.secs = 0.0;
 
         // Bug-leak bots (diag 2026-05-29) — despawn TOUS les ennemis survivants
         // avant de spawner la nouvelle wave 1. Sans ça, chaque restart de run
@@ -528,6 +531,33 @@ pub struct MetaSouls {
     pub current: u32,
     /// Gagné sur la run en cours (reset au start, exposé au sensor).
     pub earned_run: u32,
+}
+
+/// 2026-06-02 — chrono de la run en cours (style Gunfire « 6 min 43 s »).
+/// Tické pendant InRun/Boss (pause-safe : pas en Lobby/Paused), reset au start.
+/// Affiché sous la minimap.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct RunTimer {
+    pub secs: f32,
+}
+
+/// Tick le chrono de run uniquement en combat (InRun/Boss) et hors pause.
+pub fn sys_tick_run_timer(
+    time: Res<Time>,
+    app_state: Res<State<AppMode>>,
+    run_state: Option<Res<State<RunState>>>,
+    mut timer: ResMut<RunTimer>,
+) {
+    if *app_state.get() != AppMode::InGame {
+        return;
+    }
+    let in_run = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    );
+    if in_run {
+        timer.secs += time.delta_secs();
+    }
 }
 
 /// État dernière run pour l'overlay Defeat (Or perdu / Souls conservées).
