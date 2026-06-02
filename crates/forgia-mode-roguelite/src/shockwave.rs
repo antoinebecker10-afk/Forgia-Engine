@@ -32,6 +32,19 @@ pub const SHOCKWAVE_RADIUS: f32 = 12.0;
 pub const SHOCKWAVE_DAMAGE: f32 = 45.0;
 /// Durée de la VFX disque (s).
 const VFX_DURATION: f32 = 0.40;
+/// Vitesse initiale du repoussement (m/s).
+const KNOCKBACK_SPEED: f32 = 16.0;
+/// Durée du repoussement (s) — décélère vers 0 (déplacement net ~2.4 m).
+const KNOCKBACK_DURATION: f32 = 0.30;
+
+/// Repoussement appliqué à un ennemi touché par l'onde. Poussé par
+/// `sys_apply_knockback` (GameSet::Effects, APRÈS l'AI Movement → gagne sur
+/// l'écriture Transform de l'AI des bots KinematicPositionBased).
+#[derive(Component)]
+pub struct Knockback {
+    pub vel: Vec3,
+    pub time_left: f32,
+}
 
 /// État du sort F (cooldown + compteur de casts pour sensor).
 #[derive(Resource, Default, Debug, Clone, Copy)]
@@ -126,6 +139,15 @@ pub fn sys_shockwave_input(
             weapon: None,
             body_zone: HitZone::Body,
         });
+        // Repoussement radial horizontal léger (depuis le joueur vers l'ennemi).
+        let mut dir = Vec3::new(d.x, 0.0, d.z).normalize_or_zero();
+        if dir == Vec3::ZERO {
+            dir = Vec3::Z; // fallback si l'ennemi est pile sur le joueur
+        }
+        commands.entity(e).insert(Knockback {
+            vel: dir * KNOCKBACK_SPEED,
+            time_left: KNOCKBACK_DURATION,
+        });
         hits += 1;
     }
 
@@ -171,6 +193,25 @@ pub fn sys_animate_shockwave_vfx(
         }
         if vfx.age >= VFX_DURATION {
             commands.entity(e).despawn();
+        }
+    }
+}
+
+/// Applique le repoussement (GameSet::Effects → après l'AI Movement, gagne sur
+/// l'écriture Transform des bots KinematicPositionBased). Décélère via la
+/// fraction de temps restante puis retire le composant.
+pub fn sys_apply_knockback(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut Transform, &mut Knockback)>,
+) {
+    let dt = time.delta_secs();
+    for (e, mut tf, mut kb) in &mut q {
+        let frac = (kb.time_left / KNOCKBACK_DURATION).clamp(0.0, 1.0);
+        tf.translation += kb.vel * dt * frac; // décélération douce
+        kb.time_left -= dt;
+        if kb.time_left <= 0.0 {
+            commands.entity(e).remove::<Knockback>();
         }
     }
 }

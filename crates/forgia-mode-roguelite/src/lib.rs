@@ -173,7 +173,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         );
         app.add_systems(
             Update,
-            shockwave::sys_animate_shockwave_vfx
+            (
+                shockwave::sys_animate_shockwave_vfx,
+                shockwave::sys_apply_knockback,
+            )
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
         );
