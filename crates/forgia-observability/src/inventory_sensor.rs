@@ -35,6 +35,7 @@
 
 use bevy::prelude::*;
 use forgia_player::Player;
+use forgia_rpg_data::gold::Gold;
 use forgia_rpg_data::inventory::{Inventory, ItemId, INVENTORY_MAX_SLOTS};
 use std::collections::HashMap;
 
@@ -48,7 +49,7 @@ pub struct InventorySensorState {
 
 pub fn sys_write_inventory_sensor(
     time: Res<Time>,
-    q_player: Query<&Inventory, With<Player>>,
+    q_player: Query<(&Inventory, Option<&Gold>), With<Player>>,
     mut state: ResMut<InventorySensorState>,
 ) {
     let now = time.elapsed_secs();
@@ -57,7 +58,9 @@ pub fn sys_write_inventory_sensor(
     }
     state.last_write_secs = now;
 
-    let inv = q_player.iter().next();
+    let player = q_player.iter().next();
+    let inv = player.map(|(inv, _)| inv);
+    let gold = player.and_then(|(_, g)| g).map(|g| g.0).unwrap_or(0);
     let inventory_present = inv.is_some();
 
     let mut capacity = 0usize;
@@ -116,7 +119,7 @@ pub fn sys_write_inventory_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"inventory","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"inventory_present":{inventory_present},"capacity":{capacity},"slots_used":{slots_used},"slots_free":{slots_free},"is_full":{is_full},"total_items":{total_items},"unique_item_types":{unique_item_types},"top_items":[{top_json}]}}"#,
+        r#"{{"id":"inventory","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"inventory_present":{inventory_present},"gold":{gold},"capacity":{capacity},"slots_used":{slots_used},"slots_free":{slots_free},"is_full":{is_full},"total_items":{total_items},"unique_item_types":{unique_item_types},"top_items":[{top_json}]}}"#,
         now,
     );
 

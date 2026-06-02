@@ -133,6 +133,41 @@ impl Inventory {
         self.slots.iter().all(|s| s.is_some())
             && self.slots.iter().flatten().all(|s| s.count >= s.max_stack)
     }
+
+    /// Retire et renvoie le contenu du slot `idx` (le laisse vide). Pour le
+    /// déplacement WoW-like (pick up). `None` si idx hors borne ou slot vide.
+    pub fn take(&mut self, idx: usize) -> Option<ItemStack> {
+        self.slots.get_mut(idx)?.take()
+    }
+
+    /// Pose `stack` dans le slot `idx`, renvoie l'ancien contenu (pour l'échange
+    /// WoW-like). Si `idx` hors borne, renvoie `stack` inchangé.
+    pub fn place(&mut self, idx: usize, stack: ItemStack) -> Option<ItemStack> {
+        match self.slots.get_mut(idx) {
+            Some(slot) => slot.replace(stack),
+            None => Some(stack),
+        }
+    }
+
+    /// Consomme 1 unité du slot `idx` (vide le slot si le compte tombe à 0).
+    pub fn consume_one(&mut self, idx: usize) {
+        if let Some(slot) = self.slots.get_mut(idx) {
+            if let Some(s) = slot.as_mut() {
+                s.count = s.count.saturating_sub(1);
+            }
+            if slot.as_ref().is_some_and(|s| s.count == 0) {
+                *slot = None;
+            }
+        }
+    }
+}
+
+/// Demande d'utilisation d'un objet (clic droit inventaire WoW-like). Consommé
+/// par un système gameplay (forgia-rpg) qui applique l'effet (soin, équipement).
+#[derive(Message, Debug, Clone, Copy)]
+pub struct UseItemRequest {
+    pub entity: Entity,
+    pub slot: usize,
 }
 
 #[derive(Message, Debug, Clone)]
@@ -157,7 +192,8 @@ pub struct ForgiaInventoryPlugin;
 
 impl Plugin for ForgiaInventoryPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<InventoryEvent>();
+        app.add_message::<InventoryEvent>()
+            .add_message::<UseItemRequest>();
     }
 }
 

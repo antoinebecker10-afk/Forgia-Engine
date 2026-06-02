@@ -9,6 +9,12 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::gold::Gold;
+use crate::inventory::{Inventory, ItemId, ItemStack};
+use crate::items::ItemRegistry;
+use crate::quests::{QuestCatalogue, QuestId, QuestLog, QuestProgress};
+use crate::shop::OpenShop;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DialogueId(pub String);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -40,6 +46,12 @@ pub struct DialogueChoice {
 pub enum DialogueEffect {
     GiveItem { id: String, count: u32 },
     StartQuest { id: String },
+    /// Increment a quest objective counter (no-combat progression hook).
+    AdvanceQuest { tag: String, delta: u32 },
+    /// Remet une quête `Completed` au donneur → `TurnedIn` (clôture la boucle).
+    TurnInQuest { id: String },
+    /// Ouvre la boutique du PNJ courant (vendeur). Termine le dialogue.
+    OpenShop,
     EndConversation,
 }
 
@@ -103,16 +115,25 @@ fn start_sessions(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn advance_sessions(
     mut events: MessageReader<ChooseDialogueOption>,
     mut sessions: Query<&mut DialogueSession>,
     registry: Res<DialogueRegistry>,
     mut end_w: MessageWriter<EndDialogue>,
+    catalogue: Res<QuestCatalogue>,
+    item_registry: Res<ItemRegistry>,
+    mut inventories: Query<&mut Inventory>,
+    mut golds: Query<&mut Gold>,
+    mut quest_logs: Query<&mut QuestLog>,
+    mut quest_progress_w: MessageWriter<QuestProgress>,
+    mut shop_w: MessageWriter<OpenShop>,
 ) {
     for ev in events.read() {
         let Ok(mut session) = sessions.get_mut(ev.player) else {
             continue;
         };
+        let npc = session.npc;
         let Some(tree) = registry.trees.get(&session.tree_id) else {
             continue;
         };
@@ -122,15 +143,64 @@ fn advance_sessions(
         let Some(choice) = node.choices.get(ev.choice_index) else {
             continue;
         };
+        // Own the choice data before mutating session / other components (the
+        // `choice` borrow points into the immutable DialogueRegistry resource).
+        let effects = choice.effects.clone();
+        let next = choice.next.clone();
+
         let mut should_end = false;
-        for eff in &choice.effects {
-            if matches!(eff, DialogueEffect::EndConversation) {
-                should_end = true;
+        for eff in &effects {
+            match eff {
+                DialogueEffect::EndConversation => should_end = true,
+                DialogueEffect::GiveItem { id, count } => {
+                    if id.as_str() == "gold" {
+                        if let Ok(mut g) = golds.get_mut(ev.player) {
+                            g.add(*count);
+                        }
+                    } else if let Ok(mut inv) = inventories.get_mut(ev.player) {
+                        let max = item_registry.max_stack_of(&ItemId(id.clone()));
+                        if let Some(left) = inv.add(ItemStack::new(id.clone(), *count, max)) {
+                            warn!(
+                                "[dialogue] inventaire plein : {} x{} non ajouté",
+                                left.id.0, left.count
+                            );
+                        }
+                    }
+                }
+                DialogueEffect::StartQuest { id } => {
+                    let qid = QuestId(id.clone());
+                    if let Some(def) = catalogue.get(&qid) {
+                        if let Ok(mut log) = quest_logs.get_mut(ev.player) {
+                            log.start(def);
+                        }
+                    } else {
+                        warn!("[dialogue] StartQuest : quête inconnue '{}'", id);
+                    }
+                }
+                DialogueEffect::AdvanceQuest { tag, delta } => {
+                    quest_progress_w.write(QuestProgress {
+                        tag: tag.clone(),
+                        delta: *delta,
+                    });
+                }
+                DialogueEffect::TurnInQuest { id } => {
+                    if let Ok(mut log) = quest_logs.get_mut(ev.player) {
+                        if log.turn_in(&QuestId(id.clone())) {
+                            info!("[dialogue] quête '{}' rendue (TurnedIn)", id);
+                        }
+                    }
+                }
+                DialogueEffect::OpenShop => {
+                    shop_w.write(OpenShop {
+                        player: ev.player,
+                        npc,
+                    });
+                    should_end = true;
+                }
             }
-            // TODO: route GiveItem to forgia-inventory, StartQuest to forgia-quests
         }
-        if let Some(next) = &choice.next {
-            session.current_node = next.clone();
+        if let Some(next) = next {
+            session.current_node = next;
         } else {
             should_end = true;
         }

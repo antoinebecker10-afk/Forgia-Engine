@@ -14,8 +14,23 @@ pub mod hud_ammo;
 pub mod pause_menu;
 pub mod damage_direction;
 pub mod dialogue;
+pub mod inventory_panel;
+pub mod quest_journal;
+pub mod shop_panel;
 
 use bevy::prelude::*;
+
+/// Panneau RPG centre-écran actuellement ouvert (exclusion mutuelle des modales
+/// togglées au clavier : inventaire I / journal J). Le vendeur et le dialogue
+/// sont pilotés par composant (`ShopSession` / `DialogueSession`) et prennent le
+/// pas : quand l'un est actif, inventaire/journal sont masqués. Story-58x review.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+pub enum RpgOpenPanel {
+    #[default]
+    None,
+    Inventory,
+    Journal,
+}
 
 /// Meta-plugin bundling all 6 UI sub-systems.
 /// Use this if you want every UI feature. Otherwise add sub-plugins individually.

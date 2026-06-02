@@ -1,0 +1,34 @@
+# Forgia RPG — Catalogue d'objets (ItemRegistry, story-58x Phase 0).
+# Chargé par forgia-rpg-data::items::load_items_registry au Startup.
+# `icon` optionnel : None => fallback couleur+initiales côté UI (pas d'asset icône V2 encore).
+# rarity : Common | Uncommon | Rare | Epic | Legendary
+# category : Misc | Consumable | Weapon | Armor | Quest
+
+[[items]]
+id = "iron_dagger"
+display_name = "Dague de fer"
+max_stack = 1
+buy_price = 25
+rarity = "Common"
+category = "Weapon"
+description = "Une lame simple mais fiable, parfaite pour un apprenti."
+
+[[items]]
+id = "potion_heal"
+display_name = "Potion de soin"
+max_stack = 10
+buy_price = 10
+rarity = "Common"
+category = "Consumable"
+description = "Restaure un peu de vitalité."
+heal_amount = 25
+
+[[items]]
+id = "health_potion"
+display_name = "Grande potion de soin"
+max_stack = 10
+buy_price = 20
+rarity = "Uncommon"
+category = "Consumable"
+description = "Restaure beaucoup de vitalité."
+heal_amount = 50

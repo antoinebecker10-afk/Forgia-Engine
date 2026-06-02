@@ -213,15 +213,30 @@ pub struct LineupSpawned {
     pub stable_frames: u32,
 }
 
-/// Définitions des 5 personnages humanoïdes du lineup auto-rig.
-/// (name_display, glb_path, future_dedicated_template_hint).
-const LINEUP_CHARACTERS: &[(&str, &str)] = &[
-    ("Dorin", "models/characters/Dorin.glb#Scene0"),
-    ("Mira", "models/characters/Mira.glb#Scene0"),
-    ("Apprenti", "models/characters/L'Apprenti .glb#Scene0"),
+/// Définitions des personnages humanoïdes du lineup auto-rig, qui servent aussi
+/// de PNJ interactifs RPG (story-570). `(name, glb_path, greeting)`.
+/// Le `name` produit le tree_id de dialogue via interact_system : "Dorin" →
+/// "npc_dorin", "MaitreForgeron" → "npc_maitreforgeron" (cf register_sample_dialogues).
+const LINEUP_CHARACTERS: &[(&str, &str, &str)] = &[
+    (
+        "Dorin",
+        "models/characters/Dorin.glb#Scene0",
+        "Salut l'ami ! Va voir le Maître Forgeron, il cherche de l'aide.",
+    ),
+    (
+        "Mira",
+        "models/characters/Mira.glb#Scene0",
+        "Mes étals sont ouverts ! Que cherches-tu ?",
+    ),
+    (
+        "Apprenti",
+        "models/characters/L'Apprenti .glb#Scene0",
+        "Oh... bonjour. Je m'entraîne encore.",
+    ),
     (
         "MaitreForgeron",
         "models/characters/Maitre Forgeron Célèste.glb#Scene0",
+        "Approche, apprenti. J'ai une tâche pour toi.",
     ),
 ];
 
@@ -236,60 +251,84 @@ pub(crate) fn spawn_character_lineup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut spawned: ResMut<LineupSpawned>,
-    q_player: Query<&Transform, With<Player>>,
+    anchor: Option<Res<crate::RpgVillageAnchor>>,
 ) {
     if spawned.done {
         return;
     }
-    let Ok(player_tf) = q_player.single() else {
-        return; // wait for player spawn
-    };
-
-    // Attendre stabilisation du player (village teleport peut le déplacer après
-    // spawn). On considère stable après 30 frames consécutives sans mouvement > 5cm.
-    let pos = player_tf.translation;
-    if (pos - spawned.last_player_pos).length() < 0.05 {
-        spawned.stable_frames += 1;
-    } else {
-        spawned.stable_frames = 0;
-    }
-    spawned.last_player_pos = pos;
-    if spawned.stable_frames < 30 {
+    // Story-570 : ancrage au puits / centre village (point fixe trouvable, pas
+    // relatif au joueur qui s'éloigne). L'ancre est insérée par spawn_world
+    // OnEnter(Rpg) ; on attend simplement qu'elle existe.
+    let Some(anchor) = anchor else {
         return;
-    }
+    };
+    let center = anchor.center;
 
-    // Positionnement : 4m derrière le spawn (côté +Z = camera-facing), espacés
-    // de 1.6m en X. Y au niveau du spawn pour cohérence avec le terrain.
-    let base = pos;
-    let spawn_z = base.z + 4.0;
-    let spawn_y = base.y - 0.85; // même offset que Rex (mesh.bottom au sol)
+    // Arc de 90° côté +Z (face d'arrivée naturelle), rayon 3.5m. Chaque PNJ
+    // regarde vers le puits. Y = terrain flattené - 0.85 (offset mesh-bottom Rex).
+    const RADIUS: f32 = 3.5;
+    let n = LINEUP_CHARACTERS.len();
+    let spread = std::f32::consts::FRAC_PI_2; // 90° total
+    let start_angle = std::f32::consts::FRAC_PI_2 - spread * 0.5; // centré sur +Z
+    let spawn_y = center.y - 0.85;
 
-    let n = LINEUP_CHARACTERS.len() as f32;
-    let total_width = (n - 1.0) * 1.6;
-    let start_x = base.x - total_width * 0.5;
-
-    for (i, (name, glb_path)) in LINEUP_CHARACTERS.iter().enumerate() {
-        let x = start_x + i as f32 * 1.6;
-        commands.spawn((
+    for (i, (name, glb_path, greeting)) in LINEUP_CHARACTERS.iter().enumerate() {
+        let t = if n > 1 {
+            i as f32 / (n as f32 - 1.0)
+        } else {
+            0.5
+        };
+        let angle = start_angle + t * spread;
+        let px = center.x + angle.cos() * RADIUS;
+        let pz = center.z + angle.sin() * RADIUS;
+        // Face le puits : Bevy forward = -Z, donc yaw = atan2(-dx, -dz).
+        let dx = center.x - px;
+        let dz = center.z - pz;
+        let yaw = (-dx).atan2(-dz);
+        let mut ent = commands.spawn((
             LineupCharacter,
             LineupName(name.to_string()),
+            // Story-570 : ces personnages on-brand sont les PNJ interactifs du RPG
+            // (E pour parler), ancrés au puits village. TODO(story-445) : migrer
+            // vers forgia-village-npc-spawner data-driven.
+            crate::Npc {
+                name: name.to_string(),
+                greeting: greeting.to_string(),
+            },
+            crate::InteractablePoint {
+                label: name.to_string(),
+                radius: 4.0,
+            },
             SceneRoot(asset_server.load(*glb_path)),
-            Transform::from_xyz(x, spawn_y, spawn_z)
-                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+            Transform::from_xyz(px, spawn_y, pz).with_rotation(Quat::from_rotation_y(yaw)),
             // Tous Humanoid pour l'instant ; créer template dédié per-character au besoin.
             NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
             Name::new(format!("LineupChar_{name}")),
         ));
+        // Story-58x Phase 4 : le Maître Forgeron donne ET reçoit la quête gobelins
+        // → marqueur ! (dispo) puis ? (à rendre) au-dessus de sa tête.
+        if *name == "MaitreForgeron" {
+            ent.insert(crate::QuestGiver {
+                offers: vec![forgia_rpg_data::quests::QuestId("kill_goblins".into())],
+                completes: vec![forgia_rpg_data::quests::QuestId("kill_goblins".into())],
+            });
+        } else if *name == "Mira" {
+            // Story-58x Phase 5 : Mira est la marchande (achat/vente).
+            ent.insert(forgia_rpg_data::shop::ShopInventory {
+                items: vec![
+                    forgia_rpg_data::inventory::ItemId("potion_heal".into()),
+                    forgia_rpg_data::inventory::ItemId("health_potion".into()),
+                    forgia_rpg_data::inventory::ItemId("iron_dagger".into()),
+                ],
+                sell_ratio: 0.33,
+            });
+        }
     }
 
     spawned.done = true;
     info!(
-        "[forgia-rpg::character] Lineup spawned : {} characters at x=[{:.1}..{:.1}] z={:.1} (Humanoid template, around player pos {:?})",
-        LINEUP_CHARACTERS.len(),
-        start_x,
-        start_x + total_width,
-        spawn_z,
-        base
+        "[forgia-rpg::character] {} PNJ on-brand spawnés en arc autour du puits village {:?} (rayon {:.1}m)",
+        n, center, RADIUS
     );
 }
 

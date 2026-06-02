@@ -16,6 +16,7 @@ forgia-assets = { workspace = true }
 forgia-input = { workspace = true }
 forgia-player = { workspace = true }
 forgia-combat = { workspace = true }
+forgia-damage = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-foliage = { workspace = true }
 forgia-audio = { workspace = true }

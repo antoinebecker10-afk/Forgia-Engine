@@ -13,12 +13,26 @@
 //! W2 : streaming N chunks autour joueur. W3 : Voronoi 10 biomes. W4 : preset_island.
 
 use bevy::prelude::*;
+use bevy_egui::{egui, EguiContexts};
 use forgia_audio::prelude::AudioSampleOffset;
 use forgia_core::prelude::*;
 use forgia_rpg_data::dialogue::{
-    DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueTree,
-    NodeId, StartDialogue,
+    DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueSession,
+    DialogueTree, NodeId, StartDialogue,
 };
+use forgia_rpg_data::shop::ShopSession;
+use forgia_damage::Health;
+use forgia_rpg_data::gold::Gold;
+use forgia_rpg_data::inventory::{Inventory, UseItemRequest};
+use forgia_rpg_data::items::ItemRegistry;
+use forgia_rpg_data::quests::{
+    Objective, QuestCatalogue, QuestDef, QuestId, QuestLog, QuestStatus, TrackedQuest,
+};
+use forgia_rpg_data::xp_curves::XpProgress;
+
+/// Or de départ du joueur RPG. TODO(economy-genome) : déplacer vers un genome
+/// économie data-driven (Phase ultérieure) plutôt qu'une const.
+const STARTING_GOLD: u32 = 50;
 use forgia_foliage::prelude::VegetationManager;
 use forgia_foliage::{FoliageExclusionDisc, RpgSampleOffset, VegetationTree};
 use forgia_genome_village::VillageGenome;
@@ -59,6 +73,25 @@ pub struct Npc {
 pub struct InteractablePoint {
     pub label: String,
     pub radius: f32,
+}
+
+/// Lien explicite PNJ → quêtes (pour marqueurs ! / ? story-58x Phase 4).
+/// Greffé à côté de `Npc` sur les donneurs de quête (ex Maître Forgeron).
+#[derive(Component, Default)]
+pub struct QuestGiver {
+    /// Quêtes proposées par ce PNJ (marqueur `!` si pas encore démarrées).
+    pub offers: Vec<QuestId>,
+    /// Quêtes à rendre à ce PNJ (marqueur `?` si `Completed`).
+    pub completes: Vec<QuestId>,
+}
+
+/// Ancre du village (≈ puits central) en coordonnées monde, insérée par
+/// `spawn_world` OnEnter(Rpg). Sert de point fixe trouvable pour le spawn des
+/// PNJ on-brand en arc (story-570) — au lieu d'un placement relatif au joueur
+/// qui s'éloigne. `center.y` = hauteur terrain flattené au centre village.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct RpgVillageAnchor {
+    pub center: Vec3,
 }
 
 // ── W1/W2 — World layout constants ──────────────────────────────────────
@@ -108,7 +141,7 @@ impl Plugin for ForgiaRpgPlugin {
         // Story-450 wave 4c : debug overlay toggle (F3).
         app.init_resource::<StreamingDebugOverlay>();
         app.init_resource::<forgia_anim_locomotion::RpgEntryCount>();
-        app.add_systems(Startup, register_sample_dialogues)
+        app.add_systems(Startup, (register_sample_dialogues, register_sample_quests))
             .add_systems(
                 OnEnter(GameMode::Rpg),
                 (
@@ -131,7 +164,9 @@ impl Plugin for ForgiaRpgPlugin {
                     toggle_streaming_overlay,    // wave 4c — F3 toggle
                     draw_streaming_debug_overlay, // wave 4c — gizmos
                     write_chunks_sensor,
+                    grant_rpg_player_components,
                     interact_system,
+                    apply_item_use,
                     rpg_cloud_drift_system,
                 )
                     .chain()
@@ -172,7 +207,8 @@ impl Plugin for ForgiaRpgPlugin {
             .init_resource::<forgia_anim_locomotion::FootIkSensorTimer>()
             .add_systems(
                 bevy_egui::EguiPrimaryContextPass,
-                character::draw_lineup_names.run_if(in_state(GameMode::Rpg)),
+                (character::draw_lineup_names, draw_quest_markers)
+                    .run_if(in_state(GameMode::Rpg)),
             )
             .add_systems(OnExit(GameMode::Rpg), character::cleanup_character_lineup);
     }
@@ -338,6 +374,22 @@ fn spawn_world(
     commands.entity(chunk_entity).insert(RpgWorldMarker);
     let mut chunk_mgr = ChunkManager::default();
     chunk_mgr.loaded_entities.insert(coord, chunk_entity);
+
+    // Story-570 : ancre village (≈ puits central) pour le spawn des PNJ on-brand.
+    // `character::spawn_character_lineup` lit cette ancre et place les 4 PNJ en arc
+    // autour (position fixe trouvable, pas relative au joueur). `well_y` = terrain
+    // flattené au centre. TODO(story-445) : forgia-village-npc-spawner data-driven.
+    {
+        let off = sample_offset();
+        let well_y = forgia_terrain::heightmap_at(
+            village_world_center.x + off.x,
+            village_world_center.y + off.y,
+            &terrain_cfg,
+        );
+        commands.insert_resource(RpgVillageAnchor {
+            center: Vec3::new(village_world_center.x, well_y, village_world_center.y),
+        });
+    }
 
     commands.insert_resource(terrain_cfg);
     commands.insert_resource(map_cfg);
@@ -1161,37 +1213,55 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
         }
     }
 
-    // ── Forgeron Aldric : quête mines ─────────────────────────────────────
-    let mut aldric = DialogueTree {
-        id: DialogueId("npc_forgeron_aldric".into()),
+    // Story-570 : arbres on-brand, keyés sur les noms du lineup character
+    // (interact_system dérive tree_id = "npc_<name_lowercase_snake>").
+
+    // ── Maître Forgeron Célèste : mentor / quest giver ─────────────────────
+    let mut maitre = DialogueTree {
+        id: DialogueId("npc_maitreforgeron".into()),
         root: NodeId("greet".into()),
         nodes: HashMap::new(),
     };
-    aldric.nodes.insert(
+    maitre.nodes.insert(
         NodeId("greet".into()),
         node(
-            "Forgeron Aldric",
-            "Bienvenue voyageur. Mes mines sont infestées de gobelins, j'ai besoin d'aide.",
+            "Maître Forgeron Célèste",
+            "Approche, apprenti. Des gobelins infestent mes mines — débarrasse-m'en.",
             vec![
                 (
-                    "J'accepte la quête.",
+                    "J'accepte.",
                     Some("accept"),
                     vec![DialogueEffect::StartQuest {
                         id: "kill_goblins".into(),
                     }],
                 ),
                 ("Pas maintenant.", Some("refuse"), vec![]),
+                (
+                    "(Debug) C'est déjà fait.",
+                    None,
+                    vec![
+                        // Self-start idempotent (or_insert ne reset pas) → évite
+                        // l'AdvanceQuest orphelin si non acceptée (BUG-570-06).
+                        DialogueEffect::StartQuest {
+                            id: "kill_goblins".into(),
+                        },
+                        DialogueEffect::AdvanceQuest {
+                            tag: "kill_goblin".into(),
+                            delta: 5,
+                        },
+                    ],
+                ),
                 ("Au revoir.", None, vec![DialogueEffect::EndConversation]),
             ],
         ),
     );
-    aldric.nodes.insert(
+    maitre.nodes.insert(
         NodeId("accept".into()),
         node(
-            "Forgeron Aldric",
-            "Excellent. Tuez 5 gobelins et revenez me voir. Voici une dague pour commencer.",
+            "Maître Forgeron Célèste",
+            "Bien. Cinq gobelins, puis reviens me voir. Tiens, prends cette dague.",
             vec![(
-                "Merci.",
+                "Merci, maître.",
                 None,
                 vec![
                     DialogueEffect::GiveItem {
@@ -1203,42 +1273,69 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
             )],
         ),
     );
-    aldric.nodes.insert(
+    maitre.nodes.insert(
         NodeId("refuse".into()),
         node(
-            "Forgeron Aldric",
-            "Comme vous voudrez. Mais les mines ne se nettoieront pas toutes seules...",
+            "Maître Forgeron Célèste",
+            "Hmpf. Les mines ne se nettoieront pas seules, apprenti.",
             vec![("Au revoir.", None, vec![DialogueEffect::EndConversation])],
         ),
     );
-    registry.trees.insert(aldric.id.clone(), aldric);
+    registry.trees.insert(maitre.id.clone(), maitre);
 
-    // ── Marchande Lyra : commerce ─────────────────────────────────────────
-    let mut lyra = DialogueTree {
-        id: DialogueId("npc_marchande_lyra".into()),
+    // ── Maître Forgeron : remise de quête (tree_id "_turnin", sélectionné par
+    //    interact_system quand kill_goblins est Completed) ───────────────────
+    let mut maitre_turnin = DialogueTree {
+        id: DialogueId("npc_maitreforgeron_turnin".into()),
         root: NodeId("greet".into()),
         nodes: HashMap::new(),
     };
-    lyra.nodes.insert(
+    maitre_turnin.nodes.insert(
         NodeId("greet".into()),
         node(
-            "Marchande Lyra",
-            "Mes étals sont ouverts ! Que cherchez-vous ?",
+            "Maître Forgeron Célèste",
+            "Les mines sont nettoyées ?! Tu as fait du bon travail, apprenti. Merci à toi.",
+            vec![(
+                "Avec plaisir, maître.",
+                None,
+                vec![
+                    DialogueEffect::TurnInQuest {
+                        id: "kill_goblins".into(),
+                    },
+                    DialogueEffect::EndConversation,
+                ],
+            )],
+        ),
+    );
+    registry.trees.insert(maitre_turnin.id.clone(), maitre_turnin);
+
+    // ── Mira : marchande ───────────────────────────────────────────────────
+    let mut mira = DialogueTree {
+        id: DialogueId("npc_mira".into()),
+        root: NodeId("greet".into()),
+        nodes: HashMap::new(),
+    };
+    mira.nodes.insert(
+        NodeId("greet".into()),
+        node(
+            "Mira",
+            "Mes étals sont ouverts ! Que cherches-tu ?",
             vec![
-                ("Vos potions.", Some("potions"), vec![]),
-                ("Vos armes.", Some("weapons"), vec![]),
+                ("Voir tes étals.", None, vec![DialogueEffect::OpenShop]),
+                ("Tes potions.", Some("potions"), vec![]),
+                ("Tes armes.", Some("weapons"), vec![]),
                 ("Rien, merci.", None, vec![DialogueEffect::EndConversation]),
             ],
         ),
     );
-    lyra.nodes.insert(
+    mira.nodes.insert(
         NodeId("potions".into()),
         node(
-            "Marchande Lyra",
-            "Une fiole de soin pour 10 pièces ?",
+            "Mira",
+            "Une fiole de soin, cadeau de bienvenue !",
             vec![
                 (
-                    "J'achète.",
+                    "Merci !",
                     None,
                     vec![
                         DialogueEffect::GiveItem {
@@ -1252,17 +1349,49 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
             ],
         ),
     );
-    lyra.nodes.insert(
+    mira.nodes.insert(
         NodeId("weapons".into()),
         node(
-            "Marchande Lyra",
+            "Mira",
             "Je n'ai qu'un poignard rouillé pour le moment.",
             vec![("Tant pis.", Some("greet"), vec![])],
         ),
     );
-    registry.trees.insert(lyra.id.clone(), lyra);
+    registry.trees.insert(mira.id.clone(), mira);
 
-    info!("[forgia-rpg] Registered 2 sample dialogue trees (Aldric + Lyra)");
+    // ── Dorin : villageois (lore) ──────────────────────────────────────────
+    let mut dorin = DialogueTree {
+        id: DialogueId("npc_dorin".into()),
+        root: NodeId("greet".into()),
+        nodes: HashMap::new(),
+    };
+    dorin.nodes.insert(
+        NodeId("greet".into()),
+        node(
+            "Dorin",
+            "Salut l'ami ! Le Maître Forgeron cherche de l'aide, tu devrais aller le voir.",
+            vec![("À bientôt.", None, vec![DialogueEffect::EndConversation])],
+        ),
+    );
+    registry.trees.insert(dorin.id.clone(), dorin);
+
+    // ── Apprenti : villageois (lore) ───────────────────────────────────────
+    let mut apprenti = DialogueTree {
+        id: DialogueId("npc_apprenti".into()),
+        root: NodeId("greet".into()),
+        nodes: HashMap::new(),
+    };
+    apprenti.nodes.insert(
+        NodeId("greet".into()),
+        node(
+            "L'Apprenti",
+            "Oh... bonjour. Je m'entraîne encore. Un jour je forgerai comme le Maître !",
+            vec![("Courage !", None, vec![DialogueEffect::EndConversation])],
+        ),
+    );
+    registry.trees.insert(apprenti.id.clone(), apprenti);
+
+    info!("[forgia-rpg] Registered 4 dialogue trees (MaitreForgeron, Mira, Dorin, Apprenti)");
 }
 
 /// Construit 1 mesh contenant N polylines ribbon distinctes avec **7 vertex par
@@ -1790,12 +1919,24 @@ fn cleanup_world(
 
 /// Interaction system : when player presses E, find nearest InteractablePoint
 /// within its radius. Triggers StartDialogue for NPCs, info log for buildings.
+#[allow(clippy::type_complexity)]
 fn interact_system(
-    players: Query<(Entity, &Transform, &ActionState<PlayerAction>), With<Player>>,
-    interactables: Query<(Entity, &Transform, &InteractablePoint, Option<&Npc>)>,
+    // BUG-review-#8 : garde via Without — pas de nouvelle interaction si un
+    // dialogue ou une boutique est déjà ouvert sur le Player.
+    players: Query<
+        (Entity, &Transform, &ActionState<PlayerAction>, &QuestLog),
+        (With<Player>, Without<DialogueSession>, Without<ShopSession>),
+    >,
+    interactables: Query<(
+        Entity,
+        &Transform,
+        &InteractablePoint,
+        Option<&Npc>,
+        Option<&QuestGiver>,
+    )>,
     mut start_dialogue: MessageWriter<StartDialogue>,
 ) {
-    let Ok((player_e, player_tf, action)) = players.single() else {
+    let Ok((player_e, player_tf, action, log)) = players.single() else {
         return;
     };
     if !action.just_pressed(&PlayerAction::Interact) {
@@ -1804,15 +1945,21 @@ fn interact_system(
     let player_pos = player_tf.translation;
 
     // Find closest interactable in radius
-    let mut best: Option<(Entity, f32, &InteractablePoint, Option<&Npc>)> = None;
-    for (e, tf, ip, npc) in &interactables {
+    let mut best: Option<(
+        Entity,
+        f32,
+        &InteractablePoint,
+        Option<&Npc>,
+        Option<&QuestGiver>,
+    )> = None;
+    for (e, tf, ip, npc, qg) in &interactables {
         let d = tf.translation.distance(player_pos);
         if d <= ip.radius && (best.is_none() || d < best.unwrap().1) {
-            best = Some((e, d, ip, npc));
+            best = Some((e, d, ip, npc, qg));
         }
     }
 
-    let Some((target, dist, ip, npc)) = best else {
+    let Some((target, dist, ip, npc, qgiver)) = best else {
         info!("[interact] no interactable in range");
         return;
     };
@@ -1820,13 +1967,198 @@ fn interact_system(
     info!("[interact] '{}' at {:.1}m", ip.label, dist);
 
     if let Some(npc) = npc {
+        let base = format!("npc_{}", npc.name.to_lowercase().replace(' ', "_"));
+        // BUG-review-#3 : variante turn-in si ce PNJ attend une quête Completed.
+        let has_turnin = qgiver
+            .map(|g| {
+                g.completes.iter().any(|qid| {
+                    log.entries
+                        .get(qid)
+                        .is_some_and(|s| s.status == QuestStatus::Completed)
+                })
+            })
+            .unwrap_or(false);
+        let tree_id = if has_turnin {
+            DialogueId(format!("{base}_turnin"))
+        } else {
+            DialogueId(base)
+        };
         info!("[dialogue] {} : « {} »", npc.name, npc.greeting);
         start_dialogue.write(StartDialogue {
             player: player_e,
             npc: target,
-            tree_id: DialogueId(format!("npc_{}", npc.name.to_lowercase().replace(' ', "_"))),
+            tree_id,
         });
     }
+}
+
+/// Startup : peuple le `QuestCatalogue` (story-570). L'id `kill_goblins` doit
+/// matcher l'effet `StartQuest` du dialogue d'Aldric (`register_sample_dialogues`).
+fn register_sample_quests(mut catalogue: ResMut<QuestCatalogue>) {
+    catalogue.register(QuestDef {
+        id: QuestId("kill_goblins".into()),
+        title: "Nettoyer les mines".into(),
+        description: "Le Forgeron Aldric a besoin d'aide : 5 gobelins infestent ses mines.".into(),
+        objectives: vec![Objective {
+            tag: "kill_goblin".into(),
+            label: "Tuer 5 gobelins".into(),
+            target: 5,
+        }],
+        xp_reward: 120,
+        item_rewards: vec![("gold".into(), 50), ("health_potion".into(), 2)],
+    });
+}
+
+/// Update (RPG, retry-jusqu'à-success) : greffe les components RPG sur le Player
+/// existant. Le Player est spawné par forgia-player (OnEnter InGame, partagé
+/// FPS/Roguelite/RPG) — le filtre `Without<Inventory>` rend l'op idempotente et
+/// évite de polluer les autres modes (story-570).
+fn grant_rpg_player_components(
+    mut commands: Commands,
+    players: Query<Entity, (With<Player>, Without<Inventory>)>,
+) {
+    for e in &players {
+        commands.entity(e).insert((
+            Inventory::default(),
+            QuestLog::default(),
+            XpProgress::default(),
+            Gold(STARTING_GOLD),
+            TrackedQuest::default(),
+        ));
+        info!(
+            "[forgia-rpg] RPG components (Inventory/QuestLog/XpProgress/Gold={}/TrackedQuest) attachés au Player",
+            STARTING_GOLD
+        );
+    }
+}
+
+// Story-58x Phase 3 : l'UI inventaire a migré vers
+// `forgia-ui-lib::inventory_panel` (sacs à icônes + tooltips + or, cartoon Forge).
+
+/// Update (RPG) : applique l'usage d'un objet (clic droit inventaire, story-58x
+/// Phase 3b). Consommable (`heal_amount > 0`) → soigne le Player + retire 1 ;
+/// équipement non encore implémenté (log honnête).
+fn apply_item_use(
+    mut events: MessageReader<UseItemRequest>,
+    registry: Res<ItemRegistry>,
+    mut q: Query<(&mut Inventory, &mut Health), With<Player>>,
+) {
+    for ev in events.read() {
+        let Ok((mut inv, mut hp)) = q.get_mut(ev.entity) else {
+            continue;
+        };
+        let Some(stack) = inv.slot(ev.slot) else {
+            continue;
+        };
+        let id = stack.id.clone();
+        let Some(def) = registry.get(&id) else {
+            continue;
+        };
+        if def.heal_amount > 0 {
+            let before = hp.current;
+            hp.current = (hp.current + def.heal_amount as f32).min(hp.max);
+            inv.consume_one(ev.slot);
+            info!(
+                "[forgia-rpg] {} utilisé → +{:.0} HP ({:.0}→{:.0})",
+                def.display_name,
+                hp.current - before,
+                before,
+                hp.current
+            );
+        } else {
+            info!(
+                "[forgia-rpg] {} : pas d'effet d'usage (équipement à venir)",
+                def.display_name
+            );
+        }
+    }
+}
+
+/// EguiPrimaryContextPass (RPG) : marqueurs flottants ! / ? au-dessus des PNJ
+/// donneurs de quête (story-58x Phase 4). Projection world→viewport via la
+/// caméra orbit RPG (modèle kill_popup.rs). Culling distance 60m.
+fn draw_quest_markers(
+    mut contexts: EguiContexts,
+    cam: Query<(&Camera, &GlobalTransform), With<character::RpgOrbitCamera>>,
+    givers: Query<(&Transform, &QuestGiver)>,
+    player_log: Query<&QuestLog, With<Player>>,
+) {
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+    let Ok((camera, cam_xf)) = cam.single() else {
+        return;
+    };
+    let Ok(log) = player_log.single() else {
+        return;
+    };
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_rpg_quest_markers"),
+    ));
+    let cam_pos = cam_xf.translation();
+    for (tf, giver) in &givers {
+        let pos = tf.translation;
+        if cam_pos.distance(pos) > 60.0 {
+            continue;
+        }
+        let Some((sym, color)) = marker_for(giver, log) else {
+            continue;
+        };
+        let Ok(screen) = camera.world_to_viewport(cam_xf, pos + Vec3::Y * 2.6) else {
+            continue;
+        };
+        // world_to_viewport renvoie un bevy::Vec2 → convertir en egui::Pos2.
+        let screen = egui::pos2(screen.x, screen.y);
+        painter.circle_filled(screen, 15.0, color);
+        painter.circle_stroke(screen, 15.0, egui::Stroke::new(2.5, egui::Color32::BLACK));
+        let font = egui::FontId::proportional(24.0);
+        for (dx, dy) in [(-1.5, -1.5), (1.5, -1.5), (-1.5, 1.5), (1.5, 1.5)] {
+            painter.text(
+                screen + egui::vec2(dx, dy),
+                egui::Align2::CENTER_CENTER,
+                sym,
+                font.clone(),
+                egui::Color32::BLACK,
+            );
+        }
+        painter.text(
+            screen,
+            egui::Align2::CENTER_CENTER,
+            sym,
+            font,
+            egui::Color32::WHITE,
+        );
+    }
+}
+
+/// Détermine le marqueur d'un donneur de quête selon le QuestLog du joueur.
+/// Priorité : à rendre (`?` or) > dispo (`!` or) > en cours (`?` gris).
+fn marker_for(giver: &QuestGiver, log: &QuestLog) -> Option<(&'static str, egui::Color32)> {
+    const GOLD: egui::Color32 = egui::Color32::from_rgb(244, 196, 48);
+    const GREY: egui::Color32 = egui::Color32::from_rgb(150, 150, 150);
+    for qid in &giver.completes {
+        if log
+            .entries
+            .get(qid)
+            .is_some_and(|s| s.status == QuestStatus::Completed)
+        {
+            return Some(("?", GOLD));
+        }
+    }
+    for qid in &giver.offers {
+        if !log.entries.contains_key(qid) {
+            return Some(("!", GOLD));
+        }
+    }
+    for qid in &giver.offers {
+        if log
+            .entries
+            .get(qid)
+            .is_some_and(|s| s.status == QuestStatus::Active)
+        {
+            return Some(("?", GREY));
+        }
+    }
+    None
 }
 
 #[cfg(test)]

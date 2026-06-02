@@ -3637,6 +3637,7 @@ dependencies = [
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
+ "forgia-damage",
  "forgia-foliage",
  "forgia-genome-village",
  "forgia-ik",
@@ -3764,6 +3765,7 @@ dependencies = [
  "forgia-effects",
  "forgia-input",
  "forgia-mode-roguelite",
+ "forgia-rpg-data",
  "leafwing-input-manager",
 ]
 

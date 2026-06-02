@@ -17,7 +17,36 @@
 
 pub mod boons;
 pub mod dialogue;
+pub mod gold;
 pub mod inventory;
+pub mod items;
 pub mod loot_tables;
 pub mod quests;
+pub mod shop;
 pub mod xp_curves;
+
+use bevy::prelude::*;
+
+/// Meta-plugin agrégeant les 4 sous-systèmes data-layer RPG câblés runtime :
+/// inventory + quests + xp_curves + dialogue. (loot_tables/boons sont Roguelite,
+/// ajoutés par `forgia-mode-roguelite`.)
+///
+/// Story-570 (2026-06-02) : remplace l'ajout solo de `dialogue::ForgiaDialoguePlugin`
+/// côté forgia-game pour activer la boucle dialogue → inventaire/quête → XP.
+pub struct ForgiaRpgDataPlugin;
+
+impl Plugin for ForgiaRpgDataPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins((
+            inventory::ForgiaInventoryPlugin,
+            quests::ForgiaQuestsPlugin,
+            xp_curves::ForgiaXpCurvesPlugin,
+            dialogue::ForgiaDialoguePlugin,
+            shop::ForgiaShopPlugin,
+        ));
+        // Story-58x Phase 0 : monnaie Or + catalogue d'objets data-driven.
+        app.init_resource::<items::ItemRegistry>()
+            .add_message::<gold::GoldChanged>()
+            .add_systems(Startup, items::load_items_registry);
+    }
+}

@@ -71,7 +71,17 @@ pub fn run_game() -> AppExit {
     ));
 
     // 6. Cross-mode systems (utilisés par forgia-rpg, requis init_resource avant Startup)
-    app.add_plugins(forgia_rpg_data::dialogue::ForgiaDialoguePlugin);
+    // Story-570 (2026-06-02) : meta-plugin data-layer RPG complet (inventory +
+    // quests + xp + dialogue) — câble la boucle dialogue → inventaire/quête → XP.
+    app.add_plugins(forgia_rpg_data::ForgiaRpgDataPlugin);
+    // UI modale de dialogue (rend la DialogueSession + choix cliquables).
+    app.add_plugins(forgia_ui_lib::dialogue::ForgiaUiDialoguePlugin);
+    // Journal de quêtes (J) + tracker bord d'écran (story-58x Phase 2).
+    app.add_plugins(forgia_ui_lib::quest_journal::ForgiaUiQuestPlugin);
+    // Sacs à icônes + tooltips (I) (story-58x Phase 3).
+    app.add_plugins(forgia_ui_lib::inventory_panel::ForgiaUiInventoryPlugin);
+    // Fenêtre vendeur (achat/vente + or) (story-58x Phase 5).
+    app.add_plugins(forgia_ui_lib::shop_panel::ForgiaUiShopPlugin);
 
     // 7. Mode-specific plugins (run_if interne par GameMode)
     app.add_plugins((
