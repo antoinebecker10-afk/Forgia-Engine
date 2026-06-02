@@ -236,9 +236,10 @@ pub(crate) fn draw_slot_strip(
     tuning: Res<AmmoHudTuning>,
     mut cache: Local<DrawCache>,
 ) {
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
-    {
+    // Story-571 HUD : en Roguelite, les armes sont affichées par
+    // `forgia-mode-roguelite::hud::draw_weapon_slots` (noms lore Pépin/Bourrasque/…).
+    // Ce strip vertical n'est donc gardé que pour l'Arena FPS (évite le doublon).
+    if *app_state.get() != AppMode::InGame || !matches!(*game_mode.get(), GameMode::Fps) {
         return;
     }
     if equipped.slots.is_empty() {

@@ -19,11 +19,13 @@ use forgia_core::prelude::*;
 // Story-571 — Or in-run = `Gold` (alias de forgia-rpg-data Souls) ; Souls méta = `MetaSouls`.
 use crate::run::{MetaSouls, RunTimer};
 use forgia_rpg_data::loot_tables::Souls as Gold;
+use forgia_ui_lib::hud_ammo::AmmoHudTuning;
 use forgia_ui_lib::style::*;
 
 use crate::enemies::EnemyArchetype;
 use crate::run::{RunState, StartRunEvent};
 use crate::waves::RogueliteWave;
+use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
 use forgia_player::FpsCamera;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
@@ -789,6 +791,107 @@ pub(crate) fn draw_minimap(
     );
 }
 
+// ─── Slots d'armes (bas-droite) — modèle Gunfire ──────────────────────────
+
+/// 2026-06-02 — barre des armes équipées (bas-droite), style Gunfire Reborn.
+/// Lit `EquippedWeapons.current` (forgia-combat) + le set `ARENA_V1_WEAPONS`.
+/// Chaque slot = touche (1..N) + **nom lore** de l'arme (Pépin/Bourrasque/…,
+/// les armes parlantes = identité Forgia), l'arme active surlignée or.
+/// + hint « ⇧ DASH ». Vue pure, orthogonale à l'économie.
+pub(crate) fn draw_weapon_slots(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    run_state: Option<Res<State<RunState>>>,
+    equipped: Option<Res<EquippedWeapons>>,
+    ammo_tuning: Option<Res<AmmoHudTuning>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let in_combat = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    );
+    if !in_combat {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let current = equipped.as_ref().map(|e| e.current).unwrap_or_default();
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_weapon_slots"),
+    ));
+
+    let weapons = ARENA_V1_WEAPONS;
+    let n = weapons.len() as f32;
+    let slot_w = 92.0;
+    let slot_h = 48.0;
+    let gap = 6.0;
+    let total_w = n * slot_w + (n - 1.0) * gap;
+
+    // Positionné à GAUCHE du compteur ammo (forgia-ui-lib::hud_ammo) pour éviter
+    // le chevauchement — layout Gunfire (armes à gauche, munitions à droite).
+    // Lit AmmoHudTuning (genome-driven) pour rester découplé des valeurs ammo.
+    let (ammo_pad_right, ammo_panel_w, ammo_pad_bottom) = ammo_tuning
+        .as_ref()
+        .map(|t| (t.counter_padding_right, t.counter_panel_w, t.counter_padding_bottom))
+        .unwrap_or((32.0, 280.0, 28.0));
+    let ammo_left = screen.max.x - ammo_pad_right - ammo_panel_w;
+    let start_x = ammo_left - 14.0 - total_w; // 14px de marge entre barre et ammo
+    let bottom_y = screen.max.y - ammo_pad_bottom - slot_h; // baseline alignée sur l'ammo
+
+    // Hint « ⇧ DASH » au-dessus de la barre (le dash existe — story-528).
+    text_with_outline(
+        &painter,
+        egui::pos2(start_x, bottom_y - 8.0),
+        egui::Align2::LEFT_BOTTOM,
+        "⇧ DASH",
+        egui::FontId::monospace(13.0),
+        C_TEXT_MUTED,
+        1.0,
+    );
+
+    for (i, w) in weapons.iter().enumerate() {
+        let x = start_x + i as f32 * (slot_w + gap);
+        let rect = egui::Rect::from_min_size(egui::pos2(x, bottom_y), egui::vec2(slot_w, slot_h));
+        let active = *w == current;
+        let fill = if active { FORGE_OR } else { C_BG_DARK };
+        chunky_rect_filled(&painter, rect, fill, if active { 4.0 } else { 2.0 }, 8.0);
+
+        let txt_color = if active { FORGE_CHARBON } else { C_TEXT_LIGHT };
+        // Touche (1..N) en haut-gauche.
+        text_with_outline(
+            &painter,
+            egui::pos2(rect.min.x + 7.0, rect.min.y + 4.0),
+            egui::Align2::LEFT_TOP,
+            &format!("{}", i + 1),
+            egui::FontId::monospace(14.0),
+            txt_color,
+            1.0,
+        );
+        // Nom lore de l'arme (talking weapons = identité Forgia ; fallback display_name).
+        let speaker = crate::run::weapon_to_speaker(*w);
+        let name = if speaker == "any" {
+            w.display_name()
+        } else {
+            speaker_label(speaker)
+        };
+        text_with_outline(
+            &painter,
+            egui::pos2(rect.center().x, rect.max.y - 13.0),
+            egui::Align2::CENTER_CENTER,
+            name,
+            egui::FontId::monospace(13.0),
+            txt_color,
+            1.0,
+        );
+    }
+}
+
 pub struct RogueliteHudPlugin;
 
 impl Plugin for RogueliteHudPlugin {
@@ -804,6 +907,7 @@ impl Plugin for RogueliteHudPlugin {
                 EguiPrimaryContextPass,
                 (
                     draw_minimap,
+                    draw_weapon_slots,
                     draw_wave_counter,
                     draw_currency_counters,
                     draw_portal_overlay,
