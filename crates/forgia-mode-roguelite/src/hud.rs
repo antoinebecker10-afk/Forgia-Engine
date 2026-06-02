@@ -892,6 +892,145 @@ pub(crate) fn draw_weapon_slots(
     }
 }
 
+// ─── Portrait joueur (bas-gauche, au-dessus du HP bar) ─────────────────────
+
+/// 2026-06-02 — portrait cartoon de l'Apprenti (bible v1), au-dessus du HP bar.
+/// Placeholder dessiné (visage amical) en attendant un asset dédié. Roguelite-only.
+pub(crate) fn draw_player_portrait(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    run_state: Option<Res<State<RunState>>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let in_combat = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    );
+    if !in_combat {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_portrait"),
+    ));
+
+    use std::f32::consts::PI;
+    const R: f32 = 34.0;
+    let pad = 24.0;
+    // Juste au-dessus du HP bar (bar h=32 + container 6 + pad bas), aligné à gauche.
+    let hp_outer_top = screen.max.y - pad - 32.0 - 6.0;
+    let center = egui::pos2(screen.min.x + pad + R, hp_outer_top - 10.0 - R);
+
+    // Disque visage + double anneau cartoon (cohérent minimap/slots).
+    painter.circle_filled(center, R, FORGE_BOIS_CLAIR);
+    painter.circle_stroke(center, R, egui::Stroke::new(4.0, FORGE_CHARBON));
+    painter.circle_stroke(center, R, egui::Stroke::new(2.0, FORGE_OR));
+
+    // Yeux (2 points charbon).
+    let eye_dx = R * 0.30;
+    let eye_dy = -R * 0.12;
+    let eye_r = R * 0.11;
+    painter.circle_filled(center + egui::vec2(-eye_dx, eye_dy), eye_r, FORGE_CHARBON);
+    painter.circle_filled(center + egui::vec2(eye_dx, eye_dy), eye_r, FORGE_CHARBON);
+
+    // Sourire (arc bas du visage = amical, bible "Apprenti doux").
+    arc_stroke(
+        &painter,
+        center,
+        R * 0.5,
+        0.18 * PI,
+        0.64 * PI,
+        1.0,
+        FORGE_CHARBON,
+        3.0,
+        16,
+    );
+}
+
+// ─── Indicateur sort F « Onde de choc » (bas-centre) ───────────────────────
+
+/// Story-572 — pastille du sort F (bas-centre). Prêt = anneau + « F » dorés ;
+/// en cooldown = anneau charbon + arc braise (progression) + secondes restantes.
+pub(crate) fn draw_shockwave_indicator(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    run_state: Option<Res<State<RunState>>>,
+    ability: Res<crate::shockwave::ShockwaveAbility>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let in_combat = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    );
+    if !in_combat {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_shockwave"),
+    ));
+
+    use std::f32::consts::{FRAC_PI_2, TAU};
+    const R: f32 = 30.0;
+    let center = egui::pos2(screen.center().x, screen.max.y - 64.0);
+    let ready = ability.cooldown_left <= 0.0;
+
+    painter.circle_filled(center, R, C_BG_DARK);
+    painter.circle_stroke(center, R, egui::Stroke::new(4.0, FORGE_CHARBON));
+    let ring = if ready { FORGE_OR } else { FORGE_METAL_CHAUD };
+    painter.circle_stroke(center, R, egui::Stroke::new(2.0, ring));
+
+    let f_color = if ready { FORGE_OR } else { C_TEXT_MUTED };
+    text_with_outline(
+        &painter,
+        center,
+        egui::Align2::CENTER_CENTER,
+        "F",
+        egui::FontId::monospace(24.0),
+        f_color,
+        2.0,
+    );
+
+    if !ready {
+        let frac =
+            1.0 - (ability.cooldown_left / crate::shockwave::SHOCKWAVE_COOLDOWN).clamp(0.0, 1.0);
+        arc_stroke(
+            &painter,
+            center,
+            R + 4.0,
+            -FRAC_PI_2,
+            TAU,
+            frac,
+            FORGE_BRAISE,
+            4.0,
+            24,
+        );
+        text_with_outline(
+            &painter,
+            egui::pos2(center.x, center.y + R + 12.0),
+            egui::Align2::CENTER_CENTER,
+            &format!("{:.0}", ability.cooldown_left.ceil()),
+            egui::FontId::monospace(14.0),
+            C_TEXT_MUTED,
+            1.0,
+        );
+    }
+}
+
 pub struct RogueliteHudPlugin;
 
 impl Plugin for RogueliteHudPlugin {
@@ -908,6 +1047,8 @@ impl Plugin for RogueliteHudPlugin {
                 (
                     draw_minimap,
                     draw_weapon_slots,
+                    draw_player_portrait,
+                    draw_shockwave_indicator,
                     draw_wave_counter,
                     draw_currency_counters,
                     draw_portal_overlay,

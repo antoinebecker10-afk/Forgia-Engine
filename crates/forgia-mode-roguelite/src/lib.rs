@@ -28,6 +28,7 @@ pub mod hud;
 pub mod kill_popup;
 pub mod run;
 pub mod sensor;
+pub mod shockwave;
 pub mod stations;
 pub mod toon_config;
 pub mod waves;
@@ -162,6 +163,20 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
+        // Story-572 — sort F « Onde de choc » : input+dégâts (Combat), cooldown (Combat),
+        // anim VFX (Effects). Tout gaté Roguelite.
+        app.add_systems(
+            Update,
+            (shockwave::sys_shockwave_input, shockwave::sys_tick_shockwave_cooldown)
+                .in_set(GameSet::Combat)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            shockwave::sys_animate_shockwave_vfx
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         // V7 M2.5 — Tag PickupCollector en Update (PAS OnEnter) car Player spawn
         // par autre plugin (forgia-player::OnEnter AppMode::InGame), ordre cross-plugin
         // non garanti. Guard idempotent via `Without<PickupCollector>` (no-op après tag).
@@ -180,6 +195,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .init_resource::<run::MetaSouls>()
             // Chrono de run (affiché sous la minimap).
             .init_resource::<run::RunTimer>()
+            // Story-572 — sort F « Onde de choc » (AOE).
+            .init_resource::<shockwave::ShockwaveAbility>()
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
