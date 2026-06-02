@@ -16,7 +16,9 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
-use forgia_rpg_data::loot_tables::Souls;
+// Story-571 — Or in-run = `Gold` (alias de forgia-rpg-data Souls) ; Souls méta = `MetaSouls`.
+use crate::run::MetaSouls;
+use forgia_rpg_data::loot_tables::Souls as Gold;
 use forgia_ui_lib::style::*;
 
 use crate::enemies::EnemyArchetype;
@@ -103,57 +105,66 @@ pub(crate) fn draw_wave_counter(
     );
 }
 
-// ─── Souls counter (top right) ───────────────────────────────────────────
+// ─── Compteurs monnaie (top right) — Or + Souls, modèle Gunfire ────────────
 
-pub(crate) fn draw_souls_counter(
+/// Story-571 — double compteur haut-droite : **Or** (in-run, `Gold`) au-dessus,
+/// **Âmes/Souls** (méta persistant, `MetaSouls`) en dessous. Modèle Gunfire Reborn
+/// (gemme + pièce). Or = doré, Âmes = teal.
+pub(crate) fn draw_currency_counters(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
-    souls: Res<Souls>,
+    gold: Res<Gold>,
+    meta: Res<MetaSouls>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
     }
-    let Ok(ctx) = contexts.ctx_mut() else { return };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
     let screen = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Foreground,
-        egui::Id::new("forgia_roguelite_souls"),
+        egui::Id::new("forgia_roguelite_currency"),
     ));
 
     let panel_w = 180.0;
-    let panel_h = 54.0;
+    let panel_h = 46.0;
+    let gap = 8.0;
     let pad = 18.0;
     let right_x = screen.max.x - pad;
     let top_y = screen.min.y + pad;
-    let panel_rect = egui::Rect::from_min_size(
-        egui::pos2(right_x - panel_w, top_y),
-        egui::vec2(panel_w, panel_h),
-    );
-    chunky_rect_filled(&painter, panel_rect, C_BG_DARK, 3.0, 8.0);
 
-    // Label "SOULS" en haut gauche du panel.
-    text_with_outline(
-        &painter,
-        egui::pos2(panel_rect.min.x + 10.0, panel_rect.min.y + 6.0),
-        egui::Align2::LEFT_TOP,
-        "SOULS",
-        egui::FontId::monospace(13.0),
-        C_TEXT_MUTED,
-        1.0,
-    );
+    let draw_counter = |y: f32, label: &str, value: u32, accent: egui::Color32| {
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(right_x - panel_w, y),
+            egui::vec2(panel_w, panel_h),
+        );
+        chunky_rect_filled(&painter, rect, C_BG_DARK, 3.0, 8.0);
+        text_with_outline(
+            &painter,
+            egui::pos2(rect.min.x + 10.0, rect.min.y + 5.0),
+            egui::Align2::LEFT_TOP,
+            label,
+            egui::FontId::monospace(12.0),
+            C_TEXT_MUTED,
+            1.0,
+        );
+        text_with_outline(
+            &painter,
+            egui::pos2(rect.max.x - 12.0, rect.center().y + 5.0),
+            egui::Align2::RIGHT_CENTER,
+            &format!("{value}"),
+            egui::FontId::monospace(26.0),
+            accent,
+            2.0,
+        );
+    };
 
-    // Nombre principal aligné droite.
-    let count_text = format!("{}", souls.current);
-    text_with_outline(
-        &painter,
-        egui::pos2(panel_rect.max.x - 12.0, panel_rect.center().y + 6.0),
-        egui::Align2::RIGHT_CENTER,
-        &count_text,
-        egui::FontId::monospace(28.0),
-        C_AMMO_TEXT,
-        2.0,
-    );
+    // Or (in-run) en haut, Âmes (méta) en dessous.
+    draw_counter(top_y, "OR", gold.current, FORGE_OR);
+    draw_counter(top_y + panel_h + gap, "ÂMES", meta.current, FORGE_TEAL);
 }
 
 // ─── Defeat overlay ──────────────────────────────────────────────────────
@@ -211,20 +222,18 @@ pub(crate) fn draw_defeat_overlay(
                                 .italics()
                                 .color(FORGE_CHARBON),
                         );
-                        // Story-558 AC8 — message carry-over encourageant.
-                        if last_defeat.souls_before > 0 {
-                            ui.add_space(20.0);
-                            ui.label(
-                                egui::RichText::new(format!(
-                                    "Tu gardes ◇ {} de ta forge précédente.",
-                                    last_defeat.souls_kept
-                                ))
-                                .size(20.0)
-                                .strong()
-                                .color(FORGE_CHARBON)
-                                .background_color(FORGE_OR),
-                            );
-                        }
+                        // Story-571 — Or perdu mais Âmes (méta) conservées (encourageant).
+                        ui.add_space(20.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Ton Or s'envole ({} perdus)… mais tu gardes tes ◇ {} âmes !",
+                                last_defeat.or_lost, last_defeat.souls_persistent
+                            ))
+                            .size(20.0)
+                            .strong()
+                            .color(FORGE_CHARBON)
+                            .background_color(FORGE_OR),
+                        );
                         ui.add_space(36.0);
 
                         let cartoon_btn =
@@ -267,7 +276,7 @@ pub(crate) fn draw_victory_overlay(
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
-    souls: Res<Souls>,
+    meta: Res<MetaSouls>,
     mut start_run: MessageWriter<StartRunEvent>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut next_app: ResMut<NextState<AppMode>>,
@@ -303,8 +312,8 @@ pub(crate) fn draw_victory_overlay(
                         ui.add_space(20.0);
                         ui.label(
                             egui::RichText::new(format!(
-                                "Boss vaincu — {} âmes récoltées.",
-                                souls.total_collected
+                                "Boss vaincu — {} âmes gagnées cette run !",
+                                meta.earned_run
                             ))
                             .size(20.0)
                             .color(C_TEXT_LIGHT),
@@ -671,6 +680,102 @@ pub(crate) fn draw_boss_enrage_banner(
         });
 }
 
+// ─── Minimap (top-left) — radar style Gunfire Reborn ───────────────────────
+
+/// 2026-06-02 — Minimap radar cartoon (HUD Roguelite, modèle Gunfire Reborn).
+///
+/// **Player-relative** : la carte tourne avec le joueur, la flèche reste fixe
+/// pointant vers le haut (= forward). Lit uniquement les positions ennemis +
+/// la caméra → aucune dépendance à l'économie (Or/Souls), 100% orthogonal.
+///
+/// Vue pure (pas de Resource produite) : pas de sensor dédié, les positions
+/// sont déjà couvertes par `forgia_entities_snapshot` / sensors roguelite.
+pub(crate) fn draw_minimap(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    run_state: Option<Res<State<RunState>>>,
+    q_cam: Query<&GlobalTransform, With<FpsCamera>>,
+    q_enemies: Query<(&GlobalTransform, &EnemyArchetype)>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    // Visible uniquement en combat (cohérent avec draw_wave_counter).
+    let in_combat = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    );
+    if !in_combat {
+        return;
+    }
+    let Ok(cam_tf) = q_cam.single() else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_minimap"),
+    ));
+    let screen = ctx.content_rect();
+
+    // Géométrie : cercle ancré haut-gauche.
+    const RADIUS: f32 = 72.0;
+    const RANGE_M: f32 = 55.0; // mètres couverts du centre au bord
+    let pad = 22.0;
+    let center = egui::pos2(screen.min.x + pad + RADIUS, screen.min.y + pad + RADIUS);
+    let scale = RADIUS / RANGE_M;
+
+    // Fond + double anneau cartoon (charbon épais + liseré or).
+    painter.circle_filled(center, RADIUS, C_BG_DARK);
+    painter.circle_stroke(center, RADIUS, egui::Stroke::new(4.0, FORGE_CHARBON));
+    painter.circle_stroke(center, RADIUS, egui::Stroke::new(2.0, FORGE_OR));
+
+    // Heading joueur projeté sur le plan XZ (le pitch caméra est ignoré).
+    let fwd = cam_tf.forward();
+    let mut fwd_xz = egui::vec2(fwd.x, fwd.z);
+    if fwd_xz.length() < 1e-4 {
+        fwd_xz = egui::vec2(0.0, -1.0);
+    }
+    let fwd_n = fwd_xz.normalized();
+    // Vecteur "droite" = rotation -90° du forward dans le plan.
+    let right_n = egui::vec2(-fwd_n.y, fwd_n.x);
+    let player_xz = egui::vec2(cam_tf.translation().x, cam_tf.translation().z);
+
+    // Blips ennemis (projetés repère joueur, clampés au rayon).
+    for (etf, archetype) in &q_enemies {
+        let delta = egui::vec2(etf.translation().x, etf.translation().z) - player_xz;
+        let up = delta.dot(fwd_n); // + = devant le joueur
+        let rg = delta.dot(right_n); // + = à droite du joueur
+        let mut blip = egui::vec2(rg * scale, -up * scale); // egui y vers le bas
+        if blip.length() > RADIUS - 6.0 {
+            blip = blip.normalized() * (RADIUS - 6.0);
+        }
+        let (color, r) = match archetype {
+            EnemyArchetype::Boss => (egui::Color32::from_rgb(255, 80, 200), 5.5),
+            EnemyArchetype::Tank => (egui::Color32::from_rgb(240, 70, 70), 4.5),
+            EnemyArchetype::Sniper => (egui::Color32::from_rgb(190, 100, 255), 4.0),
+            EnemyArchetype::Runner => (egui::Color32::from_rgb(255, 180, 60), 3.5),
+        };
+        let p = center + blip;
+        painter.circle_filled(p, r + 1.0, FORGE_CHARBON); // outline lisibilité
+        painter.circle_filled(p, r, color);
+    }
+
+    // Flèche joueur au centre (pointe vers le haut = forward).
+    let tip = center + egui::vec2(0.0, -9.0);
+    let bl = center + egui::vec2(-6.0, 7.0);
+    let br = center + egui::vec2(6.0, 7.0);
+    painter.add(egui::Shape::convex_polygon(
+        vec![tip, bl, br],
+        FORGE_TEAL,
+        egui::Stroke::new(2.0, FORGE_CHARBON),
+    ));
+}
+
 pub struct RogueliteHudPlugin;
 
 impl Plugin for RogueliteHudPlugin {
@@ -685,8 +790,9 @@ impl Plugin for RogueliteHudPlugin {
             .add_systems(
                 EguiPrimaryContextPass,
                 (
+                    draw_minimap,
                     draw_wave_counter,
-                    draw_souls_counter,
+                    draw_currency_counters,
                     draw_portal_overlay,
                     draw_defeat_overlay,
                     draw_victory_overlay,
