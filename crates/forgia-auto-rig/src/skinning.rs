@@ -17,8 +17,11 @@
 //! `GlobalTransform` des bones (qu'on vient de spawner en `Update`) soit valide.
 //!
 //! **Limitations Phase 1B** :
-//! - Nearest-bone simple → artefacts visibles sur articulations (acceptable
-//!   pour walk cycle ±20°, moche pour pose extrême). Heat-diffusion en Phase 2.
+//! - Poids par distance point→**segment** d'os (envelope, story-A1) : un vertex
+//!   reste assigné à son os sur toute sa longueur → le mesh suit la rotation
+//!   même en pose extrême (bras 90°). distance-to-head capturait le haut du bras
+//!   sur clavicle/chest (count_primary effondré). Heat-diffusion géodésique =
+//!   Phase 2 (meilleur blending aux articulations multi-os).
 //! - `SkinningConfig::max_verts_per_mesh` caps les meshes lourds (perf safety).
 //! - Multi-Mesh3d : on traite tous les Mesh3d descendants, chacun avec ses propres
 //!   ATTRIBUTE_JOINT_*. Tous partagent les mêmes bones.
@@ -26,7 +29,7 @@
 use bevy::mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes};
 use bevy::mesh::{Mesh, Mesh3d, VertexAttributeValues};
 use bevy::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{AutoRigStats, AutoRigged};
 
@@ -150,6 +153,38 @@ pub fn inject_skinning_for_rigged_meshes(
             .map(|p| mesh_root_inv.transform_point3(*p))
             .collect();
 
+        // Segments d'os [tête → bout] pour le skinning par distance-au-segment
+        // (story-A1) : distance-to-head capturait les vertices du haut du bras
+        // sur clavicle/chest (têtes proches) → le mesh ne suivait pas la rotation
+        // de l'os (arm_L count_primary=312). Le bout = tête de l'os enfant le
+        // plus éloigné (direction principale de l'os) ; os feuille (main/pied/
+        // tête sans enfant) → segment dégénéré = point. Les os sont parentés
+        // bone→bone (spawn_embedded_bones) donc q_children donne les enfants-os.
+        let bone_idx: HashMap<Entity, usize> =
+            bones.iter().enumerate().map(|(i, &e)| (e, i)).collect();
+        let bone_segments_local: Vec<(Vec3, Vec3)> = bones
+            .iter()
+            .enumerate()
+            .map(|(i, &e)| {
+                let head = bone_positions_local[i];
+                let mut tip = head;
+                let mut best_d2 = 0.0_f32;
+                if let Ok(children) = q_children.get(e) {
+                    for child in children.iter() {
+                        if let Some(&ci) = bone_idx.get(&child) {
+                            let cpos = bone_positions_local[ci];
+                            let d2 = (cpos - head).length_squared();
+                            if d2 > best_d2 {
+                                best_d2 = d2;
+                                tip = cpos;
+                            }
+                        }
+                    }
+                }
+                (head, tip)
+            })
+            .collect();
+
         // 3. Walk descendants → trouve les Mesh3d entities + leur GlobalTransform.
         let mut mesh3d_entities: Vec<Entity> = Vec::new();
         collect_mesh3d_descendants(mesh_root, &q_children, &q_mesh3d, &mut mesh3d_entities);
@@ -255,7 +290,7 @@ pub fn inject_skinning_for_rigged_meshes(
             let (joint_indices, joint_weights) = compute_nearest_bone_weights(
                 &positions,
                 &mesh3d_to_root_local,
-                &bone_positions_local,
+                &bone_segments_local,
                 &config,
             );
 
@@ -425,6 +460,19 @@ fn collect_mesh3d_descendants(
     }
 }
 
+/// Distance² d'un point `p` au segment `[a, b]` (clamp aux extrémités). Segment
+/// dégénéré (`a ≈ b`, os feuille sans enfant) → distance² au point `a`.
+#[inline]
+fn point_to_segment_dist_sq(p: Vec3, a: Vec3, b: Vec3) -> f32 {
+    let ab = b - a;
+    let len_sq = ab.length_squared();
+    if len_sq < 1e-12 {
+        return (p - a).length_squared();
+    }
+    let t = ((p - a).dot(ab) / len_sq).clamp(0.0, 1.0);
+    (p - (a + ab * t)).length_squared()
+}
+
 /// Pour chaque vertex (positions[i] dans le repère mesh3d-local), trouve les K
 /// bones les plus proches dans le repère mesh-root-local, pondère par
 /// `1 / distance^power` normalisé à `sum = 1.0`.
@@ -433,22 +481,24 @@ fn collect_mesh3d_descendants(
 fn compute_nearest_bone_weights(
     positions: &[[f32; 3]],
     mesh3d_to_root_local: &Mat4,
-    bone_positions_local: &[Vec3],
+    bone_segments_local: &[(Vec3, Vec3)],
     config: &SkinningConfig,
 ) -> (Vec<[u16; 4]>, Vec<[f32; 4]>) {
     let k = (config.bones_per_vertex as usize).min(4);
-    let n_bones = bone_positions_local.len();
+    let n_bones = bone_segments_local.len();
     let mut indices: Vec<[u16; 4]> = Vec::with_capacity(positions.len());
     let mut weights: Vec<[f32; 4]> = Vec::with_capacity(positions.len());
 
     for p in positions {
         let v_root = mesh3d_to_root_local.transform_point3(Vec3::from_array(*p));
 
-        // Distance² à chaque bone (squared pour éviter sqrt + diviser après).
+        // Distance² au segment de chaque os (squared pour éviter sqrt + diviser
+        // après). distance-au-segment (pas à la tête) : un vertex au milieu d'un
+        // os long lui reste assigné (story-A1, fix arm count_primary effondré).
         // K petit (≤4) → partial selection plus rapide qu'un sort complet O(n log n).
         let mut top: Vec<(usize, f32)> = Vec::with_capacity(k);
-        for (bi, bp) in bone_positions_local.iter().enumerate() {
-            let d2 = (v_root - *bp).length_squared();
+        for (bi, seg) in bone_segments_local.iter().enumerate() {
+            let d2 = point_to_segment_dist_sq(v_root, seg.0, seg.1);
             if top.len() < k {
                 top.push((bi, d2));
                 if top.len() == k {
@@ -512,6 +562,12 @@ mod tests {
         SkinningConfig::default()
     }
 
+    /// Helper : têtes d'os → segments dégénérés (`head == tip`) pour réutiliser
+    /// les tests historiques basés sur distance-au-point (story-A1).
+    fn pts(heads: &[Vec3]) -> Vec<(Vec3, Vec3)> {
+        heads.iter().map(|&h| (h, h)).collect()
+    }
+
     /// Story-454 — propriété Bevy SkinnedMesh : le vertex shader applique
     /// `world_pos = bone_global * inverse_bindpose * vertex_local`. Pour qu'au
     /// bind pose le mesh apparaisse à `mesh3d_world.transform_point(vertex_local)`
@@ -552,7 +608,7 @@ mod tests {
             Vec3::new(0.0, 0.5, -0.5),
         ];
         let (_, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
         for w in &weights {
             let sum: f32 = w.iter().sum();
             assert!(
@@ -574,7 +630,7 @@ mod tests {
             Vec3::new(0.0, 0.0, 10.0),
         ];
         let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
         assert_eq!(indices[0][0], 0, "bone 0 doit être le 1er joint");
         assert!(
             weights[0][0] > 0.9,
@@ -591,7 +647,7 @@ mod tests {
         let positions = vec![[1.0, 1.0, 1.0]];
         let bones = vec![Vec3::ZERO];
         let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
         assert_eq!(indices[0][0], 0);
         let sum: f32 = weights[0].iter().sum();
         assert!(
@@ -606,8 +662,35 @@ mod tests {
         let positions = vec![[0.0, 0.0, 0.0]; 100];
         let bones = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z, Vec3::NEG_X];
         let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &bones, &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
         assert_eq!(indices.len(), 100);
         assert_eq!(weights.len(), 100);
+    }
+
+    /// Story-A1 — distance-to-segment : un vertex au MILIEU d'un os long doit
+    /// s'assigner à cet os, même si la TÊTE d'un petit os voisin est plus proche.
+    /// Régression du bug "arm count_primary=312" (vertices du bras capturés par
+    /// clavicle/chest car distance-to-head). Échoue avec l'ancienne formule.
+    #[test]
+    fn segment_distance_beats_head_distance_for_long_bone() {
+        // bone A : os long [(0,0,0) → (0,0,4)]. bone B : petit os dont la tête
+        // est près du MILIEU de A (0.3, 0, 2). Vertex au milieu de A.
+        let positions = vec![[0.0, 0.0, 2.0]];
+        let segments = vec![
+            (Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 4.0)),
+            (Vec3::new(0.3, 0.0, 2.0), Vec3::new(0.3, 0.0, 2.1)),
+        ];
+        let (indices, weights) =
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &cfg());
+        assert_eq!(
+            indices[0][0], 0,
+            "vertex au milieu de l'os long A doit s'assigner à A (segment), pas B (tête proche)"
+        );
+        assert!(
+            weights[0][0] > weights[0][1],
+            "A doit dominer B : got A={}, B={}",
+            weights[0][0],
+            weights[0][1]
+        );
     }
 }

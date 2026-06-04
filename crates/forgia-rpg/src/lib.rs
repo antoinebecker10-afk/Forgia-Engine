@@ -194,6 +194,8 @@ impl Plugin for ForgiaRpgPlugin {
                     forgia_anim_locomotion::write_foot_ik_sensor,
                     forgia_anim_locomotion::write_walk_pose_sensor,
                     forgia_anim_locomotion::write_rex_bones_live_sensor,
+                    forgia_anim_locomotion::write_walk_dir_probe,
+                    forgia_anim_locomotion::write_anim_full_sensor,
                 )
                     .chain()
                     .in_set(GameSet::Movement)
@@ -205,6 +207,14 @@ impl Plugin for ForgiaRpgPlugin {
             .init_resource::<forgia_anim_locomotion::FootIkConfig>()
             .init_resource::<forgia_anim_locomotion::FootIkStats>()
             .init_resource::<forgia_anim_locomotion::FootIkSensorTimer>()
+            // DEBUG 2026-06-03 : freeze ON par défaut (F6 toggle ne prenait pas) →
+            // mesh figé au bind (état original non déformé) pour diagnostiquer
+            // l'alignement squelette↔mesh. Remettre .init_resource (false) après.
+            .insert_resource(forgia_anim_locomotion::AnimFreezeBind(true))
+            .add_systems(
+                Update,
+                forgia_anim_locomotion::toggle_anim_freeze_bind.run_if(in_state(GameMode::Rpg)),
+            )
             .add_systems(
                 bevy_egui::EguiPrimaryContextPass,
                 (character::draw_lineup_names, draw_quest_markers)

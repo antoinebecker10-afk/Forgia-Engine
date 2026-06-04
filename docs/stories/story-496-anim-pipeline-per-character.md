@@ -1,9 +1,53 @@
 # Story-496 — Anim pipeline per-character + bone axis validation
 
-**Status** : DRAFT
+**Status** : WIP — Incrément 1 (axe de flexion par-os) DONE 2026-06-02
 **Scale** : Standard (5-10 files, story requise)
 **Created** : 2026-05-21 PM
 **Depends on** : commit `e7fb48a` (Phase A sensors V2 + Rex baseline)
+
+## Journal d'avancement
+
+### 2026-06-02 — Incrément 1 : axe de swing par-os (le fix coeur)
+Cause racine reformulée (vs draft AC1-AC6) après design bevy-specialist : pas
+besoin de templates per-character NI de `GlobalTransform`. L'axe de flexion se
+dérive **en espace local pur** depuis `tip_local` (direction head→tip déjà
+capturée). Livré dans `crates/forgia-anim-locomotion/src/locomotion.rs` :
+- `BonePose.flex_axis: Vec3` (défaut `Vec3::X` = comportement historique préservé)
+- `derive_flex_axis(tip_local)` : os ~Y-local (jambes) → X ; os ~X-local (bras) →
+  `cross(dir, Y)` normalisé. Remplace le `from_rotation_x` hardcodé qui *roulait*
+  les bras (T-pose).
+- `compose_swing` / `compose_stance_swing` → `from_axis_angle(flex_axis, swing)`
+  (+ correction `stance.inverse()` pour la stance ±90° des bras).
+- Sensor `forgia2_rex_bones.json` enrichi : `flex_axis` + `bone_dir` + `flex_axis_dir`.
+- 4 tests unitaires `flex_axis_tests` (vert), clippy 0 warning.
+
+Backward-compatible : jambes inchangées, aucun `LocomotionTarget` actif par défaut
+→ zéro changement visible tant qu'Incrément 2 n'est pas fait.
+
+**Reste** : Incrément 2 = réactiver les 4 lignes sur Rex.glb ([character.rs:155-158])
++ valider runtime (bras non-±90°, pas de pied déformé). Incrément 3 = foot IK
+chaîne 3-segments (problème Pinocchio 1-os/jambe, différé).
+
+### 2026-06-02 (suite) — Incrément 2 réactivé + Incrément 1 CORRIGÉ (défaut d'axe)
+Vérification adversariale (workflow 5 agents bevy-specialist + qa-lead) AVANT test
+runtime : a détecté que `derive_flex_axis` (cross(dir,Y)) donnait `±Z` aux bras →
+balancement **frontal/latéral** au lieu de sagittal. Confirmé par witness run
+(`forgia2_rex_bones.json` : left_arm flex_axis_dir=`-Z`).
+
+**Données witness runtime** (release-fast 21:51, binaire frais) :
+- AABB `[-0.874..0.871] → delta +0.000` → hauteur stable, pas de saut.
+- `shin L/R=true/true, foot L/R=true/true` (20 bones Pinocchio) → genoux/chevilles OK.
+- **Tous bind ≈ identité** (`bind_was_identity` partout) → squelette repos aligné axes.
+
+**Correction** (locomotion.rs) : la flexion du walk est TOUJOURS un pivot sagittal
+autour de l'axe latéral (`LATERAL_AXIS = Vec3::X`). `derive_flex_axis(tip_local)`
+remplacé par `swing_axis_local(bind) = bind⁻¹·latéral`. Deux corrections de stance :
+- `compose_stance_swing` (bras) : annule le stance propre Rz(±90°) (déjà en place).
+- `compose_swing_inherit` (NOUVEAU, avant-bras) : annule le stance HÉRITÉ du bras
+  parent (sinon le coude fléchit latéralement). Tibias OK sans correction (parent
+  cuisse tourne autour de X, axe invariant).
+4 tests d'invariant : `world_swing_axis == latéral` pour les 3 compose-paths. Vert,
+clippy 0w. **À valider runtime** (récap ci-dessous).
 
 ## Contexte
 

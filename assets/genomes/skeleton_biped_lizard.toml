@@ -1,12 +1,20 @@
-# Template skeleton BipedLizard (Rex) — 16 bones body + 4 tail = 20 bones
+# Template skeleton BipedLizard (Rex) — 15 bones body + 4 tail = 19 bones
 # Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
 # Hot-reloadable via Bevy AssetServer (Shift+F12).
 #
 # `class` = classification anatomique déclarative (story-481).
+#
+# 2026-06-04 : retrait de `spine_mid` (4 os spine → 3). Le torse court de Rex ne
+# tenait pas 4 os de colonne (hip/spine_lower/spine_mid/chest se superposaient).
+# Chaîne réduite : hip → spine_lower (taille, seule vertèbre de flexion) → chest
+# (ancre bras/cou). `chest` re-parenté sur `spine_lower`. Indices `parent`
+# renumérotés en conséquence. Best practice : on ne garde que les os qu'on pilote
+# (la locomotion ne drive qu'un slot `spine`).
 
 [[bones]]
 name = "hip"
-pos = [0.0, 0.45, 0.02]
+# 2026-06-04 : z 0.02 → 0.05, bassin avancé "un peu" (demande user).
+pos = [0.0, 0.45, 0.05]
 class = "spine"
 
 [[bones]]
@@ -16,86 +24,85 @@ pos = [0.0, 0.53, 0.08]
 class = "spine"
 
 [[bones]]
-name = "spine_mid"
-parent = 1
-pos = [0.0, 0.63, 0.10]
-class = "spine"
-
-[[bones]]
 name = "chest"
-parent = 2
-pos = [0.0, 0.71, 0.08]
+parent = 1
+# 2026-06-04 : y 0.71 → 0.74, remonte le point vert chest au niveau des épaules
+# (l'embedder place les spine via arc-length t le long du path médial ; y plus
+# haut = t plus grand = échantillonne le path plus haut). Reste sous neck (0.76).
+pos = [0.0, 0.74, 0.08]
 class = "spine"
 
 [[bones]]
 name = "neck"
-parent = 3
+parent = 2
 pos = [0.0, 0.76, 0.06]
 class = "spine"
 
 [[bones]]
 name = "head"
-parent = 4
+parent = 3
 pos = [0.0, 0.82, 0.10]
 class = "head"
 
 [[bones]]
 name = "arm_L"
-parent = 3
+parent = 2
 pos = [-0.18, 0.71, 0.0]
 class = "arm"
 
 [[bones]]
 name = "forearm_L"
-parent = 6
+parent = 5
 pos = [-0.36, 0.71, 0.0]
 class = "arm"
 
 [[bones]]
 name = "arm_R"
-parent = 3
+parent = 2
 pos = [0.18, 0.71, 0.0]
 class = "arm"
 
 [[bones]]
 name = "forearm_R"
-parent = 8
+parent = 7
 pos = [0.36, 0.71, 0.0]
 class = "arm"
 
 [[bones]]
 name = "thigh_L"
 parent = 0
-pos = [-0.10, 0.37, 0.0]
+# 2026-06-04 : z 0.06 → 0.09, tête de cuisse (bassin) avancée "un peu" (user).
+pos = [-0.10, 0.37, 0.09]
 class = "leg"
 
 [[bones]]
 name = "shin_L"
-parent = 10
+parent = 9
 pos = [-0.10, 0.20, 0.12]
 class = "leg"
 
 [[bones]]
 name = "foot_L"
-parent = 11
+parent = 10
 pos = [-0.10, 0.04, 0.06]
 class = "leg"
 
 [[bones]]
 name = "thigh_R"
 parent = 0
-pos = [0.10, 0.37, 0.0]
+# 2026-06-04 : z 0.06 → 0.09, tête de cuisse (bassin) avancée "un peu" (user).
+pos = [0.10, 0.37, 0.09]
 class = "leg"
 
 [[bones]]
 name = "shin_R"
-parent = 13
+parent = 12
 pos = [0.10, 0.20, 0.12]
 class = "leg"
 
 [[bones]]
 name = "foot_R"
-parent = 14
+parent = 13
 pos = [0.10, 0.04, 0.06]
 class = "leg"
 
@@ -107,18 +114,18 @@ class = "tail"
 
 [[bones]]
 name = "tail_02"
-parent = 16
+parent = 15
 pos = [0.0, 0.39, -0.22]
 class = "tail"
 
 [[bones]]
 name = "tail_03"
-parent = 17
+parent = 16
 pos = [0.0, 0.37, -0.32]
 class = "tail"
 
 [[bones]]
 name = "tail_04"
-parent = 18
-pos = [0.0, 0.35, -0.42]
+parent = 17
+pos = [0.0, 0.27, -0.42]
 class = "tail"

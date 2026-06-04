@@ -373,8 +373,9 @@ impl SkeletonTemplate {
         head_y_frac: f32,
         arm_span_half_frac: f32,
         torso_x_offset_frac: f32,
-        // disabled : double-counterait forward lean lizard
-        _torso_z_offset_frac: f32,
+        // 2026-06-03 : ré-activé (lizard) → applique l'offset Z du torse au tronc/
+        // bassin/bras/queue, sinon ils restent en arrière du corps mesh (signalé user).
+        torso_z_offset_frac: f32,
     ) -> Self {
         let find_y = |needle: &str| -> Option<f32> {
             self.bones
@@ -448,9 +449,20 @@ impl SkeletonTemplate {
                 } else {
                     0.0
                 };
+                // 2026-06-03 : offset Z du torse → le tronc/bassin/bras/queue suivent
+                // le corps mesh avancé (torso_z_off≈0.11). RÉGLER TORSO_Z_FACTOR pour
+                // avancer/reculer le bassin (1.0 = plein offset, 0 = aucun). Les jambes
+                // gardent leur Z propre (embedder path + biais genou).
+                const TORSO_Z_FACTOR: f32 = 0.45;
+                let apply_z_offset = torso_z_offset_frac.abs() > 0.006;
+                let z_offset = if apply_z_offset {
+                    torso_z_offset_frac * TORSO_Z_FACTOR
+                } else {
+                    0.0
+                };
                 let (x_final, z_final) = match class {
                     BoneClass::Spine | BoneClass::Head | BoneClass::Arm | BoneClass::Tail => {
-                        (x_scaled + x_offset, z)
+                        (x_scaled + x_offset, z + z_offset)
                     }
                     BoneClass::Leg | BoneClass::Other => (x_scaled, z),
                 };
@@ -508,31 +520,32 @@ impl SkeletonTemplate {
         ])
     }
 
-    /// Template biped lézard (Rex) 20 bones (16 body + 4 tail).
+    /// Template biped lézard (Rex) 19 bones (15 body + 4 tail).
     /// **Source de vérité** : `assets/genomes/skeleton_biped_lizard.toml`.
+    /// 2026-06-04 : `spine_mid` retiré (4 os spine → 3), `chest` re-parenté sur
+    /// `spine_lower`, indices `parent` renumérotés. Cf TOML pour le détail.
     pub fn biped_lizard() -> Self {
         use BoneClass::*;
         Self::from_data(&[
-            ("hip", None, [0.0, 0.45, 0.02], Spine),
+            ("hip", None, [0.0, 0.45, 0.05], Spine),
             ("spine_lower", Some(0), [0.0, 0.53, 0.08], Spine),
-            ("spine_mid", Some(1), [0.0, 0.63, 0.10], Spine),
-            ("chest", Some(2), [0.0, 0.71, 0.08], Spine),
-            ("neck", Some(3), [0.0, 0.76, 0.06], Spine),
-            ("head", Some(4), [0.0, 0.82, 0.10], Head),
-            ("arm_L", Some(3), [-0.18, 0.71, 0.0], Arm),
-            ("forearm_L", Some(6), [-0.36, 0.71, 0.0], Arm),
-            ("arm_R", Some(3), [0.18, 0.71, 0.0], Arm),
-            ("forearm_R", Some(8), [0.36, 0.71, 0.0], Arm),
-            ("thigh_L", Some(0), [-0.10, 0.37, 0.0], Leg),
-            ("shin_L", Some(10), [-0.10, 0.20, 0.12], Leg),
-            ("foot_L", Some(11), [-0.10, 0.04, 0.06], Leg),
-            ("thigh_R", Some(0), [0.10, 0.37, 0.0], Leg),
-            ("shin_R", Some(13), [0.10, 0.20, 0.12], Leg),
-            ("foot_R", Some(14), [0.10, 0.04, 0.06], Leg),
+            ("chest", Some(1), [0.0, 0.74, 0.08], Spine),
+            ("neck", Some(2), [0.0, 0.76, 0.06], Spine),
+            ("head", Some(3), [0.0, 0.82, 0.10], Head),
+            ("arm_L", Some(2), [-0.18, 0.71, 0.0], Arm),
+            ("forearm_L", Some(5), [-0.36, 0.71, 0.0], Arm),
+            ("arm_R", Some(2), [0.18, 0.71, 0.0], Arm),
+            ("forearm_R", Some(7), [0.36, 0.71, 0.0], Arm),
+            ("thigh_L", Some(0), [-0.10, 0.37, 0.09], Leg),
+            ("shin_L", Some(9), [-0.10, 0.20, 0.12], Leg),
+            ("foot_L", Some(10), [-0.10, 0.04, 0.06], Leg),
+            ("thigh_R", Some(0), [0.10, 0.37, 0.09], Leg),
+            ("shin_R", Some(12), [0.10, 0.20, 0.12], Leg),
+            ("foot_R", Some(13), [0.10, 0.04, 0.06], Leg),
             ("tail_01", Some(0), [0.0, 0.41, -0.12], Tail),
-            ("tail_02", Some(16), [0.0, 0.39, -0.22], Tail),
-            ("tail_03", Some(17), [0.0, 0.37, -0.32], Tail),
-            ("tail_04", Some(18), [0.0, 0.35, -0.42], Tail),
+            ("tail_02", Some(15), [0.0, 0.39, -0.22], Tail),
+            ("tail_03", Some(16), [0.0, 0.37, -0.32], Tail),
+            ("tail_04", Some(17), [0.0, 0.27, -0.42], Tail),
         ])
     }
 
@@ -950,11 +963,17 @@ mod tests {
     }
 
     #[test]
-    fn biped_lizard_has_20_bones_with_root_hip() {
+    fn biped_lizard_has_19_bones_with_root_hip() {
         let t = SkeletonTemplate::biped_lizard();
-        assert_eq!(t.bones.len(), 20, "biped_lizard = 16 body + 4 tail");
+        // 2026-06-04 : spine_mid retiré (4 os spine → 3) → 15 body + 4 tail.
+        assert_eq!(t.bones.len(), 19, "biped_lizard = 15 body + 4 tail");
         assert_eq!(t.bones[0].name, "hip");
         assert!(t.bones[0].parent.is_none());
+        // spine_mid ne doit plus exister ; chest est re-parenté sur spine_lower.
+        assert!(!t.bones.iter().any(|b| b.name == "spine_mid"));
+        let chest = t.bones.iter().position(|b| b.name == "chest").unwrap();
+        let spine_lower = t.bones.iter().position(|b| b.name == "spine_lower").unwrap();
+        assert_eq!(t.bones[chest].parent, Some(spine_lower));
     }
 
     #[test]

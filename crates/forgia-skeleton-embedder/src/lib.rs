@@ -541,12 +541,18 @@ fn embed_one_chain(
                 let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
                 (Vec3::new(template_pos.x, path_pos.y, path_pos.z), path_r)
             } else if is_leg_y_lock {
-                // Leg : Y ET Z depuis template (knee placé pile à fraction et
-                // forward bias contrôlé pour digitigrade Rex). X depuis path
-                // pour suivre la centerline lateral si bow leg.
+                // Leg : Y depuis template (hauteur genou), X depuis path médial
+                // (centerline latérale). Z = centerline médial + biais vers le
+                // template (digitigrade lizard : genou en avant, shin z=0.12, cuisse
+                // z=0, pied z=0.06). 2026-06-03 : pur path_pos.z mettait le genou trop
+                // en ARRIÈRE (centerline) pour le raptor → on l'avance via le biais.
+                // RÉGLER LEG_Z_FORWARD_BIAS pour avancer/reculer le ring genou
+                // (0.0 = centerline pure, 1.0 = template forward digitigrade plein).
+                const LEG_Z_FORWARD_BIAS: f32 = 0.6;
                 let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+                let z_final = path_pos.z + LEG_Z_FORWARD_BIAS * (template_pos.z - path_pos.z);
                 (
-                    Vec3::new(path_pos.x, template_pos.y, template_pos.z),
+                    Vec3::new(path_pos.x, template_pos.y, z_final),
                     path_r,
                 )
             } else {

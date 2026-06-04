@@ -27,8 +27,6 @@ use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
-#[allow(unused_imports)]
-// LocomotionTarget/Template gardés pour réactivation future (cf spawn_rex_character)
 use forgia_anim_locomotion::{
     LocomotionBoneCache, LocomotionState, LocomotionTarget, LocomotionTemplate, ProcBodyAnim,
     AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_BREATH_AMP, IDLE_BREATH_FREQ,
@@ -38,7 +36,6 @@ use forgia_anim_locomotion::{
 use forgia_auto_rig::{AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
 use forgia_player::prelude::{FpsCamera, Player};
-#[allow(unused_imports)] // SkeletonTemplateId gardé pour réactivation future
 use forgia_skeleton_template::SkeletonTemplateId;
 use std::f32::consts::TAU;
 
@@ -135,27 +132,20 @@ pub(crate) fn spawn_rex_character(
                     SceneRoot(asset_server.load("models/characters/Rex.glb#Scene0")),
                     Transform::from_xyz(0.0, -0.85, 0.0)
                         .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-                    NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
-                    // ── 2026-05-21 — Anim pipeline DESACTIVÉ sur Rex (baseline) ──
-                    // Tentative ré-activation (TOML stance=0) a révélé un problème
-                    // architectural plus profond : Pinocchio embed les bones avec
-                    // des axes locaux qui varient selon la morphologie du mesh.
-                    // Rex.glb (clone Kael) a left_arm bone HORIZONTAL (tip_local
-                    // X=-0.296, Y=0) → proc_walk swing autour de X local rotate
-                    // hors plan → foot/arm deformation (cf forgia2_rex_bones.json).
-                    //
-                    // Story dédiée requise pour : per-character template variants,
-                    // bone axis convention validation, foot IK calibration par
-                    // mesh source. Cf reference_arm_rest_z_rad_t_pose_assumption.md
-                    // + reference_pinocchio_flat_bone_hierarchy.md.
-                    //
-                    // Baseline propre confirmée : lineup (spawn_character_lineup)
-                    // utilise même template SANS ces components → rend correctement.
-                    //
-                    // LocomotionTarget,
-                    // LocomotionBoneCache::default(),
-                    // ProcBodyAnim::default(),
-                    // LocomotionTemplate(SkeletonTemplateId::Humanoid),
+                    NeedsAutoRig::Template(AutoRigTemplate::BipedLizard),
+                    // ── 2026-06-02 — Anim pipeline RÉACTIVÉ (story-496 Incrément 1) ──
+                    // Cause historique (T-pose + pied déformé) corrigée : proc_walk
+                    // ne suppose plus que le X local d'un os est l'axe de flexion.
+                    // Le walk pivote chaque membre autour de l'axe latéral du perso
+                    // (forgia_anim_locomotion::swing_axis_local + correction stance
+                    // propre/hérité) : flexion sagittale correcte bras ET jambes.
+                    // Witness : forgia2_rex_bones.json champs flex_axis /
+                    // flex_axis_dir. Foot IK reste inactif (Pinocchio 1-os/jambe) →
+                    // Incrément 3. Réversible : recommenter les 4 lignes ci-dessous.
+                    LocomotionTarget,
+                    LocomotionBoneCache::default(),
+                    ProcBodyAnim::default(),
+                    LocomotionTemplate(SkeletonTemplateId::BipedLizard),
                 ));
             });
         }
