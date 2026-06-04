@@ -140,17 +140,15 @@ fn main_menu_ui(
                 );
                 ui.add_space(60.0);
 
-                if ui
-                    .add(
-                        egui::Button::new(egui::RichText::new("⚔  FPS Arena").size(28.0))
-                            .min_size(egui::vec2(280.0, 60.0)),
-                    )
-                    .clicked()
-                {
-                    next_game.set(GameMode::Fps);
-                    next_app.set(AppMode::InGame);
-                }
-                ui.add_space(20.0);
+                // Mode "FPS Arena" retiré du menu (2026-06-04, décision user) :
+                // l'arène nue était redondante avec Roguelite (arène décorée =
+                // seule arène de jeu désormais). Le variant `GameMode::Fps` reste
+                // dans l'enum : de nombreux systèmes partagés (HUD ammo/hp/wave,
+                // viewmodel, killfeed, screen-flash, sensors, système de vagues)
+                // sont gatés `Fps | Roguelite`, et `forgia-mode-roguelite` réutilise
+                // `forgia-mode-fps-arena` (TargetCube/WaveState). Sans entrée menu,
+                // `OnEnter(Fps)` ne tire plus jamais → l'arène nue ne se spawn pas.
+                // Suppression complète du crate = refactor séparé (Roguelite en dépend).
                 if ui
                     .add(
                         egui::Button::new(egui::RichText::new("🗺  RPG OpenWorld").size(28.0))
