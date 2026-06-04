@@ -23,9 +23,11 @@ use forgia_core::prelude::*;
 
 pub mod boons_apply;
 pub mod coffre_sensor;
+pub mod decor;
 pub mod enemies;
 pub mod hud;
 pub mod kill_popup;
+pub mod poi;
 pub mod run;
 pub mod sensor;
 pub mod shockwave;
@@ -144,6 +146,92 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             toon_config::sys_write_toon_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-561 (2026-06-03) — POI gameplay (loot vault + lava hazard + forge)
+        // greffé sur les anchors AnchorKind::PoiSlot de forgia-stage. Genome
+        // roguelite_poi_gameplay.toml hot-reload mtime. Sensor forgia2_stage_poi.json.
+        app.init_resource::<poi::PoiStats>();
+        app.add_systems(Startup, poi::sys_init_poi_genome);
+        app.add_systems(OnEnter(GameMode::Roguelite), poi::sys_reset_poi_stats);
+        app.add_systems(
+            Update,
+            (
+                poi::sys_hot_reload_poi_genome,
+                // Reset POI au départ de run (couvre le retry in-place REFORGER /
+                // Nouvelle Run où OnEnter ne tire pas). Ordonné APRÈS sys_start_run
+                // (RunSeed frais visible) et AVANT reconcile (despawn+clear flushés
+                // avant re-spawn, même frame via AutoInsertApplyDeferred Bevy 0.18).
+                poi::sys_clear_poi_on_run_start.after(run::sys_start_run),
+                poi::sys_reconcile_poi_anchors.after(poi::sys_clear_poi_on_run_start),
+            )
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            poi::sys_loot_vault_walkover
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            poi::sys_lava_tick
+                .in_set(GameSet::Combat)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            poi::sys_write_poi_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-562b (2026-06-03) — props décoratifs procéduraux pour remplir
+        // l'arène (rochers/cristaux/piliers en anneau + débris au sol). Crate
+        // libre, zéro touche forgia-stage. Genome roguelite_decor.toml hot-reload.
+        app.add_systems(
+            Startup,
+            (decor::sys_init_decor_genome, decor::sys_load_decor_assets),
+        );
+        app.add_systems(
+            Update,
+            (
+                decor::sys_hot_reload_decor_genome,
+                decor::sys_reconcile_decor,
+                decor::sys_calibrate_decor,
+            )
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            decor::sys_write_decor_sensor.in_set(GameSet::Sensors),
+        );
+        // 2026-06-03 — pièces d'or qui tournent (CoinSpin) + aimantation des
+        // pickups vers le joueur pendant l'écran de choix (Coffre) : plus besoin
+        // de la caméra pour récupérer l'or restant (Hadès/Vampire Survivors).
+        app.add_systems(
+            Update,
+            run::sys_magnetize_pickups_on_break
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            sys_spin_coins
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Wisps d'âme (Âmes méta) : collecte walk-over → MetaSouls + anim flottante.
+        app.add_systems(
+            Update,
+            (run::sys_collect_soul_wisps, run::sys_animate_soul_wisps)
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Caméra : clic HORS du panel de choix → look (override curseur/block_look).
+        app.add_systems(
+            Update,
+            hud::sys_break_look_override
+                .in_set(GameSet::UI)
+                .run_if(in_state(GameMode::Roguelite)),
         );
         // Observer drop pickup on enemy death (filtré par EnemyArchetype).
         app.add_observer(run::obs_roguelite_enemy_death);
@@ -273,6 +361,18 @@ impl Plugin for ForgiaModeRoguelitePlugin {
 
 fn reset_wave_resource(mut wave: ResMut<waves::RogueliteWave>) {
     *wave = waves::RogueliteWave::default();
+}
+
+/// Marqueur sur les pickups pièce d'or (GLB Coin) — fait tourner la pièce.
+#[derive(Component)]
+pub struct CoinSpin;
+
+/// Fait tourner les pièces d'or sur elles-mêmes (lecture "pièce").
+fn sys_spin_coins(time: Res<Time>, mut q: Query<&mut Transform, With<CoinSpin>>) {
+    let dr = time.delta_secs() * 2.6;
+    for mut t in &mut q {
+        t.rotate_y(dr);
+    }
 }
 
 /// 2026-05-21 — Auto-fire StartRunEvent OnEnter(GameMode::Roguelite).

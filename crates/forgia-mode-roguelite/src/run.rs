@@ -9,7 +9,9 @@
 //! gérée par un terminal parallèle (V7 dédié cleanup orchestration). Ce fichier
 //! n'inclut PAS le system `sys_cleanup_run_markers` pour éviter conflit merge.
 
+use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
+use bevy::scene::SceneRoot;
 use bevy::state::state_scoped::DespawnOnExit;
 use forgia_core::prelude::*;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
@@ -263,6 +265,7 @@ pub fn obs_roguelite_enemy_death(
     time: Res<Time>,
     q_player_hp: Query<&forgia_damage::Health, With<forgia_player::Player>>,
     equipped: Option<Res<EquippedWeapons>>,
+    asset_server: Res<AssetServer>,
 ) {
     let target = event.target;
     let Ok((xf, archetype)) = enemies_q.get(target) else {
@@ -329,61 +332,103 @@ pub fn obs_roguelite_enemy_death(
     let base_y = 0.85;
     let pos = xf.translation.with_y(base_y);
     // TODO(story-471..479): PickupKind supprimé — is_heart bool remplace kind == PickupKind::Heart
-    let core_radius = if is_heart { 0.35 } else { 0.28 };
-    let halo_radius = if is_heart { 0.70 } else { 0.55 };
-
-    let core_mat = materials.add(StandardMaterial {
-        base_color: Color::srgba(color.0, color.1, color.2, 1.0),
-        emissive,
-        metallic: 0.0,
-        perceptual_roughness: 0.4,
-        ..default()
-    });
-    let halo_mat = materials.add(StandardMaterial {
-        base_color: Color::srgba(color.0 * 0.6, color.1 * 0.6, color.2 * 0.6, 0.30),
-        emissive: LinearRgba::new(
-            emissive.red * 0.5,
-            emissive.green * 0.5,
-            emissive.blue * 0.5,
-            1.0,
-        ),
-        alpha_mode: AlphaMode::Blend,
-        cull_mode: None,
-        unlit: true,
-        ..default()
-    });
-    let core_mesh = meshes.add(Sphere::new(core_radius));
-    let halo_mesh = meshes.add(Sphere::new(halo_radius));
-
-    // TODO(story-471..479): PickupKind + PickupAnimState supprimés de forgia_loot_tables
     let label = if is_heart {
         format!("RoguelitePickup_heart{value}")
     } else {
         format!("RoguelitePickup_{value}souls")
     };
-    let parent_id = commands
-        .spawn((
-            Name::new(label),
-            RogueliteRunMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            Pickup {
-                value,
-                lifetime_secs: 30.0,
-                collect_radius: 2.5,
-            },
-            // PickupAnimState supprimé — disabled
-            Mesh3d(core_mesh),
-            MeshMaterial3d(core_mat),
-            Transform::from_translation(pos),
-        ))
-        .id();
-    commands.spawn((
-        ChildOf(parent_id),
-        Name::new("PickupHalo"),
-        Mesh3d(halo_mesh),
-        MeshMaterial3d(halo_mat),
-        Transform::default(),
-    ));
+    let parent_id = if is_heart {
+        // Cœur : sphère emissive (inchangé).
+        let core_mat = materials.add(StandardMaterial {
+            base_color: Color::srgba(color.0, color.1, color.2, 1.0),
+            emissive,
+            metallic: 0.0,
+            perceptual_roughness: 0.4,
+            ..default()
+        });
+        let core_mesh = meshes.add(Sphere::new(0.35));
+        commands
+            .spawn((
+                Name::new(label),
+                RogueliteRunMarker,
+                DespawnOnExit(GameMode::Roguelite),
+                Pickup {
+                    value,
+                    lifetime_secs: 30.0,
+                    collect_radius: 2.5,
+                },
+                Mesh3d(core_mesh),
+                MeshMaterial3d(core_mat),
+                Transform::from_translation(pos),
+            ))
+            .id()
+    } else {
+        // Or : vraie PIÈCE GLB (Coin_001 pack Inferno) qui tourne. Scale ~ valeur.
+        let coin = asset_server
+            .load(GltfAssetLabel::Scene(0).from_asset("models/environment/inferno/Coin_001.glb"));
+        let coin_scale = 1.3 + (value.min(60) as f32) * 0.01;
+        commands
+            .spawn((
+                Name::new(label),
+                RogueliteRunMarker,
+                DespawnOnExit(GameMode::Roguelite),
+                Pickup {
+                    value,
+                    lifetime_secs: 30.0,
+                    collect_radius: 2.5,
+                },
+                SceneRoot(coin),
+                Transform::from_translation(pos).with_scale(Vec3::splat(coin_scale)),
+                crate::CoinSpin,
+            ))
+            .id()
+    };
+    // Halo glow uniquement pour le cœur — la pièce d'or n'a PAS de sphère autour.
+    if is_heart {
+        let halo_mat = materials.add(StandardMaterial {
+            base_color: Color::srgba(color.0 * 0.6, color.1 * 0.6, color.2 * 0.6, 0.30),
+            emissive: LinearRgba::new(
+                emissive.red * 0.5,
+                emissive.green * 0.5,
+                emissive.blue * 0.5,
+                1.0,
+            ),
+            alpha_mode: AlphaMode::Blend,
+            cull_mode: None,
+            unlit: true,
+            ..default()
+        });
+        let halo_mesh = meshes.add(Sphere::new(0.70));
+        commands.spawn((
+            ChildOf(parent_id),
+            Name::new("PickupHalo"),
+            Mesh3d(halo_mesh),
+            MeshMaterial3d(halo_mat),
+            Transform::default(),
+        ));
+    }
+
+    // Wisps d'âme (Âmes méta) : le boss en lâche plusieurs, les ennemis normaux
+    // parfois (~8%). Visuel bleu-teal fantomatique, distinct des pièces d'or.
+    let wisp_count = if matches!(*archetype, crate::EnemyArchetype::Boss) {
+        4
+    } else if roll % 100 < 8 {
+        1
+    } else {
+        0
+    };
+    for i in 0..wisp_count {
+        let s = seed.wrapping_add((i as u64).wrapping_mul(97).wrapping_add(31));
+        let ox = ((s % 13) as f32 - 6.0) * 0.35;
+        let oz = (((s >> 4) % 13) as f32 - 6.0) * 0.35;
+        spawn_soul_wisp(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            pos + Vec3::new(ox, 0.0, oz),
+            s,
+        );
+    }
 }
 
 /// Tag le Player avec PickupCollector pour que `forgia_loot_tables::sys_collect_pickups`
@@ -403,6 +448,162 @@ pub fn sys_tag_player_as_collector(
             ec.insert(PickupCollector);
             info!("[roguelite] Player {e:?} tagged PickupCollector");
         }
+    }
+}
+
+/// QoL — aimante les pickups (or + cœurs) vers le joueur quand l'écran de choix
+/// (Coffre du Forgeron) est ouvert. Plus besoin de tourner la caméra pour
+/// récupérer l'or restant : il vole vers le joueur (collecté par
+/// `sys_collect_pickups` à l'arrivée, radius 2.5). Pattern Hadès/Vampire Survivors.
+pub fn sys_magnetize_pickups_on_break(
+    time: Res<Time>,
+    coffre: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
+    q_player: Query<&Transform, With<PickupCollector>>,
+    mut q_pickups: Query<&mut Transform, (With<Pickup>, Without<PickupCollector>, Without<SoulWisp>)>,
+    mut q_wisps: Query<&mut Transform, (With<SoulWisp>, Without<PickupCollector>, Without<Pickup>)>,
+) {
+    let Some(coffre) = coffre else {
+        return;
+    };
+    if !coffre.is_open {
+        return;
+    }
+    let Some(player) = q_player.iter().next() else {
+        return;
+    };
+    let ppos = player.translation;
+    let step = 38.0 * time.delta_secs();
+    for mut pt in &mut q_pickups {
+        let to = ppos - pt.translation;
+        let d = to.length();
+        if d > 0.05 {
+            pt.translation += to / d * step.min(d);
+        }
+    }
+    for mut pt in &mut q_wisps {
+        let to = ppos - pt.translation;
+        let d = to.length();
+        if d > 0.05 {
+            pt.translation += to / d * step.min(d);
+        }
+    }
+}
+
+// ─── Wisps d'âme (Âmes méta) — pickup distinct des coins (Or) ─────────────────
+
+/// Valeur en Âmes d'un wisp ramassé.
+pub const SOUL_WISP_VALUE: u32 = 2;
+
+/// Pickup wisp d'âme : flotte + bobbe + tourne, bleu-teal fantomatique.
+/// Distinct des coins (Or) : donne des **Âmes** (`MetaSouls`), pas de l'Or.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct SoulWisp {
+    pub value: u32,
+    pub collect_radius: f32,
+    pub base_y: f32,
+    pub phase: f32,
+}
+
+/// Spawn un wisp d'âme procédural (core sphère emissive + halo translucide +
+/// pointe flamme) à `pos`. Flotte à ~1 m du sol.
+pub fn spawn_soul_wisp(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    pos: Vec3,
+    seed: u64,
+) {
+    let core_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.25, 0.85, 0.95),
+        emissive: LinearRgba::new(0.3, 2.6, 3.2, 1.0),
+        metallic: 0.0,
+        perceptual_roughness: 0.3,
+        ..default()
+    });
+    let halo_mat = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.35, 0.9, 1.0, 0.22),
+        emissive: LinearRgba::new(0.2, 1.3, 1.6, 1.0),
+        alpha_mode: AlphaMode::Blend,
+        cull_mode: None,
+        unlit: true,
+        ..default()
+    });
+    let core_mesh = meshes.add(Sphere::new(0.26));
+    let halo_mesh = meshes.add(Sphere::new(0.52));
+    let tip_mesh = meshes.add(Cone {
+        radius: 0.14,
+        height: 0.46,
+    });
+    let base_y = 1.0;
+    let phase = (seed % 628) as f32 * 0.01;
+    let parent = commands
+        .spawn((
+            Name::new(format!("RogueliteSoulWisp_{SOUL_WISP_VALUE}")),
+            RogueliteRunMarker,
+            DespawnOnExit(GameMode::Roguelite),
+            SoulWisp {
+                value: SOUL_WISP_VALUE,
+                collect_radius: 2.5,
+                base_y,
+                phase,
+            },
+            Mesh3d(core_mesh),
+            MeshMaterial3d(core_mat.clone()),
+            Transform::from_translation(pos.with_y(base_y)),
+        ))
+        .id();
+    commands.spawn((
+        ChildOf(parent),
+        Name::new("SoulWispHalo"),
+        Mesh3d(halo_mesh),
+        MeshMaterial3d(halo_mat),
+        Transform::default(),
+    ));
+    commands.spawn((
+        ChildOf(parent),
+        Name::new("SoulWispTip"),
+        Mesh3d(tip_mesh),
+        MeshMaterial3d(core_mat),
+        Transform::from_xyz(0.0, 0.42, 0.0),
+    ));
+}
+
+/// Walk-over collect des wisps → `MetaSouls` (Âmes). Radius `collect_radius`.
+pub fn sys_collect_soul_wisps(
+    mut commands: Commands,
+    mut meta: ResMut<MetaSouls>,
+    q_player: Query<&Transform, With<PickupCollector>>,
+    q_wisps: Query<(Entity, &Transform, &SoulWisp)>,
+) {
+    let Some(player) = q_player.iter().next() else {
+        return;
+    };
+    let ppos = player.translation;
+    for (e, xf, wisp) in &q_wisps {
+        let r_sq = wisp.collect_radius * wisp.collect_radius;
+        if (xf.translation - ppos).length_squared() <= r_sq {
+            meta.current = meta.current.saturating_add(wisp.value);
+            meta.earned_run = meta.earned_run.saturating_add(wisp.value);
+            commands.entity(e).despawn();
+            info!("[roguelite] Soul wisp collected : +{} Âmes", wisp.value);
+        }
+    }
+}
+
+/// Flottement (bob sinus) + rotation lente des wisps. Skip pendant le Coffre
+/// ouvert (l'aimantation contrôle alors la position).
+pub fn sys_animate_soul_wisps(
+    time: Res<Time>,
+    coffre: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
+    mut q: Query<(&mut Transform, &SoulWisp)>,
+) {
+    if coffre.map(|c| c.is_open).unwrap_or(false) {
+        return;
+    }
+    let t = time.elapsed_secs();
+    for (mut tf, wisp) in &mut q {
+        tf.translation.y = wisp.base_y + (t * 2.2 + wisp.phase).sin() * 0.16;
+        tf.rotate_y(time.delta_secs() * 1.3);
     }
 }
 

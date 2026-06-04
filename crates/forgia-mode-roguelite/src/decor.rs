@@ -1,0 +1,884 @@
+//! decor.rs — Story-562b : props décoratifs (GLB Inferno) pour remplir l'arène.
+//!
+//! Greffe de vrais props 3D (pack **Inferno** CC0, volcan, déjà dans
+//! `assets/models/environment/inferno/`) par-dessus l'arène `forgia-stage`, SANS
+//! la toucher. Rochers, crags, mounds, colonnes, braseros (lueur), statue, tour,
+//! + petits props dispersés (vases, boîtes, engrenages).
+//!
+//! ## Cohérence d'échelle (calibration AABB)
+//!
+//! Les tailles natives des GLB varient énormément (TowerBig ≫ Vase). Pour un
+//! rendu cohérent, chaque prop est **calibré à une taille cible** par groupe :
+//! `NeedsDecorCalibrate` mesure l'AABB runtime → `scale = target / max_dim`.
+//! C'est la même logique que `forgia-asset-registry::calibrate_assets`, répliquée
+//! ici car ce système est gaté `GameMode::Rpg`.
+//!
+//! ## Colliders (pattern rapier 0.33 parent/enfant)
+//!
+//! Gros props (périmètre) = solides : **parent** `RigidBody::Fixed` (scale 1) +
+//! **enfant** `SceneRoot` scalé + `AsyncSceneCollider{ConvexHull}` → rapier
+//! génère le collider depuis le mesh scalé et l'attache au RigidBody parent
+//! (quirk rapier 0.33, cf forgia-mode-fps-arena). Petits débris au sol = SANS
+//! collider (bots/joueur passent au travers = nav safe).
+//!
+//! ## Lifecycle (count-based reconcile)
+//!
+//! Arène bâtie (anchor `PlayerSpawn`) + aucun prop → spawn. Props tagués
+//! `StageArenaMarker` → cleanup par forgia-stage à chaque transition. Retry
+//! in-place → décor persiste.
+
+use bevy::camera::primitives::Aabb;
+use bevy::gltf::GltfAssetLabel;
+use bevy::prelude::*;
+use bevy::scene::{Scene, SceneRoot};
+use bevy::state::state_scoped::DespawnOnExit;
+use bevy_rapier3d::prelude::{Collider, RigidBody};
+use forgia_anchor::{AnchorKind, AnchorPoint};
+use forgia_core::prelude::*;
+use forgia_stage::{StageArenaMarker, StageLoadResult};
+use rand_xoshiro::rand_core::{RngCore, SeedableRng};
+use rand_xoshiro::Xoshiro256StarStar;
+use serde::Deserialize;
+use std::f32::consts::TAU;
+use std::fs;
+use std::path::PathBuf;
+use std::time::SystemTime;
+
+use crate::run::RunSeed;
+
+const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_decor.toml";
+const SENSOR_PATH: &str = "forgia2_stage_decor.json";
+const POLL_PERIOD_SEC: f32 = 1.0;
+const ATMOSPHERE_LUMEN_CAP: f32 = 8_000.0;
+
+// ─── Catalogue de props (pack Inferno CC0, déjà dans assets/) ─────────────────
+
+/// Landmarks hauts = points focaux (statue, tour).
+const LANDMARK_PROPS: &[&str] = &[
+    "models/environment/inferno/StatueKnight_002.glb",
+    "models/environment/inferno/TowerBig_001.glb",
+];
+
+/// Gros props de remplissage (rochers, crags, mounds, colonnes).
+const BIG_PROPS: &[&str] = &[
+    "models/environment/inferno/RockBig_001.glb",
+    "models/environment/inferno/RockBig_003.glb",
+    "models/environment/inferno/RockBig_004.glb",
+    "models/environment/inferno/Crag_001.glb",
+    "models/environment/inferno/Crag_003.glb",
+    "models/environment/inferno/Mound_005.glb",
+    "models/environment/inferno/Mound_008.glb",
+    "models/environment/inferno/ColumnBig_001.glb",
+    "models/environment/inferno/ColumnBigBroken_001.glb",
+    "models/environment/inferno/ColumnBigBroken_002.glb",
+];
+
+/// Braseros — élément lumineux (feu GLB + PointLight chaud).
+const BRAZIERS: &[&str] = &[
+    "models/environment/inferno/Brazier_002.glb",
+    "models/environment/inferno/Brazier_004.glb",
+];
+
+/// Petits props dispersés au sol.
+const SCATTER_PROPS: &[&str] = &[
+    "models/environment/inferno/RockMid_001.glb",
+    "models/environment/inferno/RockMid_002.glb",
+    "models/environment/inferno/RockMid_003.glb",
+    "models/environment/inferno/Box_001.glb",
+    "models/environment/inferno/Vase_001.glb",
+    "models/environment/inferno/Vase_002.glb",
+    "models/environment/inferno/Gear_001.glb",
+    "models/environment/inferno/Gear_002.glb",
+];
+
+/// Segments de mur KayKit dungeon (salles en L). Échelle NATIVE (modulaires).
+const WALL_VARIANTS: &[&str] = &[
+    "models/kaykit/dungeon/wall.glb",
+    "models/kaykit/dungeon/wall.glb",
+    "models/kaykit/dungeon/wall_broken.glb",
+    "models/kaykit/dungeon/wall_window.glb",
+];
+const WALL_CORNER: &str = "models/kaykit/dungeon/wall_corner.glb";
+
+/// Gravats au sol pour casser la répétition des dalles (masque, pas collider).
+const RUBBLE_PROPS: &[&str] = &["models/kaykit/dungeon/rubble.glb"];
+
+/// Dimensions natives KayKit dungeon wall.glb (cf forgia-stage : largeur 1 m,
+/// hauteur `RAMPARTS_WALL_HEIGHT_M`=4, épaisseur `RAMPARTS_WALL_THICKNESS_M`=0.4).
+const WALL_SEG_W: f32 = 1.0;
+const WALL_HEIGHT: f32 = 4.0;
+const WALL_THICK: f32 = 0.4;
+
+// ─── Genome / Config ──────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct GeneToml {
+    id: String,
+    #[serde(default)]
+    default: f32,
+}
+
+#[derive(Deserialize)]
+struct DecorGenomeToml {
+    #[serde(default)]
+    genes: Vec<GeneToml>,
+}
+
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub struct RogueliteDecorConfig {
+    pub enabled: bool,
+    pub ring_radius_min: f32,
+    pub ring_radius_max: f32,
+    pub perimeter_count: u32,
+    pub landmark_count: u32,
+    pub brazier_ratio: f32,
+    pub scatter_count: u32,
+    pub scatter_radius_min: f32,
+    pub scatter_radius_max: f32,
+    pub target_landmark: f32,
+    pub target_big: f32,
+    pub target_brazier: f32,
+    pub target_scatter: f32,
+    // Salles en L (murs KayKit + collider par bras).
+    pub room_count: u32,
+    pub room_arm_segments: u32,
+    pub room_radius_min: f32,
+    pub room_radius_max: f32,
+    // Gravats masquant la répétition du sol.
+    pub rubble_count: u32,
+    pub target_rubble: f32,
+}
+
+impl Default for RogueliteDecorConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ring_radius_min: 42.0,
+            ring_radius_max: 74.0,
+            perimeter_count: 34,
+            landmark_count: 4,
+            brazier_ratio: 0.30,
+            scatter_count: 55,
+            scatter_radius_min: 12.0,
+            scatter_radius_max: 72.0,
+            target_landmark: 16.0,
+            target_big: 7.0,
+            target_brazier: 3.5,
+            target_scatter: 1.6,
+            room_count: 4,
+            room_arm_segments: 6,
+            room_radius_min: 20.0,
+            room_radius_max: 52.0,
+            rubble_count: 34,
+            target_rubble: 3.4,
+        }
+    }
+}
+
+impl RogueliteDecorConfig {
+    /// Pur — testable headless.
+    pub fn parse_toml(content: &str) -> Self {
+        let parsed: DecorGenomeToml = match toml::from_str(content) {
+            Ok(v) => v,
+            Err(_) => return Self::default(),
+        };
+        let mut c = Self::default();
+        for gene in &parsed.genes {
+            match gene.id.as_str() {
+                "decor_enabled" => c.enabled = gene.default >= 0.5,
+                "decor_ring_radius_min" => c.ring_radius_min = gene.default.clamp(1.0, 500.0),
+                "decor_ring_radius_max" => c.ring_radius_max = gene.default.clamp(1.0, 500.0),
+                "decor_perimeter_count" => {
+                    c.perimeter_count = gene.default.clamp(0.0, 200.0) as u32
+                }
+                "decor_landmark_count" => c.landmark_count = gene.default.clamp(0.0, 50.0) as u32,
+                "decor_brazier_ratio" => c.brazier_ratio = gene.default.clamp(0.0, 1.0),
+                "decor_scatter_count" => c.scatter_count = gene.default.clamp(0.0, 600.0) as u32,
+                "decor_scatter_radius_min" => {
+                    c.scatter_radius_min = gene.default.clamp(0.0, 500.0)
+                }
+                "decor_scatter_radius_max" => {
+                    c.scatter_radius_max = gene.default.clamp(0.0, 500.0)
+                }
+                "decor_target_landmark" => c.target_landmark = gene.default.clamp(0.5, 50.0),
+                "decor_target_big" => c.target_big = gene.default.clamp(0.5, 50.0),
+                "decor_target_brazier" => c.target_brazier = gene.default.clamp(0.3, 20.0),
+                "decor_target_scatter" => c.target_scatter = gene.default.clamp(0.2, 10.0),
+                "decor_room_count" => c.room_count = gene.default.clamp(0.0, 30.0) as u32,
+                "decor_room_arm_segments" => {
+                    c.room_arm_segments = gene.default.clamp(0.0, 40.0) as u32
+                }
+                "decor_room_radius_min" => c.room_radius_min = gene.default.clamp(0.0, 500.0),
+                "decor_room_radius_max" => c.room_radius_max = gene.default.clamp(0.0, 500.0),
+                "decor_rubble_count" => c.rubble_count = gene.default.clamp(0.0, 400.0) as u32,
+                "decor_target_rubble" => c.target_rubble = gene.default.clamp(0.3, 20.0),
+                _ => {}
+            }
+        }
+        if c.ring_radius_min > c.ring_radius_max {
+            std::mem::swap(&mut c.ring_radius_min, &mut c.ring_radius_max);
+        }
+        if c.scatter_radius_min > c.scatter_radius_max {
+            std::mem::swap(&mut c.scatter_radius_min, &mut c.scatter_radius_max);
+        }
+        if c.room_radius_min > c.room_radius_max {
+            std::mem::swap(&mut c.room_radius_min, &mut c.room_radius_max);
+        }
+        c
+    }
+
+    fn load_or_default() -> Self {
+        match fs::read_to_string(PathBuf::from(GENOME_PATH)) {
+            Ok(content) => Self::parse_toml(&content),
+            Err(_) => Self::default(),
+        }
+    }
+}
+
+#[derive(Resource, Default, Debug)]
+pub struct DecorGenomeWatch {
+    pub last_mtime: Option<SystemTime>,
+    pub reload_count: u32,
+}
+
+/// Handles de scènes GLB préchargés (réutilisés sur toutes les instances).
+#[derive(Resource, Default)]
+pub struct DecorAssets {
+    pub landmarks: Vec<Handle<Scene>>,
+    pub big: Vec<Handle<Scene>>,
+    pub braziers: Vec<Handle<Scene>>,
+    pub scatter: Vec<Handle<Scene>>,
+    pub walls: Vec<Handle<Scene>>,
+    pub wall_corner: Vec<Handle<Scene>>,
+    pub rubble: Vec<Handle<Scene>>,
+}
+
+/// Marqueur sur l'entité racine d'un prop (count sensor + cleanup).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct DecorProp;
+
+/// Posé sur le SceneRoot d'un prop à calibrer. `sys_calibrate_decor` mesure
+/// l'AABB une fois la scène chargée et applique `scale = target / max_dim`.
+/// (Le collider, lui, est un cylindre primitif posé au spawn sur le parent —
+/// fiable, sized depuis la target, indépendant du timing de chargement scène.)
+#[derive(Component, Debug, Clone, Copy)]
+pub struct NeedsDecorCalibrate {
+    pub target_m: f32,
+    pub user_scale: f32,
+}
+
+// ─── Systems : init genome + assets + hot-reload ──────────────────────────────
+
+pub fn sys_init_decor_genome(mut commands: Commands) {
+    let cfg = RogueliteDecorConfig::load_or_default();
+    let mtime = fs::metadata(GENOME_PATH).and_then(|m| m.modified()).ok();
+    commands.insert_resource(cfg);
+    commands.insert_resource(DecorGenomeWatch {
+        last_mtime: mtime,
+        ..default()
+    });
+    info!(
+        "[decor] genome loaded — ring {:.0}-{:.0}m perim={} landmarks={} braziers={:.0}% scatter={}",
+        cfg.ring_radius_min,
+        cfg.ring_radius_max,
+        cfg.perimeter_count,
+        cfg.landmark_count,
+        cfg.brazier_ratio * 100.0,
+        cfg.scatter_count
+    );
+}
+
+/// Précharge toutes les scènes GLB une fois (un seul call-site `load`).
+pub fn sys_load_decor_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let load = |paths: &[&str]| -> Vec<Handle<Scene>> {
+        paths
+            .iter()
+            .map(|p| asset_server.load(GltfAssetLabel::Scene(0).from_asset(p.to_string())))
+            .collect()
+    };
+    commands.insert_resource(DecorAssets {
+        landmarks: load(LANDMARK_PROPS),
+        big: load(BIG_PROPS),
+        braziers: load(BRAZIERS),
+        scatter: load(SCATTER_PROPS),
+        walls: load(WALL_VARIANTS),
+        wall_corner: load(&[WALL_CORNER]),
+        rubble: load(RUBBLE_PROPS),
+    });
+    info!("[decor] preloaded inferno + wall + rubble prop scenes");
+}
+
+/// Poll mtime 1Hz. Sur changement réel, despawn le décor → réconciliation le
+/// reconstruit avec les nouveaux paramètres.
+pub fn sys_hot_reload_decor_genome(
+    time: Res<Time>,
+    mut accum: Local<f32>,
+    mut cfg: ResMut<RogueliteDecorConfig>,
+    mut watch: ResMut<DecorGenomeWatch>,
+    q_decor: Query<Entity, With<DecorProp>>,
+    mut commands: Commands,
+) {
+    *accum += time.delta_secs();
+    if *accum < POLL_PERIOD_SEC {
+        return;
+    }
+    *accum = 0.0;
+
+    let Ok(meta) = fs::metadata(GENOME_PATH) else {
+        return;
+    };
+    let Ok(mtime) = meta.modified() else {
+        return;
+    };
+    if watch.last_mtime == Some(mtime) {
+        return;
+    }
+    let Ok(content) = fs::read_to_string(GENOME_PATH) else {
+        return;
+    };
+    let new_cfg = RogueliteDecorConfig::parse_toml(&content);
+    watch.last_mtime = Some(mtime);
+    if new_cfg != *cfg {
+        *cfg = new_cfg;
+        watch.reload_count = watch.reload_count.saturating_add(1);
+        for e in &q_decor {
+            commands.entity(e).despawn();
+        }
+        info!(
+            "[decor] HOT-RELOADED — ring {:.0}-{:.0}m perim={} targets L{:.0}/B{:.0}/Br{:.1}/S{:.1} → régénération",
+            new_cfg.ring_radius_min,
+            new_cfg.ring_radius_max,
+            new_cfg.perimeter_count,
+            new_cfg.target_landmark,
+            new_cfg.target_big,
+            new_cfg.target_brazier,
+            new_cfg.target_scatter
+        );
+    }
+}
+
+// ─── Calibration AABB (cohérence d'échelle + ajout collider après scale) ──────
+
+/// Poll les `NeedsDecorCalibrate`, mesure l'AABB une fois la scène chargée,
+/// applique `scale = target / max_dim * user_scale`, puis ajoute le collider si
+/// demandé (après le scale → collider à la bonne taille). Gated Roguelite.
+pub fn sys_calibrate_decor(
+    mut commands: Commands,
+    q_needs: Query<(Entity, &NeedsDecorCalibrate)>,
+    q_aabb: Query<&Aabb>,
+    q_children: Query<&Children>,
+    mut q_transform: Query<&mut Transform>,
+) {
+    for (entity, needs) in &q_needs {
+        let Some(max_dim) = compute_aabb_max_dim(entity, &q_aabb, &q_children) else {
+            continue; // scène pas encore chargée, retry next frame
+        };
+        if max_dim <= 0.0 || !max_dim.is_finite() {
+            commands.entity(entity).remove::<NeedsDecorCalibrate>();
+            continue;
+        }
+        let scale = needs.target_m / max_dim * needs.user_scale;
+        if let Ok(mut tf) = q_transform.get_mut(entity) {
+            tf.scale = Vec3::splat(scale);
+        }
+        commands.entity(entity).remove::<NeedsDecorCalibrate>();
+    }
+}
+
+/// Walk récursif des Children pour le 1er `Aabb`. `max(half_extents)*2`.
+fn compute_aabb_max_dim(
+    root: Entity,
+    q_aabb: &Query<&Aabb>,
+    q_children: &Query<&Children>,
+) -> Option<f32> {
+    if let Ok(a) = q_aabb.get(root) {
+        return Some(a.half_extents.max_element() * 2.0);
+    }
+    let children = q_children.get(root).ok()?;
+    let mut max: f32 = 0.0;
+    let mut found = false;
+    for child in children.iter() {
+        if let Some(d) = compute_aabb_max_dim(child, q_aabb, q_children) {
+            max = max.max(d);
+            found = true;
+        }
+    }
+    if found {
+        Some(max)
+    } else {
+        None
+    }
+}
+
+// ─── Réconciliation count-based ───────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+pub fn sys_reconcile_decor(
+    mut commands: Commands,
+    cfg: Option<Res<RogueliteDecorConfig>>,
+    assets: Option<Res<DecorAssets>>,
+    run_seed: Option<Res<RunSeed>>,
+    stage_result: Option<Res<StageLoadResult>>,
+    q_anchors: Query<&AnchorPoint>,
+    q_decor: Query<(), With<DecorProp>>,
+) {
+    let Some(cfg) = cfg else {
+        return;
+    };
+    let Some(assets) = assets else {
+        return;
+    };
+    if !cfg.enabled {
+        return;
+    }
+    if !q_anchors.iter().any(|a| a.kind == AnchorKind::PlayerSpawn) {
+        return;
+    }
+    if q_decor.iter().next().is_some() {
+        return;
+    }
+    let seed = run_seed.map(|s| s.seed).unwrap_or(0xDEC0_F00D);
+    let biome = stage_result
+        .map(|r| r.biome.clone())
+        .unwrap_or_else(|| "default".to_string());
+
+    let count = spawn_decor_set(&mut commands, &cfg, &assets, seed);
+    info!("[decor] spawned {count} GLB props (biome={biome})");
+}
+
+#[inline]
+fn rng01(rng: &mut Xoshiro256StarStar) -> f32 {
+    rng.next_u32() as f32 / u32::MAX as f32
+}
+
+#[inline]
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+fn pick<'a>(pool: &'a [Handle<Scene>], rng: &mut Xoshiro256StarStar) -> Option<&'a Handle<Scene>> {
+    if pool.is_empty() {
+        return None;
+    }
+    pool.get((rng.next_u32() as usize) % pool.len())
+}
+
+fn decor_markers(
+    name: impl Into<String>,
+) -> (Name, StageArenaMarker, DespawnOnExit<GameMode>, DecorProp) {
+    (
+        Name::new(name.into()),
+        StageArenaMarker,
+        DespawnOnExit(GameMode::Roguelite),
+        DecorProp,
+    )
+}
+
+/// Spawn un prop périmétrique SOLIDE : parent `RigidBody::Fixed` (scale 1) +
+/// enfant visuel `SceneRoot` (scale calibré) + enfant **collider cylindre**
+/// dimensionné depuis la target (fiable, bloque le LOS/tir des bots).
+/// Optionnellement un PointLight (brasero). `col_radius_factor` = footprint
+/// relatif (fin pour les tours/statues, large pour les rochers).
+#[allow(clippy::too_many_arguments)]
+fn spawn_perimeter_prop(
+    commands: &mut Commands,
+    handle: &Handle<Scene>,
+    name: &str,
+    pos: Vec3,
+    yaw: f32,
+    target_m: f32,
+    user_scale: f32,
+    brazier: bool,
+    col_radius_factor: f32,
+) {
+    let parent = commands
+        .spawn((
+            decor_markers(name),
+            RigidBody::Fixed,
+            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+        ))
+        .id();
+    // Enfant visuel (scale appliqué par calibration ; parent reste scale 1).
+    commands.spawn((
+        ChildOf(parent),
+        Name::new("DecorVisual"),
+        SceneRoot(handle.clone()),
+        Transform::IDENTITY,
+        NeedsDecorCalibrate { target_m, user_scale },
+    ));
+    // Enfant collider : cylindre solide centré à mi-hauteur (bloque tir bots).
+    let half_h = (target_m * 0.5).max(0.3);
+    let radius = (target_m * col_radius_factor).max(0.25);
+    commands.spawn((
+        ChildOf(parent),
+        Name::new("DecorCollider"),
+        Transform::from_xyz(0.0, half_h, 0.0),
+        Collider::cylinder(half_h, radius),
+    ));
+    if brazier {
+        commands.spawn((
+            ChildOf(parent),
+            PointLight {
+                color: Color::srgb(1.0, 0.55, 0.2),
+                intensity: 4_500.0_f32.min(ATMOSPHERE_LUMEN_CAP),
+                range: 14.0,
+                shadows_enabled: false,
+                ..default()
+            },
+            Transform::from_xyz(0.0, target_m * 0.7, 0.0),
+        ));
+    }
+}
+
+/// Spawn l'ensemble du décor. Retourne le nombre de props posés.
+fn spawn_decor_set(
+    commands: &mut Commands,
+    cfg: &RogueliteDecorConfig,
+    assets: &DecorAssets,
+    seed: u64,
+) -> u32 {
+    let mut rng = Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEC0_DEC0_F00D_BEEF);
+    let mut count = 0u32;
+
+    // ── Anneau périmétrique ───────────────────────────────────────────────────
+    let n = cfg.perimeter_count.max(1);
+    let step = TAU / n as f32;
+    // Slots des landmarks : répartis ~également autour de l'anneau.
+    let landmark_n = cfg.landmark_count.min(cfg.perimeter_count);
+    let landmark_step = if landmark_n > 0 {
+        (cfg.perimeter_count / landmark_n).max(1)
+    } else {
+        u32::MAX
+    };
+    let mut landmarks_placed = 0u32;
+
+    for i in 0..cfg.perimeter_count {
+        let jitter = (rng01(&mut rng) - 0.5) * step * 0.6;
+        let angle = step * i as f32 + jitter;
+        let radius = lerp(cfg.ring_radius_min, cfg.ring_radius_max, rng01(&mut rng));
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw = rng01(&mut rng) * TAU;
+
+        let is_landmark = landmarks_placed < landmark_n && i % landmark_step == 0;
+        let roll = rng01(&mut rng);
+
+        let (pool, name, target, us, brazier, crf) = if is_landmark {
+            landmarks_placed += 1;
+            (
+                &assets.landmarks,
+                "Decor_Landmark",
+                cfg.target_landmark,
+                0.95 + rng01(&mut rng) * 0.12,
+                false,
+                0.16, // tours/statues : footprint fin
+            )
+        } else if roll < cfg.brazier_ratio {
+            (
+                &assets.braziers,
+                "Decor_Brazier",
+                cfg.target_brazier,
+                0.9 + rng01(&mut rng) * 0.2,
+                true,
+                0.32,
+            )
+        } else {
+            (
+                &assets.big,
+                "Decor_Big",
+                cfg.target_big,
+                0.85 + rng01(&mut rng) * 0.35,
+                false,
+                0.34, // rochers/colonnes : footprint large
+            )
+        };
+        let Some(handle) = pick(pool, &mut rng) else {
+            continue;
+        };
+        spawn_perimeter_prop(commands, handle, name, pos, yaw, target, us, brazier, crf);
+        count += 1;
+    }
+
+    // ── Petits props dispersés au sol (sans collider) ─────────────────────────
+    for _ in 0..cfg.scatter_count {
+        let Some(handle) = pick(&assets.scatter, &mut rng) else {
+            break;
+        };
+        let angle = rng01(&mut rng) * TAU;
+        let t = rng01(&mut rng).sqrt(); // uniforme en surface
+        let radius = lerp(cfg.scatter_radius_min, cfg.scatter_radius_max, t);
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw = rng01(&mut rng) * TAU;
+        let us = 0.75 + rng01(&mut rng) * 0.5;
+
+        commands.spawn((
+            decor_markers("Decor_Scatter"),
+            SceneRoot(handle.clone()),
+            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+            NeedsDecorCalibrate {
+                target_m: cfg.target_scatter,
+                user_scale: us,
+            },
+        ));
+        count += 1;
+    }
+
+    // ── Salles en L (coin + 2 bras de mur KayKit, 1 collider cuboid par bras) ─
+    for r in 0..cfg.room_count {
+        let angle = (r as f32 / cfg.room_count.max(1) as f32) * TAU + (rng01(&mut rng) - 0.5) * 0.8;
+        let radius = lerp(cfg.room_radius_min, cfg.room_radius_max, rng01(&mut rng));
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw0 = rng01(&mut rng) * TAU;
+        count += spawn_wall_room(commands, assets, &mut rng, pos, yaw0, cfg.room_arm_segments);
+    }
+
+    // ── Gravats au sol (masque la répétition des dalles, sans collider) ───────
+    for _ in 0..cfg.rubble_count {
+        let Some(handle) = pick(&assets.rubble, &mut rng) else {
+            break;
+        };
+        let angle = rng01(&mut rng) * TAU;
+        let t = rng01(&mut rng).sqrt();
+        let radius = lerp(cfg.scatter_radius_min, cfg.scatter_radius_max, t);
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw = rng01(&mut rng) * TAU;
+        let us = 0.8 + rng01(&mut rng) * 0.6;
+        commands.spawn((
+            decor_markers("Decor_Rubble"),
+            SceneRoot(handle.clone()),
+            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+            NeedsDecorCalibrate {
+                target_m: cfg.target_rubble,
+                user_scale: us,
+            },
+        ));
+        count += 1;
+    }
+
+    count
+}
+
+/// Spawn une "salle" en L : coin + 2 bras perpendiculaires de murs KayKit.
+/// Layout OUVERT (pas d'enceinte fermée) → les bots peuvent contourner. 1
+/// collider cuboid par bras (efficace, cf forgia-stage ramparts).
+fn spawn_wall_room(
+    commands: &mut Commands,
+    assets: &DecorAssets,
+    rng: &mut Xoshiro256StarStar,
+    origin: Vec3,
+    yaw0: f32,
+    arm_segments: u32,
+) -> u32 {
+    if arm_segments == 0 || assets.walls.is_empty() {
+        return 0;
+    }
+    let rot = Quat::from_rotation_y(yaw0);
+    let mut count = 0u32;
+
+    // Coin au pivot (visuel seulement).
+    if let Some(corner) = assets.wall_corner.first() {
+        commands.spawn((
+            decor_markers("Decor_Wall"),
+            SceneRoot(corner.clone()),
+            Transform::from_translation(origin).with_rotation(rot),
+        ));
+        count += 1;
+    }
+
+    // Deux bras perpendiculaires (local +X et local +Z).
+    for dir in [rot * Vec3::X, rot * Vec3::Z] {
+        count += spawn_wall_arm(commands, assets, rng, origin, dir, arm_segments);
+    }
+    count
+}
+
+/// Aligne `n` segments de mur le long de `dir` (normalisé), espacés de
+/// `WALL_SEG_W`, + 1 collider cuboid couvrant tout le bras.
+fn spawn_wall_arm(
+    commands: &mut Commands,
+    assets: &DecorAssets,
+    rng: &mut Xoshiro256StarStar,
+    origin: Vec3,
+    dir: Vec3,
+    n: u32,
+) -> u32 {
+    // Convention KayKit : axe X = largeur du mur. yaw aligne X sur dir.
+    let yaw = (-dir.z).atan2(dir.x);
+    let q = Quat::from_rotation_y(yaw);
+    let mut count = 0u32;
+    for s in 1..=n {
+        let Some(handle) = pick(&assets.walls, rng) else {
+            break;
+        };
+        let p = origin + dir * (s as f32 * WALL_SEG_W);
+        commands.spawn((
+            decor_markers("Decor_Wall"),
+            SceneRoot(handle.clone()),
+            Transform::from_translation(p).with_rotation(q),
+        ));
+        count += 1;
+    }
+    // 1 collider cuboid couvrant le bras (half-len sur X local).
+    if n > 0 {
+        let half_len = n as f32 * WALL_SEG_W * 0.5;
+        let center = origin + dir * half_len + Vec3::Y * (WALL_HEIGHT * 0.5);
+        commands.spawn((
+            Name::new("Decor_WallCollider"),
+            StageArenaMarker,
+            DespawnOnExit(GameMode::Roguelite),
+            RigidBody::Fixed,
+            Transform {
+                translation: center,
+                rotation: q,
+                scale: Vec3::ONE,
+            },
+            Collider::cuboid(half_len, WALL_HEIGHT * 0.5, WALL_THICK * 0.5),
+        ));
+    }
+    count
+}
+
+// ─── Sensor ────────────────────────────────────────────────────────────────────
+
+pub fn sys_write_decor_sensor(
+    time: Res<Time>,
+    mut accum: Local<f32>,
+    q_decor: Query<&Name, With<DecorProp>>,
+) {
+    *accum += time.delta_secs();
+    if *accum < 1.0 {
+        return;
+    }
+    *accum = 0.0;
+
+    let mut total = 0u32;
+    let mut landmarks = 0u32;
+    let mut braziers = 0u32;
+    let mut big = 0u32;
+    let mut scatter = 0u32;
+    let mut walls = 0u32;
+    let mut rubble = 0u32;
+    for name in &q_decor {
+        total += 1;
+        let s = name.as_str();
+        if s.contains("Landmark") {
+            landmarks += 1;
+        } else if s.contains("Brazier") {
+            braziers += 1;
+        } else if s.contains("Wall") {
+            walls += 1;
+        } else if s.contains("Rubble") {
+            rubble += 1;
+        } else if s.contains("Big") {
+            big += 1;
+        } else if s.contains("Scatter") {
+            scatter += 1;
+        }
+    }
+    let (severity, next_step) = severity_for_decor(total);
+    let json = format!(
+        r#"{{"id":"stage_decor","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"decor_total":{total},"landmarks":{landmarks},"braziers":{braziers},"walls":{walls},"big_props":{big},"rubble":{rubble},"scatter":{scatter}}}"#,
+        time.elapsed_secs(),
+    );
+    let _ = fs::write(SENSOR_PATH, json);
+}
+
+/// Pur — testable.
+pub fn severity_for_decor(total: u32) -> (&'static str, &'static str) {
+    if total == 0 {
+        (
+            "info",
+            "0 prop décor (hors arène ou decor_enabled=0). Read roguelite_decor.toml.",
+        )
+    } else {
+        ("ok", "Décor posé. Ajuste rayons/counts/targets via roguelite_decor.toml (Shift+F12).")
+    }
+}
+
+// ─── Tests purs ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_empty_is_default() {
+        assert_eq!(
+            RogueliteDecorConfig::parse_toml(""),
+            RogueliteDecorConfig::default()
+        );
+    }
+
+    #[test]
+    fn parse_overrides_and_clamps() {
+        let toml = r#"
+[[genes]]
+id = "decor_perimeter_count"
+default = 999.0
+[[genes]]
+id = "decor_target_landmark"
+default = 99.0
+[[genes]]
+id = "decor_brazier_ratio"
+default = 2.0
+[[genes]]
+id = "decor_enabled"
+default = 0.0
+"#;
+        let c = RogueliteDecorConfig::parse_toml(toml);
+        assert_eq!(c.perimeter_count, 200);
+        assert_eq!(c.target_landmark, 50.0); // clamp
+        assert_eq!(c.brazier_ratio, 1.0);
+        assert!(!c.enabled);
+    }
+
+    #[test]
+    fn parse_swaps_inverted_ranges() {
+        let toml = r#"
+[[genes]]
+id = "decor_ring_radius_min"
+default = 90.0
+[[genes]]
+id = "decor_ring_radius_max"
+default = 40.0
+"#;
+        let c = RogueliteDecorConfig::parse_toml(toml);
+        assert_eq!(c.ring_radius_min, 40.0);
+        assert_eq!(c.ring_radius_max, 90.0);
+    }
+
+    #[test]
+    fn prop_paths_valid() {
+        for p in LANDMARK_PROPS
+            .iter()
+            .chain(BIG_PROPS)
+            .chain(BRAZIERS)
+            .chain(SCATTER_PROPS)
+        {
+            assert!(p.starts_with("models/environment/inferno/"));
+            assert!(p.ends_with(".glb"));
+        }
+        assert!(!LANDMARK_PROPS.is_empty());
+        assert!(!BIG_PROPS.is_empty());
+    }
+
+    #[test]
+    fn calibration_scale_normalizes() {
+        // scale = target / max_dim * user_scale → un prop natif 8m visé à 4m = 0.5.
+        let target = 4.0_f32;
+        let max_dim = 8.0_f32;
+        let user = 1.0_f32;
+        assert_eq!(target / max_dim * user, 0.5);
+    }
+
+    #[test]
+    fn severity_info_empty_ok_present() {
+        assert_eq!(severity_for_decor(0).0, "info");
+        assert_eq!(severity_for_decor(50).0, "ok");
+    }
+
+    #[test]
+    fn lerp_endpoints() {
+        assert_eq!(lerp(10.0, 20.0, 0.0), 10.0);
+        assert_eq!(lerp(10.0, 20.0, 1.0), 20.0);
+    }
+}

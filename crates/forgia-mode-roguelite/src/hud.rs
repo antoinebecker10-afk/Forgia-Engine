@@ -138,15 +138,37 @@ pub(crate) fn draw_currency_counters(
     let right_x = screen.max.x - pad;
     let top_y = screen.min.y + pad;
 
-    let draw_counter = |y: f32, label: &str, value: u32, accent: egui::Color32| {
+    let draw_counter = |y: f32, label: &str, value: u32, accent: egui::Color32, is_soul: bool| {
         let rect = egui::Rect::from_min_size(
             egui::pos2(right_x - panel_w, y),
             egui::vec2(panel_w, panel_h),
         );
         chunky_rect_filled(&painter, rect, C_BG_DARK, 3.0, 8.0);
+        // Icône monnaie à gauche du compteur.
+        let icon_c = egui::pos2(rect.min.x + 24.0, rect.center().y);
+        if is_soul {
+            // Wisp d'âme : empilement de cercles teal = flamme/âme fantomatique.
+            painter.circle_filled(icon_c + egui::vec2(0.0, 4.0), 9.0, accent);
+            painter.circle_filled(icon_c + egui::vec2(0.0, -4.0), 5.5, accent);
+            painter.circle_filled(icon_c + egui::vec2(0.0, -11.0), 2.5, accent);
+            painter.circle_filled(
+                icon_c + egui::vec2(0.0, 3.0),
+                3.5,
+                egui::Color32::from_rgb(225, 255, 255),
+            );
+        } else {
+            // Pièce d'or : disque + rim sombre + reflet clair.
+            painter.circle_filled(icon_c, 11.0, accent);
+            painter.circle_stroke(
+                icon_c,
+                11.0,
+                egui::Stroke::new(2.0, egui::Color32::from_rgb(150, 110, 20)),
+            );
+            painter.circle_filled(icon_c, 6.0, egui::Color32::from_rgb(255, 228, 130));
+        }
         text_with_outline(
             &painter,
-            egui::pos2(rect.min.x + 10.0, rect.min.y + 5.0),
+            egui::pos2(rect.min.x + 44.0, rect.min.y + 5.0),
             egui::Align2::LEFT_TOP,
             label,
             egui::FontId::monospace(12.0),
@@ -165,8 +187,52 @@ pub(crate) fn draw_currency_counters(
     };
 
     // Or (in-run) en haut, Âmes (méta) en dessous.
-    draw_counter(top_y, "OR", gold.current, FORGE_OR);
-    draw_counter(top_y + panel_h + gap, "ÂMES", meta.current, FORGE_TEAL);
+    draw_counter(top_y, "OR", gold.current, FORGE_OR, false);
+    draw_counter(top_y + panel_h + gap, "ÂMES", meta.current, FORGE_TEAL, true);
+}
+
+/// Caméra pendant l'écran de choix (Coffre / fin de run) : si on maintient un
+/// clic HORS du panel egui → grab curseur + look (la caméra tourne) ; sinon
+/// curseur libre pour cliquer les boutons. Override per-frame de `block_look`
+/// + `CursorOptions` (forgia-ui les fige en statique, on reprend la main ici).
+#[allow(clippy::too_many_arguments)]
+pub fn sys_break_look_override(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    run_state: Option<Res<State<RunState>>>,
+    coffre: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    mut blockers: ResMut<forgia_input::InputBlockers>,
+    mut q_cursor: Query<&mut bevy::window::CursorOptions, With<bevy::window::PrimaryWindow>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let coffre_open = coffre.map(|c| c.is_open).unwrap_or(false);
+    let end_screen = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::Defeat) | Some(RunState::Victory)
+    );
+    if !coffre_open && !end_screen {
+        return; // gameplay normal — forgia-ui gère curseur/look
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let over_panel = ctx.is_pointer_over_area();
+    let held = mouse.pressed(MouseButton::Left) || mouse.pressed(MouseButton::Right);
+    let look = held && !over_panel;
+    blockers.block_look = !look;
+    if let Ok(mut opts) = q_cursor.single_mut() {
+        if look {
+            opts.grab_mode = bevy::window::CursorGrabMode::Locked;
+            opts.visible = false;
+        } else {
+            opts.grab_mode = bevy::window::CursorGrabMode::None;
+            opts.visible = true;
+        }
+    }
 }
 
 // ─── Defeat overlay ──────────────────────────────────────────────────────

@@ -82,6 +82,7 @@
 | `forgia2_skeleton_template_registry.json` | T0 | forgia-skeleton-template | `src/lib.rs:786,1267` | once+hot | SkeletonTemplate registry, TOML hot-reload | active |
 | `forgia2_stage.json` | T0 | forgia-anchor **+** forgia-stage **+** forgia-stage::layout_sensor | `forgia-anchor/src/lib.rs:474` **+** `forgia-stage/src/lib.rs:51` **+** `forgia-stage/src/layout_sensor.rs:248` | event | stage load, anchor record (**triple-writer** à investiguer) | **duplicate-writer** |
 | `forgia2_stage_layout.json` | T0 | forgia-stage | `src/layout_sensor.rs:16` | event | stage layout post-load (cover, sightline) | active |
+| `forgia2_stage_poi.json` | T1 | forgia-mode-roguelite | `src/poi.rs` | 1Hz | POI gameplay : counts vivants (loot_vaults/lava_hazards/forges) + cumuls (vaults_looted, souls_from_vaults, lava_kills_total, lava_player_ticks) — story-561 | active |
 | `forgia2_walk_pose.json` | T0 | forgia-anim-locomotion | `src/locomotion.rs:884` | 1Hz | walk pose phase, foot contacts | active |
 | `forgia2_watchdog.json` | T0 | forgia-observability | `src/watchdog_sensor.rs:74` | 1Hz | watchdog heartbeat, seconds_in_emergency | active |
 

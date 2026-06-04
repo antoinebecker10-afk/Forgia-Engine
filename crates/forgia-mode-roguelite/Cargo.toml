@@ -23,6 +23,8 @@ forgia-mode-fps-arena = { workspace = true }
 forgia-rpg-data = { workspace = true }
 # Player marker requis pour tag PickupCollector
 forgia-player = { workspace = true }
+# 2026-06-03 — InputBlockers (block_look) pour le clic-hors-panel → caméra pendant le choix.
+forgia-input = { workspace = true }
 # Story-470 V7 M1 — RunSeed déterministe (host-authoritative, choix audit §0.2)
 rand_xoshiro = "0.7"
 # Story-470 V7 M2.5 — HUD Roguelite (Wave/Souls + Defeat/Victory overlays).
@@ -30,6 +32,9 @@ bevy_egui = { workspace = true }
 forgia-ui-lib = { workspace = true }
 # Story-470 V7 M3 step 2 (2026-05-20) — StageGraph node-driven run loop.
 forgia-stage = { workspace = true }
+# Story-561 (2026-06-03) — POI gameplay greffé sur les anchors AnchorKind::PoiSlot.
+# AnchorPoint/AnchorKind = contrat stable découplé de forgia-stage (édité autre terminal).
+forgia-anchor = { workspace = true }
 # Story-544 (2026-05-27 → close 2026-05-29) — toon cel-shading + Sobel outline
 # post-process pour direction cartoon bible v1 (réf reference_bible_forgia_roguelite_v1.md).
 forgia-postprocess = { workspace = true }

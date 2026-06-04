@@ -1,0 +1,99 @@
+# roguelite_decor.toml — Story-562b : props GLB Inferno pour remplir l'arène.
+#
+# Pack Inferno (CC0, volcan) dans assets/models/environment/inferno/. Spawné par
+# forgia-mode-roguelite (crate LIBRE), greffé sur l'arène SANS toucher
+# forgia-stage. Hot-reload mtime 1Hz.
+#
+# COHÉRENCE : chaque prop est calibré à une TAILLE CIBLE (m) par groupe via
+# mesure AABB runtime (les tailles natives des GLB varient trop). Ajuste les
+# `decor_target_*` pour la taille voulue. Colliders auto sur les gros props
+# (périmètre) ; petits débris au sol = sans collider (nav bots safe).
+# Arène crypts_of_anvil = extent 90 m (POI ~50 m, murs ~90 m).
+
+[[genes]]
+id = "decor_enabled"
+default = 1.0
+
+# ─── Anneau périmétrique ───────────────────────────────────────────────────────
+[[genes]]
+id = "decor_ring_radius_min"
+default = 42.0
+
+[[genes]]
+id = "decor_ring_radius_max"
+default = 74.0
+
+# Total props sur l'anneau (landmarks + braseros + gros rochers/piliers).
+[[genes]]
+id = "decor_perimeter_count"
+default = 34.0
+
+# Nombre de LANDMARKS (statue / tour) = points focaux hauts. Pris sur le total.
+[[genes]]
+id = "decor_landmark_count"
+default = 4.0
+
+# Fraction du RESTE de l'anneau qui sont des braseros lumineux.
+[[genes]]
+id = "decor_brazier_ratio"
+default = 0.30
+
+# ─── Petits props dispersés au sol (sans collider) ────────────────────────────
+[[genes]]
+id = "decor_scatter_count"
+default = 55.0
+
+[[genes]]
+id = "decor_scatter_radius_min"
+default = 12.0
+
+[[genes]]
+id = "decor_scatter_radius_max"
+default = 72.0
+
+# ─── Tailles cibles (m) par groupe — calibration AABB (cohérence) ─────────────
+# Hauteur/taille max visée pour chaque type. C'est ICI qu'on règle l'échelle.
+[[genes]]
+id = "decor_target_landmark"
+default = 16.0
+
+[[genes]]
+id = "decor_target_big"
+default = 7.0
+
+[[genes]]
+id = "decor_target_brazier"
+default = 3.5
+
+[[genes]]
+id = "decor_target_scatter"
+default = 1.6
+
+# ─── Salles en L (murs KayKit dungeon, colliders) ─────────────────────────────
+# Coin + 2 bras de mur perpendiculaires, layout OUVERT (bots contournent).
+# Mets decor_room_count=0 si les bots se coincent.
+[[genes]]
+id = "decor_room_count"
+default = 4.0
+
+# Longueur de chaque bras (en segments de mur de 1 m).
+[[genes]]
+id = "decor_room_arm_segments"
+default = 6.0
+
+[[genes]]
+id = "decor_room_radius_min"
+default = 20.0
+
+[[genes]]
+id = "decor_room_radius_max"
+default = 52.0
+
+# ─── Gravats au sol (masquent la répétition des dalles forgia-stage) ──────────
+[[genes]]
+id = "decor_rubble_count"
+default = 34.0
+
+[[genes]]
+id = "decor_target_rubble"
+default = 3.4
