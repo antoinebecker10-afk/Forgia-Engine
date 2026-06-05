@@ -207,10 +207,10 @@ impl Plugin for ForgiaRpgPlugin {
             .init_resource::<forgia_anim_locomotion::FootIkConfig>()
             .init_resource::<forgia_anim_locomotion::FootIkStats>()
             .init_resource::<forgia_anim_locomotion::FootIkSensorTimer>()
-            // DEBUG 2026-06-03 : freeze ON par défaut (F6 toggle ne prenait pas) →
-            // mesh figé au bind (état original non déformé) pour diagnostiquer
-            // l'alignement squelette↔mesh. Remettre .init_resource (false) après.
-            .insert_resource(forgia_anim_locomotion::AnimFreezeBind(true))
+            // 2026-06-04 : freeze révoqué (alignement squelette↔mesh validé en freeze).
+            // Défaut OFF (Default=false) → Rex s'anime. Toggle F6 conservé pour re-figer
+            // au bind si besoin de re-vérifier un alignement (mesh original non déformé).
+            .init_resource::<forgia_anim_locomotion::AnimFreezeBind>()
             .add_systems(
                 Update,
                 forgia_anim_locomotion::toggle_anim_freeze_bind.run_if(in_state(GameMode::Rpg)),

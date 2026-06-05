@@ -399,7 +399,16 @@ pub fn attach_locomotion_bones(
 
         if topo.is_usable() {
             // Spring chain queue (tail)
-            if topo.tail_chain.len() >= 2 {
+            // 2026-06-04 (audit anim) : double-driver queue résolu. La queue est
+            // pilotée par le YAW PROCÉDURAL (procedural_locomotion → tail_segment_yaw,
+            // ~l.788). Le SpringBone (forgia-secondary-motion) écrasait ce yaw en
+            // PostUpdate en supposant l'axe d'os +Y (≠ bind Pinocchio de Rex) → whip
+            // Verlet, queue de travers. Option B retenue : SpringBone OFF (driver unique
+            // = procédural). Pour repasser en secondary-motion physique (Option A),
+            // remettre `true` ET corriger l'axe supposé +Y du solver
+            // (forgia-secondary-motion/src/solver.rs:159).
+            const TAIL_USE_SPRINGBONE: bool = false;
+            if TAIL_USE_SPRINGBONE && topo.tail_chain.len() >= 2 {
                 let followers: Vec<Entity> = topo.tail_chain[1..].to_vec();
                 for &bone in &followers {
                     commands.entity(bone).insert(SpringBone {
@@ -1299,7 +1308,7 @@ pub fn write_anim_full_sensor(
     let Ok(lstate) = q_state.single() else {
         let _ = std::fs::write(
             ANIM_FULL_PATH,
-            "{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"no_locomotion_state\"}\n".to_string(),
+            "{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"no_locomotion_state\"}\n",
         );
         return;
     };
@@ -1409,9 +1418,8 @@ pub fn write_anim_full_sensor(
             }
             None => (None, None),
         };
-        let align = align_frac.and_then(|f| {
-            (mesh_found && present).then(|| head.y - (mesh_min_y + mesh_height * f))
-        });
+        let align = align_frac
+            .and_then(|f| (mesh_found && present).then_some(head.y - (mesh_min_y + mesh_height * f)));
         let fv = |v: Vec3| format!("[{:.3},{:.3},{:.3}]", v.x, v.y, v.z);
         let fd = |o: Option<Vec3>| o.map(fv).unwrap_or_else(|| "null".to_string());
         let ff = |o: Option<f32>| {
@@ -1472,7 +1480,7 @@ pub fn write_anim_full_sensor(
     let leg_r_swing = rphase >= tun.stance_frac;
 
     let json = format!(
-        "{{\n  \"id\": \"anim_full\",\n  \"BUILD_MARKER\": \"RESUME-TORSO_2026-06-04\",\n  \"severity\": \"ok\",\n  \"timestamp_secs\": {:.1},\n  \"entry_index\": {},\n  \"guide\": \"world_deg/world_dir/forward_lean = orientation MONDE (apres Ry PI) — SEUL fiable (euler peut gimbal-lock a Y=90, cf gimbal_warn). forward_lean>0 = os pointe AVANT (sens marche), <0 = arriere. mesh_align_dy = head.y - Y_attendu(AABB mesh) ; |.|>0.10 = os hors feature mesh (rings genoux/epaules). hand_l/r jamais pilotes (figes au bind). stance gauche/droite via stance_deg.\",\n  \"pipeline\": {{\n    \"cache_ready\": {}, \"gave_up\": {}, \"frames_waited\": {},\n    \"locomotion_target_count\": {},\n    \"topology_[hip,spine,clavL,armL,foreL,handL,clavR,armR,foreR,handR,legL,shinL,footL,legR,shinR,footR]\": \"{}\",\n    \"stance_source\": \"{}\"\n  }},\n  \"gait\": {{\n    \"is_moving\": {}, \"moving_world\": {}, \"speed_m_s\": {:.3}, \"speed_factor\": {:.3},\n    \"gait_phase\": {:.3}, \"stance_frac\": {:.3}, \"leg_l_in_swing\": {}, \"leg_r_in_swing\": {},\n    \"thigh_l_deg\": {:.1}, \"thigh_r_deg\": {:.1}, \"knee_l_deg\": {:.1}, \"knee_r_deg\": {:.1},\n    \"ankle_l_deg\": {:.1}, \"ankle_r_deg\": {:.1},\n    \"arm_l_pitch_deg\": {:.1}, \"arm_r_pitch_deg\": {:.1}, \"elbow_l_deg\": {:.1}, \"elbow_r_deg\": {:.1},\n    \"pelvic_yaw_deg\": {:.1}, \"pelvic_roll_deg\": {:.1}\n  }},\n  \"root\": {{\n    \"world_translation\": [{:.3},{:.3},{:.3}],\n    \"world_yaw_deg\": {:.1}, \"ry_pi_confirmed\": {}, \"pitch_deg\": {:.1}, \"roll_deg\": {:.1},\n    \"travel_dir_world\": [{:.3},{:.3},{:.3}]\n  }},\n  \"mesh\": {{\n    \"found\": {}, \"aabb_world_center\": [{:.3},{:.3},{:.3}], \"aabb_world_half\": [{:.3},{:.3},{:.3}],\n    \"mesh_height\": {:.3}, \"hip_vs_mesh_center_desync_m\": {:.3}\n  }},\n  \"foot_ik_see\": \"forgia_foot_ik.json\",\n  \"spring_see\": \"forgia_bone_trace.json (tail)\",\n  \"bones\": [\n    {}\n  ]\n}}\n",
+        "{{\n  \"id\": \"anim_full\",\n  \"BUILD_MARKER\": \"UNFREEZE-WALK_2026-06-04\",\n  \"severity\": \"ok\",\n  \"timestamp_secs\": {:.1},\n  \"entry_index\": {},\n  \"guide\": \"world_deg/world_dir/forward_lean = orientation MONDE (apres Ry PI) — SEUL fiable (euler peut gimbal-lock a Y=90, cf gimbal_warn). forward_lean>0 = os pointe AVANT (sens marche), <0 = arriere. mesh_align_dy = head.y - Y_attendu(AABB mesh) ; |.|>0.10 = os hors feature mesh (rings genoux/epaules). hand_l/r jamais pilotes (figes au bind). stance gauche/droite via stance_deg.\",\n  \"pipeline\": {{\n    \"cache_ready\": {}, \"gave_up\": {}, \"frames_waited\": {},\n    \"locomotion_target_count\": {},\n    \"topology_[hip,spine,clavL,armL,foreL,handL,clavR,armR,foreR,handR,legL,shinL,footL,legR,shinR,footR]\": \"{}\",\n    \"stance_source\": \"{}\"\n  }},\n  \"gait\": {{\n    \"is_moving\": {}, \"moving_world\": {}, \"speed_m_s\": {:.3}, \"speed_factor\": {:.3},\n    \"gait_phase\": {:.3}, \"stance_frac\": {:.3}, \"leg_l_in_swing\": {}, \"leg_r_in_swing\": {},\n    \"thigh_l_deg\": {:.1}, \"thigh_r_deg\": {:.1}, \"knee_l_deg\": {:.1}, \"knee_r_deg\": {:.1},\n    \"ankle_l_deg\": {:.1}, \"ankle_r_deg\": {:.1},\n    \"arm_l_pitch_deg\": {:.1}, \"arm_r_pitch_deg\": {:.1}, \"elbow_l_deg\": {:.1}, \"elbow_r_deg\": {:.1},\n    \"pelvic_yaw_deg\": {:.1}, \"pelvic_roll_deg\": {:.1}\n  }},\n  \"root\": {{\n    \"world_translation\": [{:.3},{:.3},{:.3}],\n    \"world_yaw_deg\": {:.1}, \"ry_pi_confirmed\": {}, \"pitch_deg\": {:.1}, \"roll_deg\": {:.1},\n    \"travel_dir_world\": [{:.3},{:.3},{:.3}]\n  }},\n  \"mesh\": {{\n    \"found\": {}, \"aabb_world_center\": [{:.3},{:.3},{:.3}], \"aabb_world_half\": [{:.3},{:.3},{:.3}],\n    \"mesh_height\": {:.3}, \"hip_vs_mesh_center_desync_m\": {:.3}\n  }},\n  \"foot_ik_see\": \"forgia_foot_ik.json\",\n  \"spring_see\": \"forgia_bone_trace.json (tail)\",\n  \"bones\": [\n    {}\n  ]\n}}\n",
         time.elapsed_secs(),
         entry.0,
         cache.ready, cache.gave_up, cache.frames_waited,

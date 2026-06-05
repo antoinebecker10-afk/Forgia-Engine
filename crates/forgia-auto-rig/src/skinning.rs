@@ -72,6 +72,54 @@ impl Default for SkinningConfig {
     }
 }
 
+/// Reconstruit les `GlobalTransform` (Mat4) de **rest pose** de tous les
+/// descendants de `mesh_root`, en forçant la rotation LOCALE de chaque entité à
+/// l'identité. Marche la hiérarchie via `q_children`.
+///
+/// Pourquoi : la inverse-bindpose et le matching de poids du skinning doivent
+/// référencer la pose de REPOS du squelette (os à l'embed, rotation identité),
+/// PAS la pose live. La locomotion (`forgia-anim-locomotion`) ne modifie QUE les
+/// rotations locales des os (jamais les translations) ; si l'injection skinning
+/// tourne pendant que la locomotion pose (race PostUpdate vs Update), lire le
+/// `GlobalTransform` live capturerait une rest tordue → mesh déformé au retour au
+/// bind (bug observé 2026-06-04, masqué jusque-là par le freeze forcé).
+///
+/// Invariant : les os spawnent en rotation identité (pinocchio `from_translation`,
+/// sensor `bind_deg=[0,0,0]`). Si un futur template embarque une rotation de repos
+/// non-nulle sur les os, ce helper devra capturer le bind à l'embed.
+fn compute_rest_bone_globals(
+    mesh_root: Entity,
+    q_global: &Query<&GlobalTransform>,
+    q_children: &Query<&Children>,
+    q_transform: &Query<&Transform>,
+) -> HashMap<Entity, Mat4> {
+    let mut rest: HashMap<Entity, Mat4> = HashMap::new();
+    let root_global = q_global
+        .get(mesh_root)
+        .map(|g| g.to_matrix())
+        .unwrap_or(Mat4::IDENTITY);
+    rest.insert(mesh_root, root_global);
+    let mut stack = vec![mesh_root];
+    while let Some(e) = stack.pop() {
+        let parent_global = rest[&e];
+        if let Ok(children) = q_children.get(e) {
+            for child in children.iter() {
+                let local = q_transform.get(child).copied().unwrap_or_default();
+                // Rotation locale forcée à IDENTITÉ = pose de repos.
+                let rest_local = Mat4::from_scale_rotation_translation(
+                    local.scale,
+                    Quat::IDENTITY,
+                    local.translation,
+                );
+                let child_global = parent_global * rest_local;
+                rest.insert(child, child_global);
+                stack.push(child);
+            }
+        }
+    }
+    rest
+}
+
 /// Système Phase 1B. Tourne en `PostUpdate` pour avoir `GlobalTransform` valide
 /// sur les bones spawnés en Update par `auto_rig_pending_meshes`.
 pub fn inject_skinning_for_rigged_meshes(
@@ -85,6 +133,7 @@ pub fn inject_skinning_for_rigged_meshes(
     q_children: Query<&Children>,
     q_mesh3d: Query<&Mesh3d>,
     q_global: Query<&GlobalTransform>,
+    q_transform: Query<&Transform>,
     q_bones: Query<(Entity, &BoneEntity)>,
     q_names: Query<&Name>,
 ) {
@@ -115,29 +164,39 @@ pub fn inject_skinning_for_rigged_meshes(
             continue;
         }
 
-        // 2. Calculer les positions monde des bones (bind pose = pose actuelle).
-        //    Note : GlobalTransform peut ne pas être propagé si transform_propagate
-        //    n'a pas tourné. PostUpdate inclut TransformPropagate avant nos systems
-        //    custom donc OK Bevy 0.18.
+        // 2. Guard de propagation : si tous les bones sont à (0,0,0), le
+        //    GlobalTransform n'est pas encore propagé → retry au prochain frame.
+        let live_positions: Vec<Vec3> = bones
+            .iter()
+            .map(|&b| q_global.get(b).map(|gt| gt.translation()).unwrap_or(Vec3::ZERO))
+            .collect();
+        if live_positions.iter().all(|p| p.length_squared() < 1e-6) {
+            // Retry attendu (pas de stats incrément).
+            continue;
+        }
+
+        // 2b. Positions/globals de REST des os (rotation locale forcée identité).
+        //     CRITIQUE (fix 2026-06-04) : la inverse-bindpose ET le matching de
+        //     poids doivent référencer la pose de REPOS, PAS la pose live. La
+        //     locomotion tourne en Update et pose les os AVANT que ce système
+        //     (PostUpdate) lise leur GlobalTransform → sans freeze, lire le live
+        //     capturerait une rest tordue (os parent tourné = enfants déplacés en
+        //     FK) → mesh déformé au retour au bind. Le freeze forcé masquait ce
+        //     bug. On reconstruit la rest pose, robuste au timing d'injection.
+        //     Cf compute_rest_bone_globals + la locomotion ne change QUE les
+        //     rotations locales (jamais les translations), donc les translations
+        //     locales lues sont déjà celles du repos.
+        let rest_globals =
+            compute_rest_bone_globals(mesh_root, &q_global, &q_children, &q_transform);
         let bone_world_positions: Vec<Vec3> = bones
             .iter()
             .map(|&b| {
-                q_global
-                    .get(b)
-                    .map(|gt| gt.translation())
+                rest_globals
+                    .get(&b)
+                    .map(|m| m.transform_point3(Vec3::ZERO))
                     .unwrap_or(Vec3::ZERO)
             })
             .collect();
-
-        // Si tous les bones sont à (0,0,0), GlobalTransform pas encore propagé.
-        // Retry au prochain frame (ne pas poser SkinningInjected).
-        let all_zero = bone_world_positions
-            .iter()
-            .all(|p| p.length_squared() < 1e-6);
-        if all_zero {
-            // Note : pas de stats incrément ici, c'est un retry attendu.
-            continue;
-        }
 
         // Mesh root world transform → permettra de mettre les vertex en repère
         // mesh-root-local pour matching bones (qui sont aussi en mesh-root-local
@@ -195,12 +254,17 @@ pub fn inject_skinning_for_rigged_meshes(
             continue;
         }
 
-        // 4. Bones globaux au bind pose (pose courante post-spawn, avant anim).
-        //    Mat4 complets avec translation+rotation+scale via GlobalTransform.
-        //    PostUpdate APRÈS TransformPropagate → GlobalTransform fiable.
+        // 4. Bones globaux au bind pose = pose de REST (rotation os = identité),
+        //    PAS la pose live (cf 2b : la locomotion a pu poser les os ce frame).
+        //    Mat4 complets translation+rotation+scale.
         let bone_globals: Vec<Mat4> = bones
             .iter()
-            .map(|&b| q_global.get(b).copied().unwrap_or_default().to_matrix())
+            .map(|&b| {
+                rest_globals
+                    .get(&b)
+                    .copied()
+                    .unwrap_or_else(|| q_global.get(b).copied().unwrap_or_default().to_matrix())
+            })
             .collect();
 
         // 5. Pour chaque Mesh3d : process vertices.
@@ -596,6 +660,48 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Fix 2026-06-04 : la rest pose du skinning doit IGNORER la rotation locale
+    /// des os (la locomotion peut les avoir posés avant l'injection). Un os enfant
+    /// avec une rotation locale non triviale doit produire un rest global à
+    /// rotation identité (translation pure héritée du parent).
+    #[test]
+    fn rest_globals_ignore_bone_rotation() {
+        use bevy::ecs::system::SystemState;
+        let mut world = World::new();
+        let root = world
+            .spawn((Transform::IDENTITY, GlobalTransform::IDENTITY))
+            .id();
+        // Os enfant : translation + rotation locale 90° Z (pose, à ignorer).
+        let child = world
+            .spawn((
+                Transform::from_translation(Vec3::new(0.0, 1.0, 0.0))
+                    .with_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
+                GlobalTransform::IDENTITY,
+            ))
+            .id();
+        world.entity_mut(root).add_child(child);
+
+        let mut state: SystemState<(
+            Query<&GlobalTransform>,
+            Query<&Children>,
+            Query<&Transform>,
+        )> = SystemState::new(&mut world);
+        let (q_global, q_children, q_transform) = state.get(&world);
+        let rest = compute_rest_bone_globals(root, &q_global, &q_children, &q_transform);
+
+        let child_rest = rest.get(&child).expect("child rest global présent");
+        let (scale, rot, trans) = child_rest.to_scale_rotation_translation();
+        assert!(
+            (trans - Vec3::new(0.0, 1.0, 0.0)).length() < 1e-5,
+            "translation = translation locale (rest), got {trans:?}"
+        );
+        assert!(
+            rot.angle_between(Quat::IDENTITY) < 1e-4,
+            "rotation doit être identité (rest, rotation d'os ignorée), got {rot:?}"
+        );
+        assert!((scale - Vec3::ONE).length() < 1e-5, "scale 1");
     }
 
     #[test]

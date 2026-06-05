@@ -32,7 +32,7 @@ use crate::BoneEntity;
 /// Écrit par `draw_rig_gizmos` (qui a déjà tous les `BoneEntity` + GlobalTransform).
 const SENSOR_RIG_BONES_PATH: &str = "forgia_rig_bones.json";
 /// Marqueur de build pour vérifier que l'exe tourne le bon code (cf rule stale-binary).
-const RIG_BONES_BUILD_MARKER: &str = "RIGBONES-TORSO2_2026-06-04";
+const RIG_BONES_BUILD_MARKER: &str = "SKINREST-FIX_2026-06-04";
 
 /// Configuration globale du draw de gizmos rig. Default = enabled, toggle
 /// via inspector ou keybind dans le caller.
