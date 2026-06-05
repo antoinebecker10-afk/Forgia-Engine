@@ -32,7 +32,7 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::scene::{Scene, SceneRoot};
 use bevy::state::state_scoped::DespawnOnExit;
-use bevy_rapier3d::prelude::{Collider, RigidBody};
+use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, RigidBody};
 use forgia_anchor::{AnchorKind, AnchorPoint};
 use forgia_core::prelude::*;
 use forgia_stage::{StageArenaMarker, StageLoadResult};
@@ -107,7 +107,6 @@ const RUBBLE_PROPS: &[&str] = &["models/kaykit/dungeon/rubble.glb"];
 /// hauteur `RAMPARTS_WALL_HEIGHT_M`=4, épaisseur `RAMPARTS_WALL_THICKNESS_M`=0.4).
 const WALL_SEG_W: f32 = 1.0;
 const WALL_HEIGHT: f32 = 4.0;
-const WALL_THICK: f32 = 0.4;
 
 // ─── Genome / Config ──────────────────────────────────────────────────────────
 
@@ -267,6 +266,16 @@ pub struct NeedsDecorCalibrate {
     pub user_scale: f32,
 }
 
+/// Posé sur le PARENT d'un prop : `sys_decor_build_hull_colliders` attache un
+/// `Collider` **ConvexHull** construit depuis chaque mesh chargé (suit la
+/// silhouette du prop ; fiable car bâti APRÈS chargement, pas le souci async de
+/// `AsyncSceneCollider`). Fallback cylindre si aucun hull n'est productible.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct NeedsHullCollider {
+    pub fallback_target_m: f32,
+    pub fallback_radius_factor: f32,
+}
+
 // ─── Systems : init genome + assets + hot-reload ──────────────────────────────
 
 pub fn sys_init_decor_genome(mut commands: Commands) {
@@ -410,6 +419,82 @@ fn compute_aabb_max_dim(
     }
 }
 
+// ─── Colliders mesh-fidèles (ConvexHull) ──────────────────────────────────────
+
+/// Walk récursif : collecte les entités porteuses d'un `Mesh3d` sous `root`.
+fn collect_mesh_entities(
+    root: Entity,
+    q_children: &Query<&Children>,
+    q_mesh: &Query<&Mesh3d>,
+    out: &mut Vec<Entity>,
+) {
+    if q_mesh.contains(root) {
+        out.push(root);
+    }
+    if let Ok(children) = q_children.get(root) {
+        for child in children.iter() {
+            collect_mesh_entities(child, q_children, q_mesh, out);
+        }
+    }
+}
+
+/// Pour chaque prop marqué `NeedsHullCollider`, une fois ses meshes chargés,
+/// attache un `Collider` ConvexHull sur chaque entité `Mesh3d` (rapier le scale
+/// via le `GlobalTransform` = le scale appliqué par la calibration). Si aucun
+/// hull n'est productible, pose un cylindre de secours. Retry tant que les
+/// meshes ne sont pas chargés. Gated Roguelite.
+pub fn sys_decor_build_hull_colliders(
+    mut commands: Commands,
+    q_needs: Query<(Entity, &NeedsHullCollider)>,
+    q_children: Query<&Children>,
+    q_mesh: Query<&Mesh3d>,
+    meshes: Res<Assets<Mesh>>,
+) {
+    for (parent, needs) in &q_needs {
+        let mut mesh_entities = Vec::new();
+        collect_mesh_entities(parent, &q_children, &q_mesh, &mut mesh_entities);
+        if mesh_entities.is_empty() {
+            continue; // scène pas encore peuplée → retry frame suivante
+        }
+        // Attendre que TOUS les assets Mesh soient chargés (sinon retry).
+        let all_loaded = mesh_entities.iter().all(|e| {
+            q_mesh
+                .get(*e)
+                .ok()
+                .and_then(|m| meshes.get(&m.0))
+                .is_some()
+        });
+        if !all_loaded {
+            continue;
+        }
+        let mut built = 0u32;
+        for &me in &mesh_entities {
+            if let Ok(m3d) = q_mesh.get(me) {
+                if let Some(mesh) = meshes.get(&m3d.0) {
+                    if let Some(col) =
+                        Collider::from_bevy_mesh(mesh, &ComputedColliderShape::ConvexHull)
+                    {
+                        commands.entity(me).insert(col);
+                        built += 1;
+                    }
+                }
+            }
+        }
+        if built == 0 {
+            // Fallback : cylindre primitif (mesh dégénéré / non hull-able).
+            let half_h = (needs.fallback_target_m * 0.5).max(0.3);
+            let radius = (needs.fallback_target_m * needs.fallback_radius_factor).max(0.25);
+            commands.spawn((
+                ChildOf(parent),
+                Name::new("DecorColliderFallback"),
+                Transform::from_xyz(0.0, half_h, 0.0),
+                Collider::cylinder(half_h, radius),
+            ));
+        }
+        commands.entity(parent).remove::<NeedsHullCollider>();
+    }
+}
+
 // ─── Réconciliation count-based ───────────────────────────────────────────────
 
 #[allow(clippy::too_many_arguments)]
@@ -475,8 +560,8 @@ fn decor_markers(
 }
 
 /// Spawn un prop périmétrique SOLIDE : parent `RigidBody::Fixed` (scale 1) +
-/// enfant visuel `SceneRoot` (scale calibré) + enfant **collider cylindre**
-/// dimensionné depuis la target (fiable, bloque le LOS/tir des bots).
+/// enfant visuel `SceneRoot` (scale calibré) + **collider ConvexHull** construit
+/// depuis le mesh chargé (épouse la silhouette ; bloque le LOS/tir des bots).
 /// Optionnellement un PointLight (brasero). `col_radius_factor` = footprint
 /// relatif (fin pour les tours/statues, large pour les rochers).
 #[allow(clippy::too_many_arguments)]
@@ -506,15 +591,13 @@ fn spawn_perimeter_prop(
         Transform::IDENTITY,
         NeedsDecorCalibrate { target_m, user_scale },
     ));
-    // Enfant collider : cylindre solide centré à mi-hauteur (bloque tir bots).
-    let half_h = (target_m * 0.5).max(0.3);
-    let radius = (target_m * col_radius_factor).max(0.25);
-    commands.spawn((
-        ChildOf(parent),
-        Name::new("DecorCollider"),
-        Transform::from_xyz(0.0, half_h, 0.0),
-        Collider::cylinder(half_h, radius),
-    ));
+    // Collider mesh-fidèle : ConvexHull construit depuis le mesh chargé par
+    // `sys_decor_build_hull_colliders` (suit la silhouette ; fiable). Fallback
+    // cylindre si le mesh ne produit pas de hull. Marqueur sur le parent.
+    commands.entity(parent).insert(NeedsHullCollider {
+        fallback_target_m: target_m,
+        fallback_radius_factor: col_radius_factor,
+    });
     if brazier {
         commands.spawn((
             ChildOf(parent),
@@ -680,6 +763,11 @@ fn spawn_wall_room(
             decor_markers("Decor_Wall"),
             SceneRoot(corner.clone()),
             Transform::from_translation(origin).with_rotation(rot),
+            // Collider ConvexHull du coin (comble le gap d'angle des salles).
+            NeedsHullCollider {
+                fallback_target_m: WALL_HEIGHT,
+                fallback_radius_factor: 0.3,
+            },
         ));
         count += 1;
     }
@@ -692,7 +780,8 @@ fn spawn_wall_room(
 }
 
 /// Aligne `n` segments de mur le long de `dir` (normalisé), espacés de
-/// `WALL_SEG_W`, + 1 collider cuboid couvrant tout le bras.
+/// `WALL_SEG_W`. Chaque mur reçoit son propre collider ConvexHull (épouse le
+/// mesh) — plus de cuboïde unique par-bras désaligné.
 fn spawn_wall_arm(
     commands: &mut Commands,
     assets: &DecorAssets,
@@ -714,25 +803,15 @@ fn spawn_wall_arm(
             decor_markers("Decor_Wall"),
             SceneRoot(handle.clone()),
             Transform::from_translation(p).with_rotation(q),
+            // Collider ConvexHull PAR mur (épouse exactement le mesh, via
+            // sys_decor_build_hull_colliders). Remplace l'ancien cuboïde unique
+            // par-bras qui était décalé de ½ segment → gap au bout d'arme + coin.
+            NeedsHullCollider {
+                fallback_target_m: WALL_HEIGHT,
+                fallback_radius_factor: 0.3,
+            },
         ));
         count += 1;
-    }
-    // 1 collider cuboid couvrant le bras (half-len sur X local).
-    if n > 0 {
-        let half_len = n as f32 * WALL_SEG_W * 0.5;
-        let center = origin + dir * half_len + Vec3::Y * (WALL_HEIGHT * 0.5);
-        commands.spawn((
-            Name::new("Decor_WallCollider"),
-            StageArenaMarker,
-            DespawnOnExit(GameMode::Roguelite),
-            RigidBody::Fixed,
-            Transform {
-                translation: center,
-                rotation: q,
-                scale: Vec3::ONE,
-            },
-            Collider::cuboid(half_len, WALL_HEIGHT * 0.5, WALL_THICK * 0.5),
-        ));
     }
     count
 }

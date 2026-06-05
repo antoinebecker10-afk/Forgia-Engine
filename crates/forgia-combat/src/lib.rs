@@ -146,6 +146,7 @@ impl Plugin for ForgiaCombatPlugin {
             // (damage_reduction — Phase 4b).
             .init_resource::<combat_mods::PlayerCombatMods>()
             .add_message::<combat_juice::CombatHitEvent>()
+            .add_message::<combat_juice::WeaponFiredEvent>()
             .add_message::<ammo::AmmoChanged>()
             .add_systems(
                 Startup,

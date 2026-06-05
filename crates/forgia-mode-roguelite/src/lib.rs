@@ -21,6 +21,7 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
+pub mod audio;
 pub mod boons_apply;
 pub mod coffre_sensor;
 pub mod decor;
@@ -109,6 +110,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         if !app.is_plugin_added::<forgia_stage::ForgiaStageArenaPlugin>() {
             app.add_plugins(forgia_stage::ForgiaStageArenaPlugin);
         }
+        // Debug collision (2026-06-05) — affiche TOUS les colliders physiques en
+        // fil-de-fer (toggle F10) pour diagnostiquer les traversées de murs :
+        // collider absent / désaligné vs mur visuel. Feature `debug-render-3d` ON.
+        if !app.is_plugin_added::<bevy_rapier3d::render::RapierDebugRenderPlugin>() {
+            app.add_plugins(bevy_rapier3d::render::RapierDebugRenderPlugin {
+                enabled: false,
+                ..default()
+            });
+        }
+        app.add_systems(Update, sys_toggle_collider_debug);
         // Story-544 close (2026-05-29) — toon cel-shading + Sobel outline pour
         // direction cartoon bible v1. Genome-driven via roguelite_toon.toml
         // (hot-reload mtime 1Hz). Attaché OnEnter Roguelite, retiré OnExit.
@@ -196,6 +207,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 decor::sys_hot_reload_decor_genome,
                 decor::sys_reconcile_decor,
                 decor::sys_calibrate_decor,
+                decor::sys_decor_build_hull_colliders,
             )
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -345,6 +357,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                     .run_if(in_state(GameMode::Roguelite)),
             )
             .add_plugins(hud::RogueliteHudPlugin)
+            // Story-559 slice A — audio Roguelite (SFX impact/kill/hurt + ding
+            // Or/Âmes + musique combat/break). Orthogonal : 0 édition cross-crate.
+            .add_plugins(audio::RogueliteAudioPlugin)
             // Story-558 P2 Vlambeer juice — kill popup cartoon par archetype.
             .add_plugins(kill_popup::RogueliteKillPopupPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").
@@ -356,6 +371,19 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             );
         // Cleanup OnExit(GameMode::Roguelite) géré par terminal parallèle (V7 cleanup
         // orchestration). Ne PAS dupliquer ici.
+    }
+}
+
+/// Debug : toggle l'affichage fil-de-fer des colliders physiques (F10). Permet
+/// de voir si les colliders (murs ramparts, salles, props) sont présents et
+/// alignés avec les meshes visuels — diagnostic des traversées de murs.
+fn sys_toggle_collider_debug(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut ctx: ResMut<bevy_rapier3d::render::DebugRenderContext>,
+) {
+    if keys.just_pressed(KeyCode::F10) {
+        ctx.enabled = !ctx.enabled;
+        info!("[roguelite] Rapier collider debug render = {}", ctx.enabled);
     }
 }
 

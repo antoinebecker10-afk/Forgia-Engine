@@ -3476,9 +3476,11 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "bevy_kira_audio",
  "bevy_rapier3d",
  "forgia-ai-arena-bot",
  "forgia-anchor",
+ "forgia-audio",
  "forgia-combat",
  "forgia-core",
  "forgia-damage",

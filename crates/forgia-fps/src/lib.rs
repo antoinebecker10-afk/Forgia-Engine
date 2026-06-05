@@ -283,6 +283,8 @@ pub struct HitscanCtx<'w, 's> {
     /// Story-558 Phase 4 — boons multiplicateurs (damage_mul, fire_rate_mul,
     /// damage_reduction). Default neutre 1.0/1.0/0.0 si pas de boon actif.
     pub combat_mods: Res<'w, forgia_combat::combat_mods::PlayerCombatMods>,
+    /// Story-559 slice B — émet `WeaponFiredEvent` par tir (son d'arme propre).
+    pub fired: MessageWriter<'w, forgia_combat::combat_juice::WeaponFiredEvent>,
 }
 
 /// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
@@ -589,6 +591,16 @@ fn fire_weapon_minimal(
 
     let origin = cam_tf.translation();
     let direction = cam_tf.forward().as_vec3();
+
+    // Story-559 slice B — son de tir propre à l'arme (hit OU miss). Émis ici : le
+    // tir est désormais engagé (trigger OK + munition consommée). Lu par
+    // forgia-mode-roguelite::audio pour jouer le SFX mappé au WeaponType.
+    if let Ok(shooter) = q_player.single() {
+        hitscan_ctx.fired.write(forgia_combat::combat_juice::WeaponFiredEvent {
+            shooter,
+            weapon: ammo.equipped.current,
+        });
+    }
 
     // Cooldown depuis genome (fallback 0.1s = ModernAR 10 shots/s).
     // Story-558 Phase 4 — fire_rate_mul des boons divise le cooldown (clamp ≥0.1).

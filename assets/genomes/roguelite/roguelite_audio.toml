@@ -1,0 +1,61 @@
+# Roguelite — Audio (story-559 slice A, 2026-06-04)
+#
+# SFX combat (impact/kill/hurt) + ding pickup (Or/Âmes) + musique (combat/break).
+# Hot-reload Shift+F12 (poll mtime 1Hz). Volumes 0..2 (1.0 = nominal).
+# Chemins relatifs à la racine `assets/` (junction `audio-v1/` = assets V1 HQ).
+#
+# SFX combat/pickup = Kenney.nl CC0 (libre, SANS attribution), cf
+# assets/audio/roguelite/sfx/CREDITS.md. Swap = change le path + Shift+F12.
+# (Remplace les anciens jingles V1 musicaux, 2026-06-05.)
+
+master_volume = 0.9
+music_volume = 0.45
+
+[impact]                # hit ennemi (court, fréquent) — Kenney impactGeneric_light
+path = "audio/roguelite/sfx/impact.ogg"
+volume = 0.45
+
+[kill]                  # kill (meaty) — Kenney impactMining
+path = "audio/roguelite/sfx/kill.ogg"
+volume = 0.7
+
+[hurt]                  # joueur touché (thud sourd) — Kenney impactPlank
+path = "audio/roguelite/sfx/hurt.ogg"
+volume = 0.6
+
+[ding_gold]             # ramassage Or — Kenney handleCoins
+path = "audio/roguelite/sfx/ding_gold.ogg"
+volume = 0.6
+
+[ding_souls]            # ramassage Âme (cloche éthérée) — Kenney impactBell
+path = "audio/roguelite/sfx/ding_souls.ogg"
+volume = 0.55
+
+[music_combat]
+path = "audio-v1/music/playlist_main.ogg"
+volume = 0.8
+
+[music_break]
+path = "audio-v1/music/emotional_01.ogg"
+volume = 0.8
+
+# ── Sons de TIR par arme (slice B) ──────────────────────────────────────────
+# CC-BY 3.0 (Vincent Sevedge), cf assets/audio/roguelite/weapons/CREDITS.md.
+# Mapping slot Digit1-4 : Pépin=pistolet · Bourrasque=mitraillette · Lenoir=sniper
+# · Boucherie=pompe. Volume 0..2 ; swappe le path par un autre .ogg pour changer.
+
+[fire_pepin]        # Digit1 — pistolet (CZ-52)
+path = "audio/roguelite/weapons/pepin.ogg"
+volume = 0.75
+
+[fire_bourrasque]   # Digit2 — mitraillette (SKS)
+path = "audio/roguelite/weapons/bourrasque.ogg"
+volume = 0.6
+
+[fire_lenoir]       # Digit3 — sniper (Mosin Nagant)
+path = "audio/roguelite/weapons/lenoir.ogg"
+volume = 0.9
+
+[fire_boucherie]    # Digit4 — pompe (fusil à pompe)
+path = "audio/roguelite/weapons/boucherie.ogg"
+volume = 0.85

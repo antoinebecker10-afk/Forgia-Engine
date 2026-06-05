@@ -295,6 +295,83 @@ fn pick_avoid_direction(
     }
 }
 
+// ─── Collide-and-slide contre les murs (anti-traversée) ───────────────────────
+//
+// Les bots sont `RigidBody::KinematicPositionBased` déplacés par mutation directe
+// de `Transform` → Rapier ne les stoppe PAS contre les murs statiques (un corps
+// kinematic n'est jamais bloqué par du Fixed). De plus leurs colliders body/head
+// sont des `Sensor` (story-517 : le joueur traverse les ennemis + hitscan OK).
+// On valide donc chaque déplacement à la main : shapecast approximé par 3 rayons
+// (centre + 2 bords latéraux = largeur capsule) contre les colliders SOLIDES
+// (`exclude_sensors` → on ignore les autres ennemis), clamp conservateur (jamais
+// de pénétration) + slide le long de la surface pour contourner.
+
+/// Rayon approximatif de la capsule du bot pour la validation murs (les vrais
+/// rayons par archétype ~0.3-0.5 ; 0.4 = valeur moyenne, marge conservatrice).
+const BOT_BODY_RADIUS_M: f32 = 0.4;
+/// Marge anti-pénétration : le bord du bot s'arrête à cette distance du mur.
+const COLLIDE_SKIN_M: f32 = 0.08;
+
+/// Valide un déplacement XZ contre les murs solides. Retourne le déplacement
+/// effectif (clampé à l'impact + slide tangentiel si le couloir est dégagé).
+fn collide_and_slide(
+    origin: Vec3,
+    step: Vec3,
+    rapier: &RapierContext,
+    self_entity: Entity,
+) -> Vec3 {
+    let flat = Vec3::new(step.x, 0.0, step.z);
+    let len = flat.length();
+    if len < 1.0e-4 {
+        return step;
+    }
+    let dir = flat / len;
+    let pred = |e: Entity| e != self_entity;
+    let filter = QueryFilter::default().exclude_sensors().predicate(&pred);
+    let probe = origin + Vec3::Y * 0.5;
+    let lateral = Vec3::new(-dir.z, 0.0, dir.x) * BOT_BODY_RADIUS_M;
+    let max_toi = len + BOT_BODY_RADIUS_M + COLLIDE_SKIN_M;
+    // 3 rayons parallèles : centre + bords gauche/droit (couvre la largeur capsule
+    // → ne franchit pas un coin de mur qu'un rayon central seul manquerait).
+    let mut best: Option<(f32, Vec3)> = None; // (time_of_impact, normale XZ)
+    for off in [Vec3::ZERO, lateral, -lateral] {
+        if let Some((_, hit)) =
+            rapier.cast_ray_and_get_normal(probe + off, dir, max_toi, true, filter)
+        {
+            if best.is_none_or(|(bt, _)| hit.time_of_impact < bt) {
+                let n = Vec3::new(hit.normal.x, 0.0, hit.normal.z).normalize_or_zero();
+                best = Some((hit.time_of_impact, n));
+            }
+        }
+    }
+    let Some((toi, normal)) = best else {
+        return step; // rien devant → déplacement complet
+    };
+    // Conservateur : on retire rayon + skin → le bord ne pénètre jamais le mur.
+    let allowed = (toi - BOT_BODY_RADIUS_M - COLLIDE_SKIN_M).clamp(0.0, len);
+    let mut moved = dir * allowed;
+    // Slide : projette le reste sur la tangente du mur, si le couloir est dégagé.
+    if normal != Vec3::ZERO {
+        let remaining = len - allowed;
+        let slide_dir = (dir - normal * dir.dot(normal)).normalize_or_zero();
+        if slide_dir != Vec3::ZERO {
+            let slide_clear = rapier
+                .cast_ray(
+                    probe,
+                    slide_dir,
+                    remaining + BOT_BODY_RADIUS_M + COLLIDE_SKIN_M,
+                    true,
+                    filter,
+                )
+                .is_none_or(|(_, t)| t > BOT_BODY_RADIUS_M + COLLIDE_SKIN_M);
+            if slide_clear {
+                moved += slide_dir * remaining;
+            }
+        }
+    }
+    Vec3::new(moved.x, 0.0, moved.z)
+}
+
 /// Override state machine V1 — Chase intelligent : forward + strafe + obstacle avoidance.
 /// Run APRÈS `bot_state_machine` original pour appliquer le tactical layer.
 #[allow(clippy::too_many_arguments)]
@@ -342,8 +419,11 @@ pub fn bot_tactical_movement(
         )
         .unwrap_or(fwd_dir); // fallback forward simple si tous bloqués
         let step = final_dir * bot.speed * dt;
-        xf.translation.x += step.x;
-        xf.translation.z += step.z;
+        // Anti-traversée : clamp/slide le déplacement contre les murs solides
+        // (le kinematic ne s'arrête pas tout seul sur du Fixed).
+        let safe = collide_and_slide(xf.translation, step, &ctx, bot_entity);
+        xf.translation.x += safe.x;
+        xf.translation.z += safe.z;
         // Y stays at spawn (pas de jump V2).
     }
 }
@@ -363,7 +443,11 @@ const SEPARATION_PUSH_STRENGTH: f32 = 0.5;
 
 pub fn bot_separation(
     mut bots: Query<(Entity, &mut Transform), (With<ArenaBot>, Without<BotTarget>)>,
+    rapier: ReadRapierContext,
 ) {
+    let Ok(ctx) = rapier.single() else {
+        return;
+    };
     // Snapshot positions pour comparaison stable (sinon mutation iterative biaise).
     let positions: Vec<(Entity, Vec3)> = bots
         .iter()
@@ -400,8 +484,11 @@ pub fn bot_separation(
     }
     for (entity, mut tf) in &mut bots {
         if let Some(delta) = deltas.get(&entity) {
-            tf.translation.x += delta.x;
-            tf.translation.z += delta.y; // Vec2.y → world Z
+            // Anti-traversée : la poussée de séparation respecte aussi les murs.
+            let safe =
+                collide_and_slide(tf.translation, Vec3::new(delta.x, 0.0, delta.y), &ctx, entity);
+            tf.translation.x += safe.x;
+            tf.translation.z += safe.z;
         }
     }
 }

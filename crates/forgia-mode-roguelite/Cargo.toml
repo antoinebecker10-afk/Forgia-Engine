@@ -38,6 +38,11 @@ forgia-anchor = { workspace = true }
 # Story-544 (2026-05-27 → close 2026-05-29) — toon cel-shading + Sobel outline
 # post-process pour direction cartoon bible v1 (réf reference_bible_forgia_roguelite_v1.md).
 forgia-postprocess = { workspace = true }
+# Story-559 slice A (2026-06-04) — audio Roguelite : SFX combat + ding + musique.
+# forgia-audio fournit ForgiaAudioCorePlugin (wrap AudioPlugin) ; bevy_kira_audio
+# pour les channels SFX/Music. Orthogonal (in-crate), 0 édition cross-crate.
+forgia-audio = { workspace = true }
+bevy_kira_audio = { workspace = true }
 # Story-544 close — TOML genome parsing for hot-reload toon config.
 serde = { workspace = true }
 toml = { workspace = true }

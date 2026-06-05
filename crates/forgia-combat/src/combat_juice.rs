@@ -48,6 +48,15 @@ pub struct CombatHitEvent {
     pub body_zone: forgia_damage::HitZone,
 }
 
+/// Story-559 slice B (2026-06-04) — émis à CHAQUE tir effectif du joueur (hit OU
+/// miss), juste après la consommation de munition. Porte le `WeaponType` courant
+/// pour jouer le son de tir propre à l'arme (audio Roguelite) + futur muzzle flash.
+#[derive(Message)]
+pub struct WeaponFiredEvent {
+    pub shooter: Entity,
+    pub weapon: crate::weapons::WeaponType,
+}
+
 /// Tracks previous health to detect damage via change detection.
 #[derive(Component)]
 pub struct PrevHealth(pub f32);
