@@ -520,10 +520,11 @@ impl SkeletonTemplate {
         ])
     }
 
-    /// Template biped lézard (Rex) 19 bones (15 body + 4 tail).
+    /// Template biped lézard (Rex) 21 bones (17 body + 4 tail).
     /// **Source de vérité** : `assets/genomes/skeleton_biped_lizard.toml`.
     /// 2026-06-04 : `spine_mid` retiré (4 os spine → 3), `chest` re-parenté sur
-    /// `spine_lower`, indices `parent` renumérotés. Cf TOML pour le détail.
+    /// `spine_lower`, indices `parent` renumérotés. 2026-06-05 : os `toe_L/R`
+    /// ajoutés (orteil digitigrade, parent foot). Cf TOML pour le détail.
     pub fn biped_lizard() -> Self {
         use BoneClass::*;
         Self::from_data(&[
@@ -546,6 +547,8 @@ impl SkeletonTemplate {
             ("tail_02", Some(15), [0.0, 0.39, -0.22], Tail),
             ("tail_03", Some(16), [0.0, 0.37, -0.32], Tail),
             ("tail_04", Some(17), [0.0, 0.27, -0.42], Tail),
+            ("toe_L", Some(11), [-0.10, 0.01, 0.16], Leg),
+            ("toe_R", Some(14), [0.10, 0.01, 0.16], Leg),
         ])
     }
 
@@ -963,10 +966,10 @@ mod tests {
     }
 
     #[test]
-    fn biped_lizard_has_19_bones_with_root_hip() {
+    fn biped_lizard_has_21_bones_with_root_hip() {
         let t = SkeletonTemplate::biped_lizard();
-        // 2026-06-04 : spine_mid retiré (4 os spine → 3) → 15 body + 4 tail.
-        assert_eq!(t.bones.len(), 19, "biped_lizard = 15 body + 4 tail");
+        // 2026-06-04 : spine_mid retiré (3 os spine). 2026-06-05 : +toe_L/R.
+        assert_eq!(t.bones.len(), 21, "biped_lizard = 17 body + 4 tail");
         assert_eq!(t.bones[0].name, "hip");
         assert!(t.bones[0].parent.is_none());
         // spine_mid ne doit plus exister ; chest est re-parenté sur spine_lower.
@@ -974,6 +977,10 @@ mod tests {
         let chest = t.bones.iter().position(|b| b.name == "chest").unwrap();
         let spine_lower = t.bones.iter().position(|b| b.name == "spine_lower").unwrap();
         assert_eq!(t.bones[chest].parent, Some(spine_lower));
+        // toe_L doit être parenté sur foot_L (orteil digitigrade).
+        let toe_l = t.bones.iter().position(|b| b.name == "toe_L").unwrap();
+        let foot_l = t.bones.iter().position(|b| b.name == "foot_L").unwrap();
+        assert_eq!(t.bones[toe_l].parent, Some(foot_l));
     }
 
     #[test]

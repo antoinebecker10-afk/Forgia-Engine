@@ -725,9 +725,28 @@ pub fn procedural_locomotion(
         return;
     }
 
-    // Walk cycle anatomique
+    // Walk cycle anatomique — DIRECTION-AWARE (avancer vs reculer).
+    // 2026-06-05 : le swing de base lit comme une marche ARRIÈRE quand on AVANCE
+    // (convention d'axe d'os, open-question audit confirmée visuellement). On
+    // signe donc l'avance du gait par la direction de marche relative au facing :
+    // avancer INVERSE le sens du cycle (→ marche avant correcte), reculer le GARDE
+    // (→ marche arrière). Knee/ankle suivent la phase inversée naturellement.
+    let facing_fwd = (driver_tf.rotation * Vec3::NEG_Z)
+        .with_y(0.0)
+        .normalize_or_zero();
+    let forward_speed = horiz_vel.dot(facing_fwd);
+    // FLIP_FORWARD = -1 : avancer (forward_speed ≥ 0) inverse le cycle. Si c'est
+    // inversé in-game (avancer reste une marche arrière), passer FLIP_FORWARD à 1.0.
+    const FLIP_FORWARD: f32 = -1.0;
+    let phase_dir = if forward_speed >= 0.0 {
+        FLIP_FORWARD
+    } else {
+        -FLIP_FORWARD
+    };
+
     let tunables = crate::proc_walk::GaitTunables::for_speed(speed);
-    state.gait_phase = crate::proc_walk::update_gait_phase(state.gait_phase, speed, dt, &tunables);
+    state.gait_phase =
+        crate::proc_walk::update_gait_phase(state.gait_phase, speed * phase_dir, dt, &tunables);
     let gait = state.gait_phase;
     let speed_factor =
         ((speed - IDLE_SPEED_THRESHOLD) / crate::proc_walk::SPEED_WALK_PEAK_M_S).clamp(0.0, 1.2);
@@ -1480,7 +1499,7 @@ pub fn write_anim_full_sensor(
     let leg_r_swing = rphase >= tun.stance_frac;
 
     let json = format!(
-        "{{\n  \"id\": \"anim_full\",\n  \"BUILD_MARKER\": \"UNFREEZE-WALK_2026-06-04\",\n  \"severity\": \"ok\",\n  \"timestamp_secs\": {:.1},\n  \"entry_index\": {},\n  \"guide\": \"world_deg/world_dir/forward_lean = orientation MONDE (apres Ry PI) — SEUL fiable (euler peut gimbal-lock a Y=90, cf gimbal_warn). forward_lean>0 = os pointe AVANT (sens marche), <0 = arriere. mesh_align_dy = head.y - Y_attendu(AABB mesh) ; |.|>0.10 = os hors feature mesh (rings genoux/epaules). hand_l/r jamais pilotes (figes au bind). stance gauche/droite via stance_deg.\",\n  \"pipeline\": {{\n    \"cache_ready\": {}, \"gave_up\": {}, \"frames_waited\": {},\n    \"locomotion_target_count\": {},\n    \"topology_[hip,spine,clavL,armL,foreL,handL,clavR,armR,foreR,handR,legL,shinL,footL,legR,shinR,footR]\": \"{}\",\n    \"stance_source\": \"{}\"\n  }},\n  \"gait\": {{\n    \"is_moving\": {}, \"moving_world\": {}, \"speed_m_s\": {:.3}, \"speed_factor\": {:.3},\n    \"gait_phase\": {:.3}, \"stance_frac\": {:.3}, \"leg_l_in_swing\": {}, \"leg_r_in_swing\": {},\n    \"thigh_l_deg\": {:.1}, \"thigh_r_deg\": {:.1}, \"knee_l_deg\": {:.1}, \"knee_r_deg\": {:.1},\n    \"ankle_l_deg\": {:.1}, \"ankle_r_deg\": {:.1},\n    \"arm_l_pitch_deg\": {:.1}, \"arm_r_pitch_deg\": {:.1}, \"elbow_l_deg\": {:.1}, \"elbow_r_deg\": {:.1},\n    \"pelvic_yaw_deg\": {:.1}, \"pelvic_roll_deg\": {:.1}\n  }},\n  \"root\": {{\n    \"world_translation\": [{:.3},{:.3},{:.3}],\n    \"world_yaw_deg\": {:.1}, \"ry_pi_confirmed\": {}, \"pitch_deg\": {:.1}, \"roll_deg\": {:.1},\n    \"travel_dir_world\": [{:.3},{:.3},{:.3}]\n  }},\n  \"mesh\": {{\n    \"found\": {}, \"aabb_world_center\": [{:.3},{:.3},{:.3}], \"aabb_world_half\": [{:.3},{:.3},{:.3}],\n    \"mesh_height\": {:.3}, \"hip_vs_mesh_center_desync_m\": {:.3}\n  }},\n  \"foot_ik_see\": \"forgia_foot_ik.json\",\n  \"spring_see\": \"forgia_bone_trace.json (tail)\",\n  \"bones\": [\n    {}\n  ]\n}}\n",
+        "{{\n  \"id\": \"anim_full\",\n  \"BUILD_MARKER\": \"WALKDIR_2026-06-05\",\n  \"severity\": \"ok\",\n  \"timestamp_secs\": {:.1},\n  \"entry_index\": {},\n  \"guide\": \"world_deg/world_dir/forward_lean = orientation MONDE (apres Ry PI) — SEUL fiable (euler peut gimbal-lock a Y=90, cf gimbal_warn). forward_lean>0 = os pointe AVANT (sens marche), <0 = arriere. mesh_align_dy = head.y - Y_attendu(AABB mesh) ; |.|>0.10 = os hors feature mesh (rings genoux/epaules). hand_l/r jamais pilotes (figes au bind). stance gauche/droite via stance_deg.\",\n  \"pipeline\": {{\n    \"cache_ready\": {}, \"gave_up\": {}, \"frames_waited\": {},\n    \"locomotion_target_count\": {},\n    \"topology_[hip,spine,clavL,armL,foreL,handL,clavR,armR,foreR,handR,legL,shinL,footL,legR,shinR,footR]\": \"{}\",\n    \"stance_source\": \"{}\"\n  }},\n  \"gait\": {{\n    \"is_moving\": {}, \"moving_world\": {}, \"speed_m_s\": {:.3}, \"speed_factor\": {:.3},\n    \"gait_phase\": {:.3}, \"stance_frac\": {:.3}, \"leg_l_in_swing\": {}, \"leg_r_in_swing\": {},\n    \"thigh_l_deg\": {:.1}, \"thigh_r_deg\": {:.1}, \"knee_l_deg\": {:.1}, \"knee_r_deg\": {:.1},\n    \"ankle_l_deg\": {:.1}, \"ankle_r_deg\": {:.1},\n    \"arm_l_pitch_deg\": {:.1}, \"arm_r_pitch_deg\": {:.1}, \"elbow_l_deg\": {:.1}, \"elbow_r_deg\": {:.1},\n    \"pelvic_yaw_deg\": {:.1}, \"pelvic_roll_deg\": {:.1}\n  }},\n  \"root\": {{\n    \"world_translation\": [{:.3},{:.3},{:.3}],\n    \"world_yaw_deg\": {:.1}, \"ry_pi_confirmed\": {}, \"pitch_deg\": {:.1}, \"roll_deg\": {:.1},\n    \"travel_dir_world\": [{:.3},{:.3},{:.3}]\n  }},\n  \"mesh\": {{\n    \"found\": {}, \"aabb_world_center\": [{:.3},{:.3},{:.3}], \"aabb_world_half\": [{:.3},{:.3},{:.3}],\n    \"mesh_height\": {:.3}, \"hip_vs_mesh_center_desync_m\": {:.3}\n  }},\n  \"foot_ik_see\": \"forgia_foot_ik.json\",\n  \"spring_see\": \"forgia_bone_trace.json (tail)\",\n  \"bones\": [\n    {}\n  ]\n}}\n",
         time.elapsed_secs(),
         entry.0,
         cache.ready, cache.gave_up, cache.frames_waited,

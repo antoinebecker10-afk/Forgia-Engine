@@ -1,4 +1,4 @@
-# Template skeleton BipedLizard (Rex) — 15 bones body + 4 tail = 19 bones
+# Template skeleton BipedLizard (Rex) — 17 bones body + 4 tail = 21 bones
 # Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
 # Hot-reloadable via Bevy AssetServer (Shift+F12).
 #
@@ -129,3 +129,19 @@ name = "tail_04"
 parent = 17
 pos = [0.0, 0.27, -0.42]
 class = "tail"
+
+# 2026-06-05 : os d'orteil (toe-off + structure digitigrade raptor + tip mesurable
+# pour le foot IK / sensor). Appended → parents = foot_L(11)/foot_R(14), aucune
+# renumérotation. Étend la chaîne jambe (thigh→shin→foot→toe = 4 segments raptor).
+# Pos : devant le pied (z 0.06→0.16) et au sol (y 0.04→0.01). Tunable au re-rig.
+[[bones]]
+name = "toe_L"
+parent = 11
+pos = [-0.10, 0.01, 0.16]
+class = "leg"
+
+[[bones]]
+name = "toe_R"
+parent = 14
+pos = [0.10, 0.01, 0.16]
+class = "leg"

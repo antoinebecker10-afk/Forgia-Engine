@@ -32,7 +32,7 @@ use crate::BoneEntity;
 /// Écrit par `draw_rig_gizmos` (qui a déjà tous les `BoneEntity` + GlobalTransform).
 const SENSOR_RIG_BONES_PATH: &str = "forgia_rig_bones.json";
 /// Marqueur de build pour vérifier que l'exe tourne le bon code (cf rule stale-binary).
-const RIG_BONES_BUILD_MARKER: &str = "SKINREST-FIX_2026-06-04";
+const RIG_BONES_BUILD_MARKER: &str = "TOE-BONE_2026-06-05";
 
 /// Configuration globale du draw de gizmos rig. Default = enabled, toggle
 /// via inspector ou keybind dans le caller.
@@ -179,7 +179,7 @@ fn write_rig_bones_sensor(
 /// Label court de classe (aligné `color_for_name`) pour le sensor.
 fn class_label(name: &str) -> &'static str {
     let n = name.to_ascii_lowercase();
-    if n.contains("thigh") || n.contains("shin") || n.contains("foot") || n.contains("leg") {
+    if n.contains("thigh") || n.contains("shin") || n.contains("foot") || n.contains("leg") || n.contains("toe") {
         "leg"
     } else if n.contains("arm") || n.contains("forearm") || n.contains("clavicle") || n.contains("hand") {
         "arm"
@@ -199,7 +199,7 @@ fn class_label(name: &str) -> &'static str {
 /// (hip, spine_*, thigh_L/R, shin_*, foot_*, arm_L/R, forearm_*, neck, head, tail_*).
 fn color_for_name(name: &str) -> Color {
     let n = name.to_ascii_lowercase();
-    if n.contains("thigh") || n.contains("shin") || n.contains("foot") || n.contains("leg") {
+    if n.contains("thigh") || n.contains("shin") || n.contains("foot") || n.contains("leg") || n.contains("toe") {
         if n.contains("_l") || n.ends_with("l") {
             COLOR_LEG
         } else {
