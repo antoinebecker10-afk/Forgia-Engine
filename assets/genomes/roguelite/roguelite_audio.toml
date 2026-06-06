@@ -31,8 +31,10 @@ volume = 0.6
 path = "audio/roguelite/sfx/ding_souls.ogg"
 volume = 0.55
 
+# Musique CONTINUE du jeu = le morceau « entre les waves » (user 2026-06-05).
+# combat == break → pas de switch/restart aux transitions de wave.
 [music_combat]
-path = "audio-v1/music/playlist_main.ogg"
+path = "audio-v1/music/emotional_01.ogg"
 volume = 0.8
 
 [music_break]
@@ -59,3 +61,4 @@ volume = 0.9
 [fire_boucherie]    # Digit4 — pompe (fusil à pompe)
 path = "audio/roguelite/weapons/boucherie.ogg"
 volume = 0.85
+

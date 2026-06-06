@@ -21,6 +21,7 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
+pub mod atmosphere;
 pub mod audio;
 pub mod boons_apply;
 pub mod coffre_sensor;
@@ -28,6 +29,7 @@ pub mod decor;
 pub mod enemies;
 pub mod hud;
 pub mod kill_popup;
+pub mod loot_room;
 pub mod poi;
 pub mod run;
 pub mod sensor;
@@ -208,6 +210,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 decor::sys_reconcile_decor,
                 decor::sys_calibrate_decor,
                 decor::sys_decor_build_hull_colliders,
+                decor::sys_unstick_bots_from_decor,
             )
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -343,7 +346,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                     // waves::sys_unstick_bots,
                 )
                     .in_set(GameSet::Movement)
-                    .run_if(in_state(GameMode::Roguelite)),
+                    .run_if(in_state(GameMode::Roguelite))
+                    // Gèle la progression de vague pendant le parcours (loot room).
+                    .run_if(loot_room::combat_running),
             )
             // V7 M3 step 3 — Health + Ammo stations walk-over collect (Effects set).
             .add_systems(
@@ -360,6 +365,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // Story-559 slice A — audio Roguelite (SFX impact/kill/hurt + ding
             // Or/Âmes + musique combat/break). Orthogonal : 0 édition cross-crate.
             .add_plugins(audio::RogueliteAudioPlugin)
+            // Incrément 4 — atmosphère volcanique (brume DistanceFog + ambiante chaude).
+            .add_plugins(atmosphere::RogueliteAtmospherePlugin)
+            // Portail → salle de loot verticale (2026-06-06).
+            .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-558 P2 Vlambeer juice — kill popup cartoon par archetype.
             .add_plugins(kill_popup::RogueliteKillPopupPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").

@@ -135,7 +135,9 @@ impl Default for RogueliteAudioConfig {
             hurt: SoundDef::new("audio-v1/music/jingles/jingles_NES10.ogg", 0.5),
             ding_gold: SoundDef::new("audio-v1/music/jingles/jingles_PIZZI00.ogg", 0.7),
             ding_souls: SoundDef::new("audio-v1/music/jingles/jingles_PIZZI08.ogg", 0.7),
-            music_combat: SoundDef::new("audio-v1/music/playlist_main.ogg", 0.8),
+            // Musique continue du jeu = le morceau « entre les waves » (user 2026-06-05).
+            // combat == break → handle-compare évite tout restart aux transitions.
+            music_combat: SoundDef::new("audio-v1/music/emotional_01.ogg", 0.8),
             music_break: SoundDef::new("audio-v1/music/emotional_01.ogg", 0.8),
             // Sons de tir CC-BY 3.0 (Vincent Sevedge) — cf
             // assets/audio/roguelite/weapons/CREDITS.md. CZ-52/SKS/Mosin/Shotgun.
@@ -179,7 +181,7 @@ pub struct RogueliteAudioStats {
 /// État musique : None=stoppée, Some(false)=combat, Some(true)=break.
 #[derive(Resource, Default)]
 struct MusicTrack {
-    in_break: Option<bool>,
+    current: Option<Handle<AudioSource>>,
 }
 
 /// Suivi mtime du genome pour hot-reload.
@@ -351,7 +353,7 @@ fn sys_hot_reload_audio_genome(
         *cfg = new_cfg;
         *handles = load_handles(&asset_server, &cfg);
         // Force le redémarrage de la musique avec le nouveau handle/volume.
-        music_track.in_break = None;
+        music_track.current = None;
         info!("[roguelite-audio] genome HOT-RELOADED ({GENOME_PATH})");
     }
 }
@@ -484,20 +486,23 @@ fn sys_music_update(
     mut stats: ResMut<RogueliteAudioStats>,
 ) {
     let want_break = wave.map(|w| w.in_break).unwrap_or(false);
-    if track.in_break == Some(want_break) {
+    let (handle, def) = if want_break {
+        (&handles.music_break, &cfg.music_break)
+    } else {
+        (&handles.music_combat, &cfg.music_combat)
+    };
+    // Ne (re)démarre QUE si le morceau voulu diffère de l'actuel → pas de restart
+    // quand combat et break pointent sur le MÊME fichier (musique continue ;
+    // demande user : « le son entre les waves = la musique du jeu »).
+    if track.current.as_ref() == Some(handle) {
         return;
     }
     music.stop();
-    let (handle, def) = if want_break {
-        (handles.music_break.clone(), &cfg.music_break)
-    } else {
-        (handles.music_combat.clone(), &cfg.music_combat)
-    };
     music
-        .play(handle)
+        .play(handle.clone())
         .looped()
         .with_volume(amp_to_db(def.volume * cfg.music_volume));
-    track.in_break = Some(want_break);
+    track.current = Some(handle.clone());
     stats.music_playing = true;
 }
 
@@ -507,7 +512,7 @@ fn sys_stop_music(
     mut stats: ResMut<RogueliteAudioStats>,
 ) {
     music.stop();
-    track.in_break = None;
+    track.current = None;
     stats.music_playing = false;
 }
 

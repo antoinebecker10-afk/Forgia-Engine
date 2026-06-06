@@ -2,7 +2,7 @@
 #
 # Per-file budget of asset-load call-sites. CI gate : `cargo xtask asset-load`.
 # Regenerate after removing loads : `cargo xtask asset-load --fix`.
-# Baseline total : 78 (target V2 Lock L1 : <= 30).
+# Baseline total : 80 (target V2 Lock L1 : <= 30).
 #
 # Detection : .load( / .load::<> / .load_with_settings( / .load_folder( with
 # non-empty parens, excluding genome configs (genomes/, Genome<, .toml).
@@ -24,7 +24,9 @@
 "crates/forgia-foliage/src/lib.rs" = 1
 "crates/forgia-level-presets/src/lib.rs" = 1
 "crates/forgia-mode-fps-arena/src/wave.rs" = 1
+"crates/forgia-mode-roguelite/src/audio.rs" = 1
 "crates/forgia-mode-roguelite/src/decor.rs" = 1
+"crates/forgia-mode-roguelite/src/loot_room.rs" = 1
 "crates/forgia-mode-roguelite/src/run.rs" = 1
 "crates/forgia-mode-roguelite/src/waves.rs" = 1
 "crates/forgia-observability/src/asset_handles.rs" = 1

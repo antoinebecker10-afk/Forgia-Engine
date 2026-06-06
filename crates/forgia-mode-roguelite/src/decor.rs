@@ -33,6 +33,7 @@ use bevy::prelude::*;
 use bevy::scene::{Scene, SceneRoot};
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, RigidBody};
+use forgia_ai_arena_bot::ArenaBot;
 use forgia_anchor::{AnchorKind, AnchorPoint};
 use forgia_core::prelude::*;
 use forgia_stage::{StageArenaMarker, StageLoadResult};
@@ -103,6 +104,29 @@ const WALL_CORNER: &str = "models/kaykit/dungeon/wall_corner.glb";
 /// Gravats au sol pour casser la répétition des dalles (masque, pas collider).
 const RUBBLE_PROPS: &[&str] = &["models/kaykit/dungeon/rubble.glb"];
 
+/// Bâtiments KayKit Medieval Hexagon (couleur ROUGE = forge/feu) pour la ville
+/// industrielle « Cratère de la Forge » (incr.3). Self-contained .gltf + atlas
+/// `hexagons_medieval.png`. Mix industriel dominant (blacksmith ×2, mine, tours,
+/// barracks, castle, lumbermill, scaffolding, ruines) + un peu de civil.
+const BUILDINGS: &[&str] = &[
+    "models/kaykit/hexagon/red/building_blacksmith_red.gltf",
+    "models/kaykit/hexagon/red/building_blacksmith_red.gltf",
+    "models/kaykit/hexagon/red/building_mine_red.gltf",
+    "models/kaykit/hexagon/red/building_tower_A_red.gltf",
+    "models/kaykit/hexagon/red/building_tower_B_red.gltf",
+    "models/kaykit/hexagon/red/building_tower_catapult_red.gltf",
+    "models/kaykit/hexagon/red/building_barracks_red.gltf",
+    "models/kaykit/hexagon/red/building_castle_red.gltf",
+    "models/kaykit/hexagon/red/building_lumbermill_red.gltf",
+    "models/kaykit/hexagon/red/building_tavern_red.gltf",
+    "models/kaykit/hexagon/red/building_home_A_red.gltf",
+    "models/kaykit/hexagon/red/building_home_B_red.gltf",
+    "models/kaykit/hexagon/red/building_market_red.gltf",
+    "models/kaykit/hexagon/neutral/building_scaffolding.gltf",
+    "models/kaykit/hexagon/neutral/building_destroyed.gltf",
+    "models/kaykit/hexagon/neutral/building_grain.gltf",
+];
+
 /// Dimensions natives KayKit dungeon wall.glb (cf forgia-stage : largeur 1 m,
 /// hauteur `RAMPARTS_WALL_HEIGHT_M`=4, épaisseur `RAMPARTS_WALL_THICKNESS_M`=0.4).
 const WALL_SEG_W: f32 = 1.0;
@@ -146,6 +170,27 @@ pub struct RogueliteDecorConfig {
     // Gravats masquant la répétition du sol.
     pub rubble_count: u32,
     pub target_rubble: f32,
+    // Fond « Cratère de la Forge » : anneau de falaises volcaniques + pics géants
+    // hors-map (ÉNORME, sans collider — pure silhouette à l'horizon).
+    pub background_count: u32,
+    pub background_radius_min: f32,
+    pub background_radius_max: f32,
+    pub target_background: f32,
+    pub giant_peak_count: u32,
+    pub giant_peak_radius: f32,
+    pub target_giant_peak: f32,
+    // Cœur de forge (incr.2) : anneau de braseros « ring of fire » autour de
+    // l'aire de combat + monuments/cheminées hauts qui encadrent le centre.
+    pub forge_ring_count: u32,
+    pub forge_ring_radius: f32,
+    pub forge_monument_count: u32,
+    pub forge_monument_radius: f32,
+    pub forge_monument_target: f32,
+    // Ville KayKit (incr.3) : ceinture de bâtiments industriels (red) face au centre.
+    pub building_count: u32,
+    pub building_radius_min: f32,
+    pub building_radius_max: f32,
+    pub target_building: f32,
 }
 
 impl Default for RogueliteDecorConfig {
@@ -170,6 +215,25 @@ impl Default for RogueliteDecorConfig {
             room_radius_max: 52.0,
             rubble_count: 34,
             target_rubble: 3.4,
+            // Cratère de fond : crête dense + 2 pics géants dominants.
+            background_count: 44,
+            background_radius_min: 110.0,
+            background_radius_max: 165.0,
+            target_background: 34.0,
+            giant_peak_count: 2,
+            giant_peak_radius: 205.0,
+            target_giant_peak: 80.0,
+            // Cœur de forge : 8 braseros en anneau à 16 m + 4 monuments à ~30 m.
+            forge_ring_count: 8,
+            forge_ring_radius: 16.0,
+            forge_monument_count: 4,
+            forge_monument_radius: 30.0,
+            forge_monument_target: 18.0,
+            // Ville : 18 bâtiments KayKit en ceinture, ~12 m, à 52-76 m.
+            building_count: 18,
+            building_radius_min: 52.0,
+            building_radius_max: 76.0,
+            target_building: 12.0,
         }
     }
 }
@@ -211,6 +275,46 @@ impl RogueliteDecorConfig {
                 "decor_room_radius_max" => c.room_radius_max = gene.default.clamp(0.0, 500.0),
                 "decor_rubble_count" => c.rubble_count = gene.default.clamp(0.0, 400.0) as u32,
                 "decor_target_rubble" => c.target_rubble = gene.default.clamp(0.3, 20.0),
+                "decor_background_count" => {
+                    c.background_count = gene.default.clamp(0.0, 200.0) as u32
+                }
+                "decor_background_radius_min" => {
+                    c.background_radius_min = gene.default.clamp(10.0, 600.0)
+                }
+                "decor_background_radius_max" => {
+                    c.background_radius_max = gene.default.clamp(10.0, 600.0)
+                }
+                "decor_target_background" => c.target_background = gene.default.clamp(5.0, 120.0),
+                "decor_giant_peak_count" => {
+                    c.giant_peak_count = gene.default.clamp(0.0, 12.0) as u32
+                }
+                "decor_giant_peak_radius" => {
+                    c.giant_peak_radius = gene.default.clamp(20.0, 800.0)
+                }
+                "decor_target_giant_peak" => c.target_giant_peak = gene.default.clamp(10.0, 200.0),
+                "decor_forge_ring_count" => {
+                    c.forge_ring_count = gene.default.clamp(0.0, 40.0) as u32
+                }
+                "decor_forge_ring_radius" => c.forge_ring_radius = gene.default.clamp(4.0, 80.0),
+                "decor_forge_monument_count" => {
+                    c.forge_monument_count = gene.default.clamp(0.0, 20.0) as u32
+                }
+                "decor_forge_monument_radius" => {
+                    c.forge_monument_radius = gene.default.clamp(6.0, 90.0)
+                }
+                "decor_forge_monument_target" => {
+                    c.forge_monument_target = gene.default.clamp(2.0, 50.0)
+                }
+                "decor_building_count" => {
+                    c.building_count = gene.default.clamp(0.0, 80.0) as u32
+                }
+                "decor_building_radius_min" => {
+                    c.building_radius_min = gene.default.clamp(10.0, 200.0)
+                }
+                "decor_building_radius_max" => {
+                    c.building_radius_max = gene.default.clamp(10.0, 200.0)
+                }
+                "decor_target_building" => c.target_building = gene.default.clamp(3.0, 40.0),
                 _ => {}
             }
         }
@@ -222,6 +326,12 @@ impl RogueliteDecorConfig {
         }
         if c.room_radius_min > c.room_radius_max {
             std::mem::swap(&mut c.room_radius_min, &mut c.room_radius_max);
+        }
+        if c.background_radius_min > c.background_radius_max {
+            std::mem::swap(&mut c.background_radius_min, &mut c.background_radius_max);
+        }
+        if c.building_radius_min > c.building_radius_max {
+            std::mem::swap(&mut c.building_radius_min, &mut c.building_radius_max);
         }
         c
     }
@@ -250,6 +360,7 @@ pub struct DecorAssets {
     pub walls: Vec<Handle<Scene>>,
     pub wall_corner: Vec<Handle<Scene>>,
     pub rubble: Vec<Handle<Scene>>,
+    pub buildings: Vec<Handle<Scene>>,
 }
 
 /// Marqueur sur l'entité racine d'un prop (count sensor + cleanup).
@@ -274,6 +385,15 @@ pub struct NeedsDecorCalibrate {
 pub struct NeedsHullCollider {
     pub fallback_target_m: f32,
     pub fallback_radius_factor: f32,
+}
+
+/// Marqueur sur un décor SOLIDE (prop/mur/coin) avec son rayon de footprint
+/// approximatif. `sys_unstick_bots_from_decor` s'en sert pour qu'un ennemi
+/// n'apparaisse jamais COINCÉ dans le décor (position d'entité → robuste au
+/// timing de build des colliders, contrairement à un test physique).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct SolidDecorObstacle {
+    pub radius: f32,
 }
 
 // ─── Systems : init genome + assets + hot-reload ──────────────────────────────
@@ -313,8 +433,9 @@ pub fn sys_load_decor_assets(mut commands: Commands, asset_server: Res<AssetServ
         walls: load(WALL_VARIANTS),
         wall_corner: load(&[WALL_CORNER]),
         rubble: load(RUBBLE_PROPS),
+        buildings: load(BUILDINGS),
     });
-    info!("[decor] preloaded inferno + wall + rubble prop scenes");
+    info!("[decor] preloaded inferno + wall + rubble + kaykit buildings scenes");
 }
 
 /// Poll mtime 1Hz. Sur changement réel, despawn le décor → réconciliation le
@@ -495,6 +616,43 @@ pub fn sys_decor_build_hull_colliders(
     }
 }
 
+// ─── Clear-spawn ennemis : jamais coincés dans le décor ───────────────────────
+
+/// Footprint approx d'un bot (XZ) pour le clear-spawn.
+const BOT_FOOTPRINT_M: f32 = 0.5;
+
+/// Empêche un ennemi de RESTER apparu dans un décor solide : si un bot chevauche
+/// le footprint d'un `SolidDecorObstacle`, on le pousse juste au bord (nudge
+/// radial minimal → ne casse pas le cover). Robuste au timing (positions
+/// d'entités, pas de test physique async). Gated Roguelite.
+pub fn sys_unstick_bots_from_decor(
+    mut q_bots: Query<&mut Transform, With<ArenaBot>>,
+    q_obstacles: Query<(&Transform, &SolidDecorObstacle), Without<ArenaBot>>,
+) {
+    if q_obstacles.is_empty() {
+        return;
+    }
+    for mut tf in &mut q_bots {
+        for (otf, obs) in &q_obstacles {
+            let dx = tf.translation.x - otf.translation.x;
+            let dz = tf.translation.z - otf.translation.z;
+            let clear = obs.radius + BOT_FOOTPRINT_M;
+            let d2 = dx * dx + dz * dz;
+            if d2 < clear * clear {
+                let d = d2.sqrt();
+                let (nx, nz) = if d > 1.0e-3 {
+                    (dx / d, dz / d)
+                } else {
+                    (1.0, 0.0) // pile au centre → pousse vers +X
+                };
+                let push = clear - d + 0.1;
+                tf.translation.x += nx * push;
+                tf.translation.z += nz * push;
+            }
+        }
+    }
+}
+
 // ─── Réconciliation count-based ───────────────────────────────────────────────
 
 #[allow(clippy::too_many_arguments)]
@@ -559,6 +717,27 @@ fn decor_markers(
     )
 }
 
+/// Spawn une silhouette de FOND (Cratère de la Forge) : ÉNORME, hors-map, SANS
+/// collider (le joueur n'y va jamais). Entité unique scalée par calibration AABB.
+fn spawn_background_silhouette(
+    commands: &mut Commands,
+    handle: &Handle<Scene>,
+    name: &str,
+    pos: Vec3,
+    yaw: f32,
+    target_m: f32,
+) {
+    commands.spawn((
+        decor_markers(name),
+        SceneRoot(handle.clone()),
+        Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+        NeedsDecorCalibrate {
+            target_m,
+            user_scale: 1.0,
+        },
+    ));
+}
+
 /// Spawn un prop périmétrique SOLIDE : parent `RigidBody::Fixed` (scale 1) +
 /// enfant visuel `SceneRoot` (scale calibré) + **collider ConvexHull** construit
 /// depuis le mesh chargé (épouse la silhouette ; bloque le LOS/tir des bots).
@@ -594,10 +773,16 @@ fn spawn_perimeter_prop(
     // Collider mesh-fidèle : ConvexHull construit depuis le mesh chargé par
     // `sys_decor_build_hull_colliders` (suit la silhouette ; fiable). Fallback
     // cylindre si le mesh ne produit pas de hull. Marqueur sur le parent.
-    commands.entity(parent).insert(NeedsHullCollider {
-        fallback_target_m: target_m,
-        fallback_radius_factor: col_radius_factor,
-    });
+    commands.entity(parent).insert((
+        NeedsHullCollider {
+            fallback_target_m: target_m,
+            fallback_radius_factor: col_radius_factor,
+        },
+        // Footprint approx (rayon ~0.4× la taille cible) pour le clear-spawn ennemis.
+        SolidDecorObstacle {
+            radius: (target_m * 0.4).max(0.6),
+        },
+    ));
     if brazier {
         commands.spawn((
             ChildOf(parent),
@@ -622,6 +807,127 @@ fn spawn_decor_set(
 ) -> u32 {
     let mut rng = Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEC0_DEC0_F00D_BEEF);
     let mut count = 0u32;
+
+    // ── Fond « Cratère de la Forge » : crête volcanique + pics géants ─────────
+    // Anneau lointain de falaises ÉNORMES (hors-map, SANS collider) → silhouette
+    // de cratère ; hauteurs variées = crête déchiquetée. + pics géants dominants
+    // (« le rocher géant hors map »). Réutilise les rochers/crags Inferno (big).
+    let bg_n = cfg.background_count.max(1);
+    for i in 0..cfg.background_count {
+        let slot = TAU * i as f32 / bg_n as f32;
+        let jitter = (rng01(&mut rng) - 0.5) * (TAU / bg_n as f32) * 0.85;
+        let angle = slot + jitter;
+        let radius = lerp(
+            cfg.background_radius_min,
+            cfg.background_radius_max,
+            rng01(&mut rng),
+        );
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw = rng01(&mut rng) * TAU;
+        // Hauteur variée (0.7..1.4× la cible) → crête déchiquetée, pas un mur plat.
+        let target = cfg.target_background * (0.7 + rng01(&mut rng) * 0.7);
+        if let Some(handle) = pick(&assets.big, &mut rng) {
+            spawn_background_silhouette(commands, handle, "Decor_Background", pos, yaw, target);
+            count += 1;
+        }
+    }
+    let peaks = cfg.giant_peak_count.max(1);
+    for i in 0..cfg.giant_peak_count {
+        let angle = TAU * (i as f32 + 0.3) / peaks as f32 + rng01(&mut rng) * 0.7;
+        let pos = Vec3::new(
+            cfg.giant_peak_radius * angle.cos(),
+            0.0,
+            cfg.giant_peak_radius * angle.sin(),
+        );
+        let yaw = rng01(&mut rng) * TAU;
+        if let Some(handle) = pick(&assets.big, &mut rng) {
+            spawn_background_silhouette(
+                commands,
+                handle,
+                "Decor_GiantPeak",
+                pos,
+                yaw,
+                cfg.target_giant_peak,
+            );
+            count += 1;
+        }
+    }
+
+    // ── Cœur de forge : anneau de braseros (ring of fire) + monuments hauts ────
+    // Rapproche l'atmosphère forge du joueur : cercle de feu autour de l'aire de
+    // combat + monuments/cheminées hauts encadrant le centre. Solides (collider
+    // hull) → cover + contournés par les bots (collide-and-slide).
+    for i in 0..cfg.forge_ring_count {
+        let angle = TAU * i as f32 / cfg.forge_ring_count.max(1) as f32;
+        let pos = Vec3::new(
+            cfg.forge_ring_radius * angle.cos(),
+            0.0,
+            cfg.forge_ring_radius * angle.sin(),
+        );
+        let yaw = rng01(&mut rng) * TAU;
+        if let Some(handle) = pick(&assets.braziers, &mut rng) {
+            spawn_perimeter_prop(
+                commands,
+                handle,
+                "Decor_ForgeBrazier",
+                pos,
+                yaw,
+                cfg.target_brazier,
+                1.0,
+                true,
+                0.3,
+            );
+            count += 1;
+        }
+    }
+    for i in 0..cfg.forge_monument_count {
+        let angle = TAU * (i as f32 + 0.5) / cfg.forge_monument_count.max(1) as f32;
+        let radius = cfg.forge_monument_radius * (0.85 + rng01(&mut rng) * 0.3);
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw = rng01(&mut rng) * TAU;
+        if let Some(handle) = pick(&assets.landmarks, &mut rng) {
+            spawn_perimeter_prop(
+                commands,
+                handle,
+                "Decor_ForgeMonument",
+                pos,
+                yaw,
+                cfg.forge_monument_target,
+                1.0,
+                false,
+                0.16,
+            );
+            count += 1;
+        }
+    }
+
+    // ── Ville-forge : ceinture de bâtiments KayKit industriels (incr.3) ───────
+    // Bâtiments (forge, mine, tours, barracks, ruines) FACE au centre (dos aux
+    // ramparts) → skyline de ville-forge autour de l'arène. Solides (collider
+    // hull + clear-spawn ennemis). Réutilise spawn_perimeter_prop.
+    for i in 0..cfg.building_count {
+        let slot = TAU * i as f32 / cfg.building_count.max(1) as f32;
+        let jitter = (rng01(&mut rng) - 0.5) * (TAU / cfg.building_count.max(1) as f32) * 0.45;
+        let angle = slot + jitter;
+        let radius = lerp(cfg.building_radius_min, cfg.building_radius_max, rng01(&mut rng));
+        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let yaw = angle + std::f32::consts::PI; // face au centre
+        let target = cfg.target_building * (0.85 + rng01(&mut rng) * 0.4);
+        if let Some(handle) = pick(&assets.buildings, &mut rng) {
+            spawn_perimeter_prop(
+                commands,
+                handle,
+                "Decor_Building",
+                pos,
+                yaw,
+                target,
+                1.0,
+                false,
+                0.32,
+            );
+            count += 1;
+        }
+    }
 
     // ── Anneau périmétrique ───────────────────────────────────────────────────
     let n = cfg.perimeter_count.max(1);
@@ -768,6 +1074,9 @@ fn spawn_wall_room(
                 fallback_target_m: WALL_HEIGHT,
                 fallback_radius_factor: 0.3,
             },
+            SolidDecorObstacle {
+                radius: WALL_SEG_W * 0.7,
+            },
         ));
         count += 1;
     }
@@ -809,6 +1118,9 @@ fn spawn_wall_arm(
             NeedsHullCollider {
                 fallback_target_m: WALL_HEIGHT,
                 fallback_radius_factor: 0.3,
+            },
+            SolidDecorObstacle {
+                radius: WALL_SEG_W * 0.6,
             },
         ));
         count += 1;

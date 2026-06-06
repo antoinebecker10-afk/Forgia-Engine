@@ -97,3 +97,83 @@ default = 34.0
 [[genes]]
 id = "decor_target_rubble"
 default = 3.4
+
+# ─── Fond « Cratère de la Forge » (incr.1) — hors-map, ÉNORME, sans collider ───
+# Anneau lointain de falaises volcaniques (rochers/crags Inferno scalés énormes)
+# AU-DELÀ des ramparts (~90 m) → silhouette de cratère à l'horizon. Hauteurs
+# variées = crête déchiquetée. + pics géants dominants (« le rocher géant hors map »).
+# Règle le radius/taille pour cadrer la skyline. Pure déco lointaine.
+[[genes]]
+id = "decor_background_count"
+default = 44.0
+
+[[genes]]
+id = "decor_background_radius_min"
+default = 110.0
+
+[[genes]]
+id = "decor_background_radius_max"
+default = 165.0
+
+# Taille cible (m) des falaises de crête. ÉNORME pour dominer les ramparts ~90 m.
+[[genes]]
+id = "decor_target_background"
+default = 34.0
+
+# Pics géants : peu nombreux, gigantesques, dominent la crête.
+[[genes]]
+id = "decor_giant_peak_count"
+default = 2.0
+
+[[genes]]
+id = "decor_giant_peak_radius"
+default = 205.0
+
+[[genes]]
+id = "decor_target_giant_peak"
+default = 80.0
+
+# ─── Cœur de forge (incr.2) : anneau de feu + monuments hauts ─────────────────
+# Braseros en anneau autour de l'aire de combat (« ring of fire ») + monuments/
+# cheminées hauts encadrant le centre. Rapproche l'ambiance forge du joueur.
+# Solides (cover, contournés par les bots). Centre (rayon < forge_ring_radius)
+# reste OUVERT pour le combat.
+[[genes]]
+id = "decor_forge_ring_count"
+default = 8.0
+
+[[genes]]
+id = "decor_forge_ring_radius"
+default = 16.0
+
+[[genes]]
+id = "decor_forge_monument_count"
+default = 4.0
+
+[[genes]]
+id = "decor_forge_monument_radius"
+default = 30.0
+
+[[genes]]
+id = "decor_forge_monument_target"
+default = 18.0
+
+# ─── Ville-forge (incr.3) : ceinture de bâtiments KayKit Medieval Hexagon ─────
+# Bâtiments rouges (forge, mine, tours, barracks, ruines...) en anneau FACE au
+# centre, dos aux ramparts → skyline de ville. Calibrés à `decor_target_building`.
+# Réduis `decor_perimeter_count` si la ville + les rochers font trop chargé.
+[[genes]]
+id = "decor_building_count"
+default = 18.0
+
+[[genes]]
+id = "decor_building_radius_min"
+default = 52.0
+
+[[genes]]
+id = "decor_building_radius_max"
+default = 76.0
+
+[[genes]]
+id = "decor_target_building"
+default = 12.0
