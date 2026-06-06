@@ -113,5 +113,15 @@ enabled = true
 # Élargi radius_m=27 (>26.8m max building distance) + falloff_m=5 (transition rapide
 # au-delà). Total influence = 32m > bounding_radius (28). Buildings restent plats,
 # roads (gates ~25m) aussi.
+# MàJ 2026-06-05 (story-574, audit M9) : relief dramatique (RPG max_height 28→80)
+# → gradient ~3x au bord du village. falloff_m 5→25, sinon le smoothstep sur 5m
+# pour ~76m de dénivelé crée un mur de soutènement ~60-72°. Total influence = 52m.
+# MàJ 2026-06-06 (story-577) : user "la montagne a englouti le spawn". Sample
+# heights montrent terrain à 60-87m dans un rayon de 64-181m (vs spawn ~38m) →
+# falloff 25m laissait encore un mur dès 52m. falloff_m 25→80 → rampe ~14° sur
+# 80m du plateau (38m) vers le relief (~58m@107m), montagnes repoussées en backdrop.
+# Foliage/mesh/village/routes appliquent TOUS FlattenZones (pas d'arbres flottants).
+# falloff_m est hot-reloadable (Shift+F12) → dialer en live : 50 (montagnes proches)
+# à 120 (cuvette large). Pour relief globalement plus doux, voir terrain_shape.toml::max_height.
 radius_m = 27.0      # rayon plateau plat — couvre tous les buildings outer-ring
-falloff_m = 5.0      # transition smoothstep rapide vers terrain naturel
+falloff_m = 80.0     # rampe douce plateau→relief (story-577 anti-mur de montagne au spawn)

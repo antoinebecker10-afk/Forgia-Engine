@@ -108,7 +108,17 @@ const RPG_SEED: u32 = 1337;
 /// Public depuis 2026-05-20 : forgia-water lit `SeaLevel` Resource insérée
 /// par ce plugin, plus de hardcode dupliqué cross-crate (cf bug Arena 2026-05-12).
 pub const RPG_SEA_LEVEL: f32 = 4.0;
-const RPG_MAX_HEIGHT: f32 = 28.0;
+// 2026-06-05 (story-574) — relief dramatique. Lignée : audit procgen → B2 a
+// confirmé que max_height=28 était une baseline PLATE délibérée du vertical
+// slice (pas un bug) ; user a explicitement choisi un relief plus marqué.
+// 28 → 80 : amplitude 4..80m (×3.2 vs 24m). RPG_SEA_LEVEL inchangé À DESSEIN :
+// `heightmap_at` fait `h = sea + h_norm*(max-sea)` avec h_norm>=0, donc le
+// terrain ne descend JAMAIS sous sea_level (plancher = sea_level) → l'eau reste
+// flush quel que soit sea_level, aucune cascade swim/eau. Consommateurs
+// auto-adaptés : snow band (max*0.75), biome altitude (gen_config.max_height),
+// village flatten (target_y échantillonné). Const Rust = NON hot-reloadable :
+// pour tuner la magnitude en live, voir option C (genome TOML).
+const RPG_MAX_HEIGHT: f32 = 80.0;
 
 /// Fallback Manhattan radius si `StreamingConfig` indisponible (boot frame 0,
 /// avant que load_streaming_genome ait inséré la Resource). Cible la couverture
@@ -117,6 +127,13 @@ const RPG_MAX_HEIGHT: f32 = 28.0;
 const FALLBACK_RENDER_DIST: i32 = 10;
 /// Fallback chunks/frame si config absente. Override par `StreamingConfig.async_pipeline`.
 const FALLBACK_CHUNKS_PER_FRAME: usize = 4;
+/// Estimation mémoire par chunk chargé (MB). DÉRIVÉE du mesh uniforme 33×33
+/// (audit procgen 2026-06-05, corrige sensor ×25) : positions(13ko)+uvs(8.7ko)
+/// +colors(17.4ko)+normals(13ko)+indices(24.6ko)+heights(4.4ko) ≈ 81ko CPU +
+/// ~73ko upload GPU ≈ 0.15-0.16 MB/chunk. L'ancien 5.0 surestimait ×25 → budget
+/// eviction faussement conservateur. Comme tous les chunks ont la MÊME topo,
+/// cette constante EST la valeur réelle (pas un proxy). Raffinage GPU-exact = P2.
+const CHUNK_MB_EST: f32 = 0.16;
 /// W2 — intervalle d'export sensor JSON (secondes).
 const SENSOR_INTERVAL_S: f32 = 1.0;
 
@@ -159,6 +176,8 @@ impl Plugin for ForgiaRpgPlugin {
                 (
                     spawn_village_paths_when_loaded,
                     teleport_player_to_terrain,
+                    terrain_reload_input_system,
+                    apply_terrain_reload, // Shift+F12 → régén live (AVANT stream)
                     stream_chunks_around_player,
                     enforce_chunk_memory_budget, // wave 3a — runs AFTER stream
                     toggle_streaming_overlay,    // wave 4c — F3 toggle
@@ -234,15 +253,30 @@ fn sample_offset() -> Vec2 {
     Vec2::ZERO
 }
 
+/// Genome de forme du terrain (hot-reloadable : octaves / edge_falloff / max_height).
+const TERRAIN_SHAPE_GENOME_PATH: &str = "config/genomes/terrain_shape.toml";
+
+// Genome du village de spawn (terrain_leveling hot-reloadable + buildings).
+const VILLAGE_GENOME_PATH: &str = "config/genomes/villages/starter_hamlet.toml";
+
 fn make_terrain_config() -> TerrainConfig {
+    // 2026-06-06 — la FORME du relief (octaves, edge_falloff, max_height) vient
+    // désormais du genome `terrain_shape.toml` (data-driven, tunable sans rebuild).
+    // Fallback = retune par défaut (rolling/traversable) si TOML absent/invalide.
+    // `sea_level` reste sur RPG_SEA_LEVEL (couplé à la Resource SeaLevel/eau).
+    let shape = forgia_terrain::TerrainShapeGenome::load_or_default(TERRAIN_SHAPE_GENOME_PATH);
     TerrainConfig {
         map_size: RPG_MAP_SIZE,
         seed: RPG_SEED,
         sea_level: RPG_SEA_LEVEL,
-        max_height: RPG_MAX_HEIGHT,
+        max_height: shape.max_height,
         streaming_radius: 4,
         chunks_per_frame: 2,
         y_offset: 0.0,
+        octaves: shape.octave_pairs(),
+        edge_falloff_m: shape.edge_falloff_m,
+        warp_strength: shape.warp_strength,
+        warp_freq: shape.warp_freq,
     }
 }
 
@@ -258,6 +292,10 @@ fn make_map_gen_config() -> MapGenConfig {
     // cuvettes énormes (Lake depth=8 sur max=28 = 29% dip → terrain à
     // Y=-4 < sea=4 → bandes d'eau parasites mid-distance autour du spawn).
     // Fix : features RPG-adaptées light (à étoffer plus tard si besoin lacs).
+    // MàJ 2026-06-05 (story-574) : RPG_MAX_HEIGHT 28→80 (relief dramatique).
+    // features RESTENT vides : `heightmap_at` (le path mesh RPG, cf
+    // meshing_heightmap.rs:77) ignore de toute façon gen_config.features ;
+    // re-enable = pass dédié quand le besoin lacs/cratères viendra.
     MapGenConfig {
         seed: RPG_SEED,
         map_size: RPG_MAP_SIZE,
@@ -293,6 +331,127 @@ fn terrain_height_local_with_flatten(
     }
 }
 
+/// Story-447 + 577 — construit la `FlattenZones` du village depuis le genome
+/// `starter_hamlet.toml` (target_y = `heightmap_at(centre village)`, inner/falloff
+/// = genome). Appelé par `spawn_world` (OnEnter) ET `apply_terrain_reload` (Shift+F12)
+/// pour que `radius_m`/`falloff_m` soient hot-reloadables comme `max_height` — tuner
+/// le « bowl » anti-mur du spawn en live. Vide si le genome désactive le leveling.
+fn make_village_flatten_zones(terrain_cfg: &TerrainConfig) -> FlattenZones {
+    let village_world_center = Vec2::new(CHUNK_X as f32 * 0.5, CHUNK_Z as f32 * 0.5);
+    let mut flatten_zones = FlattenZones::new();
+    match VillageGenome::load_from_path(VILLAGE_GENOME_PATH) {
+        Ok(genome) if genome.terrain_leveling.enabled => {
+            let off = sample_offset();
+            let target_y = forgia_terrain::heightmap_at(
+                village_world_center.x + off.x,
+                village_world_center.y + off.y,
+                terrain_cfg,
+            );
+            flatten_zones.push(VillageFlattenZone {
+                center: village_world_center,
+                target_y,
+                inner_radius: genome.terrain_leveling.radius_m,
+                falloff_radius: genome.terrain_leveling.falloff_m,
+            });
+            info!(
+                "[forgia-rpg] terrain_leveling : target_y={:.2}m, inner={}m, falloff={}m",
+                target_y, genome.terrain_leveling.radius_m, genome.terrain_leveling.falloff_m
+            );
+        }
+        Ok(_) => {
+            info!("[forgia-rpg] terrain_leveling disabled (genome.terrain_leveling.enabled=false)")
+        }
+        Err(e) => {
+            warn!("[forgia-rpg] terrain_leveling : genome load failed ({e}) — terrain restera brut")
+        }
+    }
+    flatten_zones
+}
+
+// ── Hot-reload terrain live (Shift+F12) — story-576 increment 2 ───────────────
+
+/// Requête de régén terrain posée par `terrain_reload_input_system` (Shift+F12),
+/// consommée une fois par `apply_terrain_reload`.
+#[derive(Resource)]
+struct TerrainReloadRequest;
+
+/// Shift+F12 → demande une régén live du terrain depuis `terrain_shape.toml`
+/// (même touche que le hot-reload biomes/village : "recharger les genomes").
+fn terrain_reload_input_system(keyboard: Res<ButtonInput<KeyCode>>, mut commands: Commands) {
+    if keyboard.pressed(KeyCode::ShiftLeft) && keyboard.just_pressed(KeyCode::F12) {
+        commands.insert_resource(TerrainReloadRequest);
+        info!("[terrain-shape] hot-reload terrain demandé (Shift+F12)");
+    }
+}
+
+/// Régén LIVE du terrain : recharge le genome → met à jour `TerrainConfig`
+/// (octaves/edge/max) → despawn tous les chunks + LOD2 + clear `ChunkManager`
+/// (cache inclus) → reset `last_player_chunk` (None). Le `stream_chunks_around_player`
+/// qui suit dans la chaîne régénère le ring avec la nouvelle forme. Le player est
+/// re-snappé sur le nouveau sol à son XZ courant (évite chute/burial transitoire).
+/// Le village (FlattenZones + bâtiments) est laissé tel quel — cohérent entre eux ;
+/// re-enter le RPG pour ré-aligner le village si on change beaucoup max_height.
+#[allow(clippy::too_many_arguments)]
+fn apply_terrain_reload(
+    mut commands: Commands,
+    request: Option<Res<TerrainReloadRequest>>,
+    mut terrain_cfg: ResMut<TerrainConfig>,
+    mut chunk_mgr: ResMut<ChunkManager>,
+    mut lod2_mgr: ResMut<Lod2TileManager>,
+    mut player_q: Query<&mut Transform, With<Player>>,
+) {
+    if request.is_none() {
+        return;
+    }
+    commands.remove_resource::<TerrainReloadRequest>();
+
+    // 1. Recharge le genome → update la config (consommée par heightmap_at).
+    let shape = forgia_terrain::TerrainShapeGenome::load_or_default(TERRAIN_SHAPE_GENOME_PATH);
+    terrain_cfg.max_height = shape.max_height;
+    terrain_cfg.octaves = shape.octave_pairs();
+    terrain_cfg.edge_falloff_m = shape.edge_falloff_m;
+    terrain_cfg.warp_strength = shape.warp_strength;
+    terrain_cfg.warp_freq = shape.warp_freq;
+    // Re-publie aussi l'amplitude relief par biome → éditer un config/biomes/*.toml
+    // (amplitude_mult) + Shift+F12 retune le relief par biome en live.
+    forgia_terrain::publish_biome_amplitudes_from_config();
+    // Story-577 : rebuild la FlattenZones du village (radius_m/falloff_m du genome
+    // hot-reloadables comme max_height) → tuner le "bowl" anti-mur du spawn en live.
+    // target_y re-échantillonné sur la nouvelle forme. Les chunks régénérés ci-dessous
+    // + le foliage l'appliquent → cohérence mesh/arbres/village (pas d'arbre flottant).
+    let flatten_zones = make_village_flatten_zones(&terrain_cfg);
+    commands.insert_resource(flatten_zones.clone());
+
+    // 2. Despawn tous les chunks trackés + LOD2, clear le ChunkManager (cache
+    //    inclus → pas de restore d'anciennes hauteurs). last_player_chunk=None
+    //    → stream_chunks_around_player régénère le ring avec la nouvelle forme.
+    for entity in chunk_mgr.loaded_entities.values() {
+        if let Ok(mut ec) = commands.get_entity(*entity) {
+            ec.try_despawn();
+        }
+    }
+    chunk_mgr.clear_all();
+    lod2_mgr.despawn_all(&mut commands);
+
+    // 3. Re-snap le player sur le nouveau sol à son XZ courant.
+    if let Ok(mut tf) = player_q.single_mut() {
+        let h = terrain_height_local_with_flatten(
+            tf.translation.x,
+            tf.translation.z,
+            &terrain_cfg,
+            Some(&flatten_zones),
+        );
+        tf.translation.y = h + 1.5;
+    }
+
+    info!(
+        "[terrain-shape] terrain régénéré LIVE : max={:.0} edge={:.0} octaves={}",
+        terrain_cfg.max_height,
+        terrain_cfg.edge_falloff_m,
+        terrain_cfg.octaves.len()
+    );
+}
+
 /// W1 — Spawn 1 terrain chunk via forgia-terrain (heightmap-grid + Voronoi biomes).
 /// W2 étendra à streaming N chunks autour du joueur.
 fn spawn_world(
@@ -305,6 +464,14 @@ fn spawn_world(
     let terrain_cfg = make_terrain_config();
     let map_cfg = make_map_gen_config();
     let biome_map = BiomeMap::generate(&terrain_cfg, Some(&map_cfg));
+    // Publie la BiomeMap globale (lue par heightmap_at) → forme biome-aware
+    // cohérente partout : mesh + foliage + village + spawn + décor reposent sur
+    // le MÊME sol biome-aware (fix assets flottants story-576 inc.5).
+    forgia_terrain::set_world_biome_map(biome_map.clone());
+    // Publie aussi la table d'amplitude relief par biome (config/biomes/*.toml,
+    // fallback hardcodé) → heightmap_at applique Mountain haut / Plains plat de
+    // façon data-driven (story-576 inc.6).
+    forgia_terrain::publish_biome_amplitudes_from_config();
 
     // Material partagé : fourni par ForgiaTerrainPlugin Startup, fallback lazy
     // si la session a été nettoyée OnExit (W2+).
@@ -329,39 +496,11 @@ fn spawn_world(
     };
 
     // ── Story-447 — village terrain leveling (calc AVANT chunk mesh) ────
-    // Load le village genome maintenant pour piloter le flatten zone, et le
-    // village-loader le re-lira plus tard pour spawner les buildings. Coût
-    // négligeable (TOML ~1KB) ; alternative serait de partager une Resource
-    // mais la double-lecture est plus simple et hot-reload-friendly.
-    const VILLAGE_GENOME_PATH: &str = "config/genomes/villages/starter_hamlet.toml";
+    // FlattenZones depuis starter_hamlet.toml (cf make_village_flatten_zones,
+    // partagé avec apply_terrain_reload pour hot-reload Shift+F12). Le
+    // village-loader re-lira le genome plus tard pour spawner les buildings.
     let village_world_center = Vec2::new(CHUNK_X as f32 * 0.5, CHUNK_Z as f32 * 0.5);
-    let mut flatten_zones = FlattenZones::new();
-    match VillageGenome::load_from_path(VILLAGE_GENOME_PATH) {
-        Ok(genome) if genome.terrain_leveling.enabled => {
-            let off = sample_offset();
-            let target_y = forgia_terrain::heightmap_at(
-                village_world_center.x + off.x,
-                village_world_center.y + off.y,
-                &terrain_cfg,
-            );
-            flatten_zones.push(VillageFlattenZone {
-                center: village_world_center,
-                target_y,
-                inner_radius: genome.terrain_leveling.radius_m,
-                falloff_radius: genome.terrain_leveling.falloff_m,
-            });
-            info!(
-                "[forgia-rpg] terrain_leveling : target_y={:.2}m, inner={}m, falloff={}m",
-                target_y, genome.terrain_leveling.radius_m, genome.terrain_leveling.falloff_m
-            );
-        }
-        Ok(_) => {
-            info!("[forgia-rpg] terrain_leveling disabled (genome.terrain_leveling.enabled=false)")
-        }
-        Err(e) => {
-            warn!("[forgia-rpg] terrain_leveling : genome load failed ({e}) — terrain restera brut")
-        }
-    }
+    let flatten_zones = make_village_flatten_zones(&terrain_cfg);
 
     // ── 1 chunk static à l'origine (W1 vertical slice) ───────────────────
     let coord = ChunkCoord::new(0, 0);
@@ -744,9 +883,9 @@ fn stream_chunks_around_player(
         stats.lod1_count = lod.lod1_count;
         stats.lod2_count = lod.lod2_count;
     }
-    // Memory estimation : ~5 MB per loaded chunk (mesh + collider + textures).
-    // Wave 3c raffinera (asset_server.get_memory + GPU buffer tracking).
-    stats.loaded_mb_est = stats.loaded_count as f32 * 5.0;
+    // Memory estimation : CHUNK_MB_EST (~0.16 MB) dérivé du mesh uniforme 33×33.
+    // Ancien 5.0 = ×25 overestimate (audit 2026-06-05). Raffinage GPU-exact = P2.
+    stats.loaded_mb_est = stats.loaded_count as f32 * CHUNK_MB_EST;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -943,7 +1082,7 @@ fn enforce_chunk_memory_budget(
     let min_residence = cfg.hysteresis.min_residence_secs;
 
     let loaded_count = chunk_mgr.loaded_entities.len() as u32;
-    let loaded_mb_est = loaded_count as f32 * 5.0;
+    let loaded_mb_est = loaded_count as f32 * CHUNK_MB_EST;
     let over_mb = loaded_mb_est > cfg.budget.max_mb;
     let over_count = loaded_count > cfg.budget.max_chunks;
     if !over_mb && !over_count {
@@ -1027,6 +1166,7 @@ fn write_chunks_sensor(
     chunk_mgr: Option<Res<ChunkManager>>,
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
+    streaming_cfg: Option<Res<StreamingConfig>>,
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
@@ -1039,6 +1179,15 @@ fn write_chunks_sensor(
     else {
         return;
     };
+
+    // P0 observability fix (audit 2026-06-05) : render_dist DOIT refléter la
+    // portée runtime réelle, pas la constante FALLBACK_RENDER_DIST. Même formule
+    // que stream_chunks_around_player (ceil(view_m / CHUNK_X)), fallback si la
+    // StreamingConfig n'est pas encore chargée.
+    let render_dist = streaming_cfg
+        .as_deref()
+        .map(|c| (c.radii.view_m / CHUNK_X as f32).ceil() as i32)
+        .unwrap_or(FALLBACK_RENDER_DIST);
 
     // Distribution biomes : compte 1 sample / chunk au centre.
     let off = sample_offset();
@@ -1060,7 +1209,7 @@ fn write_chunks_sensor(
         chunk_mgr.loaded_entities.len(),
         chunk_mgr.last_player_chunk.map(|c| c.x).unwrap_or(0),
         chunk_mgr.last_player_chunk.map(|c| c.z).unwrap_or(0),
-        FALLBACK_RENDER_DIST,
+        render_dist,
         terrain_cfg.map_size,
         terrain_cfg.sea_level,
         terrain_cfg.max_height,
@@ -1908,6 +2057,9 @@ fn cleanup_world(
     // Resources terrain — TerrainSharedMaterial conservé (réutilisable session suivante).
     commands.remove_resource::<ChunkManager>();
     commands.remove_resource::<BiomeMap>();
+    // Efface la BiomeMap globale (sinon heightmap_at resterait biome-aware hors RPG).
+    forgia_terrain::clear_world_biome_map();
+    forgia_terrain::clear_world_biome_amplitudes();
     commands.remove_resource::<MapGenConfig>();
     commands.remove_resource::<TerrainConfig>();
     commands.remove_resource::<RpgSampleOffset>();
@@ -2282,7 +2434,7 @@ mod tests {
                 let h = terrain_height_local(x as f32, z as f32, &cfg);
                 assert!(h.is_finite(), "h={} not finite at ({},{})", h, x, z);
                 assert!(
-                    h >= 0.0 && h <= RPG_MAX_HEIGHT * 1.1,
+                    h >= 0.0 && h <= cfg.max_height * 1.1,
                     "h={} out of expected bounds at ({},{})",
                     h,
                     x,

@@ -1,0 +1,23 @@
+# Jungle — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "jungle"
+name = "Jungle"
+display_name_fr = "Jungle"
+color = [0.12, 0.32, 0.10]       # = BiomeType::Jungle.color()
+roughness = 0.82
+preview_rgb = [25, 89, 20]
+spawn_weight = 1.0
+amplitude_mult = 1.10             # relief: vallonné dense
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 1.2
+speed_mult = 0.8
+dmg_mult = 1.2
+
+[road]
+width_mult = 0.8
+depression_mult = 0.6
+edge_noise = 1.5
+vegetation_encroachment = 0.3

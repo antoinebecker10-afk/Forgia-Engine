@@ -1,0 +1,23 @@
+# Canyon — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "canyon"
+name = "Canyon"
+display_name_fr = "Canyon"
+color = [0.72, 0.40, 0.22]       # = BiomeType::Canyon.color()
+roughness = 0.93
+preview_rgb = [173, 107, 64]
+spawn_weight = 1.0
+amplitude_mult = 1.20             # relief: relief marqué
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 1.1
+speed_mult = 1.0
+dmg_mult = 1.1
+
+[road]
+width_mult = 1.1
+depression_mult = 0.5
+edge_noise = 0.6
+vegetation_encroachment = 0.0

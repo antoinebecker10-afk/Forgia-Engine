@@ -23,8 +23,18 @@ pub struct BiomeRegistry {
 impl BiomeRegistry {
     pub fn load() -> Self {
         let dir = crate::config_dir::find_config_dir().join("biomes");
-        let specs_vec = load_all_biome_specs(&dir);
+        let reg = Self::from_specs(load_all_biome_specs(&dir));
+        info!(
+            "BiomeRegistry: loaded {} biome specs from TOML",
+            reg.specs.len()
+        );
+        reg
+    }
 
+    /// Construit le registry depuis des specs déjà chargées (sans I/O disque).
+    /// Utilisé par `load()`, le hot-reload et les tests de validation TOML
+    /// (story-575 : prouve que les TOML miroir == fallbacks Rust).
+    pub fn from_specs(specs_vec: Vec<BiomeSpec>) -> Self {
         let mut specs = HashMap::new();
         for spec in specs_vec {
             if let Some(bt) = biome_type_from_id(&spec.id) {
@@ -33,11 +43,6 @@ impl BiomeRegistry {
                 warn!("BiomeRegistry: unknown biome id '{}', skipping", spec.id);
             }
         }
-
-        info!(
-            "BiomeRegistry: loaded {} biome specs from TOML",
-            specs.len()
-        );
         Self { specs }
     }
 
@@ -137,6 +142,16 @@ impl BiomeRegistry {
             .get(&biome)
             .and_then(|s| s.height_mult)
             .unwrap_or(1.0)
+    }
+
+    /// Multiplicateur d'amplitude du relief par biome (Mountain montagneux, Plains
+    /// plat). TOML `config/biomes/<id>.toml::amplitude_mult` si présent, sinon
+    /// fallback hardcodé `BiomeType::amplitude_mult_default()`. Story-576 Incr.6.
+    pub fn amplitude_mult_for(&self, biome: BiomeType) -> f32 {
+        self.specs
+            .get(&biome)
+            .and_then(|s| s.amplitude_mult)
+            .unwrap_or_else(|| biome.amplitude_mult_default())
     }
 
     pub fn lacunarity_for(&self, biome: BiomeType) -> Option<f32> {
@@ -351,6 +366,76 @@ mod tests {
         let reg = BiomeRegistry::default();
         for b in ALL_BIOMES {
             assert_eq!(reg.spawn_weight(b), 1.0, "default spawn_weight for {b:?}");
+        }
+    }
+
+    /// Story-575 (audit procgen 2026-06-05) : les 10 config/biomes/*.toml sont un
+    /// MIROIR EXACT des fallbacks Rust. Ce test charge les vrais TOML et prouve
+    /// que chaque accessor renvoie la même valeur qu'un registry vide (fallbacks)
+    /// → zero-régression garantie au `cargo test`, sans lancer le jeu.
+    #[test]
+    fn config_biomes_toml_mirror_rust_fallbacks_exactly() {
+        use crate::biome_spec::load_all_biome_specs;
+        use std::path::Path;
+
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/biomes");
+        let specs = load_all_biome_specs(&dir);
+        assert_eq!(
+            specs.len(),
+            10,
+            "attendu 10 biome TOMLs dans {dir:?}, trouvé {}",
+            specs.len()
+        );
+
+        let toml = BiomeRegistry::from_specs(specs);
+        let fb = BiomeRegistry::default();
+
+        for b in ALL_BIOMES {
+            assert!(toml.get(b).is_some(), "{b:?} manquant dans les TOML");
+            assert_eq!(toml.color(b), fb.color(b), "color {b:?}");
+            assert!(
+                (toml.roughness(b) - fb.roughness(b)).abs() < 1e-6,
+                "roughness {b:?}"
+            );
+            assert_eq!(toml.preview_rgb(b), fb.preview_rgb(b), "preview_rgb {b:?}");
+            assert_eq!(
+                toml.display_name_fr(b),
+                fb.display_name_fr(b),
+                "display_name_fr {b:?}"
+            );
+            assert_eq!(
+                toml.enemy_modifiers(b),
+                fb.enemy_modifiers(b),
+                "enemy_modifiers {b:?}"
+            );
+            assert!(
+                (toml.spawn_weight(b) - fb.spawn_weight(b)).abs() < 1e-6,
+                "spawn_weight {b:?}"
+            );
+            let (rt, rf) = (toml.road_config(b), fb.road_config(b));
+            assert!(
+                (rt.width_mult - rf.width_mult).abs() < 1e-6
+                    && (rt.depression_mult - rf.depression_mult).abs() < 1e-6
+                    && (rt.edge_noise - rf.edge_noise).abs() < 1e-6
+                    && (rt.vegetation_encroachment - rf.vegetation_encroachment).abs() < 1e-6,
+                "road_config {b:?}: TOML {rt:?} != fallback {rf:?}"
+            );
+            // Champs Option volontairement omis → doivent rester None / 1.0.
+            assert_eq!(toml.lacunarity_for(b), None, "lacunarity {b:?} doit rester None");
+            assert_eq!(toml.persistence_for(b), None, "persistence {b:?}");
+            assert_eq!(toml.slope_max_for(b), None, "slope_max {b:?}");
+            assert!(
+                (toml.height_mult_for(b) - 1.0).abs() < 1e-6,
+                "height_mult {b:?} doit rester 1.0"
+            );
+            // Story-576 Incr.6 : amplitude_mult des TOML == fallback hardcodé.
+            assert!(
+                (toml.amplitude_mult_for(b) - fb.amplitude_mult_for(b)).abs() < 1e-6
+                    && (toml.amplitude_mult_for(b) - b.amplitude_mult_default()).abs() < 1e-6,
+                "amplitude_mult {b:?}: TOML {} != fallback {}",
+                toml.amplitude_mult_for(b),
+                b.amplitude_mult_default()
+            );
         }
     }
 }

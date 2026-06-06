@@ -1,0 +1,31 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Plains — biome definition (story-575, audit procgen 2026-06-05)
+# ──────────────────────────────────────────────────────────────────────────────
+# MIROIR EXACT des fallbacks Rust (biomes.rs::color/roughness +
+# biome_registry.rs::enemy_modifiers/road/preview/display_name_fr).
+# Comportement IDENTIQUE — ce fichier ACTIVE la couche definition (le registry
+# chargeait 0 spec → tout tombait sur les fallbacks hardcodés) et la rend
+# hot-reloadable via Shift+F12. Tuner ici SANS rebuild.
+# Champs Option omis volontairement (lacunarity/persistence/slope_max/height_mult/
+# thermal_passes) = fallback None/1.0 préservé. `grass` omis = aucun consommateur.
+
+id = "plains"
+name = "Plains"
+display_name_fr = "Plaines"
+color = [0.42, 0.62, 0.22]       # = BiomeType::Plains.color() (srgb)
+roughness = 0.90                  # = BiomeType::Plains.roughness()
+preview_rgb = [115, 166, 64]
+spawn_weight = 1.0
+amplitude_mult = 0.45             # relief: plaines plates (= BiomeType::Plains.amplitude_mult_default())
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 1.0
+speed_mult = 1.0
+dmg_mult = 1.0
+
+[road]
+width_mult = 1.2
+depression_mult = 1.0
+edge_noise = 0.8
+vegetation_encroachment = 0.1

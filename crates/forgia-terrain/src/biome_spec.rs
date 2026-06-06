@@ -179,6 +179,11 @@ pub struct BiomeSpec {
     pub beach_width: Option<f32>,
     #[serde(default)]
     pub height_mult: Option<f32>,
+    /// Multiplicateur d'amplitude du relief par biome (Mountain 1.5, Plains 0.45…).
+    /// `None` → fallback `BiomeType::amplitude_mult_default()`. Tunable hot-reload
+    /// (Shift+F12) ; publié dans le global lu par `heightmap_at`. Story-576 Incr.6.
+    #[serde(default)]
+    pub amplitude_mult: Option<f32>,
     #[serde(default)]
     pub lacunarity: Option<f32>,
     #[serde(default)]

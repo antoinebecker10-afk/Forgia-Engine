@@ -45,30 +45,53 @@ fn continental_bias(
     (c * 0.5 + 0.5) * strength * max_height
 }
 
-/// Multi-octave Perlin noise heightmap (original, backward compatible).
+/// Bruit de base normalisé [0,1] (domain warp + octaves) — PARTAGÉ entre
+/// `heightmap_at` (global) et `heightmap_at_blended` (biome-aware).
+fn base_noise_norm(x: f32, z: f32, config: &TerrainConfig, perlin: &Perlin) -> f32 {
+    // Domain warping (IQ) : déplace les coords d'échantillonnage avec un bruit
+    // basse-fréquence → terrain naturel/sinueux vs blobs alignés grille. Warp
+    // COHÉRENT (toutes les octaves décalées du même déplacement monde).
+    let (sx, sz) = if config.warp_strength > 0.0 {
+        let wf = config.warp_freq;
+        let qx = perlin.get([f64::from(x) * wf + 5.2, f64::from(z) * wf + 1.3]) as f32;
+        let qz = perlin.get([f64::from(x) * wf + 9.1, f64::from(z) * wf + 4.7]) as f32;
+        (x + config.warp_strength * qx, z + config.warp_strength * qz)
+    } else {
+        (x, z)
+    };
+    // Octaves genome-driven (terrain_shape.toml). `ridged` → crêtes acérées.
+    let mut h: f32 = 0.0;
+    for &(freq, amp, ridged) in &config.octaves {
+        let p = perlin.get([f64::from(sx) * freq, f64::from(sz) * freq]) as f32;
+        let v = if ridged { (1.0 - p.abs()) * 2.0 - 1.0 } else { p };
+        h += v * amp;
+    }
+    (h + 1.0) * 0.5
+}
+
+/// Edge falloff (interpolation vers sea_level aux bords du monde) + floor.
+/// Pattern industrie : terrain descend vers la mer aux bords, pas vers l'abysse.
+/// Coords RÉELLES (x,z), pas warpées.
+fn apply_edge_and_floor(h: f32, x: f32, z: f32, config: &TerrainConfig, half: f32) -> f32 {
+    let edge_factor = edge_falloff(x, z, half, config.edge_falloff_m);
+    let h = config.sea_level + (h - config.sea_level) * edge_factor;
+    h.max(2.0)
+}
+
+/// Heightmap principal — BIOME-AWARE via le global `WORLD_BIOME_MAP` (publié au
+/// spawn du monde). L'amplitude au-dessus de sea_level est multipliée par le
+/// `amplitude_mult` blendé du biome (Mountain tall, Plains flat), transition
+/// douce smoothstep aux frontières (foothills, pas de seam — best-practice
+/// NoisePost / RedBlobGames). Hors monde (tests) → amp=1.0 = comportement global
+/// d'origine. TOUS les consommateurs (mesh, foliage, village, spawn, décor)
+/// passent par ici → cohérence : les assets reposent sur le sol biome-aware.
 pub fn heightmap_at(x: f32, z: f32, config: &TerrainConfig) -> f32 {
     let perlin = cached_perlin(config.seed);
     let half = config.map_size / 2.0;
-
-    let octaves: [(f64, f32); 4] = [(0.003, 1.0), (0.008, 0.5), (0.025, 0.15), (0.060, 0.05)];
-
-    let mut h: f32 = 0.0;
-    for &(freq, amp) in &octaves {
-        h += perlin.get([f64::from(x) * freq, f64::from(z) * freq]) as f32 * amp;
-    }
-
-    h = (h + 1.0) * 0.5;
-    h = config.sea_level + h * (config.max_height - config.sea_level);
-
-    // Fix : interpolation vers sea_level au lieu de multiplication vers 0.
-    // L'ancienne formule `h *= edge_factor` faisait descendre h sous sea_level
-    // partout où edge_factor < 1 → cuvettes systématiques avec floor à 2.0
-    // masquant le bug. Pattern industrie : terrain descend vers la mer aux
-    // bords, pas vers l'abysse.
-    let edge_factor = edge_falloff(x, z, half, 80.0);
-    h = config.sea_level + (h - config.sea_level) * edge_factor;
-
-    h.max(2.0)
+    let h_norm = base_noise_norm(x, z, config, &perlin);
+    let amp_mult = crate::biomes::world_biome_amplitude_mult(x, z);
+    let h = config.sea_level + h_norm * (config.max_height - config.sea_level) * amp_mult;
+    apply_edge_and_floor(h, x, z, config, half)
 }
 
 /// Configurable heightmap with MapGenConfig support.

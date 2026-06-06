@@ -104,11 +104,50 @@ impl BiomeType {
             Self::Canyon => 0.93,
         }
     }
+
+    /// Multiplicateur d'amplitude du relief par biome (forme spécifique).
+    /// 1.0 = référence Forest (rolling). >1 = montagneux, <1 = plat. Appliqué à
+    /// la hauteur au-dessus de sea_level dans `heightmap_at`, blendé smoothstep
+    /// aux frontières (pas de seam dur — cf NoisePost biome blending).
+    ///
+    /// Data-driven (story-576 Incr.6) : lit la table publiée depuis
+    /// `config/biomes/<id>.toml::amplitude_mult` (hot-reload Shift+F12) via le
+    /// global `WORLD_BIOME_AMPLITUDES` ; à défaut → `amplitude_mult_default()`.
+    pub fn amplitude_mult(&self) -> f32 {
+        if let Ok(guard) = WORLD_BIOME_AMPLITUDES.read() {
+            if let Some(table) = guard.as_ref() {
+                return table[*self as usize];
+            }
+        }
+        self.amplitude_mult_default()
+    }
+
+    /// Valeurs FALLBACK hardcodées de l'amplitude relief (= défaut si aucun
+    /// `config/biomes/<id>.toml` ne définit `amplitude_mult`). Source de vérité
+    /// des défauts, comme `color()`/`roughness()` ; mirroir des 10 TOML.
+    pub fn amplitude_mult_default(&self) -> f32 {
+        match self {
+            Self::Plains => 0.45,    // plaines plates
+            Self::Forest => 1.0,     // rolling (référence)
+            Self::Desert => 0.65,    // dunes basses
+            Self::Mountain => 1.5,   // montagnes hautes
+            Self::Swamp => 0.40,     // marais très plat
+            Self::Tundra => 0.85,    // collines douces
+            Self::Savanna => 0.70,   // plat-ondulé
+            Self::Jungle => 1.10,    // vallonné dense
+            Self::Volcanic => 1.30,  // accidenté
+            Self::Canyon => 1.20,    // relief marqué
+        }
+    }
 }
 
 // ─────────────────────────── BiomeSeed & BiomeBlend ───────────────────────────
 
 pub const MAX_BLEND_BIOMES: usize = 4;
+
+/// Rayon (m) de blend de la FORME du terrain entre biomes voisins (foothills).
+/// Plus large = transitions de relief plus graduelles. ~200m = naturel.
+const BIOME_SHAPE_BLEND_RADIUS_M: f32 = 200.0;
 
 #[derive(Debug, Clone)]
 pub struct BiomeSeed {
@@ -127,6 +166,117 @@ pub struct BiomeBlend {
 #[derive(Resource, Clone)]
 pub struct BiomeMap {
     pub seeds: Vec<BiomeSeed>,
+}
+
+// ── World biome map global ────────────────────────────────────────────────────
+// Le mesh, le foliage (crate VERROUILLÉE), le village, le spawn et le décor
+// appellent TOUS `heightmap_at(x,z,config)` SANS biome_map. Pour que la forme
+// biome-aware (amplitude_mult par biome) soit cohérente PARTOUT — donc que les
+// assets reposent sur le sol biome-aware au lieu de flotter — on publie la
+// BiomeMap du monde courant via ce global read-only, lu par `heightmap_at`.
+// Set au spawn du monde (forgia-rpg), clear à la sortie. Lecture seule après
+// génération → RwLock non contendu (concurrent reads OK pendant le meshing).
+static WORLD_BIOME_MAP: std::sync::RwLock<Option<BiomeMap>> = std::sync::RwLock::new(None);
+
+/// Publie la BiomeMap du monde courant (appelé par forgia-rpg au spawn + reload).
+pub fn set_world_biome_map(map: BiomeMap) {
+    if let Ok(mut g) = WORLD_BIOME_MAP.write() {
+        *g = Some(map);
+    }
+}
+
+/// Efface la BiomeMap globale (sortie du monde RPG).
+pub fn clear_world_biome_map() {
+    if let Ok(mut g) = WORLD_BIOME_MAP.write() {
+        *g = None;
+    }
+}
+
+// ── World biome amplitude table global ─────────────────────────────────────────
+// Le multiplicateur d'amplitude relief par biome est DATA-DRIVEN (story-576
+// Incr.6) : il vient de `config/biomes/<id>.toml::amplitude_mult`. Mais
+// `heightmap_at` est une fonction pure (threads de meshing, foliage) sans accès
+// ECS au `BiomeRegistry`. On publie donc la table résolue (TOML ou fallback) dans
+// ce global indexé par `BiomeType as usize` (Plains=0…Canyon=9). Set au spawn +
+// hot-reload par forgia-rpg, clear à la sortie. `None` → fallback hardcodé.
+static WORLD_BIOME_AMPLITUDES: std::sync::RwLock<Option<[f32; 10]>> =
+    std::sync::RwLock::new(None);
+
+/// Table d'amplitude relief par défaut (fallback hardcodé), indexée
+/// `BiomeType as usize`. Utilisée quand aucune table TOML n'est publiée.
+fn default_amplitude_table() -> [f32; 10] {
+    [
+        BiomeType::Plains.amplitude_mult_default(),
+        BiomeType::Forest.amplitude_mult_default(),
+        BiomeType::Desert.amplitude_mult_default(),
+        BiomeType::Mountain.amplitude_mult_default(),
+        BiomeType::Swamp.amplitude_mult_default(),
+        BiomeType::Tundra.amplitude_mult_default(),
+        BiomeType::Savanna.amplitude_mult_default(),
+        BiomeType::Jungle.amplitude_mult_default(),
+        BiomeType::Volcanic.amplitude_mult_default(),
+        BiomeType::Canyon.amplitude_mult_default(),
+    ]
+}
+
+/// Snapshot de la table d'amplitude (1 lock read) — pour le hot path de blend qui
+/// itère sur 4 biomes voisins par sample (évite 4 locks/vertex). TOML si publié,
+/// sinon défauts hardcodés.
+fn world_biome_amplitudes_snapshot() -> [f32; 10] {
+    if let Ok(guard) = WORLD_BIOME_AMPLITUDES.read() {
+        if let Some(table) = guard.as_ref() {
+            return *table;
+        }
+    }
+    default_amplitude_table()
+}
+
+/// Publie une table d'amplitude relief par biome (indexée `BiomeType as usize`).
+pub fn set_world_biome_amplitudes(table: [f32; 10]) {
+    if let Ok(mut g) = WORLD_BIOME_AMPLITUDES.write() {
+        *g = Some(table);
+    }
+}
+
+/// Efface la table d'amplitude globale (sortie du monde RPG → retour au fallback).
+pub fn clear_world_biome_amplitudes() {
+    if let Ok(mut g) = WORLD_BIOME_AMPLITUDES.write() {
+        *g = None;
+    }
+}
+
+/// Charge le `BiomeRegistry` (config/biomes) et publie la table d'amplitude relief
+/// dans le global lu par `heightmap_at`. Appelé par forgia-rpg au spawn du monde
+/// (à côté de `set_world_biome_map`) + au hot-reload terrain. Aucun TOML pour un
+/// biome → sa valeur fallback hardcodée est publiée (zéro régression).
+pub fn publish_biome_amplitudes_from_config() {
+    let reg = BiomeRegistry::load();
+    let table = [
+        reg.amplitude_mult_for(BiomeType::Plains),
+        reg.amplitude_mult_for(BiomeType::Forest),
+        reg.amplitude_mult_for(BiomeType::Desert),
+        reg.amplitude_mult_for(BiomeType::Mountain),
+        reg.amplitude_mult_for(BiomeType::Swamp),
+        reg.amplitude_mult_for(BiomeType::Tundra),
+        reg.amplitude_mult_for(BiomeType::Savanna),
+        reg.amplitude_mult_for(BiomeType::Jungle),
+        reg.amplitude_mult_for(BiomeType::Volcanic),
+        reg.amplitude_mult_for(BiomeType::Canyon),
+    ];
+    set_world_biome_amplitudes(table);
+}
+
+/// Amplitude biome blendée au point (x,z) depuis le global, ou 1.0 si aucun
+/// monde publié (tests, hors RPG → heightmap_at = comportement global d'origine).
+/// Lu par `heightmap_at` → cohérence mesh ↔ foliage ↔ village ↔ spawn.
+pub fn world_biome_amplitude_mult(x: f32, z: f32) -> f32 {
+    let Ok(guard) = WORLD_BIOME_MAP.read() else {
+        return 1.0;
+    };
+    match guard.as_ref() {
+        Some(bm) => bm.blended_amplitude_mult(x, z),
+        None => 1.0,
+    }
 }
 
 impl BiomeMap {
@@ -611,6 +761,26 @@ impl BiomeMap {
             result.count = 1;
         }
         result
+    }
+
+    /// Multiplicateur d'amplitude blendé au point (x,z) : somme pondérée des
+    /// `BiomeType::amplitude_mult()` des biomes voisins, poids normalisés
+    /// smoothstep (sum=1) → transition DOUCE de forme aux frontières (foothills),
+    /// pas de seam dur (best-practice biome blending). Consommé par
+    /// `heightmap_at_blended`. Coût : 1 lookup voisinage + lerp scalaire (cheap).
+    pub fn blended_amplitude_mult(&self, x: f32, z: f32) -> f32 {
+        let blend = self.biome_weights_at(x, z, MAX_BLEND_BIOMES, BIOME_SHAPE_BLEND_RADIUS_M);
+        if blend.count == 0 {
+            return 1.0;
+        }
+        // Hot path : snapshot la table d'amplitude une seule fois (pas 4 locks).
+        let table = world_biome_amplitudes_snapshot();
+        let mut mult = 0.0;
+        for i in 0..blend.count {
+            let (biome, w) = blend.biomes[i];
+            mult += table[biome as usize] * w;
+        }
+        mult
     }
 
     pub fn assign_chunk_biomes(&self, chunk_origin_x: f32, chunk_origin_z: f32) -> Vec<u8> {

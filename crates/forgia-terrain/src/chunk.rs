@@ -206,6 +206,21 @@ impl ChunkManager {
     pub fn cache_len(&self) -> usize {
         self.chunk_cache.len()
     }
+
+    /// Vide TOUT l'état (chunks, entités trackées, cache zstd, hystérèse) — pour
+    /// la régén complète au hot-reload terrain (Shift+F12). Vide aussi le cache
+    /// pour éviter qu'un `restore_from_cache` ne ramène d'anciennes hauteurs.
+    /// NE despawn PAS les entités Bevy : le caller le fait via Commands depuis
+    /// `loaded_entities` AVANT d'appeler ceci.
+    pub fn clear_all(&mut self) {
+        self.chunks.clear();
+        self.loaded_entities.clear();
+        self.dirty_chunks.clear();
+        self.last_player_chunk = None;
+        self.chunk_cache.clear();
+        self.cache_order.clear();
+        self.empty_mesh_coords.clear();
+    }
 }
 
 // ─────────────────────────── TerrainConfig ───────────────────────────
@@ -219,6 +234,17 @@ pub struct TerrainConfig {
     pub sea_level: f32,
     pub max_height: f32,
     pub y_offset: f32,
+    /// Octaves Perlin `(freq, amp, ridged)` — genome-driven (terrain_shape.toml),
+    /// consommées par `heightmap_at`. `ridged`=true → crêtes acérées (montagnes).
+    /// Hot-reloadable. Vide = fallback retune.
+    pub octaves: Vec<(f64, f32, bool)>,
+    /// Largeur (m) du falloff de bord vers sea_level (genome-driven).
+    pub edge_falloff_m: f32,
+    /// Domain warping (genome-driven) : amplitude (m) du déplacement des coords
+    /// d'échantillonnage → terrain naturel/sinueux. 0 = désactivé.
+    pub warp_strength: f32,
+    /// Fréquence du bruit de warp (genome-driven).
+    pub warp_freq: f64,
 }
 
 impl Default for TerrainConfig {
@@ -231,6 +257,10 @@ impl Default for TerrainConfig {
             sea_level: 18.0,
             max_height: 180.0,
             y_offset: 0.0,
+            octaves: crate::terrain_shape::default_octaves(),
+            edge_falloff_m: 80.0,
+            warp_strength: 40.0,
+            warp_freq: 0.006,
         }
     }
 }

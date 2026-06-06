@@ -32,7 +32,10 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
-pub use biomes::{BiomeMap, BiomeType};
+pub use biomes::{
+    clear_world_biome_amplitudes, clear_world_biome_map, publish_biome_amplitudes_from_config,
+    set_world_biome_amplitudes, set_world_biome_map, BiomeMap, BiomeType,
+};
 pub use chunk::{ChunkCoord, ChunkManager, TerrainConfig, CHUNK_X, CHUNK_Z};
 pub use flatten::{FlattenZones, VillageFlattenZone};
 pub use generation::heightmap_at;
@@ -45,6 +48,7 @@ pub use paths::{
     build_path_network, build_path_segment, PathNetwork, PathPolyline, PathSample, RoadTier,
 };
 pub use terrain_material::{init_terrain_material, repeat_sampler, TerrainSharedMaterial};
+pub use terrain_shape::{default_octaves, TerrainShapeGenome};
 
 pub mod biome_registry;
 pub mod biome_spec;
@@ -66,6 +70,8 @@ pub mod meshing_heightmap;
 pub mod terrain_material;
 // Story-447 — local flattening discs autour villages (post-process heightmap).
 pub mod flatten;
+// 2026-06-06 — genome data-driven de la forme du terrain (octaves, hot-reload).
+pub mod terrain_shape;
 // W5 — LOD 3-niveaux GTA5 style (chunks + mega-tiles).
 pub mod lod;
 
@@ -89,8 +95,10 @@ impl Plugin for ForgiaTerrainPlugin {
                     lod::update_chunk_lod,
                     lod::build_lod2_tiles_system,
                     lod::sys_update_lod_sample_points,
+                    lod::sys_update_lod_coverage,
                     lod::export_lod_sensor_system,
                 )
+                    .chain()
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
             );

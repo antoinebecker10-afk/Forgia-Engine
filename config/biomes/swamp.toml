@@ -1,0 +1,23 @@
+# Swamp — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "swamp"
+name = "Swamp"
+display_name_fr = "Marais"
+color = [0.32, 0.40, 0.20]       # = BiomeType::Swamp.color()
+roughness = 0.88
+preview_rgb = [77, 97, 56]
+spawn_weight = 1.0
+amplitude_mult = 0.40             # relief: marais très plat
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 1.0
+speed_mult = 0.7
+dmg_mult = 1.3
+
+[road]
+width_mult = 0.7
+depression_mult = 0.4
+edge_noise = 2.0
+vegetation_encroachment = 0.5

@@ -18,7 +18,8 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 use crate::biomes::BiomeMap;
-use crate::chunk::{ChunkManager, TerrainConfig, CHUNK_X};
+use crate::chunk::{ChunkCoord, ChunkManager, TerrainConfig, CHUNK_X};
+use crate::flatten::FlattenZones;
 use crate::generation::heightmap_at;
 use crate::terrain_material::TerrainSharedMaterial;
 
@@ -41,10 +42,25 @@ pub const LOD_HYSTERESIS_M: f32 = 16.0;
 /// Un cluster déjà spawn ne se despawn que si player approche à dist < 128 - 16 = 112m.
 /// Évite le flicker 2 Hz quand player marche le long de la frontière LOD2.
 pub const LOD2_INNER_HYSTERESIS_M: f32 = 16.0;
+/// Story-577 v3 — biais de profondeur (skirt) appliqué au LOD2 sous les chunks.
+/// Depuis le fix extent-aware, les tiles LOD2 chevauchent les chunks (~38–160m) ;
+/// au même Y → z-fighting (« la texture change selon l'angle caméra »). On descend
+/// le tile LOD2 de ce biais → dans la zone de recouvrement le chunk gagne toujours
+/// le depth-test (pas de flicker) ; au-delà (trou comblé + lointain) le LOD2 est
+/// 2m sous la hauteur vraie = imperceptible à 144m+ et angle rasant. Mesh + arbres/
+/// rochers (enfants du tile) descendent ENSEMBLE → arbres restent posés sur le LOD2.
+pub const LOD2_DEPTH_BIAS_M: f32 = 2.0;
 
 const CLUSTER_CHUNKS: i32 = 4;
 const CHUNK_SIZE_M: f32 = CHUNK_X as f32;
 const CLUSTER_SIZE_M: f32 = CLUSTER_CHUNKS as f32 * CHUNK_SIZE_M;
+/// Demi-diagonale d'un cluster LOD2 (128m) : distance centre→coin = (S/2)·√2 ≈ 90.5m.
+/// Sert à rendre l'inclusion/exclusion LOD2 sensible à l'ÉTENDUE du cluster, pas
+/// seulement à son centre. Story-577 : tester le centre laissait un trou annulaire
+/// (~144–181m en diagonale) car un cluster centré < `LOD1_MAX_M` mais dont le coin
+/// dépasse `LOD1_MAX_M` était exclu du LOD2 alors que les chunks (⌀ ≈ view_m) ne
+/// l'atteignaient pas → ni chunk ni LOD2 = skybox à travers le sol.
+const CLUSTER_HALF_DIAG_M: f32 = CLUSTER_SIZE_M * std::f32::consts::FRAC_1_SQRT_2;
 /// Wave 5 phase 2g : UV tile reps pour LOD2 textured mesh. Matche la densité
 /// chunks LOD0/LOD1 où 1 tile texture = 1 chunk de 32m. LOD2 = 128m donc
 /// 4 reps de texture pour visual continuity.
@@ -78,6 +94,10 @@ pub struct LodStats {
     /// 12 points fixes en ring autour de (0,0). Mis à jour 1Hz par
     /// `sys_update_lod_sample_points`. Exporté dans `forgia_terrain_lod.json`.
     pub sample_points: Vec<LodSamplePoint>,
+    /// Story-577 : couverture chunk/LOD2 par anneau autour du player (détection
+    /// trou annulaire). Rempli 1Hz par `sys_update_lod_coverage`, exporté dans le
+    /// sensor. Un `gap > 0` = points sans chunk NI LOD2 = sol manquant visible.
+    pub coverage_rings: Vec<LodCoverageRing>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -87,6 +107,19 @@ pub struct LodSamplePoint {
     pub lod0_y: f32,
     pub lod2_y: f32,
     pub sea_level: f32,
+}
+
+/// Story-577 : couverture terrain à un rayon donné autour du player. Pour `samples`
+/// angles répartis sur le cercle, compte combien de points sont couverts par un
+/// chunk loaded, par un LOD2 tile, ou par RIEN (`gap`). Un `gap > 0` localise le
+/// trou annulaire (chunks ⌀ ≈ view_m ne se rejoignent pas avec les LOD2 tiles).
+#[derive(Clone, Copy, Debug)]
+pub struct LodCoverageRing {
+    pub radius_m: f32,
+    pub samples: u32,
+    pub chunk_covered: u32,
+    pub lod2_covered: u32,
+    pub gap: u32,
 }
 
 /// Simule la Y produite par `build_lod2_terrain_mesh` à un point (x, z).
@@ -296,6 +329,7 @@ fn build_lod2_terrain_mesh(
     sample_offset: (f32, f32),
     terrain_cfg: &TerrainConfig,
     biome_map: &BiomeMap,
+    flatten_zones: Option<&FlattenZones>,
 ) -> Mesh {
     const SUBDIVS: usize = 16; // 16 quads = 17 verts par côté
     const VERTS_PER_SIDE: usize = SUBDIVS + 1;
@@ -304,12 +338,12 @@ fn build_lod2_terrain_mesh(
 
     let total_verts = VERTS_PER_SIDE * VERTS_PER_SIDE;
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(total_verts);
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(total_verts);
     let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(total_verts);
-    // Wave 5 phase 2a — per-vertex biome color (Skyrim/Witcher 3 pattern :
-    // baked terrain color blend au lieu de material splat per chunk).
-    // Vertex colors sont multipliés par base_color = white du material partagé.
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_verts);
+    // Wave 5 phase 2a — per-vertex biome color (Skyrim/Witcher 3 pattern).
+    // Audit 2026-06-05 : la couleur est désormais calculée en PASS 2 (après
+    // compute_normals) via `blend_biome_color` — rock/snow tint IDENTIQUE au LOD0.
+    // Avant : `biome.color()` brut + normales plates [0,1,0] → lointain sombre et
+    // sans roche/neige = perçu comme une "couche" distincte vs le proche LOD0.
 
     // Wave 5 phase 2d retiré 2026-05-18 : le clamp Y=sea_level + bleu marine
     // créait des "phantom water patches" au LOD2 ring là où le heightmap dip
@@ -331,23 +365,21 @@ fn build_lod2_terrain_mesh(
             let sample_x = world_x + sample_offset.0;
             let sample_z = world_z + sample_offset.1;
             let raw_y = heightmap_at(sample_x, sample_z, terrain_cfg);
+            // Story-577 v2 : applique le FlattenZones du village (coords MONDE sans
+            // offset, comme build_chunk_mesh:84). Indispensable depuis que le fix
+            // extent-aware fait chevaucher les tiles LOD2 sur la zone du spawn : sans
+            // ça, le mesh LOD2 brut (montagne) recouvrait la ville aplanie.
+            let y = match flatten_zones {
+                Some(fz) => fz.sample(world_x, world_z, raw_y),
+                None => raw_y,
+            };
 
-            let biome = biome_map.biome_at(sample_x, sample_z);
-            let vertex_color = biome.color().to_linear();
-            let world_y = [local_x, raw_y, local_z];
-            positions.push(world_y);
-            normals.push([0.0, 1.0, 0.0]); // approx — PBR lit accepte
-                                           // Wave 5 phase 2g : UV × UV_TILE_REPS pour densité texture cohérente
-                                           // avec chunks (chunks 32m = 1 rep, LOD2 128m = 4 reps).
+            positions.push([local_x, y, local_z]);
+            // Wave 5 phase 2g : UV × UV_TILE_REPS pour densité texture cohérente
+            // avec chunks (chunks 32m = 1 rep, LOD2 128m = 4 reps).
             uvs.push([
                 (i as f32 / SUBDIVS as f32) * UV_TILE_REPS,
                 (j as f32 / SUBDIVS as f32) * UV_TILE_REPS,
-            ]);
-            colors.push([
-                vertex_color.red,
-                vertex_color.green,
-                vertex_color.blue,
-                vertex_color.alpha,
             ]);
         }
     }
@@ -377,11 +409,39 @@ fn build_lod2_terrain_mesh(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(indices));
+    // Audit 2026-06-05 : VRAIES normales (smooth, mesh indexé) comme LOD0
+    // (meshing_heightmap.rs:118 `compute_normals`) au lieu de [0,1,0] plat → le
+    // lointain reçoit la lumière correctement (fini la "couche sombre" sous
+    // soleil bas qui le faisait paraître une couche distincte du proche).
+    mesh.compute_normals();
+
+    // Pass 2 — couleur biome rock(pente)/snow(altitude) IDENTIQUE au LOD0, via la
+    // pente extraite des normales fraîchement calculées.
+    let normals = mesh
+        .attribute(Mesh::ATTRIBUTE_NORMAL)
+        .and_then(|a| a.as_float3())
+        .map(|n| n.to_vec())
+        .unwrap_or_default();
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(total_verts);
+    for (idx, pos) in positions.iter().enumerate() {
+        let sample_x = cluster_center_xz.x + pos[0] + sample_offset.0;
+        let sample_z = cluster_center_xz.y + pos[2] + sample_offset.1;
+        let biome = biome_map.biome_at(sample_x, sample_z);
+        let slope = normals
+            .get(idx)
+            .map(|n| (1.0 - n[1].clamp(0.0, 1.0)).clamp(0.0, 1.0))
+            .unwrap_or(0.0);
+        colors.push(crate::meshing_heightmap::blend_biome_color(
+            biome,
+            pos[1],
+            slope,
+            terrain_cfg,
+        ));
+    }
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh
 }
 
@@ -425,6 +485,7 @@ pub fn build_lod2_tiles_system(
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     terrain_shared_mat: Option<Res<TerrainSharedMaterial>>,
+    flatten_zones: Option<Res<FlattenZones>>,
     player_q: Query<&Transform>,
     offset: Option<Res<LodSampleOffset>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -455,7 +516,6 @@ pub fn build_lod2_tiles_system(
         return;
     }
 
-    let inner_sq = inner_m * inner_m;
     let outer_sq = outer_m * outer_m;
 
     let player_cluster = cluster_key_from_world(player_pos.x, player_pos.z);
@@ -469,7 +529,12 @@ pub fn build_lod2_tiles_system(
             let dx = center.x - player_pos.x;
             let dz = center.y - player_pos.z;
             let dist_sq = dx * dx + dz * dz;
-            if dist_sq >= inner_sq && dist_sq < outer_sq {
+            // Extent-aware (fix story-577 trou annulaire) : on dessine le LOD2 dès que
+            // le COIN du cluster dépasse `inner_m` (chunks ⌀ ≈ view_m). Tester le seul
+            // centre laissait la bande inner_m..(centre+90m) sans chunk NI LOD2.
+            // Recouvrement chunk/LOD2 bénin (même Y heightmap → depth buffer gère le Z).
+            let center_dist = dist_sq.sqrt();
+            if center_dist + CLUSTER_HALF_DIAG_M >= inner_m && dist_sq < outer_sq {
                 desired.insert(key, ());
             }
         }
@@ -522,16 +587,19 @@ pub fn build_lod2_tiles_system(
 
         let center = cluster_world_center(key);
 
-        // Per-cluster mesh : Y per-vertex heightmap + color per-vertex biome.
-        let cluster_mesh = build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map);
+        // Per-cluster mesh : Y per-vertex heightmap (+ flatten village) + color biome.
+        let cluster_mesh =
+            build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map, flatten_zones.as_deref());
         let mesh_handle = meshes.add(cluster_mesh);
 
         let tile_entity = commands
             .spawn((
                 Mesh3d(mesh_handle),
                 MeshMaterial3d(shared_mat.clone()),
-                // Transform Y=0 — le mesh contient déjà les Y absolus heightmap.
-                Transform::from_xyz(center.x, 0.0, center.y),
+                // Y = -biais skirt (story-577 v3) : le mesh porte les Y absolus, on
+                // descend tout le tile (mesh + arbres enfants) sous les chunks → le
+                // chunk gagne le depth-test dans le recouvrement (fin du z-fighting).
+                Transform::from_xyz(center.x, -LOD2_DEPTH_BIAS_M, center.y),
                 Lod2Tile { cluster_key: key },
                 Name::new(format!("Lod2Tile({},{})", key.0, key.1)),
             ))
@@ -548,7 +616,13 @@ pub fn build_lod2_tiles_system(
             let lz = (((hash >> 8) & 0xFF) as f32 / 255.0 - 0.5) * (CLUSTER_SIZE_M * 0.85);
             let world_x = center.x + lx;
             let world_z = center.y + lz;
-            let world_y = heightmap_at(world_x + off.0, world_z + off.1, &terrain_cfg);
+            let world_y = {
+                let raw = heightmap_at(world_x + off.0, world_z + off.1, &terrain_cfg);
+                match flatten_zones.as_deref() {
+                    Some(fz) => fz.sample(world_x, world_z, raw),
+                    None => raw,
+                }
+            };
             // Skip si sous sea_level (pas d'arbres dans l'eau).
             if world_y < terrain_cfg.sea_level + 0.5 {
                 continue;
@@ -584,7 +658,13 @@ pub fn build_lod2_tiles_system(
             let lz = (((hash >> 8) & 0xFF) as f32 / 255.0 - 0.5) * (CLUSTER_SIZE_M * 0.9);
             let world_x = center.x + lx;
             let world_z = center.y + lz;
-            let world_y = heightmap_at(world_x + off.0, world_z + off.1, &terrain_cfg);
+            let world_y = {
+                let raw = heightmap_at(world_x + off.0, world_z + off.1, &terrain_cfg);
+                match flatten_zones.as_deref() {
+                    Some(fz) => fz.sample(world_x, world_z, raw),
+                    None => raw,
+                }
+            };
             if world_y < terrain_cfg.sea_level + 0.5 {
                 continue; // pas de rocher sous l'eau
             }
@@ -619,7 +699,7 @@ pub fn build_lod2_tiles_system(
     // UE5 World Partition : asymétrie load/unload thresholds.
     // - Spawn :   dist >= inner_m            (déjà géré dans desired)
     // - Despawn : dist <  inner_m - LOD2_INNER_HYSTERESIS_M  OU dist > outer_m
-    let inner_despawn_sq = (inner_m - LOD2_INNER_HYSTERESIS_M).max(0.0).powi(2);
+    let inner_despawn = (inner_m - LOD2_INNER_HYSTERESIS_M).max(0.0);
     let to_remove: Vec<(i32, i32)> = tile_mgr
         .tiles
         .keys()
@@ -628,8 +708,11 @@ pub fn build_lod2_tiles_system(
             let dx = center.x - player_pos.x;
             let dz = center.y - player_pos.z;
             let dist_sq = dx * dx + dz * dz;
-            // Despawn UNIQUEMENT si bien sous l'inner (avec marge) ou hors outer.
-            dist_sq < inner_despawn_sq || dist_sq >= outer_sq
+            let center_dist = dist_sq.sqrt();
+            // Symétrique au spawn (story-577) : despawn UNIQUEMENT si le cluster est
+            // ENTIÈREMENT sous l'inner (coin inclus + marge hystérèse) ou hors outer.
+            // Sinon on retirerait un tile dont un coin couvre encore le trou.
+            (center_dist + CLUSTER_HALF_DIAG_M) < inner_despawn || dist_sq >= outer_sq
         })
         .copied()
         .collect();
@@ -642,6 +725,73 @@ pub fn build_lod2_tiles_system(
     }
 
     lod_stats.lod2_tile_count = tile_mgr.tiles.len() as u32;
+}
+
+/// Story-577 — sonde de couverture terrain par anneau (1Hz). Pour chaque rayon
+/// autour du player, échantillonne `ANGLES` directions et compte les points couverts
+/// par un chunk loaded, par un LOD2 tile, ou par RIEN (`gap`). Un `gap > 0` =
+/// trou visible (skybox/eau à travers le sol) = root cause du « sol qui ne s'affiche
+/// pas au loin ». Garde-fou non-régression du fix extent-aware ci-dessus.
+///
+/// Mirror du pattern player `Query<&Transform>` + `.iter().next()` des autres
+/// systèmes LOD → la couverture est mesurée par rapport au MÊME point que le LOD2.
+pub fn sys_update_lod_coverage(
+    chunk_mgr: Option<Res<ChunkManager>>,
+    tile_mgr: Res<Lod2TileManager>,
+    player_q: Query<&Transform>,
+    mut lod_stats: ResMut<LodStats>,
+    time: Res<Time>,
+    mut last_write: Local<f32>,
+) {
+    let now = time.elapsed_secs();
+    if now - *last_write < 1.0 {
+        return;
+    }
+    *last_write = now;
+
+    let Some(chunk_mgr) = chunk_mgr else { return };
+    let Some(player_tf) = player_q.iter().next() else {
+        return;
+    };
+    let player_pos = player_tf.translation;
+
+    // Rayons sondés : encadrent la transition chunk→LOD2 (view_m ≈ LOD1_MAX_M = 128m)
+    // où le trou annulaire apparaissait (~144–181m, pire en diagonale).
+    const RADII: [f32; 7] = [96.0, 120.0, 140.0, 160.0, 180.0, 220.0, 300.0];
+    const ANGLES: u32 = 16;
+
+    let mut rings = Vec::with_capacity(RADII.len());
+    for &r in &RADII {
+        let mut chunk_covered = 0u32;
+        let mut lod2_covered = 0u32;
+        let mut gap = 0u32;
+        for a in 0..ANGLES {
+            let theta = a as f32 / ANGLES as f32 * std::f32::consts::TAU;
+            let wx = player_pos.x + r * theta.cos();
+            let wz = player_pos.z + r * theta.sin();
+            let chunk = chunk_mgr
+                .loaded_entities
+                .contains_key(&ChunkCoord::from_world(Vec3::new(wx, 0.0, wz)));
+            let lod2 = tile_mgr.tiles.contains_key(&cluster_key_from_world(wx, wz));
+            if chunk {
+                chunk_covered += 1;
+            }
+            if lod2 {
+                lod2_covered += 1;
+            }
+            if !chunk && !lod2 {
+                gap += 1;
+            }
+        }
+        rings.push(LodCoverageRing {
+            radius_m: r,
+            samples: ANGLES,
+            chunk_covered,
+            lod2_covered,
+            gap,
+        });
+    }
+    lod_stats.coverage_rings = rings;
 }
 
 /// Sensor `forgia_terrain_lod.json` toutes les 1s (observability-required.md).
@@ -674,8 +824,41 @@ pub fn export_lod_sensor_system(
         format!("[{}]", parts.join(","))
     };
 
+    // Story-577 : couverture par anneau + résumé pire-trou (gap fraction max).
+    let cov_json = if lod_stats.coverage_rings.is_empty() {
+        "[]".to_string()
+    } else {
+        let parts: Vec<String> = lod_stats
+            .coverage_rings
+            .iter()
+            .map(|c| {
+                format!(
+                    "{{\"r\":{:.0},\"samples\":{},\"chunk\":{},\"lod2\":{},\"gap\":{}}}",
+                    c.radius_m, c.samples, c.chunk_covered, c.lod2_covered, c.gap
+                )
+            })
+            .collect();
+        format!("[{}]", parts.join(","))
+    };
+    let (worst_gap_r, max_gap_frac) =
+        lod_stats
+            .coverage_rings
+            .iter()
+            .fold((0.0f32, 0.0f32), |(wr, wf), c| {
+                let frac = if c.samples > 0 {
+                    c.gap as f32 / c.samples as f32
+                } else {
+                    0.0
+                };
+                if frac > wf {
+                    (c.radius_m, frac)
+                } else {
+                    (wr, wf)
+                }
+            });
+
     let json = format!(
-        "{{\"timestamp_secs\":{:.1},\"lod0_count\":{},\"lod1_count\":{},\"lod2_count\":{},\"lod2_tile_count\":{},\"transitions_last_frame\":{},\"lod0_max_m\":{:.0},\"lod1_max_m\":{:.0},\"lod2_max_m\":{:.0},\"sample_points\":{}}}",
+        "{{\"timestamp_secs\":{:.1},\"lod0_count\":{},\"lod1_count\":{},\"lod2_count\":{},\"lod2_tile_count\":{},\"transitions_last_frame\":{},\"lod0_max_m\":{:.0},\"lod1_max_m\":{:.0},\"lod2_max_m\":{:.0},\"sample_points\":{},\"coverage\":{},\"worst_gap_r\":{:.0},\"max_gap_frac\":{:.3}}}",
         now,
         lod_stats.lod0_count,
         lod_stats.lod1_count,
@@ -686,6 +869,9 @@ pub fn export_lod_sensor_system(
         LOD1_MAX_M,
         LOD2_MAX_M,
         sp_json,
+        cov_json,
+        worst_gap_r,
+        max_gap_frac,
     );
     let _ = std::fs::write("forgia_terrain_lod.json", json);
 }

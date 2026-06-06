@@ -304,6 +304,11 @@ pub struct StreamingStats {
     pub loaded_mb_est: f32,
     pub pending_load_count: u32,
     pub pending_gen_count: u32,
+    /// PLACEHOLDER : la génération de chunks est SYNCHRONE (main thread, cf
+    /// forgia-rpg::stream_chunks_around_player) — aucun AsyncComputeTaskPool
+    /// n'est câblé, donc ce champ reste TOUJOURS 0. Le sensor le signale via
+    /// `"mode": "synchronous"` (audit 2026-06-05). À alimenter quand le pipeline
+    /// async sera implémenté (P2).
     pub async_queue_depth: u32,
     pub lod0_count: u32,
     pub lod1_count: u32,
@@ -614,7 +619,7 @@ fn build_sensor_json(
   "radii": {{ "simulation_m": {:.1}, "view_m": {:.1}, "unload_m": {:.1} }},
   "hysteresis": {{ "min_residence_secs": {:.2} }},
   "budget": {{ "max_mb": {:.1}, "max_chunks": {}, "current_mb_est": {:.1}, "current_chunks": {} }},
-  "async_pipeline": {{ "max_queue_depth": {}, "current_depth": {}, "chunks_per_frame": {} }},
+  "async_pipeline": {{ "max_queue_depth": {}, "current_depth": {}, "chunks_per_frame": {}, "mode": "synchronous", "_note": "generation sync main-thread; async pool not implemented -> current_depth always 0 (placeholder)" }},
   "counts": {{ "loaded": {}, "pending_load": {}, "pending_gen": {} }},
   "lod_histogram": {{ "lod0": {}, "lod1": {}, "lod2": {} }},
   "hysteresis_blocked_unloads": {},

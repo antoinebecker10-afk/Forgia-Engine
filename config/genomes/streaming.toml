@@ -2,8 +2,10 @@
 # streaming.toml — Forgia V2 chunk streaming genome (story-450 wave 1)
 # ──────────────────────────────────────────────────────────────────────────────
 #
-# Configuration runtime du système de streaming chunks. Hot-reloadable via
-# Shift+F12 (Bevy file_watcher feature).
+# Configuration runtime du système de streaming chunks.
+# ⚠️ Lu au Startup UNIQUEMENT (load_streaming_genome, std::fs) — PAS via le
+# file_watcher Bevy → RELANCER le jeu pour appliquer un changement (aucun
+# hot-reload câblé, malgré l'ancienne note erronée corrigée 2026-06-05).
 #
 # Pattern industrie composite :
 # - Dual radii (Minecraft view_radius != simulation_radius)
@@ -21,17 +23,23 @@ schema_version = 1
 # Radii — dual tier streaming (Minecraft + Roblox pattern)
 # ──────────────────────────────────────────────────────────────────────────────
 #
-# Forgia chunk = 32m × 32m. Defaults visent ~3 chunks ring view :
+# Forgia chunk = 32m × 32m.
 # - simulation_m=64m  : 2 chunks ring → collisions/AI/vegetation tick
-# - view_m=96m        : 3 chunks ring → mesh + LOD0 + foliage rendered
-# - unload_m=128m     : 4 chunks ring → eviction eligible (1.33× hysteresis)
+# - view_m=128m       : 4 chunks ring → mesh + LOD0 + foliage rendered
+# - unload_m=160m     : 5 chunks ring → eviction eligible (hysteresis)
 #
+# 2026-06-05 (audit procgen) : view_m 96→128 pour FERMER le gap de couverture
+# 96-128m. Les mega-tiles LOD2 ne spawnent qu'à partir de LOD1_MAX_M=128m
+# (forgia-terrain/src/lod.rs) ; avec view_m=96 la bande annulaire 96-128m
+# n'avait NI chunk NI LOD2 → trou au plancher sea_level (devenu béant avec
+# max_height=80). view_m=128 aligne le bord des chunks sur le seuil LOD2 inner.
+# unload_m 128→160 préserve la marge d'hystérésis (≥1 chunk).
 # Tune up pour vision lointaine ; tune down si frame budget serré.
 
 [radii]
 simulation_m = 64.0
-view_m = 96.0
-unload_m = 128.0
+view_m = 128.0
+unload_m = 160.0
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Hysteresis — UE5 Level Streaming Volumes default 2.0s unload delay

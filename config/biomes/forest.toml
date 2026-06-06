@@ -1,0 +1,23 @@
+# Forest — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "forest"
+name = "Forest"
+display_name_fr = "Foret"
+color = [0.18, 0.38, 0.12]       # = BiomeType::Forest.color()
+roughness = 0.85
+preview_rgb = [51, 107, 38]
+spawn_weight = 1.0
+amplitude_mult = 1.0              # relief: rolling (référence)
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 1.1
+speed_mult = 0.9
+dmg_mult = 1.1
+
+[road]
+width_mult = 0.8
+depression_mult = 0.6
+edge_noise = 1.5
+vegetation_encroachment = 0.3

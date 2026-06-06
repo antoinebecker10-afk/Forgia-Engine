@@ -73,6 +73,8 @@ pub fn build_chunk_mesh(
             // World coord = chunk center + local + (sample shift vers intérieur monde)
             let wx = origin.x + half_x + lx;
             let wz = origin.z + half_z + lz;
+            // heightmap_at est biome-aware via le global WORLD_BIOME_MAP →
+            // cohérent avec foliage/village/spawn (mêmes hauteurs biome-aware).
             let raw_h =
                 crate::generation::heightmap_at(wx + sample_offset.x, wz + sample_offset.y, config);
             // Story-447 — apply village flatten zones post-process. World-space XZ
@@ -145,7 +147,15 @@ pub fn build_chunk_mesh(
     }
 }
 
-fn blend_biome_color(biome: BiomeType, h: f32, slope: f32, config: &TerrainConfig) -> [f32; 4] {
+/// Couleur biome avec teinte roche (pente) + neige (altitude). `pub(crate)` :
+/// réutilisé par `lod.rs::build_lod2_terrain_mesh` pour que le LOD2 lointain ait
+/// EXACTEMENT le même rendu que le LOD0 proche (audit 2026-06-05).
+pub(crate) fn blend_biome_color(
+    biome: BiomeType,
+    h: f32,
+    slope: f32,
+    config: &TerrainConfig,
+) -> [f32; 4] {
     let base = biome.linear_rgba();
     // Mix vers la roche grise sur les pentes raides (cliffs naturels).
     let rock = [0.45, 0.42, 0.38, 1.0];
