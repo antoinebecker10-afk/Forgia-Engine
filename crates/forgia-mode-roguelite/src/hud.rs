@@ -25,6 +25,7 @@ use forgia_ui_lib::style::*;
 use crate::enemies::EnemyArchetype;
 use crate::run::{RunState, StartRunEvent};
 use crate::waves::RogueliteWave;
+use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonId, BoonsCatalogue};
 use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
 use forgia_player::FpsCamera;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
@@ -189,6 +190,129 @@ pub(crate) fn draw_currency_counters(
     // Or (in-run) en haut, Âmes (méta) en dessous.
     draw_counter(top_y, "OR", gold.current, FORGE_OR, false);
     draw_counter(top_y + panel_h + gap, "ÂMES", meta.current, FORGE_TEAL, true);
+}
+
+/// Couleur + libellé court d'un effet de boon (pour le panneau Améliorations).
+fn boon_visual(effect: &BoonEffectKind) -> (egui::Color32, String) {
+    match effect {
+        BoonEffectKind::DamageMul { factor } => (
+            egui::Color32::from_rgb(231, 76, 60),
+            format!("+{:.0}% dmg", (factor - 1.0) * 100.0),
+        ),
+        BoonEffectKind::FireRateMul { factor } => (
+            egui::Color32::from_rgb(80, 160, 255),
+            format!("+{:.0}% cadence", (factor - 1.0) * 100.0),
+        ),
+        BoonEffectKind::HealOnKill { hp } => (
+            egui::Color32::from_rgb(80, 220, 120),
+            format!("+{hp:.0} PV/kill"),
+        ),
+        BoonEffectKind::DamageReduction { factor } => (
+            egui::Color32::from_rgb(244, 196, 48),
+            format!("-{:.0}% reçu", factor * 100.0),
+        ),
+        BoonEffectKind::ChainTargets { count } => (
+            egui::Color32::from_rgb(180, 120, 255),
+            format!("+{count} chaîne"),
+        ),
+        BoonEffectKind::Knockback { .. } => {
+            (egui::Color32::from_rgb(255, 140, 60), "recul".to_string())
+        }
+        BoonEffectKind::FlatBonus { stat, amount } => (
+            egui::Color32::from_rgb(200, 200, 200),
+            format!("+{amount:.0} {stat}"),
+        ),
+    }
+}
+
+/// Panneau « AMÉLIORATIONS » (gauche, sous la minimap) : liste les boons actifs
+/// (Coffre entre-waves + orbes du parcours) avec nom, stack ×N et effet. Lit
+/// `ActiveBoons` + `BoonsCatalogue`. Vide → masqué.
+pub(crate) fn draw_active_boons(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    active: Res<ActiveBoons>,
+    catalogue: Option<Res<BoonsCatalogue>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let Some(cat) = catalogue else {
+        return;
+    };
+    if active.active.is_empty() {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+
+    // Ordre d'acquisition, dédupliqué (le count vient du Vec complet).
+    let mut order: Vec<&BoonId> = Vec::new();
+    for id in &active.active {
+        if !order.contains(&id) {
+            order.push(id);
+        }
+    }
+
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_active_boons"),
+    ));
+    let panel_w = 224.0;
+    let row_h = 26.0;
+    let x = screen.min.x + 18.0;
+    let mut y = screen.min.y + 210.0;
+
+    let header = egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(panel_w, 24.0));
+    chunky_rect_filled(&painter, header, C_BG_DARK, 3.0, 8.0);
+    text_with_outline(
+        &painter,
+        egui::pos2(x + 12.0, y + 12.0),
+        egui::Align2::LEFT_CENTER,
+        "AMÉLIORATIONS",
+        egui::FontId::proportional(15.0),
+        FORGE_OR,
+        2.0,
+    );
+    y += 28.0;
+
+    for id in order {
+        let Some(def) = cat.entries.iter().find(|b| &b.id == id) else {
+            continue;
+        };
+        let count = active.active.iter().filter(|b| *b == id).count();
+        let (color, eff) = boon_visual(&def.effect);
+        let rect = egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(panel_w, row_h - 3.0));
+        chunky_rect_filled(&painter, rect, C_BG_DARK, 2.0, 6.0);
+        painter.circle_filled(egui::pos2(x + 14.0, rect.center().y), 6.0, color);
+        let name = if count > 1 {
+            format!("{}  x{count}", def.name)
+        } else {
+            def.name.clone()
+        };
+        text_with_outline(
+            &painter,
+            egui::pos2(x + 28.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            &name,
+            egui::FontId::proportional(13.0),
+            egui::Color32::from_rgb(240, 235, 225),
+            1.5,
+        );
+        text_with_outline(
+            &painter,
+            egui::pos2(rect.max.x - 10.0, rect.center().y),
+            egui::Align2::RIGHT_CENTER,
+            &eff,
+            egui::FontId::proportional(11.0),
+            color,
+            1.0,
+        );
+        y += row_h;
+    }
 }
 
 /// Caméra pendant l'écran de choix (Coffre / fin de run) : si on maintient un
@@ -1122,6 +1246,7 @@ impl Plugin for RogueliteHudPlugin {
                     draw_shockwave_indicator,
                     draw_wave_counter,
                     draw_currency_counters,
+                    draw_active_boons,
                     draw_portal_overlay,
                     draw_defeat_overlay,
                     draw_victory_overlay,
