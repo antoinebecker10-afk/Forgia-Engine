@@ -10,7 +10,8 @@
 //!    si `BarkOverrideConfig.enabled`.
 //! 3. `apply_trunk_bark_override` (Update, GameSet::Movement) : BFS polling sur les enfants
 //!    de chaque entite marquee, cherche la primitive trunk par nom, applique le material.
-//!    Fallback : dernier enfant par triangle count apres `frames_polled_max` frames.
+//!    Fallback : enfant avec le PLUS PETIT triangle count (trunk = cylindre simple)
+//!    apres `frames_polled_max` frames.
 //!
 //! ## Textures
 //!
@@ -26,11 +27,28 @@ pub const BARK_NOR_PATH: &str =
 pub const BARK_ARM_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.jpg";
 
 /// Noms de primitives consideres comme "tronc" (lowercase substring match).
-pub const TRUNK_PATTERNS: &[&str] = &["bark", "trunk", "wood", "stem"];
+///
+/// `"tree"` couvre la convention Quaternius/KayKit (`Icosphere.001.Tree`,
+/// `Tree_01_zb.926.Tree_01`) ou la primitive bois s'appelle `.Tree`, distincte
+/// du feuillage `.Leaves`. Sans ce pattern, ces arbres tombaient dans le fallback
+/// "plus petit tri" qui pouvait appliquer l'ecorce sur le feuillage
+/// (ex. `Icosphere.001` : `.Leaves` 220 tri < `.Tree` 306 tri).
+pub const TRUNK_PATTERNS: &[&str] = &["bark", "trunk", "wood", "stem", "tree"];
 
-/// Retourne `true` si `name` (insensible a la casse) contient l'un des patterns tronc.
+/// Noms de primitives qui sont du FEUILLAGE, jamais du tronc. Filtre prioritaire :
+/// `Tree_01_zb.926.Tree_01_Leaves` contient `"tree"` mais EST du feuillage.
+pub const LEAF_PATTERNS: &[&str] = &["leaf", "leaves", "canopy", "foliage", "needle"];
+
+/// Retourne `true` si `name` (insensible a la casse) designe une primitive tronc.
+///
+/// Le filtre feuillage est prioritaire : un nom qui matche un `LEAF_PATTERNS`
+/// n'est jamais un tronc, meme s'il contient aussi un `TRUNK_PATTERNS`
+/// (cas `*.Tree_01_Leaves`).
 pub fn is_trunk_primitive_name(name: &str) -> bool {
     let lower = name.to_lowercase();
+    if LEAF_PATTERNS.iter().any(|pat| lower.contains(pat)) {
+        return false;
+    }
     TRUNK_PATTERNS.iter().any(|pat| lower.contains(pat))
 }
 
@@ -147,7 +165,7 @@ pub fn preload_bark_textures(mut commands: Commands, asset_server: Res<AssetServ
 ///   et qui possede un `Mesh3d`.
 /// - Si trouve : insere `MeshMaterial3d(bark_mat)`, retire le marker.
 /// - Sinon si `frames_polled > frames_polled_max` : fallback par triangle count
-///   (enfant avec le plus grand nombre de triangles).
+///   (enfant avec le PLUS PETIT nombre de triangles = trunk = cylindre simple).
 /// - Sinon si `frames_polled > frames_polled_max * 2` : abandon, retire le marker.
 /// - Sinon : incremente `frames_polled`.
 #[allow(clippy::too_many_arguments)]
@@ -386,5 +404,25 @@ mod tests {
         assert!(is_trunk_primitive_name("mesh_trunk_001"));
         assert!(is_trunk_primitive_name("polyhaven_wood"));
         assert!(is_trunk_primitive_name("root_stem_a"));
+    }
+
+    /// Convention Quaternius/KayKit `.Tree`/`.Leaves` (cf forgia_foliage_fallback.json).
+    /// Sans le pattern "tree" + filtre feuillage prioritaire, ces troncs tombaient
+    /// dans le fallback "plus petit tri" qui appliquait parfois l'ecorce au feuillage.
+    #[test]
+    fn tree_convention_trunk_vs_leaves() {
+        // La primitive bois `.Tree` est reconnue comme tronc.
+        assert!(is_trunk_primitive_name("Icosphere.001.Tree"));
+        assert!(is_trunk_primitive_name("Cylinder.003.Tree"));
+        assert!(is_trunk_primitive_name("Tree_01_zb.926.Tree_01"));
+
+        // Le feuillage est exclu, meme s'il contient "tree" (filtre prioritaire).
+        assert!(!is_trunk_primitive_name("Icosphere.001.Leaves"));
+        assert!(!is_trunk_primitive_name("Tree_01_zb.926.Tree_01_Leaves"));
+
+        // Quaternius color-named (Cube.NNN.Black/White) : aucun keyword -> pas un
+        // name-match, reste sur le fallback tri count (comportement inchange).
+        assert!(!is_trunk_primitive_name("Cube.083.Black"));
+        assert!(!is_trunk_primitive_name("Cube.083.White"));
     }
 }
