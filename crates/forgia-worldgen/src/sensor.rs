@@ -4,6 +4,8 @@
 
 use crate::registry::AssetRegistry;
 use crate::spawn::{SpawnQueue, WorldgenStats};
+use crate::streaming::CityStreaming;
+use crate::CityLayout;
 use bevy::prelude::*;
 
 /// Pure severity logic (testable headless): a loaded registry is the precondition for
@@ -26,6 +28,8 @@ pub fn sys_write_worldgen_sensor(
     registry: Option<Res<AssetRegistry>>,
     stats: Res<WorldgenStats>,
     queue: Res<SpawnQueue>,
+    city: Res<CityLayout>,
+    streaming: Res<CityStreaming>,
 ) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -35,13 +39,16 @@ pub fn sys_write_worldgen_sensor(
 
     let registry_modules = registry.map(|r| r.len()).unwrap_or(0);
     let (severity, next_step) = severity_for_worldgen(registry_modules);
+    let roads = if city.present { city.roads.segments.len() } else { 0 };
+    let parcels = if city.present { city.parcels.len() } else { 0 };
 
     let json = format!(
-        r#"{{"id":"worldgen","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"registry_modules":{registry_modules},"spawned_modules":{},"pending":{},"last_row":{}}}"#,
+        r#"{{"id":"worldgen","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"registry_modules":{registry_modules},"spawned_modules":{},"pending":{},"last_row":{},"city_roads":{roads},"city_parcels":{parcels},"stream_chunks":{}}}"#,
         time.elapsed_secs(),
         stats.spawned,
         queue.pending.len(),
         stats.last_row,
+        streaming.active_chunks(),
     );
 
     if let Err(e) = std::fs::write("forgia2_worldgen.json", &json) {

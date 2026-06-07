@@ -7,6 +7,13 @@ description = "Forgia V2 — procedural worldgen engine (cities/villages/maps). 
 [lints]
 workspace = true
 
+[features]
+# `dev-tools` = key-triggered demo/visualization (F7 hamlet / F9 city / F11 baked / F8 viz /
+# F5 streaming / Shift+F12 reload). On by default for dev; disable for ship builds
+# (`forgia-worldgen = { ..., default-features = false }`) — the authoring API stays available.
+default = ["dev-tools"]
+dev-tools = []
+
 [dependencies]
 serde = { workspace = true }
 ron = { workspace = true }

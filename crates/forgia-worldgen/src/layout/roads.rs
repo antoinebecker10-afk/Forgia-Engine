@@ -198,10 +198,12 @@ mod tests {
             radial_strength: 1.0,
             radial_radius: 40.0,
         };
-        // Near the center the tangential component should rotate the major dir away from +X.
-        let near = f.major_dir(Vec2::new(0.0, 10.0));
-        let far = f.major_dir(Vec2::new(0.0, 1000.0));
+        // On the +X axis the tangential component is along Y, so it rotates the major dir
+        // away from pure +X near the center; far away the field relaxes back to the grid.
+        let near = f.major_dir(Vec2::new(10.0, 0.0));
+        let far = f.major_dir(Vec2::new(1000.0, 0.0));
         assert!((far.x - 1.0).abs() < 0.05, "far from center → grid (+X)");
-        assert!(near.x.abs() < 0.99, "near center → bent away from pure +X");
+        assert!(near.x.abs() < 0.9, "near center → bent away from pure +X");
+        assert!(near.y.abs() > 0.1, "near center → gained a perpendicular component");
     }
 }

@@ -1,6 +1,6 @@
 # Story-578 — `forgia-worldgen` : moteur de génération procédurale (villes / villages / maps)
 
-> **Statut** : EN COURS — **P0 + P1 + P2 DONE** (2026-06-07), P3→P6 PLANNED
+> **Statut** : ✅ **DONE — P0 → P6 COMPLETS** (2026-06-07). Pipeline procédural de bout en bout.
 > **Niveau BMAD** : Enterprise (nouveau crate, multi-module, cross-cutting, ≥10 fichiers)
 > **Origine** : besoin user « générer des villes, villages, maps ». Audit web 2026-06-07
 > (Unreal PCG, Houdini/PDG, tensor-field roads, ECS data-oriented, WFC) → archi enrichie.
@@ -100,6 +100,153 @@ apparaît au sol devant la caméra. Édite `seed`/`grid`/`roles` dans `hamlet.to
 
 **Suivis P3+** : routes (tensor field) + parcelles (subdivision) ; seeds hiérarchiques + chunk
 streaming (P4) ; grammaire bâtiments + injection POI hand-crafted (P5) ; bake + LOD (P6).
+
+---
+
+## ✅ P3 — Routes (tensor field) + parcelles (subdivision) (LIVRÉ 2026-06-07)
+
+Layout de **ville cohérent** : réseau de routes tracé depuis un **tensor field** + **blocs
+subdivisés en lots convexes**, visualisé en debug viz. Nouveau module `layout/` (géométrie 2D
+pure, Vec2, 0 ECS).
+
+**Livrables :**
+- `layout/roads.rs` — `TensorField` (grille + composante tangentielle/anneaux radiale, blend) →
+  `generate_roads` = tracé de **streamlines avec séparation** (technique tensor-field roads,
+  Chen 2008 simplifiée). `RoadNetwork { segments: [a,b,kind] }` (majeures/mineures). Déterministe.
+- `layout/parcels.rs` — `generate_parcels` : tuile en blocs (taille = espacement routes) →
+  `subdivide_rect` (**subdivision récursive le long du plus long côté** → lots convexes ≤ aire
+  cible). `Parcel { polygon, center }`. Déterministe.
+- `recipe.rs` — `CityRecipe` (size, base_angle, radial_strength/radius, road_spacing/step/sep,
+  parcel_target_area/inset, building_scale/role) + `load_city_recipe` (TOML, fallback).
+- `assets/genomes/worldgen/city.toml` — recette ville (hot-éditable).
+- `lib.rs` — `CityLayout` Resource (routes + parcelles + transform monde) ; `sys_worldgen_input`
+  étendu : **F9** = ville (routes+parcelles viz + 1 bâtiment grounded/parcelle), **Shift+F12**
+  régénère le dernier (hameau OU ville). `build_city` déterministe.
+- `debug_viz.rs` — `sys_layout_gizmos` : routes (or=majeures, gris=mineures) + contours parcelles
+  (vert) + marqueurs centres. Toggle F8.
+- `sensor.rs` — `forgia2_worldgen.json` + `city_roads` / `city_parcels`.
+- **22 tests** (7 nouveaux : routes déterministes/in-bounds, field radial courbe, subdivision
+  conserve l'aire/borne le lot, parcelles déterministes, target→densité, recettes parse). clippy 0.
+
+**Demo (F9 + F8)** : presse **F9** devant toi → une ville apparaît : bâtiments posés sur une
+grille de parcelles, **F8** révèle routes + parcelles en gizmos. Édite `city.toml`
+(`radial_strength = 0.8` → routes en anneaux ; `road_spacing` → taille des blocs) + **Shift+F12**.
+
+**Limites P3 (honnêtes)** : routes et parcelles partagent bounds+orientation mais le couplage
+topologique exact (faces de routes → parcelles) est différé ; field radial courbe les routes
+mais les parcelles restent rectangulaires (defaut `radial_strength=0` → aligné). RNG splitmix64
+inline (seeds hiérarchiques = P4). Pas de mesh de route (gizmos only ; meshing = P5/P6).
+
+**Suivis P4+** : seeds hiérarchiques (`forgia-rng`) + chunk streaming (forgia-terrain) ;
+grammaire bâtiments + injection POI hand-crafted (P5) ; mesh routes + bake + LOD (P6).
+
+---
+
+## ✅ P4 — Seeds hiérarchiques + chunk streaming (LIVRÉ 2026-06-07)
+
+Une ville **infinie qui stream autour du joueur**, **reproductible** (même seed → même monde).
+**Découplé** : worldgen possède sa propre grille de chunks (PAS de dép `forgia-terrain` — l'autre
+terminal l'édite + invariant §10), position joueur via `Camera3d`, sol via `GroundSampler`.
+
+**Livrables :**
+- `seed.rs` — seeds hiérarchiques `world → chunk` : `SeededRng` (splitmix64), `derive(parent,
+  index)`, `chunk_seed(world, cx, cy)`. Remplace le RNG inline de P2/P3 (source unique).
+- `points.rs::generate_chunk` — contenu d'un chunk depuis `chunk_seed` (coords MONDE absolues,
+  grounded). Généré **en isolation** (pas besoin des voisins) → reproductible.
+- `recipe.rs::StreamRecipe` + `load_stream_recipe` ; `assets/genomes/worldgen/stream.toml`.
+- `spawn.rs::spawn_module` — **refacto** : le spawn d'1 module (grounded + children + collider)
+  extrait en fn réutilisable, partagé par le drain de queue ET le streamer.
+- `streaming.rs` — `CityStreaming` resource + `sys_toggle_streaming` (**F10**) +
+  `sys_stream_city` : charge les chunks dans `view_radius` (nearest-first, **budget 1 chunk/frame**),
+  décharge les sortants. HashMap chunk→entities.
+- `lib.rs` — **gating Roguelite** : toute la démo (F7/F9/F8/F10 + streaming) sous
+  `run_if(in_state(GameMode::Roguelite))` (décision user 2026-06-07). Les fonctions de génération
+  restent mode-agnostiques/réutilisables.
+- `sensor.rs` — `+ stream_chunks` (chunks actifs).
+- **27 tests** (5 nouveaux : RNG déterministe + ranges, chunk_seed stable/distinct/sans collision,
+  chunk reproductible + dans sa cellule). clippy 0.
+
+**Demo (F10)** : en Roguelite, **F10** active le streaming → des bâtiments apparaissent par chunks
+autour de toi ; déplace-toi → de nouveaux chunks chargent devant, les anciens se déchargent
+derrière. **Reproductible** : même `world_seed` (stream.toml) → exactement la même ville. Re-toggle
+F10 (off→on) recharge la recette (hot-reload).
+
+**Mode** : worldgen gaté **Roguelite uniquement** (choix user). Crate réutilisable ailleurs plus tard.
+
+**Suivis P5+** : grammaire de bâtiments (footprint→étages→toit) + injection POI hand-crafted
+(forgia-stage) ; mesh de routes + bake/cache + LOD distant (P6) ; couplage chunk↔terrain réel.
+
+---
+
+## ✅ P5 — Grammaire de bâtiments + landmarks hand-crafted (LIVRÉ 2026-06-07)
+
+Les parcelles deviennent des **bâtiments empilés** (grammaire) et la recette injecte des
+**landmarks hand-crafted** (la forge), les parcelles autour étant réservées.
+
+**Livrables :**
+- `resolve.rs` — `resolve_building(template, registry, world_xz, base_y, seed, scale)` :
+  grammaire **base → N étages → toit**, modules empilés en Y via leurs hauteurs registre (chacun
+  repose sur le précédent). Nb d'étages **seedé** → variété par parcelle. Déterministe. Pur (0 ECS).
+- `recipe.rs` — `BuildingTemplate` (base/body/cap_role + min/max_floors) + `Landmark`
+  (module_id + x/z + scale). `CityRecipe` étendu : `building` + `landmarks` + `landmark_reserve_radius`
+  (remplace l'ancien `building_role` unique).
+- `assets/genomes/worldgen/city.toml` — table `[building]` + `[[landmarks]]` (la Forge =
+  `Cube.001` tour ~33 m au centre). ⚠️ piège attrapé : `[[landmarks]]` (pluriel) doit matcher le
+  champ serde — test renforcé pour le garantir.
+- `lib.rs::build_city` — réécrit : place les landmarks d'abord (réserve leur footprint), puis
+  **résout chaque parcelle non réservée** en bâtiment via la grammaire (seed parcelle =
+  `derive(city_seed, index)`, hiérarchique P4).
+- **30 tests** (3 nouveaux resolve : bâtiment déterministe, modules empilés vers le haut depuis
+  la base, nb de modules dans la plage ; + test landmark renforcé). clippy 0.
+
+**Demo (F9 + F8)** : presse **F9** → une ville avec **bâtiments à plusieurs étages** (1-3, variés)
+sur les parcelles + **la Forge** (grande tour) au centre, les parcelles autour étant vides
+(réservées). Édite `[building]` (`max_floors = 6`) ou `[[landmarks]]` dans `city.toml` + **Shift+F12**.
+
+**Limites P5 (honnêtes)** : grammaire = empilement simple (footprint→étages→toit), pas de variation
+de footprint/façade (L-system = futur) ; landmarks placés par worldgen (PAS encore synchronisés aux
+anchors `forgia-stage` — crate contendue + invariant découplage ; adaptateur = futur). Grammaire
+appliquée à la ville F9 ; le streaming P4 garde des modules simples (extension possible).
+
+**Suivis P6** : mesh de routes (au lieu de gizmos) + bake/cache (sérialiser une ville résolue) +
+LOD distant ; couplage chunk↔terrain réel ; adaptateur landmarks→forgia-stage POI.
+
+---
+
+## ✅ P6 — Bake/cache + LOD distant (LIVRÉ 2026-06-07) — STORY COMPLÈTE
+
+**Livrables :**
+- `cache.rs` — `bake(points, path)` sérialise la **ville résolue** (points) en RON (via DTO plat
+  `[f32…]`, évite la dép glam-serde) ; `load(path)` la recharge **sans régénérer**. Round-trip testé.
+- `lib.rs` — **F9** bake la ville après génération (`worldgen_baked_city.ron`) ; **F11** recharge la
+  ville bakée instantanément (0 régénération — parité bake Unreal/Houdini).
+- `sys_worldgen_lod` — **LOD distant** : cull (`Visibility::Hidden`) des modules au-delà de
+  `LOD_FAR_M=200 m` de la caméra, throttlé 0.25 s, écriture seulement sur transition → budget frame
+  tenu sur grande ville streamée/bakée. (Pas de `VisibilityRange` dans le workspace → LOD custom.)
+- **31 tests** (+1 bake round-trip). clippy 0.
+
+**Demo** : **F9** (génère + bake) → **F11** (recharge instantané, log « loaded N baked modules (no
+regen) »). Éloigne-toi d'une grande ville → les modules lointains se cullent (LOD). Perf : streaming
+1 chunk/frame + spawn 8/frame + LOD cull.
+
+**Limites P6 (honnêtes)** : pas de mesh de route (toujours gizmos — meshing = futur) ; LOD =
+cull binaire (pas d'imposteur/billboard distant) ; bake = points résolus (pas les colliders/asset
+handles, reconstruits au spawn). Couplage chunk↔terrain réel + adaptateur forgia-stage = futur.
+
+---
+
+## 🏁 Story-578 — bilan final
+
+Pipeline procédural **complet de bout en bout**, en 7 incréments à valeur prouvée :
+P0 registre → P1 spawn grounded → P2 recette hameau → P3 routes/parcelles → P4 streaming
+reproductible → P5 grammaire + landmarks → P6 bake + LOD.
+
+**Touches (Roguelite)** : F7 hameau · F9 ville (+bake) · F11 reload baké · F10 streaming ·
+F8 debug viz · Shift+F12 hot-reload.
+
+**Qualité** : 31 tests, clippy 0, **crate-feuille 0 dép gameplay/terrain** (découplé : `GroundSampler`
++ chunk grid + landmarks internes), tout gaté Roguelite. Invariants §10 tenus. Suivis ouverts =
+mesh routes, couplage terrain réel, adaptateur forgia-stage, L-system façades (P7+ si besoin).
 
 ---
 

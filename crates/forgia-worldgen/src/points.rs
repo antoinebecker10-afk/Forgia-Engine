@@ -9,6 +9,7 @@
 
 use crate::recipe::HamletRecipe;
 use crate::registry::{AssetMeta, AssetRegistry, AssetRole};
+use crate::seed::{chunk_seed, SeededRng};
 use bevy::prelude::*;
 
 /// One module instance to spawn — the atomic unit of the points+attributes model.
@@ -139,36 +140,11 @@ fn place(
     }
 }
 
-/// Tiny deterministic RNG (splitmix64). P2 jitter / selection are reproducible from the
-/// recipe seed. P4 will switch to `forgia-rng` for hierarchical world seeds.
-struct Rng(u64);
-
-impl Rng {
-    fn new(seed: u64) -> Self {
-        Self(seed)
-    }
-    fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-    /// Uniform in `[0, 1)`.
-    fn next_f32(&mut self) -> f32 {
-        (self.next_u64() >> 40) as f32 / (1u64 << 24) as f32
-    }
-    /// Uniform signed in `[-1, 1)`.
-    fn next_signed(&mut self) -> f32 {
-        self.next_f32() * 2.0 - 1.0
-    }
-}
-
-fn pick<'a>(pool: &[&'a AssetMeta], rng: &mut Rng) -> Option<&'a AssetMeta> {
+fn pick<'a>(pool: &[&'a AssetMeta], rng: &mut SeededRng) -> Option<&'a AssetMeta> {
     if pool.is_empty() {
         None
     } else {
-        Some(pool[(rng.next_u64() as usize) % pool.len()])
+        Some(pool[rng.below(pool.len())])
     }
 }
 
@@ -185,7 +161,7 @@ pub fn generate_hamlet(
 ) -> PointCloud {
     let cols = recipe.grid_cols.max(1);
     let rows = recipe.grid_rows.max(1);
-    let mut rng = Rng::new(recipe.seed);
+    let mut rng = SeededRng::new(recipe.seed);
 
     // Building pool: the chosen roles, minus oversized pieces (no 50m spires in a hamlet).
     let mut building_pool: Vec<&AssetMeta> = recipe
@@ -240,12 +216,109 @@ pub fn generate_hamlet(
     PointCloud { points }
 }
 
+/// Per-chunk generation parameters (story-578 P4 streaming).
+#[derive(Clone, Copy, Debug)]
+pub struct ChunkConfig {
+    /// Chunk side length (meters).
+    pub chunk_size: f32,
+    /// Buildings placed per chunk.
+    pub buildings_per_chunk: u32,
+    /// Role drawn for buildings.
+    pub building_role: AssetRole,
+    /// Uniform building scale.
+    pub scale: f32,
+}
+
+/// Generate the content of chunk `(cx, cy)` deterministically from `world_seed` (hierarchical
+/// chunk seed). Positions are **absolute world coordinates** (the city is fixed in the world;
+/// the player streams through it), grounded via the sampler. Same `world_seed` → same chunk,
+/// always — and a chunk is generated in isolation (no neighbour needed).
+pub fn generate_chunk(
+    world_seed: u64,
+    cx: i32,
+    cy: i32,
+    cfg: &ChunkConfig,
+    registry: &AssetRegistry,
+    ground: &GroundSampler,
+) -> PointCloud {
+    let mut rng = SeededRng::new(chunk_seed(world_seed, cx, cy));
+    let mut pool: Vec<&AssetMeta> = registry
+        .by_role(cfg.building_role)
+        .filter(|m| m.height() <= 16.0)
+        .collect();
+    pool.sort_by(|a, b| a.id.cmp(&b.id));
+    if pool.is_empty() {
+        return PointCloud::default();
+    }
+
+    let cs = cfg.chunk_size.max(2.0);
+    let base_x = cx as f32 * cs;
+    let base_z = cy as f32 * cs;
+    let mut points = Vec::with_capacity(cfg.buildings_per_chunk as usize);
+    for _ in 0..cfg.buildings_per_chunk {
+        let meta = pool[rng.below(pool.len())];
+        let x = base_x + rng.next_f32() * cs;
+        let z = base_z + rng.next_f32() * cs;
+        let gy = ground.height(x, z);
+        let yaw = rng.below(4) as f32 * std::f32::consts::FRAC_PI_2;
+        points.push(Point {
+            module_id: meta.id.clone(),
+            ground_pos: Vec3::new(x, gy, z),
+            yaw,
+            scale: cfg.scale,
+        });
+    }
+    PointCloud { points }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn registry() -> AssetRegistry {
         AssetRegistry::from_ron(include_str!("../../../assets/registry/asset_meta.ron")).unwrap()
+    }
+
+    fn chunk_cfg() -> ChunkConfig {
+        ChunkConfig {
+            chunk_size: 40.0,
+            buildings_per_chunk: 5,
+            building_role: AssetRole::Prop,
+            scale: 0.5,
+        }
+    }
+
+    #[test]
+    fn chunk_is_reproducible() {
+        let reg = registry();
+        let g = GroundSampler::default();
+        let cfg = chunk_cfg();
+        let a = generate_chunk(2024, 3, -1, &cfg, &reg, &g);
+        let b = generate_chunk(2024, 3, -1, &cfg, &reg, &g);
+        assert_eq!(a.points.len(), cfg.buildings_per_chunk as usize);
+        let ids_a: Vec<&String> = a.points.iter().map(|p| &p.module_id).collect();
+        let ids_b: Vec<&String> = b.points.iter().map(|p| &p.module_id).collect();
+        assert_eq!(ids_a, ids_b, "same world seed + coord → identical chunk");
+        for (pa, pb) in a.points.iter().zip(&b.points) {
+            assert!(pa.ground_pos.distance(pb.ground_pos) < 1e-4);
+        }
+    }
+
+    #[test]
+    fn chunks_differ_by_coord_and_sit_in_their_cell() {
+        let reg = registry();
+        let g = GroundSampler::default();
+        let cfg = chunk_cfg();
+        let a = generate_chunk(2024, 0, 0, &cfg, &reg, &g);
+        let b = generate_chunk(2024, 1, 0, &cfg, &reg, &g);
+        let ids_a: Vec<&String> = a.points.iter().map(|p| &p.module_id).collect();
+        let ids_b: Vec<&String> = b.points.iter().map(|p| &p.module_id).collect();
+        assert_ne!(ids_a, ids_b, "different chunk coord → different content");
+        // Chunk (1,0) buildings sit in world X ∈ [40, 80).
+        for p in &b.points {
+            assert!(p.ground_pos.x >= 40.0 && p.ground_pos.x < 80.0, "in cell X: {}", p.ground_pos.x);
+            assert!(p.ground_pos.z >= 0.0 && p.ground_pos.z < 40.0, "in cell Z: {}", p.ground_pos.z);
+        }
     }
 
     #[test]

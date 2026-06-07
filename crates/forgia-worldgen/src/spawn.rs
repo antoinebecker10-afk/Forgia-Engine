@@ -8,7 +8,7 @@
 //! exactly on the ground — no sinking, no floating, whatever the pivot.
 
 use crate::points::Point;
-use crate::registry::{AssetRegistry, ColliderKind};
+use crate::registry::{AssetMeta, AssetRegistry, ColliderKind};
 use bevy::gltf::{Gltf, GltfMesh};
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, RigidBody};
@@ -94,85 +94,100 @@ pub fn sys_spawn_drain(
             break;
         };
 
-        // Grounded transform: bottom rests on ground_pos.y (the P0 pivot fix).
-        let origin_y = meta.placement_y(point.ground_pos.y, point.scale);
-        let tf = Transform {
-            translation: Vec3::new(point.ground_pos.x, origin_y, point.ground_pos.z),
-            rotation: Quat::from_rotation_y(point.yaw),
-            scale: Vec3::splat(point.scale),
-        };
-        let center = Vec3::new(
-            (meta.aabb_min.0 + meta.aabb_max.0) * 0.5,
-            (meta.aabb_min.1 + meta.aabb_max.1) * 0.5,
-            (meta.aabb_min.2 + meta.aabb_max.2) * 0.5,
-        );
-        let half = Vec3::new(
-            (meta.aabb_max.0 - meta.aabb_min.0) * 0.5,
-            (meta.aabb_max.1 - meta.aabb_min.1) * 0.5,
-            (meta.aabb_max.2 - meta.aabb_min.2) * 0.5,
-        );
-        let collider_kind = meta.collider;
-        let primitives = gltf_mesh.primitives.clone();
-        let fallback_mat = kit.fallback_mat.clone();
+        spawn_module(&mut commands, &kit, &meshes, meta, gltf_mesh, &point);
+        stats.spawned += 1;
+    }
+}
 
-        let mut parent = commands.spawn((
-            WorldgenModule {
-                module_id: point.module_id.clone(),
-                local_center: center,
-                local_half: half,
-            },
-            Name::new(format!("worldgen:{}", point.module_id)),
-            tf,
-            Visibility::default(),
-        ));
+/// Spawn one module: a grounded parent entity (the P0 pivot) with the kit mesh primitives as
+/// visual children and a collider per [`ColliderKind`]. Returns the parent entity. Shared by the
+/// spawn-queue drain and the P4 streamer (callers resolve `meta` + `gltf_mesh` first).
+pub(crate) fn spawn_module(
+    commands: &mut Commands,
+    kit: &WorldgenKit,
+    meshes: &Assets<Mesh>,
+    meta: &AssetMeta,
+    gltf_mesh: &GltfMesh,
+    point: &Point,
+) -> Entity {
+    // Grounded transform: bottom rests on ground_pos.y (the P0 pivot fix).
+    let origin_y = meta.placement_y(point.ground_pos.y, point.scale);
+    let tf = Transform {
+        translation: Vec3::new(point.ground_pos.x, origin_y, point.ground_pos.z),
+        rotation: Quat::from_rotation_y(point.yaw),
+        scale: Vec3::splat(point.scale),
+    };
+    let center = Vec3::new(
+        (meta.aabb_min.0 + meta.aabb_max.0) * 0.5,
+        (meta.aabb_min.1 + meta.aabb_max.1) * 0.5,
+        (meta.aabb_min.2 + meta.aabb_max.2) * 0.5,
+    );
+    let half = Vec3::new(
+        (meta.aabb_max.0 - meta.aabb_min.0) * 0.5,
+        (meta.aabb_max.1 - meta.aabb_min.1) * 0.5,
+        (meta.aabb_max.2 - meta.aabb_min.2) * 0.5,
+    );
+    let collider_kind = meta.collider;
+    let primitives = gltf_mesh.primitives.clone();
+    let fallback_mat = kit.fallback_mat.clone();
 
-        parent.with_children(|p| {
-            // Visual: one child per glTF primitive (same local space → identity transform).
-            for prim in &primitives {
-                let material = prim.material.clone().unwrap_or_else(|| fallback_mat.clone());
+    let mut parent = commands.spawn((
+        WorldgenModule {
+            module_id: point.module_id.clone(),
+            local_center: center,
+            local_half: half,
+        },
+        Name::new(format!("worldgen:{}", point.module_id)),
+        tf,
+        Visibility::default(),
+    ));
+
+    parent.with_children(|p| {
+        // Visual: one child per glTF primitive (same local space → identity transform).
+        for prim in &primitives {
+            let material = prim.material.clone().unwrap_or_else(|| fallback_mat.clone());
+            p.spawn((
+                Mesh3d(prim.mesh.clone()),
+                MeshMaterial3d(material),
+                Transform::default(),
+            ));
+        }
+        // Collider per kind. Cuboid/Cylinder come straight from the AABB (cheap, no mesh
+        // needed); ConvexHull/TriMesh are built from the primitive meshes.
+        match collider_kind {
+            ColliderKind::NoCollider => {}
+            ColliderKind::Cuboid => {
                 p.spawn((
-                    Mesh3d(prim.mesh.clone()),
-                    MeshMaterial3d(material),
-                    Transform::default(),
+                    Transform::from_translation(center),
+                    Collider::cuboid(half.x, half.y, half.z),
                 ));
             }
-            // Collider per kind. Cuboid/Cylinder come straight from the AABB (cheap, no mesh
-            // needed); ConvexHull/TriMesh are built from the primitive meshes.
-            match collider_kind {
-                ColliderKind::NoCollider => {}
-                ColliderKind::Cuboid => {
-                    p.spawn((
-                        Transform::from_translation(center),
-                        Collider::cuboid(half.x, half.y, half.z),
-                    ));
-                }
-                ColliderKind::Cylinder => {
-                    p.spawn((
-                        Transform::from_translation(center),
-                        Collider::cylinder(half.y, half.x.max(half.z)),
-                    ));
-                }
-                ColliderKind::ConvexHull | ColliderKind::TriMesh => {
-                    let shape = if matches!(collider_kind, ColliderKind::TriMesh) {
-                        ComputedColliderShape::TriMesh(default())
-                    } else {
-                        ComputedColliderShape::ConvexHull
-                    };
-                    for prim in &primitives {
-                        if let Some(mesh) = meshes.get(&prim.mesh) {
-                            if let Some(col) = Collider::from_bevy_mesh(mesh, &shape) {
-                                p.spawn((Transform::default(), col));
-                            }
+            ColliderKind::Cylinder => {
+                p.spawn((
+                    Transform::from_translation(center),
+                    Collider::cylinder(half.y, half.x.max(half.z)),
+                ));
+            }
+            ColliderKind::ConvexHull | ColliderKind::TriMesh => {
+                let shape = if matches!(collider_kind, ColliderKind::TriMesh) {
+                    ComputedColliderShape::TriMesh(default())
+                } else {
+                    ComputedColliderShape::ConvexHull
+                };
+                for prim in &primitives {
+                    if let Some(mesh) = meshes.get(&prim.mesh) {
+                        if let Some(col) = Collider::from_bevy_mesh(mesh, &shape) {
+                            p.spawn((Transform::default(), col));
                         }
                     }
                 }
             }
-        });
-
-        if !matches!(collider_kind, ColliderKind::NoCollider) {
-            parent.insert(RigidBody::Fixed);
         }
+    });
 
-        stats.spawned += 1;
+    if !matches!(collider_kind, ColliderKind::NoCollider) {
+        parent.insert(RigidBody::Fixed);
     }
+
+    parent.id()
 }

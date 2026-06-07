@@ -1,0 +1,37 @@
+# Recette de ville — routes (tensor field) + parcelles (subdivision) + bâtiments (grammaire)
+# + landmarks hand-crafted. Story-578 P3 + P5.
+#
+# HOT-RELOAD : en jeu (Roguelite) F9 (régénère devant la caméra) ou Shift+F12 (sur place).
+# F8 affiche routes (or=majeures, gris=mineures) + parcelles (vert). Une grammaire empile
+# des modules par parcelle (base → étages → toit), et les landmarks (la forge) sont injectés
+# au centre, les parcelles autour étant réservées.
+#
+# ⚠️ TOML : les scalaires ci-dessous DOIVENT rester AVANT les tables [building] / [[landmark]].
+
+seed = 7                  # graine (bâtiments + nb d'étages par parcelle)
+size = 120.0              # côté de la ville (m), centrée sur le point de placement
+base_angle_deg = 0.0      # orientation de la grille de routes
+radial_strength = 0.0     # 0 = grille pure ; >0 = routes en anneaux près du centre (essaie 0.8)
+radial_radius = 50.0      # portée de l'influence radiale (m)
+road_spacing = 30.0       # espacement des routes majeures = taille des blocs (m)
+road_step = 4.0           # pas de tracé des streamlines (m)
+road_sep = 6.0            # séparation min entre routes d'une même famille (m)
+parcel_target_area = 180.0 # surface cible d'un lot (m²) — plus petit = plus de parcelles
+parcel_inset = 3.0        # marge route autour de chaque bloc (m)
+building_scale = 0.5      # échelle des bâtiments
+landmark_reserve_radius = 14.0  # rayon de réservation autour d'un landmark (m)
+
+# Grammaire de bâtiment : base au sol → N étages → toit. Le nb d'étages varie (seedé).
+[building]
+base_role = "Platform"    # module de base (large, au sol)
+body_role = "Pillar"      # module d'étage (empilé)
+cap_role = "Prop"         # module de toit
+min_floors = 1            # nb min d'étages
+max_floors = 3            # nb max d'étages (variété : 1 à 3)
+
+# La Forge — landmark hand-crafted au centre. Les parcelles autour sont réservées.
+[[landmarks]]
+module_id = "Cube.001"    # grande tour (spire ~33 m à scale 0.6)
+x = 0.0                   # centre de la ville
+z = 0.0
+scale = 0.6
