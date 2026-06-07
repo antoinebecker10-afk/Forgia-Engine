@@ -29,6 +29,10 @@ pub mod prelude {
     pub use forgia_effects::hitmarker::HitmarkerState;
 }
 
+/// Fond vidéo du menu (frames webp pré-extraites → cache LRU egui). Porté V1.
+mod menu_video;
+use menu_video::MenuVideoState;
+
 pub struct ForgiaUiPlugin;
 
 impl Plugin for ForgiaUiPlugin {
@@ -46,7 +50,12 @@ impl Plugin for ForgiaUiPlugin {
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
         // Anti-trap V1 : éviter le frame où aucune caméra n'existe (ESC bug).
-        app.add_systems(Startup, spawn_menu_camera_permanent)
+        app.add_systems(Startup, (spawn_menu_camera_permanent, menu_video::setup_menu_video))
+            // Fond vidéo menu : tick (avance frame) + sensor (forgia2_menu_video.json).
+            .add_systems(
+                Update,
+                (menu_video::menu_video_tick, menu_video::menu_video_sensor),
+            )
             .add_systems(OnEnter(AppMode::Menu), release_cursor)
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
             .add_systems(OnEnter(AppMode::Paused), (release_cursor, pause_time))
@@ -108,6 +117,8 @@ fn main_menu_ui(
     mut next_game: ResMut<NextState<GameMode>>,
     mut exit: MessageWriter<AppExit>,
     mut start_run: MessageWriter<forgia_mode_roguelite::StartRunEvent>,
+    mut video: Option<ResMut<MenuVideoState>>,
+    asset_server: Res<AssetServer>,
     mut last_state: Local<Option<AppMode>>,
 ) {
     let current = app_state.get().clone();
@@ -118,13 +129,36 @@ fn main_menu_ui(
     if current != AppMode::Menu {
         return;
     }
+
+    // Fond vidéo : maintient le cache LRU + preroll, renvoie le TextureId de la
+    // frame courante. None → fallback fond sombre uni (preroll en cours / asset
+    // absent). Calculé AVANT `ctx_mut` (libère le &mut EguiContexts).
+    let bg_id = video
+        .as_deref_mut()
+        .and_then(|v| menu_video::ensure_menu_video_frame(&mut contexts, v, &asset_server));
+
     let Ok(ctx) = contexts.ctx_mut() else {
         warn!("[forgia-ui] main_menu_ui: egui ctx not found (no Camera2d?)");
         return;
     };
     egui::CentralPanel::default()
-        .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(15, 15, 25)))
+        .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(8, 8, 12)))
         .show(ctx, |ui| {
+            // Fond vidéo plein écran + scrim sombre (lisibilité du titre/boutons).
+            if let Some(id) = bg_id {
+                let rect = ui.max_rect();
+                ui.painter().image(
+                    id,
+                    rect,
+                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    egui::Color32::WHITE,
+                );
+                ui.painter().rect_filled(
+                    rect,
+                    egui::CornerRadius::same(0),
+                    egui::Color32::from_black_alpha(90),
+                );
+            }
             ui.vertical_centered(|ui| {
                 ui.add_space(120.0);
                 ui.heading(
