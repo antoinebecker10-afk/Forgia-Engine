@@ -7,16 +7,20 @@
 
 ## 1. Vision
 
-**Forgia** = YouTube du gaming. Funnel `Play → Build → Edit`.
+**Forgia** = **moteur de jeu IA-natif** : le créateur apporte son idée et ses assets, **l'IA construit le jeu 3D**. Pas du no-code — de l'**IA-code** (langage naturel + assets). Le moat = ce codebase + mémoire + process conçus pour qu'une IA fasse *exactement* ce qu'on demande.
 
-V2 = workspace propre repensé après audit V1 (88 % dette technique, 32 crates dont 22 actives).
-Objectif V2 : ship V1 Bots Brawl Q4 2026 / Q1 2027, mode RPG OpenWorld V2.M2.
+> "Décris ton jeu. Importe tes assets. L'IA le construit."
 
-| Mode | Touche | Statut V2 |
-|------|--------|-----------|
-| **Menu** | défaut | Choix FPS ou RPG |
-| **FPS Arena** | menu → "FPS" | **Priorité 1** — ship V1 |
-| **RPG OpenWorld** | menu → "RPG" | Squelette V1, dev V2.M2 |
+**Priorité absolue : SHIP le 1er jeu = le Roguelite** (FPS roguelite type *Gunfire Reborn*). Tout ce qui ne débloque pas ce ship est différé. **Modèle deux-tracks** : SHIP (Roguelite) ← FORGE (RPG = banc d'outils anim/rig qui refluent) ; travail RPG autorisé seulement s'il accélère le ship.
+
+| Phase | Objectif | Statut |
+|-------|----------|--------|
+| **0** | Ship le Roguelite (Gunfire-like) | **Priorité 1 — maintenant** |
+| **1** | Ouvrir la création (importe assets + dirige l'IA) | Plus tard |
+| **2** | Édition fine (Build/Edit), assistée IA | À terme |
+| **3** | Écosystème (partage/distribution) | Différé (destination) |
+
+> Cycle Build/Edit = feature moteur différée (Phase 2). TAB réservé au GAMEPLAY in-game (modèle Gunfire Reborn). Vision plateforme "publier/monétiser" superseded 2026-06-04. Détail : `docs/vision/FORGIA_VISION_2026-06-04.md`.
 
 ---
 
