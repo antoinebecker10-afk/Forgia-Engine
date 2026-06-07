@@ -93,6 +93,23 @@ la hauteur vraie (imperceptible à 144m+ / angle rasant). Trou toujours fermé (
 d'entité, pas de hauteur → `max_gap_frac` reste 0). Watch : léger ressaut ~2m possible à la
 frontière trou (~144m, lointain) — réduire le biais à ~1m si visible.
 
+## Volet 5 — Polish (session 2026-06-07)
+
+User choisit "Polish + finitions". 3 items :
+1. **Imposteurs LOD2 sur le village** : le fix extent-aware faisait scatter arbres/rochers
+   imposteurs sur les clusters chevauchant la zone chunk (real foliage + village y vivent) →
+   clutter. Fix : `continue` le scatter si le point le plus proche du cluster est < inner_m
+   (`center_dist - CLUSTER_HALF_DIAG_M < inner_m`). Le MESH LOD2 couvre toujours (gap fermé),
+   seuls les imposteurs sont sautés → réservés au lointain (silhouette Skyrim-style).
+2. **Couleur biome HARD** (audit) : `build_chunk_mesh` + LOD2 coloraient via `biome_at`
+   (nearest-seed Voronoi DUR) alors que le relief blende (foothills) → seam de couleur tranchant
+   sur colline lisse. Fix : helper `meshing_heightmap::blended_vertex_color` — couleur = somme
+   pondérée des `blend_biome_color` des biomes voisins via `biome_weights_at` (smoothstep,
+   `BIOME_COLOR_BLEND_RADIUS_M=60m`, plus serré que la forme 200m). Branché chunks + LOD2. Coût ≈
+   inchangé (remplace un `biome_at` O(seeds) par un `biome_weights_at` O(seeds)).
+3. **Ressaut skirt ~2m** : laissé en observation runtime (sensors voient gap=0 mais pas le step) —
+   réduire `LOD2_DEPTH_BIAS_M` à ~1m si visible.
+
 ## Validation
 
 forgia-terrain : clippy clean + 127 tests ✓. forgia-rpg : clippy clean + terrain tests 2/2 ✓.

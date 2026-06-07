@@ -429,16 +429,13 @@ fn build_lod2_terrain_mesh(
     for (idx, pos) in positions.iter().enumerate() {
         let sample_x = cluster_center_xz.x + pos[0] + sample_offset.0;
         let sample_z = cluster_center_xz.y + pos[2] + sample_offset.1;
-        let biome = biome_map.biome_at(sample_x, sample_z);
         let slope = normals
             .get(idx)
             .map(|n| (1.0 - n[1].clamp(0.0, 1.0)).clamp(0.0, 1.0))
             .unwrap_or(0.0);
-        colors.push(crate::meshing_heightmap::blend_biome_color(
-            biome,
-            pos[1],
-            slope,
-            terrain_cfg,
+        // Story-577 polish : couleur blendée (cohérent avec les chunks LOD0/LOD1).
+        colors.push(crate::meshing_heightmap::blended_vertex_color(
+            biome_map, sample_x, sample_z, pos[1], slope, terrain_cfg,
         ));
     }
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
@@ -605,6 +602,17 @@ pub fn build_lod2_tiles_system(
             ))
             .id();
         tile_mgr.tiles.insert(key, tile_entity);
+
+        // Polish story-577 : imposteurs (arbres/rochers) UNIQUEMENT pour les clusters
+        // ENTIÈREMENT au-delà de la couverture chunk (point le plus proche >= inner_m).
+        // Depuis le fix extent-aware, les clusters de bord chevauchent la zone chunk
+        // (real foliage + village y vivent) → scatter dessus = clutter au spawn. Le
+        // MESH LOD2 couvre toujours (gap fermé), seuls les imposteurs sont sautés.
+        let cdx = center.x - player_pos.x;
+        let cdz = center.y - player_pos.z;
+        if (cdx * cdx + cdz * cdz).sqrt() - CLUSTER_HALF_DIAG_M < inner_m {
+            continue;
+        }
 
         // Wave 5 phase 2c : scatter N tree imposters per tile selon biome.
         // Pattern Skyrim distant trees — silhouette présente au loin sans

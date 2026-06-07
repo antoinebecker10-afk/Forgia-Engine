@@ -351,6 +351,26 @@ fn populate_new_chunks(
                 ),
             };
 
+            // Story-580 — collider de tronc en taille MONDE absolue, DÉCOUPLÉ du
+            // facteur d'échelle GLB : `Collider::cylinder(1.5,0.3)` était fixe (3m) et
+            // se faisait multiplier par `initial_scale = target/measured` → ballonnait
+            // jusqu'au ciel quand `measured` est petit (le visuel, lui, scale juste à
+            // `target`). On divise la taille par `initial_scale` → taille MONDE = tronc,
+            // peu importe le scale. Compound offset +col_half → base AU SOL (jamais
+            // centré, donc jamais sous la map). User 2026-06-07 : "rien sous la map /
+            // colliders qui gênent". (Cas measured=None : recalé au scale final par
+            // calibrate → léger transitoire ; assets mesurés en steady-state.)
+            let trunk_world_h = (target * 0.85).max(1.0);
+            let trunk_world_r = (target * 0.05).clamp(0.12, 0.5);
+            let inv = 1.0 / initial_scale.max(1e-3);
+            let col_half = trunk_world_h * 0.5 * inv;
+            let col_r = trunk_world_r * inv;
+            let trunk_collider = Collider::compound(vec![(
+                Vec3::new(0.0, col_half, 0.0),
+                Quat::IDENTITY,
+                Collider::cylinder(col_half, col_r),
+            )]);
+
             let mut ec = commands.spawn((
                 SceneRoot(scene_handle),
                 Transform {
@@ -359,9 +379,7 @@ fn populate_new_chunks(
                     scale: Vec3::splat(initial_scale),
                 },
                 RigidBody::Fixed,
-                // Collider générique trunk-like (~3m × 0.3m). Une amélioration
-                // future : générer le Collider depuis l'AABB après calibration.
-                Collider::cylinder(1.5, 0.3),
+                trunk_collider,
                 VegetationTree,
                 Name::new(format!(
                     "Tree_{}_{}_{}_{i}",

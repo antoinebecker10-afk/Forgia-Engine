@@ -149,6 +149,12 @@ pub const MAX_BLEND_BIOMES: usize = 4;
 /// Plus large = transitions de relief plus graduelles. ~200m = naturel.
 const BIOME_SHAPE_BLEND_RADIUS_M: f32 = 200.0;
 
+/// Rayon (m) de blend de la COULEUR du sol entre biomes voisins (story-577 polish).
+/// Plus serré que la forme (~200m) → transition de teinte visible mais nette, pas
+/// délavée. Consommé par `meshing_heightmap::blended_vertex_color` (chunks + LOD2)
+/// → fini le seam Voronoi dur sur le relief lissé.
+pub const BIOME_COLOR_BLEND_RADIUS_M: f32 = 60.0;
+
 #[derive(Debug, Clone)]
 pub struct BiomeSeed {
     pub position: Vec2,

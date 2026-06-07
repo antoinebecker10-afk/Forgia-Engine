@@ -129,13 +129,13 @@ pub fn build_chunk_mesh(
     for (i, pos) in positions.iter().enumerate() {
         let wx = origin.x + half_x + pos[0] + sample_offset.x;
         let wz = origin.z + half_z + pos[2] + sample_offset.y;
-        let biome = biome_map.biome_at(wx, wz);
         let slope = if i < normals.len() {
             (1.0 - normals[i][1].clamp(0.0, 1.0)).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        colors.push(blend_biome_color(biome, pos[1], slope, config));
+        // Story-577 polish : couleur blendée par biomes voisins (fin du seam Voronoi).
+        colors.push(blended_vertex_color(biome_map, wx, wz, pos[1], slope, config));
     }
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
 
@@ -176,6 +176,42 @@ pub(crate) fn blend_biome_color(
     };
     let with_rock = lerp(base, rock, rock_t);
     lerp(with_rock, snow, snow_t)
+}
+
+/// Couleur de sol BLENDÉE par poids des biomes voisins (smoothstep, même infra
+/// `biome_weights_at` que le relief) → transition de teinte douce au lieu du seam
+/// Voronoi dur (`biome_at`) sur un relief pourtant lissé. Story-577 polish.
+/// `wx`/`wz` = coords d'échantillonnage (avec sample_offset, comme `biome_at`).
+/// Coût ≈ inchangé : on remplace un `biome_at` O(seeds) par un `biome_weights_at`
+/// O(seeds). `h`/`slope` identiques pour chaque biome au vertex (tint altitude/pente).
+pub(crate) fn blended_vertex_color(
+    biome_map: &BiomeMap,
+    wx: f32,
+    wz: f32,
+    h: f32,
+    slope: f32,
+    config: &TerrainConfig,
+) -> [f32; 4] {
+    let blend = biome_map.biome_weights_at(
+        wx,
+        wz,
+        crate::biomes::MAX_BLEND_BIOMES,
+        crate::biomes::BIOME_COLOR_BLEND_RADIUS_M,
+    );
+    if blend.count == 0 {
+        return blend_biome_color(biome_map.biome_at(wx, wz), h, slope, config);
+    }
+    let mut col = [0.0f32; 4];
+    for k in 0..blend.count {
+        let (biome, w) = blend.biomes[k];
+        let c = blend_biome_color(biome, h, slope, config);
+        col[0] += c[0] * w;
+        col[1] += c[1] * w;
+        col[2] += c[2] * w;
+        col[3] += c[3] * w;
+    }
+    col[3] = 1.0;
+    col
 }
 
 /// Spawn the chunk entity : Mesh + Material + Collider::heightfield + ChunkCoord.
