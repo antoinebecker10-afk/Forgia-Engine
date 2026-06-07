@@ -1,0 +1,34 @@
+# Dialogue d'arrivée Roguelite — séquence ordonnée jouée à l'entrée (bulle BD cartoon).
+# Bible v1 kid-friendly (Overwatch × Hadès × Cult of the Lamb). Vocabulaire canon :
+# âme-arme / cage / Forgeron Noir / apprenti / éclat. Lignes courtes (≤ ~10 mots).
+#
+# speaker = id persona → couleur via forgia_ui_lib::style::forge_persona_color
+# name    = libellé affiché (plaque nom)
+# text    = réplique (révélée en machine à écrire)
+#
+# Hot-éditable : modifier ce fichier puis relancer (chargé au Startup).
+
+[[line]]
+speaker = "maitre_forgeron"
+name = "Maître Forgeron"
+text = "Te revoilà, apprenti. La Forge t'attendait."
+
+[[line]]
+speaker = "maitre_forgeron"
+name = "Maître Forgeron"
+text = "Le Forgeron Noir a encore enfermé des âmes dans ses cages."
+
+[[line]]
+speaker = "apprenti"
+name = "L'Apprenti"
+text = "Mmh. Je vais les ramener."
+
+[[line]]
+speaker = "pepin"
+name = "Pépin"
+text = "On... on y va doucement, d'accord ? Pardon d'avance."
+
+[[line]]
+speaker = "maitre_forgeron"
+name = "Maître Forgeron"
+text = "Casse les cages. Libère les âmes. Et reviens entier."

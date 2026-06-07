@@ -28,6 +28,7 @@ pub mod coffre_sensor;
 pub mod decor;
 pub mod enemies;
 pub mod hud;
+pub mod intro_dialogue;
 pub mod kill_popup;
 pub mod loot_room;
 pub mod poi;
@@ -362,6 +363,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                     .run_if(in_state(GameMode::Roguelite)),
             )
             .add_plugins(hud::RogueliteHudPlugin)
+            // Dialogue d'arrivée (bulle BD cartoon) — immersion bible v1 à l'entrée.
+            .add_plugins(intro_dialogue::IntroDialoguePlugin)
             // Story-559 slice A — audio Roguelite (SFX impact/kill/hurt + ding
             // Or/Âmes + musique combat/break). Orthogonal : 0 édition cross-crate.
             .add_plugins(audio::RogueliteAudioPlugin)

@@ -214,6 +214,10 @@ pub struct StageLoadResult {
     pub extent_m: f32,
     pub anchors_placed: u32,
     pub props_spawned: u32,
+    /// Nombre de PointLights d'ambiance cartoon (glow chaud par POI + BossPad,
+    /// biome-tuned). Cosmétique, audit §6 gap#3 emissive/glow. Visible via
+    /// `forgia2_stage.json::ambiance_lights`.
+    pub ambiance_lights: u32,
     /// Timestamp en secondes (since startup) du dernier passage en Loading.
     /// Utilisé pour détecter Loading > 5s (health alert).
     pub loading_started_secs: f64,
@@ -370,6 +374,7 @@ struct StageSensorJson<'a> {
     extent_m: f32,
     anchors_placed: u32,
     props_spawned: u32,
+    ambiance_lights: u32,
     wall_natural_len_used: f32,
     walls_per_segment: u32,
     music_state_id: &'a str,
@@ -417,6 +422,7 @@ fn write_stage_sensor(
         extent_m: result.extent_m,
         anchors_placed: result.anchors_placed,
         props_spawned: result.props_spawned,
+        ambiance_lights: result.ambiance_lights,
         wall_natural_len_used: result.wall_natural_len_used,
         walls_per_segment: result.walls_per_segment,
         music_state_id: &result.music_state_id,
@@ -626,24 +632,9 @@ fn ramparts_wall_glb(kit: &str) -> &'static str {
     }
 }
 
-/// Couleur du sol par biome. Hardcoded UI/visual only (autorisé par
-/// `.claude/rules/no-hardcode.md` exception cosmetic) — pourra migrer vers
-/// biome_genome.toml en M2 si raffinage demandé.
-fn biome_floor_color(biome: &str) -> Color {
-    match biome {
-        "Volcanic" => Color::srgb(0.30, 0.20, 0.18),
-        "Plains" => Color::srgb(0.40, 0.45, 0.32),
-        "Desert" => Color::srgb(0.65, 0.55, 0.38),
-        "Forest" => Color::srgb(0.22, 0.32, 0.20),
-        "Tundra" => Color::srgb(0.75, 0.78, 0.82),
-        "Jungle" => Color::srgb(0.18, 0.30, 0.18),
-        "Swamp" => Color::srgb(0.28, 0.30, 0.20),
-        "Mountain" => Color::srgb(0.45, 0.45, 0.48),
-        "Canyon" => Color::srgb(0.55, 0.35, 0.25),
-        "Savanna" => Color::srgb(0.62, 0.55, 0.32),
-        _ => Color::srgb(0.32, 0.30, 0.28),
-    }
-}
+/// Côté (m) d'une tuile de sol GLB KayKit dungeon. MÊME valeur que le mode FPS
+/// (`forgia-mode-fps-arena::TILE_SIZE = 4.0`) pour un sol identique.
+const FLOOR_TILE_SIZE: f32 = 4.0;
 
 /// Lighting cartoon family-friendly per biome. Bible v1 direction artistique :
 /// jamais pitch black, fill light cartoon généreux, sky teinté biome.
@@ -701,6 +692,28 @@ fn biome_lighting_params(biome: &str) -> (Color, f32, Color, f32, Color) {
     }
 }
 
+/// Glow d'ambiance cartoon par biome posé sur chaque POI + BossPad
+/// (Cult of the Lamb : emissive/glow chaud pour l'atmosphère, audit §6 gap#3).
+/// Crée des pools de lumière chaude façon "torche/forge" sans toucher au
+/// key+fill `biome_lighting_params` (qui reste la source de vérité globale).
+///
+/// ⚠️ Intensité FAIBLE volontaire (≤ 8k lumens) : un PointLight plein-intensité
+/// (100k+ "réaliste") casse l'Atmosphere/bloom — leçon dette tech 2026-05-18,
+/// cf `forgia-effects/weapon_vfx` muzzle light. Shadowless = cheap, spawn-time
+/// (pas hot path).
+///
+/// Returns (color, intensity_lumens, range_m).
+fn biome_ambiance_glow(biome: &str) -> (Color, f32, f32) {
+    match biome {
+        "Volcanic" => (Color::srgb(1.0, 0.45, 0.18), 7_000.0, 12.0), // braise forge
+        "Plains" => (Color::srgb(1.0, 0.95, 0.82), 4_500.0, 11.0),   // sanctuaire doux
+        "Desert" => (Color::srgb(1.0, 0.86, 0.58), 5_000.0, 11.0),
+        "Forest" | "Jungle" => (Color::srgb(0.78, 1.0, 0.68), 4_000.0, 10.0),
+        "Tundra" => (Color::srgb(0.72, 0.88, 1.0), 4_500.0, 11.0), // glow froid
+        _ => (Color::srgb(1.0, 0.92, 0.80), 4_500.0, 11.0),
+    }
+}
+
 /// Pondère et tire un POI parmi `pool` selon les `weight` field. Pure (testable).
 /// Retourne `None` si pool vide ou total_weight == 0.
 fn pick_poi_weighted<'a>(
@@ -738,8 +751,6 @@ fn spawn_stage_arena_on_request(
     stages_assets: Res<Assets<Genome<RogueliteStagesGenome>>>,
     pois_assets: Res<Assets<Genome<RoguelitePoisGenome>>>,
     asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     mut result: ResMut<StageLoadResult>,
     anchor_stats: Res<AnchorStats>,
     prefab_stats: Res<PrefabStats>,
@@ -805,23 +816,69 @@ fn spawn_stage_arena_on_request(
     let extent = stage_def.arena_extent_m;
     let mut props_spawned: u32 = 0;
 
-    // 1. Floor — primitive Bevy + collider Rapier, biome-colored.
-    let floor_color = biome_floor_color(&stage_def.biome);
-    let floor_mat = materials.add(StandardMaterial {
-        base_color: floor_color,
-        perceptual_roughness: 0.92,
-        ..default()
-    });
+    // Glow d'ambiance cartoon biome-tuné (un PointLight chaud shadowless par POI
+    // + BossPad). Calculé une fois, réutilisé dans les boucles ci-dessous.
+    let (glow_color, glow_intensity, glow_range) = biome_ambiance_glow(&stage_def.biome);
+    let mut ambiance_lights: u32 = 0;
+
+    // 1. Floor — tuiles GLB KayKit dungeon tilées : MÊME sol que le mode FPS
+    //    (cf forgia-mode-fps-arena::spawn_arena). floor.glb au centre, floor_dirt
+    //    + floor_rocks en périphérie. Tuiles culled hors du cercle de rayon `extent`
+    //    (forme arène, limite le compte). 1 collider sol global — les SceneRoot
+    //    n'ont pas de collider individuel (LOCK identique au FPS).
+    let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
+    let floor_dirt: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
+    let floor_rocks: Handle<Scene> =
+        asset_server.load("models/kaykit/dungeon/floor_rocks.glb#Scene0");
+    let tiles_radius = (extent / FLOOR_TILE_SIZE).ceil() as i32;
+    // Centre "propre" (floor.glb) ~1/3 du rayon, comme la proportion FPS (dist>=4 sur 9).
+    let clean_center = (tiles_radius / 3).max(2);
+    let mut floor_tiles_spawned = 0u32;
+    for tx in -tiles_radius..=tiles_radius {
+        for tz in -tiles_radius..=tiles_radius {
+            let pos = Vec3::new(tx as f32 * FLOOR_TILE_SIZE, 0.0, tz as f32 * FLOOR_TILE_SIZE);
+            if pos.length() > extent {
+                continue; // cull hors arène (cercle inscrivant l'hex)
+            }
+            let dist = tx.abs().max(tz.abs());
+            let tile = if dist >= clean_center {
+                if (tx + tz).rem_euclid(3) == 0 {
+                    floor_rocks.clone()
+                } else {
+                    floor_dirt.clone()
+                }
+            } else {
+                floor.clone()
+            };
+            // Rotation par tuile (0/90/180/270°) déterministe → casse la
+            // répétition visible de la grille (le pattern fissuré tourne par
+            // cellule). Tuile carrée 4m centrée → footprint invariant, zéro gap.
+            let yaw_q = (tx.wrapping_mul(7) ^ tz.wrapping_mul(13)).rem_euclid(4);
+            let yaw = yaw_q as f32 * std::f32::consts::FRAC_PI_2;
+            commands.spawn((
+                Name::new(format!("StageFloorTile_{tx}_{tz}")),
+                StageArenaMarker,
+                Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+                Visibility::default(),
+                children![(SceneRoot(tile), Transform::default())],
+            ));
+            floor_tiles_spawned += 1;
+        }
+    }
+    // Collider sol global (les tuiles SceneRoot pures n'ont pas de collider).
     commands.spawn((
-        Name::new(format!("StageFloor_{}", req.stage_id)),
+        Name::new(format!("StageFloorCollider_{}", req.stage_id)),
         StageArenaMarker,
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(extent * 2.0, extent * 2.0))),
-        MeshMaterial3d(floor_mat),
-        Transform::IDENTITY,
+        Transform::from_xyz(0.0, -0.5, 0.0),
         RigidBody::Fixed,
-        Collider::cuboid(extent, 0.1, extent),
+        Collider::cuboid(extent + 5.0, 0.5, extent + 5.0),
     ));
     props_spawned += 1;
+    info!(
+        "[stage-arena] Floor: {floor_tiles_spawned} KayKit tiles (radius {tiles_radius}, ~{}m)",
+        extent
+    );
 
     // 2. Ramparts — 6 segments hexagonaux, walls **tilés côte-à-côte sans stretch**
     //    (fix story-483 P1 2026-05-20 PM, screenshot user → murs étirés tordus).
@@ -916,6 +973,21 @@ fn spawn_stage_arena_on_request(
         ));
         anchor_stats.record(AnchorKind::PoiSlot);
         props_spawned += 1;
+
+        // Glow d'ambiance cartoon : pool de lumière chaude au-dessus du POI.
+        commands.spawn((
+            Name::new(format!("StagePoiGlow_{slot}")),
+            StageArenaMarker,
+            PointLight {
+                color: glow_color,
+                intensity: glow_intensity,
+                range: glow_range,
+                shadows_enabled: false,
+                ..default()
+            },
+            Transform::from_translation(*pos + Vec3::Y * 1.8),
+        ));
+        ambiance_lights += 1;
     }
 
     // 5. BossPad if required — pick the POI tagged encounter="boss".
@@ -946,6 +1018,25 @@ fn spawn_stage_arena_on_request(
             ));
             anchor_stats.record(AnchorKind::BossPad);
             props_spawned += 1;
+
+            // Glow focal BossPad : plus intense (×1.4) + plus haut pour signaler
+            // le point d'arène majeur (lisibilité, audit §5 telegraph boss).
+            commands.spawn((
+                Name::new("StageBossPadGlow"),
+                StageArenaMarker,
+                PointLight {
+                    color: glow_color,
+                    // Clamp à 8k : garde-fou Atmosphere (un PointLight plein-intensité
+                    // casse le bloom — dette 2026-05-18). Robuste si un biome futur
+                    // pousse la base trop haut.
+                    intensity: (glow_intensity * 1.4).min(8_000.0),
+                    range: glow_range * 1.3,
+                    shadows_enabled: false,
+                    ..default()
+                },
+                Transform::from_translation(boss_pos + Vec3::Y * 2.5),
+            ));
+            ambiance_lights += 1;
         }
     }
 
@@ -1076,6 +1167,7 @@ fn spawn_stage_arena_on_request(
     result.extent_m = extent;
     result.anchors_placed = anchor_stats.total();
     result.props_spawned = props_spawned;
+    result.ambiance_lights = ambiance_lights;
     result.error_message.clear();
     result.wall_natural_len_used = wall_len;
     result.walls_per_segment = ((hex_side_len / wall_len).ceil() as u32).max(1);
@@ -1131,6 +1223,28 @@ pub fn cleanup_stage_arena(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Garde-fou Atmosphere : le glow POI (base) ne dépasse jamais 8k lumens
+    /// (un PointLight plein-intensité casse l'Atmosphere/bloom — dette 2026-05-18).
+    /// Le BossPad applique ×1.4 PUIS clamp `.min(8000)` au spawn — vérifié ici aussi.
+    #[test]
+    fn ambiance_glow_intensity_bounded_for_atmosphere() {
+        for biome in [
+            "Volcanic", "Plains", "Desert", "Forest", "Jungle", "Tundra", "Unknown",
+        ] {
+            let (_color, intensity, range) = biome_ambiance_glow(biome);
+            // POI glow utilise la base directement.
+            assert!(
+                intensity <= 8_000.0,
+                "{biome}: glow POI {intensity} dépasse la borne Atmosphere 8k"
+            );
+            // BossPad glow = base ×1.4 clampé à 8k.
+            let boss = (intensity * 1.4).min(8_000.0);
+            assert!(boss <= 8_000.0, "{biome}: glow boss {boss} dépasse 8k");
+            assert!(intensity > 0.0, "{biome}: glow nul");
+            assert!((5.0..=20.0).contains(&range), "{biome}: range {range} hors plage");
+        }
+    }
 
     #[test]
     fn state_as_str_round_trip() {

@@ -236,3 +236,39 @@ pub fn cartoon_drop_shadow(
         );
     }
 }
+
+// ─── Persona colors (dialogue Roguelite — cast bible v1) ─────────────────
+//
+// Couleurs cartoon des âmes-armes / PNJ pour les bulles de dialogue. Saturées,
+// distinctes au premier coup d'œil (bible : timide vert / vent bleu / noble violet
+// / boucher rouge / mentor cuivre / héros teal). Source unique : ici.
+
+/// Pépin (pistolet timide) — vert frais.
+pub const FORGE_PERSONA_PEPIN: Color32 = Color32::from_rgb(122, 201, 130);
+/// Bourrasque (SMG vent) — bleu vif.
+pub const FORGE_PERSONA_BOURRASQUE: Color32 = Color32::from_rgb(96, 165, 235);
+/// Madame Lenoir (sniper) — violet noble.
+pub const FORGE_PERSONA_LENOIR: Color32 = Color32::from_rgb(168, 116, 214);
+/// Boucherie / Maurice (shotgun) — rouge sang chaud.
+pub const FORGE_PERSONA_BOUCHERIE: Color32 = Color32::from_rgb(208, 78, 66);
+/// Maître Forgeron (mentor) — cuivre chaud.
+pub const FORGE_PERSONA_FORGERON: Color32 = Color32::from_rgb(214, 146, 74);
+/// L'Apprenti (héros) — teal doux.
+pub const FORGE_PERSONA_APPRENTI: Color32 = Color32::from_rgb(110, 184, 196);
+/// Le Forgeron Noir (boss) — charbon violacé.
+pub const FORGE_PERSONA_NOIR: Color32 = Color32::from_rgb(92, 80, 104);
+
+/// Couleur cartoon d'un persona depuis son `speaker` id (dialogue Roguelite).
+/// Fallback métal neutre pour `"any"` / inconnu.
+pub fn forge_persona_color(speaker: &str) -> Color32 {
+    match speaker {
+        "pepin" => FORGE_PERSONA_PEPIN,
+        "bourrasque" => FORGE_PERSONA_BOURRASQUE,
+        "lenoir" => FORGE_PERSONA_LENOIR,
+        "boucherie" => FORGE_PERSONA_BOUCHERIE,
+        "maitre_forgeron" => FORGE_PERSONA_FORGERON,
+        "apprenti" => FORGE_PERSONA_APPRENTI,
+        "forgeron_noir" => FORGE_PERSONA_NOIR,
+        _ => FORGE_METAL_CHAUD,
+    }
+}
