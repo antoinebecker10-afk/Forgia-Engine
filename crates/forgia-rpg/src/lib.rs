@@ -147,6 +147,15 @@ impl Plugin for ForgiaRpgPlugin {
         // déformer le mesh visuel. ProcBodyAnim/locomotion restent disable.
         // Validation visuelle bones d'abord, anim Phase 2+ après.
         app.add_plugins(forgia_auto_rig::ForgiaAutoRigPlugin);
+        // Rendu final Rex (2026-06-07) : masque l'overlay debug du rig — rings +
+        // lignes gizmos OFF, et Rex reste OPAQUE (rex_make_transparent_one_shot
+        // se gate sur ce même flag). Le sensor forgia_rig_bones.json continue
+        // d'écrire (draw_rig_gizmos ne gate que le visuel). Flip à `true` pour
+        // re-déboguer le squelette à travers le mesh.
+        app.insert_resource(forgia_auto_rig::AutoRigGizmosConfig {
+            enabled: false,
+            ..Default::default()
+        });
         // Story-450 wave 2 FIX 2026-05-28 — `SeaLevel(pub f32)` Resource
         // désormais défini dans forgia-water::prelude. Insert ici sync
         // WaterSettings.height via sync_sea_level_resource. Plus de hardcode

@@ -113,39 +113,41 @@ pub fn draw_rig_gizmos(
     q_bones: Query<(Entity, &GlobalTransform, &Name, Option<&ChildOf>, &BoneEntity)>,
     q_global: Query<&GlobalTransform>,
 ) {
-    if !config.enabled {
-        return;
-    }
+    // `config.enabled` ne masque QUE l'overlay VISUEL (rings + lignes). Le dump
+    // sensor `forgia_rig_bones.json` plus bas tourne TOUJOURS (observability-
+    // required) : masquer les rings pour voir le rendu final ne doit pas
+    // aveugler le diagnostic du squelette.
+    if config.enabled {
+        // Build map entity → world_pos pour résoudre les parents.
+        let positions: HashMap<Entity, Vec3> = q_bones
+            .iter()
+            .map(|(e, gt, _, _, _)| (e, gt.translation()))
+            .collect();
 
-    // Build map entity → world_pos pour résoudre les parents.
-    let positions: HashMap<Entity, Vec3> = q_bones
-        .iter()
-        .map(|(e, gt, _, _, _)| (e, gt.translation()))
-        .collect();
+        for (entity, gt, name, child_of, _bone) in &q_bones {
+            let pos = gt.translation();
+            let color = color_for_name(name.as_str());
 
-    for (entity, gt, name, child_of, _bone) in &q_bones {
-        let pos = gt.translation();
-        let color = color_for_name(name.as_str());
+            // Sphère à la position du bone
+            gizmos.sphere(pos, config.sphere_radius, color);
 
-        // Sphère à la position du bone
-        gizmos.sphere(pos, config.sphere_radius, color);
+            // Ligne vers le parent (= bone parent OU mesh root si root bone)
+            let parent_pos = child_of.and_then(|c| {
+                let p = c.parent();
+                // Si parent est un autre bone : sa world position
+                positions
+                    .get(&p)
+                    .copied()
+                    // Sinon (parent = mesh_root), lookup global transform direct
+                    .or_else(|| q_global.get(p).ok().map(|gt| gt.translation()))
+            });
 
-        // Ligne vers le parent (= bone parent OU mesh root si root bone)
-        let parent_pos = child_of.and_then(|c| {
-            let p = c.parent();
-            // Si parent est un autre bone : sa world position
-            positions
-                .get(&p)
-                .copied()
-                // Sinon (parent = mesh_root), lookup global transform direct
-                .or_else(|| q_global.get(p).ok().map(|gt| gt.translation()))
-        });
+            if let Some(pp) = parent_pos {
+                gizmos.line(pp, pos, color);
+            }
 
-        if let Some(pp) = parent_pos {
-            gizmos.line(pp, pos, color);
+            let _ = entity; // explicit unused
         }
-
-        let _ = entity; // explicit unused
     }
 
     // ── Accumulation compression torse (par rig, CHAQUE frame) ─────────────

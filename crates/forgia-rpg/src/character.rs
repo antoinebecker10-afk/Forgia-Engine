@@ -33,7 +33,7 @@ use forgia_anim_locomotion::{
     IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP, WALK_BOB_AMP,
     WALK_FREQ,
 };
-use forgia_auto_rig::{AutoRigTemplate, NeedsAutoRig};
+use forgia_auto_rig::{AutoRigGizmosConfig, AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
 use forgia_player::prelude::{FpsCamera, Player};
 use forgia_skeleton_template::SkeletonTemplateId;
@@ -552,12 +552,19 @@ pub struct RexMaterialTransparent;
 /// travers le mesh. Clone les `StandardMaterial` des Mesh3d descendants de
 /// Rex, set `alpha = 0.40` + `alpha_mode = Blend`. Idempotent via marker.
 pub(crate) fn rex_make_transparent_one_shot(
+    gizmos_config: Res<AutoRigGizmosConfig>,
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     q_rex: Query<Entity, With<RexCharacter>>,
     children_q: Query<&Children>,
     q_mat: Query<(Entity, &MeshMaterial3d<StandardMaterial>), Without<RexMaterialTransparent>>,
 ) {
+    // La transparence n'existe QUE pour voir les gizmos du squelette à travers
+    // le mesh. Rig debug overlay OFF (AutoRigGizmosConfig.enabled=false en mode
+    // RPG) → Rex reste opaque = rendu final. Flip le flag pour re-déboguer.
+    if !gizmos_config.enabled {
+        return;
+    }
     let Ok(rex_entity) = q_rex.single() else {
         return;
     };
