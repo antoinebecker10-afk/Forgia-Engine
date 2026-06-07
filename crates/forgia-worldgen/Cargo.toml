@@ -1,0 +1,16 @@
+[package]
+name = "forgia-worldgen"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — procedural worldgen engine (cities/villages/maps). Story-578. P0: asset registry. P1: points + instanced spawn (grounded, collider per kind) + sensor + debug viz. Decoupled — ground height is injected (no forgia-terrain / gameplay dep)."
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+ron = { workspace = true }
+toml = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }

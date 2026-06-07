@@ -46,3 +46,6 @@ forgia-secondary-motion = { workspace = true }
 forgia-anim-debug = { workspace = true }
 forgia-prefab = { workspace = true }
 forgia-village-loader = { workspace = true }
+# Story-578 P1 — worldgen procédural (registre d'assets + spawn instancié grounded).
+# Découplé : 0 dép terrain/gameplay, conformance sol injectée.
+forgia-worldgen = { workspace = true }

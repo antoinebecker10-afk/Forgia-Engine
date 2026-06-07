@@ -3122,6 +3122,8 @@ dependencies = [
  "forgia-rig-topology",
  "forgia-secondary-motion",
  "forgia-skeleton-template",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -3351,6 +3353,7 @@ dependencies = [
  "forgia-viewmodel",
  "forgia-village-loader",
  "forgia-water",
+ "forgia-worldgen",
 ]
 
 [[package]]
@@ -3859,6 +3862,18 @@ dependencies = [
  "bevy_rapier3d",
  "forgia-core",
  "forgia-damage",
+]
+
+[[package]]
+name = "forgia-worldgen"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_rapier3d",
+ "forgia-core",
+ "ron 0.8.1",
+ "serde",
+ "toml",
 ]
 
 [[package]]

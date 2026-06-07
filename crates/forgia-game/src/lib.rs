@@ -95,6 +95,7 @@ pub fn run_game() -> AppExit {
         forgia_foliage::prelude::ForgiaFoliagePlugin,
         forgia_water::prelude::ForgiaWaterPlugin,
         forgia_audio::prelude::ForgiaAudioBiomePlugin,
+        forgia_worldgen::ForgiaWorldgenPlugin, // story-578 P1 — procgen registry + spawn demo (F7/F8)
     ));
 
     // 7b. Anim Layer (story-437) + 3P camera (story-438) — utilisés par forgia-rpg

@@ -1,9 +1,105 @@
 # Story-578 — `forgia-worldgen` : moteur de génération procédurale (villes / villages / maps)
 
-> **Statut** : PLANNED (plan validé option A, 2026-06-07)
+> **Statut** : EN COURS — **P0 + P1 + P2 DONE** (2026-06-07), P3→P6 PLANNED
 > **Niveau BMAD** : Enterprise (nouveau crate, multi-module, cross-cutting, ≥10 fichiers)
 > **Origine** : besoin user « générer des villes, villages, maps ». Audit web 2026-06-07
 > (Unreal PCG, Houdini/PDG, tensor-field roads, ECS data-oriented, WFC) → archi enrichie.
+
+---
+
+## ✅ P0 — Registre d'assets (LIVRÉ 2026-06-07)
+
+**Crate** `forgia-worldgen` créé (pure-data, 0 dép Bevy/forgia — `serde` + `ron` only,
+crate-feuille immunisée au churn multi-terminal). Ajouté aux workspace members (1 ligne).
+
+**Livrables :**
+- `crates/forgia-worldgen/src/registry.rs` — types `AssetMeta` / `AssetRole` (Platform/
+  Pillar/Wall/Ramp/Prop/Decal/Backdrop/Loot/Hazard/Unknown) / `ColliderKind` (Cuboid/
+  Cylinder/ConvexHull/TriMesh/NoCollider) + loader RON (`AssetRegistry::from_ron`) +
+  helper de grounding `placement_y(ground_y, scale)` (le fix anti-enfoncé/flottant).
+- `assets/registry/asset_meta.ron` — **107 modules** ithappy catalogués semi-auto depuis
+  `One_file_assets.glb` (parseur GLB pur-Python). Géométrie `aabb_min/max` + `ground_offset`
+  **EXACTE** (accessor min/max). Rôle/collider = passe géométrique (18 Platform, 14 Pillar,
+  2 Wall, 3 Backdrop, 18 Decal, 3 **Unknown** = file de revue P1, 49 Prop).
+- `assets/models/environment/platformer/one_file_assets.glb` — copie source (spawn P1).
+- **9 tests** (preuve P0 : `every_module_grounds_correctly` = 107 modules × 4 scales ×
+  4 hauteurs → bottom == ground, jamais enfoncé/flottant ; `solid_roles_have_colliders` =
+  invariant anti-walkable-sans-collider). `cargo test` vert, clippy 0 warning.
+
+**Audit qa-lead (BUG REPORT) — suivis P1 :**
+- 🟠 QA-03 (Majeur, traité non-spéculativement) : `Cube.035`/`Cube.042` (modules longs 27m/
+  25m) → marqués `Unknown` au lieu de deviner Platform/Wall. **P1 : voir le mesh → trancher.**
+- 🟡 QA-01 (Mineur) : `from_file` collapse silencieux des ids dupliqués (doc explicite ajoutée ;
+  loader faillible = P1 si 2ᵉ consumer).
+- ⚪ QA-02/04/05 (Cosmétique) : ground_offset négatif (maths prouvées), `include_str!` test-only
+  (commenté), variantes `Cube.001/002/090` (géométrie identique = variantes kit probables).
+
+**Vérification** (pas de runtime — pure data) : `cargo test -p forgia-worldgen` → 9 passed.
+
+---
+
+## ✅ P1 — Points + spawn instancié (LIVRÉ 2026-06-07)
+
+La crate `forgia-worldgen` devient un **plugin Bevy**. Modèle points+attributs + spawn
+budgété + sensor + debug viz. **Découplé** : ground height = `GroundSampler` injecté
+(défaut plat), **0 dép forgia-terrain / gameplay** (confirmé : l'autre terminal édite
+forgia-terrain ET forgia-stage → couplage évité).
+
+**Livrables :**
+- `points.rs` — `Point` / `PointCloud` (modèle central), `GroundSampler` (Box<dyn Fn> injecté),
+  `generate_row` + `generate_showcase_row` (modules variés, déterministe par id).
+- `spawn.rs` — `sys_spawn_drain` budgété (**8 modules/frame**, anti-freeze pilier perf #3) :
+  mesh par nom (`gltf.named_meshes`), transform **grounded** via `placement_y` (pivot P0),
+  collider per `ColliderKind` (Cuboid/Cylinder depuis l'AABB ; ConvexHull/TriMesh via
+  `Collider::from_bevy_mesh`). `WorldgenModule` marker + `SpawnQueue` + `WorldgenStats`.
+- `sensor.rs` — `forgia2_worldgen.json` (1 Hz) : registry_modules, spawned, pending, last_row +
+  severity (warn si registre vide).
+- `debug_viz.rs` — gizmos AABB monde (F8 toggle).
+- `lib.rs` — `ForgiaWorldgenPlugin` : load registry (fs) + GLB (asset_server, **+1 call-site
+  L1**, noté) au Startup ; **F7** = spawn rangée showcase devant la caméra ; F8 viz ; sensor
+  in `GameSet::Sensors`.
+- **Wiring** `forgia-game` : dep workspace + `Cargo.toml` + `ForgiaWorldgenPlugin` dans le
+  tuple mode-specific (lib.rs:97). `cargo check -p forgia` OK.
+- **10 tests** (9 P0 + sensor severity), clippy 0 warning.
+
+**Demo observable (F7)** : une rangée de ~8 modules variés (2 Platform / 2 Pillar / 2 Wall /
+2 Prop — pivots très différents) apparaît au sol devant la caméra, **tous posés flush** sur la
+même ligne de sol → preuve visuelle du grounding P0. Re-F7 = nouvelle rangée (clear auto).
+
+**Vérification runtime** : `forgia.exe` (release-fast) → entrer en Roguelite → **F7**.
+
+**Suivis P2+** : brancher un vrai `GroundSampler` terrain (conformance pentes, story P4) ;
+remplacer la rangée demo par un layout recette-driven (P2) ; instancing GPU explicite (P6).
+
+---
+
+## ✅ P2 — Recette grille → hameau data-driven (LIVRÉ 2026-06-07)
+
+Couche **recette** (génome TOML hot-reload) + layout grille simple → la rangée demo P1 est
+remplacée par un **petit hameau généré depuis une recette**. La variété vient de la donnée.
+
+**Livrables :**
+- `recipe.rs` — `HamletRecipe` (seed, grid_cols/rows, cell_size, jitter, scale, fill_chance,
+  yaw_random, building_roles, border, border_role) + `load_recipe` (TOML, `#[serde(default)]`,
+  fallback intégré). Rôles désérialisés directement en `AssetRole` (`["Prop","Pillar"]`).
+- `assets/genomes/worldgen/hamlet.toml` — la recette (commentée, hot-éditable).
+- `points.rs::generate_hamlet` — grille jitterée (bâtiments intérieurs `fill_chance` + ceinture
+  de murs) → `PointCloud` (modèle P1 réutilisé). **RNG splitmix64 inline déterministe** (seed) ;
+  P4 passera à `forgia-rng` (seeds hiérarchiques). Filtre hauteur ≤16 (pas de spire de 50 m).
+- `lib.rs` — `sys_worldgen_input` : **F7** = nouveau hameau devant la caméra ; **Shift+F12** =
+  re-lit la recette + régénère sur place (**hot-reload**). `LastHamletPlacement` mémorise le spot.
+- **15 tests** (5 nouveaux : recette sane/parse, hameau déterministe, seed→variété, grounding).
+  clippy 0.
+
+**Demo (F7 / Shift+F12)** : un hameau (grille 6×5, ceinture de murs + bâtiments props/piliers)
+apparaît au sol devant la caméra. Édite `seed`/`grid`/`roles` dans `hamlet.toml` → **Shift+F12**
+→ disposition différente. Déterministe (même seed → même hameau, testé).
+
+**Vérification runtime** : `forgia.exe` → Roguelite → **F7** (hameau) → éditer `hamlet.toml` →
+**Shift+F12** (régénère). Sensor `forgia2_worldgen.json::last_row` = nb modules du hameau.
+
+**Suivis P3+** : routes (tensor field) + parcelles (subdivision) ; seeds hiérarchiques + chunk
+streaming (P4) ; grammaire bâtiments + injection POI hand-crafted (P5) ; bake + LOD (P6).
 
 ---
 

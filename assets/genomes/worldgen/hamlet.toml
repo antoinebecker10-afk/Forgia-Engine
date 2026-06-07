@@ -1,0 +1,20 @@
+# Recette de hameau — layout grille data-driven (story-578 P2).
+#
+# HOT-RELOAD : édite ce fichier puis en jeu (Roguelite) appuie sur F7 (régénère devant
+# la caméra) ou Shift+F12 (régénère au même endroit). La variété vient de la donnée, pas
+# du code. Change `seed` pour une autre disposition ; `grid_cols/rows` pour la taille.
+#
+# Rôles disponibles (registre ithappy) : Platform, Pillar, Wall, Prop, Decal, Backdrop, Unknown.
+
+seed = 1337           # graine déterministe (même seed → même hameau)
+grid_cols = 6         # colonnes de la grille
+grid_rows = 5         # lignes de la grille
+cell_size = 13.0      # distance entre centres de cellules (m)
+jitter = 2.5          # décalage aléatoire max par module (m) → évite l'effet damier rigide
+scale = 0.6           # échelle des modules
+fill_chance = 0.65    # proba qu'une cellule intérieure reçoive un bâtiment
+yaw_random = true     # orientation aléatoire (multiples de 90°)
+
+building_roles = ["Prop", "Pillar"]   # corps du hameau (bâtiments / structures)
+border = true                          # ceinturer le hameau d'un mur
+border_role = "Wall"                   # rôle utilisé pour la clôture
