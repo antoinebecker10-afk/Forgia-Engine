@@ -244,6 +244,19 @@ pub fn inject_skinning_for_rigged_meshes(
             })
             .collect();
 
+        // Classe skin par os (anti-déformation tête) : un os de bras n'influence
+        // pas les vertices dont l'os le plus proche est tête/nuque. Index-aligné
+        // avec `bones` (donc avec joints[] du SkinnedMesh).
+        let bone_kinds: Vec<BoneSkinKind> = bones
+            .iter()
+            .map(|&e| {
+                q_names
+                    .get(e)
+                    .map(|n| classify_bone_skin_kind(n.as_str()))
+                    .unwrap_or_default()
+            })
+            .collect();
+
         // 3. Walk descendants → trouve les Mesh3d entities + leur GlobalTransform.
         let mut mesh3d_entities: Vec<Entity> = Vec::new();
         collect_mesh3d_descendants(mesh_root, &q_children, &q_mesh3d, &mut mesh3d_entities);
@@ -355,6 +368,7 @@ pub fn inject_skinning_for_rigged_meshes(
                 &positions,
                 &mesh3d_to_root_local,
                 &bone_segments_local,
+                &bone_kinds,
                 &config,
             );
 
@@ -537,6 +551,46 @@ fn point_to_segment_dist_sq(p: Vec3, a: Vec3, b: Vec3) -> f32 {
     (p - (a + ab * t)).length_squared()
 }
 
+/// Classe d'os pour le skinning anti-déformation tête. Permet d'empêcher les os
+/// de bras d'influencer les vertices de la région tête : ainsi une rotation de
+/// stance de la clavicule (A-pose) ne drague JAMAIS les écailles du crâne/nuque
+/// (régression 2026-06-05, clavicle_L influençait ~5887 verts dont des écailles).
+#[derive(Clone, Copy, Default)]
+struct BoneSkinKind {
+    /// Os de bras (clavicule, bras, avant-bras, main) — exclu des verts tête ET torse.
+    is_arm: bool,
+    /// Os de tête/nuque — un vertex dont l'os le plus proche est `is_head`
+    /// définit la "région tête" protégée (exclut les os de bras).
+    is_head: bool,
+    /// Os de torse (spine/chest/hip/pelvis) — un vertex dont l'os le plus proche
+    /// est `is_body` définit la "région torse" protégée : exclut les os de bras
+    /// pour que le balancement du bras / la protraction de la clavicule ne
+    /// **compriment PAS la peau du buste**. Symétrique de `is_head`.
+    ///
+    /// 2026-06-06 : compression « arm-driven » confirmée (user + sensor d'os
+    /// stable `torso_y_range≈0.9mm` → la colonne ne bouge pas, donc 100 %
+    /// skinning). La frontière deltoïde/torse est naturelle : un vert d'épaule
+    /// (proche=clavicule/bras) suit toujours le bras ; seul le torse-propre
+    /// (proche=spine) devient immunisé. Permet de resserrer les bras (coudes
+    /// collés) SANS re-déformer — découple largeur d'os et déformation.
+    is_body: bool,
+}
+
+/// Classe un os par sous-chaîne de son nom (aligné conventions templates Forgia
+/// humanoid/biped_lizard : clavicle_L/R, arm_L/R, forearm_L/R, hand_L/R, neck, head).
+fn classify_bone_skin_kind(name: &str) -> BoneSkinKind {
+    let n = name.to_ascii_lowercase();
+    BoneSkinKind {
+        is_arm: n.contains("arm") || n.contains("clavicle") || n.contains("hand"),
+        is_head: n.contains("head") || n.contains("neck") || n.contains("skull"),
+        is_body: n.contains("spine")
+            || n.contains("chest")
+            || n.contains("hip")
+            || n.contains("torso")
+            || n.contains("pelvis"),
+    }
+}
+
 /// Pour chaque vertex (positions[i] dans le repère mesh3d-local), trouve les K
 /// bones les plus proches dans le repère mesh-root-local, pondère par
 /// `1 / distance^power` normalisé à `sum = 1.0`.
@@ -546,12 +600,16 @@ fn compute_nearest_bone_weights(
     positions: &[[f32; 3]],
     mesh3d_to_root_local: &Mat4,
     bone_segments_local: &[(Vec3, Vec3)],
+    bone_kinds: &[BoneSkinKind],
     config: &SkinningConfig,
 ) -> (Vec<[u16; 4]>, Vec<[f32; 4]>) {
     let k = (config.bones_per_vertex as usize).min(4);
     let n_bones = bone_segments_local.len();
     let mut indices: Vec<[u16; 4]> = Vec::with_capacity(positions.len());
     let mut weights: Vec<[f32; 4]> = Vec::with_capacity(positions.len());
+    // Buffer distances² réutilisé par vertex (skinning = one-shot par rig, mais on
+    // évite une alloc par vertex). Une seule passe de distance par vertex.
+    let mut d2_buf = vec![0.0_f32; n_bones];
 
     for p in positions {
         let v_root = mesh3d_to_root_local.transform_point3(Vec3::from_array(*p));
@@ -559,10 +617,45 @@ fn compute_nearest_bone_weights(
         // Distance² au segment de chaque os (squared pour éviter sqrt + diviser
         // après). distance-au-segment (pas à la tête) : un vertex au milieu d'un
         // os long lui reste assigné (story-A1, fix arm count_primary effondré).
-        // K petit (≤4) → partial selection plus rapide qu'un sort complet O(n log n).
-        let mut top: Vec<(usize, f32)> = Vec::with_capacity(k);
+        // On note au passage l'os le plus proche (pour la règle anti-tête).
+        let mut nearest_bi = 0usize;
+        let mut nearest_d2 = f32::INFINITY;
         for (bi, seg) in bone_segments_local.iter().enumerate() {
             let d2 = point_to_segment_dist_sq(v_root, seg.0, seg.1);
+            d2_buf[bi] = d2;
+            if d2 < nearest_d2 {
+                nearest_d2 = d2;
+                nearest_bi = bi;
+            }
+        }
+
+        // Compartimentage par région (anti-déformation tête / torse / bras). Le vertex
+        // appartient à la région de son os le plus proche ; on EXCLUT de ses poids les
+        // os des régions INCOMPATIBLES. Régions : tête/nuque (`is_head`), torse/colonne
+        // (`is_body`), bras (`is_arm`) ; jambes/queue = neutres (jamais exclues).
+        //  - vert TÊTE  : exclut les os de bras (clavicule A-pose ne drague pas le crâne,
+        //    régression 2026-06-05).
+        //  - vert TORSE : exclut bras (compression arm-driven 2026-06-06) ET tête/nuque
+        //    (la nuque sur-influençait 8936 verts / 26% du mesh, dont l'épaule/haut-torse
+        //    → léger pli au cou quand le buste/bras bougent, 2026-06-07).
+        //  - vert BRAS  : exclut tête/nuque (l'épaule ne suit plus la nuque).
+        // Effet : nuque/tête localisées à la région tête. La frontière reste lisse car
+        // les verts tête blendent encore avec le chest (is_body non exclu côté tête).
+        let nk = bone_kinds.get(nearest_bi).copied().unwrap_or_default();
+        let exclude_arm = nk.is_head || nk.is_body;
+        let exclude_head = nk.is_body || nk.is_arm;
+
+        // Sélection top-K par distance (avec exclusion conditionnelle des bras).
+        // K petit (≤4) → partial selection plus rapide qu'un sort complet O(n log n).
+        let mut top: Vec<(usize, f32)> = Vec::with_capacity(k);
+        for (bi, &d2) in d2_buf.iter().enumerate() {
+            let kd = bone_kinds.get(bi).copied().unwrap_or_default();
+            if exclude_arm && kd.is_arm {
+                continue;
+            }
+            if exclude_head && kd.is_head {
+                continue;
+            }
             if top.len() < k {
                 top.push((bi, d2));
                 if top.len() == k {
@@ -630,6 +723,12 @@ mod tests {
     /// les tests historiques basés sur distance-au-point (story-A1).
     fn pts(heads: &[Vec3]) -> Vec<(Vec3, Vec3)> {
         heads.iter().map(|&h| (h, h)).collect()
+    }
+
+    /// Classes "neutres" (ni bras ni tête) pour les tests historiques qui ne
+    /// testent pas l'exclusion anti-tête (comportement = aucun filtrage).
+    fn neutral_kinds(n: usize) -> Vec<BoneSkinKind> {
+        vec![BoneSkinKind::default(); n]
     }
 
     /// Story-454 — propriété Bevy SkinnedMesh : le vertex shader applique
@@ -714,7 +813,7 @@ mod tests {
             Vec3::new(0.0, 0.5, -0.5),
         ];
         let (_, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
         for w in &weights {
             let sum: f32 = w.iter().sum();
             assert!(
@@ -736,7 +835,7 @@ mod tests {
             Vec3::new(0.0, 0.0, 10.0),
         ];
         let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
         assert_eq!(indices[0][0], 0, "bone 0 doit être le 1er joint");
         assert!(
             weights[0][0] > 0.9,
@@ -753,7 +852,7 @@ mod tests {
         let positions = vec![[1.0, 1.0, 1.0]];
         let bones = vec![Vec3::ZERO];
         let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
         assert_eq!(indices[0][0], 0);
         let sum: f32 = weights[0].iter().sum();
         assert!(
@@ -768,7 +867,7 @@ mod tests {
         let positions = vec![[0.0, 0.0, 0.0]; 100];
         let bones = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z, Vec3::NEG_X];
         let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &cfg());
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
         assert_eq!(indices.len(), 100);
         assert_eq!(weights.len(), 100);
     }
@@ -786,8 +885,13 @@ mod tests {
             (Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 4.0)),
             (Vec3::new(0.3, 0.0, 2.0), Vec3::new(0.3, 0.0, 2.1)),
         ];
-        let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &cfg());
+        let (indices, weights) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &segments,
+            &neutral_kinds(segments.len()),
+            &cfg(),
+        );
         assert_eq!(
             indices[0][0], 0,
             "vertex au milieu de l'os long A doit s'assigner à A (segment), pas B (tête proche)"
@@ -797,6 +901,128 @@ mod tests {
             "A doit dominer B : got A={}, B={}",
             weights[0][0],
             weights[0][1]
+        );
+    }
+
+    /// Anti-déformation tête (2026-06-05) : un vertex dont l'os le plus proche est
+    /// tête/nuque ne doit recevoir AUCUN poids d'un os de bras (clavicule), même
+    /// si la clavicule est géométriquement proche. Garantit qu'une rotation de
+    /// stance de la clavicule (A-pose) ne déforme jamais les écailles de la tête.
+    #[test]
+    fn head_region_vertex_excludes_arm_bones() {
+        // Vertex juste sous la tête. head = le plus proche ; clavicle (arm) est
+        // 2e plus proche → sans exclusion elle capterait le vertex.
+        let positions = vec![[0.0, 0.05, 0.0]];
+        let segments = vec![
+            (Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 0.0)), // 0 head (le + proche)
+            (Vec3::new(0.1, 0.0, 0.0), Vec3::new(0.2, 0.0, 0.0)), // 1 clavicle (arm, proche)
+            (Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, -0.5, 0.0)), // 2 chest
+        ];
+        let kinds = vec![
+            BoneSkinKind { is_arm: false, is_head: true, is_body: false },
+            BoneSkinKind { is_arm: true, is_head: false, is_body: false },
+            BoneSkinKind { is_arm: false, is_head: false, is_body: false },
+        ];
+        let (indices, weights) =
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
+        assert!(
+            !indices[0].iter().any(|&j| j == 1),
+            "clavicle (arm, index 1) ne doit apparaître dans AUCUN slot d'un vertex tête, got {:?}",
+            indices[0]
+        );
+        assert_eq!(indices[0][0], 0, "head doit dominer le vertex tête");
+        // Contre-preuve : SANS exclusion (kinds neutres), la clavicle DOIT entrer.
+        let (indices_no_excl, _) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &segments,
+            &neutral_kinds(segments.len()),
+            &cfg(),
+        );
+        assert!(
+            indices_no_excl[0].iter().any(|&j| j == 1),
+            "sans exclusion, la clavicle proche DOIT capter le vertex (sinon le test ne prouve rien)"
+        );
+    }
+
+    /// Symétrique du test tête : un vertex de la **région torse** (os le plus
+    /// proche = chest, `is_body`) doit EXCLURE les os de bras. Garantit que le
+    /// balancement du bras ne comprime pas la peau du buste (2026-06-06).
+    #[test]
+    fn body_region_vertex_excludes_arm_bones() {
+        // Vertex sur le flanc du buste : chest le plus proche (dist 0.04) ; arm
+        // (bras) 2e très proche (dist 0.06) → sans exclusion il capterait le
+        // vertex et le dragguerait au swing du bras.
+        let positions = vec![[0.04, 0.0, 0.0]];
+        let segments = vec![
+            (Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 0.0)), // 0 chest (le + proche, 0.04)
+            (Vec3::new(0.10, 0.0, 0.0), Vec3::new(0.30, 0.0, 0.0)), // 1 arm (2e proche, 0.06)
+            (Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, -0.5, 0.0)), // 2 hip (body, loin)
+        ];
+        let kinds = vec![
+            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
+            BoneSkinKind { is_arm: true, is_head: false, is_body: false },
+            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
+        ];
+        let (indices, _) =
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
+        assert!(
+            !indices[0].iter().any(|&j| j == 1),
+            "arm (index 1) ne doit apparaître dans AUCUN slot d'un vertex torse, got {:?}",
+            indices[0]
+        );
+        assert_eq!(indices[0][0], 0, "chest doit dominer le vertex torse");
+        // Contre-preuve : sans exclusion (kinds neutres), le bras DOIT entrer.
+        let (indices_no_excl, _) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &segments,
+            &neutral_kinds(segments.len()),
+            &cfg(),
+        );
+        assert!(
+            indices_no_excl[0].iter().any(|&j| j == 1),
+            "sans exclusion, le bras proche DOIT capter le vertex torse (sinon le test ne prouve rien)"
+        );
+    }
+
+    /// Compartimentage 2026-06-07 : un vertex de torse (proche=chest, is_body) doit
+    /// AUSSI exclure les os tête/nuque (`is_head`) — la nuque sur-influençait le
+    /// haut-torse/épaule → léger pli au cou. Localise nuque/tête à la région tête.
+    #[test]
+    fn body_region_vertex_excludes_head_bones() {
+        // Vertex de haut-torse : chest le plus proche (0.04) ; neck (is_head) 2e
+        // proche (0.06). Sans exclusion la nuque le capterait et le dragguerait.
+        let positions = vec![[0.04, 0.0, 0.0]];
+        let segments = vec![
+            (Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 0.0)), // 0 chest (proche, 0.04)
+            (Vec3::new(0.10, 0.0, 0.0), Vec3::new(0.30, 0.0, 0.0)), // 1 neck (is_head, 2e, 0.06)
+            (Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, -0.5, 0.0)), // 2 hip (body, loin)
+        ];
+        let kinds = vec![
+            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
+            BoneSkinKind { is_arm: false, is_head: true, is_body: false },
+            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
+        ];
+        let (indices, _) =
+            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
+        assert!(
+            !indices[0].iter().any(|&j| j == 1),
+            "neck (is_head, index 1) ne doit PAS capter un vertex torse, got {:?}",
+            indices[0]
+        );
+        assert_eq!(indices[0][0], 0, "chest doit dominer le vertex torse");
+        // Contre-preuve : sans exclusion, la nuque proche DOIT entrer.
+        let (no_excl, _) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &segments,
+            &neutral_kinds(segments.len()),
+            &cfg(),
+        );
+        assert!(
+            no_excl[0].iter().any(|&j| j == 1),
+            "sans exclusion, la nuque proche DOIT capter le vertex (sinon le test ne prouve rien)"
         );
     }
 }

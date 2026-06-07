@@ -32,7 +32,7 @@ use crate::BoneEntity;
 /// Écrit par `draw_rig_gizmos` (qui a déjà tous les `BoneEntity` + GlobalTransform).
 const SENSOR_RIG_BONES_PATH: &str = "forgia_rig_bones.json";
 /// Marqueur de build pour vérifier que l'exe tourne le bon code (cf rule stale-binary).
-const RIG_BONES_BUILD_MARKER: &str = "TOE-BONE_2026-06-05";
+const RIG_BONES_BUILD_MARKER: &str = "SKIN-COMPARTMENT-NECK_2026-06-07";
 
 /// Configuration globale du draw de gizmos rig. Default = enabled, toggle
 /// via inspector ou keybind dans le caller.
@@ -63,6 +63,41 @@ const COLOR_HEAD: Color = Color::srgb(1.0, 0.80, 0.30);
 const COLOR_TAIL: Color = Color::srgb(0.80, 0.30, 1.0);
 const COLOR_UNKNOWN: Color = Color::srgb(0.53, 0.53, 0.53);
 
+/// Accumulateur de **compression du torse** par rig, entre deux dumps du sensor.
+///
+/// Mesure l'extent vertical `chest.y - hip.y` (= hauteur du buste en monde) et
+/// l'offset avant `chest.z - hip.z` (= lean avant). On garde min/max/last sur la
+/// fenêtre 0.5s pour **capturer l'extrême du cycle de marche** — un snapshot
+/// instantané (0.5s) raterait la frame où le torse est le plus comprimé.
+///
+/// Le mesh (peau) n'est pas directement observable au runtime ; cet extent d'os
+/// est le proxy honnête le plus proche : si `torso_y` chute en marche vs idle,
+/// le buste se comprime verticalement (ce que l'œil voit). Story "le torse se
+/// comprime quand j'avance" (2026-06-06).
+#[derive(Clone, Copy)]
+pub struct TorsoStat {
+    pub y_min: f32,
+    pub y_max: f32,
+    pub y_last: f32,
+    pub z_min: f32,
+    pub z_max: f32,
+    pub z_last: f32,
+}
+
+impl TorsoStat {
+    fn new(y: f32, z: f32) -> Self {
+        Self { y_min: y, y_max: y, y_last: y, z_min: z, z_max: z, z_last: z }
+    }
+    fn update(&mut self, y: f32, z: f32) {
+        self.y_min = self.y_min.min(y);
+        self.y_max = self.y_max.max(y);
+        self.y_last = y;
+        self.z_min = self.z_min.min(z);
+        self.z_max = self.z_max.max(z);
+        self.z_last = z;
+    }
+}
+
 /// Système Gizmos : pour chaque entity `BoneEntity`, trace une ligne de son
 /// parent à lui-même + une sphère à sa position monde. Couleur selon
 /// classification heuristique du nom.
@@ -73,6 +108,7 @@ pub fn draw_rig_gizmos(
     config: Res<AutoRigGizmosConfig>,
     time: Res<Time>,
     mut dump_timer: Local<f32>,
+    mut torso_accum: Local<HashMap<u64, TorsoStat>>,
     mut gizmos: Gizmos,
     q_bones: Query<(Entity, &GlobalTransform, &Name, Option<&ChildOf>, &BoneEntity)>,
     q_global: Query<&GlobalTransform>,
@@ -112,12 +148,38 @@ pub fn draw_rig_gizmos(
         let _ = entity; // explicit unused
     }
 
+    // ── Accumulation compression torse (par rig, CHAQUE frame) ─────────────
+    // Capture min/max de l'extent vertical chest→hip + offset avant chest→hip
+    // sur la fenêtre 0.5s. Répond à « le torse se comprime quand j'avance » :
+    // si `torso_y_min` (en marche) << `torso_y` idle → compression visible.
+    {
+        let mut frame: HashMap<u64, (Option<Vec3>, Option<Vec3>)> = HashMap::new();
+        for (_, gt, name, _, bone) in &q_bones {
+            let entry = frame.entry(bone.rig_root.to_bits()).or_insert((None, None));
+            match name.as_str() {
+                "chest" => entry.0 = Some(gt.translation()),
+                "hip" => entry.1 = Some(gt.translation()),
+                _ => {}
+            }
+        }
+        for (rig, (chest, hip)) in frame {
+            if let (Some(c), Some(h)) = (chest, hip) {
+                let (ty, tz) = (c.y - h.y, c.z - h.z);
+                torso_accum
+                    .entry(rig)
+                    .and_modify(|s| s.update(ty, tz))
+                    .or_insert_with(|| TorsoStat::new(ty, tz));
+            }
+        }
+    }
+
     // ── Dump sensor positions monde (observabilité torse) ──────────────────
     // Throttle 0.5s. Tri par Y monde décroissant (haut→bas) pour lisibilité.
     *dump_timer += time.delta_secs();
     if *dump_timer >= 0.5 {
         *dump_timer = 0.0;
-        write_rig_bones_sensor(&q_bones);
+        write_rig_bones_sensor(&q_bones, &torso_accum);
+        torso_accum.clear();
     }
 }
 
@@ -128,6 +190,7 @@ pub fn draw_rig_gizmos(
 /// `dy_prev`/`dz_prev` ne sont calculés qu'à l'intérieur d'un même `rig`.
 fn write_rig_bones_sensor(
     q_bones: &Query<(Entity, &GlobalTransform, &Name, Option<&ChildOf>, &BoneEntity)>,
+    torso_accum: &HashMap<u64, TorsoStat>,
 ) {
     // (rig_id, name, color, world) — rig_id = bits stables de l'entity rig_root.
     let mut rows: Vec<(u64, String, &'static str, Vec3)> = q_bones
@@ -154,7 +217,7 @@ fn write_rig_bones_sensor(
         "  \"BUILD_MARKER\": \"{RIG_BONES_BUILD_MARKER}\",\n"
     ));
     json.push_str(&format!("  \"bone_count\": {},\n", rows.len()));
-    json.push_str("  \"note\": \"groupé par 'rig' (squelette), trié Y décroissant. Rex = le rig avec des os tail_*. color=classe gizmo (green=spine). dy/dz vs bone précédent DU MÊME rig.\",\n");
+    json.push_str("  \"note\": \"groupé par 'rig' (squelette), trié Y décroissant. Rex = le rig avec des os tail_*. color=classe gizmo (green=spine). dy/dz vs bone précédent DU MÊME rig. spine_metrics = compression torse (chest.y-hip.y) min/max sur fenêtre 0.5s : torso_y_min << idle => buste comprimé en marche.\",\n");
     json.push_str("  \"bones\": [\n");
     let mut prev: Option<(u64, Vec3)> = None;
     for (i, (rig, name, color, p)) in rows.iter().enumerate() {
@@ -167,6 +230,20 @@ fn write_rig_bones_sensor(
         json.push_str(&format!(
             "    {{\"rig\":{rig},\"name\":\"{name}\",\"color\":\"{color}\",\"world\":[{:.3},{:.3},{:.3}],\"dy_prev\":{:.3},\"dz_prev\":{:.3}}}{comma}\n",
             p.x, p.y, p.z, ddy, ddz
+        ));
+    }
+    json.push_str("  ],\n");
+
+    // ── spine_metrics : compression du torse par rig (fenêtre 0.5s) ────────
+    json.push_str("  \"spine_metrics\": [\n");
+    let mut rigs: Vec<u64> = torso_accum.keys().copied().collect();
+    rigs.sort_unstable();
+    for (i, rig) in rigs.iter().enumerate() {
+        let s = torso_accum[rig];
+        let comma = if i + 1 < rigs.len() { "," } else { "" };
+        json.push_str(&format!(
+            "    {{\"rig\":{rig},\"torso_y_min\":{:.4},\"torso_y_max\":{:.4},\"torso_y_range\":{:.4},\"torso_y_last\":{:.4},\"fwd_z_last\":{:.4}}}{comma}\n",
+            s.y_min, s.y_max, s.y_max - s.y_min, s.y_last, s.z_last
         ));
     }
     json.push_str("  ]\n}\n");

@@ -225,6 +225,12 @@ pub struct ArticulatedBones {
     pub foot_r: BonePose,
     pub spine: BonePose,
     pub hip: BonePose,
+    /// Tête (look-around idle façon WoW). Posée au yaw idle, slerp bind en marche.
+    pub head: BonePose,
+    /// Nuque (parent de la tête). Reçoit la MOITIÉ du yaw du regard pour que la
+    /// tête tourne AVEC la nuque (pas de twist relatif fort → pas de cisaillement
+    /// de la peau au cou). 2026-06-06.
+    pub neck: BonePose,
     pub tail_chain: Vec<BonePose>,
 }
 
@@ -290,7 +296,10 @@ pub struct ProcBodyAnim {
 pub const WALK_FREQ: f32 = 2.5;
 pub const WALK_BOB_AMP: f32 = 0.025;
 pub const LEAN_FORWARD_AMP: f32 = 0.18;
-pub const ROLL_WADDLE_AMP: f32 = 0.06;
+// 2026-06-05 : 0.06 → 0.03. 2026-06-06 : 0.03 → 0.015 — user « moins basculer le
+// corps de droite à gauche quand on avance ». Roulis CORPS ENTIER (waddle root,
+// character.rs target_roll_z) ramené à ~0.86° au lieu de 1.7°. 0 = aucun roulis.
+pub const ROLL_WADDLE_AMP: f32 = 0.015;
 pub const JUMP_SQUASH_AMP: f32 = 0.08;
 pub const FALL_STRETCH_AMP: f32 = 0.06;
 pub const AIRBORNE_VY_THRESHOLD: f32 = 0.8;
@@ -301,7 +310,9 @@ pub const AIRBORNE_VY_THRESHOLD: f32 = 0.8;
 // est chargé via forgia-genome-core.
 
 pub const IDLE_SPEED_THRESHOLD: f32 = 0.15;
-pub const IDLE_BREATH_FREQ: f32 = 1.2;
+// 2026-06-06 : 1.2 → 0.45 Hz — user « mouvements trop rapides ». 1.2 Hz = un souffle
+// toutes les 0.8s (halètement) ; un souffle calme ≈ 0.25-0.45 Hz (toutes les 2-4s).
+pub const IDLE_BREATH_FREQ: f32 = 0.45;
 pub const IDLE_BREATH_AMP: f32 = 0.03;
 
 const GIVEUP_FRAMES: u32 = 120;
@@ -480,6 +491,7 @@ pub fn attach_locomotion_bones(
             let hand_r_e = lookup("hand_R");
             let clavicle_l_e = lookup("clavicle_L");
             let clavicle_r_e = lookup("clavicle_R");
+            let neck_e = lookup("neck");
             let shin_l_e = lookup("shin_L");
             let shin_r_e = lookup("shin_R");
             let foot_l_e = lookup("foot_L");
@@ -509,6 +521,8 @@ pub fn attach_locomotion_bones(
                 foot_r: BonePose::from_entity(foot_r_e, &rot_of),
                 spine: BonePose::from_entity(topo.spine, &rot_of),
                 hip: BonePose::from_entity(topo.root, &rot_of),
+                head: BonePose::from_entity(topo.head, &rot_of),
+                neck: BonePose::from_entity(neck_e, &rot_of),
                 tail_chain: topo
                     .tail_chain
                     .iter()
@@ -684,7 +698,7 @@ pub fn procedural_locomotion(
         for bone in [
             &b.left_arm, &b.right_arm, &b.forearm_l, &b.forearm_r, &b.hand_l, &b.hand_r,
             &b.clavicle_l, &b.clavicle_r, &b.left_leg, &b.right_leg, &b.shin_l, &b.shin_r,
-            &b.foot_l, &b.foot_r, &b.spine, &b.hip,
+            &b.foot_l, &b.foot_r, &b.spine, &b.hip, &b.head, &b.neck,
         ] {
             slerp_to_bind(&mut bones, bone, 1.0);
         }
@@ -699,16 +713,76 @@ pub fn procedural_locomotion(
     if !is_moving {
         let t_secs = time.elapsed_secs();
         let breath = (t_secs * IDLE_BREATH_FREQ).sin() * IDLE_BREATH_AMP;
-        compose_swing(&mut bones, &b.spine, breath);
+        // Posture WoW : léger voûtement AVANT du buste (épaules arrondies, pas
+        // militaire-droit) → c'est LE cue anti-« crispé ». Avance aussi les épaules
+        // donc les mains pendent vers l'avant (pas remontées aux hanches). +X =
+        // avant (même convention/sens que le lean buste du walk). + respiration.
+        const IDLE_FORWARD_HUNCH: f32 = 0.09; // ~5° avant
+        if let Some(e) = b.spine.entity {
+            if let Ok(mut tf) = bones.get_mut(e) {
+                tf.rotation = b.spine.bind
+                    * Quat::from_rotation_x(IDLE_FORWARD_HUNCH)
+                    * Quat::from_axis_angle(b.spine.flex_axis, breath);
+            }
+        }
 
-        slerp_to_stance(&mut bones, &b.left_arm, stance.arm_l, 0.15);
-        slerp_to_stance(&mut bones, &b.right_arm, stance.arm_r, 0.15);
-        // P2c : clavicle stance (no swing, pure stance offset).
+        // ── Bras vivants en idle (moins « poteau collé », demande user 2026-06-06) :
+        // (1) ABDUCTION : décolle les bras du corps (gap naturel) → tue l'effet
+        //     « soudé droit le long du torse ». (2) léger swing d'épaule + (3)
+        //     micro-respiration du coude — lents, petits, L/R déphasés (organique).
+        const IDLE_ARM_SWAY_FREQ: f32 = 0.32; // 2026-06-06 : 0.55→0.32, user « trop rapide »
+        const IDLE_ARM_SWAY_AMP: f32 = 0.07; // ~4° swing épaule (ampli gardée, juste + lent)
+        const IDLE_ELBOW_BREATHE_AMP: f32 = 0.09; // ~5° respiration coude
+        const IDLE_ARM_ABDUCT_DEG: f32 = 6.0; // écartement bras↔corps (gap)
+        let arm_sway_l = (t_secs * IDLE_ARM_SWAY_FREQ).sin() * IDLE_ARM_SWAY_AMP;
+        let arm_sway_r = (t_secs * IDLE_ARM_SWAY_FREQ + 0.7).sin() * IDLE_ARM_SWAY_AMP;
+        let elbow_breathe_l =
+            (t_secs * IDLE_ARM_SWAY_FREQ * 0.8).sin() * IDLE_ELBOW_BREATHE_AMP;
+        let elbow_breathe_r =
+            (t_secs * IDLE_ARM_SWAY_FREQ * 0.8 + 0.9).sin() * IDLE_ELBOW_BREATHE_AMP;
+
+        // Abduction : réduit le Rz du stance bras (moins « rabattu vers la verticale »
+        // = bras plus écarté du corps). Rz pur → commute avec le stance bras (pur Rz).
+        // L : stance +Rz, on retranche ; R : stance −Rz, on ajoute (symétrique).
+        let abduct = IDLE_ARM_ABDUCT_DEG.to_radians();
+        let arm_l_idle = stance.arm_l * Quat::from_rotation_z(-abduct);
+        let arm_r_idle = stance.arm_r * Quat::from_rotation_z(abduct);
+
+        // Épaule : stance abducté + léger swing fore-aft (slerp vers une cible qui
+        // oscille). Axe corrigé sur la chaîne clavicule×bras (sagittal, comme le walk).
+        for (arm, own, parent, sway) in [
+            (&b.left_arm, arm_l_idle, stance.clavicle_l, arm_sway_l),
+            (&b.right_arm, arm_r_idle, stance.clavicle_r, arm_sway_r),
+        ] {
+            if let Some(e) = arm.entity {
+                if let Ok(mut tf) = bones.get_mut(e) {
+                    let chain = parent * own;
+                    let axis = (chain.inverse() * arm.flex_axis).normalize_or(Vec3::X);
+                    let target = arm.bind * own * Quat::from_axis_angle(axis, sway);
+                    tf.rotation = tf.rotation.slerp(target, 0.15);
+                }
+            }
+        }
+        // Clavicule : stance pur (ancre l'épaule, pas de swing).
         slerp_to_stance(&mut bones, &b.clavicle_l, stance.clavicle_l, 0.15);
         slerp_to_stance(&mut bones, &b.clavicle_r, stance.clavicle_r, 0.15);
+        // Coude : flexion de repos LÉGÈRE (ELBOW_REST_FLEX_IDLE ~9° → mains basses,
+        // près des cuisses pas des hanches) + micro-respiration. Parent = clavicule×
+        // bras ABDUCTÉ (l'avant-bras suit l'écartement). Axe sagittal comme le walk.
+        for (fa, parent, breathe) in [
+            (&b.forearm_l, stance.clavicle_l * arm_l_idle, elbow_breathe_l),
+            (&b.forearm_r, stance.clavicle_r * arm_r_idle, elbow_breathe_r),
+        ] {
+            if let Some(e) = fa.entity {
+                if let Ok(mut tf) = bones.get_mut(e) {
+                    let axis = (parent.inverse() * fa.flex_axis).normalize_or(Vec3::X);
+                    let flex = crate::proc_walk::ELBOW_REST_FLEX_IDLE + breathe;
+                    let target = fa.bind * Quat::from_axis_angle(axis, -flex);
+                    tf.rotation = tf.rotation.slerp(target, 0.15);
+                }
+            }
+        }
         for bone in [
-            &b.forearm_l,
-            &b.forearm_r,
             &b.left_leg,
             &b.right_leg,
             &b.shin_l,
@@ -719,6 +793,37 @@ pub fn procedural_locomotion(
         ] {
             slerp_to_bind(&mut bones, bone, 0.15);
         }
+
+        // ── Idle vivant : queue qui ondule (lézard) + tête qui regarde G/D (WoW) ─
+        // Queue : onde lente VOYAGEUSE le long des segments (yaw autour de Y =
+        // balancement latéral), amplitude croissante vers le bout. Les rotations
+        // locales se composent le long de la chaîne → garder petit.
+        const TAIL_IDLE_FREQ: f32 = 0.55; // 2026-06-06 : 1.1→0.55, user « trop rapide »
+        const TAIL_IDLE_AMP: f32 = 0.09; // ~5° base/segment (compose vers le bout)
+        const TAIL_IDLE_PHASE: f32 = 0.7; // déphasage/segment = onde voyageuse
+        for (idx, seg) in b.tail_chain.iter().enumerate() {
+            let grow = 0.5 + 0.13 * idx as f32; // racine raide, bout souple
+            let yaw = (t_secs * TAIL_IDLE_FREQ - idx as f32 * TAIL_IDLE_PHASE).sin()
+                * TAIL_IDLE_AMP
+                * grow;
+            if let Some(e) = seg.entity {
+                if let Ok(mut tf) = bones.get_mut(e) {
+                    tf.rotation = seg.bind * Quat::from_rotation_y(yaw);
+                }
+            }
+        }
+        // Tête : balayage lent gauche↔droite (2 sinus → rythme organique, pas
+        // robotique). Yaw autour de Y (bind ≈ identité → vertical monde).
+        // 2026-06-07 : HEAD-LOOK DÉSACTIVÉ — tête + nuque STATIQUES au bind en idle.
+        // Diagnostic `forgia_skinning_weights.json` : l'os `neck` sur-influence 8936
+        // verts (26% du mesh, un vert à 0.987) et `head` 3725 verts → animer la tête/
+        // nuque, même de quelques degrés, drague les verts épaule/haut-torse → la
+        // déformation (régression du neck-split + « tête déformée à droite » d'origine).
+        // Le bind statique = la pose validée « parfaite ». Pour ré-activer le balayage
+        // SANS déformer, il faut LOCALISER les poids nuque/tête (re-rig, skinning.rs),
+        // pas tweaker la pose ici. Story candidate : skinning weights localization.
+        slerp_to_bind(&mut bones, &b.head, 0.15);
+        slerp_to_bind(&mut bones, &b.neck, 0.15);
 
         stats.locomotion_gait_phase = state.gait_phase;
         stats.locomotion_us = timer.elapsed_us();
@@ -773,28 +878,68 @@ pub fn procedural_locomotion(
     // vers l'ARRIÈRE. Retour au pristine = vers l'avant (contralatéral correct).
     // Tout le gait est désormais pristine : le walk d'origine était bon ; les
     // négations venaient de données polluées (binaire stale + sonde pied faussée).
-    compose_stance_swing(
+    // 2026-06-05 (workflow swing-axis-derive) : le bras hérite du stance de la
+    // CLAVICULE (Rz±40° A-pose) appliqué par l'os parent. compose_stance_swing
+    // ne corrigeait l'axe que pour le stance PROPRE du bras → l'axe de swing
+    // restait incliné de 40° → les mains TWISTAIENT au lieu de basculer avant-
+    // arrière. On corrige l'axe pour la chaîne héritée COMPLÈTE clavicule×bras
+    // (préfixe local = bras seul, la clavicule étant déjà un os parent réel).
+    // ── Protraction de l'ÉPAULE (la clavicule BOUGE en marche) ───────────────
+    // 2026-06-06 (user : "le point de l'épaule est quasiment statique"). Le point
+    // d'épaule (arm_L) est le PIVOT du swing du bras → statique par construction.
+    // Pour qu'il bouge, on anime la CLAVICULE : rotation autour de la VERTICALE
+    // (Y, pré-multipliée = frame torse) en sync avec le swing du bras → l'épaule
+    // avance/recule (protraction/rétraction) et le bras entier hérite ce décalage.
+    // `clav_*_rot` = rotation locale TOTALE clavicule (protraction × stance A-pose),
+    // réutilisée comme parent_stance du bras ET de l'avant-bras → leur swing reste
+    // fore-aft (axe corrigé chaîne complète). Y (pas X) car la clavicule s'étend le
+    // long de X → un swing X la twisterait sans déplacer l'épaule.
+    let clav_l_protract =
+        crate::proc_walk::CLAVICLE_PROTRACT_FACTOR * arm_l_pitch * speed_factor;
+    let clav_r_protract =
+        crate::proc_walk::CLAVICLE_PROTRACT_FACTOR * arm_r_pitch * speed_factor;
+    let clav_l_rot = Quat::from_rotation_y(clav_l_protract) * stance.clavicle_l;
+    let clav_r_rot = Quat::from_rotation_y(clav_r_protract) * stance.clavicle_r;
+    if let Some(e) = b.clavicle_l.entity {
+        if let Ok(mut tf) = bones.get_mut(e) {
+            tf.rotation = b.clavicle_l.bind * clav_l_rot;
+        }
+    }
+    if let Some(e) = b.clavicle_r.entity {
+        if let Ok(mut tf) = bones.get_mut(e) {
+            tf.rotation = b.clavicle_r.bind * clav_r_rot;
+        }
+    }
+    // Bras : swing épaule propre (arm_pitch), axe corrigé pour la clavicule
+    // PROTRACTÉE (parent_stance = clav_*_rot, plus le stance statique).
+    compose_inherited_stance_swing(
         &mut bones,
         &b.left_arm,
         stance.arm_l,
+        clav_l_rot,
         arm_l_pitch * speed_factor,
     );
-    compose_stance_swing(
+    compose_inherited_stance_swing(
         &mut bones,
         &b.right_arm,
         stance.arm_r,
+        clav_r_rot,
         arm_r_pitch * speed_factor,
     );
-    // P2c : clavicle stance (no swing pendant walk — la clavicle est statique
-    // sur la pose game, seule l'arm pitch fait l'oscillation walk cycle).
-    slerp_to_stance(&mut bones, &b.clavicle_l, stance.clavicle_l, 0.25);
-    slerp_to_stance(&mut bones, &b.clavicle_r, stance.clavicle_r, 0.25);
-    // Avant-bras : enfants d'un bras stancé Rz(±90°) → correction stance hérité.
-    // 2026-06-03 : sonde forgia_anim_full.json → forearm forward_lean = -0.8 (le
-    // coude pliait l'avant-bras vers l'ARRIÈRE). On inverse le signe du coude pour
-    // que l'avant-bras suive le bras vers l'avant. Vérifié via forward_lean.
-    compose_swing_inherit(&mut bones, &b.forearm_l, stance.arm_l, -elbow_l * speed_factor);
-    compose_swing_inherit(&mut bones, &b.forearm_r, stance.arm_r, -elbow_r * speed_factor);
+    // Avant-bras : hérite clavicule(protractée) × bras → parent_stance complet.
+    // 2026-06-03 : signe du coude inversé pour que l'avant-bras suive vers l'avant.
+    compose_swing_inherit(
+        &mut bones,
+        &b.forearm_l,
+        clav_l_rot * stance.arm_l,
+        -elbow_l * speed_factor,
+    );
+    compose_swing_inherit(
+        &mut bones,
+        &b.forearm_r,
+        clav_r_rot * stance.arm_r,
+        -elbow_r * speed_factor,
+    );
 
     let (pelvic_yaw, pelvic_roll, _bob_y) =
         crate::proc_walk::pelvic_pose(gait, speed_factor, &tunables);
@@ -807,10 +952,22 @@ pub fn procedural_locomotion(
 
     if let Some(e) = b.spine.entity {
         if let Ok(mut tf) = bones.get_mut(e) {
+            // Forward lean du SPINE — petite emphase torse PAR-DESSUS le lean root
+            // (dominant, character.rs, désormais +). 2026-06-06 : le vrai coupable
+            // "penche en arrière" était le lean ROOT (flippé en +). Le spine
+            // accompagne en avant (même convention, sous le Y=π du root). Petit
+            // (+0.10) pour que le torse penche un poil plus que les jambes.
+            const FORWARD_LEAN_RAD: f32 = 0.10; // ~6° torse, en plus du root
             tf.rotation = b.spine.bind
+                * Quat::from_rotation_x(FORWARD_LEAN_RAD * speed_factor)
                 * Quat::from_rotation_y(crate::proc_walk::spine_counter_rot(pelvic_yaw));
         }
     }
+
+    // En marche, la tête ET la nuque regardent DEVANT (annule le look-around idle,
+    // sinon elles restent figées de travers). Slerp doux vers le bind.
+    slerp_to_bind(&mut bones, &b.head, 0.15);
+    slerp_to_bind(&mut bones, &b.neck, 0.15);
 
     let tail_len = b.tail_chain.len();
     for (idx, seg) in b.tail_chain.iter().enumerate() {
@@ -873,20 +1030,34 @@ fn slerp_to_bind(
     }
 }
 
+/// Comme [`compose_swing`] mais pour un os qui porte un stance PROPRE
+/// (`own_stance`, ex bras Rz(±25°)) ET hérite d'un stance d'un ANCÊTRE
+/// (`parent_stance`, ex clavicule Rz(±40°) appliqué par l'os parent réel en monde).
+///
+/// Le swing doit pivoter autour de l'axe latéral MONDE. Le frame monde de l'os
+/// avant swing = `parent_stance * own_stance` (binds Pinocchio ≈ identité), donc
+/// l'axe local corrigé = `(parent_stance * own_stance)⁻¹ · flex_axis`. L'ordre
+/// `parent * own` est OBLIGATOIRE (un test à stance pure-Z ne le discrimine pas,
+/// car deux Rz commutent — cf test à clavicule non-Z).
+///
+/// ⚠️ Le préfixe appliqué dans le local reste `own_stance` SEUL : `parent_stance`
+/// est déjà appliqué par l'os parent réel en monde. Le ré-appliquer ici le baked
+/// DEUX FOIS → pose de repos cassée (workflow swing-axis-derive 2026-06-05,
+/// key_risk unanime des 3 dérivations). Cas `parent_stance = IDENTITY` = l'ancien
+/// `compose_stance_swing` (stance propre seul).
 #[inline]
-fn compose_stance_swing(
+fn compose_inherited_stance_swing(
     bones: &mut Query<&mut Transform, (Without<LocomotionState>, Without<LocomotionTarget>)>,
     bone: &BonePose,
-    stance: Quat,
+    own_stance: Quat,
+    parent_stance: Quat,
     swing_x: f32,
 ) {
     if let Some(e) = bone.entity {
         if let Ok(mut tf) = bones.get_mut(e) {
-            // flex_axis est défini en espace bind-local ; la stance peut tourner
-            // l'os (bras : ±90° autour de Z) → on ré-exprime l'axe en espace
-            // post-stance pour que le swing reste anatomique (pas un roll).
-            let axis = (stance.inverse() * bone.flex_axis).normalize_or(Vec3::X);
-            tf.rotation = bone.bind * stance * Quat::from_axis_angle(axis, swing_x);
+            let chain = parent_stance * own_stance;
+            let axis = (chain.inverse() * bone.flex_axis).normalize_or(Vec3::X);
+            tf.rotation = bone.bind * own_stance * Quat::from_axis_angle(axis, swing_x);
         }
     }
 }
@@ -1499,7 +1670,7 @@ pub fn write_anim_full_sensor(
     let leg_r_swing = rphase >= tun.stance_frac;
 
     let json = format!(
-        "{{\n  \"id\": \"anim_full\",\n  \"BUILD_MARKER\": \"WALKDIR_2026-06-05\",\n  \"severity\": \"ok\",\n  \"timestamp_secs\": {:.1},\n  \"entry_index\": {},\n  \"guide\": \"world_deg/world_dir/forward_lean = orientation MONDE (apres Ry PI) — SEUL fiable (euler peut gimbal-lock a Y=90, cf gimbal_warn). forward_lean>0 = os pointe AVANT (sens marche), <0 = arriere. mesh_align_dy = head.y - Y_attendu(AABB mesh) ; |.|>0.10 = os hors feature mesh (rings genoux/epaules). hand_l/r jamais pilotes (figes au bind). stance gauche/droite via stance_deg.\",\n  \"pipeline\": {{\n    \"cache_ready\": {}, \"gave_up\": {}, \"frames_waited\": {},\n    \"locomotion_target_count\": {},\n    \"topology_[hip,spine,clavL,armL,foreL,handL,clavR,armR,foreR,handR,legL,shinL,footL,legR,shinR,footR]\": \"{}\",\n    \"stance_source\": \"{}\"\n  }},\n  \"gait\": {{\n    \"is_moving\": {}, \"moving_world\": {}, \"speed_m_s\": {:.3}, \"speed_factor\": {:.3},\n    \"gait_phase\": {:.3}, \"stance_frac\": {:.3}, \"leg_l_in_swing\": {}, \"leg_r_in_swing\": {},\n    \"thigh_l_deg\": {:.1}, \"thigh_r_deg\": {:.1}, \"knee_l_deg\": {:.1}, \"knee_r_deg\": {:.1},\n    \"ankle_l_deg\": {:.1}, \"ankle_r_deg\": {:.1},\n    \"arm_l_pitch_deg\": {:.1}, \"arm_r_pitch_deg\": {:.1}, \"elbow_l_deg\": {:.1}, \"elbow_r_deg\": {:.1},\n    \"pelvic_yaw_deg\": {:.1}, \"pelvic_roll_deg\": {:.1}\n  }},\n  \"root\": {{\n    \"world_translation\": [{:.3},{:.3},{:.3}],\n    \"world_yaw_deg\": {:.1}, \"ry_pi_confirmed\": {}, \"pitch_deg\": {:.1}, \"roll_deg\": {:.1},\n    \"travel_dir_world\": [{:.3},{:.3},{:.3}]\n  }},\n  \"mesh\": {{\n    \"found\": {}, \"aabb_world_center\": [{:.3},{:.3},{:.3}], \"aabb_world_half\": [{:.3},{:.3},{:.3}],\n    \"mesh_height\": {:.3}, \"hip_vs_mesh_center_desync_m\": {:.3}\n  }},\n  \"foot_ik_see\": \"forgia_foot_ik.json\",\n  \"spring_see\": \"forgia_bone_trace.json (tail)\",\n  \"bones\": [\n    {}\n  ]\n}}\n",
+        "{{\n  \"id\": \"anim_full\",\n  \"BUILD_MARKER\": \"ARMS-DOWN_2026-06-05\",\n  \"severity\": \"ok\",\n  \"timestamp_secs\": {:.1},\n  \"entry_index\": {},\n  \"guide\": \"world_deg/world_dir/forward_lean = orientation MONDE (apres Ry PI) — SEUL fiable (euler peut gimbal-lock a Y=90, cf gimbal_warn). forward_lean>0 = os pointe AVANT (sens marche), <0 = arriere. mesh_align_dy = head.y - Y_attendu(AABB mesh) ; |.|>0.10 = os hors feature mesh (rings genoux/epaules). hand_l/r jamais pilotes (figes au bind). stance gauche/droite via stance_deg.\",\n  \"pipeline\": {{\n    \"cache_ready\": {}, \"gave_up\": {}, \"frames_waited\": {},\n    \"locomotion_target_count\": {},\n    \"topology_[hip,spine,clavL,armL,foreL,handL,clavR,armR,foreR,handR,legL,shinL,footL,legR,shinR,footR]\": \"{}\",\n    \"stance_source\": \"{}\"\n  }},\n  \"gait\": {{\n    \"is_moving\": {}, \"moving_world\": {}, \"speed_m_s\": {:.3}, \"speed_factor\": {:.3},\n    \"gait_phase\": {:.3}, \"stance_frac\": {:.3}, \"leg_l_in_swing\": {}, \"leg_r_in_swing\": {},\n    \"thigh_l_deg\": {:.1}, \"thigh_r_deg\": {:.1}, \"knee_l_deg\": {:.1}, \"knee_r_deg\": {:.1},\n    \"ankle_l_deg\": {:.1}, \"ankle_r_deg\": {:.1},\n    \"arm_l_pitch_deg\": {:.1}, \"arm_r_pitch_deg\": {:.1}, \"elbow_l_deg\": {:.1}, \"elbow_r_deg\": {:.1},\n    \"pelvic_yaw_deg\": {:.1}, \"pelvic_roll_deg\": {:.1}\n  }},\n  \"root\": {{\n    \"world_translation\": [{:.3},{:.3},{:.3}],\n    \"world_yaw_deg\": {:.1}, \"ry_pi_confirmed\": {}, \"pitch_deg\": {:.1}, \"roll_deg\": {:.1},\n    \"travel_dir_world\": [{:.3},{:.3},{:.3}]\n  }},\n  \"mesh\": {{\n    \"found\": {}, \"aabb_world_center\": [{:.3},{:.3},{:.3}], \"aabb_world_half\": [{:.3},{:.3},{:.3}],\n    \"mesh_height\": {:.3}, \"hip_vs_mesh_center_desync_m\": {:.3}\n  }},\n  \"foot_ik_see\": \"forgia_foot_ik.json\",\n  \"spring_see\": \"forgia_bone_trace.json (tail)\",\n  \"bones\": [\n    {}\n  ]\n}}\n",
         time.elapsed_secs(),
         entry.0,
         cache.ready, cache.gave_up, cache.frames_waited,
@@ -1596,5 +1767,120 @@ mod swing_axis_tests {
                 "flexion coude doit rester latérale, parent_stance={parent_stance:?}"
             );
         }
+    }
+
+    /// 2026-06-05 (workflow swing-axis-derive) : quand la clavicule a un stance
+    /// (A-pose Rz±40°), le bras en hérite. L'axe de swing doit être corrigé pour
+    /// la chaîne COMPLÈTE clavicule×bras, sinon il reste incliné de 40° → la main
+    /// twiste. Test à clavicule NON purement-Z (composante X 15°) : indispensable
+    /// car deux Rz commutent et un test Z-only validerait un mauvais ordre.
+    #[test]
+    fn clavicle_inherited_stance_swing_world_axis_is_lateral() {
+        let bind = Quat::IDENTITY;
+        let flex = swing_axis_local(bind); // = X
+        // Clavicule non-Z (Rz40 * Rx15) pour discriminer l'ordre clav*arm.
+        let clav = Quat::from_rotation_z(40.0_f32.to_radians())
+            * Quat::from_rotation_x(15.0_f32.to_radians());
+        let arm = Quat::from_rotation_z(25.0_f32.to_radians());
+        let chain = clav * arm;
+
+        // (1) Axe-monde du swing bras = latéral X (corrigé chaîne complète).
+        let arm_axis = (chain.inverse() * flex).normalize_or(Vec3::X);
+        assert!(
+            approx_eq(chain * arm_axis, LATERAL_AXIS),
+            "axe-monde swing bras doit = X, got {:?}",
+            chain * arm_axis
+        );
+
+        // (2) Falsification du BUG : ancienne formule (arm⁻¹) s'écarte de X (~40°).
+        let old_axis = (arm.inverse() * flex).normalize_or(Vec3::X);
+        assert!(
+            (chain * old_axis).angle_between(LATERAL_AXIS) > 0.5,
+            "ancien axe (arm⁻¹) doit dévier ~40° (preuve que le test discrimine)"
+        );
+
+        // (3) Falsification de l'ORDRE : (arm*clav)⁻¹ dévie sur clavicule non-Z.
+        let rev_axis = ((arm * clav).inverse() * flex).normalize_or(Vec3::X);
+        assert!(
+            (chain * rev_axis).angle_between(LATERAL_AXIS) > 0.02,
+            "ordre inversé (arm*clav) doit dévier sur clavicule non-Z"
+        );
+
+        // (4) Avant-bras : parent_stance = clavicule×bras → axe-monde = X.
+        let fore_axis = (chain.inverse() * flex).normalize_or(Vec3::X);
+        assert!(
+            approx_eq(chain * fore_axis, LATERAL_AXIS),
+            "axe-monde coude doit = X, got {:?}",
+            chain * fore_axis
+        );
+
+        // (5) Trajectoire USER-FACING : pivot pur autour de X-monde → le BOUT de
+        // la main garde sa composante latérale X (= pas de twist) et balance en Z
+        // (avant-arrière, signes opposés). Construction monde : arm_world = frame
+        // parent (clavicule = chain⁻¹ déjà inclus) → arm_world(sw) = chain * R(arm_axis,sw)
+        // (le préfixe own_stance=arm est DÉJÀ dans chain=clav*arm, binds=I).
+        let arm_world = |sw: f32| chain * Quat::from_axis_angle(arm_axis, sw);
+        let fore_world = |sw: f32, el: f32| arm_world(sw) * Quat::from_axis_angle(fore_axis, el);
+        let tip = |sw: f32, el: f32| fore_world(sw, el) * Vec3::NEG_X; // main local = I
+        let rest = tip(0.0, 0.0);
+        let fwd = tip(0.5, 0.3);
+        let bwd = tip(-0.5, -0.3);
+        // (a) twist nul : composante latérale X conservée (pivot autour de X).
+        assert!(
+            (fwd.x - rest.x).abs() < 0.01,
+            "twist bras (Δx avant) = {}, doit être ~0",
+            (fwd.x - rest.x).abs()
+        );
+        assert!(
+            (bwd.x - rest.x).abs() < 0.01,
+            "twist bras (Δx arrière) = {}",
+            (bwd.x - rest.x).abs()
+        );
+        // (b) fore-aft réel en Z, signes opposés avant/arrière.
+        assert!(
+            (fwd.z - rest.z).abs() > 0.2,
+            "amplitude avant-arrière insuffisante, got {}",
+            (fwd.z - rest.z).abs()
+        );
+        assert!(
+            (fwd.z - rest.z) * (bwd.z - rest.z) < 0.0,
+            "avant et arrière doivent être en Z opposés"
+        );
+    }
+
+    /// 2026-06-05 : invariant USER-FACING (pas seulement l'axe). Le bras est en
+    /// T-pose (pointe le long de X = l'axe de swing latéral) → SANS stance le swing
+    /// le fait TWISTER sur lui-même ("pivote sur lui-même"). La stance Rz±90° le
+    /// fait PENDRE (-Y) ; le même swing autour de X devient alors un BALANCEMENT
+    /// AVANT-ARRIÈRE (±Z). On vérifie la trajectoire du BOUT du bras, pas l'axe.
+    #[test]
+    fn arm_swing_is_fore_aft_not_twist() {
+        let bind = Quat::IDENTITY;
+        let flex = swing_axis_local(bind); // = X
+        // arm_l : Rz(+90°) descend le bras gauche (T-pose -X → pendant -Y).
+        let stance = Quat::from_rotation_z(FRAC_PI_2);
+        // Direction du bras au repos : T-pose gauche pointe le long de -X (bind=I).
+        let local_tip = Vec3::NEG_X;
+        let arm_dir = |swing: f32| -> Vec3 {
+            let axis = stance.inverse() * flex;
+            (bind * stance * Quat::from_axis_angle(axis, swing)) * local_tip
+        };
+
+        // swing=0 : le bras PEND vers le bas (-Y), plus en T-pose.
+        let rest = arm_dir(0.0);
+        assert!(rest.y < -0.9, "bras pendant au repos (-Y), got {rest:?}");
+
+        // swing ± : le bout balance AVANT-ARRIÈRE (±Z), opposés, pas un twist.
+        let fwd = arm_dir(0.5);
+        let bwd = arm_dir(-0.5);
+        assert!(
+            fwd.z.abs() > 0.3,
+            "le swing déplace le bras en Z (fore-aft), got {fwd:?}"
+        );
+        assert!(fwd.z * bwd.z < 0.0, "swings opposés = Z opposés (avant vs arrière)");
+        assert!(
+            (fwd - rest).length() > 0.3,
+            "le bras bouge vraiment (pas un twist sur place), got {fwd:?}"
+        );
     }
 }

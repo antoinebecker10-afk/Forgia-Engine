@@ -29,7 +29,7 @@ use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_anim_locomotion::{
     LocomotionBoneCache, LocomotionState, LocomotionTarget, LocomotionTemplate, ProcBodyAnim,
-    AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_BREATH_AMP, IDLE_BREATH_FREQ,
+    AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP,
     IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP, WALK_BOB_AMP,
     WALK_FREQ,
 };
@@ -776,8 +776,11 @@ pub(crate) fn procedural_whole_body_anim(
             // Walk bob : |sin(2φ)| produit 2 oscillations par cycle (pied gauche+droit).
             (anim.walk_phase * 2.0).sin().abs() * WALK_BOB_AMP * speed_factor
         } else {
-            // Idle breathing très subtil.
-            (time.elapsed_secs() * IDLE_BREATH_FREQ).sin() * IDLE_BREATH_AMP * 0.5
+            // 2026-06-05 : idle = AUCUN bob du corps entier. Le user veut une
+            // respiration du TORSE (poitrine), pas le corps qui s'élève/redescend
+            // dans les airs. La respiration est portée par le spine breath dans
+            // procedural_locomotion (compose_swing sur b.spine, locomotion.rs).
+            0.0
         };
         anim.bob_smooth = anim.bob_smooth * 0.75 + target_bob * 0.25;
 
@@ -795,10 +798,14 @@ pub(crate) fn procedural_whole_body_anim(
                     // On veut mesh.bottom_world = hit_world_y.
                     // delta = hit_world_y - (player_tf.y - 1.0) = hit_world_y - player_tf.y + 1.0
                     let delta = hit_world_y - player_tf.translation.y + 1.0;
-                    // Clamp pour éviter spikes (téléportation, terrain manquant) :
-                    // positif = terrain plus haut que capsule bottom (montée slope) → ok
-                    // négatif = terrain en dessous (gap, falaise) → ne pas dangler les pieds
-                    delta.clamp(0.0, 0.4)
+                    // delta = terrain - capsule_bottom = correction pour poser le BAS
+                    // du mesh pile sur le terrain (base_y cale mesh_bottom = capsule_bottom).
+                    // 2026-06-05 : on AUTORISE le négatif (clamp -0.5) — avant, clamp
+                    // [0.0, 0.4] ne pouvait que REMONTER Rex → s'il flottait (capsule
+                    // au-dessus du sol) ou en pente descendante, il lévitait sans fix.
+                    // Borne -0.5 = pas de dangle infini au bord d'une falaise ; +0.4 =
+                    // montée de pente. Bidirectionnel = suit le terrain dans les 2 sens.
+                    delta.clamp(-0.5, 0.4)
                 } else {
                     0.0
                 }
@@ -814,9 +821,12 @@ pub(crate) fn procedural_whole_body_anim(
 
         // ── Lean / Roll (rotation) ─────────────────────────────────────────
         let target_lean_x = if is_moving && !airborne {
-            -LEAN_FORWARD_AMP * speed_factor
+            // 2026-06-06 : signe flippé (+) — c'est le lean ROOT corps-entier
+            // DOMINANT. Avec Y=π appliqué avant X (from_euler YXZ), `-` penchait en
+            // ARRIÈRE (confirmé user). `+` = vers l'AVANT en marche.
+            LEAN_FORWARD_AMP * speed_factor
         } else if airborne && vy > 0.0 {
-            -0.10 // léger tuck forward en montée
+            0.10 // léger tuck forward en montée (même convention que la marche)
         } else {
             0.0
         };

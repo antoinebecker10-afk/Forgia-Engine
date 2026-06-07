@@ -39,9 +39,21 @@ pub const STANCE_FRAC_RUN: f32 = 0.40;
 pub const AMP_THIGH_WALK: f32 = 0.80;
 pub const AMP_THIGH_RUN: f32 = 1.00;
 
-/// Amplitude arm swing (rad, pitch épaule). Walk ~32°, run ~49°.
-pub const AMP_ARM_WALK: f32 = 0.55;
-pub const AMP_ARM_RUN: f32 = 0.85;
+/// Amplitude arm swing (rad, pitch ÉPAULE). 2026-06-06 : 0.55→0.75 walk (~43°),
+/// 0.85→1.05 run (~60°). Le bras doit penduler depuis l'ÉPAULE de façon visible
+/// (user : "faire bouger les bras de l'épaule aussi"). 0.55 + scaling vitesse
+/// tombait à ~15-20° en marche lente → peu visible. Tunable (↓ si trop "marche
+/// militaire", ↑ si encore trop discret).
+pub const AMP_ARM_WALK: f32 = 0.75;
+pub const AMP_ARM_RUN: f32 = 1.05;
+
+/// Protraction de l'épaule (clavicule) en sync avec le swing du bras. La clavicule
+/// tourne autour de la VERTICALE (Y) de `FACTOR * arm_pitch` → l'épaule avance/recule
+/// visiblement en marche (le point d'épaule n'est plus statique). 2026-06-06 (user).
+/// Tunable (↑ = épaule plus mobile ; signe à flipper si l'épaule recule quand le
+/// bras avance). NB : autour de Y (pas X) car la clavicule s'étend le long de X —
+/// un swing X la twisterait sans déplacer l'épaule.
+pub const CLAVICLE_PROTRACT_FACTOR: f32 = 0.35;
 
 /// Knee max flexion en swing peak (rad). Exagéré pour lecture cam 3P.
 pub const KNEE_FLEX_PEAK_WALK: f32 = 1.60; // ~92°
@@ -50,15 +62,29 @@ pub const KNEE_FLEX_PEAK_RUN: f32 = 1.80; // ~103°
 /// Ankle dorsi-flex peak en mid-swing (rad). ~15°.
 pub const ANKLE_FLEX_PEAK: f32 = 0.26;
 
-/// Elbow rest flexion (rad). Bras au repos plié à ~70°.
-pub const ELBOW_REST_FLEX: f32 = 1.20;
+/// Elbow rest flexion en MARCHE (rad). 2026-06-06 : 1.20 (~69°) → 0.25 (~14°).
+/// À 69° l'avant-bras se REPLIAIT trop (seules les mains bougeaient). À 14° le bras
+/// swing comme un tout, l'avant-bras suit avec une flexion naturelle légère. Valeur
+/// validée user. Tunable (↑ = coude plus plié). Voir [`ELBOW_REST_FLEX_IDLE`] pour
+/// la flexion à l'arrêt (séparée car le swing du walk tolère plus de flexion que la
+/// pose statique debout, où trop de flexion remonte les mains vers les hanches).
+pub const ELBOW_REST_FLEX: f32 = 0.25;
+
+/// Elbow rest flexion à L'ARRÊT (rad), ~15°. Historique : 20° → mains trop hautes
+/// (« proches des hanches ») ; 9° → trop tendu (« poteau »). 2026-06-06 : remonté à
+/// ~15° MAIS combiné à la voûte avant du buste (IDLE_FORWARD_HUNCH) qui avance les
+/// épaules → les mains reposent DEVANT les cuisses (bas), pas remontées aux hanches.
+/// Pose WoW relâchée. Tunable : ↑ = coude plus plié (mains montent), ↓ = bras tendu.
+pub const ELBOW_REST_FLEX_IDLE: f32 = 0.26;
 
 /// Pelvic yaw amplitude (rad). Walk ~6°, run ~10°.
 pub const PELVIC_YAW_AMP_WALK: f32 = 0.10;
 pub const PELVIC_YAW_AMP_RUN: f32 = 0.17;
 
-/// Pelvic roll amplitude (rad). ±7° typique.
-pub const PELVIC_ROLL_AMP: f32 = 0.12;
+/// Pelvic roll amplitude (rad). 2026-06-05 : 0.12 → 0.08. 2026-06-06 : 0.08 → 0.04
+/// — user « moins basculer le corps de droite à gauche quand on avance ». Réduit
+/// l'inclinaison latérale du bassin (~2.3° au lieu de 4.6°). ↑ pour ré-accentuer.
+pub const PELVIC_ROLL_AMP: f32 = 0.04;
 
 /// Pelvic bob Y amplitude (m). ~4cm walk, ~7cm run.
 pub const PELVIC_BOB_AMP_WALK: f32 = 0.04;
@@ -70,7 +96,9 @@ pub const SPEED_WALK_PEAK_M_S: f32 = 1.8; // marche confortable
 pub const SPEED_RUN_THRESHOLD_M_S: f32 = 4.0; // course établie
 
 /// Spine counter-rotation factor (fraction du pelvic yaw, opposé).
-pub const SPINE_COUNTER_ROT_FACTOR: f32 = 0.7;
+/// 2026-06-05 : 0.7 → 1.0 pour un buste qui contre-tourne visiblement (épaules
+/// opposées au bassin) = marche plus naturelle type WoW. Tunable.
+pub const SPINE_COUNTER_ROT_FACTOR: f32 = 1.0;
 
 // ── Modèle paramétré par speed ──────────────────────────────────────────────
 
@@ -89,19 +117,24 @@ pub struct GaitTunables {
 }
 
 impl GaitTunables {
+    /// Story-579 incr.1 : les 7 paires WALK/RUN viennent désormais du `GaitGenome`
+    /// (data-driven, per-personnage, hot-reloadable) au lieu des const module. Les
+    /// const restent la SOURCE des défauts (miroir, cf `gait_genome` — zéro régression).
+    /// Les seuils de vitesse (`SPEED_*`) restent const (partagés avec `speed_factor`).
     pub fn for_speed(speed_m_s: f32) -> Self {
+        let g = crate::gait_genome::gait();
         let speed_t = ((speed_m_s - SPEED_WALK_PEAK_M_S)
             / (SPEED_RUN_THRESHOLD_M_S - SPEED_WALK_PEAK_M_S))
             .clamp(0.0, 1.0);
         let lerp = |a: f32, b: f32| a + (b - a) * speed_t;
         Self {
-            stride_per_m: lerp(STRIDE_PER_M_WALK, STRIDE_PER_M_RUN),
-            stance_frac: lerp(STANCE_FRAC_WALK, STANCE_FRAC_RUN),
-            amp_thigh: lerp(AMP_THIGH_WALK, AMP_THIGH_RUN),
-            amp_arm: lerp(AMP_ARM_WALK, AMP_ARM_RUN),
-            knee_flex_peak: lerp(KNEE_FLEX_PEAK_WALK, KNEE_FLEX_PEAK_RUN),
-            pelvic_yaw_amp: lerp(PELVIC_YAW_AMP_WALK, PELVIC_YAW_AMP_RUN),
-            pelvic_bob_amp: lerp(PELVIC_BOB_AMP_WALK, PELVIC_BOB_AMP_RUN),
+            stride_per_m: lerp(g.stride_per_m_walk, g.stride_per_m_run),
+            stance_frac: lerp(g.stance_frac_walk, g.stance_frac_run),
+            amp_thigh: lerp(g.amp_thigh_walk, g.amp_thigh_run),
+            amp_arm: lerp(g.amp_arm_walk, g.amp_arm_run),
+            knee_flex_peak: lerp(g.knee_flex_peak_walk, g.knee_flex_peak_run),
+            pelvic_yaw_amp: lerp(g.pelvic_yaw_amp_walk, g.pelvic_yaw_amp_run),
+            pelvic_bob_amp: lerp(g.pelvic_bob_amp_walk, g.pelvic_bob_amp_run),
         }
     }
 }
@@ -378,8 +411,8 @@ mod tests {
         let spine = spine_counter_rot(pelvic_yaw);
         assert!(spine * pelvic_yaw < 0.0, "spine opposed to pelvis");
         assert!(
-            (spine.abs() - 0.07).abs() < 1e-4,
-            "spine = -0.7 * pelvis, got {}",
+            (spine.abs() - 0.10).abs() < 1e-4,
+            "spine = -1.0 * pelvis (factor 2026-06-05), got {}",
             spine
         );
     }

@@ -38,8 +38,10 @@
 //! ```
 
 pub mod foot_ik;
+pub mod gait_genome;
 pub mod locomotion;
 pub mod proc_walk;
 
 pub use foot_ik::*;
+pub use gait_genome::*;
 pub use locomotion::*;

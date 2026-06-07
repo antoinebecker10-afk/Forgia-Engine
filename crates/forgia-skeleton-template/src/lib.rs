@@ -520,11 +520,12 @@ impl SkeletonTemplate {
         ])
     }
 
-    /// Template biped lézard (Rex) 21 bones (17 body + 4 tail).
+    /// Template biped lézard (Rex) 25 bones (humanoïde digitigrade à queue).
     /// **Source de vérité** : `assets/genomes/skeleton_biped_lizard.toml`.
-    /// 2026-06-04 : `spine_mid` retiré (4 os spine → 3), `chest` re-parenté sur
-    /// `spine_lower`, indices `parent` renumérotés. 2026-06-05 : os `toe_L/R`
-    /// ajoutés (orteil digitigrade, parent foot). Cf TOML pour le détail.
+    /// 2026-06-04 : `spine_mid` retiré (3 os spine), `chest` re-parenté.
+    /// 2026-06-05 : `toe_L/R` (orteil digitigrade) + chaîne bras complète
+    /// `clavicule → upper → forearm → main` (best practices). Placement bras
+    /// déterministe (embedder `is_arm`, anti-snap-cou). Ordre BFS. Cf TOML.
     pub fn biped_lizard() -> Self {
         use BoneClass::*;
         Self::from_data(&[
@@ -533,22 +534,26 @@ impl SkeletonTemplate {
             ("chest", Some(1), [0.0, 0.74, 0.08], Spine),
             ("neck", Some(2), [0.0, 0.76, 0.06], Spine),
             ("head", Some(3), [0.0, 0.82, 0.10], Head),
-            ("arm_L", Some(2), [-0.18, 0.71, 0.0], Arm),
-            ("forearm_L", Some(5), [-0.36, 0.71, 0.0], Arm),
-            ("arm_R", Some(2), [0.18, 0.71, 0.0], Arm),
-            ("forearm_R", Some(7), [0.36, 0.71, 0.0], Arm),
+            ("clavicle_L", Some(2), [-0.09, 0.73, 0.0], Arm),
+            ("arm_L", Some(5), [-0.15, 0.71, 0.0], Arm),
+            ("forearm_L", Some(6), [-0.30, 0.71, 0.0], Arm),
+            ("hand_L", Some(7), [-0.52, 0.71, 0.0], Arm),
+            ("clavicle_R", Some(2), [0.09, 0.73, 0.0], Arm),
+            ("arm_R", Some(9), [0.15, 0.71, 0.0], Arm),
+            ("forearm_R", Some(10), [0.30, 0.71, 0.0], Arm),
+            ("hand_R", Some(11), [0.52, 0.71, 0.0], Arm),
             ("thigh_L", Some(0), [-0.10, 0.37, 0.09], Leg),
-            ("shin_L", Some(9), [-0.10, 0.20, 0.12], Leg),
-            ("foot_L", Some(10), [-0.10, 0.04, 0.06], Leg),
+            ("shin_L", Some(13), [-0.10, 0.20, 0.12], Leg),
+            ("foot_L", Some(14), [-0.10, 0.04, 0.06], Leg),
+            ("toe_L", Some(15), [-0.10, 0.01, 0.16], Leg),
             ("thigh_R", Some(0), [0.10, 0.37, 0.09], Leg),
-            ("shin_R", Some(12), [0.10, 0.20, 0.12], Leg),
-            ("foot_R", Some(13), [0.10, 0.04, 0.06], Leg),
+            ("shin_R", Some(17), [0.10, 0.20, 0.12], Leg),
+            ("foot_R", Some(18), [0.10, 0.04, 0.06], Leg),
+            ("toe_R", Some(19), [0.10, 0.01, 0.16], Leg),
             ("tail_01", Some(0), [0.0, 0.41, -0.12], Tail),
-            ("tail_02", Some(15), [0.0, 0.39, -0.22], Tail),
-            ("tail_03", Some(16), [0.0, 0.37, -0.32], Tail),
-            ("tail_04", Some(17), [0.0, 0.27, -0.42], Tail),
-            ("toe_L", Some(11), [-0.10, 0.01, 0.16], Leg),
-            ("toe_R", Some(14), [0.10, 0.01, 0.16], Leg),
+            ("tail_02", Some(21), [0.0, 0.39, -0.22], Tail),
+            ("tail_03", Some(22), [0.0, 0.37, -0.32], Tail),
+            ("tail_04", Some(23), [0.0, 0.27, -0.42], Tail),
         ])
     }
 
@@ -966,21 +971,23 @@ mod tests {
     }
 
     #[test]
-    fn biped_lizard_has_21_bones_with_root_hip() {
+    fn biped_lizard_has_25_bones_with_root_hip() {
         let t = SkeletonTemplate::biped_lizard();
-        // 2026-06-04 : spine_mid retiré (3 os spine). 2026-06-05 : +toe_L/R.
-        assert_eq!(t.bones.len(), 21, "biped_lizard = 17 body + 4 tail");
+        // 3 spine + 2 head/neck + 8 bras (clav+upper+fore+main ×2) + 8 jambes
+        // (thigh+shin+foot+toe ×2) + 4 tail = 25.
+        assert_eq!(t.bones.len(), 25, "biped_lizard = 25 os (humanoïde complet)");
         assert_eq!(t.bones[0].name, "hip");
         assert!(t.bones[0].parent.is_none());
-        // spine_mid ne doit plus exister ; chest est re-parenté sur spine_lower.
         assert!(!t.bones.iter().any(|b| b.name == "spine_mid"));
-        let chest = t.bones.iter().position(|b| b.name == "chest").unwrap();
-        let spine_lower = t.bones.iter().position(|b| b.name == "spine_lower").unwrap();
-        assert_eq!(t.bones[chest].parent, Some(spine_lower));
-        // toe_L doit être parenté sur foot_L (orteil digitigrade).
-        let toe_l = t.bones.iter().position(|b| b.name == "toe_L").unwrap();
-        let foot_l = t.bones.iter().position(|b| b.name == "foot_L").unwrap();
-        assert_eq!(t.bones[toe_l].parent, Some(foot_l));
+        let idx = |n: &str| t.bones.iter().position(|b| b.name == n).unwrap();
+        assert_eq!(t.bones[idx("chest")].parent, Some(idx("spine_lower")));
+        // Chaîne bras complète : clavicule → upper → forearm → main.
+        assert_eq!(t.bones[idx("clavicle_L")].parent, Some(idx("chest")));
+        assert_eq!(t.bones[idx("arm_L")].parent, Some(idx("clavicle_L")));
+        assert_eq!(t.bones[idx("forearm_L")].parent, Some(idx("arm_L")));
+        assert_eq!(t.bones[idx("hand_L")].parent, Some(idx("forearm_L")));
+        // Jambe : toe parenté sur foot (digitigrade).
+        assert_eq!(t.bones[idx("toe_L")].parent, Some(idx("foot_L")));
     }
 
     #[test]

@@ -16,3 +16,5 @@ forgia-secondary-motion = { workspace = true }
 forgia-skeleton-template = { workspace = true }
 forgia-genome-core = { workspace = true }
 forgia-ik = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

@@ -500,8 +500,22 @@ fn embed_one_chain(
         let is_spine_xz = matches!(bone_class, BoneClass::Spine);
         let is_spine_x_only = is_head;
         let is_leg_y_lock = matches!(bone_class, BoneClass::Leg);
+        // ARM — placement 100% TEMPLATE (rescalé), AUCUN medial axis. Vérifié
+        // runtime 2026-06-05 (3 essais) : DÈS qu'un os de bras prend X/Z (ou Y) du
+        // path médial, il (a) déforme le VISAGE (la région chest/épaule/cou de l'axe
+        // médial est dense et capte des vertices du visage) et (b) crée de
+        // l'ASYMÉTRIE gauche/droite (l'axe médial du mesh n'est pas symétrique). Le
+        // template, lui, est symétrique et déjà rescalé aux landmarks (shoulder_y,
+        // arm_span). Donc TOUT le bras est verrouillé au template → face-safe +
+        // symétrique. Le coude se règle en tunant les positions template (jamais via
+        // le medial axis). Radius = sphère médiale la plus proche (épaisseur skin).
+        let is_arm = matches!(bone_class, BoneClass::Arm);
 
-        let (bone_world_pos, radius) = if i == n - 1 {
+        let (bone_world_pos, radius) = if is_arm {
+            let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
+            let (sphere, _) = find_nearest_sphere(&graph.spheres, template_pos);
+            (template_pos, sphere.radius)
+        } else if i == n - 1 {
             // Terminal bone : prend la sphère terminale, mais si c'est un spine
             // bone override X/Z (ou X seul pour head) au template pour garder
             // l'alignement vertical strict du dos.
@@ -797,9 +811,11 @@ mod tests {
     }
 
     #[test]
-    fn biped_lizard_template_has_20_bones() {
+    fn biped_lizard_template_has_25_bones() {
+        // 2026-06-05 : 3 spine + head/neck + chaîne bras complète (clav+upper+
+        // fore+main ×2) + jambes (thigh+shin+foot+toe ×2) + 4 tail = 25.
         let t = SkeletonTemplate::biped_lizard();
-        assert_eq!(t.bones.len(), 20); // 14 body + 6 (foot L/R = 6 leg total) = 16 + 4 tail = 20
+        assert_eq!(t.bones.len(), 25);
     }
 
     #[test]
@@ -814,6 +830,53 @@ mod tests {
         assert_eq!(embedded.bones.len(), template.bones.len());
         // Sans graph, on fallback sur template-fit AABB → cost = 0 (pas de snap)
         assert_eq!(embedded.total_embedding_cost, 0.0);
+    }
+
+    /// Fix 2026-06-05 : les os de bras sont placés au **template** (rescalé), PAS
+    /// snappés sur l'axe médial — sinon ils captent le visage / créent de l'asymétrie.
+    /// Ici la sphère "bras" est à (−0.20, 0.30) mais le template bras à (−0.20, 0.50) :
+    /// l'os doit rester au template (Y=0.50, X=−0.20), pas suivre la sphère (Y=0.30).
+    #[test]
+    fn arm_bones_use_template_not_medial_snap() {
+        use forgia_skeleton_template::BoneClass;
+        // chest branche (neck + clavicle) → la clavicule démarre sa chaîne à i==0.
+        let template = SkeletonTemplate::from_data(&[
+            ("hip", None, [0.0, 0.20, 0.0], BoneClass::Spine),
+            ("chest", Some(0), [0.0, 0.50, 0.0], BoneClass::Spine),
+            ("neck", Some(1), [0.0, 0.62, 0.0], BoneClass::Spine),
+            ("clavicle_L", Some(1), [-0.10, 0.50, 0.0], BoneClass::Arm),
+            ("arm_L", Some(3), [-0.20, 0.50, 0.0], BoneClass::Arm),
+        ]);
+        // Sphère "bras" plus BASSE (Y=0.30) que le template bras (Y=0.50).
+        let graph = MedialAxisGraph {
+            spheres: vec![
+                MedialSphere {
+                    center: Vec3::new(0.0, 0.50, 0.0),
+                    radius: 0.15,
+                },
+                MedialSphere {
+                    center: Vec3::new(-0.20, 0.30, 0.0),
+                    radius: 0.10,
+                },
+            ],
+            edges: vec![(0, 1)],
+        };
+        let bounds = (Vec3::new(-0.6, 0.0, -0.2), Vec3::new(0.6, 1.0, 0.2));
+        let embedded = embed_template_skeleton(&template, &graph, bounds);
+
+        let arm = embedded.bones.iter().find(|b| b.name == "arm_L").unwrap();
+        // Y verrouillé au template (0.50), PAS suivi la sphère basse (0.30).
+        assert!(
+            (arm.world_pos.y - 0.50).abs() < 0.08,
+            "arm_L Y doit rester au template (0.50), pas suivre la sphère (0.30) — got y={}",
+            arm.world_pos.y
+        );
+        // X depuis le path → l'os suit le bras (latéral), pas resté au centre.
+        assert!(
+            arm.world_pos.x < -0.10,
+            "arm_L X depuis le path (latéral ~-0.20), got x={}",
+            arm.world_pos.x
+        );
     }
 
     #[test]
