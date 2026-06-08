@@ -38,10 +38,22 @@ Params (const, v1) : `HEX_SCALE=3.0`, `HEX_RADIUS=3` (37 tuiles), flatten inner 
 - `cargo build -p forgia --profile release-fast` : OK, binaire frais 16:01:59
 - Crates **non-contendues** (autre terminal = debug/foliage/game/roguelite/observability)
 
+## Audit runtime (2026-06-08) — bug "plus de végétation à côté du village"
+
+User report après le 1er commit. **2 fausses pistes avant la bonne** (leçon [[feedback_dont_deflect_to_other_terminal_own_the_code]]) :
+1. ❌ « budget foliage story-583 autre terminal » — réfuté en rebuildant SANS leur WIP (végétation toujours absente près du village).
+2. ❌ « flatten + skip `h < sea_level+0.3` » — réfuté par sensor : `player_pos Y=38.7`, biome Forest, ≫ 4.3m.
+3. ✅ **`sys_clear_village_foliage` rasait un disque de 32.4m** (= flatten inner+falloff) alors que l'emprise tuiles ≈ 21.5m → 11m de forêt rasée en trop, chaque frame.
+
+**Fix** : `FOLIAGE_CLEAR_RADIUS` dérivé de `VILLAGE_TILE_EXTENT` (≈ 21.5m) + 1m → la forêt pousse jusqu'au bord du village. Validé runtime user ("c'est revenu").
+
+**"Rien sous la map"** vérifié : placement == rendu (tout posé à `anchor.y == flatten target_y`, terrain rendu aplani au même Y), joueur `depth_below_surface=0`, seul le socle des tuiles KayKit est enterré (design, invisible).
+
 ## Reste (incréments)
 
-- [ ] **Validation runtime user** (look du village)
-- [ ] Rues : tuiles `hex_road_A..M` (connexions) — v1 = grass only, transitions déjà nettes
+- [x] **Validation runtime user** (look + végétation + sous-map) — OK
+- [x] Rue principale (axe q, `hex_road_A` yaw 0, orientation vérifiée par analyse mesh)
+- [x] Fix clear foliage (32→22m)
+- [ ] Réseau de rues complet (cross-streets axes r/q+r + jonctions D/E/F connection-aware)
 - [ ] Recette TOML data-driven (v1 = const) — sortir HEX_SCALE/RADIUS/density dans `rpg_village.toml`
 - [ ] Sensor `forgia2_rpg_village.json` (count tuiles/bâtiments + centre)
-- [ ] Commit scopé (forgia-worldgen + forgia-rpg + assets) une fois validé

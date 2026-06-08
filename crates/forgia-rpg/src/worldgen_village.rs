@@ -42,14 +42,23 @@ const BUILD_DENSITY: f32 = 0.62;
 /// from the village center at (16,16)) so the player lands on flat ground.
 pub(crate) const VILLAGE_FLATTEN_INNER: f32 = 26.0;
 pub(crate) const VILLAGE_FLATTEN_FALLOFF: f32 = 16.0;
-/// Streamed trees are despawned within this radius of the village center.
-const FOLIAGE_CLEAR_RADIUS: f32 = VILLAGE_FLATTEN_INNER + VILLAGE_FLATTEN_FALLOFF * 0.4;
+/// Tiled village outer extent (m): furthest ring tile center (`R · √3 · size`) + one tile half-width
+/// (`size`). For R=3, scale 3 → ≈ 21.5 m.
+const VILLAGE_TILE_EXTENT: f32 =
+    HEX_RADIUS as f32 * 1.732_050_8 * (HEX_SIZE_NATIVE * HEX_SCALE) + HEX_SIZE_NATIVE * HEX_SCALE;
+/// Streamed trees are despawned only within the **tiled footprint** (+1 m) so the forest grows right
+/// up to the village edge. Audit 2026-06-08: the old 32 m radius left a bare Forest moat around the
+/// village ("plus aucune végétation à côté du village") — it cleared 11 m of forest beyond the tiles.
+const FOLIAGE_CLEAR_RADIUS: f32 = VILLAGE_TILE_EXTENT + 1.0;
 
 /// Village seed (deterministic layout).
 const VILLAGE_SEED: u64 = 1310;
 
 /// Grass tile — the village floor.
 const TILE_GRASS: &str = "tiles/base/hex_grass.gltf";
+/// Straight road tile — its road connects the ±X edges (verified from the mesh), so a line of them
+/// along the q-axis (`r == 0`) at yaw 0 connects end-to-end into a clean main street.
+const TILE_ROAD: &str = "tiles/roads/hex_road_A.gltf";
 /// Plaza centerpiece.
 const WELL: &str = "buildings/blue/building_well_blue.gltf";
 /// Homes (mixed colors → cheerful village).
@@ -104,6 +113,12 @@ enum TileRole {
     Decoration,
     /// Bare grass.
     Empty,
+}
+
+/// The main street = the q-axis line through the center (`r == 0`). Straight road tiles there
+/// connect end-to-end at yaw 0 (their road runs along ±X = the q-axis).
+fn is_road_hex(hex: Hex) -> bool {
+    hex.r == 0
 }
 
 /// Pure role decision (testable). Center + ring 1 are always plaza; ring ≥ 2 rolls building vs
@@ -185,12 +200,19 @@ pub(crate) fn sys_spawn_worldgen_village(
         let pos = Vec3::new(center.x + local.x, base_y, center.y + local.y);
         let mut rng = SeededRng::new(derive(VILLAGE_SEED, hash_hex(hex)));
 
-        // Ground tile (always), yaw snapped to the hex grid for a tidy tessellation.
-        let tile_yaw = (rng.below(6) as f32) * std::f32::consts::FRAC_PI_3;
+        // Ground tile (always). A main street runs along the q-axis (`r == 0`): those tiles use the
+        // straight road tile at yaw 0 (road along ±X → connects end-to-end). Every other tile is
+        // grass with a hex-snapped yaw for tidy tessellation.
+        let road = is_road_hex(hex);
+        let (tile_path, tile_yaw) = if road {
+            (TILE_ROAD, 0.0)
+        } else {
+            (TILE_GRASS, (rng.below(6) as f32) * std::f32::consts::FRAC_PI_3)
+        };
         commands.spawn((
             RpgVillagePiece,
             Name::new("village:tile"),
-            SceneRoot(scene(&asset_server, &mut cache, TILE_GRASS)),
+            SceneRoot(scene(&asset_server, &mut cache, tile_path)),
             Transform::from_translation(pos)
                 .with_rotation(Quat::from_rotation_y(tile_yaw))
                 .with_scale(tile_scale),
@@ -200,6 +222,10 @@ pub(crate) fn sys_spawn_worldgen_village(
         // Well on its dedicated plaza tile.
         if hex == well_hex {
             spawn_prop(&mut commands, scene(&asset_server, &mut cache, WELL), pos, 0.0, HEX_SCALE, true);
+            continue;
+        }
+        // Keep the street clear of buildings / decoration.
+        if road {
             continue;
         }
 
@@ -331,6 +357,15 @@ mod tests {
         let player = Vec2::new(0.0, 0.0);
         assert!(player.distance(z.center) < z.inner_radius, "player spawn must be on flat ground");
         assert_eq!(z.target_y, 5.0);
+    }
+
+    #[test]
+    fn main_street_is_the_q_axis() {
+        assert!(is_road_hex(Hex::new(0, 0)));
+        assert!(is_road_hex(Hex::new(3, 0)));
+        assert!(is_road_hex(Hex::new(-2, 0)));
+        assert!(!is_road_hex(Hex::new(0, 1)));
+        assert!(!is_road_hex(Hex::new(1, -1)));
     }
 
     #[test]
