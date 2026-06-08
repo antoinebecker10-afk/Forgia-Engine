@@ -3330,6 +3330,7 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
+ "forgia-debug",
  "forgia-effects",
  "forgia-enemy-nameplate",
  "forgia-foliage",
@@ -3660,6 +3661,7 @@ dependencies = [
  "forgia-ui",
  "forgia-village-loader",
  "forgia-water",
+ "forgia-worldgen",
  "leafwing-input-manager",
  "noise",
 ]

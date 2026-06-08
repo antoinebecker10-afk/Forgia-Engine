@@ -6,4 +6,4 @@ pub mod parcels;
 pub mod roads;
 
 pub use parcels::{generate_parcels, subdivide_rect, Parcel};
-pub use roads::{generate_roads, RoadKind, RoadNetwork, RoadSegment, TensorField};
+pub use roads::{generate_roads, road_grid, RoadKind, RoadNetwork, RoadSegment, TensorField};

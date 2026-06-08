@@ -94,6 +94,33 @@ pub fn generate_roads(
     RoadNetwork { segments: out }
 }
 
+/// Clean grid streets: one full-length road segment per grid line (vertical + horizontal) at
+/// `spacing` intervals. Aligns with the parcel blocks (which tile at the same `spacing`), so the
+/// road mesh draws crisp streets between blocks instead of overlapping streamline ribbons.
+pub fn road_grid(min: Vec2, max: Vec2, spacing: f32) -> RoadNetwork {
+    let s = spacing.max(1.0);
+    let mut segments = Vec::new();
+    let mut x = min.x;
+    while x <= max.x + 1e-3 {
+        segments.push(RoadSegment {
+            a: Vec2::new(x, min.y),
+            b: Vec2::new(x, max.y),
+            kind: RoadKind::Minor,
+        });
+        x += s;
+    }
+    let mut z = min.y;
+    while z <= max.y + 1e-3 {
+        segments.push(RoadSegment {
+            a: Vec2::new(min.x, z),
+            b: Vec2::new(max.x, z),
+            kind: RoadKind::Minor,
+        });
+        z += s;
+    }
+    RoadNetwork { segments }
+}
+
 fn grid_seeds(min: Vec2, max: Vec2, spacing: f32) -> Vec<Vec2> {
     let mut seeds = Vec::new();
     let mut y = min.y;

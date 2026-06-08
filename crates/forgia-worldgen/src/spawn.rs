@@ -43,11 +43,14 @@ pub struct WorldgenStats {
     pub last_row: u32,
 }
 
-/// The loaded kit GLB + a fallback material for primitives without one.
+/// The loaded kit GLB + a fallback material for primitives without one + the road material.
 #[derive(Resource)]
 pub struct WorldgenKit {
     pub gltf: Handle<Gltf>,
     pub fallback_mat: Handle<StandardMaterial>,
+    pub road_mat: Handle<StandardMaterial>,
+    /// White, double-sided material for procedural houses (per-vertex colors show through).
+    pub house_mat: Handle<StandardMaterial>,
 }
 
 /// Drain the spawn queue, budgeted. No-op until the registry and kit GLB are loaded.

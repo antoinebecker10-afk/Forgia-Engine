@@ -53,6 +53,7 @@ use leafwing_input_manager::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod character;
+pub mod worldgen_village;
 // proc_walk déplacé vers forgia-anim-locomotion (story-482 P1)
 
 pub mod prelude {
@@ -248,7 +249,22 @@ impl Plugin for ForgiaRpgPlugin {
                 (character::draw_lineup_names, draw_quest_markers)
                     .run_if(in_state(GameMode::Rpg)),
             )
-            .add_systems(OnExit(GameMode::Rpg), character::cleanup_character_lineup);
+            .add_systems(OnExit(GameMode::Rpg), character::cleanup_character_lineup)
+            // Story-578 — village procédural via la toolbox forgia-worldgen, posé sur le terrain.
+            .init_resource::<worldgen_village::RpgVillageState>()
+            .add_systems(
+                Update,
+                (
+                    worldgen_village::sys_spawn_worldgen_village,
+                    worldgen_village::sys_clear_village_foliage,
+                )
+                    .in_set(GameSet::Effects)
+                    .run_if(in_state(GameMode::Rpg)),
+            )
+            .add_systems(
+                OnExit(GameMode::Rpg),
+                worldgen_village::sys_cleanup_worldgen_village,
+            );
     }
 }
 
@@ -347,15 +363,22 @@ fn terrain_height_local_with_flatten(
 /// le « bowl » anti-mur du spawn en live. Vide si le genome désactive le leveling.
 fn make_village_flatten_zones(terrain_cfg: &TerrainConfig) -> FlattenZones {
     let village_world_center = Vec2::new(CHUNK_X as f32 * 0.5, CHUNK_Z as f32 * 0.5);
+    let off = sample_offset();
+    let target_y = forgia_terrain::heightmap_at(
+        village_world_center.x + off.x,
+        village_world_center.y + off.y,
+        terrain_cfg,
+    );
     let mut flatten_zones = FlattenZones::new();
+    // Story-578 — hex KayKit village : flat disc large enough for the hex grid + the player spawn
+    // (world origin). Pushed UNCONDITIONALLY so the village is always flat, independent of the
+    // legacy starter-hamlet genome below. Done before the chunks mesh (caller = spawn_world).
+    flatten_zones.push(worldgen_village::village_flatten_zone(
+        village_world_center,
+        target_y,
+    ));
     match VillageGenome::load_from_path(VILLAGE_GENOME_PATH) {
         Ok(genome) if genome.terrain_leveling.enabled => {
-            let off = sample_offset();
-            let target_y = forgia_terrain::heightmap_at(
-                village_world_center.x + off.x,
-                village_world_center.y + off.y,
-                terrain_cfg,
-            );
             flatten_zones.push(VillageFlattenZone {
                 center: village_world_center,
                 target_y,

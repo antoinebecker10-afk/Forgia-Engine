@@ -20,11 +20,14 @@
 
 pub mod cache;
 pub mod debug_viz;
+pub mod hex;
+pub mod house_mesh;
 pub mod layout;
 pub mod points;
 pub mod recipe;
 pub mod registry;
 pub mod resolve;
+pub mod road_mesh;
 pub mod seed;
 pub mod sensor;
 pub mod spawn;
@@ -108,11 +111,12 @@ impl Plugin for ForgiaWorldgenPlugin {
             .init_resource::<CityLayout>()
             .init_resource::<streaming::CityStreaming>()
             .add_systems(Startup, (sys_load_registry, sys_load_kit))
-            // Always available — the authoring runtime: drain the spawn queue (so authored
-            // content reaches the world even in ship), distant LOD, and the sensor.
+            // Always available, ALL modes — the authoring runtime: drain the spawn queue (so
+            // authored content reaches the world: Roguelite demo AND the RPG village), distant
+            // LOD, and the sensor. NOT mode-gated — cheap no-ops when the queue is empty.
             .add_systems(
                 Update,
-                (sys_spawn_drain, sys_worldgen_lod).run_if(in_state(GameMode::Roguelite)),
+                (sys_spawn_drain, sys_worldgen_lod).in_set(GameSet::Effects),
             )
             .add_systems(
                 Update,
@@ -166,7 +170,14 @@ fn sys_load_kit(
         perceptual_roughness: 0.9,
         ..default()
     });
-    commands.insert_resource(WorldgenKit { gltf, fallback_mat });
+    let road_mat = materials.add(road_mesh::road_material());
+    let house_mat = materials.add(house_mesh::house_material());
+    commands.insert_resource(WorldgenKit {
+        gltf,
+        fallback_mat,
+        road_mat,
+        house_mat,
+    });
 }
 
 /// Worldgen demo input:
@@ -187,6 +198,8 @@ fn sys_worldgen_input(
     mut stats: ResMut<WorldgenStats>,
     mut last: ResMut<LastGen>,
     mut city: ResMut<CityLayout>,
+    kit: Option<Res<WorldgenKit>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     q_cam: Query<&GlobalTransform, With<Camera3d>>,
     q_existing: Query<Entity, With<WorldgenModule>>,
     mut commands: Commands,
@@ -278,6 +291,29 @@ fn sys_worldgen_input(
                 Err(e) => warn!("[worldgen] bake failed: {e}"),
             }
             queue.pending.extend(points);
+            // P6+ road mesh — a real flat ribbon mesh for the roads (not just gizmos).
+            if let Some(kit) = &kit {
+                let mesh = road_mesh::build_road_mesh(
+                    &roads,
+                    origin,
+                    axis_x,
+                    axis_z,
+                    &ground,
+                    road_mesh::ROAD_WIDTH_M,
+                );
+                commands.spawn((
+                    WorldgenModule {
+                        module_id: "worldgen:roads".to_string(),
+                        local_center: Vec3::ZERO,
+                        local_half: Vec3::ZERO,
+                    },
+                    Name::new("worldgen:roads"),
+                    Mesh3d(meshes.add(mesh)),
+                    MeshMaterial3d(kit.road_mat.clone()),
+                    Transform::from_translation(origin),
+                    Visibility::default(),
+                ));
+            }
             *city = CityLayout {
                 present: true,
                 roads,

@@ -33,6 +33,8 @@ forgia-ik = { workspace = true }
 forgia-prefab = { workspace = true }
 forgia-village-loader = { workspace = true }
 forgia-genome-village = { workspace = true }
+# Story-578 — toolbox procédurale : génère un village RPG (build_city + routes) sur le terrain.
+forgia-worldgen = { workspace = true }
 forgia-streaming = { workspace = true }
 forgia-water = { workspace = true }
 noise = { workspace = true }
