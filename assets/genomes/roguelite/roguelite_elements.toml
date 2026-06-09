@@ -63,3 +63,21 @@ damage_factor = 0.5
 
 [execute]
 hp_ratio_threshold = 0.25
+
+# ── VFX (story-588) — rend les éléments VISIBLES ────────────────────────────
+# Flash coloré à l'impact (couleur par élément) + pulse sur les ennemis en DoT.
+# Couleurs RGB linéaires. Hot-reload : les couleurs sont ré-appliquées en place
+# sur les matériaux partagés (les sparks vivants changent aussi).
+[vfx]
+enabled = true
+impact_scale = 0.55       # rayon (m) du flash d'un hit normal
+impact_ttl = 0.28         # durée de vie (s) — fade par scale -> 0
+explosive_scale = 2.4     # × taille du flash pour un hit explosif (splash)
+light_intensity = 40000.0 # lumens de la lumière d'impact (fade avec le flash)
+light_range = 6.0         # portée (m) de la lumière d'impact
+dot_pulse_scale = 0.3     # rayon (m) du pulse sur un ennemi en DoT
+dot_pulse_period = 0.45   # période (s) entre 2 pulses DoT
+fire_rgb = [1.0, 0.42, 0.06]          # 🔥 feu — orange (SMG Bourrasque)
+poison_rgb = [0.42, 1.0, 0.16]        # 🟣 poison — vert (pompe Boucherie)
+explosive_rgb = [1.0, 0.82, 0.12]     # 💥 explosif — jaune (pistolet Pépin)
+armor_pierce_rgb = [0.30, 0.85, 1.0]  # 🎯 perforant — cyan (sniper Lenoir)

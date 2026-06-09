@@ -26,6 +26,7 @@ pub mod audio;
 pub mod boons_apply;
 pub mod coffre_sensor;
 pub mod decor;
+pub mod element_vfx;
 pub mod elements;
 pub mod enemies;
 pub mod hud;
@@ -231,6 +232,34 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             elements::sys_write_elements_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-588 (2026-06-09) — VFX colorés des éléments (flash d'impact +
+        // pulse DoT) pour rendre le système d'éléments VISIBLE. Mesh + 4
+        // matériaux partagés (0 alloc/hit), fade par scale, hot-reload couleurs.
+        // Sensor forgia2_element_vfx.json.
+        app.init_resource::<element_vfx::ElementVfxStats>();
+        app.add_systems(
+            Startup,
+            element_vfx::sys_init_vfx_assets.after(elements::sys_init_element_genome),
+        );
+        app.add_systems(
+            OnEnter(GameMode::Roguelite),
+            element_vfx::sys_reset_vfx_stats,
+        );
+        app.add_systems(
+            Update,
+            (
+                element_vfx::sys_refresh_vfx_materials,
+                element_vfx::sys_spawn_element_impact,
+                element_vfx::sys_dot_pulse_vfx,
+                element_vfx::sys_tick_element_sparks,
+            )
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            element_vfx::sys_write_element_vfx_sensor.in_set(GameSet::Sensors),
         );
         // Story-562b (2026-06-03) — props décoratifs procéduraux pour remplir
         // l'arène (rochers/cristaux/piliers en anneau + débris au sol). Crate

@@ -72,6 +72,27 @@ impl Element {
             _ => None,
         }
     }
+
+    /// Index stable `0..4` — pour indexer les handles VFX par élément
+    /// ([`crate::element_vfx::ElementVfxAssets`]).
+    pub fn idx(self) -> usize {
+        match self {
+            Element::Fire => 0,
+            Element::Poison => 1,
+            Element::Explosive => 2,
+            Element::ArmorPierce => 3,
+        }
+    }
+
+    /// Couleur RGB (linéaire) de l'élément, data-driven via [`VfxParams`].
+    pub fn rgb(self, v: &VfxParams) -> [f32; 3] {
+        match self {
+            Element::Fire => v.fire_rgb,
+            Element::Poison => v.poison_rgb,
+            Element::Explosive => v.explosive_rgb,
+            Element::ArmorPierce => v.armor_pierce_rgb,
+        }
+    }
 }
 
 // ─── Config genome (mtime, miroir poi.rs) ───────────────────────────────────
@@ -152,6 +173,55 @@ pub struct ExecuteParams {
     pub hp_ratio_threshold: f32,
 }
 
+/// Paramètres VFX (story-588) — couleurs + tailles du flash d'impact et du pulse
+/// DoT. `#[serde(default)]` : si la section `[vfx]` manque du TOML, fallback sur
+/// ces valeurs (backward-compat avec les genomes Phase A). Hot-reload : les
+/// couleurs sont ré-appliquées en place sur les matériaux partagés.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct VfxParams {
+    /// Master switch des VFX éléments (le sensor flag si off).
+    pub enabled: bool,
+    /// Rayon (m) de la sphère de flash à l'impact d'un hit normal.
+    pub impact_scale: f32,
+    /// Durée de vie (s) d'un flash d'impact (fade par scale → 0).
+    pub impact_ttl: f32,
+    /// Multiplicateur de taille du flash pour un hit explosif (splash visible).
+    pub explosive_scale: f32,
+    /// Intensité (lumens) de la lumière d'impact (fade avec le flash).
+    pub light_intensity: f32,
+    /// Portée (m) de la lumière d'impact.
+    pub light_range: f32,
+    /// Rayon (m) du pulse coloré sur un ennemi en DoT (burn/poison).
+    pub dot_pulse_scale: f32,
+    /// Période (s) entre deux pulses DoT.
+    pub dot_pulse_period: f32,
+    pub fire_rgb: [f32; 3],
+    pub poison_rgb: [f32; 3],
+    pub explosive_rgb: [f32; 3],
+    pub armor_pierce_rgb: [f32; 3],
+}
+
+impl Default for VfxParams {
+    fn default() -> Self {
+        // Miroir EXACT de la section [vfx] de roguelite_elements.toml.
+        Self {
+            enabled: true,
+            impact_scale: 0.55,
+            impact_ttl: 0.28,
+            explosive_scale: 2.4,
+            light_intensity: 40_000.0,
+            light_range: 6.0,
+            dot_pulse_scale: 0.3,
+            dot_pulse_period: 0.45,
+            fire_rgb: [1.0, 0.42, 0.06],
+            poison_rgb: [0.42, 1.0, 0.16],
+            explosive_rgb: [1.0, 0.82, 0.12],
+            armor_pierce_rgb: [0.30, 0.85, 1.0],
+        }
+    }
+}
+
 /// Config gameplay des éléments. Resource + parsée du TOML (mtime hot-reload).
 #[derive(Resource, Deserialize, Clone, Debug, PartialEq)]
 pub struct ElementConfig {
@@ -164,6 +234,9 @@ pub struct ElementConfig {
     pub poison: PoisonParams,
     pub aoe: AoeParams,
     pub execute: ExecuteParams,
+    /// VFX (story-588) — optionnel dans le TOML (backward-compat Phase A).
+    #[serde(default)]
+    pub vfx: VfxParams,
 }
 
 impl Default for ElementConfig {
@@ -192,6 +265,7 @@ impl Default for ElementConfig {
             },
             aoe: AoeParams { radius: 3.5, damage_factor: 0.5 },
             execute: ExecuteParams { hp_ratio_threshold: 0.25 },
+            vfx: VfxParams::default(),
         }
     }
 }
@@ -716,5 +790,87 @@ mod tests {
         // base 18, bonus = 18×(1.68−1)=12.24, cur 100 → 87.76.
         let (hp, _) = resolve_target_hit(Element::Poison, 100.0, 120.0, 18.0, 1.4, 1.2, 0.25);
         assert!((hp - 87.76).abs() < 1e-2);
+    }
+
+    // ── VFX (story-588) ──
+
+    #[test]
+    fn element_idx_is_stable_and_distinct() {
+        let idx: Vec<usize> = [
+            Element::Fire,
+            Element::Poison,
+            Element::Explosive,
+            Element::ArmorPierce,
+        ]
+        .iter()
+        .map(|e| e.idx())
+        .collect();
+        assert_eq!(idx, vec![0, 1, 2, 3], "idx doit indexer [0..4] sans collision");
+    }
+
+    #[test]
+    fn element_rgb_maps_to_signature_colors() {
+        let v = VfxParams::default();
+        assert_eq!(Element::Fire.rgb(&v), v.fire_rgb);
+        assert_eq!(Element::Poison.rgb(&v), v.poison_rgb);
+        assert_eq!(Element::Explosive.rgb(&v), v.explosive_rgb);
+        assert_eq!(Element::ArmorPierce.rgb(&v), v.armor_pierce_rgb);
+    }
+
+    #[test]
+    fn vfx_default_is_enabled_and_sane() {
+        let v = VfxParams::default();
+        assert!(v.enabled);
+        assert!(v.impact_scale > 0.0 && v.impact_ttl > 0.0);
+        assert!(v.explosive_scale > 1.0, "le splash explosif doit être plus gros");
+        assert!(v.dot_pulse_period > 0.0);
+    }
+
+    #[test]
+    fn config_vfx_field_defaults_when_section_absent() {
+        // Un TOML Phase A (sans [vfx]) doit parser et obtenir le VfxParams par défaut.
+        let toml = r#"
+always_on = true
+[mapping]
+modern_ar = "explosive"
+assault_rifle = "fire"
+shotgun = "armor_pierce"
+rocket_launcher = "poison"
+[matchup.fire]
+tank = 1.0
+runner = 1.3
+sniper = 1.1
+boss = 1.0
+[matchup.poison]
+tank = 1.4
+runner = 1.0
+sniper = 1.1
+boss = 1.2
+[matchup.explosive]
+tank = 1.1
+runner = 1.4
+sniper = 1.2
+boss = 1.0
+[matchup.armor_pierce]
+tank = 2.0
+runner = 1.0
+sniper = 1.3
+boss = 1.5
+[burn]
+dps = 8.0
+duration = 3.0
+[poison]
+dps_per_stack = 4.0
+duration = 4.0
+max_stacks = 5
+shred_per_stack = 0.04
+[aoe]
+radius = 3.5
+damage_factor = 0.5
+[execute]
+hp_ratio_threshold = 0.25
+"#;
+        let c = ElementConfig::parse_toml(toml);
+        assert_eq!(c.vfx, VfxParams::default(), "section [vfx] absente → default");
     }
 }
