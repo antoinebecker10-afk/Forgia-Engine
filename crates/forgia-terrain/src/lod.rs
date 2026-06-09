@@ -15,6 +15,7 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, RigidBody};
 use std::collections::HashMap;
 
 use crate::biomes::BiomeMap;
@@ -587,20 +588,30 @@ pub fn build_lod2_tiles_system(
         // Per-cluster mesh : Y per-vertex heightmap (+ flatten village) + color biome.
         let cluster_mesh =
             build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map, flatten_zones.as_deref());
+        // B2 (story-587) : collider trimesh sur le mesh LOD2 → le sol lointain
+        // (128–1500m) devient collisionnable. Avant, seuls les chunks LOD0/LOD1
+        // portaient un `Collider::heightfield` → chute à travers le terrain dès qu'on
+        // sortait du ring (téléport, knockback, projectile rapide). Le trimesh épouse
+        // exactement le mesh visuel. Pas de `CollisionGroups` (cohérent avec le
+        // heightfield LOD0 qui n'en a pas — l'harmonisation des groupes = cleanup à part).
+        let lod2_collider =
+            Collider::from_bevy_mesh(&cluster_mesh, &ComputedColliderShape::TriMesh(default()));
         let mesh_handle = meshes.add(cluster_mesh);
 
-        let tile_entity = commands
-            .spawn((
-                Mesh3d(mesh_handle),
-                MeshMaterial3d(shared_mat.clone()),
-                // Y = -biais skirt (story-577 v3) : le mesh porte les Y absolus, on
-                // descend tout le tile (mesh + arbres enfants) sous les chunks → le
-                // chunk gagne le depth-test dans le recouvrement (fin du z-fighting).
-                Transform::from_xyz(center.x, -LOD2_DEPTH_BIAS_M, center.y),
-                Lod2Tile { cluster_key: key },
-                Name::new(format!("Lod2Tile({},{})", key.0, key.1)),
-            ))
-            .id();
+        let mut tile_ec = commands.spawn((
+            Mesh3d(mesh_handle),
+            MeshMaterial3d(shared_mat.clone()),
+            // Y = -biais skirt (story-577 v3) : le mesh porte les Y absolus, on
+            // descend tout le tile (mesh + arbres enfants) sous les chunks → le
+            // chunk gagne le depth-test dans le recouvrement (fin du z-fighting).
+            Transform::from_xyz(center.x, -LOD2_DEPTH_BIAS_M, center.y),
+            Lod2Tile { cluster_key: key },
+            Name::new(format!("Lod2Tile({},{})", key.0, key.1)),
+        ));
+        if let Some(col) = lod2_collider {
+            tile_ec.insert((RigidBody::Fixed, col));
+        }
+        let tile_entity = tile_ec.id();
         tile_mgr.tiles.insert(key, tile_entity);
 
         // Polish story-577 : imposteurs (arbres/rochers) UNIQUEMENT pour les clusters
