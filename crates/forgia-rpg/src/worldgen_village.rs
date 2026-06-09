@@ -558,15 +558,22 @@ fn hash_hex(hex: Hex) -> u64 {
 /// each frame and despawns any tree that lands inside the village disc).
 pub(crate) fn sys_clear_village_foliage(
     state: Res<RpgVillageState>,
-    q_trees: Query<(Entity, &GlobalTransform), With<VegetationTree>>,
+    // story-588 FIX : `Transform` (local) et NON `GlobalTransform`. Les arbres sont
+    // spawnés dans le même Update que ce système ; leur `GlobalTransform` n'est propagé
+    // qu'en PostUpdate → il vaut l'identité (0,0,0) la frame du spawn. Lu via
+    // GlobalTransform, CHAQUE arbre paraissait à 22.6m du centre village (= dist
+    // origine→centre) donc DANS le disque de 50m → tous despawnés avant d'être rendus
+    // (régression invisible). Les arbres étant des entités racine, `Transform.translation`
+    // = position monde, correcte immédiatement (cohérent avec `spawn_village_paths`).
+    q_trees: Query<(Entity, &Transform), With<VegetationTree>>,
     mut commands: Commands,
 ) {
     if !state.spawned {
         return;
     }
     let r2 = FOLIAGE_CLEAR_RADIUS * FOLIAGE_CLEAR_RADIUS;
-    for (e, gt) in &q_trees {
-        let p = gt.translation();
+    for (e, tf) in &q_trees {
+        let p = tf.translation;
         let (dx, dz) = (p.x - state.center.x, p.z - state.center.y);
         if dx * dx + dz * dz < r2 {
             commands.entity(e).despawn();

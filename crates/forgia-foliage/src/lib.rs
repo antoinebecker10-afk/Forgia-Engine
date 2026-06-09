@@ -505,6 +505,11 @@ fn write_vegetation_sensor(
     time: Res<Time>,
     veg: Res<VegetationManager>,
     bark_cfg: Option<Res<BarkOverrideConfig>>,
+    // story-588 diag (B4 régression végé invisible) : queries LIVE pour distinguer
+    // "compteur menteur" (veg.total_trees incrément-only) du nombre réel d'entités
+    // VegetationTree vivantes + instanciées (SceneRoot a produit des Children).
+    q_live: Query<(&GlobalTransform, Option<&Children>), With<VegetationTree>>,
+    excl: Option<Res<FoliageExclusionDisc>>,
     mut last_write: Local<f32>,
 ) {
     let now = time.elapsed_secs();
@@ -512,6 +517,42 @@ fn write_vegetation_sensor(
         return;
     }
     *last_write = now;
+
+    // LIVE diagnostic : vrai compte d'entités (pas le compteur de spawn cumulatif).
+    let mut live_entities = 0u32;
+    let mut instantiated = 0u32;
+    let mut inside_excl = 0u32;
+    let mut min_d = f32::MAX;
+    let mut max_d = 0.0f32;
+    let ec = excl.as_deref();
+    for (gt, children) in &q_live {
+        live_entities += 1;
+        if children.is_some_and(|c| !c.is_empty()) {
+            instantiated += 1;
+        }
+        if let Some(ed) = ec {
+            let p = gt.translation();
+            let (dx, dz) = (p.x - ed.center.x, p.z - ed.center.y);
+            let d = (dx * dx + dz * dz).sqrt();
+            min_d = min_d.min(d);
+            max_d = max_d.max(d);
+            if d < ed.radius {
+                inside_excl += 1;
+            }
+        }
+    }
+    if live_entities == 0 {
+        min_d = 0.0;
+    }
+    let live_diag = format!(
+        ",\"live_diag\":{{\"live_entities\":{},\"instantiated\":{},\"inside_excl\":{},\"min_dist_excl_m\":{:.1},\"max_dist_excl_m\":{:.1},\"excl_radius_m\":{:.1}}}",
+        live_entities,
+        instantiated,
+        inside_excl,
+        min_d,
+        max_d,
+        ec.map_or(0.0, |e| e.radius),
+    );
 
     let dist: String = veg
         .per_biome
@@ -528,8 +569,8 @@ fn write_vegetation_sensor(
         None => String::new(),
     };
     let json = format!(
-        "{{\"timestamp_secs\":{:.1},\"loaded_chunks\":{},\"total_trees\":{},\"per_biome\":{{{}}}{}}}",
-        now, veg.chunk_entities.len(), veg.total_trees, dist, trunk_json,
+        "{{\"timestamp_secs\":{:.1},\"loaded_chunks\":{},\"total_trees\":{},\"per_biome\":{{{}}}{}{}}}",
+        now, veg.chunk_entities.len(), veg.total_trees, dist, trunk_json, live_diag,
     );
     let _ = std::fs::write("forgia_vegetation.json", json);
 }
