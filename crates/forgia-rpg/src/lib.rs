@@ -53,6 +53,7 @@ use leafwing_input_manager::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod character;
+pub mod npc_pose;
 pub mod worldgen_village;
 // proc_walk déplacé vers forgia-anim-locomotion (story-482 P1)
 
@@ -227,6 +228,16 @@ impl Plugin for ForgiaRpgPlugin {
                     forgia_anim_locomotion::write_anim_full_sensor,
                 )
                     .chain()
+                    .in_set(GameSet::Movement)
+                    .run_if(in_state(GameMode::Rpg)),
+            )
+            // Story-583 (2026-06-08) — pose idle « bras le long » des PNJ (sort la
+            // T-pose). Système séparé du cœur locomotion (mono-perso .single) pour
+            // ne PAS toucher l'anim de Rex. Idempotent (NpcPosed), retry jusqu'à
+            // ce que l'auto-rig ait spawné les os.
+            .add_systems(
+                Update,
+                npc_pose::sys_pose_npcs_idle
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Rpg)),
             )
@@ -597,17 +608,17 @@ fn spawn_world(
         waiting_chunks: 0, // mis à jour frame suivante par stream_chunks_around_player
     });
 
-    // ── Village procgen (story-442 supersedes 441) ──────────────────────
-    // Le village est généré procéduralement depuis un genome TOML (seed +
-    // density + bounding) plutôt qu'un TOML hardcodant les positions XYZ.
-    // Path network reste vide jusqu'à `spawn_village_paths_when_loaded`.
+    // ── Village = système hexagonal KayKit (worldgen_village.rs) UNIQUEMENT ──
+    // story-586 (2026-06-09) : le système legacy "village-loader" (genome procgen,
+    // 6 bâtiments rouges + routes ribbon Bézier) est DÉBRANCHÉ du RPG — il rendait
+    // des bâtiments DOUBLONS imbriqués dans le village hex au même centre (16,16),
+    // colliders chevauchants. On ne pose plus `LoadVillageGenomeRequest` →
+    // `process_village_genome_request` no-op → 0 bâtiment B, 0 `VillageLoadResult`,
+    // 0 route ribbon. Ce que B fournissait seul est re-câblé : spawn joueur via
+    // `RpgVillageAnchor` (cf `teleport_player_to_terrain`) + `FoliageExclusionDisc`
+    // posé par le village hex (cf `sys_spawn_worldgen_village`). `PathNetwork` reste
+    // vide (les routes hex de A sont des tuiles, pas des samples).
     commands.insert_resource(PathNetwork::default());
-    // World center déjà calculé plus haut pour terrain leveling (story-447).
-    commands.insert_resource(LoadVillageGenomeRequest {
-        genome_path: VILLAGE_GENOME_PATH.into(),
-        terrain_sample_offset: sample_offset(),
-        world_center: village_world_center,
-    });
 
     // Caves removed 2026-05-17 PM — n'apportaient rien visuellement, le village
     // procgen est désormais le seul focal du spawn. La fonction `spawn_cave_entrance`
@@ -1257,20 +1268,22 @@ fn write_chunks_sensor(
 #[derive(Resource)]
 struct PendingPlayerTeleport;
 
-/// Téléporte le Player à la position définie par le village TOML (story-441) :
-/// `VillageLoadResult.spawn_position` (Y déjà offset au-dessus du terrain).
-/// Gating : attend que le village loader ait fini de charger le TOML.
+/// Téléporte le Player au centre du village hex (story-586) via `RpgVillageAnchor`.
+/// `anchor.center.y` = `well_y` = le Y flatten du centre village → le joueur atterrit
+/// sur le sol plat, pas sous le terrain. (Avant story-586 : lisait
+/// `VillageLoadResult.spawn_position` du système B legacy, désormais débranché du RPG.)
+/// Gating : attend que le sim ring soit chargé (StreamingPause), une seule fois par Rpg.
 fn teleport_player_to_terrain(
     mut commands: Commands,
     pending: Option<Res<PendingPlayerTeleport>>,
-    village: Option<Res<VillageLoadResult>>,
+    anchor: Option<Res<RpgVillageAnchor>>,
     pause: Option<Res<StreamingPause>>,
     mut q: Query<&mut Transform, With<Player>>,
 ) {
     if pending.is_none() {
         return;
     }
-    let Some(village) = village else { return };
+    let Some(anchor) = anchor else { return };
     // Wave 4a — block teleport tant que le sim ring n'est pas loaded.
     // Pattern Roblox StreamingPauseMode : "min-radius is a correctness contract".
     if let Some(pause) = pause {
@@ -1279,13 +1292,14 @@ fn teleport_player_to_terrain(
         }
     }
     let Ok(mut tf) = q.single_mut() else { return };
-    tf.translation = village.spawn_position;
-    tf.rotation = Quat::from_rotation_y(village.spawn_yaw_deg.to_radians());
+    // Léger offset XZ (+3,+3) pour ne pas spawn pile sur le puits ; +2 en Y = marge
+    // au-dessus du sol flatten, la gravité Rapier pose ensuite le joueur au sol.
+    let spawn = Vec3::new(anchor.center.x + 3.0, anchor.center.y + 2.0, anchor.center.z + 3.0);
+    tf.translation = spawn;
     commands.remove_resource::<PendingPlayerTeleport>();
     info!(
-        "[forgia-rpg] Player teleported to village '{}' spawn ({:.1},{:.1},{:.1}) — sim ring loaded",
-        village.village_id,
-        village.spawn_position.x, village.spawn_position.y, village.spawn_position.z
+        "[forgia-rpg] Player teleported to village hex spawn ({:.1},{:.1},{:.1}) — sim ring loaded",
+        spawn.x, spawn.y, spawn.z
     );
 }
 

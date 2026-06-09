@@ -261,20 +261,23 @@ pub(crate) fn spawn_character_lineup(
     let spread = std::f32::consts::FRAC_PI_2; // 90° total
     let start_angle = std::f32::consts::FRAC_PI_2 - spread * 0.5; // centré sur +Z
     let spawn_y = center.y - 0.85;
+    // Story-539 : chaque PNJ se tient devant « son » bâtiment (forge / marché / taverne / puits).
+    let stations = crate::worldgen_village::npc_stations(&anchor);
 
     for (i, (name, glb_path, greeting)) in LINEUP_CHARACTERS.iter().enumerate() {
-        let t = if n > 1 {
-            i as f32 / (n as f32 - 1.0)
+        // Station dédiée si elle existe, sinon arc autour du puits (fallback).
+        let (px, pz, yaw) = if let Some((_, xz, syaw)) =
+            stations.iter().find(|(s, _, _)| *s == *name)
+        {
+            (xz.x, xz.y, *syaw)
         } else {
-            0.5
+            let t = if n > 1 { i as f32 / (n as f32 - 1.0) } else { 0.5 };
+            let angle = start_angle + t * spread;
+            let px = center.x + angle.cos() * RADIUS;
+            let pz = center.z + angle.sin() * RADIUS;
+            let yaw = (px - center.x).atan2(pz - center.z);
+            (px, pz, yaw)
         };
-        let angle = start_angle + t * spread;
-        let px = center.x + angle.cos() * RADIUS;
-        let pz = center.z + angle.sin() * RADIUS;
-        // Face le puits : Bevy forward = -Z, donc yaw = atan2(-dx, -dz).
-        let dx = center.x - px;
-        let dz = center.z - pz;
-        let yaw = (-dx).atan2(-dz);
         let mut ent = commands.spawn((
             LineupCharacter,
             LineupName(name.to_string()),
@@ -345,12 +348,18 @@ pub(crate) fn calibrate_lineup_y_and_height(
     transforms_q: Query<&Transform, Without<LineupCharacter>>,
     aabbs_q: Query<&Aabb>,
     q_player: Query<&Transform, (With<Player>, Without<LineupCharacter>)>,
+    anchor: Option<Res<crate::RpgVillageAnchor>>,
 ) {
-    let Ok(player_tf) = q_player.single() else {
-        return;
+    // Story-539 : le sol = le Y plat du village (ancre stable), pas `player.y - 1.0` — celui-ci est
+    // transitoire au spawn (le joueur tombe), ce qui figeait les PNJ en l'air (calibration one-shot).
+    let ground_y = if let Some(a) = &anchor {
+        a.center.y
+    } else {
+        let Ok(player_tf) = q_player.single() else {
+            return;
+        };
+        player_tf.translation.y - 1.0
     };
-    // Sol = bottom du capsule Player (half_height 0.7 + radius 0.3 = 1.0m).
-    let ground_y = player_tf.translation.y - 1.0;
 
     for (entity, mut char_tf) in &mut q_lineup {
         let mut min_y = f32::INFINITY;

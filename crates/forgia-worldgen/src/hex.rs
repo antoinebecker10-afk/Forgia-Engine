@@ -35,6 +35,24 @@ impl Hex {
         Vec2::new(x, z)
     }
 
+    /// Nearest hex to a world XZ offset (inverse of [`to_world`], with cube rounding). `size` =
+    /// center-to-vertex of the rendered tile. Used to keep the player's spawn hex clear.
+    pub fn from_world(pos: Vec2, size: f32) -> Hex {
+        const SQRT3: f32 = 1.732_050_8;
+        let rf = (2.0 / 3.0) * pos.y / size;
+        let qf = (pos.x / size) / SQRT3 - rf / 2.0;
+        // Cube rounding: round q,r,s; fix up the largest deviation.
+        let sf = -qf - rf;
+        let (mut q, mut r, s) = (qf.round(), rf.round(), sf.round());
+        let (dq, dr, ds) = ((q - qf).abs(), (r - rf).abs(), (s - sf).abs());
+        if dq > dr && dq > ds {
+            q = -r - s;
+        } else if dr > ds {
+            r = -q - s;
+        }
+        Hex::new(q as i32, r as i32)
+    }
+
     /// Hex (ring) distance between two coordinates.
     pub fn distance(self, other: Hex) -> i32 {
         let dq = self.q - other.q;
@@ -45,6 +63,12 @@ impl Hex {
     /// Ring index from the center (= `distance(ZERO)`).
     pub fn ring(self) -> i32 {
         self.distance(Hex::ZERO)
+    }
+
+    /// The six neighbours, in canonical direction order (index `i` → [`DIRECTIONS`]`[i]`). Used by
+    /// connection-aware tiling (the edge toward neighbour `i` is hex slot `(6 - i) % 6`).
+    pub fn neighbors(self) -> [Hex; 6] {
+        DIRECTIONS.map(|d| Hex::new(self.q + d.q, self.r + d.r))
     }
 }
 
@@ -144,6 +168,14 @@ mod tests {
         let row = Hex::new(0, 1).to_world(size);
         assert!((row.x - 1.0).abs() < 1e-4, "row x {} != 1.0", row.x);
         assert!((row.y - 1.5 * size).abs() < 1e-4);
+    }
+
+    #[test]
+    fn from_world_inverts_to_world() {
+        let size = 5.0;
+        for h in hex_spiral(4) {
+            assert_eq!(Hex::from_world(h.to_world(size), size), h, "roundtrip failed for {h:?}");
+        }
     }
 
     #[test]

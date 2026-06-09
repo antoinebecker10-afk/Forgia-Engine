@@ -220,6 +220,9 @@ fn populate_new_chunks(
         return;
     }
 
+    // Story-583 (budget par frame) reverted 2026-06-09 : régression « végétation
+    // disparue » (jamais validé runtime). On repeuple TOUS les chunks prêts par frame
+    // (état qui marchait). L'anti-stutter sera refait + validé proprement plus tard.
     for (chunk_entity, coord, lod) in &q_chunks {
         if veg.chunk_entities.contains_key(coord) {
             continue;

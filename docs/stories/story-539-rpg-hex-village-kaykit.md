@@ -49,11 +49,22 @@ User report après le 1er commit. **2 fausses pistes avant la bonne** (leçon [[
 
 **"Rien sous la map"** vérifié : placement == rendu (tout posé à `anchor.y == flatten target_y`, terrain rendu aplani au même Y), joueur `depth_below_surface=0`, seul le socle des tuiles KayKit est enterré (design, invisible).
 
-## Reste (incréments)
+## Incréments
 
-- [x] **Validation runtime user** (look + végétation + sous-map) — OK
-- [x] Rue principale (axe q, `hex_road_A` yaw 0, orientation vérifiée par analyse mesh)
-- [x] Fix clear foliage (32→22m)
-- [ ] Réseau de rues complet (cross-streets axes r/q+r + jonctions D/E/F connection-aware)
-- [ ] Recette TOML data-driven (v1 = const) — sortir HEX_SCALE/RADIUS/density dans `rpg_village.toml`
-- [ ] Sensor `forgia2_rpg_village.json` (count tuiles/bâtiments + centre)
+- [x] **Validation runtime** look + végétation + sous-map + rues — OK (« routes parfait »)
+- [x] Rue principale puis **réseau autotilé complet** (3 rues radiales, autotiler A-M connection-aware)
+- [x] Fix clear foliage (dérivé de l'emprise)
+- [x] **Commité** `2371fbc` (village) + `0ffa760` (rue + fix clear)
+
+### Itération 5-retours (CODE-COMPLETE, clippy 0, 11 tests — NON COMMITÉ, runtime à valider)
+Fichiers : `worldgen_village.rs` + `character.rs` + `hex.rs` (tous MIENS ; foliage = autre terminal, exclu).
+- [x] **Scale ×1.8** (HEX_SCALE 4.5 + BUILDING_SCALE_MUL 1.2) — bâtiments ~5m vs Rex ~2m
+- [x] **Ville R=4 moins dense** (BUILD_DENSITY 0.42) — bâtiments espacés
+- [x] **Fortifications** : enceinte continue (mur sur chaque hex non-porte + tours par-dessus) + 3 portes
+- [x] **PNJ aux stations** (devant forge/marché/taverne/puits) + fix flottement (calib ancrée Y village)
+- [x] Sécurité spawn joueur (`Hex::from_world` → hex de spawn dégagé)
+
+### Reste
+- [ ] **Valider runtime** R=4 fortifié (enceinte fermée ? espacement ? PNJ au sol ?) → commit scopé
+- [ ] Recette TOML data-driven (sortir HEX_SCALE/RADIUS/density/scale)
+- [ ] Sensor `forgia2_rpg_village.json`
