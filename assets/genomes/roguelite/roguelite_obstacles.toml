@@ -1,0 +1,29 @@
+# roguelite_obstacles.toml — Story-590 (2026-06-09)
+# Obstacles animés du parcours (façon Fall Guys). Hot-reload mtime (Shift+F12-like).
+# Miroir EXACT de ObstacleConfig::default() (parcours_obstacles.rs).
+#
+# Familles (taxonomie obstacle_<type> du GLB platformer_underworld) :
+#   obstacle_1     -> marteau pendule (balance sous le pivot du haut)
+#   obstacle_3/4/6 -> balayeur (barre/croix qui tourne sur Y)
+#   obstacle_2     -> bloc coulissant (translation en travers)
+
+[hammer]
+enabled = true
+swing_deg = 62.0   # amplitude de balancement de part et d'autre (degrés)
+freq = 1.6         # pulsation (rad/s) — plus haut = plus rapide
+
+[spinner]
+enabled = true
+speed = 1.0        # vitesse de rotation Y (rad/s)
+
+[slider]
+enabled = true
+amplitude = 2.5    # translation de part et d'autre (m)
+freq = 1.1         # pulsation (rad/s)
+spin_speed = 2.0   # rotation Y du bloc en glissant (rad/s)
+
+# Push physique : repousse le joueur tant qu'il chevauche un obstacle (même à
+# l'arrêt), sans le laisser traverser. Détection via le vrai collider.
+[push]
+enabled = true
+speed = 7.0        # vitesse de répulsion (m/s) tant que le chevauchement dure

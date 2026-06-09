@@ -33,6 +33,7 @@ pub mod hud;
 pub mod intro_dialogue;
 pub mod kill_popup;
 pub mod loot_room;
+pub mod parcours_obstacles;
 pub mod poi;
 pub mod run;
 pub mod sensor;
@@ -441,6 +442,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_plugins(atmosphere::RogueliteAtmospherePlugin)
             // Portail → salle de loot verticale (2026-06-06).
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
+            // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).
+            .add_plugins(parcours_obstacles::ParcoursObstaclesPlugin)
             // Story-558 P2 Vlambeer juice — kill popup cartoon par archetype.
             .add_plugins(kill_popup::RogueliteKillPopupPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").

@@ -11,12 +11,16 @@
 
 use crate::elements::{Element, ElementUnlocks};
 use crate::kill_popup::{KillPopup, KillPopupState};
+use crate::parcours_obstacles::{
+    classify, phase_from_pos, AnimatedObstacle, ObstacleAnim, ObstacleStats, RotatingObstacle,
+    SlidingObstacle, SwingingHammer,
+};
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_egui::egui;
-use bevy_rapier3d::prelude::{Collider, ComputedColliderShape};
+use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, RigidBody};
 use forgia_ai_arena_bot::BotTarget;
 use forgia_core::prelude::*;
 use forgia_damage::Health;
@@ -109,9 +113,8 @@ struct DemoUnmarked;
 /// Mesh du niveau démo en attente de son collider ConvexHull (généré par lots).
 #[derive(Component)]
 struct NeedsLevelCollider;
-/// Spinner de parcours : pièce qui tourne sur son axe Y (obstacle_3/_6 du démo).
-#[derive(Component)]
-struct RotatingObstacle;
+// Obstacles animés (marteau/balayeur/coulissant) : composants + systèmes dans
+// `parcours_obstacles.rs` (story-590). Ici on ne fait que les TAGUER au marquage.
 
 #[derive(Resource, Default)]
 pub struct LootRoomState {
@@ -224,7 +227,6 @@ impl Plugin for RogueliteLootRoomPlugin {
                     sys_player_shrink,
                     sys_mark_demo_meshes,
                     sys_collide_demo_incremental,
-                    sys_rotate_obstacles,
                 )
                     .in_set(GameSet::Movement)
                     .run_if(in_state(GameMode::Roguelite)),
@@ -317,23 +319,28 @@ fn sys_setup(
 
 // ── Colliders incrémentaux du niveau démo ───────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn sys_mark_demo_meshes(
     mut commands: Commands,
     q_root: Query<Entity, (With<DemoLevelRoot>, With<DemoUnmarked>)>,
     q_children: Query<&Children>,
     q_mesh: Query<(), With<Mesh3d>>,
     q_name: Query<&Name>,
+    q_tf: Query<&Transform>,
+    mut stats: ResMut<ObstacleStats>,
 ) {
     for root in &q_root {
         let Ok(top) = q_children.get(root) else {
             continue;
         };
-        let mut stack: Vec<(Entity, Option<LevelItemKind>)> =
-            top.iter().map(|e| (e, None)).collect();
+        // Le 3e champ = `animated` : propagé au sous-arbre d'un obstacle pour
+        // marquer aussi les entités-mesh ENFANT (qui portent le collider).
+        let mut stack: Vec<(Entity, Option<LevelItemKind>, bool)> =
+            top.iter().map(|e| (e, None, false)).collect();
         let mut count = 0u32;
-        let mut spinners = 0u32;
+        let (mut hammers, mut spinners, mut sliders) = (0u32, 0u32, 0u32);
         let mut items = 0u32;
-        while let Some((e, mut item)) = stack.pop() {
+        while let Some((e, mut item, mut animated)) = stack.pop() {
             // Item ramassable repéré par nom (couronne/cœur/…) → tag une fois sur le
             // node nommé ; son sous-arbre n'aura PAS de collider (traversable + collecté).
             if item.is_none() {
@@ -350,31 +357,63 @@ fn sys_mark_demo_meshes(
                     commands.entity(e).insert(NeedsLevelCollider);
                     count += 1;
                 }
-                // Spinners de parcours : barres obstacle_3 / obstacle_6 (pivot centré).
-                if let Ok(name) = q_name.get(e) {
-                    let s = name.as_str();
-                    if s.starts_with("obstacle_3") || s.starts_with("obstacle_6") {
-                        commands.entity(e).insert(RotatingObstacle);
-                        spinners += 1;
+                // Obstacle animé (story-590) : seulement le node-RACINE (pas déjà dans
+                // un sous-arbre animé). On en fait un corps KinematicPositionBased → son
+                // collider (sur ce node OU un enfant-mesh) bouge VRAIMENT dans Rapier
+                // (le KCC bloque + intersect_shape détecte le chevauchement). Un collider
+                // statique dont seul le parent bouge ne se resynchronise pas → le joueur
+                // traversait l'obstacle (fix 2026-06-09, sensor push.events restait 0).
+                if !animated {
+                    if let Ok(name) = q_name.get(e) {
+                        if let Some(anim) = classify(name.as_str()) {
+                            let base = q_tf.get(e).copied().unwrap_or_default();
+                            animated = true;
+                            commands
+                                .entity(e)
+                                .insert(RigidBody::KinematicPositionBased);
+                            match anim {
+                                ObstacleAnim::Hammer => {
+                                    commands.entity(e).insert(SwingingHammer {
+                                        base: base.rotation,
+                                        phase: phase_from_pos(base.translation),
+                                    });
+                                    hammers += 1;
+                                }
+                                ObstacleAnim::Spinner => {
+                                    commands.entity(e).insert(RotatingObstacle);
+                                    spinners += 1;
+                                }
+                                ObstacleAnim::Slider => {
+                                    commands.entity(e).insert(SlidingObstacle {
+                                        base: base.translation,
+                                        axis: Vec3::X,
+                                        phase: phase_from_pos(base.translation),
+                                    });
+                                    sliders += 1;
+                                }
+                            }
+                        }
                     }
                 }
             }
+            // Marqueur de push sur TOUT le sous-arbre animé : le collider est souvent
+            // sur une entité-mesh ENFANT créée par le loader glTF, pas le node nommé.
+            if animated {
+                commands.entity(e).insert(AnimatedObstacle);
+            }
             if let Ok(ch) = q_children.get(e) {
                 for c in ch.iter() {
-                    stack.push((c, item));
+                    stack.push((c, item, animated));
                 }
             }
         }
+        stats.hammers += hammers;
+        stats.spinners += spinners;
+        stats.sliders += sliders;
         commands.entity(root).remove::<DemoUnmarked>();
-        info!("[loot-room] niveau démo : {count} meshes collider ; {spinners} spinners ; {items} items ramassables");
-    }
-}
-
-/// Fait tourner les spinners de parcours sur leur axe Y (collider suit via propagation).
-fn sys_rotate_obstacles(time: Res<Time>, mut q: Query<&mut Transform, With<RotatingObstacle>>) {
-    let dt = time.delta_secs();
-    for mut tf in &mut q {
-        tf.rotate_local_y(dt * 1.0);
+        info!(
+            "[loot-room] niveau démo : {count} meshes collider ; {hammers} marteaux ; {spinners} balayeurs ; {sliders} blocs coulissants ; {items} items"
+        );
     }
 }
 
