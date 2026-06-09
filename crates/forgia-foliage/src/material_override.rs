@@ -21,10 +21,18 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 /// Chemin relatif aux 3 textures PBR Jolcham Oak Bark (depuis `assets/`).
-pub const BARK_DIFF_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.jpg";
+///
+/// Story-588 (B4) : `.ktx2` UASTC (transcode BC7 sur desktop via la feature bevy
+/// `basis-universal`) → VRAM ÷4 vs RGBA8 (3× 2048×4096 ≈ 128 MB → ~32 MB). Color space
+/// **préservé tout-sRGB** comme l'ancien rendu jpg validé : le loader `repeat` ci-dessous
+/// laisse `is_srgb=true` (défaut), et bevy choisit le format de transcode via `is_srgb`
+/// (ktx2.rs `Bc7RgbaUnormSrgb`), pas l'OETF du fichier. Les 3 sont donc encodées sRGB.
+/// (Corriger nor/arm en linéaire = follow-up qualité séparé, changerait l'éclairage.)
+/// Les `.jpg` sources restent en place (revert).
+pub const BARK_DIFF_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.ktx2";
 pub const BARK_NOR_PATH: &str =
-    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_2k.jpg";
-pub const BARK_ARM_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.jpg";
+    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_2k.ktx2";
+pub const BARK_ARM_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.ktx2";
 
 /// Noms de primitives consideres comme "tronc" (lowercase substring match).
 ///

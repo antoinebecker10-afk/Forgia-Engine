@@ -95,7 +95,7 @@ unused_variables = "warn"
 
 [workspace.dependencies]
 # Pin Bevy 0.18.1 stable until V1 ship. Migration 0.19+ post-ship V1.1.
-bevy = { version = "0.18.1", features = ["wav", "mp3", "vorbis", "jpeg", "bevy_dev_tools", "ktx2", "webp", "file_watcher"] }
+bevy = { version = "0.18.1", features = ["wav", "mp3", "vorbis", "jpeg", "bevy_dev_tools", "ktx2", "basis-universal", "webp", "file_watcher"] }
 bevy_rapier3d = { version = "0.33", features = ["debug-render-3d"] }
 bevy_egui = "0.39.1"
 bevy_hanabi = { version = "0.18", default-features = false, features = ["3d"] }
