@@ -1,0 +1,65 @@
+# roguelite_elements.toml — Story-582 Phase A (2026-06-07)
+# Système d'éléments par-arme (Borderlands × Gunfire Reborn).
+# Hot-reload mtime (Shift+F12-like). Miroir exact de ElementConfig::default().
+#
+# Élément signature par arme :
+#   pistolet Pépin (modern_ar)     -> explosif (AOE splash)
+#   SMG Bourrasque (assault_rifle) -> feu (burn DoT)
+#   sniper Lenoir (shotgun)        -> perforant (exécution tank)
+#   pompe Boucherie (rocket_launcher) -> poison (DoT stackant + shred)
+#
+# matchup = multiplicateur d'efficacité appliqué au hit de base, par type
+# d'ennemi (Tank / Runner / Sniper / Boss). C'est la source du "fort contre".
+
+# Phase A : tous les éléments actifs (test arène). Passe à 0 pour tout désactiver
+# (le sensor forgia2_elements.json flag alors severity=warn).
+always_on = true
+
+[mapping]
+modern_ar = "explosive"
+assault_rifle = "fire"
+shotgun = "armor_pierce"
+rocket_launcher = "poison"
+
+# ── Tables d'efficacité (× sur le hit de base) ──────────────────────────────
+[matchup.fire]
+tank = 1.0
+runner = 1.3
+sniper = 1.1
+boss = 1.0
+
+[matchup.poison]
+tank = 1.4
+runner = 1.0
+sniper = 1.1
+boss = 1.2
+
+[matchup.explosive]
+tank = 1.1
+runner = 1.4
+sniper = 1.2
+boss = 1.0
+
+[matchup.armor_pierce]
+tank = 2.0
+runner = 1.0
+sniper = 1.3
+boss = 1.5
+
+# ── Status effects + AOE + exécution ────────────────────────────────────────
+[burn]
+dps = 8.0
+duration = 3.0
+
+[poison]
+dps_per_stack = 4.0
+duration = 4.0
+max_stacks = 5
+shred_per_stack = 0.04
+
+[aoe]
+radius = 3.5
+damage_factor = 0.5
+
+[execute]
+hp_ratio_threshold = 0.25

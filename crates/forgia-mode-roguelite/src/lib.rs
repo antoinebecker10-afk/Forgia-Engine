@@ -26,6 +26,7 @@ pub mod audio;
 pub mod boons_apply;
 pub mod coffre_sensor;
 pub mod decor;
+pub mod elements;
 pub mod enemies;
 pub mod hud;
 pub mod intro_dialogue;
@@ -196,6 +197,40 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             poi::sys_write_poi_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-582 (2026-06-07) — système d'éléments par-arme (feu/poison/
+        // explosif/perforant) : matchups vs archetype + status DoT + AOE +
+        // exécution. Mute forgia_combat::Health directement (despawn_dead_cubes
+        // → DeathEvent → loot/heal). Genome roguelite_elements.toml hot-reload mtime.
+        app.init_resource::<elements::ElementConfig>();
+        app.init_resource::<elements::ElementStats>();
+        app.init_resource::<elements::ElementGenomeWatch>();
+        app.add_systems(Startup, elements::sys_init_element_genome);
+        app.add_systems(
+            OnEnter(GameMode::Roguelite),
+            elements::sys_reset_element_stats,
+        );
+        app.add_systems(
+            Update,
+            elements::sys_hot_reload_element_genome
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            elements::sys_apply_elements_on_hit
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            elements::sys_tick_element_status
+                .in_set(GameSet::Combat)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            elements::sys_write_elements_sensor.in_set(GameSet::Sensors),
         );
         // Story-562b (2026-06-03) — props décoratifs procéduraux pour remplir
         // l'arène (rochers/cristaux/piliers en anneau + débris au sol). Crate
