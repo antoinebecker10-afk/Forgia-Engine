@@ -21,9 +21,10 @@
 
 use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
-use forgia_combat::weapons::WeaponType;
+use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -40,7 +41,7 @@ pub const STATUS_TICK_INTERVAL: f32 = 0.5;
 
 // ─── Élément ──────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Element {
     /// Feu — burn DoT plat. Identité SMG (Bourrasque).
     Fire,
@@ -92,6 +93,46 @@ impl Element {
             Element::Explosive => v.explosive_rgb,
             Element::ArmorPierce => v.armor_pierce_rgb,
         }
+    }
+
+    /// Nom FR (cartes de choix HUD, story-589).
+    pub fn fr_name(self) -> &'static str {
+        match self {
+            Element::Fire => "FEU",
+            Element::Poison => "POISON",
+            Element::Explosive => "EXPLOSIF",
+            Element::ArmorPierce => "PERFORANT",
+        }
+    }
+
+    /// Tag court d'identité (sous-titre de carte).
+    pub fn tag(self) -> &'static str {
+        match self {
+            Element::Fire => "brûlure (DoT)",
+            Element::Poison => "poison stackant + shred",
+            Element::Explosive => "splash de zone (AOE)",
+            Element::ArmorPierce => "exécute les tanks",
+        }
+    }
+
+    /// Popup `&'static str` au déblocage (story-589 ; `KillPopup.text` est statique).
+    pub fn armed_popup(self) -> &'static str {
+        match self {
+            Element::Fire => "FEU ARMÉ !",
+            Element::Poison => "POISON ARMÉ !",
+            Element::Explosive => "EXPLOSIF ARMÉ !",
+            Element::ArmorPierce => "PERFORANT ARMÉ !",
+        }
+    }
+
+    /// Itère les 4 éléments (ordre stable = ordre d'`idx`).
+    pub fn all() -> [Element; 4] {
+        [
+            Element::Fire,
+            Element::Poison,
+            Element::Explosive,
+            Element::ArmorPierce,
+        ]
     }
 }
 
@@ -225,8 +266,11 @@ impl Default for VfxParams {
 /// Config gameplay des éléments. Resource + parsée du TOML (mtime hot-reload).
 #[derive(Resource, Deserialize, Clone, Debug, PartialEq)]
 pub struct ElementConfig {
-    /// Phase A : tous les éléments actifs par défaut (test arène). Phase B :
-    /// passera à un débloquage par-arme via le choix 1-parmi-3 au portail.
+    /// **Override dev** (story-589) : `true` = les 4 éléments armés d'office
+    /// (mode test Phase A). `false` (ship) = progression via [`ElementUnlocks`]
+    /// (départ armé + déblocages au portail). N'est plus le gate runtime des
+    /// hits : c'est `ElementUnlocks` qui gate ; `always_on` ne fait que remplir
+    /// le Set au reset.
     pub always_on: bool,
     pub mapping: WeaponMapping,
     pub matchup: MatchupTable,
@@ -243,7 +287,9 @@ impl Default for ElementConfig {
     fn default() -> Self {
         // Miroir EXACT de assets/genomes/roguelite/roguelite_elements.toml.
         Self {
-            always_on: true,
+            // Story-589 : défaut SHIP = progression (départ armé + déblocages
+            // portail). `true` = override dev (4 éléments armés, test Phase A).
+            always_on: false,
             mapping: WeaponMapping {
                 modern_ar: "explosive".into(),
                 assault_rifle: "fire".into(),
@@ -297,6 +343,35 @@ impl ElementConfig {
 
     pub fn matchup_for(&self, e: Element, a: EnemyArchetype) -> f32 {
         self.matchup.for_element(e).for_archetype(a)
+    }
+}
+
+// ─── Progression : éléments armés (story-589 Phase B) ───────────────────────
+
+/// Éléments actuellement **armés** par le joueur dans le run. Un hit n'applique
+/// son élément que si l'élément est dans ce set. Rempli au reset (départ = arme
+/// de départ) puis étendu au portail de fin de zone (`loot_room::ZoneReward`).
+/// L'override dev `always_on=true` remplit les 4 au reset (mode test Phase A).
+#[derive(Resource, Default, Clone, Debug)]
+pub struct ElementUnlocks(pub HashSet<Element>);
+
+impl ElementUnlocks {
+    pub fn is_unlocked(&self, e: Element) -> bool {
+        self.0.contains(&e)
+    }
+    /// Arme un élément. Retourne `true` s'il ne l'était pas déjà.
+    pub fn unlock(&mut self, e: Element) -> bool {
+        self.0.insert(e)
+    }
+    pub fn count(&self) -> usize {
+        self.0.len()
+    }
+    /// Éléments encore verrouillés (ordre stable `idx`) — offerts au portail.
+    pub fn locked(&self) -> Vec<Element> {
+        Element::all()
+            .into_iter()
+            .filter(|e| !self.0.contains(e))
+            .collect()
     }
 }
 
@@ -424,6 +499,34 @@ pub fn sys_reset_element_stats(mut stats: ResMut<ElementStats>) {
     *stats = ElementStats::default();
 }
 
+/// OnEnter Roguelite — reset des éléments armés (story-589). Slate vierge SAUF :
+/// - **départ armé** : l'élément de l'arme de départ (`EquippedWeapons.current`)
+///   est armé d'office (le joueur a toujours ≥1 élément actif),
+/// - **override dev** `always_on=true` : les 4 éléments sont armés (mode test).
+pub fn sys_reset_element_unlocks(
+    config: Res<ElementConfig>,
+    equipped: Option<Res<EquippedWeapons>>,
+    mut unlocks: ResMut<ElementUnlocks>,
+) {
+    unlocks.0.clear();
+    if config.always_on {
+        for e in Element::all() {
+            unlocks.0.insert(e);
+        }
+        info!("[elements] always_on → 4 éléments armés (mode dev)");
+        return;
+    }
+    let start = equipped
+        .as_deref()
+        .and_then(|eq| config.element_for(eq.current));
+    if let Some(e) = start {
+        unlocks.0.insert(e);
+        info!("[elements] départ armé : {} (arme de départ)", e.fr_name());
+    } else {
+        info!("[elements] départ sans élément (arme non mappée) — unlocks au portail");
+    }
+}
+
 // ─── System : application des éléments au hit ───────────────────────────────
 
 /// Décision PURE (testable headless) d'un hit élémentaire sur la cible. `cur_hp`
@@ -458,6 +561,7 @@ pub fn resolve_target_hit(
 pub fn sys_apply_elements_on_hit(
     mut events: MessageReader<CombatHitEvent>,
     config: Res<ElementConfig>,
+    unlocks: Res<ElementUnlocks>,
     mut commands: Commands,
     mut stats: ResMut<ElementStats>,
     q_archetype: Query<&EnemyArchetype>,
@@ -467,9 +571,6 @@ pub fn sys_apply_elements_on_hit(
     // Buffer AOE réutilisé (0 alloc dans le chemin combat — règle scalability §hot).
     mut aoe_buf: Local<Vec<Entity>>,
 ) {
-    if !config.always_on {
-        return;
-    }
     for ev in events.read() {
         let Some(weapon) = ev.weapon else {
             continue;
@@ -477,6 +578,10 @@ pub fn sys_apply_elements_on_hit(
         let Some(element) = config.element_for(weapon) else {
             continue;
         };
+        // Story-589 : l'élément n'agit que s'il est ARMÉ (départ + déblocages portail).
+        if !unlocks.is_unlocked(element) {
+            continue;
+        }
         let Ok(archetype) = q_archetype.get(ev.target).copied() else {
             continue;
         };
@@ -618,11 +723,13 @@ pub fn sys_tick_element_status(
 // ─── Sensor forgia2_elements.json ───────────────────────────────────────────
 
 /// Écrit `forgia2_elements.json` 1Hz : mapping par arme, hits par élément, DoT
-/// actifs, executes. Severity `warn` si `always_on=0` (aucun élément actif).
+/// actifs, executes, **éléments armés** (story-589). Severity `warn` si aucun
+/// élément armé hors mode dev (le départ-armé a échoué → progression cassée).
 pub fn sys_write_elements_sensor(
     time: Res<Time>,
     mut accum: Local<f32>,
     config: Res<ElementConfig>,
+    unlocks: Res<ElementUnlocks>,
     stats: Res<ElementStats>,
     q_burn: Query<(), With<StatusBurn>>,
     q_poison: Query<&StatusPoison>,
@@ -637,19 +744,24 @@ pub fn sys_write_elements_sensor(
     let active_poisons = q_poison.iter().count();
     let active_stacks: u32 = q_poison.iter().map(|p| p.stacks).sum();
 
-    let (severity, next_step) = if config.always_on {
+    let (severity, next_step) = if config.always_on || unlocks.count() >= 1 {
         ("ok", "")
     } else {
         (
             "warn",
-            "always_on=0 — aucun élément actif (set 1 dans roguelite_elements.toml)",
+            "0 élément armé — départ-armé KO (EquippedWeapons absent/non mappé au reset Roguelite)",
         )
     };
 
     let json = format!(
-        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"aoe_hits":{},"executes":{},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks}}}"#,
+        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"aoe_hits":{},"executes":{},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks}}}"#,
         time.elapsed_secs(),
         config.always_on,
+        unlocks.is_unlocked(Element::Fire),
+        unlocks.is_unlocked(Element::Poison),
+        unlocks.is_unlocked(Element::Explosive),
+        unlocks.is_unlocked(Element::ArmorPierce),
+        unlocks.count(),
         config.mapping.modern_ar,
         config.mapping.assault_rifle,
         config.mapping.shotgun,
@@ -740,8 +852,24 @@ mod tests {
     }
 
     #[test]
-    fn default_is_always_on() {
-        assert!(ElementConfig::default().always_on);
+    fn default_is_progression_mode() {
+        // Story-589 : défaut ship = progression (always_on=false → gate par ElementUnlocks).
+        assert!(!ElementConfig::default().always_on);
+    }
+
+    #[test]
+    fn unlocks_gate_and_locked_list() {
+        let mut u = ElementUnlocks::default();
+        assert_eq!(u.count(), 0);
+        assert!(!u.is_unlocked(Element::Fire));
+        assert_eq!(u.locked().len(), 4);
+        assert!(u.unlock(Element::Fire));
+        assert!(!u.unlock(Element::Fire), "re-unlock = false (déjà armé)");
+        assert!(u.is_unlocked(Element::Fire));
+        assert_eq!(u.count(), 1);
+        let locked = u.locked();
+        assert_eq!(locked.len(), 3);
+        assert!(!locked.contains(&Element::Fire));
     }
 
     #[test]

@@ -25,7 +25,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_core::prelude::*;
 
-use crate::elements::{Element, ElementConfig, StatusBurn, StatusPoison};
+use crate::elements::{Element, ElementConfig, ElementUnlocks, StatusBurn, StatusPoison};
 
 const SENSOR_PATH: &str = "forgia2_element_vfx.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
@@ -126,11 +126,12 @@ pub fn sys_reset_vfx_stats(mut stats: ResMut<ElementVfxStats>) {
 
 /// Lit `CombatHitEvent` (même producteur que `sys_apply_elements_on_hit`) et
 /// spawn un flash coloré à `hit_world_pos`. L'explosif est plus gros (splash) et
-/// 2× plus lumineux. Gaté par `always_on` (cohérence avec l'application réelle)
-/// + `vfx.enabled`.
+/// 2× plus lumineux. Gaté par le MÊME check que l'application réelle
+/// (`unlocks.is_unlocked`, story-589) + `vfx.enabled` — sinon flash sans dégâts.
 pub fn sys_spawn_element_impact(
     mut events: MessageReader<CombatHitEvent>,
     config: Res<ElementConfig>,
+    unlocks: Res<ElementUnlocks>,
     assets: Option<Res<ElementVfxAssets>>,
     q_sparks: Query<(), With<ElementSpark>>,
     mut stats: ResMut<ElementVfxStats>,
@@ -141,7 +142,7 @@ pub fn sys_spawn_element_impact(
     };
     let mut live = q_sparks.iter().count();
     for ev in events.read() {
-        if !config.always_on || !config.vfx.enabled || live >= MAX_ACTIVE_SPARKS {
+        if !config.vfx.enabled || live >= MAX_ACTIVE_SPARKS {
             continue;
         }
         let Some(weapon) = ev.weapon else {
@@ -150,6 +151,10 @@ pub fn sys_spawn_element_impact(
         let Some(element) = config.element_for(weapon) else {
             continue;
         };
+        // Cohérence VFX↔dégâts : même gate que sys_apply_elements_on_hit.
+        if !unlocks.is_unlocked(element) {
+            continue;
+        }
         let explosive = element == Element::Explosive;
         let scale = config.vfx.impact_scale * if explosive { config.vfx.explosive_scale } else { 1.0 };
         let light0 = config.vfx.light_intensity * if explosive { 2.0 } else { 1.0 };

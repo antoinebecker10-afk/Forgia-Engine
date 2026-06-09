@@ -11,9 +11,10 @@
 # matchup = multiplicateur d'efficacité appliqué au hit de base, par type
 # d'ennemi (Tank / Runner / Sniper / Boss). C'est la source du "fort contre".
 
-# Phase A : tous les éléments actifs (test arène). Passe à 0 pour tout désactiver
-# (le sensor forgia2_elements.json flag alors severity=warn).
-always_on = true
+# Story-589 : SHIP = progression. always_on=false → les éléments s'arment au fil
+# du run (départ = élément de l'arme de départ, +1 par portail de fin de zone).
+# Mets à `true` (override dev / test Phase A) pour armer les 4 éléments d'office.
+always_on = false
 
 [mapping]
 modern_ar = "explosive"

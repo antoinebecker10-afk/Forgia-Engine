@@ -1228,22 +1228,67 @@ pub(crate) fn draw_shockwave_indicator(
 
 pub struct RogueliteHudPlugin;
 
-/// Story-585 — 3 cartes de boon au portail de fin de zone (choix gratuit, agency Hadès, touche 1/2/3).
+/// Story-585/589 — cartes de choix au portail de fin de zone (choix gratuit,
+/// agency Hadès, touche 1/2/3). Story-589 : si `is_element_choice`, les cartes
+/// ARMENT un élément (couleur = couleur de l'élément) ; sinon ce sont des boons.
 pub(crate) fn draw_zone_reward_cards(
     mut contexts: EguiContexts,
     reward: Res<crate::loot_room::ZoneReward>,
     catalogue: Option<Res<forgia_rpg_data::boons::BoonsCatalogue>>,
+    elements_cfg: Option<Res<crate::elements::ElementConfig>>,
 ) {
     if !reward.choosing() {
         return;
     }
     let Ok(ctx) = contexts.ctx_mut() else { return };
-    let cat = catalogue.as_deref();
-    let card_colors = [
+
+    // Construit les cartes (titre, sous-titre, couleur) selon le type de choix.
+    let boon_colors = [
         egui::Color32::from_rgb(231, 76, 60),
         egui::Color32::from_rgb(80, 160, 255),
         egui::Color32::from_rgb(80, 220, 120),
     ];
+    let (heading, cards): (&str, Vec<(String, String, egui::Color32)>) = if reward.is_element_choice()
+    {
+        let vfx = elements_cfg.as_deref().map(|c| c.vfx.clone()).unwrap_or_default();
+        let cards = reward
+            .element_candidates
+            .iter()
+            .map(|e| {
+                let [r, g, b] = e.rgb(&vfx);
+                let col =
+                    egui::Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8);
+                (e.fr_name().to_string(), e.tag().to_string(), col)
+            })
+            .collect();
+        ("ARME UN ÉLÉMENT", cards)
+    } else {
+        let cat = catalogue.as_deref();
+        let cards = reward
+            .candidates
+            .iter()
+            .enumerate()
+            .map(|(i, id)| {
+                let name = cat
+                    .and_then(|c| c.entries.iter().find(|b| &b.id == id))
+                    .map(|d| d.name.to_string())
+                    .unwrap_or_else(|| "???".to_string());
+                (name, String::new(), boon_colors[i.min(2)])
+            })
+            .collect();
+        ("CHOISIS UNE AMÉLIORATION", cards)
+    };
+
+    // Prompt dynamique : reflète le nombre réel de cartes (story-589 — au portail
+    // final il peut n'y avoir que 2 éléments à armer, pas 3).
+    let prompt = format!(
+        "Appuie sur {}",
+        (1..=cards.len())
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(" · ")
+    );
+
     egui::Area::new(egui::Id::new("forgia_zone_reward"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
@@ -1255,24 +1300,19 @@ pub(crate) fn draw_zone_reward_cards(
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.heading(
-                            egui::RichText::new("CHOISIS UNE AMÉLIORATION")
+                            egui::RichText::new(heading)
                                 .size(34.0)
                                 .strong()
                                 .color(egui::Color32::WHITE),
                         );
                         ui.add_space(16.0);
                         ui.horizontal(|ui| {
-                            for (i, id) in reward.candidates.iter().enumerate() {
-                                let name = cat
-                                    .and_then(|c| c.entries.iter().find(|b| &b.id == id))
-                                    .map(|d| d.name.as_str())
-                                    .unwrap_or("???");
-                                let col = card_colors[i.min(2)];
+                            for (i, (title, subtitle, col)) in cards.iter().enumerate() {
                                 egui::Frame::new()
                                     .fill(egui::Color32::from_rgb(40, 38, 48))
                                     .inner_margin(egui::Margin::same(16))
                                     .corner_radius(egui::CornerRadius::same(10))
-                                    .stroke(egui::Stroke::new(3.0, col))
+                                    .stroke(egui::Stroke::new(3.0, *col))
                                     .show(ui, |ui| {
                                         ui.set_width(180.0);
                                         ui.vertical_centered(|ui| {
@@ -1280,15 +1320,23 @@ pub(crate) fn draw_zone_reward_cards(
                                                 egui::RichText::new(format!("{}", i + 1))
                                                     .size(30.0)
                                                     .strong()
-                                                    .color(col),
+                                                    .color(*col),
                                             );
                                             ui.add_space(6.0);
                                             ui.label(
-                                                egui::RichText::new(name)
+                                                egui::RichText::new(title)
                                                     .size(18.0)
                                                     .strong()
                                                     .color(egui::Color32::WHITE),
                                             );
+                                            if !subtitle.is_empty() {
+                                                ui.add_space(4.0);
+                                                ui.label(
+                                                    egui::RichText::new(subtitle)
+                                                        .size(13.0)
+                                                        .color(egui::Color32::LIGHT_GRAY),
+                                                );
+                                            }
                                         });
                                     });
                                 ui.add_space(10.0);
@@ -1296,7 +1344,7 @@ pub(crate) fn draw_zone_reward_cards(
                         });
                         ui.add_space(14.0);
                         ui.label(
-                            egui::RichText::new("Appuie sur 1 · 2 · 3")
+                            egui::RichText::new(&prompt)
                                 .size(18.0)
                                 .color(egui::Color32::LIGHT_GRAY),
                         );

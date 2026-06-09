@@ -9,6 +9,7 @@
 //! la zone courante (checkpoint). En entrant on retire `BotTarget` + la wave est
 //! gelée (cf lib.rs `combat_running`). Zéro touche forgia-stage (contendu).
 
+use crate::elements::{Element, ElementUnlocks};
 use crate::kill_popup::{KillPopup, KillPopupState};
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
@@ -144,7 +145,7 @@ pub struct ShrinkBuff {
     active: bool,
 }
 
-/// Phase du choix de boon au portail de fin de zone (agency Hadès, story-585).
+/// Phase du choix au portail de fin de zone (agency Hadès, story-585).
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
 enum RewardPhase {
     #[default]
@@ -153,19 +154,36 @@ enum RewardPhase {
     Choosing,
 }
 
-/// Choix 1-parmi-3 GRATUIT au portail `Next` : 3 boons tirés, le joueur en prend 1 (touche 1/2/3),
-/// puis est téléporté vers `target`. Distinct du Coffre du Forgeron (shop, fin de wave).
+/// Nature du choix présenté au portail (story-589) : armer un ÉLÉMENT tant qu'il
+/// en reste à débloquer, sinon retomber sur un boon stat.
+#[derive(Default, PartialEq, Eq, Clone, Copy)]
+pub(crate) enum ChoiceKind {
+    #[default]
+    Boon,
+    Element,
+}
+
+/// Choix 1-parmi-3 GRATUIT au portail `Next` (touche 1/2/3) puis TP vers `target`.
+/// Story-589 : si des éléments restent verrouillés → on offre des **éléments**
+/// (`kind=Element`, `element_candidates`) ; sinon des **boons** (`candidates`).
+/// Distinct du Coffre du Forgeron (shop, fin de wave).
 #[derive(Resource, Default)]
 pub(crate) struct ZoneReward {
     phase: RewardPhase,
+    pub(crate) kind: ChoiceKind,
     pub(crate) candidates: Vec<BoonId>,
+    pub(crate) element_candidates: Vec<Element>,
     target: Vec3,
 }
 
 impl ZoneReward {
-    /// True quand les 3 cartes sont affichées (le HUD lit ça).
+    /// True quand les cartes sont affichées (le HUD lit ça).
     pub(crate) fn choosing(&self) -> bool {
         self.phase == RewardPhase::Choosing
+    }
+    /// True si le choix courant arme un élément (vs un boon).
+    pub(crate) fn is_element_choice(&self) -> bool {
+        self.kind == ChoiceKind::Element
     }
 }
 
@@ -728,11 +746,15 @@ fn sys_portal_walkover(
     }
 }
 
-/// Tire 3 candidats de boon quand un portail `Next` a ouvert le choix. Pool vide → TP direct.
+/// Prépare le choix quand un portail `Next` l'a ouvert. Story-589 : s'il reste
+/// des éléments verrouillés → on offre les ÉLÉMENTS (jusqu'à 3) ; sinon on tire
+/// 3 boons. Aucune option éligible → TP direct.
+#[allow(clippy::too_many_arguments)]
 fn sys_roll_zone_reward(
     mut reward: ResMut<ZoneReward>,
     catalogue: Option<Res<BoonsCatalogue>>,
     active: Res<ActiveBoons>,
+    unlocks: Res<ElementUnlocks>,
     mut rng: ResMut<CoffreRng>,
     mut state: ResMut<LootRoomState>,
     mut q_player: Query<&mut Transform, With<Player>>,
@@ -740,12 +762,25 @@ fn sys_roll_zone_reward(
     if reward.phase != RewardPhase::NeedRoll {
         return;
     }
+
+    // 1) Tant qu'un élément reste verrouillé → on l'offre (max 3 cartes).
+    let locked: Vec<Element> = unlocks.locked().into_iter().take(3).collect();
+    if !locked.is_empty() {
+        info!("[loot-room] choix d'élément : {} à armer", locked.len());
+        reward.kind = ChoiceKind::Element;
+        reward.element_candidates = locked;
+        reward.candidates.clear();
+        reward.phase = RewardPhase::Choosing;
+        return;
+    }
+
+    // 2) Tous éléments armés → choix de boon stat (comportement story-585).
     let candidates = catalogue
         .as_deref()
         .map(|cat| roll_candidates(cat, &active, 3, &mut rng_next_index(&mut rng.0)))
         .unwrap_or_default();
     if candidates.is_empty() {
-        // Aucun boon éligible → pas de choix, on TP directement.
+        // Aucune option → pas de choix, on TP directement.
         if let Ok(mut ptf) = q_player.single_mut() {
             ptf.translation = reward.target;
             state.current_pad = reward.target;
@@ -755,11 +790,14 @@ fn sys_roll_zone_reward(
         return;
     }
     info!("[loot-room] choix de boon : {} candidats", candidates.len());
+    reward.kind = ChoiceKind::Boon;
     reward.candidates = candidates;
+    reward.element_candidates.clear();
     reward.phase = RewardPhase::Choosing;
 }
 
-/// Touche 1/2/3 → applique le boon choisi (gratuit) + TP vers la zone suivante + ferme le choix.
+/// Touche 1/2/3 → applique le choix (gratuit) + TP vers la zone suivante + ferme.
+/// Story-589 : branche selon `reward.kind` (armer un élément, ou appliquer un boon).
 #[allow(clippy::too_many_arguments)]
 fn sys_zone_reward_pick(
     time: Res<Time>,
@@ -768,6 +806,7 @@ fn sys_zone_reward_pick(
     mut state: ResMut<LootRoomState>,
     mut q_player: Query<&mut Transform, With<Player>>,
     mut active: ResMut<ActiveBoons>,
+    mut unlocks: ResMut<ElementUnlocks>,
     catalogue: Option<Res<BoonsCatalogue>>,
     mut popups: ResMut<KillPopupState>,
 ) {
@@ -783,27 +822,55 @@ fn sys_zone_reward_pick(
     } else {
         return;
     };
-    let Some(id) = reward.candidates.get(pick).cloned() else {
-        return; // touche hors candidats
-    };
     let Ok(mut ptf) = q_player.single_mut() else {
         return;
     };
-    if let Some(cat) = catalogue.as_deref() {
-        if let Some(def) = cat.entries.iter().find(|b| b.id == id) {
-            active.apply(def, cat);
+
+    match reward.kind {
+        ChoiceKind::Element => {
+            let Some(&element) = reward.element_candidates.get(pick) else {
+                return; // touche hors candidats
+            };
+            unlocks.unlock(element);
             popups.active.push(KillPopup {
                 world_pos: ptf.translation + Vec3::Y * 1.5,
-                text: "BOON CHOISI !",
-                color: egui::Color32::from_rgb(120, 220, 255),
+                text: element.armed_popup(),
+                color: {
+                    let [r, g, b] = element.rgb(&Default::default());
+                    egui::Color32::from_rgb(
+                        (r * 255.0) as u8,
+                        (g * 255.0) as u8,
+                        (b * 255.0) as u8,
+                    )
+                },
                 spawned_secs: time.elapsed_secs(),
             });
-            info!("[loot-room] boon choisi : {}", def.name);
+            info!("[loot-room] élément armé : {}", element.fr_name());
+        }
+        ChoiceKind::Boon => {
+            let Some(id) = reward.candidates.get(pick).cloned() else {
+                return; // touche hors candidats
+            };
+            if let Some(cat) = catalogue.as_deref() {
+                if let Some(def) = cat.entries.iter().find(|b| b.id == id) {
+                    active.apply(def, cat);
+                    popups.active.push(KillPopup {
+                        world_pos: ptf.translation + Vec3::Y * 1.5,
+                        text: "BOON CHOISI !",
+                        color: egui::Color32::from_rgb(120, 220, 255),
+                        spawned_secs: time.elapsed_secs(),
+                    });
+                    info!("[loot-room] boon choisi : {}", def.name);
+                }
+            }
         }
     }
+
     ptf.translation = reward.target;
     state.current_pad = reward.target;
     reward.phase = RewardPhase::Closed;
+    reward.kind = ChoiceKind::Boon;
     reward.candidates.clear();
+    reward.element_candidates.clear();
     state.cooldown = TELEPORT_COOLDOWN;
 }

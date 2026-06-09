@@ -205,11 +205,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // → DeathEvent → loot/heal). Genome roguelite_elements.toml hot-reload mtime.
         app.init_resource::<elements::ElementConfig>();
         app.init_resource::<elements::ElementStats>();
+        app.init_resource::<elements::ElementUnlocks>();
         app.init_resource::<elements::ElementGenomeWatch>();
         app.add_systems(Startup, elements::sys_init_element_genome);
         app.add_systems(
             OnEnter(GameMode::Roguelite),
-            elements::sys_reset_element_stats,
+            // Story-589 : reset compteurs sensor + éléments armés (départ armé / dev).
+            (
+                elements::sys_reset_element_stats,
+                elements::sys_reset_element_unlocks,
+            ),
         );
         app.add_systems(
             Update,
