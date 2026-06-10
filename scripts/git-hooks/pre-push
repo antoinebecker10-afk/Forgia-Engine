@@ -1,0 +1,18 @@
+#!/bin/sh
+# Forgia V2 — pre-push gate (story-593 M1.5, audit 2026-06-10).
+# La CI etant indisponible (billing), les ratchets bloquent ICI tant qu'elle ne
+# tourne pas. Cout : ~5-10 s (xtask deja compile). Bypass d'urgence : --no-verify
+# (a justifier dans le message de commit).
+#
+# Installation (une fois) :
+#   cp scripts/git-hooks/pre-push .git/hooks/pre-push
+
+set -e
+
+echo "[pre-push] gates xtask (arch-drift / no-scaffold / sensor-audit / story-ids / asset-load)..."
+cargo xtask arch-drift
+cargo xtask no-scaffold
+cargo xtask sensor-audit
+cargo xtask story-ids
+cargo xtask asset-load
+echo "[pre-push] OK — push autorise"

@@ -46,11 +46,10 @@
 | `forgia_skinning_weights.json` | T1 | forgia-auto-rig | `src/skinning.rs:400` | once | bone weights distribution (story-482 audit) | active |
 | `forgia_stage_graph.json` | T1 | forgia-stage | `src/graph.rs:23` | event | stage graph traversal, transitions | active |
 | `forgia_terrain_lod.json` | T1 | forgia-terrain | `src/lod.rs:690` | 1Hz | LOD0/LOD1 producteurs, story-502 | active |
-| `forgia_textures.json` | T1 | forgia-qa-core | `src/source.rs:77,92` | once | PBR material audit (purple shader, missing maps) | active |
 | `forgia_vegetation.json` | T1 | forgia-foliage | `src/lib.rs:513` | 1Hz | vegetation placement, density | active |
 | `forgia_viewmodel_calibration.json` | T1 | forgia-viewmodel | `src/calibration_sensor.rs:298` | 1Hz | viewmodel offset, FOV calibration | active |
 | `forgia_village.json` | T1 | forgia-village-loader | `src/lib.rs:481` | 1Hz | village spawn, prefab loading | active |
-| `forgia_village_debug.json` | T1 | forgia-village-loader | `src/lib.rs:846,897` | event | village placement debug, terrain leveling | active |
+| `forgia_village_debug.json` | T1 | forgia-village-loader | `src/lib.rs:846,897` | event | village placement debug — ⚠ pipeline DÉBRANCHÉ (story-586), écrit `village:null`, dépose prévue | **duplicate-writer** |
 | `forgia2_anchor.json` | T0 | forgia-anchor | `src/lib.rs:30` | 1Hz | AnchorKind stats, props_spawned counter | active |
 | `forgia2_arena.json` | T0 | forgia-observability | `src/forgia2_aggregator.rs:136` | 1Hz | Arena unified (arena_feedback + arena_waves agrégés) | active |
 | `forgia2_assets.json` | T0 | forgia-observability | `src/assets_load_sensor.rs:98` | 1Hz | LoadState::Failed silencieux, scene_failed, mesh_failed | active |
@@ -72,7 +71,6 @@
 | `forgia2_quests.json` | T0 | forgia-observability | `src/quests_sensor.rs` | 1Hz | QuestCatalogue total + QuestLog active/completed/turned_in/failed counts + top 10 active quests avec completion_percent | active |
 | `forgia2_inventory.json` | T0 | forgia-observability | `src/inventory_sensor.rs` | 1Hz | LOCK-INV-1 audit (capacity≤80) + slots_used/free + is_full + top 5 items (id/count/max_stack) | active |
 | `forgia2_npcs.json` | T0 | forgia-observability | `src/npcs_sensor.rs` | 1Hz | npc_count_total + interactable_points + npcs_near_player_5m/20m + dialogue_active/npc_name/tree_id/current_node + DialogueRegistry size | active |
-| `forgia2_player_hp_diag.json` | T0 | forgia-ui-lib (hud/player_hp) | `src/hud/player_hp.rs:?` (WIP autre terminal 2026-05-28) | 1Hz | HP bar render skips, frames_skipped reasons | active-wip |
 | `forgia2_player_state.json` | T0 | forgia-observability | `src/player_state_sensor.rs:134` | 1Hz | player position, velocity, grounded, swim | active |
 | `forgia2_rex_bones.json` | T3 | forgia-anim-locomotion | `src/locomotion.rs:477` | event | Rex skeleton bind dump (story-482) | active |
 | `forgia2_rex_bones_live.json` | T3 | forgia-anim-locomotion | `src/locomotion.rs:780` | 1Hz | Rex bones live rotations (clavicle_l/r etc.) | active |
@@ -86,17 +84,37 @@
 | `forgia2_stage_poi.json` | T1 | forgia-mode-roguelite | `src/poi.rs` | 1Hz | POI gameplay : counts vivants (loot_vaults/lava_hazards/forges) + cumuls (vaults_looted, souls_from_vaults, lava_kills_total, lava_player_ticks) — story-561 | active |
 | `forgia2_walk_pose.json` | T0 | forgia-anim-locomotion | `src/locomotion.rs:884` | 1Hz | walk pose phase, foot contacts | active |
 | `forgia2_watchdog.json` | T0 | forgia-observability | `src/watchdog_sensor.rs:74` | 1Hz | watchdog heartbeat, seconds_in_emergency | active |
+| `forgia_anim_full.json` | T1 | forgia-anim-locomotion | `src/locomotion.rs:1464` | 1Hz | dump anim complet (debug rig) | active |
+| `forgia_rig_bones.json` | T1 | forgia-auto-rig | `src/debug_gizmos.rs:33` | 1Hz | os du rig live (gizmos debug, AutoRigGizmosConfig) | active |
+| `forgia_water.json` | T1 | forgia-water | `src/lib.rs` | 1Hz | water tiles, sea level — story-552 | active |
+| `forgia2_boons.json` | T0 | forgia-observability | `src/boons_sensor.rs:32` | 1Hz | boons actifs, stacks, derniers achats | active |
+| `forgia2_coffre.json` | T0 | forgia-mode-roguelite | `src/coffre_sensor.rs:19` | 1Hz | coffre du Forgeron : offres, achats, rerolls | active |
+| `forgia2_element_vfx.json` | T0 | forgia-mode-roguelite | `src/element_vfx.rs:30` | 1Hz | sparks actifs (cap 64), hits par élément — story-588 | active |
+| `forgia2_elements.json` | T0 | forgia-mode-roguelite | `src/elements.rs:36` | 1Hz | élément par arme, DoT actifs, matchups — story-582 | active |
+| `forgia2_fps_feel.json` | T0 | forgia-observability | `src/fps_feel_sensor.rs:38` | 1Hz | dash uses, hit feedbacks, aim assist — story-528 | active |
+| `forgia2_menu_video.json` | T0 | forgia-ui | `src/menu_video.rs:55` | 1Hz | frames fond vidéo menu, cache LRU, preroll | active |
+| `forgia2_obstacles.json` | T0 | forgia-mode-roguelite | `src/parcours_obstacles.rs:35` | 1Hz | obstacles animés + push physique — story-590 | active |
+| `forgia2_roguelite_intro.json` | T0 | forgia-mode-roguelite | `src/intro_dialogue.rs:197` | event | dialogue d'intro (bulle BD) | active |
+| `forgia2_stage_decor.json` | T0 | forgia-mode-roguelite | `src/decor.rs:51` | 1Hz | décor GLB Inferno par POI | active |
+| `forgia2_toon.json` | T0 | forgia-mode-roguelite | `src/toon_config.rs:22` | 1Hz | toon cel-shading hot-reload — ⚠ champ `outline_attached` = état réel (story-593) | active |
+| `forgia2_vram.json` | T0 | forgia-observability | `src/vram_sensor.rs:201` | 5s | VRAM estimée + top images/meshes — story-581 | active |
+| `forgia2_walk_dir_probe.json` | T0 | forgia-anim-locomotion | `src/locomotion.rs:1361` | event | sonde direction de marche (debug) | active |
+| `forgia2_worldgen.json` | T0 | forgia-worldgen | `src/sensor.rs:54` | 1Hz | SpawnQueue drainée, worldgen stats — story-578 | active |
 
-## Sensors observés runtime mais sans producteur trouvé via grep
+## Producteurs retirés — historique (story-593, audit 2026-06-10)
 
-À investiguer (story follow-up) :
+Sensors dont le producteur n'existe plus dans le code. Les fichiers JSON résiduels à la
+racine sont des fossiles (mtime figé). Noms volontairement HORS backticks pour que le
+parser de `sensor-audit` ne les compte plus comme déclarés :
 
-| Filename | Hypothèse | Action |
-|---|---|---|
-| `forgia_voicelines.json` | Producer supprimé lors fusion `forgia-audio-voicelines` → scaffold vide (cf MEMORY) | Vérifier : sensor stale OU producteur résiduel |
-| `forgia_water.json` | ~~Système water sans observabilité~~ → **Story-552 (2026-05-28) writer ajouté dans forgia-water/lib.rs** | RÉSOLU |
-| `forgia_music_state.json` | Probablement écrit par audio_sensor (chemin indirect) | Tracer via cargo expand |
-| `forgia_rex_bones_entry_{1..4}_{bind,live}.json` | Snapshots indexés statiques | Documenter ou archiver |
+- **forgia_voicelines.json** — producteur supprimé (refactor bark 471-479 abandonné, fusion audio).
+- **forgia_music_state.json** — même refactor ; le fichier racine date du 2026-05-21.
+- **forgia_textures.json** — n'a jamais eu de producteur runtime (la référence qa-core
+  src/source.rs:92 est une string de TEST — faux positif historique du registre).
+- **forgia2_player_hp_diag.json** — WIP 2026-05-28 jamais atterri ; fichier figé au 22/05.
+
+Snapshots indexés statiques (skippés par le parser car pattern accolades) :
+`forgia_rex_bones_entry_{1..4}_{bind,live}.json` — archives debug rig, à archiver.
 
 ## Duplicate writers
 
@@ -127,4 +145,6 @@ Audit révèle **2 sensors** écrits par ≥2 producteurs (risque de race + vale
 
 ---
 
-*Mise à jour : 2026-05-28 (création story-546). Format inspiré Epic Data Registry (typed versioned registries) + Bevy Cheat Book observability patterns.*
+*Mise à jour : 2026-06-10 (story-593 M1.5) — +16 entrées (orphelins audit), -4 producteurs
+retirés (section historique), scanner sensor-audit étendu aux consts SENSOR_PATH.
+Précédente : 2026-05-28 (création story-546). Format inspiré Epic Data Registry.*

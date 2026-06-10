@@ -33,6 +33,8 @@ fn main() {
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
         "asset-load" => asset_load(&args),
+        "arch-drift" => arch_drift(),
+        "story-ids" => story_ids(),
         _ => {
             print_help();
             0
@@ -54,6 +56,154 @@ fn print_help() {
     println!("  story-gate [--all-done|--story <id>]   Verify DONE stories claims vs git/code");
     println!("  no-scaffold [--fix]      Fail if any crate is a scaffold (<50 effective LOC or >80% TODO comments). Allowlist in xtask/no-scaffold-allowlist.toml.");
     println!("  asset-load [--fix]       Lock L1 ratchet : fail if asset-load call-sites drift above per-file baseline. Allowlist in xtask/asset-load-allowlist.toml.");
+    println!("  arch-drift               Fail si ARCHITECTURE.md ne liste pas exactement les crates members de Cargo.toml (story-593).");
+    println!("  story-ids                Fail sur tout NOUVEAU doublon d'ID story dans docs/stories/ (9 collisions historiques grandfathered).");
+}
+
+// ─────────────────────────── story-ids (story-593 M1.5) ───────────────────────────
+
+/// IDs en collision AVANT la création du gate (audit 2026-06-10). Grandfathered :
+/// on ne renumérote jamais une story existante (règle tr-registry). Tout NOUVEAU
+/// doublon échoue. Origine : collisions multi-terminal récurrentes (578/579, 588/589).
+const GRANDFATHERED_DUP_IDS: &[u32] = &[449, 450, 453, 481, 482, 539, 571, 588, 589];
+
+fn story_ids() -> i32 {
+    let dir = Path::new("docs/stories");
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("[story-ids] FAIL — docs/stories illisible : {e}");
+            return 1;
+        }
+    };
+
+    let mut by_id: std::collections::BTreeMap<u32, Vec<String>> = std::collections::BTreeMap::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Some(rest) = name.strip_prefix("story-") else {
+            continue;
+        };
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        if let Ok(id) = digits.parse::<u32>() {
+            by_id.entry(id).or_default().push(name);
+        }
+    }
+
+    let mut new_dups = 0usize;
+    for (id, files) in &by_id {
+        if files.len() < 2 {
+            continue;
+        }
+        if GRANDFATHERED_DUP_IDS.contains(id) {
+            continue;
+        }
+        new_dups += 1;
+        eprintln!("[story-ids] NOUVEAU doublon story-{id} :");
+        for f in files {
+            eprintln!("    docs/stories/{f}");
+        }
+    }
+
+    let max_id = by_id.keys().max().copied().unwrap_or(0);
+    if new_dups == 0 {
+        println!(
+            "[story-ids] OK — {} stories, prochain ID libre : story-{}",
+            by_id.values().map(Vec::len).sum::<usize>(),
+            max_id + 1
+        );
+        0
+    } else {
+        eprintln!(
+            "[story-ids] FAIL — {new_dups} nouveau(x) doublon(s). Prochain ID libre : story-{}. Renommer la story la plus récente (jamais renuméroter l'ancienne).",
+            max_id + 1
+        );
+        1
+    }
+}
+
+// ─────────────────────────── arch-drift (story-593 M1.1) ───────────────────────────
+
+/// Gate anti-dérive documentaire : ARCHITECTURE.md §3 doit lister exactement les
+/// crates membres du workspace. Origine : audit 2026-06-10 — le doc décrivait
+/// 258 crates pour 62 réelles pendant 3 semaines (toxique pour un moteur IA-natif).
+fn arch_drift() -> i32 {
+    // 1. Membres réels depuis Cargo.toml racine (section [workspace] members).
+    let cargo = match fs::read_to_string("Cargo.toml") {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[arch-drift] FAIL — Cargo.toml illisible : {e} (lancer depuis la racine workspace)");
+            return 1;
+        }
+    };
+    let mut real: Vec<String> = Vec::new();
+    let mut in_members = false;
+    for line in cargo.lines() {
+        let t = line.trim();
+        if t.starts_with("members") && t.contains('[') {
+            in_members = true;
+            continue;
+        }
+        if in_members {
+            if t.starts_with(']') {
+                break;
+            }
+            if let Some(name) = t
+                .trim_matches(|c| c == '"' || c == ',' || c == ' ')
+                .strip_prefix("crates/")
+            {
+                real.push(name.to_string());
+            }
+        }
+    }
+
+    // 2. Crates documentées : 1res cellules de tables `| forgia-xxx |` dans ARCHITECTURE.md.
+    let arch = match fs::read_to_string("ARCHITECTURE.md") {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[arch-drift] FAIL — ARCHITECTURE.md illisible : {e}");
+            return 1;
+        }
+    };
+    let mut documented: Vec<String> = Vec::new();
+    for line in arch.lines() {
+        if let Some(rest) = line.strip_prefix("| ") {
+            if let Some(cell) = rest.split('|').next() {
+                let name = cell.trim();
+                // Cellule = exactement un nom de crate (pas de prose multi-mots, cf §6 dettes).
+                if name.starts_with("forgia-")
+                    && !name.contains(' ')
+                    && !documented.contains(&name.to_string())
+                {
+                    documented.push(name.to_string());
+                }
+            }
+        }
+    }
+
+    // 3. Diff bidirectionnel.
+    let missing_in_doc: Vec<&String> = real.iter().filter(|c| !documented.contains(c)).collect();
+    let ghost_in_doc: Vec<&String> = documented.iter().filter(|c| !real.contains(c)).collect();
+
+    if missing_in_doc.is_empty() && ghost_in_doc.is_empty() {
+        println!(
+            "[arch-drift] OK — ARCHITECTURE.md liste exactement les {} crates du workspace",
+            real.len()
+        );
+        0
+    } else {
+        for c in &missing_in_doc {
+            eprintln!("[arch-drift] MANQUANTE dans ARCHITECTURE.md : {c}");
+        }
+        for c in &ghost_in_doc {
+            eprintln!("[arch-drift] FANTÔME dans ARCHITECTURE.md (crate inexistante) : {c}");
+        }
+        eprintln!(
+            "[arch-drift] FAIL — {} manquante(s), {} fantôme(s). Mettre à jour ARCHITECTURE.md §3.",
+            missing_in_doc.len(),
+            ghost_in_doc.len()
+        );
+        1
+    }
 }
 
 fn check_orphans() {
@@ -799,6 +949,7 @@ fn scan_sensor_producers(
                     continue;
                 };
                 let lines: Vec<&str> = content.lines().collect();
+                let mut matched_lines: Vec<usize> = Vec::new();
                 for (idx, line) in lines.iter().enumerate() {
                     let trimmed = line.trim_start();
                     if trimmed.starts_with("//") || trimmed.starts_with("///") {
@@ -816,7 +967,50 @@ fn scan_sensor_producers(
                     if !is_write_ctx {
                         continue;
                     }
+                    matched_lines.push(idx);
                     extract_sensor_literals(line, &path, idx + 1, producers);
+                }
+                // Passe 2 (story-593 M1.5) : sensors déclarés via const en tête de
+                // fichier (`const SENSOR_PATH: &str = "forgia2_x.json";`) et écrits
+                // plus loin — la fenêtre 3-lignes les ratait (29 faux « missing »
+                // mesurés à l'audit 2026-06-10). On compte le const si son ident est
+                // référencé quelque part dans un contexte d'écriture du même fichier.
+                for (idx, line) in lines.iter().enumerate() {
+                    if matched_lines.contains(&idx) {
+                        continue; // déjà compté en passe 1
+                    }
+                    let trimmed = line.trim_start();
+                    if trimmed.starts_with("//") || !line.contains(".json") {
+                        continue;
+                    }
+                    let after = trimmed
+                        .trim_start_matches("pub(crate) ")
+                        .trim_start_matches("pub ");
+                    let Some(decl) = after
+                        .strip_prefix("const ")
+                        .or_else(|| after.strip_prefix("static "))
+                    else {
+                        continue;
+                    };
+                    let Some(ident) = decl.split(':').next().map(str::trim) else {
+                        continue;
+                    };
+                    if ident.is_empty() {
+                        continue;
+                    }
+                    let used_in_write = lines.iter().enumerate().any(|(j, l)| {
+                        j != idx && l.contains(ident) && {
+                            let we = (j + 3).min(lines.len());
+                            let w = lines[j.saturating_sub(1)..we].join(" ");
+                            w.contains("fs::write")
+                                || w.contains(".write_all")
+                                || w.contains("write_atomic")
+                                || w.contains("serde_json::to_string")
+                        }
+                    });
+                    if used_in_write {
+                        extract_sensor_literals(line, &path, idx + 1, producers);
+                    }
                 }
             }
         }
