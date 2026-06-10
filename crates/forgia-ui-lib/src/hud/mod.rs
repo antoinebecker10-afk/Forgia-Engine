@@ -13,6 +13,7 @@ use bevy::prelude::*;
 // L'egui screen-space ne pouvait pas occluder derrière les murs ni gérer
 // les distances en world units.
 mod coffre_forgeron;
+mod confidence;
 mod energy;
 mod player_hp;
 mod wave_counter;
@@ -37,6 +38,8 @@ impl Plugin for ForgiaUiHudPlugin {
             // Resource (ForgiaBoonsPlugin pas wiré), system early-return silencieux
             // après refactor — voir Phase 3.
             coffre_forgeron::CoffreForgeronPlugin,
+            // Story-531 AC9 — cœurs de confiance Pépin (visible arme en main).
+            confidence::ConfidenceHudPlugin,
         ));
     }
 }
