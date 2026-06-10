@@ -1,30 +1,39 @@
-# Fine-Grained Crates (Forgia Rewrite V2) — RÈGLE FONDATRICE
+# Crates fines à la demande (Forgia Rewrite V2) — RÈGLE RÉVISÉE 2026-06-10
 
-> **Convention V2 : 1 concept = 1 crate.** Antoine a explicitement choisi 237 crates
-> fine-grained (vs ~13 V1). Cette architecture est délibérée et structurante :
-> chaque crate scaffoldé EXISTE POUR ÊTRE PEUPLÉ, pas pour rester vide.
+> **Doctrine actuelle : 1 concept = 1 crate, créée AU MOMENT DU BESOIN — jamais en réserve.**
+>
+> ⚠️ Version précédente OBSOLÈTE (« 237 crates scaffold, chaque crate scaffoldé existe pour
+> être peuplé ») : le cleanup du 2026-05-26 a supprimé ~200 scaffolds (266 → 62 crates,
+> voir [ADR-0002](../../docs/adr/ADR-0002-cleanup-crates-266-to-62.md)) et le ratchet
+> `cargo xtask no-scaffold` BLOQUE leur retour. Cette règle est la doctrine d'après.
 
 ---
 
-## 1. Règle inviolable
+## 1. Règle
 
-**Avant d'ajouter du code dans un crate existant gros (`forgia-fps`, `forgia-ui`,
-`forgia-player`, etc.), vérifier obligatoirement** :
+**Avant d'ajouter du code dans une crate orchestrator existante (`forgia-fps`,
+`forgia-ui`, `forgia-rpg`, etc.), vérifier** :
 
-1. **Existe-t-il un crate scaffold déjà créé pour ce concept ?**
-   `cargo metadata --no-deps | grep <concept>` ou `ls crates/forgia-<concept>*`
-2. **Si oui** → peupler le crate scaffold, PAS le gros crate orchestrator.
-3. **Si non** → créer un nouveau crate dédié si concept réutilisable (≥ 2 callers attendus).
+1. **Une crate dédiée au concept existe-t-elle déjà ?** `ls crates/forgia-<concept>*`
+2. **Si oui** → y mettre le code, PAS dans l'orchestrator.
+3. **Si non** → créer une crate dédiée SEULEMENT si le concept est réutilisable
+   (≥ 2 consommateurs réels ou prévus à court terme). Sinon : module dans la crate
+   du mode / le caller le plus proche.
 
-## 2. Pourquoi cette règle
+**Interdit** : créer une crate « pour plus tard » sans code réel ni consommateur.
+Le ratchet `no-scaffold` (xtask) échoue sur toute crate < 50 LOC sans justification.
 
-- **Convention V2 honorée** : 237 crates fine-grained vs scaffold morts à 16 LOC = dette structurelle silencieuse
-- **Isolation tests** : chaque crate testable sans pull tout l'écosystème
-- **Compile time** : crate isolé recompile vite quand on modifie juste ce module
-- **Réutilisabilité** : pattern V2 prévu pour 5+ modes (FPS, RPG, Platformer, Race, Survival...) qui partagent crates atomiques
-- **Lisibilité** : `forgia-fps` doit rester **orchestrator** (~500 LOC max), pas god-crate
+## 2. Pourquoi (leçon des deux extrêmes)
 
-## 3. Pattern correct — Orchestrator + atomic crates
+- **L'extrême 266 crates (2026-05) a échoué** : 85 % de scaffolds vides = bruit de
+  navigation IA, temps de compile workspace, ARCHITECTURE.md mensonger, dette de
+  gouvernance. L'audit forensic puis le cleanup l'ont acté.
+- **L'extrême god-crate (V1) a échoué aussi** : main.rs 41 KB, god-files intestables.
+  L'audit 2026-06-10 pointe encore 4 god-files V2 (forgia-rpg/lib.rs 2 345 LOC).
+- **L'équilibre** : crate fine quand le concept est RÉEL et PARTAGÉ ; module local sinon.
+  Une crate se justifie par ses consommateurs, pas par son existence.
+
+## 3. Pattern correct — Orchestrator + crates atomiques (inchangé)
 
 ```rust
 // crates/forgia-fps/src/lib.rs (orchestrator)
@@ -32,84 +41,54 @@ pub struct ForgiaFpsPlugin;
 impl Plugin for ForgiaFpsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
-            forgia_mode_fps_arena::ArenaSpawnPlugin,
             forgia_crosshair::CrosshairPlugin,
-            forgia_hitmarker::HitmarkerPlugin,
-            forgia_weapon_hitscan::WeaponHitscanPlugin,
-            forgia_weapon_viewmodel::WeaponViewmodelPlugin,
-            forgia_juice_hit_stop::HitStopPlugin,
-            forgia_juice_recoil::RecoilPlugin,
-            forgia_mesh_fader::MeshFaderPlugin,
+            forgia_viewmodel::ForgiaViewmodelPlugin,
+            // ... wire-up, pas de logique gameplay massive ici
         ));
     }
 }
-// Aucune logique gameplay ici. Juste wire-up.
 ```
 
-## 4. Anti-patterns à bannir
+L'orchestrator reste fin ; la logique vit dans les crates atomiques testables.
 
-- ❌ "Je mets ça dans `forgia-fps` pour aller vite, refacto plus tard" → la dette s'accumule, refacto n'arrive jamais
-- ❌ Ignorer les crates scaffold existants → ils restent vides + duplication ailleurs
-- ❌ Mettre du gameplay réutilisable dans un crate **mode-specific** (e.g. fire system dans `forgia-fps`) → bots IA / RPG combat ne peuvent pas réutiliser
-- ❌ Mettre de l'UI dans `forgia-ui` quand un crate UI-spécifique existe (`forgia-crosshair`, `forgia-hitmarker`, etc.)
-- ❌ Créer un nouveau crate **sans** vérifier qu'un scaffold existant convient déjà
-
-## 5. Décision arbre — où mettre du nouveau code
+## 4. Arbre de décision — où mettre du nouveau code
 
 ```
 Nouveau code à ajouter
   │
-  ├─ Concept existe déjà comme crate scaffold ? (ls crates/forgia-<concept>*)
-  │   │
-  │   ├─ OUI → peupler le crate scaffold ✓
-  │   │
+  ├─ Une crate dédiée au concept existe ? (ls crates/forgia-<concept>*)
+  │   ├─ OUI → y mettre le code ✓
   │   └─ NON
-  │       │
-  │       ├─ Concept réutilisable ≥ 2 callers prévus ? 
-  │       │   │
-  │       │   ├─ OUI → créer nouveau crate fine-grained ✓
-  │       │   │       (add workspace member + dep)
-  │       │   │
-  │       │   └─ NON → mettre dans le crate caller le plus proche
-  │       │
-  │       └─ Concept mode-specific uniquement (e.g. FPS-only)
-  │           → crate `forgia-mode-<name>` ou crate du mode
+  │       ├─ Réutilisable, ≥ 2 consommateurs réels/proches ?
+  │       │   ├─ OUI → créer la crate fine maintenant (workspace member + dep) ✓
+  │       │   └─ NON → module dans la crate appelante la plus proche ✓
+  │       └─ Mode-specific 1 caller → module dans forgia-mode-<name> ✓
 ```
 
-## 6. Audit régulier obligatoire
+## 5. Anti-patterns à bannir
 
-Avant chaque livraison majeure, vérifier :
+- ❌ Crate créée « en réserve » sans code (le ratchet no-scaffold la bloquera)
+- ❌ "Je mets ça dans l'orchestrator pour aller vite, refacto plus tard"
+- ❌ Gameplay réutilisable enfoui dans une crate mode-specific
+- ❌ Laisser grossir un god-file >1 000 LOC au lieu d'extraire les modules mûrs
+  (extraction en crate seulement si ≥ 2 consommateurs ; sinon simple split en modules)
 
-```bash
-# Liste les crates scaffold (16 LOC = vide) susceptibles de devoir être peuplés
-find crates -name lib.rs -exec wc -l {} \; | awk '$1 <= 20 {print}'
-```
+## 6. Gardes mécaniques
 
-Si un crate vide a un nom qui correspond exactement au code qu'on vient d'ajouter
-dans un autre crate → **dette détectée, à corriger avant merge**.
+- `cargo xtask no-scaffold` — bloque le retour des crates vides (protège le cleanup)
+- `cargo xtask arch-drift` — ARCHITECTURE.md doit lister exactement les members réels
+- Audit god-files : `find crates -name "*.rs" -exec wc -l {} \; | awk '$1 > 1200'`
 
-## 7. Tier 1 / Tier 2 / Tier 3
+## 7. Historique
 
-Workflow d'évaluation avant code :
+- **2026-05-14** : décision initiale 237 crates fine-grained (réservation de namespaces).
+- **2026-05-19** : audit forensic — 220 scaffolds <50 LOC sur 258 crates.
+- **2026-05-26** : cleanup 266 → 62 crates (-77 %), ratchet no-scaffold ([ADR-0002]).
+- **2026-06-10** : audit complet — cette règle était restée à l'état pré-cleanup et
+  induisait les sessions IA en erreur ; réécrite (story-593, M1.3).
 
-- **Tier 1 — Crate scaffold existe** : peupler directement (cohérence V2 immédiate, 0 nouveau crate)
-- **Tier 2 — Crate doit être créé, ≥ 2 callers** : créer le crate maintenant, cohérence V2 + reuse futur
-- **Tier 3 — Code mode-specific 1 caller** : mettre dans `forgia-mode-<name>` ou crate orchestrator du mode
+## 8. Cross-refs
 
-## 8. Origine de la règle
-
-- **2026-05-14** : Antoine choisit 237 crates V2 (vs plan 13). Décision justifiée :
-  visu features + AI nav + uniform debug pattern. Risque burnout documenté.
-  Référence : memory `reference_v2_237_crates_decision`.
-- **2026-05-16** : Audit dette technique révèle 5 crates scaffold (`forgia-crosshair`,
-  `forgia-hitmarker`, `forgia-mode-fps-arena`, `forgia-juice-recoil`, `forgia-juice-hit-stop`)
-  à 16 LOC pendant que `forgia-fps` grossit à ~1200 LOC.
-  Code mal placé identifié : `CrosshairMode` (forgia-ui), `spawn_arena` (forgia-fps),
-  `HitStopState` (forgia-combat), etc.
-- Antoine formalise : "**ça doit être une règle fondatrice**" → cette règle.
-
-## 9. Cross-refs
-
-- `reference_v2_237_crates_decision.md` (memory) — justification 237 crates
-- CLAUDE.md global Forgia §1 Vision — convention 1 concept = 1 file/module
-- `concept-first.md` rule — étape 0 "data ou code" / couche correcte
+- [ADR-0002 — cleanup crates](../../docs/adr/ADR-0002-cleanup-crates-266-to-62.md)
+- `concept-first.md` — étape 0 data/code, couche correcte
+- ARCHITECTURE.md — état réel des crates (gardé par arch-drift)
