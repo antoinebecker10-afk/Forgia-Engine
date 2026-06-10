@@ -171,36 +171,43 @@ pub fn apply_settings_to_volume(
     *applied_once = true;
 }
 
-/// Applique mode fenêtre + résolution à la fenêtre principale. Event-driven +
-/// sync initiale (couvre le chargement boot d'un settings non-défaut).
-/// Défauts = miroir du comportement pré-595 (fenêtré 1920×1080) — zéro régression.
+/// Applique mode fenêtre + résolution à la fenêtre principale.
+///
+/// 🚨 Anti-crash (2 crashes wgpu 2026-06-10, forgia2_crash.json) : la race resize
+/// Vulkan « Attachments have differing sizes » est FATALE, et Windows CLAMPE les
+/// fenêtres trop hautes (1920×1080 demandé → 1920×1009 réel sur écran 1080p).
+/// Comparer aux dimensions RÉELLES de la fenêtre re-déclenchait donc un resize
+/// à chaque réveil (boucle demande→clamp→demande). Règle : on ne répond qu'aux
+/// changements de SETTINGS (mémorisés dans `last_applied`) — ce que l'OS fait
+/// de la fenêtre ensuite ne nous regarde pas.
 pub fn apply_window_settings(
     settings: Res<UserSettings>,
     mut q_window: Query<&mut Window, With<PrimaryWindow>>,
-    mut applied_once: Local<bool>,
+    mut last_applied: Local<Option<(String, u32, u32)>>,
 ) {
-    if !settings.is_changed() && *applied_once {
+    let want = (
+        settings.window_mode.clone(),
+        settings.window_width,
+        settings.window_height,
+    );
+    if last_applied.as_ref() == Some(&want) {
         return;
     }
     let Ok(mut window) = q_window.single_mut() else {
         return;
     };
-    // Garde no-op (crash 2026-06-10 16:36, forgia2_crash.json) : tout write sur
-    // Window déclenche un reconfigure de surface, et la race resize wgpu/Vulkan
-    // « Attachments have differing sizes » (depth 1080 vs color 1009 = fenêtre
-    // clampée par l'OS) est FATALE. On n'écrit que si la valeur change réellement —
-    // le boot avec défauts == état réel devient un vrai no-op.
     match settings.window_mode.as_str() {
         "borderless" => {
-            let want = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
-            if window.mode != want {
-                window.mode = want;
+            let mode = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
+            if window.mode != mode {
+                window.mode = mode;
             }
         }
         _ => {
             if window.mode != WindowMode::Windowed {
                 window.mode = WindowMode::Windowed;
             }
+            // Au boot avec les défauts, la fenêtre est déjà 1920×1080 → vrai no-op.
             let (w, h) = (settings.window_width as f32, settings.window_height as f32);
             if (window.resolution.width() - w).abs() > 0.5
                 || (window.resolution.height() - h).abs() > 0.5
@@ -209,7 +216,7 @@ pub fn apply_window_settings(
             }
         }
     }
-    *applied_once = true;
+    *last_applied = Some(want);
 }
 
 /// BUG-455-04 fix : propagation `UserSettings → MouseLookTuning` event-driven.
@@ -289,13 +296,25 @@ pub(crate) fn draw_pause_menu(
                         PauseSubMenu::Root => {
                             draw_root(ui, &mut next_app, &mut next_game, &mut state)
                         }
-                        PauseSubMenu::Settings => draw_settings(
-                            ui,
-                            &mut state,
-                            &mut settings,
-                            &mut sensor,
-                            time.elapsed_secs(),
-                        ),
+                        PauseSubMenu::Settings => {
+                            // 🚨 Anti-crash (2026-06-10 17:51) : `&mut ResMut` =
+                            // DerefMut = UserSettings flagué Changed À CHAQUE FRAME
+                            // où le panneau est affiché → apply_window_settings se
+                            // réveillait en boucle → resize → race wgpu fatale.
+                            // bypass + set_changed() SEULEMENT si un contrôle a
+                            // réellement été modifié.
+                            let inner = settings.bypass_change_detection();
+                            let dirty = draw_settings(
+                                ui,
+                                &mut state,
+                                inner,
+                                &mut sensor,
+                                time.elapsed_secs(),
+                            );
+                            if dirty {
+                                settings.set_changed();
+                            }
+                        }
                     });
                 });
         });
@@ -350,13 +369,16 @@ fn draw_root(
     );
 }
 
+/// Retourne `true` si un réglage a RÉELLEMENT été modifié (le caller déclenche
+/// alors `set_changed()` — voir le commentaire anti-crash dans draw_pause_menu).
 fn draw_settings(
     ui: &mut egui::Ui,
     state: &mut PauseMenuState,
     settings: &mut UserSettings,
     sensor: &mut PauseMenuSensor,
     now: f32,
-) {
+) -> bool {
+    let mut dirty = false;
     ui.heading(
         egui::RichText::new("OPTIONS")
             .size(40.0)
@@ -375,6 +397,7 @@ fn draw_settings(
         .changed()
     {
         settings.mouse_sensitivity = sens;
+        dirty = true;
     }
     ui.add_space(10.0);
 
@@ -385,6 +408,7 @@ fn draw_settings(
         .changed()
     {
         settings.fov_deg = fov;
+        dirty = true;
     }
     ui.add_space(10.0);
 
@@ -396,6 +420,7 @@ fn draw_settings(
         .changed()
     {
         settings.master_volume = (vol_pct / 100.0).clamp(0.0, 1.0);
+        dirty = true;
     }
     ui.add_space(10.0);
 
@@ -405,6 +430,7 @@ fn draw_settings(
         let is_borderless = settings.window_mode == "borderless";
         if ui.selectable_label(!is_borderless, "Fenêtré").clicked() && is_borderless {
             settings.window_mode = "windowed".to_string();
+            dirty = true;
         }
         if ui
             .selectable_label(is_borderless, "Plein écran (sans bordure)")
@@ -412,6 +438,7 @@ fn draw_settings(
             && !is_borderless
         {
             settings.window_mode = "borderless".to_string();
+            dirty = true;
         }
     });
     if settings.window_mode == "windowed" {
@@ -421,6 +448,7 @@ fn draw_settings(
                 if ui.selectable_label(selected, format!("{w}×{h}")).clicked() && !selected {
                     settings.window_width = w;
                     settings.window_height = h;
+                    dirty = true;
                 }
             }
         });
@@ -481,6 +509,7 @@ fn draw_settings(
             state.last_action = "settings_back".to_string();
         }
     });
+    dirty
 }
 
 fn save_user_settings(settings: &UserSettings) -> bool {
