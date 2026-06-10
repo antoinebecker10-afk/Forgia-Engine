@@ -16,6 +16,7 @@ jobs:
   check:
     name: Cargo Check
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -25,6 +26,7 @@ jobs:
   clippy:
     name: Clippy (0 warnings)
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -34,17 +36,34 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
-    name: Cargo Test
-    runs-on: windows-latest
-    # TODO(story-516+) : cargo test --workspace casse via feature unification
-    # bevy_water + bevy_gauge (deps 3rd-party). A investiguer mais hors scope
-    # cleanup workspace immediat. continue-on-error pour debloquer merges.
-    continue-on-error: true
+    name: Cargo Test (per-crate)
+    runs-on: ubuntu-latest
+    # story-592 (M0.6) : continue-on-error RETIRE — les 1066 tests bloquent a nouveau.
+    # Boucle per-crate au lieu de --workspace : 3 echecs DIFFERENTS observes en
+    # workspace build local (artefacts incrementaux/courses), alors que chaque
+    # crate testee isolement passe (8 crates validees vertes localement).
+    # ubuntu = runner 1x facturation (le job windows 4h x2 a tue le billing).
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --no-fail-fast
+      - name: Bevy linux deps
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - name: Test chaque crate isolement
+        run: |
+          failed=()
+          for c in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'); do
+            echo "::group::cargo test -p $c"
+            if ! cargo test -p "$c" --no-fail-fast; then
+              failed+=("$c")
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Tests en echec dans: ${failed[*]}"
+            exit 1
+          fi
 
   fmt:
     name: Rustfmt
