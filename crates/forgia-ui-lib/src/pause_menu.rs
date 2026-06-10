@@ -185,15 +185,28 @@ pub fn apply_window_settings(
     let Ok(mut window) = q_window.single_mut() else {
         return;
     };
+    // Garde no-op (crash 2026-06-10 16:36, forgia2_crash.json) : tout write sur
+    // Window déclenche un reconfigure de surface, et la race resize wgpu/Vulkan
+    // « Attachments have differing sizes » (depth 1080 vs color 1009 = fenêtre
+    // clampée par l'OS) est FATALE. On n'écrit que si la valeur change réellement —
+    // le boot avec défauts == état réel devient un vrai no-op.
     match settings.window_mode.as_str() {
         "borderless" => {
-            window.mode = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
+            let want = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
+            if window.mode != want {
+                window.mode = want;
+            }
         }
         _ => {
-            window.mode = WindowMode::Windowed;
-            window
-                .resolution
-                .set(settings.window_width as f32, settings.window_height as f32);
+            if window.mode != WindowMode::Windowed {
+                window.mode = WindowMode::Windowed;
+            }
+            let (w, h) = (settings.window_width as f32, settings.window_height as f32);
+            if (window.resolution.width() - w).abs() > 0.5
+                || (window.resolution.height() - h).abs() > 0.5
+            {
+                window.resolution.set(w, h);
+            }
         }
     }
     *applied_once = true;
