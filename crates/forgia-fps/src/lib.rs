@@ -41,6 +41,7 @@ use serde::Deserialize;
 mod ammo_systems;
 mod hitscan_sensor;
 pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
+pub mod pepin;
 mod score;
 pub mod aim_assist;
 
@@ -286,6 +287,11 @@ pub struct HitscanCtx<'w, 's> {
     pub combat_mods: Res<'w, forgia_combat::combat_mods::PlayerCombatMods>,
     /// Story-559 slice B — émet `WeaponFiredEvent` par tir (son d'arme propre).
     pub fired: MessageWriter<'w, forgia_combat::combat_juice::WeaponFiredEvent>,
+    /// Story-531 AC9 — résolution hit/miss par tir (jauge confiance Pépin).
+    pub resolved: MessageWriter<'w, forgia_combat::confidence::ShotResolved>,
+    /// Story-531 — jauge + tuning lus pour le payoff dégâts (neutre hors Pépin).
+    pub pepin_conf: Res<'w, forgia_combat::confidence::PepinConfidence>,
+    pub pepin_tuning: Res<'w, pepin::PepinTuning>,
 }
 
 /// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
@@ -333,6 +339,8 @@ impl Plugin for ForgiaFpsPlugin {
         if !app.is_plugin_added::<ForgiaViewmodelPlugin>() {
             app.add_plugins(ForgiaViewmodelPlugin);
         }
+        // Story-531 — jauge de confiance Pépin (genome + update + sensor).
+        app.add_plugins(pepin::ForgiaPepinPlugin);
         app.add_plugins(score::ArenaScorePlugin)
             .init_resource::<EquippedWeapons>()
             .init_resource::<LeftMouseState>()
@@ -670,6 +678,12 @@ fn fire_weapon_minimal(
     let damage = entry.map(|e| e.damage).unwrap_or(25.0);
     let pellets = entry.map(|e| e.pellets.max(1)).unwrap_or(1);
     let spread_rad = entry.map(|e| e.spread_deg.to_radians()).unwrap_or(0.0);
+    // Story-531 — payoff jauge de confiance Pépin (1.0 pour toute autre arme).
+    let pepin_mul = pepin::confidence_damage_mul(
+        &hitscan_ctx.pepin_conf,
+        &hitscan_ctx.pepin_tuning,
+        ammo.equipped.current,
+    );
 
     // Exclure Player ET TOUS ses descendants (FpsCamera, viewmodel mesh, weapon child
     // colliders) du raycast. Pattern Overwatch GDC 2017 — Tim Ford.
@@ -819,7 +833,8 @@ fn fire_weapon_minimal(
                         * falloff_mul
                         * effective_zone
                         * hitscan_ctx.combat_mods.damage_mul
-                        * crit_mul;
+                        * crit_mul
+                        * pepin_mul;
                     if crit_mul > 1.0 {
                         info!("[fire] CRIT! dmg ×2");
                     }
@@ -864,6 +879,15 @@ fn fire_weapon_minimal(
             }
         }
     }
+
+    // Story-531 — résolution du TIR (pas par-pellet) pour la jauge de confiance :
+    // au moins un pellet a touché un ennemi = hit ; mur ou vide = miss (GDD §2.2).
+    hitscan_ctx
+        .resolved
+        .write(forgia_combat::confidence::ShotResolved {
+            weapon: ammo.equipped.current,
+            hit_enemy: hit_record.is_some(),
+        });
 
     // Hit-stop UNE FOIS par tir (pas par pellet) si au moins une cible touchée.
     if hit_record.is_some() {

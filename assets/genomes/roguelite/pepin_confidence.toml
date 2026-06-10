@@ -1,0 +1,19 @@
+# Pépin — jauge de confiance (story-531 AC9, GDD §2.2)
+# Hot-reload : sauvegarder en jeu suffit (file_watcher).
+# Défauts Rust = miroir exact (PepinTuning::default) : fichier absent/invalide
+# = comportement identique.
+#
+# GDD : « Jauge confiance 0-10. +1/hit, -1/miss. » Le payoff base rend la jauge
+# PERCEPTIBLE dès maintenant ; les boons story-530 (« Premier vrai tir »,
+# « Pépin s'enhardit », « Crénom de Pépin ! ») se grefferont par-dessus.
+
+# Coupe-circuit balance/debug : false = jauge figée, payoff neutre.
+enabled = true
+
+# Stacks max (GDD : 10).
+max_stacks = 10
+
+# Bonus dégâts par stack — 0.02 = +2 %/stack, soit +20 % à pleine confiance.
+# Pépin timide qui s'enhardit : assez pour le SENTIR, pas assez pour casser
+# l'équilibre pré-boons. Plage de tuning raisonnable : 0.01..0.04.
+per_stack_damage = 0.02
