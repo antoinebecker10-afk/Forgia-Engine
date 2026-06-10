@@ -60,12 +60,91 @@ where
         let mut buf = String::new();
         use bevy::asset::AsyncReadExt;
         reader.read_to_string(&mut buf).await?;
-        let data: T = toml::from_str(&buf)?;
+        let data: T = parse_genome(&buf)?;
         Ok(Genome { data })
     }
 
     fn extensions(&self) -> &[&str] {
         &["toml"]
+    }
+}
+
+/// Parse pur d'un genome TOML — extrait du loader async pour être testable
+/// headless (story-594 M2-B7 : le socle data-driven n'avait AUCUN test).
+///
+/// Contrat : un TOML invalide retourne `Err` (le chargement asset échoue, la
+/// Resource consommatrice garde son `Default`) — il ne panique JAMAIS le jeu.
+pub fn parse_genome<T: DeserializeOwned>(toml_src: &str) -> Result<T, toml::de::Error> {
+    toml::from_str(toml_src)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize, TypePath, Debug, PartialEq)]
+    #[serde(default)]
+    struct TestTuning {
+        speed: f32,
+        name: String,
+    }
+
+    impl Default for TestTuning {
+        fn default() -> Self {
+            Self {
+                speed: 5.0,
+                name: "default".to_string(),
+            }
+        }
+    }
+
+    #[derive(Deserialize, TypePath, Debug)]
+    struct StrictTuning {
+        #[allow(dead_code)]
+        required_field: f32,
+    }
+
+    #[test]
+    fn parse_valid_toml() {
+        let t: TestTuning = parse_genome("speed = 9.5\nname = \"pepin\"").expect("TOML valide");
+        assert_eq!(t.speed, 9.5);
+        assert_eq!(t.name, "pepin");
+    }
+
+    #[test]
+    fn parse_invalid_toml_is_err_not_panic() {
+        // Le contrat anti-crash : syntaxe cassée → Err propre, jamais de panic.
+        let r: Result<TestTuning, _> = parse_genome("speed = = broken [[[");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn parse_missing_fields_use_serde_defaults() {
+        // Forward-compat : un TOML partiel (vieux fichier) garde les défauts.
+        let t: TestTuning = parse_genome("speed = 7.0").expect("TOML partiel valide");
+        assert_eq!(t.speed, 7.0);
+        assert_eq!(t.name, "default");
+    }
+
+    #[test]
+    fn parse_missing_required_field_is_err() {
+        // Sans #[serde(default)], un champ manquant doit échouer explicitement
+        // (pas de valeur fantôme silencieuse).
+        let r: Result<StrictTuning, _> = parse_genome("other = 1.0");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn parse_wrong_type_is_err() {
+        let r: Result<TestTuning, _> = parse_genome("speed = \"pas un nombre\"");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn loader_accepts_toml_extension_only() {
+        let loader = GenomeLoader::<TestTuning>::default();
+        assert_eq!(loader.extensions(), &["toml"]);
     }
 }
 

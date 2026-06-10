@@ -310,4 +310,157 @@ mod tests {
         assert_eq!(t.damage_mul(HitZone::Body), 1.0);
         assert_eq!(t.damage_mul(HitZone::Limb), 0.7);
     }
+
+    // ─── apply_damage headless (story-594 M2-B7, audit 2026-06-10 P1) ───
+    // Le chemin chaque-frame du combat n'avait AUCUN test. Harness minimal :
+    // App nu + messages + observer DeathEvent collecté dans une Resource.
+
+    #[derive(Resource, Default)]
+    struct AppliedLog(Vec<DamageAppliedEvent>);
+
+    #[derive(Resource, Default)]
+    struct DeathLog(Vec<Entity>);
+
+    fn collect_applied(mut reader: MessageReader<DamageAppliedEvent>, mut log: ResMut<AppliedLog>) {
+        for ev in reader.read() {
+            log.0.push(*ev);
+        }
+    }
+
+    fn damage_test_app() -> App {
+        let mut app = App::new();
+        app.add_message::<DamageEvent>()
+            .add_message::<DamageAppliedEvent>()
+            .init_resource::<AppliedLog>()
+            .init_resource::<DeathLog>()
+            .add_systems(Update, (apply_damage, collect_applied).chain())
+            .add_observer(|ev: On<DeathEvent>, mut log: ResMut<DeathLog>| {
+                log.0.push(ev.target);
+            });
+        app
+    }
+
+    #[test]
+    fn apply_damage_subtracts_health() {
+        let mut app = damage_test_app();
+        let target = app.world_mut().spawn(Health::new(100.0)).id();
+        app.world_mut().write_message(DamageEvent {
+            target,
+            source: None,
+            amount: 30.0,
+            kind: DamageKind::Physical,
+        });
+        app.update();
+
+        assert_eq!(app.world().get::<Health>(target).unwrap().current, 70.0);
+        let log = app.world().resource::<AppliedLog>();
+        assert_eq!(log.0.len(), 1);
+        assert_eq!(log.0[0].final_hp, 70.0);
+        assert!(!log.0[0].is_kill);
+        assert!(app.world().resource::<DeathLog>().0.is_empty());
+    }
+
+    #[test]
+    fn apply_damage_health_guard_reduces_and_clamps() {
+        let mut app = damage_test_app();
+        // Guard 0.5 → 30 dmg devient 15.
+        let guarded = app
+            .world_mut()
+            .spawn((Health::new(100.0), HealthGuard { reduction: 0.5 }))
+            .id();
+        // Guard absurde 1.5 → clamp 1.0 → 0 dégât (invulnérable, pas de heal inversé).
+        let over_guarded = app
+            .world_mut()
+            .spawn((Health::new(100.0), HealthGuard { reduction: 1.5 }))
+            .id();
+        for target in [guarded, over_guarded] {
+            app.world_mut().write_message(DamageEvent {
+                target,
+                source: None,
+                amount: 30.0,
+                kind: DamageKind::Fire,
+            });
+        }
+        app.update();
+
+        assert_eq!(app.world().get::<Health>(guarded).unwrap().current, 85.0);
+        assert_eq!(
+            app.world().get::<Health>(over_guarded).unwrap().current,
+            100.0,
+            "reduction clampée à 1.0 → aucun dégât"
+        );
+    }
+
+    #[test]
+    fn apply_damage_kill_triggers_death_event_once() {
+        let mut app = damage_test_app();
+        let target = app.world_mut().spawn(Health::new(20.0)).id();
+        app.world_mut().write_message(DamageEvent {
+            target,
+            source: None,
+            amount: 25.0,
+            kind: DamageKind::Explosion,
+        });
+        app.update();
+
+        assert_eq!(app.world().get::<Health>(target).unwrap().current, 0.0);
+        let log = app.world().resource::<AppliedLog>();
+        assert!(log.0[0].is_kill);
+        assert_eq!(
+            app.world().resource::<DeathLog>().0,
+            vec![target],
+            "exactement 1 DeathEvent"
+        );
+    }
+
+    #[test]
+    fn apply_damage_ignores_dead_target() {
+        let mut app = damage_test_app();
+        let target = app
+            .world_mut()
+            .spawn(Health {
+                current: 0.0,
+                max: 100.0,
+            })
+            .id();
+        app.world_mut().write_message(DamageEvent {
+            target,
+            source: None,
+            amount: 50.0,
+            kind: DamageKind::Physical,
+        });
+        app.update();
+
+        assert!(
+            app.world().resource::<AppliedLog>().0.is_empty(),
+            "cible morte → aucun DamageApplied, aucun double-kill"
+        );
+        assert!(app.world().resource::<DeathLog>().0.is_empty());
+    }
+
+    #[test]
+    fn apply_damage_two_events_same_frame_cumulate_single_kill() {
+        let mut app = damage_test_app();
+        let target = app.world_mut().spawn(Health::new(100.0)).id();
+        for _ in 0..2 {
+            app.world_mut().write_message(DamageEvent {
+                target,
+                source: None,
+                amount: 60.0,
+                kind: DamageKind::Physical,
+            });
+        }
+        app.update();
+
+        assert_eq!(app.world().get::<Health>(target).unwrap().current, 0.0);
+        let log = app.world().resource::<AppliedLog>();
+        assert_eq!(log.0.len(), 2, "les 2 events de la frame sont appliqués");
+        assert!(!log.0[0].is_kill, "1er hit : 100→40, pas un kill");
+        assert!(log.0[1].is_kill, "2e hit : 40→0, kill");
+        assert_eq!(
+            app.world().resource::<DeathLog>().0.len(),
+            1,
+            "un seul DeathEvent malgré 2 hits"
+        );
+    }
 }
