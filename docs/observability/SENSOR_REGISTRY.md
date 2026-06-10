@@ -94,6 +94,7 @@
 | `forgia2_fps_feel.json` | T0 | forgia-observability | `src/fps_feel_sensor.rs:38` | 1Hz | dash uses, hit feedbacks, aim assist — story-528 | active |
 | `forgia2_menu_video.json` | T0 | forgia-ui | `src/menu_video.rs:55` | 1Hz | frames fond vidéo menu, cache LRU, preroll | active |
 | `forgia2_obstacles.json` | T0 | forgia-mode-roguelite | `src/parcours_obstacles.rs:35` | 1Hz | obstacles animés + push physique — story-590 | active |
+| `forgia2_pepin.json` | T0 | forgia-fps | `src/pepin.rs` | 1Hz | jauge confiance Pépin : stacks/peak/accuracy/damage_mul — story-531 AC10 | active |
 | `forgia2_roguelite_intro.json` | T0 | forgia-mode-roguelite | `src/intro_dialogue.rs:197` | event | dialogue d'intro (bulle BD) | active |
 | `forgia2_stage_decor.json` | T0 | forgia-mode-roguelite | `src/decor.rs:51` | 1Hz | décor GLB Inferno par POI | active |
 | `forgia2_toon.json` | T0 | forgia-mode-roguelite | `src/toon_config.rs:22` | 1Hz | toon cel-shading hot-reload — ⚠ champ `outline_attached` = état réel (story-593) | active |

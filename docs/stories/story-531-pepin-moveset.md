@@ -1,10 +1,42 @@
 # Story-531 — 🔫 Pépin Moveset Distinctive (Mission 3 GDD)
 
-> **Status** : DRAFT
+> **Status** : EN COURS — incrément 1 livré 2026-06-10 (AC9+AC10, M2-A2 session 1)
 > **Scale BMAD** : Standard
 > **Effort estimé** : ~4 jours
 > **GDD ref** : [Mission 3 - Pépin](../design/gdd-roguelite-v1.md#-pépin--larme-accessible)
 > **Prérequis** : story-528 (FPS feel)
+
+## Incrément 1 (2026-06-10) — jauge de confiance complète
+
+- **AC9 ✅ code** : `forgia_combat::confidence` (ShotResolved par-tir + PepinConfidence
+  + `apply_shot` pur testé) ; émission dans fire_weapon_minimal (hit = ≥1 pellet sur
+  ennemi, mur/vide = miss, GDD) ; reset OnEnter(Roguelite) ; **payoff base
+  genome-driven** : +2 %/stack de dégâts (= +20 % à 10), neutre hors Pépin —
+  `assets/genomes/roguelite/pepin_confidence.toml` hot-reload, défauts = miroir.
+- **AC9 HUD ✅ code** : `forgia-ui-lib/hud/confidence.rs` — 10 cœurs cyan (AC8) au-dessus
+  de l'énergie, visibles UNIQUEMENT Pépin en main, cœur de tête clignote 0,5 s au changement.
+- **AC10 ✅ code** : sensor `forgia2_pepin.json` 1Hz (stacks/peak_run/accuracy/damage_mul)
+  + entrée SENSOR_REGISTRY.
+- Tests : 4 purs (apply_shot/saturations) + 4 fps (tuning miroir, mul par-arme,
+  disabled, App headless multi-armes) — 69 verts sur les 3 crates, clippy 0.
+- **Restent** (incréments suivants) : AC2 ADS accuracy ×2 static, AC3 « Petit cri »
+  (⚠ Shift = déjà Sprint, keybind à trancher), AC4 anims viewmodel, AC5-7 voicelines
+  popup (système popup = forgia-mode-roguelite, claimé multi-terminal), AC1 audit stats
+  genome vs GDD (15 dmg/mag 12/4 par s), tracer cyan 100 ms (AC8 partiel).
+
+### Test in-game (incrément 1)
+
+1. **Action** : rebuild → run Roguelite → garder Pépin (slot 1) → enchaîner des tirs
+   sur ennemis puis rater exprès.
+2. **Effet attendu** : rangée de cœurs cyan discrets au-dessus d'ÉNERGIE qui se
+   remplit à chaque hit (le dernier clignote), se vide d'un cœur par tir raté ;
+   à pleine jauge les ennemis tombent sensiblement plus vite (+20 %) ; en changeant
+   d'arme (2/3/4) les cœurs disparaissent et la jauge ne bouge plus.
+3. **Sensor** : `forgia2_pepin.json` → stacks suit les cœurs, `damage_mul` 1.00→1.20,
+   accuracy = hits/(hits+misses).
+4. **Variantes si KO** : cœurs absents → vérifier arme = slot 1 (ModernAR) + mode
+   Roguelite ; jauge ne monte pas → vérifier log `[fire] pellet … HIT` ; payoff
+   imperceptible → monter `per_stack_damage` à 0.04 dans le TOML (hot-reload).
 
 ## Pourquoi
 
