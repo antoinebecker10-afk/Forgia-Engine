@@ -55,9 +55,10 @@ pub struct ForgiaEffectsPlugin;
 
 impl Plugin for ForgiaEffectsPlugin {
     fn build(&self, app: &mut App) {
-        // Pre-spawn hanabi dummies at Startup to pay shader compile cost
-        // BEFORE first shot (pattern story-436 / reference_hanabi_shader_compile_lazy_pattern.md)
-        app.add_systems(Startup, prespawn_hanabi_dummies)
+        // Pre-spawn hanabi dummies pour payer le shader compile AVANT le 1er tir
+        // (pattern story-436 / reference_hanabi_shader_compile_lazy_pattern.md).
+        // PostStartup : setup_weapon_vfx (Startup) doit avoir inséré WeaponVfxEffects.
+        app.add_systems(PostStartup, prespawn_hanabi_dummies)
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
             .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
             .add_plugins(arena_feedback::ArenaFeedbackPlugin)
@@ -120,11 +121,32 @@ fn emissive_fade_tick(
     }
 }
 
-fn prespawn_hanabi_dummies(mut _commands: Commands) {
-    // TODO: Phase 2 — spawn 8 dummy `ParticleEffect` `Visibility::Hidden` at Y=-10000
-    // to pay shader compile cost BEFORE first shot.
-    // Pattern: memory `reference_hanabi_shader_compile_lazy_pattern.md`
-    info!("[forgia-effects] prespawn_hanabi_dummies — placeholder (Phase 2 adds 8 dummies)");
+/// Pré-spawn 1 dummy `ParticleEffect` caché par EffectAsset (8) à Y=-10000 :
+/// hanabi compile ses shaders à la première préparation d'un effet — sans ce
+/// warmup, le PREMIER tir de la session paie la compile (freeze 25 s confirmé
+/// V1, story-436). Les dummies vivent 5 s puis `lifetime_tick` les despawn.
+/// Était un placeholder « TODO Phase 2 » depuis Phase 0 — implémenté story-594
+/// (audit 2026-06-10 P1, M2-B5).
+fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::WeaponVfxEffects>) {
+    let handles = [
+        &effects.muzzle_core_flash,
+        &effects.muzzle_sparks,
+        &effects.muzzle_smoke,
+        &effects.muzzle_heat_glow,
+        &effects.muzzle_forward_flash,
+        &effects.impact_sparks,
+        &effects.impact_dust,
+        &effects.impact_flash,
+    ];
+    for handle in handles {
+        commands.spawn((
+            bevy_hanabi::ParticleEffect::new((*handle).clone()),
+            Transform::from_xyz(0.0, -10_000.0, 0.0),
+            Visibility::Hidden,
+            weapon_vfx::Lifetime(Timer::from_seconds(5.0, TimerMode::Once)),
+        ));
+    }
+    info!("[forgia-effects] prespawn 8 hanabi dummies (shader warmup, story-594)");
 }
 
 fn effects_tick() {
