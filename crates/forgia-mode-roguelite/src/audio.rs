@@ -41,13 +41,11 @@ const VOLUME_MAX: f32 = 2.0;
 
 // ─── Channels kira (découplés du biome ambient RPG) ───────────────────────────
 
-/// Channel SFX one-shot (impact/kill/hurt/ding).
-#[derive(Resource)]
-pub struct SfxChannel;
-
-/// Channel musique (boucle combat/break).
-#[derive(Resource)]
-pub struct MusicChannel;
+// Story-595 (M2-B1) : les marker types des canaux vivent désormais dans
+// forgia-audio (foundation) pour que le volume master USER (settings) puisse
+// s'appliquer à tous les canaux sans dépendance inverse. Re-export : les
+// usages locaux (`AudioChannel<SfxChannel>`) restent inchangés.
+pub use forgia_audio::{MusicChannel, SfxChannel};
 
 // ─── Genome TOML ──────────────────────────────────────────────────────────────
 
