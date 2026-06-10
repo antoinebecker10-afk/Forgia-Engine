@@ -15,5 +15,7 @@ forgia-combat = { workspace = true }
 forgia-damage = { workspace = true }
 forgia-mode-fps-arena = { workspace = true }
 forgia-player = { workspace = true }
+# Story-595 (M2-B1) : UserMasterVolume (volume settings -> canaux kira).
+forgia-audio = { workspace = true }
 forgia-genome-core = { workspace = true }
 forgia-rpg-data = { workspace = true }
