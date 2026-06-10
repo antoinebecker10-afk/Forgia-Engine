@@ -1,4 +1,13 @@
-//! forgia-postprocess — 45 post-process effects (Bevy FullscreenMaterial).
+//! forgia-postprocess — infrastructure post-process (Bevy FullscreenMaterial).
+//!
+//! ## ⚠ État réel des shaders (story-593, audit 2026-06-10)
+//!
+//! **2 effets RÉELS** : `toon` (cel-shading, wired Roguelite) et `outline`
+//! (Sobel — écrit mais plugin désactivé, crash wgpu, cf forgia-mode-roguelite).
+//! **43 effets = STUBS passthrough** : la plomberie Rust (Settings/Plugin/macro)
+//! existe, mais leurs `.wgsl` contiennent `TODO: implement` et rendent l'image
+//! inchangée (× strength). Activer leur plugin ne produit AUCUN effet visuel.
+//! → Implémenter le shader AVANT de proposer/composer un de ces 43 effets.
 //!
 //! Story-513 (2026-05-23) : fusion de 45 anciennes crates `forgia-pp-*` en
 //! une seule pour reduire la fragmentation workspace (Bevy core philosophy :

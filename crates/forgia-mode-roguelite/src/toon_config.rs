@@ -255,6 +255,16 @@ pub fn sys_detach_toon_from_cameras(
     watch.attached_cameras = 0;
 }
 
+/// État RÉEL de l'outline Sobel : le plugin est désactivé (crash wgpu
+/// `SurfaceAcquireSemaphores`, cf lib.rs bloc commenté) — `to_outline()` est
+/// calculé puis jeté (`let _ = outline;`) dans les 3 systèmes apply.
+///
+/// Story-593 (audit 2026-06-10 P1) : le sensor exportait `outline_enabled` (la
+/// CONFIG) sans dire que rien n'est appliqué — une IA diagnostiquait sur un état
+/// fictif. Cette const est LA source de vérité runtime ; la flipper à `true`
+/// UNIQUEMENT quand le plugin outline est réellement re-branché (fix node_edges).
+const OUTLINE_ATTACHED: bool = false;
+
 /// Sensor `forgia2_toon.json` 1Hz — état runtime + dernière config appliquée.
 pub fn sys_write_toon_sensor(
     time: Res<Time>,
@@ -275,15 +285,18 @@ pub fn sys_write_toon_sensor(
         return;
     };
 
-    let (severity, next_step) = severity_for_toon(cfg.strength, watch.attached_cameras);
+    let outline_ghost = cfg.outline_enabled && !OUTLINE_ATTACHED;
+    let (severity, next_step) =
+        severity_for_toon(cfg.strength, watch.attached_cameras, outline_ghost);
 
     let json = format!(
-        r#"{{"id":"toon","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"bands":{:.2},"strength":{:.2},"edge_dark":{:.2},"outline_enabled":{},"outline_thickness":{:.2},"outline_threshold":{:.2},"outline_strength":{:.2},"attached_cameras":{},"reload_count":{},"last_reload_secs":{:.1}}}"#,
+        r#"{{"id":"toon","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"bands":{:.2},"strength":{:.2},"edge_dark":{:.2},"outline_enabled":{},"outline_attached":{},"outline_thickness":{:.2},"outline_threshold":{:.2},"outline_strength":{:.2},"attached_cameras":{},"reload_count":{},"last_reload_secs":{:.1}}}"#,
         time.elapsed_secs(),
         cfg.bands,
         cfg.strength,
         cfg.edge_dark,
         cfg.outline_enabled,
+        OUTLINE_ATTACHED,
         cfg.outline_thickness,
         cfg.outline_threshold,
         cfg.outline_strength,
@@ -298,12 +311,22 @@ pub fn sys_write_toon_sensor(
 }
 
 /// Pur — testable. Severity `warn` si config "on" mais aucune caméra attachée
-/// (= post-process invisible runtime malgré activation).
-pub fn severity_for_toon(strength: f32, attached_cameras: u32) -> (&'static str, &'static str) {
+/// (= post-process invisible runtime malgré activation), `info` si l'outline est
+/// demandé en config mais jamais appliqué (plugin désactivé, story-593).
+pub fn severity_for_toon(
+    strength: f32,
+    attached_cameras: u32,
+    outline_requested_not_attached: bool,
+) -> (&'static str, &'static str) {
     if strength > 0.0 && attached_cameras == 0 {
         (
             "warn",
             "toon strength>0 mais 0 Camera3d attached — post-process invisible",
+        )
+    } else if outline_requested_not_attached {
+        (
+            "info",
+            "outline_enabled en config mais plugin outline DESACTIVE (crash wgpu) — etat reel = outline_attached:false ; fix = node_edges apres ToonSettings (lib.rs)",
         )
     } else {
         ("ok", "")
@@ -360,9 +383,14 @@ default = -5.0
 
     #[test]
     fn severity_warn_when_strength_but_no_camera() {
-        assert_eq!(severity_for_toon(1.0, 0).0, "warn");
-        assert_eq!(severity_for_toon(1.0, 1).0, "ok");
-        assert_eq!(severity_for_toon(0.0, 0).0, "ok");
+        assert_eq!(severity_for_toon(1.0, 0, false).0, "warn");
+        assert_eq!(severity_for_toon(1.0, 1, false).0, "ok");
+        assert_eq!(severity_for_toon(0.0, 0, false).0, "ok");
+        // Story-593 : outline demandé en config mais plugin désactivé → info
+        // (le sensor ne doit plus rapporter un outline fictif comme sain).
+        assert_eq!(severity_for_toon(1.0, 1, true).0, "info");
+        // La caméra manquante prime sur l'écart outline.
+        assert_eq!(severity_for_toon(1.0, 0, true).0, "warn");
     }
 
     #[test]
