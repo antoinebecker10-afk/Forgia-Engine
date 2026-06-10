@@ -48,8 +48,12 @@ pub fn sys_write_memory_sensor(
     let now = time.elapsed_secs();
     if state.system.is_none() || now - state.last_refresh_secs > 5.0 {
         let sys = state.system.get_or_insert_with(System::new);
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
         if let Ok(pid) = sysinfo::get_current_pid() {
+            // Story-592 (M0.5, audit 2026-06-10 P1) : rafraîchir UNIQUEMENT notre
+            // process. `ProcessesToUpdate::All` énumérait tous les process Windows
+            // sur le thread de jeu → stutter métronome période 5,01 s mesuré
+            // (forgia2_lag_events.json, spikes 30-50 ms). Some(&[pid]) ≈ ~2 ms.
+            sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
             state.cached_ram_bytes = sys.process(pid).map(|p| p.memory()).unwrap_or(0);
         }
         state.last_refresh_secs = now;
