@@ -11,13 +11,18 @@
 //!
 //! Cross-mode : tourne en Update sans gate GameMode, applicable Fps/Rpg/Roguelite.
 
-use bevy::asset::LoadState;
+use bevy::asset::{LoadState, UntypedAssetLoadFailedEvent};
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 
 #[derive(Resource, Default)]
 pub struct AssetLoadSensorState {
     pub last_write_secs: f32,
+    /// Échecs captés par EVENT (story-595 post-mortem KTX2) : cumulés session,
+    /// dédupliqués, cap 20. Couvre les handles JAMAIS spawnés en SceneRoot —
+    /// l'angle mort qui a laissé passer 4 armes invisibles avec scene_failed=0
+    /// (le viewmodel attend Loaded avant de spawner → échec invisible au scan world).
+    pub event_failed_paths: Vec<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -26,8 +31,18 @@ pub fn sys_write_assets_sensor(
     asset_server: Res<AssetServer>,
     q_scene: Query<&SceneRoot>,
     q_mesh: Query<&Mesh3d>,
+    mut failed_events: MessageReader<UntypedAssetLoadFailedEvent>,
     mut state: ResMut<AssetLoadSensorState>,
 ) {
+    // Drainer AVANT le throttle 1Hz : les messages non lus chaque frame sont perdus.
+    for ev in failed_events.read() {
+        let p = ev.path.to_string().replace('\\', "/");
+        if !state.event_failed_paths.contains(&p) && state.event_failed_paths.len() < 20 {
+            warn!("[forgia-observability] asset load FAILED (event): {p}");
+            state.event_failed_paths.push(p);
+        }
+    }
+
     let now = time.elapsed_secs();
     if now - state.last_write_secs < 1.0 {
         return;
@@ -72,11 +87,12 @@ pub fn sys_write_assets_sensor(
         }
     }
 
-    let total_failed = scene_failed + mesh_failed;
+    let event_failed = state.event_failed_paths.len() as u32;
+    let total_failed = scene_failed + mesh_failed + event_failed;
     let (severity, next_step) = if total_failed > 0 {
         (
             "warn",
-            "Asset load failures — check failed_paths + verify file exists on disk relative to assets/",
+            "Asset load failures — check failed_paths + event_failed_paths (echecs hors-world : handle jamais spawne) + verify file exists relative to assets/",
         )
     } else if scene_loading > 0 || mesh_loading > 0 {
         ("ok", "")
@@ -89,9 +105,15 @@ pub fn sys_write_assets_sensor(
         .map(|p| format!("\"{p}\""))
         .collect::<Vec<_>>()
         .join(",");
+    let event_failed_json: String = state
+        .event_failed_paths
+        .iter()
+        .map(|p| format!("\"{p}\""))
+        .collect::<Vec<_>>()
+        .join(",");
 
     let json = format!(
-        r#"{{"id":"assets","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"scene_loaded":{scene_loaded},"scene_loading":{scene_loading},"scene_failed":{scene_failed},"scene_not_loaded":{scene_not_loaded},"mesh_loaded":{mesh_loaded},"mesh_loading":{mesh_loading},"mesh_failed":{mesh_failed},"failed_paths":[{failed_paths_json}]}}"#,
+        r#"{{"id":"assets","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"scene_loaded":{scene_loaded},"scene_loading":{scene_loading},"scene_failed":{scene_failed},"scene_not_loaded":{scene_not_loaded},"mesh_loaded":{mesh_loaded},"mesh_loading":{mesh_loading},"mesh_failed":{mesh_failed},"event_failed":{event_failed},"failed_paths":[{failed_paths_json}],"event_failed_paths":[{event_failed_json}]}}"#,
         now,
     );
 
