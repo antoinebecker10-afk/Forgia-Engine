@@ -1,0 +1,25 @@
+# Player Movement Tuning — story-594 (M2-B4, audit 2026-06-10)
+# Hot-reload : sauvegarder ce fichier en jeu suffit (file_watcher bevy).
+# Défauts Rust = miroir exact de ces valeurs (PlayerMovementTuning::default) :
+# si ce fichier manque ou est invalide, le feel ne change PAS.
+#
+# Itération feel FPS : speed/jump/gravity sont LE trio Gunfire Reborn.
+# Garde-fous : speed 3-9 raisonnable (5=base), jump 5-9, gravity 12-25.
+
+# Vitesse horizontale (m/s), avant multiplicateur ADS (0.65 en visée).
+speed = 5.0
+
+# Vélocité verticale au saut (m/s).
+jump_velocity = 6.5
+
+# Gravité en l'air (m/s²) — le KCC n'utilise pas la gravité Rapier.
+gravity = 18.0
+
+# Vitesse de chute max (m/s, positif).
+max_fall_speed = 30.0
+
+# RPG (track FORGE) : rotation clavier Q/D quand RMB libre (rad/s, pattern WoW).
+rpg_keyboard_turn_rad_per_sec = 2.5
+
+# RPG : sensibilité mouse X -> yaw player quand RMB tenu (rad/pixel).
+rpg_rmb_steer_rad_per_px = 0.005

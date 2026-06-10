@@ -15,8 +15,10 @@ use forgia_ai_arena_bot::BotTarget;
 use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 use forgia_damage::{Health as DamageHealth, Mortal};
+use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_input::{default_input_map, prelude::*};
 use leafwing_input_manager::prelude::*;
+use serde::Deserialize;
 
 pub mod dash;
 pub mod skybox_genome;
@@ -24,8 +26,70 @@ pub mod skybox_genome;
 pub mod prelude {
     pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
     pub use crate::{
-        CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning, MovementSpeedMultiplier, Player,
+        CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning, MovementSpeedMultiplier,
+        Player, PlayerMovementTuning,
     };
+}
+
+/// Tuning du mouvement joueur — couche definition (genome TOML hot-reloadable).
+///
+/// Story-594 (M2-B4, audit 2026-06-10 P1) : speed/jump/gravity étaient les seuls
+/// littéraux du feel non itérables sans rebuild, dans un FPS dont la qualité EST
+/// l'itération du feel. Schéma plat, défauts = miroir exact des anciennes consts
+/// (zéro régression, pattern gait_genome story-579 / HitFeedbackTuning).
+/// Fichier : `assets/genomes/player_movement.toml` (hot-reload via file_watcher).
+#[derive(Resource, Deserialize, TypePath, Clone, Debug)]
+#[serde(default)]
+pub struct PlayerMovementTuning {
+    /// Vitesse de déplacement horizontale (m/s), avant MovementSpeedMultiplier (ADS).
+    pub speed: f32,
+    /// Vélocité verticale au saut (m/s).
+    pub jump_velocity: f32,
+    /// Gravité appliquée en l'air (m/s²) — le KCC n'utilise pas la gravité Rapier.
+    pub gravity: f32,
+    /// Vitesse de chute max (m/s, valeur positive).
+    pub max_fall_speed: f32,
+    /// RPG : vitesse de rotation clavier Q/D quand RMB libre (rad/s, pattern WoW).
+    pub rpg_keyboard_turn_rad_per_sec: f32,
+    /// RPG : sensibilité mouse X → yaw player quand RMB tenu (rad/pixel),
+    /// calibrée contre forgia-camera-orbit `yaw_sensitivity`.
+    pub rpg_rmb_steer_rad_per_px: f32,
+}
+
+impl Default for PlayerMovementTuning {
+    fn default() -> Self {
+        // Miroir exact des littéraux pré-story-594 — NE PAS modifier sans story :
+        // c'est le filet anti-régression si le TOML manque ou est invalide.
+        Self {
+            speed: 5.0,
+            jump_velocity: 6.5,
+            gravity: 18.0,
+            max_fall_speed: 30.0,
+            rpg_keyboard_turn_rad_per_sec: 2.5,
+            rpg_rmb_steer_rad_per_px: 0.005,
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct PlayerMovementTuningHandle(pub Handle<Genome<PlayerMovementTuning>>);
+
+fn load_player_movement_tuning(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let handle: Handle<Genome<PlayerMovementTuning>> =
+        asset_server.load("genomes/player_movement.toml");
+    commands.insert_resource(PlayerMovementTuningHandle(handle));
+}
+
+/// Sync genome → Resource (Default au boot, écrasée dès le chargement/hot-reload).
+fn sync_player_movement_tuning(
+    handle: Option<Res<PlayerMovementTuningHandle>>,
+    assets: Res<Assets<Genome<PlayerMovementTuning>>>,
+    mut tuning: ResMut<PlayerMovementTuning>,
+) {
+    let Some(g) = handle.as_deref().and_then(|h| assets.get(&h.0)) else {
+        return;
+    };
+    *tuning = g.data.clone();
 }
 
 /// Multiplicateur global sur la vitesse de déplacement player.
@@ -166,11 +230,14 @@ impl Plugin for ForgiaPlayerPlugin {
         app.init_resource::<CameraMode>()
             .init_resource::<MovementSpeedMultiplier>()
             .init_resource::<MouseLookTuning>()
+            .init_resource::<PlayerMovementTuning>()
+            .init_asset::<Genome<PlayerMovementTuning>>()
+            .register_asset_loader(GenomeLoader::<PlayerMovementTuning>::default())
             .init_resource::<dash::DashTuning>()
             .init_resource::<dash::DashTapDetector>()
             .add_message::<dash::DashUsedEvent>()
             .add_plugins(skybox_genome::SkyboxGenomePlugin)
-            .add_systems(Startup, load_skybox)
+            .add_systems(Startup, (load_skybox, load_player_movement_tuning))
             .add_systems(Update, attach_skybox_to_camera)
             .add_systems(OnEnter(AppMode::InGame), spawn_player)
             // Story-517 fix : despawn UNIQUEMENT au retour au menu, PAS sur OnExit(InGame).
@@ -181,6 +248,7 @@ impl Plugin for ForgiaPlayerPlugin {
             .add_systems(
                 Update,
                 (
+                    sync_player_movement_tuning,
                     mouse_look,
                     weapon_recoil_apply,
                     // Dash phase 1 : input AVANT player_movement (consume Jump),
@@ -193,6 +261,10 @@ impl Plugin for ForgiaPlayerPlugin {
                     player_floor_safety_net,
                 )
                     .chain()
+                    // Story-594 (M2-B4) : chaîne player DANS GameSet::Movement
+                    // (Lock L7 — était hors set : ordre vs aim_assist/Camera non
+                    // garanti par le scheduler, audit 2026-06-10 P1).
+                    .in_set(GameSet::Movement)
                     .run_if(in_state(AppMode::InGame)),
             );
     }
@@ -403,16 +475,9 @@ fn weapon_recoil_apply(
     }
 }
 
-/// Keyboard turn speed when in RPG mode + RMB not held (WoW Q/D pattern).
-/// Rad per second — calibrated for snappy but not jarring turn. Future :
-/// migrate to genome tuning (story-447).
-const RPG_KEYBOARD_TURN_RAD_PER_SEC: f32 = 2.5;
-/// Mouse X → player yaw sensitivity when RMB held in RPG (mouselook steer).
-/// Rad per pixel. Calibrated against forgia-camera-orbit `yaw_sensitivity`.
-const RPG_RMB_STEER_RAD_PER_PX: f32 = 0.005;
-
 fn player_movement(
     time: Res<Time>,
+    tuning: Res<PlayerMovementTuning>,
     speed_mul: Res<MovementSpeedMultiplier>,
     game_mode: Res<State<GameMode>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
@@ -428,10 +493,11 @@ fn player_movement(
     let Ok((mut kcc, output, mut player, action, mut tf)) = q.single_mut() else {
         return;
     };
-    let speed = 5.0 * speed_mul.0;
-    let jump_velocity = 6.5;
-    let gravity = 18.0;
-    let max_fall_speed = 30.0;
+    // Story-594 : valeurs genome (assets/genomes/player_movement.toml, hot-reload).
+    let speed = tuning.speed * speed_mul.0;
+    let jump_velocity = tuning.jump_velocity;
+    let gravity = tuning.gravity;
+    let max_fall_speed = tuning.max_fall_speed;
     let dt = time.delta_secs();
 
     // ── Mode-aware input interpretation (WoW pattern for RPG) ─────────
@@ -452,7 +518,7 @@ fn player_movement(
             dx += ev.delta.x;
         }
         if dx.abs() > f32::EPSILON {
-            player.yaw -= dx * RPG_RMB_STEER_RAD_PER_PX;
+            player.yaw -= dx * tuning.rpg_rmb_steer_rad_per_px;
             tf.rotation = Quat::from_rotation_y(player.yaw);
         }
     } else {
@@ -464,7 +530,7 @@ fn player_movement(
     // RPG turn keys (Q/D AZERTY = KeyA/KeyD) when no mouselook override.
     let strafe_override = is_rpg && cam_steer_held;
     if is_rpg && !strafe_override {
-        let turn_speed = RPG_KEYBOARD_TURN_RAD_PER_SEC;
+        let turn_speed = tuning.rpg_keyboard_turn_rad_per_sec;
         if action.pressed(&PlayerAction::MoveLeft) {
             player.yaw += turn_speed * dt;
             tf.rotation = Quat::from_rotation_y(player.yaw);
@@ -555,5 +621,19 @@ mod tests {
         let p = Player::default();
         assert_eq!(p.yaw, 0.0);
         assert_eq!(p.pitch, 0.0);
+    }
+
+    /// Régression story-594 : les défauts du tuning sont le MIROIR EXACT des
+    /// littéraux pré-genome — si le TOML manque/est invalide, le feel ne change pas.
+    /// Toute modification ici exige une story (c'est le feel du jeu ship).
+    #[test]
+    fn movement_tuning_defaults_mirror_pre_genome_literals() {
+        let t = PlayerMovementTuning::default();
+        assert_eq!(t.speed, 5.0);
+        assert_eq!(t.jump_velocity, 6.5);
+        assert_eq!(t.gravity, 18.0);
+        assert_eq!(t.max_fall_speed, 30.0);
+        assert_eq!(t.rpg_keyboard_turn_rad_per_sec, 2.5);
+        assert_eq!(t.rpg_rmb_steer_rad_per_px, 0.005);
     }
 }
