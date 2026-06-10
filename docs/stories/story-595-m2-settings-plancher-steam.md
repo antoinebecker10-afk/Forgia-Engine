@@ -4,7 +4,13 @@
 > items B1 (settings) + B6 partiel (FR pause menu).
 > **Audit 2026-06-10 P1-15** : « le mot volume n'existe nulle part dans le workspace ;
 > refund/review négative quasi garantie sur Steam ».
-> **Scale BMAD** : Standard. **Date** : 2026-06-10. **Statut** : CODE-COMPLETE — validation runtime requise.
+> **Scale BMAD** : Standard. **Date** : 2026-06-10. **Statut** : **DONE — VALIDÉ RUNTIME** (Antoine « parfait », 18:00 : bascule borderless sans crash, save %APPDATA% confirmé fov=120/borderless, lag severity ok, 0 panic).
+>
+> **Post-mortem intégré** : 2 crashes wgpu pendant la validation (16:36 + 17:51) — causes :
+> (1) `&mut ResMut` DerefMut = faux Changed chaque frame du panneau ; (2) apply window
+> comparant l'état réel clampé par l'OS (1080→1009) → boucle resize → race fatale.
+> Fix : bypass_change_detection + dirty explicite, et apply piloté par la DEMANDE
+> mémorisée, pas par l'état fenêtre. Cf memory reference-resmut-derefmut-false-changed.
 
 ## Critères d'acceptance
 
