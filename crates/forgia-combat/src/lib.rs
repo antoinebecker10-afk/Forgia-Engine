@@ -18,6 +18,7 @@ use forgia_core::prelude::*;
 pub mod ammo;
 pub mod combat_juice;
 pub mod combat_mods;
+pub mod confidence;
 pub mod melee;
 pub mod sensor;
 pub mod weapons;
@@ -40,6 +41,7 @@ pub mod prelude {
         CameraTrauma, CombatHitEvent, HitFlashCache, HitFlashTimer, WeaponRecoilDebt,
         WeaponRecoilImpulse,
     };
+    pub use crate::confidence::{PepinConfidence, ShotResolved};
     pub use crate::melee::MeleeCooldown;
     pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
     pub use crate::weapons::{
@@ -145,6 +147,9 @@ impl Plugin for ForgiaCombatPlugin {
             // par forgia-fps (damage_mul + fire_rate_mul) et forgia-damage
             // (damage_reduction — Phase 4b).
             .init_resource::<combat_mods::PlayerCombatMods>()
+            // Story-531 AC9 — jauge de confiance Pépin (state partagé fps↔HUD).
+            .init_resource::<confidence::PepinConfidence>()
+            .add_message::<confidence::ShotResolved>()
             .add_message::<combat_juice::CombatHitEvent>()
             .add_message::<combat_juice::WeaponFiredEvent>()
             .add_message::<ammo::AmmoChanged>()
