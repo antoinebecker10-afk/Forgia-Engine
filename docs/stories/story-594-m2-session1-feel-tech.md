@@ -13,7 +13,7 @@
 | AC3 (B4) | Chaîne player dans GameSet::Movement (Lock L7) | ✅ code | `.in_set(GameSet::Movement)` sur la chaîne mouse_look→movement→dash ; ordre Movement→Camera garantit enfin l'hypothèse de l'aim assist |
 | AC4 (B7) | apply_damage couvert | ✅ | 5 tests headless (soustraction, guard clampé 0..1, kill→DeathEvent unique, cible morte ignorée, cumul même frame) — 8/8 verts |
 | AC5 (B7) | genome-core couvert | ✅ | `parse_genome` extrait pur + 6 tests (TOML invalide = Err pas panic, défauts serde, champ requis manquant, mauvais type) |
-| AC6 (B3) | 4 armes en KTX2/UASTC | ✅ code / ⏳ runtime | gltf-transform uastc --zstd 0 (recette barks story-588 : scheme=0 vérifié par lecture header). gpuSize/texture : 21,28→5,59 MB (÷3,8). VRAM armes attendue ~340→~89 MB |
+| AC6 (B3) | 4 armes en KTX2/UASTC | ❌ **ÉCHEC runtime → REVERTÉ** (commit 5494cbe) | **bevy_gltf 0.18 ne supporte PAS `KHR_texture_basisu`** : `invalid glTF: textures[0].source: Missing` → les 4 GLB rejetés en entier → viewmodel invisible (signalé par Antoine, confirmé log 16:31/16:36). Les features ktx2/basis-universal ne valent que pour les .ktx2 STANDALONE (barks). Leçon : « le fichier est valide » ≠ « bevy le charge » — toute conversion d'asset exige une validation runtime AVANT commit. Alternative VRAM proposée : resize 2048→1024 (PNG standard, ÷4, zéro risque loader) — décision Antoine (netteté viewmodel) |
 
 ## Reports documentés
 
