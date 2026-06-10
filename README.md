@@ -1,72 +1,77 @@
 # Forgia V2
 
-> Moteur de jeu Bevy 0.18 / Rust — dual-mode FPS Arena + RPG OpenWorld.
-> Workspace propre repensé 2026-05-14 après audit V1 (12 % shippable / 88 % dette).
+> **Moteur de jeu IA-natif** (Rust / Bevy 0.18.1). Le créateur décrit son jeu et importe
+> ses assets, l'IA le construit. Le moat : un codebase **observable** (~100 sensors JSON
+> runtime) et **data-driven** (~105 genomes TOML hot-reload) conçu pour être piloté par
+> agents IA de façon fiable.
 
-## État actuel
+## État actuel (2026-06-10)
 
-**Phase 0 — Bootstrap workspace** (en cours)
+**Priorité Phase 0 : SHIPPER le Roguelite** — FPS roguelite type Gunfire Reborn
+(`crates/forgia-mode-roguelite`). Boucle jouable : vagues + boss → Victoire/Défaite,
+boons, éléments par arme, méta-progression persistée. Ship-readiness ≈ 55-60 % MVG.
 
-13 crates, ~14k LOC cible (vs 205k V1), 0 plugin orphan dès jour 1, 0 `#[allow(dead_code)]`.
+Le mode RPG OpenWorld (`forgia-rpg`) est le **track FORGE** : banc d'essai des outils
+(terrain streamé, auto-rig, villages procéduraux) qui refluent vers le Roguelite.
+
+- **62 crates**, ~88k LOC, 1 000+ tests — voir [ARCHITECTURE.md](ARCHITECTURE.md)
+- Vision : [docs/vision/FORGIA_VISION_2026-06-04.md](docs/vision/FORGIA_VISION_2026-06-04.md)
+- Roadmap exécution : [docs/ROADMAP_POST_AUDIT_2026-06-10.md](docs/ROADMAP_POST_AUDIT_2026-06-10.md)
 
 ## Quickstart
 
 ```bash
-# Setup (Rust 1.85+)
+# Setup (Rust stable, Windows 10+ cible production)
 rustup default stable
 
-# Compile
+# Vérifier (toutes ces commandes sont testées et fonctionnent)
 cargo check --workspace
-cargo clippy --workspace -- -D warnings
-cargo test --workspace
+cargo clippy --workspace --no-deps
+cargo test -p forgia-mode-roguelite        # tests par crate (voir note)
 
-# Run
-cargo run -p forgia-game --release-fast
+# Lancer le jeu (binaire canonique = `forgia`, package racine)
+cargo run                                   # debug
+cargo run --profile release-fast            # itération rapide optimisée
+.\run_debug.ps1                              # lance le build existant + log forgia2_run.log
 ```
 
-## Structure
+> **Note `cargo test --workspace`** : casse actuellement en local (builds concurrents /
+> artefacts incrémentaux — voir story-592). La CI et le dev testent **par crate** :
+> `cargo test -p <crate>`. Chaque crate passe isolément.
 
-13 crates dans `crates/` :
+## Le pattern Forgia (ce qui rend le moteur pilotable par IA)
 
-| Crate | Rôle |
-|---|---|
-| `forgia-core` | États (AppMode/GameMode/WorldMode), GameSet ordering, 0 dep workspace |
-| `forgia-assets` | GameAssets Resource + preload + whitelist L1 reborn |
-| `forgia-input` | Leafwing PlayerAction AZERTY + KeybindRegistry |
-| `forgia-player` | KinematicCharacterController + caméra 1P/3P + spawn/respawn |
-| `forgia-combat` | Gunfeel V5-F partagé FPS/RPG (12 fichiers V1 portés VERBATIM Phase 2) |
-| `forgia-effects` | Hanabi VFX + audio combat + HitFlashCache (pre-spawn dummy anti-freeze) |
-| `forgia-terrain` | Procédural OpenWorld (port verbatim V1, désactivé FPS) |
-| `forgia-fps` | Mode FPS Arena : modules KayKit assemblés, bots IA |
-| `forgia-rpg` | Mode RPG OpenWorld : quêtes, NPCs (squelette V1, dev V2.M2) |
-| `forgia-ui` | Menu + HUD partagés (1 seul handler ESC, MenuCamera2d isolé) |
-| `forgia-sensors` | 12 sensors max (vs 95 V1), health monitor, watchdog OS |
-| `forgia-game` | bin — wire tout + GameMode switching |
-| `xtask` | Automation : check-orphans, schedule-dump, baseline E1/E2 |
+1. **Sensors** : chaque feature écrit `forgia2_<feature>.json` à 1 Hz
+   (`{id, severity, next_step, ...}`). Un agent diagnostique l'état du jeu en lisant
+   des fichiers, sans le lancer. Registre : `docs/observability/SENSOR_REGISTRY.md`.
+2. **Genomes** : les valeurs gameplay vivent dans `assets/genomes/*.toml` et
+   `config/`, hot-reloadables (Shift+F12). Pas de hardcode gameplay.
+3. **Gates** : `cargo xtask asset-load | no-scaffold | sensor-audit | story-gate |
+   verify-sensors-format` — des ratchets mécaniques contre la dérive et le « DONE fictif ».
+4. **Stories** : tout travail Standard+ a sa story dans `docs/stories/` avec critères
+   falsifiables.
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — graphe deps + GameSet + patterns terrain à reproduire
-- [CONTRIBUTING.md](CONTRIBUTING.md) — setup day-1, conventions, BMAD workflow
-- [CLAUDE.md](CLAUDE.md) — IA contract Forgia
-- [docs/adr/ADR-0001-pivot-v2.md](docs/adr/ADR-0001-pivot-v2.md) — décision V2 elle-même
+- [ARCHITECTURE.md](ARCHITECTURE.md) — les 62 crates réelles, assemblage, GameSet, sensors
+- [CONTRIBUTING.md](CONTRIBUTING.md) — setup, conventions, workflow BMAD
+- [CLAUDE.md](CLAUDE.md) — contrat IA du workspace
+- [docs/audit/audit-2026-06-10-full-codebase.md](docs/audit/audit-2026-06-10-full-codebase.md) — dernier audit complet (16 domaines)
+- [docs/ROADMAP_ROGUELITE.md](docs/ROADMAP_ROGUELITE.md) — design/contenu Roguelite
+- ADR : [docs/adr/](docs/adr/) — décisions structurantes
 
-## Roadmap V2
+## Jalons (roadmap post-audit)
 
-| Phase | Durée | Livrable |
+| Jalon | Contenu | Cible |
 |---|---|---|
-| 0 Bootstrap | 1 sem | Workspace + window 1920×1080 |
-| 1 Hello World | 1.5 sem | Player FPS bouge sur ground placeholder |
-| 2 Gunfeel V5-F | 4 sem | **DÉCISION GO/NO-GO** — gunfeel = V1 ? |
-| 3 Arena modulaire | 5 sem | DM solo vs 4 bots, 5 min sans crash |
-| 4 UI/menu propre | 4 sem | 30 cycles menu sans bug |
-| 5 Sensors | 3 sem | 12 sensors stack |
-| 6 Polish + Steam ship | 5 sem | 5 inconnus 30 min ≥ 7/10 |
-
-**Ship cible** : Q1-Q2 2027 (réaliste), fallback Bots Brawl Q4 2026 si discipline tenue.
+| M0 Filet | push+CI, P0 gameplay, crash hook | ✅ 2026-06-10 (story-592) |
+| M1 Moat honnête | docs vraies, sensors véridiques, gates actifs | juin 2026 |
+| M2 Démo jouable interne | gameplay + plancher Steam (settings, KTX2) | mi-juillet 2026 |
+| M3 Démo publique | packaging, page Steam/itch, playtests | sept. 2026 (Next Fest oct.) |
+| M4 Ship 1.0 | contenu élargi, i18n EN | Q4 2026 – Q1 2027 |
+| M5 Phase 1 moteur | « le créateur importe ses assets » | 2027 |
 
 ## Référence V1
 
-Le code V1 reste vivant en mode **bug-fix only** dans `D:/Forgia/`.
-Voir [audit pré-pivot](../Forgia/RUST/Forgia/Forgia/docs/audits/state-of-forgia-2026-05-14.md)
-et [plan V2 complet](../Forgia/RUST/Forgia/Forgia/docs/audits/PLAN_V2_FOUNDATIONS_2026-05-14.md).
+Le code V1 (`D:/Forgia/`) est en mode bug-fix only ; il sert de carrière de patterns
+(streaming async, VRAM breakdown) re-portés à la demande.

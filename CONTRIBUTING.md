@@ -19,7 +19,9 @@ cd forgia-v2
 cargo check --workspace
 ```
 
-Si tout est vert : `cargo run -p forgia-game`. Une fenêtre 1920×1080 doit s'ouvrir.
+Si tout est vert : `cargo run` (le binaire canonique est le package racine `forgia` —
+`forgia-game` est une lib). Une fenêtre 1920×1080 doit s'ouvrir.
+Pour l'itération quotidienne : `cargo run --profile release-fast`.
 
 Si ça plante : ouvre une issue avec ton OS + version Rust + le log complet.
 
@@ -93,7 +95,9 @@ mod tests {
 }
 ```
 
-CI bloque `cargo test --workspace` mergeable. Pas de tests qui passent localement et fail CI.
+La CI exécute les tests **par crate** (`cargo test -p <crate>`) et bloque le merge en
+cas d'échec (story-592 : `--workspace` est instable en local — builds concurrents /
+artefacts incrémentaux ; chaque crate passe isolément). En local : `cargo test -p <crate-touchée>`.
 
 ### GameSet ordering respecté
 
@@ -108,18 +112,23 @@ app.add_systems(
 );
 ```
 
-Lock L7. Voir `crates/forgia-core/src/system_set.rs` pour la chaîne canonique.
+Lock L7. La chaîne canonique (9 étapes, Network→…→UI) vit dans
+`crates/forgia-core/src/lib.rs` (module `system_set` inline).
 
 ### 0 hardcode gameplay
 
-Toute valeur numérique gameplay vient de `config/genomes/*.toml` ou `FpsTuning`. Pas de magic number.
+Toute valeur numérique gameplay vient d'un genome TOML (`assets/genomes/*.toml`,
+`config/`) chargé via `forgia-genome-core` et hot-reloadable. Pas de magic number.
 
 ```rust
 // ❌ INTERDIT
 let damage = 25.0;
 
-// ✅ OK
-let damage = tuning.weapon_ak47_damage;
+// ✅ OK — struct tuning typée, désérialisée d'un TOML hot-reloadable
+// (pattern réel : voir forgia-damage::HitFeedbackTuning, forgia-enemy-nameplate::tuning)
+#[derive(Deserialize, TypePath)]
+pub struct WeaponTuning { pub damage: f32, /* + Default = fallback documenté */ }
+// système : assets: Res<Assets<Genome<WeaponTuning>>> → tuning.damage
 ```
 
 Exception : invariants physiques (`PI`, `EPSILON`) avec commentaire `// CONST: <invariant>`.
@@ -183,4 +192,5 @@ Phase 0-3 : Antoine owner sur tout. Pose questions sur le canal Discord/Slack du
 
 ---
 
-*Mise à jour : 2026-05-14 — V2 bootstrap, Phase 0*
+*Mise à jour : 2026-06-10 — story-593 M1 (commandes corrigées et testées, CI per-crate,
+chemin GameSet réel). Précédente : 2026-05-14 bootstrap.*
