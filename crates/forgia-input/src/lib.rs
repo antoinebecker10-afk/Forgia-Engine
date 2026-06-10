@@ -56,9 +56,17 @@ pub enum PlayerAction {
 }
 
 /// InputBlockers — blocage temporaire input (menu ouvert, dialog, console).
+///
+/// Contrat lecteur/écrivain (story-592) : chaque champ DOIT avoir au moins un
+/// écrivain ET un lecteur — un flag écrit jamais lu est un bug silencieux
+/// (audit 2026-06-10 P0-1 : block_fire écrit par forgia-ui, lu par personne →
+/// tir à travers les écrans de fin de run). `block_movement` (0/0) supprimé.
+///
+/// - `block_look` : écrit par forgia-ui (pause/defeat/victory) + forgia-mode-roguelite
+///   (hud coffre/choix), lu par forgia-player::mouse_look.
+/// - `block_fire` : écrit par forgia-ui, lu par `forgia-fps::fire_allowed`.
 #[derive(Resource, Default)]
 pub struct InputBlockers {
-    pub block_movement: bool,
     pub block_look: bool,
     pub block_fire: bool,
 }

@@ -25,6 +25,7 @@ use forgia_effects::prelude::{
     spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources, WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_input::InputBlockers;
 use forgia_juice_lib::camera_shake::{CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
 use forgia_juice_lib::fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
 use forgia_juice_lib::hit_stop::HitStopState;
@@ -369,7 +370,7 @@ impl Plugin for ForgiaFpsPlugin {
                     ammo_systems::cancel_reload_on_weapon_switch,
                     ammo_systems::reload_key_input,
                     ammo_systems::tick_ammo_reload,
-                    fire_weapon_minimal,
+                    fire_weapon_minimal.run_if(fire_allowed),
                     despawn_dead_cubes,
                 )
                     .chain()
@@ -495,6 +496,16 @@ fn track_left_mouse_state(
 // ════════════════════════════════════════════════════════════════════════════
 // fire_weapon_minimal — orchestrator firing path
 // ════════════════════════════════════════════════════════════════════════════
+
+/// Run-condition du firing path : `false` quand un écran UI capture le clic
+/// (Pause, Defeat, Victory — écrivains dans forgia-ui).
+///
+/// Story-592 (audit 2026-06-10 P0-1) : `InputBlockers.block_fire` avait
+/// 4 écrivains et 0 lecteur — cliquer « Nouvelle Run » sur l'écran de fin
+/// de run déclenchait un tir (son/VFX/munitions). Ce gate est LE lecteur.
+fn fire_allowed(blockers: Res<InputBlockers>) -> bool {
+    !blockers.block_fire
+}
 
 /// Fire system genome-driven (Forgia V2).
 ///
@@ -1143,6 +1154,40 @@ mod tests {
         assert_eq!(
             dispatch_fire_trigger("railgun", true, false, false, false),
             (false, false)
+        );
+    }
+
+    /// Régression story-592 (audit 2026-06-10 P0-1) : `block_fire=true` doit
+    /// empêcher le firing path de tourner (tir à travers Defeat/Victory/Pause).
+    /// Le probe partage exactement la même run-condition que fire_weapon_minimal.
+    #[test]
+    fn fire_blocked_when_block_fire_set() {
+        #[derive(Resource, Default)]
+        struct FireRuns(u32);
+        fn probe(mut runs: ResMut<FireRuns>) {
+            runs.0 += 1;
+        }
+
+        let mut app = App::new();
+        app.init_resource::<InputBlockers>()
+            .init_resource::<FireRuns>()
+            .add_systems(Update, probe.run_if(fire_allowed));
+
+        app.world_mut().resource_mut::<InputBlockers>().block_fire = true;
+        app.update();
+        app.update();
+        assert_eq!(
+            app.world().resource::<FireRuns>().0,
+            0,
+            "block_fire=true → le firing path ne doit jamais tourner"
+        );
+
+        app.world_mut().resource_mut::<InputBlockers>().block_fire = false;
+        app.update();
+        assert_eq!(
+            app.world().resource::<FireRuns>().0,
+            1,
+            "block_fire=false → le firing path reprend"
         );
     }
 
