@@ -3100,6 +3100,7 @@ name = "forgia"
 version = "0.1.0"
 dependencies = [
  "forgia-game",
+ "serde_json",
 ]
 
 [[package]]

@@ -204,6 +204,8 @@ workspace = true
 
 [dependencies]
 forgia-game = { path = "crates/forgia-game" }
+# Story-592 (M0.4) : panic hook -> forgia2_crash.json (echappement JSON correct).
+serde_json = { workspace = true }
 
 [[bin]]
 name = "forgia"
