@@ -15,6 +15,11 @@
   `assets/genomes/roguelite/pepin_confidence.toml` hot-reload, défauts = miroir.
 - **AC9 HUD ✅ code** : `forgia-ui-lib/hud/confidence.rs` — 10 cœurs cyan (AC8) au-dessus
   de l'énergie, visibles UNIQUEMENT Pépin en main, cœur de tête clignote 0,5 s au changement.
+  - **Fix 2026-06-11 (jauge invisible in-game)** : les glyphes texte ♥/♡ (U+2665/U+2661)
+    ne sont pas couverts par les polices egui → rien à l'écran alors que le payoff tournait
+    (log : dmg 37.0→37.7→38.4→39.2 par hit consécutif = +2 %/stack actif). Cœurs désormais
+    dessinés au painter via `draw_cartoon_heart` (energy.rs, passé `pub(crate)`) — la même
+    primitive que le HUD énergie qui, lui, était visible.
 - **AC10 ✅ code** : sensor `forgia2_pepin.json` 1Hz (stacks/peak_run/accuracy/damage_mul)
   + entrée SENSOR_REGISTRY.
 - Tests : 4 purs (apply_shot/saturations) + 4 fps (tuning miroir, mul par-arme,
