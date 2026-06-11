@@ -95,6 +95,7 @@
 | `forgia2_menu_video.json` | T0 | forgia-ui | `src/menu_video.rs:55` | 1Hz | frames fond vidéo menu, cache LRU, preroll | active |
 | `forgia2_obstacles.json` | T0 | forgia-mode-roguelite | `src/parcours_obstacles.rs:35` | 1Hz | obstacles animés + push physique — story-590 | active |
 | `forgia2_barks.json` | T0 | forgia-ui-lib | `src/hud/barks.rs` | 1Hz | barks armes parlantes : pools_loaded, played/suppressed (lock+rate), last_line_id, bulle active — story-531 AC5-7 | active |
+| `forgia2_bourrasque.json` | T0 | forgia-fps | `src/bourrasque.rs` | 1Hz | tirs Bourrasque : shots/shots_hit/shot_accuracy, pellets_fired/hits/ratio, kills — story-532 AC9 | active |
 | `forgia2_pepin.json` | T0 | forgia-fps | `src/pepin.rs` | 1Hz | jauge confiance Pépin : stacks/peak/accuracy/damage_mul — story-531 AC10 | active |
 | `forgia2_roguelite_intro.json` | T0 | forgia-mode-roguelite | `src/intro_dialogue.rs:197` | event | dialogue d'intro (bulle BD) | active |
 | `forgia2_stage_decor.json` | T0 | forgia-mode-roguelite | `src/decor.rs:51` | 1Hz | décor GLB Inferno par POI | active |

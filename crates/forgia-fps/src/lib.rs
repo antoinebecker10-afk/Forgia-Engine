@@ -39,6 +39,7 @@ use forgia_viewmodel::{
 use serde::Deserialize;
 
 mod ammo_systems;
+pub mod bourrasque;
 mod hitscan_sensor;
 pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
 pub mod pepin;
@@ -341,6 +342,8 @@ impl Plugin for ForgiaFpsPlugin {
         }
         // Story-531 — jauge de confiance Pépin (genome + update + sensor).
         app.add_plugins(pepin::ForgiaPepinPlugin);
+        // Story-532 AC9 — stats Bourrasque (observe ShotResolved/CombatHitEvent).
+        app.add_plugins(bourrasque::ForgiaBourrasquePlugin);
         app.add_plugins(score::ArenaScorePlugin)
             .init_resource::<EquippedWeapons>()
             .init_resource::<LeftMouseState>()

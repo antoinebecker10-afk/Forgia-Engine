@@ -1,10 +1,44 @@
 # Story-532 — 💨 Bourrasque Moveset Distinctive (Mission 3 GDD)
 
-> **Status** : DRAFT
+> **Status** : EN COURS — incrément 1 livré 2026-06-11 (AC1+AC9, AC6 via moteur barks)
 > **Scale BMAD** : Standard
 > **Effort estimé** : ~4 jours
 > **GDD ref** : [Mission 3 - Bourrasque](../design/gdd-roguelite-v1.md#-bourrasque--larme-chaos-proche)
 > **Prérequis** : story-528 (FPS feel)
+
+## Incrément 1 (2026-06-11) — identité de tir chaos proche
+
+- **AC1 ✅ code (couche definition, hot-reload)** : `viewmodel_arena.toml
+  [weapons.bourrasque]` converti ex-SMG Overwatch 16/s → GDD Mission 3 :
+  `pump` 1.5/s, **7 pellets cone 20°**, 8 dmg/pellet (56 bout portant), **range
+  10 m max** (falloff 4→10 m, ×0.25), mag **5** / réserve 25, reload 1.4 s,
+  juice pump (recoil 1.3° + yaw 0.15° chaos, calibration alignée Boucherie).
+  Différenciation vs Boucherie : cône plus large, cadence plus vite, dmg moindre.
+- **AC6 ✅ déjà couvert** : kill-barks Bourrasque (« WHOOSH ! Voilà ce que
+  j'appelle un kill ! »…) actifs depuis le moteur barks (story-531 AC5-7).
+- **AC9 ✅ code** : `forgia-fps/bourrasque.rs` — `BourrasqueStats` (observe
+  `ShotResolved` + `CombatHitEvent` multicast, ZÉRO modification du fire path),
+  reset OnEnter(Roguelite), sensor `forgia2_bourrasque.json` 1Hz
+  (shots/accuracy/pellets ratio/kills) + registry. 2 tests headless — 27 verts.
+- **Découverte design** : le knockback identité existe DÉJÀ partiellement —
+  sort **F « Coup de Bourrasque »** (gust 12 m + pop, CD 7 s, story-572,
+  `forgia-mode-roguelite/shockwave.rs`). AC2 « Souffle » RMB ferait doublon →
+  **décision Antoine requise** : (a) garder F seul, (b) RMB = souffle court 0 dmg
+  interrupt EN PLUS du F (remplace l'ADS de Bourrasque), (c) déplacer le gust F
+  sur RMB. AC3 TORNADE = conflit Shift=Sprint (même décision keybind que Pépin
+  « Petit cri »).
+
+### Test in-game (incrément 1)
+
+1. **Action** : run Roguelite → Digit2 (Bourrasque) → tirer à bout portant,
+   à 5 m, à 15 m sur ennemis.
+2. **Effet attendu** : pump 1,5 tir/s (plus d'auto 16/s), gerbe de 7 impacts
+   en cône large, ennemis fondent à bout portant (~2 tirs), quasi-zéro dégâts
+   au-delà de 10 m, mag de 5 + recharge rapide, kick visible.
+3. **Sensor** : `forgia2_bourrasque.json` → shots_run/pellet_hit_ratio/kills_run.
+4. **Variantes si KO** : trop faible à bout portant → `damage` 8→10 (hot-reload
+   Shift+F12 inutile, file_watcher auto) ; cône trop large → `spread_deg` 20→14 ;
+   trop puissant → `damage_falloff_start` 4→2.
 
 ## Pourquoi
 
