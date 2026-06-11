@@ -24,6 +24,7 @@ use forgia_core::prelude::*;
 pub mod atmosphere;
 pub mod audio;
 pub mod boons_apply;
+pub mod boucherie_rocket;
 pub mod coffre_sensor;
 pub mod decor;
 pub mod element_vfx;
@@ -354,6 +355,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
         );
+        // Story-534 — roquette parabolique Boucherie (le fire path forgia-fps
+        // garde ammo/recoil avec damage=0 ; ici balistique + explosion AOE).
+        app.add_plugins(boucherie_rocket::BoucherieRocketPlugin);
         // V7 M2.5 — Tag PickupCollector en Update (PAS OnEnter) car Player spawn
         // par autre plugin (forgia-player::OnEnter AppMode::InGame), ordre cross-plugin
         // non garanti. Guard idempotent via `Without<PickupCollector>` (no-op après tag).

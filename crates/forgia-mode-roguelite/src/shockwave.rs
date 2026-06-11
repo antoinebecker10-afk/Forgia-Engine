@@ -171,7 +171,7 @@ pub fn sys_shockwave_input(
             });
             let (aff, tot) = aoe_strike(
                 origin, CALIN_PUSH_RADIUS, 0.0, origin, CALIN_PUSH_SPEED, 0.0,
-                player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
             );
             spawn_disc_vfx(
                 &mut commands, &mut meshes, &mut materials, ground_center, 0.5, CALIN_PUSH_RADIUS,
@@ -188,7 +188,7 @@ pub fn sys_shockwave_input(
         WeaponType::AssaultRifle => {
             let (aff, tot) = aoe_strike(
                 origin, GUST_RADIUS, GUST_DAMAGE, origin, GUST_PUSH_SPEED, GUST_POP,
-                player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
             );
             spawn_disc_vfx(
                 &mut commands, &mut meshes, &mut materials, ground_center, 0.5, GUST_RADIUS,
@@ -202,7 +202,7 @@ pub fn sys_shockwave_input(
         WeaponType::Shotgun => {
             let (hit, tot) = line_strike(
                 origin, fwd_xz, PIERCE_RANGE, PIERCE_HALF_WIDTH, PIERCE_DAMAGE,
-                player_e, &q_bots, &mut q_health, &mut hits_w,
+                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w,
             );
             spawn_beam_vfx(
                 &mut commands, &mut meshes, &mut materials,
@@ -222,7 +222,7 @@ pub fn sys_shockwave_input(
             );
             let (aff, tot) = aoe_strike(
                 impact, BOUM_RADIUS, BOUM_DAMAGE, impact, BOUM_PUSH_SPEED, BOUM_POP,
-                player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
             );
             spawn_disc_vfx(
                 &mut commands, &mut meshes, &mut materials, impact, 0.5, BOUM_RADIUS,
@@ -236,7 +236,7 @@ pub fn sys_shockwave_input(
         _ => {
             aoe_strike(
                 origin, GUST_RADIUS, GUST_DAMAGE, origin, GUST_PUSH_SPEED, GUST_POP,
-                player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
             );
             spawn_disc_vfx(
                 &mut commands, &mut meshes, &mut materials, ground_center, 0.5, GUST_RADIUS,
@@ -254,6 +254,7 @@ pub fn sys_shockwave_input(
 /// AOE radiale autour de `center` (rayon XZ) : push depuis `push_from` (avec pop
 /// vertical en arc) et dégâts positifs via CombatHitEvent pour chaque ennemi.
 /// Renvoie `(affected, total)` pour diagnostic (affected = bots dans le rayon).
+/// `weapon` = attribution du hit (barks de kill persona + killfeed + sensors).
 #[allow(clippy::too_many_arguments)]
 fn aoe_strike(
     center: Vec3,
@@ -262,6 +263,7 @@ fn aoe_strike(
     push_from: Vec3,
     push_speed: f32,
     push_pop: f32,
+    weapon: Option<WeaponType>,
     player_e: Entity,
     q_bots: &Query<(Entity, &Transform), With<ArenaBot>>,
     q_health: &mut Query<&mut Health>,
@@ -292,7 +294,7 @@ fn aoe_strike(
             pop_height: push_pop,
             ground_y: tf.translation.y,
         });
-        deal_damage(e, tf.translation, damage, player_e, q_health, hits_w);
+        deal_damage(e, tf.translation, damage, weapon, player_e, q_health, hits_w);
     }
     (affected, total)
 }
@@ -307,6 +309,7 @@ fn line_strike(
     range: f32,
     half_width: f32,
     damage: f32,
+    weapon: Option<WeaponType>,
     player_e: Entity,
     q_bots: &Query<(Entity, &Transform), With<ArenaBot>>,
     q_health: &mut Query<&mut Health>,
@@ -327,17 +330,19 @@ fn line_strike(
             continue;
         }
         hit += 1;
-        deal_damage(e, tf.translation, damage, player_e, q_health, hits_w);
+        deal_damage(e, tf.translation, damage, weapon, player_e, q_health, hits_w);
     }
     (hit, total)
 }
 
 /// Applique des dégâts à un bot + émet `CombatHitEvent` (chiffres/flash/boons).
 /// Mort déléguée à `despawn_dead_cubes`. Skip si damage == 0 (sorts non-létaux).
+/// `weapon` attribue le hit (barks de kill persona + killfeed + sensors).
 fn deal_damage(
     e: Entity,
     bot_pos: Vec3,
     damage: f32,
+    weapon: Option<WeaponType>,
     player_e: Entity,
     q_health: &mut Query<&mut Health>,
     hits_w: &mut MessageWriter<CombatHitEvent>,
@@ -356,7 +361,7 @@ fn deal_damage(
                 is_kill: dead,
                 is_headshot: false,
                 hit_world_pos: bot_pos + Vec3::Y * 1.2,
-                weapon: None,
+                weapon,
                 body_zone: HitZone::Body,
             });
         }
@@ -364,8 +369,9 @@ fn deal_damage(
 }
 
 /// Spawn d'un disque VFX au sol (anime par sys_animate_shockwave_vfx, scale).
+/// pub(crate) : réutilisé par l'explosion roquette (boucherie_rocket.rs).
 #[allow(clippy::too_many_arguments)]
-fn spawn_disc_vfx(
+pub(crate) fn spawn_disc_vfx(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,

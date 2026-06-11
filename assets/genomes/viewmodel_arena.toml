@@ -177,7 +177,7 @@ infinite_ammo = false
 low_ammo_threshold = 0.40      # flash <= 2 (mag petit, seuil plus haut)
 
 [weapons.boucherie]
-# Slot 4 (Digit4) — Fusil à pompe (pump-action multi-pellets cone) — Boucherie
+# Slot 4 (Digit4) — LANCE-ROQUETTES parabolique (story-534 AC1, ex-pump) — Boucherie
 # Meshy axis : +Z local (vs -X autres). R_y(180)·(0,0,1)=(0,0,-1) forward.
 target_size = 1.00              # ★ réduit hipfire 1.20→1.00
 offset_x = 0.28
@@ -202,33 +202,34 @@ scope_glass_alpha_ads = 0.30
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 0.30   # body très transparent (pas d'iron sight précis)
 ads_mouse_sensitivity_factor = 0.85  # cone spread = pas besoin précision fine
-# Fire behavior — Shotgun pump Boucherie
-# TTK Overwatch/Fortnite : 1-shot kill close (≤8m) / 3-4 shots à 25m
-# 8 pellets × 18 = 144 dmg close (over-kill 100hp) / × 0.2 falloff = 28.8 dmg long range
-fire_mode = "pump"      # semi-auto avec pause pump (V1 = simple semi)
+# Fire behavior — story-534 AC1 (GDD Mission 3) : ROQUETTE parabolique.
+# damage = 0 ⇒ guard `projectile_weapon` forgia-fps : le ray hitscan ne porte
+# ni dégâts ni tracer — la roquette (boucherie_rocket.rs, 12 m/s, explosion
+# 4 m / 70 dmg + knockback pop) est spawnée sur WeaponFiredEvent.
+# Le hitscan plumbing garde : ammo, cooldown, recoil, muzzle, SFX.
+fire_mode = "pump"      # 1 roquette par pression, pause théâtrale
 burst_count = 0
-damage = 18.0          # ★ +50% per pellet : 8×18=144 close (one-shot guaranteed)
-fire_rate = 1.2        # 1 tir / 0.83s
-range = 40.0           # ★ étendu (pellets continuent en falloff au-delà 8m)
-pellets = 8            # ★ cone 8 pellets
-spread_deg = 8.0       # ★ spread cone large shotgun
+damage = 0.0           # ★ projectile : dégâts portés par l'explosion AOE
+fire_rate = 0.9        # ~1 roquette / 1.1 s
+range = 60.0           # portée du ray neutralisé (sensor log uniquement)
+pellets = 1
+spread_deg = 0.0
 sniper_scope_fullscreen = false
-# Phase F — TTK balance Fortnite (shotgun = devastating close, useless long)
-head_damage_mul = 1.2          # léger bonus head (pas focus shotgun)
-damage_falloff_start = 8.0     # full damage 0-8m (one-shot kill)
-damage_falloff_end = 25.0      # min damage 25m+
-damage_falloff_min = 0.20      # ★ -80% : 8×18×0.2 = 28.8 long range (~4 hits)
-# Phase G — Juice AAA-safe per Boucherie (shotgun gros poids) — softening v2
-shake_trauma = 0.15            # ← 0.22→0.15 (~1° peak, decay 100ms)
-recoil_pitch_deg = 1.4         # ← 2.0→1.4 (kick lourd mais pas violent)
-recoil_yaw_random_deg = 0.12   # ← 0.30→0.12 (mini cone visuel)
-fov_punch_deg = 0.8            # ← 1.2→0.8 (Fortnite pump-lite)
-# Phase H — ADS scale shrink (shotgun gros mesh = shrink agressif)
+head_damage_mul = 1.0          # sans objet (AOE = Body)
+damage_falloff_start = 60.0    # sans objet (damage 0)
+damage_falloff_end = 60.0
+damage_falloff_min = 1.0       # sans objet (damage 0)
+# Juice lance-roquettes : gros kick théâtral (le plus lourd du roster)
+shake_trauma = 0.20
+recoil_pitch_deg = 1.6
+recoil_yaw_random_deg = 0.10
+fov_punch_deg = 1.0
+# Phase H — ADS scale shrink (gros mesh = shrink agressif)
 ads_scale_factor = 0.60        # -40% taille en full ADS (mesh le plus volumineux)
-# Story-455 Phase A — Ammo Boucherie (pump shotgun shell-per-shell CoD MW Origin12)
-mag_size = 6
-reserve_max = 30               # 5 mags total
-reload_time_secs = 0.55        # durée 1 shell (boucle jusqu'à mag full ou interrupt)
+# Ammo story-534 AC1 : mag 3, reload roquette par roquette (GDD : 4 s les 3)
+mag_size = 3
+reserve_max = 15               # 5 mags total
+reload_time_secs = 1.33        # durée 1 roquette (boucle jusqu'à mag full ou interrupt)
 reload_kind = "shell_per_shell"
 infinite_ammo = false
-low_ammo_threshold = 0.34      # flash <= 2 shells (~33%)
+low_ammo_threshold = 0.34      # flash <= 1 roquette ("Plus de jouets ! Vite vite !")

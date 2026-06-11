@@ -682,6 +682,11 @@ fn fire_weapon_minimal(
 
     let range = entry.map(|e| e.range).unwrap_or(100.0);
     let damage = entry.map(|e| e.damage).unwrap_or(25.0);
+    // Story-534 — arme PROJECTILE (Boucherie) : damage<=0 dans le genome = le
+    // ray hitscan ne porte ni dégâts, ni tracer, ni impact VFX. La roquette
+    // (forgia-mode-roguelite/boucherie_rocket.rs, via WeaponFiredEvent) porte
+    // tout ça. Ammo/cooldown/recoil/muzzle restent pilotés ici.
+    let projectile_weapon = damage <= 0.0;
     let pellets = entry.map(|e| e.pellets.max(1)).unwrap_or(1);
     let spread_rad = entry.map(|e| e.spread_deg.to_radians()).unwrap_or(0.0);
     // Story-531 — payoff jauge de confiance Pépin (1.0 pour toute autre arme).
@@ -736,24 +741,27 @@ fn fire_weapon_minimal(
         let filter = QueryFilter::default().predicate(&predicate);
         let hit_result = ctx.cast_ray(origin, pellet_dir, range, true, filter);
 
-        // Tracer + impact par pellet.
+        // Tracer + impact par pellet (pas pour les armes projectile : la
+        // roquette est elle-même le visuel).
         let hit_dist = hit_result.map(|(_, t)| t).unwrap_or(range);
-        if let Some(tres) = tracer_res.as_deref() {
-            spawn_hitscan_tracer(
-                &mut commands,
-                tres,
-                origin,
-                pellet_dir,
-                hit_dist,
-                &ammo.equipped.current,
-                range.min(120.0),
-                0.30,
-            );
-        }
-        if let Some((_, toi)) = hit_result {
-            let impact_pos = origin + pellet_dir * toi;
-            if let Some(vfx) = weapon_vfx.as_deref() {
-                spawn_impact_vfx(&mut commands, vfx, impact_pos, &ammo.equipped.current);
+        if !projectile_weapon {
+            if let Some(tres) = tracer_res.as_deref() {
+                spawn_hitscan_tracer(
+                    &mut commands,
+                    tres,
+                    origin,
+                    pellet_dir,
+                    hit_dist,
+                    &ammo.equipped.current,
+                    range.min(120.0),
+                    0.30,
+                );
+            }
+            if let Some((_, toi)) = hit_result {
+                let impact_pos = origin + pellet_dir * toi;
+                if let Some(vfx) = weapon_vfx.as_deref() {
+                    spawn_impact_vfx(&mut commands, vfx, impact_pos, &ammo.equipped.current);
+                }
             }
         }
 
@@ -807,8 +815,9 @@ fn fire_weapon_minimal(
         });
 
         // Apply damage : story-457 zone-based multiplier + falloff.
+        // Armes projectile : les dégâts viennent de l'explosion AOE, pas du ray.
         if let Some((hit_collider, toi)) = hit_result {
-            if let Some(entity) = target_ancestor {
+            if let Some(entity) = target_ancestor.filter(|_| !projectile_weapon) {
                 let zone = hitscan_ctx
                     .q_zone
                     .get(hit_collider)
