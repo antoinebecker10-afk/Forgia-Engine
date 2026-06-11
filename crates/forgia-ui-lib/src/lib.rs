@@ -9,6 +9,7 @@
 //! - `dialogue` (modal dialogue UI)
 
 pub mod style;
+pub mod theme;
 pub mod hud;
 pub mod hud_ammo;
 pub mod pause_menu;

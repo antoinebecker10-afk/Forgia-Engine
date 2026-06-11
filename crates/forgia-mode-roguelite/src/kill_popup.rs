@@ -16,6 +16,7 @@ use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_core::prelude::*;
 use forgia_player::FpsCamera;
+use forgia_ui_lib::style::ease_out_back;
 
 use crate::enemies::EnemyArchetype;
 
@@ -77,16 +78,8 @@ pub fn sys_track_kill_popups(
     state.active.retain(|p| now - p.spawned_secs < POPUP_LIFETIME_SECS);
 }
 
-/// Ease-out-back canonique (overshoot 1.1 puis settle). Source : IxDF Disney 12 UI.
-fn ease_out_back(t: f32) -> f32 {
-    const C1: f32 = 1.70158;
-    const C3: f32 = C1 + 1.0;
-    let t = t.clamp(0.0, 1.0);
-    let x = t - 1.0;
-    1.0 + C3 * x * x * x + C1 * x * x
-}
-
 /// Draw les popups en EguiPrimaryContextPass. World→viewport via Camera.
+/// (ease_out_back centralisé dans `forgia_ui_lib::style` — story-596.)
 pub fn draw_kill_popups(
     mut contexts: EguiContexts,
     time: Res<Time>,

@@ -23,6 +23,8 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
+use forgia_ui_lib::style::{C_HP_HIGH, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL};
+use forgia_ui_lib::theme::display_text;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -414,32 +416,26 @@ pub fn draw_meta_shop_lobby(
     let Ok(ctx) = contexts.ctx_mut() else {
         return;
     };
-    let gold = egui::Color32::from_rgb(244, 196, 48);
-    let green = egui::Color32::from_rgb(120, 220, 140);
-    let gray = egui::Color32::from_rgb(140, 140, 150);
 
     egui::Area::new(egui::Id::new("forgia_meta_shop"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
+            // Story-596 — couleurs palette Forge partagée (étaient des littéraux
+            // locaux dupliquant FORGE_OR & co) + titre display font.
             egui::Frame::new()
-                .fill(egui::Color32::from_rgb(28, 24, 20))
+                .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(44, 30))
                 .corner_radius(egui::CornerRadius::same(14))
-                .stroke(egui::Stroke::new(4.0, gold))
+                .stroke(egui::Stroke::new(4.0, FORGE_OR))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
-                        ui.heading(
-                            egui::RichText::new("L'ENCLUME DES ÂMES")
-                                .size(38.0)
-                                .strong()
-                                .color(gold),
-                        );
+                        ui.heading(display_text("L'ENCLUME DES ÂMES", 40.0, FORGE_OR).strong());
                         ui.add_space(6.0);
                         ui.label(
-                            egui::RichText::new(format!("Âmes : {}", meta.current))
+                            egui::RichText::new(format!("◇ Âmes : {}", meta.current))
                                 .size(24.0)
                                 .strong()
-                                .color(green),
+                                .color(FORGE_TEAL),
                         );
                         ui.add_space(16.0);
                         for (i, up) in cat.upgrades.iter().enumerate() {
@@ -458,7 +454,7 @@ pub fn draw_meta_shop_lobby(
                                             max,
                                             cost
                                         ),
-                                        if afford { gold } else { gray },
+                                        if afford { FORGE_OR } else { C_TEXT_MUTED },
                                     )
                                 }
                                 None => (
@@ -466,7 +462,7 @@ pub fn draw_meta_shop_lobby(
                                         "[—]  {} — {}  (MAX {}/{})",
                                         up.name, up.desc, max, max
                                     ),
-                                    green,
+                                    C_HP_HIGH,
                                 ),
                             };
                             ui.label(egui::RichText::new(text).size(19.0).color(col));
@@ -476,7 +472,7 @@ pub fn draw_meta_shop_lobby(
                         ui.label(
                             egui::RichText::new("Touches 1-4 = acheter   ·   ENTRÉE = lancer la run")
                                 .size(18.0)
-                                .color(egui::Color32::LIGHT_GRAY),
+                                .color(C_TEXT_MUTED),
                         );
                     });
                 });

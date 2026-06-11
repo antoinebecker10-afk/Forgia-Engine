@@ -3797,6 +3797,7 @@ dependencies = [
  "forgia-input",
  "forgia-mode-roguelite",
  "forgia-rpg-data",
+ "forgia-ui-lib",
  "leafwing-input-manager",
 ]
 
@@ -3806,6 +3807,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "forgia-audio",
  "forgia-combat",
  "forgia-core",
  "forgia-damage",

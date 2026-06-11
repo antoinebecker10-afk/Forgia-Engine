@@ -27,6 +27,11 @@ pub struct ForgiaUiHudPlugin;
 
 impl Plugin for ForgiaUiHudPlugin {
     fn build(&self, app: &mut App) {
+        // Story-596 Phase A — thème global Forge (fonts + style egui), apply-once.
+        // Branché ici car ForgiaUiHudPlugin est le plugin ui-lib wiré par forgia-game.
+        if !app.is_plugin_added::<crate::theme::ForgeThemePlugin>() {
+            app.add_plugins(crate::theme::ForgeThemePlugin);
+        }
         // Story-528 AC4 — energy overlay Roguelite (rename HP→Énergie + cœurs cartoon
         // + warm fade < 30% + voiceline épuisement). Overlay non-destructif au-dessus
         // de player_hp (gated GameMode::Roguelite).

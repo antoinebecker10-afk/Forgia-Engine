@@ -19,3 +19,5 @@ forgia-effects = { workspace = true }
 forgia-mode-roguelite = { workspace = true }
 # Story-558 Phase 7 follow-up — CoffreSession Resource pour cursor toggle.
 forgia-rpg-data = { workspace = true }
+# Story-596 Phase A — palette/composants Forge (cartoon_btn, display_text) pour le menu.
+forgia-ui-lib = { workspace = true }

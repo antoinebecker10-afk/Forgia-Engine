@@ -17,6 +17,10 @@ use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_input::prelude::InputBlockers;
+use forgia_ui_lib::style::{
+    cartoon_btn, C_PRIMARY, FORGE_BOIS_CLAIR, FORGE_CREME, FORGE_METAL_CHAUD, FORGE_OR,
+};
+use forgia_ui_lib::theme::display_text;
 // Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
 pub use forgia_crosshair::CrosshairMode;
 pub use forgia_effects::hitmarker::HitmarkerState;
@@ -144,7 +148,9 @@ fn main_menu_ui(
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(8, 8, 12)))
         .show(ctx, |ui| {
-            // Fond vidéo plein écran + scrim sombre (lisibilité du titre/boutons).
+            // Fond vidéo plein écran + scrim dégradé vertical (story-596 —
+            // remplace le voile plat alpha 90 : haut léger, bas dense pour
+            // asseoir les boutons sans éteindre la vidéo).
             if let Some(id) = bg_id {
                 let rect = ui.max_rect();
                 ui.painter().image(
@@ -153,24 +159,26 @@ fn main_menu_ui(
                     egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                     egui::Color32::WHITE,
                 );
-                ui.painter().rect_filled(
-                    rect,
-                    egui::CornerRadius::same(0),
-                    egui::Color32::from_black_alpha(90),
-                );
+                let mut scrim = egui::Mesh::default();
+                let top = egui::Color32::from_black_alpha(40);
+                let bottom = egui::Color32::from_black_alpha(170);
+                scrim.colored_vertex(rect.left_top(), top);
+                scrim.colored_vertex(rect.right_top(), top);
+                scrim.colored_vertex(rect.right_bottom(), bottom);
+                scrim.colored_vertex(rect.left_bottom(), bottom);
+                scrim.add_triangle(0, 1, 2);
+                scrim.add_triangle(0, 2, 3);
+                ui.painter().add(egui::Shape::mesh(scrim));
             }
             ui.vertical_centered(|ui| {
                 ui.add_space(120.0);
-                ui.heading(
-                    egui::RichText::new("FORGIA V2")
-                        .size(64.0)
-                        .color(egui::Color32::from_rgb(255, 140, 50)),
-                );
+                // Story-596 — titre display (Lilita One) + orange Forgia canon.
+                ui.heading(display_text("FORGIA", 84.0, C_PRIMARY).strong());
                 ui.add_space(20.0);
                 ui.label(
                     egui::RichText::new("Choisis ton mode")
                         .size(24.0)
-                        .color(egui::Color32::WHITE),
+                        .color(FORGE_CREME),
                 );
                 ui.add_space(60.0);
 
@@ -183,45 +191,21 @@ fn main_menu_ui(
                 // `forgia-mode-fps-arena` (TargetCube/WaveState). Sans entrée menu,
                 // `OnEnter(Fps)` ne tire plus jamais → l'arène nue ne se spawn pas.
                 // Suppression complète du crate = refactor séparé (Roguelite en dépend).
-                if ui
-                    .add(
-                        egui::Button::new(egui::RichText::new("🗺  RPG OpenWorld").size(28.0))
-                            .min_size(egui::vec2(280.0, 60.0)),
-                    )
-                    .clicked()
-                {
+                // Story-596 — boutons cartoon partagés (bois / or CTA / métal).
+                if cartoon_btn(ui, "🗺  RPG OPENWORLD", FORGE_BOIS_CLAIR).clicked() {
                     next_game.set(GameMode::Rpg);
                     next_app.set(AppMode::InGame);
                 }
                 ui.add_space(20.0);
-                if ui
-                    .add(
-                        egui::Button::new(egui::RichText::new("🎲  Roguelite Run").size(28.0))
-                            .min_size(egui::vec2(280.0, 60.0)),
-                    )
-                    .clicked()
-                {
+                if cartoon_btn(ui, "🎲  ROGUELITE RUN", FORGE_OR).clicked() {
                     next_game.set(GameMode::Roguelite);
                     next_app.set(AppMode::InGame);
                     start_run.write(forgia_mode_roguelite::StartRunEvent { seed: None });
                 }
                 ui.add_space(40.0);
-                if ui
-                    .add(
-                        egui::Button::new(egui::RichText::new("Quitter").size(20.0))
-                            .min_size(egui::vec2(180.0, 40.0)),
-                    )
-                    .clicked()
-                {
+                if cartoon_btn(ui, "QUITTER", FORGE_METAL_CHAUD).clicked() {
                     exit.write(AppExit::Success);
                 }
-
-                ui.add_space(80.0);
-                ui.label(
-                    egui::RichText::new("Phase 1 — Hello World jouable")
-                        .size(14.0)
-                        .color(egui::Color32::GRAY),
-                );
             });
         });
 }

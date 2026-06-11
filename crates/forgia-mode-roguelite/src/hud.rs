@@ -21,6 +21,7 @@ use crate::run::{MetaSouls, RunTimer};
 use forgia_rpg_data::loot_tables::Souls as Gold;
 use forgia_ui_lib::hud_ammo::AmmoHudTuning;
 use forgia_ui_lib::style::*;
+use forgia_ui_lib::theme::{display_font, display_text};
 
 use crate::enemies::EnemyArchetype;
 use crate::run::RunState;
@@ -83,7 +84,7 @@ pub(crate) fn draw_wave_counter(
         egui::pos2(center_x, top_y + 22.0),
         egui::Align2::CENTER_CENTER,
         &main_text,
-        egui::FontId::monospace(22.0),
+        display_font(24.0),
         C_TEXT_LIGHT,
         2.0,
     );
@@ -181,7 +182,7 @@ pub(crate) fn draw_currency_counters(
             egui::pos2(rect.max.x - 12.0, rect.center().y + 5.0),
             egui::Align2::RIGHT_CENTER,
             &format!("{value}"),
-            egui::FontId::monospace(26.0),
+            display_font(26.0),
             accent,
             2.0,
         );
@@ -196,7 +197,7 @@ pub(crate) fn draw_currency_counters(
 fn boon_visual(effect: &BoonEffectKind) -> (egui::Color32, String) {
     match effect {
         BoonEffectKind::DamageMul { factor } => (
-            egui::Color32::from_rgb(231, 76, 60),
+            FORGE_BRAISE,
             format!("+{:.0}% dmg", (factor - 1.0) * 100.0),
         ),
         BoonEffectKind::FireRateMul { factor } => (
@@ -208,7 +209,7 @@ fn boon_visual(effect: &BoonEffectKind) -> (egui::Color32, String) {
             format!("+{hp:.0} PV/kill"),
         ),
         BoonEffectKind::DamageReduction { factor } => (
-            egui::Color32::from_rgb(244, 196, 48),
+            FORGE_OR,
             format!("-{:.0}% reçu", factor * 100.0),
         ),
         BoonEffectKind::ChainTargets { count } => (
@@ -273,7 +274,7 @@ pub(crate) fn draw_active_boons(
         egui::pos2(x + 12.0, y + 12.0),
         egui::Align2::LEFT_CENTER,
         "AMÉLIORATIONS",
-        egui::FontId::proportional(15.0),
+        display_font(15.0),
         FORGE_OR,
         2.0,
     );
@@ -392,22 +393,13 @@ pub(crate) fn draw_defeat_overlay(
             // Story-558 Phase 7 — overlay cartoon kid-friendly :
             // fond bois clair (pas noir grimdark) + border or 5px + shadow stack.
             // Anti-pattern documenté audit §8 : punition cosmétique Defeat = décourage.
-            egui::Frame::new()
-                .fill(FORGE_BOIS_CLAIR)
-                .inner_margin(egui::Margin::symmetric(80, 48))
-                .corner_radius(egui::CornerRadius::same(20))
-                .stroke(egui::Stroke::new(5.0, FORGE_OR))
+            forge_panel_frame()
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.add_space(4.0);
                         // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
                         // (bible v1 — vocab CE2, vocabulaire poétique enfants).
-                        ui.heading(
-                            egui::RichText::new("LA FORGE T'A BRISÉ")
-                                .size(56.0)
-                                .color(FORGE_BRAISE)
-                                .strong(),
-                        );
+                        ui.heading(display_text("LA FORGE T'A BRISÉ", 56.0, FORGE_BRAISE).strong());
                         ui.add_space(18.0);
                         // Encouragement (anti "Game Over" dépressif)
                         ui.label(
@@ -430,29 +422,13 @@ pub(crate) fn draw_defeat_overlay(
                         );
                         ui.add_space(36.0);
 
-                        let cartoon_btn =
-                            |ui: &mut egui::Ui, label: &str, fill: egui::Color32| -> bool {
-                                ui.add(
-                                    egui::Button::new(
-                                        egui::RichText::new(label)
-                                            .size(22.0)
-                                            .strong()
-                                            .color(FORGE_CHARBON),
-                                    )
-                                    .fill(fill)
-                                    .stroke(egui::Stroke::new(4.0, FORGE_CHARBON))
-                                    .corner_radius(egui::CornerRadius::same(14))
-                                    .min_size(egui::vec2(280.0, 52.0)),
-                                )
-                                .clicked()
-                            };
-
-                        if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR) {
+                        // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
+                        if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR).clicked() {
                             info!("[roguelite-hud] Defeat → Lobby (Enclume)");
                             next_run.set(RunState::Lobby);
                         }
                         ui.add_space(10.0);
-                        if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD) {
+                        if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
                             info!("[roguelite-hud] Defeat → Menu");
                             next_app.set(AppMode::Menu);
                             next_game.set(GameMode::None);
@@ -490,51 +466,45 @@ pub(crate) fn draw_victory_overlay(
     egui::Area::new(egui::Id::new("forgia_roguelite_victory"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
-            egui::Frame::new()
-                .fill(egui::Color32::from_black_alpha(220))
-                .inner_margin(egui::Margin::symmetric(80, 48))
-                .corner_radius(egui::CornerRadius::same(10))
-                .stroke(egui::Stroke::new(3.0, C_HP_HIGH))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(4.0);
-                        ui.heading(
-                            egui::RichText::new("VICTOIRE")
-                                .size(72.0)
-                                .color(C_HP_HIGH)
-                                .strong(),
-                        );
-                        ui.add_space(20.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "Boss vaincu — {} âmes gagnées cette run !",
-                                meta.earned_run
-                            ))
-                            .size(20.0)
-                            .color(C_TEXT_LIGHT),
-                        );
-                        ui.add_space(32.0);
+            // Story-596 Phase A — miroir cartoon du Defeat (bois + or, boutons
+            // partagés) : l'écran de victoire ne peut pas être moins soigné que
+            // l'écran d'échec (était : noir alpha + boutons egui par défaut).
+            forge_panel_frame().show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(4.0);
+                    ui.heading(display_text("VICTOIRE !", 64.0, FORGE_OR).strong());
+                    ui.add_space(18.0);
+                    ui.label(
+                        egui::RichText::new("Le Forgeron Noir plie le genou… pour cette fois.")
+                            .size(22.0)
+                            .italics()
+                            .color(FORGE_CHARBON),
+                    );
+                    ui.add_space(20.0);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "◇ {} âmes forgées cette run !",
+                            meta.earned_run
+                        ))
+                        .size(20.0)
+                        .strong()
+                        .color(FORGE_CHARBON)
+                        .background_color(FORGE_OR),
+                    );
+                    ui.add_space(36.0);
 
-                        let btn = |ui: &mut egui::Ui, label: &str| -> bool {
-                            ui.add(
-                                egui::Button::new(egui::RichText::new(label).size(22.0))
-                                    .min_size(egui::vec2(260.0, 46.0)),
-                            )
-                            .clicked()
-                        };
-
-                        if btn(ui, "↻ L'Enclume des Âmes") {
-                            info!("[roguelite-hud] Victory → Lobby (Enclume)");
-                            next_run.set(RunState::Lobby);
-                        }
-                        ui.add_space(8.0);
-                        if btn(ui, "✕ Retour au Menu") {
-                            info!("[roguelite-hud] Victory → Menu");
-                            next_app.set(AppMode::Menu);
-                            next_game.set(GameMode::None);
-                        }
-                    });
+                    if cartoon_btn(ui, "↻  L'ENCLUME DES ÂMES", FORGE_OR).clicked() {
+                        info!("[roguelite-hud] Victory → Lobby (Enclume)");
+                        next_run.set(RunState::Lobby);
+                    }
+                    ui.add_space(10.0);
+                    if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
+                        info!("[roguelite-hud] Victory → Menu");
+                        next_app.set(AppMode::Menu);
+                        next_game.set(GameMode::None);
+                    }
                 });
+            });
         });
 }
 
@@ -609,15 +579,10 @@ pub(crate) fn draw_portal_overlay(
 // ─── Bark bubble (Story-482 — floating text overlay armes parlantes) ───────
 
 /// Couleur RGBA du label speaker, alignée avec persona genome.
-/// Tier 2 audio (story future) gardera la même palette pour cohérence visuelle/sonore.
+/// Story-596 — délègue à la source unique `forge_persona_color` (style.rs) :
+/// les valeurs locales avaient drifté (Pépin (120,220,130) vs (122,201,130)).
 pub fn speaker_color(speaker: &str) -> egui::Color32 {
-    match speaker {
-        "pepin" => egui::Color32::from_rgb(120, 220, 130), // vert frais (timide)
-        "bourrasque" => egui::Color32::from_rgb(110, 180, 240), // bleu vent
-        "lenoir" => egui::Color32::from_rgb(180, 130, 220), // violet noble
-        "boucherie" => egui::Color32::from_rgb(230, 110, 110), // rouge sang
-        _ => egui::Color32::from_rgb(180, 180, 180),       // gris fallback "any"
-    }
+    forge_persona_color(speaker)
 }
 
 /// Label affiché (capitalisé, lisible).
@@ -804,16 +769,8 @@ pub(crate) fn draw_boss_enrage_banner(
     } else {
         1.0
     };
-    // Pop scale ease-out-back sur intro 200ms.
-    let pop_t = (lifetime_t / 0.10).min(1.0);
-    let pop_scale = if pop_t < 1.0 {
-        let x = pop_t - 1.0;
-        const C1: f32 = 1.70158;
-        const C3: f32 = C1 + 1.0;
-        1.0 + C3 * x * x * x + C1 * x * x
-    } else {
-        1.0
-    };
+    // Pop scale ease-out-back sur intro 200ms (helper partagé story-596).
+    let pop_scale = ease_out_back((lifetime_t / 0.10).min(1.0));
 
     egui::Area::new(egui::Id::new("forgia_roguelite_boss_enrage_banner"))
         .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 96.0))
@@ -1295,24 +1252,20 @@ pub(crate) fn draw_zone_reward_cards(
     egui::Area::new(egui::Id::new("forgia_zone_reward"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
+            // Story-596 — fonds harmonisés palette Forge (étaient gris-violet ad hoc).
             egui::Frame::new()
-                .fill(egui::Color32::from_rgb(28, 26, 34))
+                .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(40, 28))
                 .corner_radius(egui::CornerRadius::same(16))
-                .stroke(egui::Stroke::new(4.0, egui::Color32::from_rgb(244, 196, 48)))
+                .stroke(egui::Stroke::new(4.0, FORGE_OR))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
-                        ui.heading(
-                            egui::RichText::new(heading)
-                                .size(34.0)
-                                .strong()
-                                .color(egui::Color32::WHITE),
-                        );
+                        ui.heading(display_text(heading, 34.0, FORGE_CREME).strong());
                         ui.add_space(16.0);
                         ui.horizontal(|ui| {
                             for (i, (title, subtitle, col)) in cards.iter().enumerate() {
                                 egui::Frame::new()
-                                    .fill(egui::Color32::from_rgb(40, 38, 48))
+                                    .fill(FORGE_PANEL_LIGHT)
                                     .inner_margin(egui::Margin::same(16))
                                     .corner_radius(egui::CornerRadius::same(10))
                                     .stroke(egui::Stroke::new(3.0, *col))
@@ -1320,10 +1273,8 @@ pub(crate) fn draw_zone_reward_cards(
                                         ui.set_width(180.0);
                                         ui.vertical_centered(|ui| {
                                             ui.label(
-                                                egui::RichText::new(format!("{}", i + 1))
-                                                    .size(30.0)
-                                                    .strong()
-                                                    .color(*col),
+                                                display_text(format!("{}", i + 1), 30.0, *col)
+                                                    .strong(),
                                             );
                                             ui.add_space(6.0);
                                             ui.label(
@@ -1349,7 +1300,7 @@ pub(crate) fn draw_zone_reward_cards(
                         ui.label(
                             egui::RichText::new(&prompt)
                                 .size(18.0)
-                                .color(egui::Color32::LIGHT_GRAY),
+                                .color(C_TEXT_MUTED),
                         );
                     });
                 });

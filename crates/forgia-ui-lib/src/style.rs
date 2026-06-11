@@ -206,6 +206,11 @@ pub const FORGE_CHARBON: Color32 = Color32::from_rgb(43, 24, 16);
 pub const FORGE_CREME: Color32 = Color32::from_rgb(255, 244, 220);
 /// Healing, mana, qualité commune-plus.
 pub const FORGE_TEAL: Color32 = Color32::from_rgb(60, 174, 163);
+/// Fond panneau « charbon chaud » (modaux sombres : Enclume, reward cards).
+/// Story-596 — remplace les littéraux (28,26,34)/(28,24,20) dispersés.
+pub const FORGE_PANEL: Color32 = Color32::from_rgb(36, 28, 22);
+/// Variante éclaircie de [`FORGE_PANEL`] (cartes internes d'un modal).
+pub const FORGE_PANEL_LIGHT: Color32 = Color32::from_rgb(52, 42, 34);
 
 // Rarity colors — convention Hearthstone/Diablo (universellement lisible
 // enfants). Override des couleurs HUD générique pour le Coffre.
@@ -271,4 +276,40 @@ pub fn forge_persona_color(speaker: &str) -> Color32 {
         "forgeron_noir" => FORGE_PERSONA_NOIR,
         _ => FORGE_METAL_CHAUD,
     }
+}
+
+// ─── Composants partagés (story-596 Phase A) ────────────────────────────
+
+/// Ease-out-back canonique (overshoot ~1.1 puis settle). Source : IxDF Disney
+/// 12 UI principles. Centralisé ici — était copié dans kill_popup + hud enrage.
+pub fn ease_out_back(t: f32) -> f32 {
+    const C1: f32 = 1.70158;
+    const C3: f32 = C1 + 1.0;
+    let t = t.clamp(0.0, 1.0);
+    let x = t - 1.0;
+    1.0 + C3 * x * x * x + C1 * x * x
+}
+
+/// Bouton cartoon Forge : display font, texte charbon, stroke charbon 4px,
+/// coins 14, 280×52. Extrait du Defeat overlay (story-558 Phase 7) pour
+/// réutilisation Victory / menu principal / Enclume.
+pub fn cartoon_btn(ui: &mut egui::Ui, label: &str, fill: Color32) -> egui::Response {
+    ui.add(
+        egui::Button::new(
+            crate::theme::display_text(label, 22.0, FORGE_CHARBON).strong(),
+        )
+        .fill(fill)
+        .stroke(Stroke::new(4.0, FORGE_CHARBON))
+        .corner_radius(egui::CornerRadius::same(14))
+        .min_size(egui::vec2(280.0, 52.0)),
+    )
+}
+
+/// Frame modal cartoon « bois + or » (pattern Defeat/Coffre, bible v1).
+pub fn forge_panel_frame() -> egui::Frame {
+    egui::Frame::new()
+        .fill(FORGE_BOIS_CLAIR)
+        .inner_margin(egui::Margin::symmetric(80, 48))
+        .corner_radius(egui::CornerRadius::same(20))
+        .stroke(Stroke::new(5.0, FORGE_OR))
 }

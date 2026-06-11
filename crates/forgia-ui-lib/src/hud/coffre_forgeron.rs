@@ -30,6 +30,7 @@ use forgia_rpg_data::loot_tables::Souls;
 const REROLL_COST: u32 = 30;
 
 use crate::style::*;
+use crate::theme::display_text;
 
 pub struct CoffreForgeronPlugin;
 
@@ -95,12 +96,8 @@ fn draw_coffre(
                 ui.set_min_size(egui::vec2(panel_w, panel_h));
                 ui.vertical_centered(|ui| {
                     // Story-558 Phase 7 — header cartoon : titre charbon gros sur bois.
-                    ui.label(
-                        egui::RichText::new("⚒  LE MAÎTRE FORGERON")
-                            .size(28.0)
-                            .strong()
-                            .color(FORGE_CHARBON),
-                    );
+                    // Story-596 — display font (Lilita One).
+                    ui.label(display_text("⚒  LE MAÎTRE FORGERON", 28.0, FORGE_CHARBON).strong());
                     let voiceline = if session_res.maitre_voiceline.is_empty() {
                         "Choisis ta bénédiction, petit forgeron !"
                     } else {
