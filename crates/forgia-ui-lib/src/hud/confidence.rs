@@ -12,7 +12,7 @@ use forgia_combat::confidence::PepinConfidence;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_core::prelude::*;
 
-use crate::style::*;
+use super::energy::draw_cartoon_heart;
 
 /// Cyan Pépin (AC8 — couleur dominante de la persona).
 const C_PEPIN: egui::Color32 = egui::Color32::from_rgb(80, 220, 255);
@@ -61,7 +61,11 @@ pub(crate) fn draw_confidence_hearts(
         1.0
     };
 
+    // Cœurs dessinés au painter (draw_cartoon_heart) — PAS en glyphe texte :
+    // ♥/♡ ne sont pas couverts par les polices egui (jauge invisible, vu runtime
+    // 2026-06-11 alors que le payoff +2 %/stack tournait dans le log).
     let heart_spacing = 16.0;
+    let heart_size = 9.0;
     let stacks = usize::from(conf.stacks);
     for i in 0..10usize {
         let filled = i < stacks;
@@ -81,14 +85,12 @@ pub(crate) fn draw_confidence_hearts(
             C_PEPIN.b(),
             alpha,
         );
-        text_with_outline(
+        draw_cartoon_heart(
             &painter,
-            egui::pos2(left_x + i as f32 * heart_spacing, base_y),
-            egui::Align2::LEFT_CENTER,
-            if filled { "♥" } else { "♡" },
-            egui::FontId::proportional(13.0),
+            left_x + heart_size * 0.5 + i as f32 * heart_spacing,
+            base_y,
+            heart_size,
             color,
-            1.0,
         );
     }
 }

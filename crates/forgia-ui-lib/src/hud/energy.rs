@@ -147,7 +147,9 @@ pub(crate) fn sys_energy_exhaustion_voiceline(
 
 /// Cœur cartoon stylisé : 2 demi-disques + triangle inversé. Approximation
 /// avec painter.circle_filled + line_segment pour rester simple.
-fn draw_cartoon_heart(
+/// Partagé avec la jauge de confiance Pépin (confidence.rs) — les glyphes
+/// texte ♥/♡ ne sont pas couverts par les polices egui, on dessine la forme.
+pub(crate) fn draw_cartoon_heart(
     painter: &egui::Painter,
     cx: f32,
     cy: f32,
