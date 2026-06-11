@@ -7,7 +7,11 @@
 # Garde-fous : speed 3-9 raisonnable (5=base), jump 5-9, gravity 12-25.
 
 # Vitesse horizontale (m/s), avant multiplicateur ADS (0.65 en visée).
-speed = 5.0
+# 2026-06-11 : 5.0 -> 6.5, feedback Antoine "trop lent". Défaut Rust reste 5.0 (filet si TOML absent).
+speed = 6.5
+
+# Multiplicateur sprint (Shift gauche tenu, hors ADS). 1.0 = désactivé.
+sprint_multiplier = 1.5
 
 # Vélocité verticale au saut (m/s).
 jump_velocity = 6.5

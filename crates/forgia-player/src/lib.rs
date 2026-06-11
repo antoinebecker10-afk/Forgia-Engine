@@ -43,6 +43,8 @@ pub mod prelude {
 pub struct PlayerMovementTuning {
     /// Vitesse de déplacement horizontale (m/s), avant MovementSpeedMultiplier (ADS).
     pub speed: f32,
+    /// Multiplicateur sprint (Shift tenu, hors ADS). 1.0 = sprint désactivé.
+    pub sprint_multiplier: f32,
     /// Vélocité verticale au saut (m/s).
     pub jump_velocity: f32,
     /// Gravité appliquée en l'air (m/s²) — le KCC n'utilise pas la gravité Rapier.
@@ -62,6 +64,9 @@ impl Default for PlayerMovementTuning {
         // c'est le filet anti-régression si le TOML manque ou est invalide.
         Self {
             speed: 5.0,
+            // Sprint ajouté 2026-06-11 (post-594) : pas de littéral pré-genome,
+            // le défaut active le sprint même si le TOML est absent.
+            sprint_multiplier: 1.5,
             jump_velocity: 6.5,
             gravity: 18.0,
             max_fall_speed: 30.0,
@@ -494,7 +499,10 @@ fn player_movement(
         return;
     };
     // Story-594 : valeurs genome (assets/genomes/player_movement.toml, hot-reload).
-    let speed = tuning.speed * speed_mul.0;
+    // Sprint (Shift) : bloqué en ADS (speed_mul < 1.0 = visée, convention CoD).
+    let sprinting = action.pressed(&PlayerAction::Sprint) && speed_mul.0 >= 1.0;
+    let sprint_mul = if sprinting { tuning.sprint_multiplier } else { 1.0 };
+    let speed = tuning.speed * speed_mul.0 * sprint_mul;
     let jump_velocity = tuning.jump_velocity;
     let gravity = tuning.gravity;
     let max_fall_speed = tuning.max_fall_speed;
@@ -630,6 +638,7 @@ mod tests {
     fn movement_tuning_defaults_mirror_pre_genome_literals() {
         let t = PlayerMovementTuning::default();
         assert_eq!(t.speed, 5.0);
+        assert_eq!(t.sprint_multiplier, 1.5); // post-594 (2026-06-11), pas de littéral pré-genome
         assert_eq!(t.jump_velocity, 6.5);
         assert_eq!(t.gravity, 18.0);
         assert_eq!(t.max_fall_speed, 30.0);
