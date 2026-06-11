@@ -139,18 +139,23 @@ fn load_bark_genome(mut state: ResMut<BarkTuningHandleState>, asset_server: Res<
 }
 
 fn sync_bark_library(
+    mut events: MessageReader<AssetEvent<Genome<BarkGenome>>>,
     state: Res<BarkTuningHandleState>,
     assets: Res<Assets<Genome<BarkGenome>>>,
     mut library: ResMut<BarkLibrary>,
 ) {
+    // Resync sur Added (boot) ET Modified (hot-reload file_watcher). Un proxy
+    // « taille des pools » raterait les changements de tuning seuls (bug vu
+    // 2026-06-11 : bark_chance_on_kill édité à chaud jamais appliqué).
+    let dirty = events
+        .read()
+        .any(|e| matches!(e, AssetEvent::Added { .. } | AssetEvent::Modified { .. }));
+    if !dirty {
+        return;
+    }
     let Some(g) = state.0.as_ref().and_then(|h| assets.get(h)) else {
         return;
     };
-    // Sync à chaque frame est inutile : ne recopier que si le contenu a bougé
-    // (taille pools = proxy suffisant, hot-reload recharge l'asset entier).
-    if library.pools.len() == g.data.pool.len() && !library.pools.is_empty() {
-        return;
-    }
     library.pools = g.data.pool.clone();
     library.tuning = tuning_from(&g.data.genes);
     info!(
@@ -182,6 +187,10 @@ pub struct BarkEngine {
     /// Timestamps des barks joués (fenêtre 60 s pour le plafond par minute).
     pub recent: VecDeque<f32>,
     pub rng: u64,
+    /// Kills d'une arme parlante VUS par le trigger (avant tirage de chance) —
+    /// distingue « pas d'événement » de « pas de chance » dans le sensor.
+    pub kills_seen: u32,
+    pub skipped_chance: u32,
     pub played_total: u32,
     pub suppressed_lock: u32,
     pub suppressed_rate: u32,
@@ -196,6 +205,8 @@ impl Default for BarkEngine {
             lock_until: 0.0,
             recent: VecDeque::new(),
             rng: 0x9E37_79B9_7F4A_7C15,
+            kills_seen: 0,
+            skipped_chance: 0,
             played_total: 0,
             suppressed_lock: 0,
             suppressed_rate: 0,
@@ -290,8 +301,10 @@ fn sys_trigger_kill_barks(
         let Some(speaker) = hit.weapon.and_then(speaker_for) else {
             continue;
         };
+        engine.kills_seen += 1;
         // P(bark) — un kill silencieux est normal (anti-fatigue, Hadès).
         if roll01(&mut engine.rng) >= library.tuning.chance_on_kill {
+            engine.skipped_chance += 1;
             continue;
         }
         engine.recent.retain(|t| now - t < 60.0);
@@ -423,10 +436,12 @@ fn sys_write_barks_sensor(
         .map(|a| a.text.as_str())
         .unwrap_or("");
     let json = format!(
-        r#"{{"id":"barks","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"pools_loaded":{},"chance_on_kill":{:.2},"played_total":{},"suppressed_lock":{},"suppressed_rate":{},"last_line_id":"{}","active_text":"{}"}}"#,
+        r#"{{"id":"barks","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"pools_loaded":{},"chance_on_kill":{:.2},"kills_seen":{},"skipped_chance":{},"played_total":{},"suppressed_lock":{},"suppressed_rate":{},"last_line_id":"{}","active_text":"{}"}}"#,
         time.elapsed_secs(),
         library.pools.len(),
         library.tuning.chance_on_kill,
+        engine.kills_seen,
+        engine.skipped_chance,
         engine.played_total,
         engine.suppressed_lock,
         engine.suppressed_rate,
@@ -582,6 +597,7 @@ lines = [
         app.update();
 
         let engine = app.world().resource::<BarkEngine>();
+        assert_eq!(engine.kills_seen, 2, "les 2 kills sont comptés");
         assert_eq!(engine.played_total, 1, "1er kill parle");
         assert_eq!(engine.suppressed_lock, 1, "2e kill même frame = lock");
         let active = engine.active.as_ref().expect("bulle active");
