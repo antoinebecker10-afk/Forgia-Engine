@@ -65,7 +65,7 @@ infinite_ammo = false
 low_ammo_threshold = 0.25      # flash <= 3 bullets
 
 [weapons.bourrasque]
-# Slot 2 (Digit2) — Chaos proche 7 pellets cone (story-532 AC1, ex-SMG) — Bourrasque
+# Slot 2 (Digit2) — Lance-rafales de vent, auto 4/s × 5 pellets (story-532 AC1 v2) — Bourrasque
 target_size = 0.90              # ★ réduit hipfire 1.10→0.90
 offset_x = 0.22
 offset_y = -0.35
@@ -89,36 +89,36 @@ scope_glass_alpha_ads = 0.20
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 0.40   # body semi-transparent SMG
 ads_mouse_sensitivity_factor = 0.70  # cadence rapide, précision moyenne
-# Fire behavior — story-532 AC1 (GDD Mission 3) : l'arme CHAOS PROCHE.
-# Ex-SMG Overwatch 16/s (pré-pivot) → 7 pellets cone 20°, courte portée brutale.
-# 7×8 = 56 dmg bout portant / ×0.25 à 10 m = 14 (les pellets d'air s'essoufflent).
-# Différenciation vs Boucherie (pump lourd one-shot 8m) : cône plus LARGE,
-# cadence plus rapide (1.5/s vs 1.2), dmg moindre — on danse, on ne one-shot pas.
-fire_mode = "pump"
+# Fire behavior — story-532 AC1 v2 (feedback user 2026-06-11 : le pump 1.5/s
+# « fait trop fusil à pompe » = redondant Boucherie). Bourrasque = LANCE-RAFALES :
+# jet de vent CONTINU, auto 4/s × 5 pellets en cône serré — unique au roster
+# (Pépin semi précis, Lenoir sniper, Boucherie pump lourd, Bourrasque = souffle).
+# 5×6 = 30/rafale bout portant (DPS 120 close), ×0.25 à 12 m = 7.5.
+fire_mode = "auto"
 burst_count = 0
-damage = 8.0            # par pellet (GDD : 8 dmg/pellet)
-fire_rate = 1.5         # GDD : 1.5 tirs/s — pump rapide joyeux
-range = 10.0            # GDD : 10 m MAX — identité close-range
-pellets = 7             # GDD : 7 pellets
-spread_deg = 20.0       # GDD : cone 20° (déviation ±10° par axe) — plus large que Boucherie
+damage = 6.0            # par pellet (5×6 = 30 par rafale)
+fire_rate = 4.0         # rafales de vent continues — ni SMG 16/s ni pump 1.5/s
+range = 12.0            # courte portée identitaire (l'air s'essouffle)
+pellets = 5             # petite gerbe par rafale
+spread_deg = 12.0       # cône serré = jet de vent, pas blast de pompe
 sniper_scope_fullscreen = false
-head_damage_mul = 1.2          # cone weapon = pas focus headshot (miroir Boucherie)
-damage_falloff_start = 4.0     # full damage 0-4m (cœur de la danse)
-damage_falloff_end = 10.0      # mort des pellets à 10m
-damage_falloff_min = 0.25      # 56→14 en bout de course
-# Juice pump (calibration alignée Boucherie 1.4 / Lenoir 1.2 post-softening)
-shake_trauma = 0.14
-recoil_pitch_deg = 1.3         # kick pump visible (GDD "4°" recalibré échelle actuelle)
-recoil_yaw_random_deg = 0.15   # léger chaos horizontal — signature Bourrasque
-fov_punch_deg = 0.7
+head_damage_mul = 1.2          # cone weapon = pas focus headshot
+damage_falloff_start = 5.0     # full damage 0-5m (cœur de la danse)
+damage_falloff_end = 12.0      # mort des pellets à 12m
+damage_falloff_min = 0.25
+# Juice vent : léger et vibrant (auto 4/s — pas de gros kick pump)
+shake_trauma = 0.05
+recoil_pitch_deg = 0.35
+recoil_yaw_random_deg = 0.25   # wobble horizontal — chaos joyeux signature
+fov_punch_deg = 0.0
 ads_scale_factor = 0.65        # -35% taille en full ADS
-# Ammo story-532 AC1 : mag 5, pump théâtral
-mag_size = 5
-reserve_max = 25               # 5 mags total
-reload_time_secs = 1.4         # pump clic-clac, plus vif que SMG mag
+# Ammo v2 : mag 20 = 5 s de vent continu, recharge vive
+mag_size = 20
+reserve_max = 100              # 5 mags total
+reload_time_secs = 1.6
 reload_kind = "mag"
 infinite_ammo = false
-low_ammo_threshold = 0.4       # flash <= 2 cartouches ("Saperlipopette, faut recharger !")
+low_ammo_threshold = 0.25      # flash <= 5 ("Saperlipopette, faut recharger !")
 
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir

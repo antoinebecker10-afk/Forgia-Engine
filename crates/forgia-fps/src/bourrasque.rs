@@ -21,7 +21,8 @@ pub const BOURRASQUE_WEAPON: WeaponType = WeaponType::AssaultRifle;
 
 const SENSOR_PATH: &str = "forgia2_bourrasque.json";
 /// Doit suivre `pellets` du genome (sensor only — le gameplay lit le genome).
-const PELLETS_PER_SHOT: u32 = 7;
+/// v2 lance-rafales 2026-06-11 : 5 pellets (le pump 7 « faisait trop pompe »).
+const PELLETS_PER_SHOT: u32 = 5;
 
 /// Stats de la run courante — Resource globale (1 joueur).
 #[derive(Resource, Debug, Default, Clone, Copy)]

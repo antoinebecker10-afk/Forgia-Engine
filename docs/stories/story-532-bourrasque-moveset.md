@@ -8,12 +8,15 @@
 
 ## Incrément 1 (2026-06-11) — identité de tir chaos proche
 
-- **AC1 ✅ code (couche definition, hot-reload)** : `viewmodel_arena.toml
-  [weapons.bourrasque]` converti ex-SMG Overwatch 16/s → GDD Mission 3 :
-  `pump` 1.5/s, **7 pellets cone 20°**, 8 dmg/pellet (56 bout portant), **range
-  10 m max** (falloff 4→10 m, ×0.25), mag **5** / réserve 25, reload 1.4 s,
-  juice pump (recoil 1.3° + yaw 0.15° chaos, calibration alignée Boucherie).
-  Différenciation vs Boucherie : cône plus large, cadence plus vite, dmg moindre.
+- **AC1 ✅ v2 VALIDÉE 2026-06-11 (« C'est mieux! »)** : `viewmodel_arena.toml
+  [weapons.bourrasque]`. v1 = pump 1.5/s × 7 pellets cone 20° (lecture littérale
+  GDD) → feedback user « **ça fait trop fusil à pompe** » (redondant Boucherie).
+  **v2 = LANCE-RAFALES de vent** : `auto` 4/s × **5 pellets cône serré 12°**,
+  6 dmg/pellet (30/rafale, DPS 120 close), range 12 m (falloff 5→12, ×0.25),
+  mag 20 (5 s de souffle continu) / réserve 100, reload 1.6 s, juice léger +
+  wobble yaw 0.25° (pas de kick pump). Unique au roster : Pépin semi précis /
+  Lenoir sniper / Boucherie pump / **Bourrasque souffle continu**. Itération
+  full hot-reload (file_watcher), validée en live sans rebuild.
 - **AC6 ✅ déjà couvert** : kill-barks Bourrasque (« WHOOSH ! Voilà ce que
   j'appelle un kill ! »…) actifs depuis le moteur barks (story-531 AC5-7).
 - **AC9 ✅ code** : `forgia-fps/bourrasque.rs` — `BourrasqueStats` (observe
