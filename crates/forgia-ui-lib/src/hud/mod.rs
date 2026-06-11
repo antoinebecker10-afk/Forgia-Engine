@@ -12,6 +12,7 @@ use bevy::prelude::*;
 // `forgia-enemy-nameplate` (3D billboard world-space, custom Material possible).
 // L'egui screen-space ne pouvait pas occluder derrière les murs ni gérer
 // les distances en world units.
+mod barks;
 mod coffre_forgeron;
 mod confidence;
 mod energy;
@@ -40,6 +41,9 @@ impl Plugin for ForgiaUiHudPlugin {
             coffre_forgeron::CoffreForgeronPlugin,
             // Story-531 AC9 — cœurs de confiance Pépin (visible arme en main).
             confidence::ConfidenceHudPlugin,
+            // Story-531 AC5-7 incrément kill — barks armes parlantes (bulle
+            // persona sur kill, consomme roguelite_dialogue.toml).
+            barks::WeaponBarksPlugin,
         ));
     }
 }

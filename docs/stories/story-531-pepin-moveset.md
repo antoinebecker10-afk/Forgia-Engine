@@ -25,10 +25,20 @@
   + entrée SENSOR_REGISTRY.
 - Tests : 4 purs (apply_shot/saturations) + 4 fps (tuning miroir, mul par-arme,
   disabled, App headless multi-armes) — 69 verts sur les 3 crates, clippy 0.
+- **AC5-7 incrément kill ✅ code (2026-06-11)** : `forgia-ui-lib/hud/barks.rs` — le
+  genome `roguelite_dialogue.toml` (dormant depuis l'abandon 471-479) est ENFIN
+  consommé. Trigger = `CombatHitEvent{is_kill, weapon}` (multicast, killfeed non
+  affecté) → l'arme qui tue parle pour les **4 personas** (pools kill existants).
+  Pattern Hadès : P(bark)=0.30, tirage pondéré, cooldown par ligne, lock global
+  2,5 s anti-overlap, plafond 12/min anti-fatigue — tout genome hot-reload. Bulle
+  cartoon bas-droite, liseré couleur persona, fade-out. Sensor `forgia2_barks.json`
+  + registry. 5 tests (parse TOML réel, tirage déterministe, gate, mapping, App
+  headless kill→bark+lock) — 12/12 verts, clippy 0.
 - **Restent** (incréments suivants) : AC2 ADS accuracy ×2 static, AC3 « Petit cri »
-  (⚠ Shift = déjà Sprint, keybind à trancher), AC4 anims viewmodel, AC5-7 voicelines
-  popup (système popup = forgia-mode-roguelite, claimé multi-terminal), AC1 audit stats
-  genome vs GDD (15 dmg/mag 12/4 par s), tracer cyan 100 ms (AC8 partiel).
+  (⚠ Shift = déjà Sprint, keybind à trancher), AC4 anims viewmodel, AC5-7 events
+  restants (fire « PIOU ! » = pas de pool fire dans le TOML actuellement, lowhp,
+  idle, reload, swap, pickup — le moteur barks les accepte déjà, manque les triggers),
+  AC1 audit stats genome vs GDD (15 dmg/mag 12/4 par s), tracer cyan 100 ms (AC8 partiel).
 
 ### Test in-game (incrément 1)
 
