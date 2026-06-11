@@ -1,6 +1,7 @@
 # Story-531 — 🔫 Pépin Moveset Distinctive (Mission 3 GDD)
 
-> **Status** : EN COURS — incrément 1 livré 2026-06-10 (AC9+AC10, M2-A2 session 1)
+> **Status** : EN COURS — incrément 1 livré 2026-06-10 + **VALIDÉ RUNTIME 2026-06-11**
+> (user « ok parfait » : cœurs visibles, peak_run=10 atteint, dmg 37.0→44.4 = ×1,20 confirmé log+sensor)
 > **Scale BMAD** : Standard
 > **Effort estimé** : ~4 jours
 > **GDD ref** : [Mission 3 - Pépin](../design/gdd-roguelite-v1.md#-pépin--larme-accessible)
