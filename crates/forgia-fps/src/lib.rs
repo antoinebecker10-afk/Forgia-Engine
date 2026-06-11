@@ -41,6 +41,7 @@ use serde::Deserialize;
 mod ammo_systems;
 pub mod bourrasque;
 mod hitscan_sensor;
+pub mod lenoir;
 pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
 pub mod pepin;
 mod score;
@@ -344,6 +345,8 @@ impl Plugin for ForgiaFpsPlugin {
         app.add_plugins(pepin::ForgiaPepinPlugin);
         // Story-532 AC9 — stats Bourrasque (observe ShotResolved/CombatHitEvent).
         app.add_plugins(bourrasque::ForgiaBourrasquePlugin);
+        // Story-533 AC10 — stats Lenoir (HS ratio, même pattern observe-only).
+        app.add_plugins(lenoir::ForgiaLenoirPlugin);
         app.add_plugins(score::ArenaScorePlugin)
             .init_resource::<EquippedWeapons>()
             .init_resource::<LeftMouseState>()

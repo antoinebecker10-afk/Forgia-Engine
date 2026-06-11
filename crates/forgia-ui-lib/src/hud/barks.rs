@@ -16,6 +16,7 @@ use std::fs;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_combat::combat_juice::CombatHitEvent;
+use forgia_combat::confidence::ShotResolved;
 use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
@@ -25,6 +26,9 @@ use crate::style::{forge_persona_color, FORGE_CREME};
 
 const SENSOR_PATH: &str = "forgia2_barks.json";
 const BARK_EVENT_KILL: &str = "kill";
+/// Tir raté (mur/vide) — seuls les speakers avec un pool `miss` jugent
+/// (story-533 AC7 : Madame Lenoir, « Lamentable. »).
+const BARK_EVENT_MISS: &str = "miss";
 /// Durée d'affichage : base + lecture (~12 chars/s), bornée.
 const BARK_BASE_SECS: f32 = 1.6;
 const BARK_PER_CHAR_SECS: f32 = 0.045;
@@ -95,6 +99,7 @@ pub struct BarkGenome {
 #[derive(Clone, Debug)]
 pub struct BarkTuning {
     pub chance_on_kill: f32,
+    pub chance_on_miss: f32,
     pub speaker_lock_sec: f32,
     pub max_per_minute: usize,
 }
@@ -103,6 +108,7 @@ impl Default for BarkTuning {
     fn default() -> Self {
         Self {
             chance_on_kill: 0.30,
+            chance_on_miss: 0.35,
             speaker_lock_sec: 2.5,
             max_per_minute: 12,
         }
@@ -119,6 +125,7 @@ pub fn tuning_from(genes: &[BarkGene]) -> BarkTuning {
     let d = BarkTuning::default();
     BarkTuning {
         chance_on_kill: get("bark_chance_on_kill", d.chance_on_kill),
+        chance_on_miss: get("bark_chance_on_miss", d.chance_on_miss),
         speaker_lock_sec: get("bark_global_speaker_lock_sec", d.speaker_lock_sec),
         max_per_minute: get("bark_global_max_per_minute", d.max_per_minute as f32) as usize,
     }
@@ -190,6 +197,8 @@ pub struct BarkEngine {
     /// Kills d'une arme parlante VUS par le trigger (avant tirage de chance) —
     /// distingue « pas d'événement » de « pas de chance » dans le sensor.
     pub kills_seen: u32,
+    /// Tirs ratés vus (story-533 AC7 — pools `miss`).
+    pub misses_seen: u32,
     pub skipped_chance: u32,
     pub played_total: u32,
     pub suppressed_lock: u32,
@@ -206,6 +215,7 @@ impl Default for BarkEngine {
             recent: VecDeque::new(),
             rng: 0x9E37_79B9_7F4A_7C15,
             kills_seen: 0,
+            misses_seen: 0,
             skipped_chance: 0,
             played_total: 0,
             suppressed_lock: 0,
@@ -270,12 +280,94 @@ pub(crate) fn pick_weighted<'a>(candidates: &[&'a BarkLine], roll01: f32) -> Opt
     candidates.last().copied()
 }
 
+/// Issue d'une tentative de bark — l'appelant route les compteurs sensor.
+#[derive(Debug, PartialEq, Eq)]
+enum BarkOutcome {
+    Played,
+    SkippedChance,
+    Locked,
+    RateLimited,
+    /// Pas de pool pour ce (speaker, event) — silencieux par design.
+    NoPool,
+    PoolOnCooldown,
+}
+
+impl BarkEngine {
+    /// Tente de jouer un bark (chance → gate anti-spam → tirage pondéré).
+    fn try_play(
+        &mut self,
+        library: &BarkLibrary,
+        speaker: &str,
+        event: &str,
+        chance: f32,
+        now: f32,
+    ) -> BarkOutcome {
+        // P(bark) — un event silencieux est normal (anti-fatigue, Hadès).
+        if roll01(&mut self.rng) >= chance {
+            return BarkOutcome::SkippedChance;
+        }
+        self.recent.retain(|t| now - t < 60.0);
+        match gate(
+            now,
+            self.lock_until,
+            self.recent.len(),
+            library.tuning.max_per_minute,
+        ) {
+            BarkGate::Locked => return BarkOutcome::Locked,
+            BarkGate::RateLimited => return BarkOutcome::RateLimited,
+            BarkGate::Allowed => {}
+        }
+        let Some(pool) = library
+            .pools
+            .iter()
+            .find(|p| p.speaker == speaker && p.event == event)
+        else {
+            return BarkOutcome::NoPool;
+        };
+        let candidates: Vec<&BarkLine> = pool
+            .lines
+            .iter()
+            .filter(|l| self.line_ready_at.get(&l.id).is_none_or(|&t| now >= t))
+            .collect();
+        let roll = roll01(&mut self.rng);
+        let Some(line) = pick_weighted(&candidates, roll) else {
+            return BarkOutcome::PoolOnCooldown;
+        };
+        let duration = (BARK_BASE_SECS + line.text.chars().count() as f32 * BARK_PER_CHAR_SECS)
+            .min(BARK_MAX_SECS);
+        let line_id = line.id.clone();
+        let text = line.text.clone();
+        let ready_at = now + line.cooldown_sec;
+        self.line_ready_at.insert(line_id.clone(), ready_at);
+        self.lock_until = now + library.tuning.speaker_lock_sec;
+        self.recent.push_back(now);
+        self.played_total += 1;
+        self.last_line_id = line_id;
+        self.active = Some(ActiveBark {
+            speaker: speaker.to_string(),
+            text,
+            until: now + duration,
+        });
+        BarkOutcome::Played
+    }
+
+    fn route_counters(&mut self, outcome: &BarkOutcome) {
+        match outcome {
+            BarkOutcome::SkippedChance => self.skipped_chance += 1,
+            BarkOutcome::Locked => self.suppressed_lock += 1,
+            BarkOutcome::RateLimited => self.suppressed_rate += 1,
+            _ => {}
+        }
+    }
+}
+
 // ─── Systems ─────────────────────────────────────────────────────────────────
 
-/// Lit les kills, fait parler l'arme qui tue. Tourne aussi hors-combat pour
-/// expirer le bark actif (cheap : early-return sans events).
-fn sys_trigger_kill_barks(
+/// Lit kills (CombatHitEvent) et tirs ratés (ShotResolved) : l'arme en main
+/// commente. Tourne aussi hors-combat pour expirer le bark actif.
+fn sys_trigger_combat_barks(
     mut hits: MessageReader<CombatHitEvent>,
+    mut shots: MessageReader<ShotResolved>,
     mut engine: ResMut<BarkEngine>,
     library: Res<BarkLibrary>,
     time: Res<Time>,
@@ -289,6 +381,7 @@ fn sys_trigger_kill_barks(
     }
     if *game_mode.get() != GameMode::Roguelite {
         hits.clear();
+        shots.clear();
         return;
     }
     // Mélange l'horloge dans le state rng (varie les runs sans Date/rand).
@@ -302,59 +395,33 @@ fn sys_trigger_kill_barks(
             continue;
         };
         engine.kills_seen += 1;
-        // P(bark) — un kill silencieux est normal (anti-fatigue, Hadès).
-        if roll01(&mut engine.rng) >= library.tuning.chance_on_kill {
-            engine.skipped_chance += 1;
-            continue;
-        }
-        engine.recent.retain(|t| now - t < 60.0);
-        match gate(
+        let outcome = engine.try_play(
+            &library,
+            speaker,
+            BARK_EVENT_KILL,
+            library.tuning.chance_on_kill,
             now,
-            engine.lock_until,
-            engine.recent.len(),
-            library.tuning.max_per_minute,
-        ) {
-            BarkGate::Locked => {
-                engine.suppressed_lock += 1;
-                continue;
-            }
-            BarkGate::RateLimited => {
-                engine.suppressed_rate += 1;
-                continue;
-            }
-            BarkGate::Allowed => {}
+        );
+        engine.route_counters(&outcome);
+    }
+
+    // Story-533 AC7 — le tir raté fait parler les armes qui jugent (pool miss).
+    for shot in shots.read() {
+        if shot.hit_enemy {
+            continue;
         }
-        let Some(pool) = library
-            .pools
-            .iter()
-            .find(|p| p.speaker == speaker && p.event == BARK_EVENT_KILL)
-        else {
+        let Some(speaker) = speaker_for(shot.weapon) else {
             continue;
         };
-        let candidates: Vec<&BarkLine> = pool
-            .lines
-            .iter()
-            .filter(|l| engine.line_ready_at.get(&l.id).is_none_or(|&t| now >= t))
-            .collect();
-        let roll = roll01(&mut engine.rng);
-        let Some(line) = pick_weighted(&candidates, roll) else {
-            continue; // tout le pool en cooldown
-        };
-        let duration = (BARK_BASE_SECS + line.text.chars().count() as f32 * BARK_PER_CHAR_SECS)
-            .min(BARK_MAX_SECS);
-        let line_id = line.id.clone();
-        let text = line.text.clone();
-        let ready_at = now + line.cooldown_sec;
-        engine.line_ready_at.insert(line_id.clone(), ready_at);
-        engine.lock_until = now + library.tuning.speaker_lock_sec;
-        engine.recent.push_back(now);
-        engine.played_total += 1;
-        engine.last_line_id = line_id;
-        engine.active = Some(ActiveBark {
-            speaker: speaker.to_string(),
-            text,
-            until: now + duration,
-        });
+        engine.misses_seen += 1;
+        let outcome = engine.try_play(
+            &library,
+            speaker,
+            BARK_EVENT_MISS,
+            library.tuning.chance_on_miss,
+            now,
+        );
+        engine.route_counters(&outcome);
     }
 }
 
@@ -436,11 +503,13 @@ fn sys_write_barks_sensor(
         .map(|a| a.text.as_str())
         .unwrap_or("");
     let json = format!(
-        r#"{{"id":"barks","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"pools_loaded":{},"chance_on_kill":{:.2},"kills_seen":{},"skipped_chance":{},"played_total":{},"suppressed_lock":{},"suppressed_rate":{},"last_line_id":"{}","active_text":"{}"}}"#,
+        r#"{{"id":"barks","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"pools_loaded":{},"chance_on_kill":{:.2},"chance_on_miss":{:.2},"kills_seen":{},"misses_seen":{},"skipped_chance":{},"played_total":{},"suppressed_lock":{},"suppressed_rate":{},"last_line_id":"{}","active_text":"{}"}}"#,
         time.elapsed_secs(),
         library.pools.len(),
         library.tuning.chance_on_kill,
+        library.tuning.chance_on_miss,
         engine.kills_seen,
+        engine.misses_seen,
         engine.skipped_chance,
         engine.played_total,
         engine.suppressed_lock,
@@ -472,7 +541,7 @@ impl Plugin for WeaponBarksPlugin {
             .add_systems(Startup, load_bark_genome)
             .add_systems(
                 Update,
-                (sync_bark_library, sys_trigger_kill_barks)
+                (sync_bark_library, sys_trigger_combat_barks)
                     .chain()
                     .in_set(GameSet::Effects),
             )
@@ -580,7 +649,8 @@ lines = [
         });
         app.init_resource::<Time>();
         app.add_message::<CombatHitEvent>();
-        app.add_systems(Update, sys_trigger_kill_barks);
+        app.add_message::<ShotResolved>();
+        app.add_systems(Update, sys_trigger_combat_barks);
 
         for _ in 0..2 {
             app.world_mut().write_message(CombatHitEvent {
@@ -603,5 +673,55 @@ lines = [
         let active = engine.active.as_ref().expect("bulle active");
         assert_eq!(active.text, "Oh... pardon...");
         assert_eq!(engine.last_line_id, "pepin_kill_01");
+    }
+
+    /// Story-533 AC7 : un tir raté déclenche le pool `miss` du speaker —
+    /// et SEULEMENT s'il en a un (Lenoir juge, Pépin se tait).
+    #[test]
+    fn miss_triggers_pool_only_for_judging_speakers() {
+        let mut app = App::new();
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.insert_state(GameMode::Roguelite);
+        app.init_resource::<BarkEngine>();
+        app.insert_resource(BarkLibrary {
+            pools: vec![BarkPool {
+                speaker: "lenoir".into(),
+                event: "miss".into(),
+                lines: vec![BarkLine {
+                    id: "lenoir_miss_01".into(),
+                    text: "Lamentable.".into(),
+                    weight: 100,
+                    priority: 40,
+                    cooldown_sec: 18.0,
+                }],
+            }],
+            tuning: BarkTuning {
+                chance_on_miss: 1.0, // déterministe pour le test
+                ..Default::default()
+            },
+        });
+        app.init_resource::<Time>();
+        app.add_message::<CombatHitEvent>();
+        app.add_message::<ShotResolved>();
+        app.add_systems(Update, sys_trigger_combat_barks);
+
+        // Miss Pépin (pas de pool miss) puis miss Lenoir (pool présent).
+        // Pépin passe la chance mais tombe sur NoPool → ne consomme PAS le lock.
+        for weapon in [WeaponType::ModernAR, WeaponType::Shotgun] {
+            app.world_mut().write_message(ShotResolved {
+                weapon,
+                hit_enemy: false,
+            });
+        }
+        app.update();
+
+        let engine = app.world().resource::<BarkEngine>();
+        assert_eq!(engine.misses_seen, 2);
+        assert_eq!(engine.played_total, 1, "seule Lenoir juge");
+        assert_eq!(engine.last_line_id, "lenoir_miss_01");
+        assert_eq!(
+            engine.active.as_ref().expect("bulle").text,
+            "Lamentable."
+        );
     }
 }

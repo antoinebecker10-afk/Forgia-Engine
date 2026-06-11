@@ -50,6 +50,16 @@ default = 0.30
 layer = "roguelite_dialogue"
 
 [[genes]]
+id = "bark_chance_on_miss"
+label = "P(bark) on missed shot (only speakers with a miss pool judge)"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.35
+layer = "roguelite_dialogue"
+
+[[genes]]
 id = "bark_chance_on_lowhp"
 label = "P(bark) when player HP crosses lowhp threshold"
 chromosome = "Trigger"
@@ -190,6 +200,15 @@ lines = [
   { id = "lenoir_kill_02", text = "Quelle médiocrité.", weight = 25, priority = 30, cooldown_sec = 15.0 },
   { id = "lenoir_kill_03", text = "Élégant. Comme moi.", weight = 30, priority = 30, cooldown_sec = 12.0 },
   { id = "lenoir_kill_04", text = "Encore un. Soupir.", weight = 20, priority = 30, cooldown_sec = 18.0 },
+]
+
+# Story-533 AC7 — Lenoir JUGE le joueur qui rate (signature persona, GDD).
+[[pool]]
+speaker = "lenoir"
+event = "miss"
+lines = [
+  { id = "lenoir_miss_01", text = "Lamentable.", weight = 50, priority = 40, cooldown_sec = 18.0 },
+  { id = "lenoir_miss_02", text = "On se ressaisit, voulez-vous ?", weight = 50, priority = 40, cooldown_sec = 25.0 },
 ]
 
 [[pool]]

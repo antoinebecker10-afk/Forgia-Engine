@@ -1,10 +1,45 @@
 # Story-533 — 🎩 Madame Lenoir Moveset Distinctive (Mission 3 GDD)
 
-> **Status** : DRAFT
+> **Status** : EN COURS — incrément 1 livré 2026-06-11 (AC7+AC10, AC6-kill via moteur barks)
 > **Scale BMAD** : Standard
 > **Effort estimé** : ~4 jours
 > **GDD ref** : [Mission 3 - Lenoir](../design/gdd-roguelite-v1.md#-madame-lenoir--larme-précision)
 > **Prérequis** : story-528 (FPS feel)
+
+## Incrément 1 (2026-06-11) — Lenoir juge + sensor précision
+
+- **AC7 ✅ code** : barks de RATÉ — moteur barks généralisé (`try_play` +
+  event `miss` lisant `ShotResolved.hit_enemy=false`), gène
+  `bark_chance_on_miss` (0.35 hot-reload) + pool `lenoir/miss` (*« Lamentable. »*,
+  *« On se ressaisit, voulez-vous ? »*). **Seule Lenoir a un pool miss** → elle
+  seule juge ; les autres armes restent silencieuses sur un raté (NoPool, ne
+  consomme pas le lock anti-overlap).
+- **AC10 ✅ code** : `forgia-fps/lenoir.rs` — `LenoirStats` (shots/hits/
+  **headshots** via `CombatHitEvent.is_headshot`/kills, observe-only multicast),
+  reset OnEnter(Roguelite), sensor `forgia2_lenoir.json` 1Hz avec `hs_ratio`
+  (cible GDD : >40 % gamers) + registry. 41 tests verts (2 crates), clippy 0.
+- **AC1 — divergence délibérée** : stats actuelles CONSERVÉES (50 body / ×2
+  head = one-shot tête, mag 5, reload 2.5 s) au lieu du GDD littéral (80 HS /
+  40 body, mag 4, reload 3 s) — le one-shot tête est la récompense « ouverture
+  parfaite » et le tuning actuel est validé en jeu. Leçon Bourrasque v1 (GDD
+  littéral ≠ feel). Re-discuter seulement si l'équilibrage en pâtit.
+- **Restent** : AC2 scope 4×/monocle (scope existe, monocle+sway = anims), AC3
+  « Coup d'œil » through-walls (⚠ Shift=Sprint + F déjà pris par Tir Perçant
+  story-572 — keybind à trancher), AC4 anims, AC5 barks de tir, AC6 raffinement
+  HS-only 5 %, AC8 bark reload, AC9 couleurs.
+
+### Test in-game (incrément 1)
+
+1. **Action** : run Roguelite → Digit3 (Lenoir) → rater exprès quelques tirs
+   (mur/vide), puis enchaîner des tirs précis dont des têtes.
+2. **Effet attendu** : sur ~1 raté sur 3, bulle sombre bas-droite au liseré
+   Lenoir : *« Lamentable. »* ou *« On se ressaisit, voulez-vous ? »* —
+   uniquement avec Lenoir en main (rate avec Pépin : silence).
+3. **Sensor** : `forgia2_lenoir.json` → hs_ratio/accuracy ;
+   `forgia2_barks.json` → `misses_seen` monte, `chance_on_miss: 0.35`.
+4. **Variantes si KO** : jamais de jugement → `bark_chance_on_miss` 0.35→1.0
+   (hot-reload) pour valider ; trop bavarde → 0.35→0.15 ou monter les
+   `cooldown_sec` du pool.
 
 ## Pourquoi
 
