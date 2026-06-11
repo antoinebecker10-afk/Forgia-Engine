@@ -30,10 +30,12 @@ pub struct HealOnKillCumul {
 pub fn sys_recompute_boon_mods(
     active: Res<ActiveBoons>,
     catalogue: Res<BoonsCatalogue>,
+    // Story-591 — bonus permanents (méta) composés par-dessus les boons per-run.
+    perm: Res<crate::meta_shop::PermanentPlayerMods>,
     mut mods: ResMut<PlayerCombatMods>,
     mut heal: ResMut<HealOnKillCumul>,
 ) {
-    if !active.is_changed() && !catalogue.is_changed() {
+    if !active.is_changed() && !catalogue.is_changed() && !perm.is_changed() {
         return;
     }
     let mut new_mods = PlayerCombatMods::default();
@@ -73,6 +75,10 @@ pub fn sys_recompute_boon_mods(
             },
         }
     }
+    // Story-591 — compose les bonus PERMANENTS (méta) par-dessus les boons,
+    // AVANT l'overwrite (sinon sys_recompute les écraserait à chaque boon).
+    new_mods.damage_mul *= perm.damage_mul;
+    new_mods.damage_reduction = (new_mods.damage_reduction + perm.damage_reduction).min(0.85);
     *mods = new_mods;
     heal.hp_per_kill = new_heal;
     info!(

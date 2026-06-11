@@ -23,7 +23,7 @@ use forgia_ui_lib::hud_ammo::AmmoHudTuning;
 use forgia_ui_lib::style::*;
 
 use crate::enemies::EnemyArchetype;
-use crate::run::{RunState, StartRunEvent};
+use crate::run::RunState;
 use crate::waves::RogueliteWave;
 use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonId, BoonsCatalogue};
 use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
@@ -367,7 +367,9 @@ pub(crate) fn draw_defeat_overlay(
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
-    mut start_run: MessageWriter<StartRunEvent>,
+    // Story-591 — « REFORGER » renvoie au hub Lobby (L'Enclume) au lieu de
+    // relancer direct : le joueur peut dépenser ses Âmes avant la prochaine run.
+    mut next_run: ResMut<NextState<RunState>>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut next_app: ResMut<NextState<AppMode>>,
     // Story-558 Phase 5 — résumé carry-over Souls.
@@ -445,9 +447,9 @@ pub(crate) fn draw_defeat_overlay(
                                 .clicked()
                             };
 
-                        if cartoon_btn(ui, "↻  REFORGER", FORGE_OR) {
-                            info!("[roguelite-hud] Defeat → Nouvelle Run");
-                            start_run.write(StartRunEvent { seed: None });
+                        if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR) {
+                            info!("[roguelite-hud] Defeat → Lobby (Enclume)");
+                            next_run.set(RunState::Lobby);
                         }
                         ui.add_space(10.0);
                         if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD) {
@@ -469,7 +471,8 @@ pub(crate) fn draw_victory_overlay(
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
     meta: Res<MetaSouls>,
-    mut start_run: MessageWriter<StartRunEvent>,
+    // Story-591 — retour au hub Lobby (L'Enclume) au lieu de relancer direct.
+    mut next_run: ResMut<NextState<RunState>>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut next_app: ResMut<NextState<AppMode>>,
 ) {
@@ -520,9 +523,9 @@ pub(crate) fn draw_victory_overlay(
                             .clicked()
                         };
 
-                        if btn(ui, "↻ Nouvelle Run") {
-                            info!("[roguelite-hud] Victory → Nouvelle Run");
-                            start_run.write(StartRunEvent { seed: None });
+                        if btn(ui, "↻ L'Enclume des Âmes") {
+                            info!("[roguelite-hud] Victory → Lobby (Enclume)");
+                            next_run.set(RunState::Lobby);
                         }
                         ui.add_space(8.0);
                         if btn(ui, "✕ Retour au Menu") {

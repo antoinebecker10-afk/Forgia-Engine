@@ -84,6 +84,8 @@ pub fn sys_write_roguelite_state(
     timer: Option<Res<RunTimer>>,
     shockwave: Option<Res<ShockwaveAbility>>,
     wave: Option<Res<RogueliteWave>>,
+    // Story-591 — méta-progression persistée disque (L'Enclume des Âmes).
+    meta_save: Option<Res<crate::meta_shop::MetaShopSave>>,
 ) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -112,9 +114,20 @@ pub fn sys_write_roguelite_state(
     let break_secs_left = wave.as_ref().map(|w| w.break_secs_left).unwrap_or(0.0);
     let in_break = wave.as_ref().map(|w| w.in_break).unwrap_or(false);
     let victory = wave.as_ref().map(|w| w.victory_emitted).unwrap_or(false);
+    // Story-591 — état persisté disque : total d'Âmes + rangs des upgrades.
+    let meta_souls_total = meta_save.as_ref().map(|s| s.souls_total).unwrap_or(0);
+    let meta_ranks = meta_save
+        .as_ref()
+        .map(|s| {
+            let mut parts: Vec<String> =
+                s.ranks.iter().map(|(k, v)| format!("\"{k}\":{v}")).collect();
+            parts.sort();
+            format!("{{{}}}", parts.join(","))
+        })
+        .unwrap_or_else(|| "{}".to_string());
 
     let json = format!(
-        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"run_timer_secs":{run_timer_secs:.1},"shockwave_casts":{shockwave_casts},"shockwave_cd":{shockwave_cd:.1},"current_wave":{current_wave},"waves_total":{WAVES_TOTAL},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"victory":{victory}}}"#,
+        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"meta_souls_total":{meta_souls_total},"meta_ranks":{meta_ranks},"run_timer_secs":{run_timer_secs:.1},"shockwave_casts":{shockwave_casts},"shockwave_cd":{shockwave_cd:.1},"current_wave":{current_wave},"waves_total":{WAVES_TOTAL},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"victory":{victory}}}"#,
         time.elapsed_secs(),
         tel.tick_count,
         tel.time_in_state_secs,

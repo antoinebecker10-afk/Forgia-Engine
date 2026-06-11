@@ -33,6 +33,7 @@ pub mod hud;
 pub mod intro_dialogue;
 pub mod kill_popup;
 pub mod loot_room;
+pub mod meta_shop;
 pub mod parcours_obstacles;
 pub mod poi;
 pub mod run;
@@ -325,11 +326,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_observer(run::obs_roguelite_player_death);
         // Reset RogueliteWave OnEnter (relance run propre depuis lobby).
         app.add_systems(OnEnter(GameMode::Roguelite), reset_wave_resource);
-        // 2026-05-21 — Auto-fire StartRunEvent OnEnter pour activer RunState
-        // transitions (InRun) → débloque HUD wave/souls/defeat overlays gatés
-        // run_state. Sans ça, l'utilisateur entre Roguelite, voit des bots mais
-        // pas d'UI car sys_start_run n'est jamais déclenché.
-        app.add_systems(OnEnter(GameMode::Roguelite), auto_start_run_on_enter);
+        // Story-591 — l'auto-start est RETIRÉ : l'entrée Roguelite reste au Lobby
+        // (hub L'Enclume des Âmes), la run démarre quand le joueur appuie ENTRÉE
+        // (cf meta_shop::sys_meta_shop_input). Victory/Defeat → retour Lobby.
+        // (ancien : app.add_systems(OnEnter(Roguelite), auto_start_run_on_enter))
         // Chrono de run — tick pendant InRun/Boss (pause-safe).
         app.add_systems(
             Update,
@@ -444,6 +444,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).
             .add_plugins(parcours_obstacles::ParcoursObstaclesPlugin)
+            // Story-591 — L'Enclume des Âmes : méta-progression permanente (hub Lobby).
+            .add_plugins(meta_shop::MetaShopPlugin)
             // Story-558 P2 Vlambeer juice — kill popup cartoon par archetype.
             .add_plugins(kill_popup::RogueliteKillPopupPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").
@@ -487,15 +489,8 @@ fn sys_spin_coins(time: Res<Time>, mut q: Query<&mut Transform, With<CoinSpin>>)
     }
 }
 
-/// 2026-05-21 — Auto-fire StartRunEvent OnEnter(GameMode::Roguelite).
-///
-/// Sans ça, `sys_start_run` ne se déclenche jamais → `RunState` reste à
-/// `Lobby` (default SubState) → HUD wave/souls/defeat (gated sur `RunState::InRun`)
-/// reste invisible. Pattern Hadès "die-restart-die" : nouvelle entrée mode = nouveau run.
-fn auto_start_run_on_enter(mut events: MessageWriter<run::StartRunEvent>) {
-    events.write(run::StartRunEvent { seed: None });
-    info!("[roguelite] auto_start_run_on_enter — StartRunEvent fired");
-}
+// Story-591 — `auto_start_run_on_enter` retiré : le hub Lobby (L'Enclume des
+// Âmes) démarre la run sur ENTRÉE (meta_shop::sys_meta_shop_input).
 
 #[cfg(test)]
 mod tests {

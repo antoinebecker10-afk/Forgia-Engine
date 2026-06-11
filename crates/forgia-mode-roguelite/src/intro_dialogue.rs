@@ -125,9 +125,19 @@ fn sys_start_intro(time: Res<Time>, mut intro: ResMut<IntroDialogue>) {
 fn sys_advance_intro(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    run_state: Option<Res<State<RunState>>>,
     mut intro: ResMut<IntroDialogue>,
 ) {
     if !intro.active {
+        return;
+    }
+    // Story-591 — ne PAS avancer (ni consommer ENTRÉE) au Lobby : ENTRÉE y est la
+    // touche de lancement de run (meta_shop). L'intro ne s'affiche qu'en InRun/Boss
+    // (cf draw_intro_bubble) → elle ne doit avancer que là.
+    if !matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    ) {
         return;
     }
     let now = time.elapsed_secs();

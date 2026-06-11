@@ -622,6 +622,10 @@ pub fn sys_start_run(
     mut gold: Option<ResMut<Gold>>,
     mut meta: ResMut<MetaSouls>,
     mut run_timer: ResMut<RunTimer>,
+    // Story-591 — bonus permanents (L'Enclume des Âmes) appliqués au run-start.
+    meta_save: Res<crate::meta_shop::MetaShopSave>,
+    meta_cat: Res<crate::meta_shop::MetaShopCatalogue>,
+    mut perm_mods: ResMut<crate::meta_shop::PermanentPlayerMods>,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -647,10 +651,16 @@ pub fn sys_start_run(
         // méta NE sont PAS reset (persistantes) ; seul le compteur "gagné cette
         // run" est remis à zéro pour le sensor.
         if let Some(g) = gold.as_deref_mut() {
-            g.current = 0;
+            // Story-591 — nouvelle run : Or remis à l'Or de DÉPART (upgrade Pactole ;
+            // 0 sans rang acheté, donc équivalent au reset à 0 d'avant).
+            g.current = meta_save.start_gold(&meta_cat);
             g.total_collected = 0;
         }
         meta.earned_run = 0;
+        // Story-591 — bonus permanents combat (composés dans PlayerCombatMods
+        // par boons_apply::sys_recompute_boon_mods, qui re-tourne car perm change).
+        perm_mods.damage_mul = meta_save.damage_mul(&meta_cat);
+        perm_mods.damage_reduction = meta_save.damage_reduction(&meta_cat);
         // Chrono de run remis à zéro.
         run_timer.secs = 0.0;
 
@@ -672,10 +682,13 @@ pub fn sys_start_run(
         }
 
         // V7 M3 step 4 — Reset Player HP au max au start (sinon HP=0 sticky après Defeat).
-        commands.queue(|world: &mut World| {
+        // Story-591 — upgrade Vitalité : PV max = base + bonus permanent.
+        let max_hp = crate::meta_shop::BASE_PLAYER_HP + meta_save.max_hp_bonus(&meta_cat);
+        commands.queue(move |world: &mut World| {
             let mut q = world.query_filtered::<&mut forgia_damage::Health, With<Player>>();
             if let Ok(mut hp) = q.single_mut(world) {
-                hp.current = hp.max;
+                hp.max = max_hp;
+                hp.current = max_hp;
             }
         });
 
