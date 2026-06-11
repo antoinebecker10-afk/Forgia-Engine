@@ -25,7 +25,7 @@
   + entrée SENSOR_REGISTRY.
 - Tests : 4 purs (apply_shot/saturations) + 4 fps (tuning miroir, mul par-arme,
   disabled, App headless multi-armes) — 69 verts sur les 3 crates, clippy 0.
-- **AC5-7 incrément kill ✅ code (2026-06-11)** : `forgia-ui-lib/hud/barks.rs` — le
+- **AC5-7 incrément kill ✅ VALIDÉ RUNTIME 2026-06-11 (« parfait! »)** : `forgia-ui-lib/hud/barks.rs` — le
   genome `roguelite_dialogue.toml` (dormant depuis l'abandon 471-479) est ENFIN
   consommé. Trigger = `CombatHitEvent{is_kill, weapon}` (multicast, killfeed non
   affecté) → l'arme qui tue parle pour les **4 personas** (pools kill existants).
