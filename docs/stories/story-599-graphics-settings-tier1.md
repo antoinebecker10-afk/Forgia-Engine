@@ -2,8 +2,14 @@
 
 > **Statut** : RÉ-IMPLANTATION PROGRESSIVE 2026-06-16 sur base stable (post story-600 qui a corrigé
 > la vraie cause des écrans cassés = stage orphelin, PAS les réglages). Ordre incrémental validé un
-> par un : **inc.1 Tonemapping** (en cours, le « parfait » déjà validé) → inc.2 MSAA → inc.3 VSync.
+> par un : **inc.1 Tonemapping ✅ committé/validé** → **inc.2 MSAA ✅ validé** → inc.3 VSync (à venir).
 > Chaque incrément : code + check/clippy + build + validation runtime AVANT le suivant.
+>
+> **⚠️ Leçon inc.2 (MSAA)** : appliquer MSAA à la caméra **orbitale 3P** (RPG/Cyber) la casse →
+> écran marron (même fragilité que TAA/SMAA/HDR-Bloom story-550 ; isolation prouvée 2026-06-16).
+> Fix : `apply_msaa_to_cameras` gaté `With<FpsCamera>` (PAS `Camera3d`). MSAA contrôlable en
+> **Roguelite (mode ship)** ; en RPG/Cyber l'orbitale garde le défaut 4× (sûr). Le tonemapping
+> (inc.1) est OK sur toutes les caméras (composant déjà présent, on change juste sa valeur).
 >
 > _(Note historique : 1ère tentative big-bang remisée le 2026-06-16 — code sain mais invalidable sur
 > base instable. La base est stable depuis story-600.)_

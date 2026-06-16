@@ -15,6 +15,7 @@
 
 use bevy::prelude::*;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::render::view::Msaa;
 use bevy::window::{MonitorSelection, PrimaryWindow, WindowMode};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_audio::UserMasterVolume;
@@ -87,6 +88,11 @@ pub struct UserSettings {
     /// "tony" | "aces" | "agx" | "reinhard" | "none". Défaut = TonyMcMapface (défaut Bevy).
     #[serde(default = "default_tonemapping")]
     pub tonemapping: String,
+    /// Story-599 inc.2 — niveau MSAA : 1 (Off) / 2 / 4 / 8. Défaut 4 (défaut Bevy).
+    /// Appliqué UNIQUEMENT à la caméra FPS (Roguelite) : la caméra orbitale 3P
+    /// (RPG/Cyber) casse son rendu si on change son MSAA à chaud (écran marron).
+    #[serde(default = "default_msaa_samples")]
+    pub msaa_samples: u32,
 }
 
 fn default_sensor_period() -> f32 {
@@ -107,6 +113,9 @@ fn default_window_height() -> u32 {
 fn default_tonemapping() -> String {
     "tony".to_string()
 }
+fn default_msaa_samples() -> u32 {
+    4
+}
 
 impl Default for UserSettings {
     fn default() -> Self {
@@ -119,6 +128,7 @@ impl Default for UserSettings {
             window_width: 1920,
             window_height: 1080,
             tonemapping: "tony".to_string(),
+            msaa_samples: 4,
         }
     }
 }
@@ -289,6 +299,33 @@ pub fn apply_tonemapping_to_cameras(
     for mut tm in &mut q_cam {
         if *tm != target {
             *tm = target;
+        }
+    }
+}
+
+// ─── Story-599 inc.2 — anti-aliasing MSAA (caméra FPS UNIQUEMENT) ──────
+
+/// `UserSettings.msaa_samples` → composant `Msaa` sur la **caméra FPS** seule.
+///
+/// ⚠️ Gaté `With<FpsCamera>` (PAS `Camera3d`) : changer le MSAA de la caméra
+/// orbitale 3P (RPG/Cyber) à chaud casse son rendu (écran marron — confirmé par
+/// isolation 2026-06-16, même fragilité que TAA/SMAA/HDR-Bloom story-550). La
+/// caméra FPS (mode ship Roguelite) tolère le changement. En RPG/Cyber la
+/// FpsCamera est inactive → set sans effet visuel, l'orbitale garde son défaut.
+/// Idempotent (set-if-different).
+pub fn apply_msaa_to_cameras(
+    settings: Res<UserSettings>,
+    mut q_cam: Query<&mut Msaa, With<FpsCamera>>,
+) {
+    let target = match settings.msaa_samples {
+        1 => Msaa::Off,
+        2 => Msaa::Sample2,
+        8 => Msaa::Sample8,
+        _ => Msaa::Sample4,
+    };
+    for mut msaa in &mut q_cam {
+        if *msaa != target {
+            *msaa = target;
         }
     }
 }
@@ -514,6 +551,19 @@ fn draw_settings(
     });
     ui.add_space(10.0);
 
+    // Story-599 inc.2 — anti-aliasing (MSAA). Appliqué à la caméra FPS (Roguelite).
+    ui.label(egui::RichText::new("Anti-aliasing (MSAA)").size(16.0));
+    ui.horizontal(|ui| {
+        for (label, samples) in [("Off", 1u32), ("2×", 2), ("4×", 4), ("8×", 8)] {
+            let selected = settings.msaa_samples == samples;
+            if ui.selectable_label(selected, label).clicked() && !selected {
+                settings.msaa_samples = samples;
+                dirty = true;
+            }
+        }
+    });
+    ui.add_space(10.0);
+
     // Story-595 : touches affichées (lecture seule — réassignation = post-ship).
     ui.collapsing(egui::RichText::new("Touches (AZERTY)").size(16.0), |ui| {
         ui.label(
@@ -593,14 +643,18 @@ pub fn write_pause_menu_sensor(
     settings: Res<UserSettings>,
     app_state: Res<State<AppMode>>,
     mut sensor: ResMut<PauseMenuSensor>,
+    // Story-599 inc.2 — MSAA RÉEL de la caméra FPS (≠ valeur du réglage) →
+    // confirme que le réglage atteint le rendu (MSAA subtil à l'œil).
+    q_cam_msaa: Query<&Msaa, With<FpsCamera>>,
 ) {
     let now = time.elapsed_secs();
     if now - sensor.last_write_secs < settings.sensor_period_secs.max(0.1) {
         return;
     }
     sensor.last_write_secs = now;
+    let cam_msaa: Vec<u32> = q_cam_msaa.iter().map(|m| m.samples()).collect();
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"open":{},"sub_menu":"{:?}","open_count_session":{},"last_action":"{}","last_save_secs":{:.2},"last_save_success":{},"sensitivity":{:.4},"fov_deg":{:.1},"master_volume":{:.2},"window_mode":"{}","tonemapping":"{}"}}"#,
+        r#"{{"timestamp_secs":{:.2},"open":{},"sub_menu":"{:?}","open_count_session":{},"last_action":"{}","last_save_secs":{:.2},"last_save_success":{},"sensitivity":{:.4},"fov_deg":{:.1},"master_volume":{:.2},"window_mode":"{}","tonemapping":"{}","msaa_samples":{},"fps_camera_msaa_actual":{:?}}}"#,
         now,
         matches!(app_state.get(), AppMode::Paused),
         state.sub,
@@ -613,6 +667,8 @@ pub fn write_pause_menu_sensor(
         settings.master_volume,
         settings.window_mode,
         settings.tonemapping,
+        settings.msaa_samples,
+        cam_msaa,
     );
     let _ = fs::write("forgia_pause_menu.json", json);
 }
@@ -643,6 +699,8 @@ impl Plugin for ForgiaUiPauseMenuPlugin {
                     // Story-599 inc.1 — profil colorimétrique (idempotent, couvre
                     // les caméras spawnées par-mode).
                     apply_tonemapping_to_cameras,
+                    // Story-599 inc.2 — MSAA caméra FPS (idempotent).
+                    apply_msaa_to_cameras,
                     write_pause_menu_sensor,
                 ),
             );
@@ -663,6 +721,8 @@ mod tests {
         assert_eq!(s.fov_deg, 100.0);
         // Story-599 inc.1 : tonemapping absent du TOML legacy → défaut Forgia.
         assert_eq!(s.tonemapping, "tony", "défaut tonemapping = TonyMcMapface");
+        // Story-599 inc.2 : msaa absent du TOML legacy → défaut 4×.
+        assert_eq!(s.msaa_samples, 4, "défaut MSAA = 4×");
         assert_eq!(s.master_volume, 1.0, "défaut volume = plein");
         assert_eq!(s.window_mode, "windowed", "défaut = comportement pré-595");
         assert_eq!((s.window_width, s.window_height), (1920, 1080));
