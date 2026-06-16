@@ -14,6 +14,7 @@
 //! L'ancien handler ESC/Q reste dans `forgia-ui` pour la transition state.
 
 use bevy::prelude::*;
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::window::{MonitorSelection, PrimaryWindow, WindowMode};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_audio::UserMasterVolume;
@@ -82,6 +83,10 @@ pub struct UserSettings {
     pub window_width: u32,
     #[serde(default = "default_window_height")]
     pub window_height: u32,
+    /// Story-599 inc.1 — profil colorimétrique (tonemapping) :
+    /// "tony" | "aces" | "agx" | "reinhard" | "none". Défaut = TonyMcMapface (défaut Bevy).
+    #[serde(default = "default_tonemapping")]
+    pub tonemapping: String,
 }
 
 fn default_sensor_period() -> f32 {
@@ -99,6 +104,9 @@ fn default_window_width() -> u32 {
 fn default_window_height() -> u32 {
     1080
 }
+fn default_tonemapping() -> String {
+    "tony".to_string()
+}
 
 impl Default for UserSettings {
     fn default() -> Self {
@@ -110,6 +118,7 @@ impl Default for UserSettings {
             window_mode: "windowed".to_string(),
             window_width: 1920,
             window_height: 1080,
+            tonemapping: "tony".to_string(),
         }
     }
 }
@@ -251,6 +260,36 @@ pub fn apply_fov_to_camera(
     if let Projection::Perspective(ref mut p) = *proj {
         p.fov = settings.fov_deg.to_radians();
         *last_applied = settings.fov_deg;
+    }
+}
+
+// ─── Story-599 inc.1 — profil colorimétrique (tonemapping) ────────────
+
+/// Mappe la string genome-friendly → variante `Tonemapping`. Fallback = Forgia.
+fn tonemapping_from_str(s: &str) -> Tonemapping {
+    match s {
+        "aces" => Tonemapping::AcesFitted,
+        "agx" => Tonemapping::AgX,
+        "reinhard" => Tonemapping::ReinhardLuminance,
+        "none" => Tonemapping::None,
+        _ => Tonemapping::TonyMcMapface,
+    }
+}
+
+/// `UserSettings.tonemapping` → composant `Tonemapping` sur toute `Camera3d`.
+/// Idempotent (set-if-different) : couvre le changement de réglage ET les
+/// caméras spawnées plus tard (par-mode), sans boucle de change-detection.
+/// `Tonemapping` est déjà un composant requis de `Camera3d` (défaut
+/// TonyMcMapface) — on ne fait que changer sa valeur, aucun ajout de pipeline.
+pub fn apply_tonemapping_to_cameras(
+    settings: Res<UserSettings>,
+    mut q_cam: Query<&mut Tonemapping, With<Camera3d>>,
+) {
+    let target = tonemapping_from_str(&settings.tonemapping);
+    for mut tm in &mut q_cam {
+        if *tm != target {
+            *tm = target;
+        }
     }
 }
 
@@ -455,6 +494,26 @@ fn draw_settings(
     }
     ui.add_space(10.0);
 
+    // Story-599 inc.1 — profil colorimétrique (tonemapping). Composant déjà
+    // présent sur Camera3d → on change juste la valeur (sûr, ≠ post-process).
+    ui.label(egui::RichText::new("Profil colorimétrique").size(16.0));
+    ui.horizontal(|ui| {
+        for (label, key) in [
+            ("Forgia", "tony"),
+            ("ACES", "aces"),
+            ("AgX", "agx"),
+            ("Doux", "reinhard"),
+            ("Neutre", "none"),
+        ] {
+            let selected = settings.tonemapping == key;
+            if ui.selectable_label(selected, label).clicked() && !selected {
+                settings.tonemapping = key.to_string();
+                dirty = true;
+            }
+        }
+    });
+    ui.add_space(10.0);
+
     // Story-595 : touches affichées (lecture seule — réassignation = post-ship).
     ui.collapsing(egui::RichText::new("Touches (AZERTY)").size(16.0), |ui| {
         ui.label(
@@ -541,7 +600,7 @@ pub fn write_pause_menu_sensor(
     }
     sensor.last_write_secs = now;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"open":{},"sub_menu":"{:?}","open_count_session":{},"last_action":"{}","last_save_secs":{:.2},"last_save_success":{},"sensitivity":{:.4},"fov_deg":{:.1},"master_volume":{:.2},"window_mode":"{}"}}"#,
+        r#"{{"timestamp_secs":{:.2},"open":{},"sub_menu":"{:?}","open_count_session":{},"last_action":"{}","last_save_secs":{:.2},"last_save_success":{},"sensitivity":{:.4},"fov_deg":{:.1},"master_volume":{:.2},"window_mode":"{}","tonemapping":"{}"}}"#,
         now,
         matches!(app_state.get(), AppMode::Paused),
         state.sub,
@@ -553,6 +612,7 @@ pub fn write_pause_menu_sensor(
         settings.fov_deg,
         settings.master_volume,
         settings.window_mode,
+        settings.tonemapping,
     );
     let _ = fs::write("forgia_pause_menu.json", json);
 }
@@ -580,6 +640,9 @@ impl Plugin for ForgiaUiPauseMenuPlugin {
                     // pattern event-driven Changed<UserSettings>.
                     apply_settings_to_volume,
                     apply_window_settings,
+                    // Story-599 inc.1 — profil colorimétrique (idempotent, couvre
+                    // les caméras spawnées par-mode).
+                    apply_tonemapping_to_cameras,
                     write_pause_menu_sensor,
                 ),
             );
@@ -598,9 +661,22 @@ mod tests {
         let s: UserSettings = toml::from_str(legacy).expect("TOML legacy valide");
         assert_eq!(s.mouse_sensitivity, 0.003);
         assert_eq!(s.fov_deg, 100.0);
+        // Story-599 inc.1 : tonemapping absent du TOML legacy → défaut Forgia.
+        assert_eq!(s.tonemapping, "tony", "défaut tonemapping = TonyMcMapface");
         assert_eq!(s.master_volume, 1.0, "défaut volume = plein");
         assert_eq!(s.window_mode, "windowed", "défaut = comportement pré-595");
         assert_eq!((s.window_width, s.window_height), (1920, 1080));
+    }
+
+    #[test]
+    fn tonemapping_str_mapping_and_fallback() {
+        assert_eq!(tonemapping_from_str("aces"), Tonemapping::AcesFitted);
+        assert_eq!(tonemapping_from_str("agx"), Tonemapping::AgX);
+        assert_eq!(tonemapping_from_str("reinhard"), Tonemapping::ReinhardLuminance);
+        assert_eq!(tonemapping_from_str("none"), Tonemapping::None);
+        assert_eq!(tonemapping_from_str("tony"), Tonemapping::TonyMcMapface);
+        // Inconnu → fallback Forgia (TonyMcMapface), jamais un panic.
+        assert_eq!(tonemapping_from_str("garbage"), Tonemapping::TonyMcMapface);
     }
 
     #[test]
