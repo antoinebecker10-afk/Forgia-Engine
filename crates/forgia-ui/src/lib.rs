@@ -83,6 +83,18 @@ impl Plugin for ForgiaUiPlugin {
                 OnExit(forgia_mode_roguelite::RunState::Victory),
                 (grab_cursor, block_look_off),
             )
+            // Story-596 Phase B — Lobby (Enclume) : curseur libre pour cliquer
+            // cartes d'upgrade + FORGER. Gated Roguelite : RunState est global,
+            // au boot/RPG GameMode ≠ Roguelite → no-op (sinon block_look
+            // fuiterait dans le RPG).
+            .add_systems(
+                OnEnter(forgia_mode_roguelite::RunState::Lobby),
+                (release_cursor, block_look_on).run_if(in_state(GameMode::Roguelite)),
+            )
+            .add_systems(
+                OnExit(forgia_mode_roguelite::RunState::Lobby),
+                (grab_cursor, block_look_off).run_if(in_state(GameMode::Roguelite)),
+            )
             // Story-558 Phase 7 follow-up (2026-05-29) — sync cursor avec
             // CoffreSession.is_open : pendant le break Coffre, libérer la
             // souris pour cliquer Skip/Reroll/cartes sans pivoter la caméra.
@@ -201,6 +213,16 @@ fn main_menu_ui(
                     next_game.set(GameMode::Roguelite);
                     next_app.set(AppMode::InGame);
                     start_run.write(forgia_mode_roguelite::StartRunEvent { seed: None });
+                }
+                ui.add_space(20.0);
+                // Démo perf moteur (2026-06-15) — charge un GLB lourd (cyberpunk
+                // city) + flycam libre pour stress-tester rendu/VRAM. Bleu cyber
+                // pour la distinguer des modes de jeu.
+                if cartoon_btn(ui, "🏙  CYBER CITY DÉMO", egui::Color32::from_rgb(70, 130, 200))
+                    .clicked()
+                {
+                    next_game.set(GameMode::CyberCity);
+                    next_app.set(AppMode::InGame);
                 }
                 ui.add_space(40.0);
                 if cartoon_btn(ui, "QUITTER", FORGE_METAL_CHAUD).clicked() {

@@ -22,6 +22,7 @@ use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::input::ButtonInput;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
+use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_core::prelude::*;
 
 pub mod prelude {
@@ -279,7 +280,11 @@ fn orbit_auto_recenter_on_move(
 fn orbit_follow(
     targets: Query<&GlobalTransform, Without<OrbitCamera>>,
     mut cams: Query<(&OrbitCamera, &mut Transform), With<Camera3d>>,
+    rapier: ReadRapierContext,
 ) {
+    // Contexte physique pour l'anti-clip (None en test / si Rapier absent →
+    // distance pleine, comportement historique).
+    let ctx = rapier.single().ok();
     for (orbit, mut cam_tf) in &mut cams {
         let Ok(target_gt) = targets.get(orbit.target) else {
             continue;
@@ -305,7 +310,20 @@ fn orbit_follow(
         );
 
         let look_target = target_pos + Vec3::Y * orbit.height_offset;
-        cam_tf.translation = look_target + back * orbit.distance;
+
+        // Anti-clip (2026-06-16) : raycast depuis le point visé vers la position
+        // caméra souhaitée. Si un collider est touché avant `distance`, on
+        // rapproche la caméra pour qu'elle ne traverse plus sol/murs. Exclut le
+        // rigidbody du target (le joueur) pour ne pas se heurter à sa capsule.
+        let mut dist = orbit.distance;
+        if let Some(ctx) = &ctx {
+            let filter = QueryFilter::default().exclude_rigid_body(orbit.target);
+            if let Some((_e, toi)) = ctx.cast_ray(look_target, back, orbit.distance, true, filter) {
+                const CAM_SKIN_M: f32 = 0.3;
+                dist = (toi - CAM_SKIN_M).max(0.2);
+            }
+        }
+        cam_tf.translation = look_target + back * dist;
         cam_tf.look_at(look_target, Vec3::Y);
     }
 }

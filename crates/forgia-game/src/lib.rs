@@ -14,6 +14,10 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
 
+/// Démo perf moteur (2026-06-15) — "Cyber City démo" : charge un GLB lourd +
+/// flycam libre pour stress-tester le rendu. Entrée via le menu principal.
+mod cyber_city;
+
 /// Build the App with all Forgia plugins wired, then run it. Returns `AppExit`.
 pub fn run_game() -> AppExit {
     let mut app = App::new();
@@ -104,6 +108,16 @@ pub fn run_game() -> AppExit {
         forgia_camera_orbit::prelude::ForgiaCameraOrbitPlugin,
         forgia_secondary_motion::prelude::ForgiaSecondaryMotionPlugin,
     ));
+
+    // 7d. Debug overlay dev-loop (story-547 + story-581) — monitor perf/mémoire/VRAM
+    // egui multi-catégories. Master toggle = F2 (F3 reste les gizmos chunks RPG).
+    // Brancher ce plugin était l'étape manquante : la crate forgia-debug existait
+    // mais n'était ajoutée nulle part → monitor in-game invisible.
+    app.add_plugins(forgia_debug::prelude::ForgiaDebugPlugin);
+
+    // 7e. Démo perf "Cyber City" (2026-06-15) — GLB lourd + flycam libre,
+    // entrée menu dédiée. Mode self-contained (GameMode::CyberCity).
+    app.add_plugins(cyber_city::CyberCityDemoPlugin);
 
     // 7c. Village data-driven (story-441) — Prefab + Village Loader.
     // 2026-05-20 fix : ForgiaPrefabPlugin peut déjà être ajouté transitivement

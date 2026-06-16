@@ -49,3 +49,6 @@ forgia-village-loader = { workspace = true }
 # Story-578 P1 — worldgen procédural (registre d'assets + spawn instancié grounded).
 # Découplé : 0 dép terrain/gameplay, conformance sol injectée.
 forgia-worldgen = { workspace = true }
+# Story-581 — debug overlay dev-loop (monitor perf/mémoire/VRAM egui). La crate
+# existait (story-547) mais n'était jamais branchée dans le jeu → monitor invisible.
+forgia-debug = { workspace = true }

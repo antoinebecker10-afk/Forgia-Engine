@@ -53,6 +53,10 @@ pub mod states {
         Rpg,
         // Story-470 V7 M1 — 3e jeu Forgia : roguelite FPS coop 1-3j (cible Next Fest)
         Roguelite,
+        /// Démo perf moteur (2026-06-15) — charge un GLB lourd (cyberpunk city)
+        /// + flycam libre pour stress-tester rendu/VRAM. Pas de gameplay.
+        /// Géré par `forgia_game::cyber_city::CyberCityDemoPlugin`.
+        CyberCity,
     }
 
     /// WorldMode — gate la simulation (Editor désactive AI/physics).

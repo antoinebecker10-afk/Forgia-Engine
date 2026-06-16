@@ -139,6 +139,15 @@ const CHUNK_MB_EST: f32 = 0.16;
 /// W2 — intervalle d'export sensor JSON (secondes).
 const SENSOR_INTERVAL_S: f32 = 1.0;
 
+/// Modes où Rex est piloté en 3e personne : le RPG, et la démo perf "Cyber City"
+/// (2026-06-15) qui réutilise le pipeline locomotion + caméra orbitale de Rex
+/// pour se déplacer dans la ville. Élargit le gating sans dupliquer la chaîne
+/// d'animation mono-perso (`.single()`) ni spawner le monde RPG (terrain/village
+/// restent gatés strictement `OnEnter(Rpg)`, le lineup PNJ no-op sans anchor).
+fn rex_third_person_active(state: Res<State<GameMode>>) -> bool {
+    matches!(state.get(), GameMode::Rpg | GameMode::CyberCity)
+}
+
 pub struct ForgiaRpgPlugin;
 
 impl Plugin for ForgiaRpgPlugin {
@@ -181,6 +190,13 @@ impl Plugin for ForgiaRpgPlugin {
             .add_systems(
                 OnExit(GameMode::Rpg),
                 (character::cleanup_rex_character, cleanup_world, cleanup_village).chain(),
+            )
+            // Démo Cyber City (2026-06-15) : Rex 3P réutilise le pipeline RPG.
+            // Cleanup dédié (despawn Rex + OrbitCamera, ré-active FpsCamera) — sans
+            // cleanup_world/village (aucun monde RPG n'est spawné en CyberCity).
+            .add_systems(
+                OnExit(GameMode::CyberCity),
+                character::cleanup_rex_character,
             )
             .add_systems(
                 Update,
@@ -229,7 +245,8 @@ impl Plugin for ForgiaRpgPlugin {
                 )
                     .chain()
                     .in_set(GameSet::Movement)
-                    .run_if(in_state(GameMode::Rpg)),
+                    // Rpg + démo Cyber City (Rex 3P réutilise ce pipeline).
+                    .run_if(rex_third_person_active),
             )
             // Story-583 (2026-06-08) — pose idle « bras le long » des PNJ (sort la
             // T-pose). Système séparé du cœur locomotion (mono-perso .single) pour
