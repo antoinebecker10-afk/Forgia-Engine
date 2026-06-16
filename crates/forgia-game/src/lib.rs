@@ -10,6 +10,7 @@
 //!
 //! Both call `forgia_game::run_game()`.
 
+use bevy::image::{ImagePlugin, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
@@ -23,14 +24,29 @@ pub fn run_game() -> AppExit {
     let mut app = App::new();
 
     // 1. Bevy DefaultPlugins EN PREMIER (fournit StatesPlugin requis par ForgiaCorePlugin)
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: "Forgia V2".to_string(),
-            resolution: (1920u32, 1080u32).into(),
-            ..default()
-        }),
-        ..default()
-    }));
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Forgia V2".to_string(),
+                    resolution: (1920u32, 1080u32).into(),
+                    ..default()
+                }),
+                ..default()
+            })
+            // B1 (audit story-598) — filtrage anisotrope 16× sur le sampler par
+            // défaut : nette les textures vues en oblique (rues/murs en
+            // perspective = l'essentiel d'une vue 3P de ville). Effet maximal
+            // sur textures mippées ; sans mipmaps le gain reste limité (cf B2
+            // KTX2/mipmaps). Les samplers custom (terrain/foliage) ne sont pas
+            // affectés (ils overrident via ImageLoaderSettings).
+            .set(ImagePlugin {
+                default_sampler: ImageSamplerDescriptor {
+                    anisotropy_clamp: 16,
+                    ..ImageSamplerDescriptor::linear()
+                },
+            }),
+    );
 
     // 2. Forgia Core (init_state nécessite StatesPlugin déjà chargé)
     app.add_plugins(ForgiaCorePlugin);
