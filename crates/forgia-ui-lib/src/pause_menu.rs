@@ -16,7 +16,7 @@
 use bevy::prelude::*;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::render::view::Msaa;
-use bevy::window::{MonitorSelection, PrimaryWindow, WindowMode};
+use bevy::window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_audio::UserMasterVolume;
 use forgia_core::prelude::*;
@@ -93,6 +93,9 @@ pub struct UserSettings {
     /// (RPG/Cyber) casse son rendu si on change son MSAA à chaud (écran marron).
     #[serde(default = "default_msaa_samples")]
     pub msaa_samples: u32,
+    /// Story-599 inc.3 — VSync (true = `PresentMode::AutoVsync`, false = `AutoNoVsync`). Défaut on.
+    #[serde(default = "default_vsync")]
+    pub vsync: bool,
 }
 
 fn default_sensor_period() -> f32 {
@@ -116,6 +119,9 @@ fn default_tonemapping() -> String {
 fn default_msaa_samples() -> u32 {
     4
 }
+fn default_vsync() -> bool {
+    true
+}
 
 impl Default for UserSettings {
     fn default() -> Self {
@@ -129,6 +135,7 @@ impl Default for UserSettings {
             window_height: 1080,
             tonemapping: "tony".to_string(),
             msaa_samples: 4,
+            vsync: true,
         }
     }
 }
@@ -326,6 +333,27 @@ pub fn apply_msaa_to_cameras(
     for mut msaa in &mut q_cam {
         if *msaa != target {
             *msaa = target;
+        }
+    }
+}
+
+// ─── Story-599 inc.3 — VSync ──────────────────────────────────────────
+
+/// `UserSettings.vsync` → `Window.present_mode` (AutoVsync ↔ AutoNoVsync).
+/// Touche la fenêtre, pas les caméras → aucun risque de casser un rendu de
+/// caméra. Idempotent (set-if-different). Off = FPS débridé (tearing possible).
+pub fn apply_vsync_to_window(
+    settings: Res<UserSettings>,
+    mut q_window: Query<&mut Window, With<PrimaryWindow>>,
+) {
+    let target = if settings.vsync {
+        PresentMode::AutoVsync
+    } else {
+        PresentMode::AutoNoVsync
+    };
+    if let Ok(mut window) = q_window.single_mut() {
+        if window.present_mode != target {
+            window.present_mode = target;
         }
     }
 }
@@ -564,6 +592,20 @@ fn draw_settings(
     });
     ui.add_space(10.0);
 
+    // Story-599 inc.3 — VSync.
+    ui.label(egui::RichText::new("VSync").size(16.0));
+    ui.horizontal(|ui| {
+        if ui.selectable_label(settings.vsync, "Activé").clicked() && !settings.vsync {
+            settings.vsync = true;
+            dirty = true;
+        }
+        if ui.selectable_label(!settings.vsync, "Désactivé").clicked() && settings.vsync {
+            settings.vsync = false;
+            dirty = true;
+        }
+    });
+    ui.add_space(10.0);
+
     // Story-595 : touches affichées (lecture seule — réassignation = post-ship).
     ui.collapsing(egui::RichText::new("Touches (AZERTY)").size(16.0), |ui| {
         ui.label(
@@ -646,6 +688,8 @@ pub fn write_pause_menu_sensor(
     // Story-599 inc.2 — MSAA RÉEL de la caméra FPS (≠ valeur du réglage) →
     // confirme que le réglage atteint le rendu (MSAA subtil à l'œil).
     q_cam_msaa: Query<&Msaa, With<FpsCamera>>,
+    // Story-599 inc.3 — present_mode RÉEL de la fenêtre (confirme le VSync).
+    q_window: Query<&Window, With<PrimaryWindow>>,
 ) {
     let now = time.elapsed_secs();
     if now - sensor.last_write_secs < settings.sensor_period_secs.max(0.1) {
@@ -653,8 +697,12 @@ pub fn write_pause_menu_sensor(
     }
     sensor.last_write_secs = now;
     let cam_msaa: Vec<u32> = q_cam_msaa.iter().map(|m| m.samples()).collect();
+    let present_mode = q_window
+        .single()
+        .map(|w| format!("{:?}", w.present_mode))
+        .unwrap_or_else(|_| "Unknown".to_string());
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"open":{},"sub_menu":"{:?}","open_count_session":{},"last_action":"{}","last_save_secs":{:.2},"last_save_success":{},"sensitivity":{:.4},"fov_deg":{:.1},"master_volume":{:.2},"window_mode":"{}","tonemapping":"{}","msaa_samples":{},"fps_camera_msaa_actual":{:?}}}"#,
+        r#"{{"timestamp_secs":{:.2},"open":{},"sub_menu":"{:?}","open_count_session":{},"last_action":"{}","last_save_secs":{:.2},"last_save_success":{},"sensitivity":{:.4},"fov_deg":{:.1},"master_volume":{:.2},"window_mode":"{}","tonemapping":"{}","msaa_samples":{},"fps_camera_msaa_actual":{:?},"vsync":{},"present_mode_actual":"{}"}}"#,
         now,
         matches!(app_state.get(), AppMode::Paused),
         state.sub,
@@ -669,6 +717,8 @@ pub fn write_pause_menu_sensor(
         settings.tonemapping,
         settings.msaa_samples,
         cam_msaa,
+        settings.vsync,
+        present_mode,
     );
     let _ = fs::write("forgia_pause_menu.json", json);
 }
@@ -701,6 +751,8 @@ impl Plugin for ForgiaUiPauseMenuPlugin {
                     apply_tonemapping_to_cameras,
                     // Story-599 inc.2 — MSAA caméra FPS (idempotent).
                     apply_msaa_to_cameras,
+                    // Story-599 inc.3 — VSync (Window.present_mode, idempotent).
+                    apply_vsync_to_window,
                     write_pause_menu_sensor,
                 ),
             );
@@ -723,6 +775,8 @@ mod tests {
         assert_eq!(s.tonemapping, "tony", "défaut tonemapping = TonyMcMapface");
         // Story-599 inc.2 : msaa absent du TOML legacy → défaut 4×.
         assert_eq!(s.msaa_samples, 4, "défaut MSAA = 4×");
+        // Story-599 inc.3 : vsync absent du TOML legacy → défaut on.
+        assert!(s.vsync, "défaut VSync = on");
         assert_eq!(s.master_volume, 1.0, "défaut volume = plein");
         assert_eq!(s.window_mode, "windowed", "défaut = comportement pré-595");
         assert_eq!((s.window_width, s.window_height), (1920, 1080));

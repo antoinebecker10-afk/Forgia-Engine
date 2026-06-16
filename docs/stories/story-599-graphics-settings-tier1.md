@@ -2,7 +2,9 @@
 
 > **Statut** : RÉ-IMPLANTATION PROGRESSIVE 2026-06-16 sur base stable (post story-600 qui a corrigé
 > la vraie cause des écrans cassés = stage orphelin, PAS les réglages). Ordre incrémental validé un
-> par un : **inc.1 Tonemapping ✅ committé/validé** → **inc.2 MSAA ✅ validé** → inc.3 VSync (à venir).
+> par un : **inc.1 Tonemapping ✅** → **inc.2 MSAA ✅** → **inc.3 VSync ✅** — TOUS validés runtime
+> (sensor objectif : `fps_camera_msaa_actual:[8]`=réglage, `present_mode_actual:AutoVsync`=réglage,
+> persistance OK). **Story-599 COMPLÈTE.**
 > Chaque incrément : code + check/clippy + build + validation runtime AVANT le suivant.
 >
 > **⚠️ Leçon inc.2 (MSAA)** : appliquer MSAA à la caméra **orbitale 3P** (RPG/Cyber) la casse →
