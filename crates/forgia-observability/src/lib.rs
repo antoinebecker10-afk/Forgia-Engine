@@ -57,6 +57,7 @@ pub mod npcs_sensor;
 pub mod fps_feel_sensor;
 // Story-529 Phase 1 — boons foundation (catalogue + active + tag unlocks).
 pub mod boons_sensor;
+pub mod render_sensor;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -175,6 +176,13 @@ impl Plugin for ForgiaObservabilityPlugin {
                 boons_sensor::sys_write_boons_sensor,
             )
                 .in_set(GameSet::Sensors),
+        );
+        // Audit 2026-06-17 — capteur de rendu cross-mode (forgia2_render.json) :
+        // diagnostic direct écran brun / monde invisible (mesh3d_total vs visible
+        // + état par caméra). Comble le trou d'observabilité du rendu.
+        app.add_systems(
+            Update,
+            render_sensor::sys_write_render_sensor.in_set(GameSet::Sensors),
         );
         // Story-465 — forgia2 aggregator Tier 1 : combat + arena.
         // V7 M1 (story-470) : gate étendu Fps OU Roguelite — V7 réutilise le firing
