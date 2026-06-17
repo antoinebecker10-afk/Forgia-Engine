@@ -146,6 +146,9 @@ pub struct AutoRigged {
 pub enum AutoRigTemplate {
     /// 20 bones bipède Vitruvien (humain, gobelin, orc, nain, céleste).
     Humanoid,
+    /// 20 bones bipède Vitruvien variante arms-down (story-601) — meshes générés
+    /// bras le long du corps (Cyber et assets IA similaires).
+    HumanoidApose,
     /// 20 bones bipède lézard avec tail 4-segments (Rex).
     BipedLizard,
 }

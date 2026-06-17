@@ -291,6 +291,7 @@ pub fn auto_rig_pinocchio_v1(
 pub fn auto_rig_to_skeleton_template_id(t: AutoRigTemplate) -> SkeletonTemplateId {
     match t {
         AutoRigTemplate::Humanoid => SkeletonTemplateId::Humanoid,
+        AutoRigTemplate::HumanoidApose => SkeletonTemplateId::HumanoidApose,
         AutoRigTemplate::BipedLizard => SkeletonTemplateId::BipedLizard,
     }
 }
@@ -417,6 +418,10 @@ mod tests {
         assert_eq!(
             auto_rig_to_skeleton_template_id(AutoRigTemplate::Humanoid),
             SkeletonTemplateId::Humanoid
+        );
+        assert_eq!(
+            auto_rig_to_skeleton_template_id(AutoRigTemplate::HumanoidApose),
+            SkeletonTemplateId::HumanoidApose
         );
         assert_eq!(
             auto_rig_to_skeleton_template_id(AutoRigTemplate::BipedLizard),

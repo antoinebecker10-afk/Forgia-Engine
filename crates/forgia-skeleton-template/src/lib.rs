@@ -169,6 +169,9 @@ pub struct StanceOffsetsTable {
 pub enum SkeletonTemplateId {
     /// Vitruvian biped — humans, gobelins, orcs, dwarves, celestials.
     Humanoid,
+    /// Variante arms-down du Humanoid (story-601) — meshes générés bras le long
+    /// du corps (assets IA Meshy/Tripo, ex. Cyber). Bind A-pose + stance à zéro.
+    HumanoidApose,
     /// Bipède lézard digitigrade avec queue 4-segments (Rex / T-rex / raptors).
     BipedLizard,
     /// Quadrupède (chevaux, loups) — futur, prévu Phase 5 story-480.
@@ -180,6 +183,7 @@ impl SkeletonTemplateId {
     pub fn asset_path(self) -> &'static str {
         match self {
             Self::Humanoid => "genomes/skeleton_humanoid.toml",
+            Self::HumanoidApose => "genomes/skeleton_humanoid_apose.toml",
             Self::BipedLizard => "genomes/skeleton_biped_lizard.toml",
             Self::Quadruped => "genomes/skeleton_quadruped.toml",
         }
@@ -189,6 +193,7 @@ impl SkeletonTemplateId {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Humanoid => "humanoid",
+            Self::HumanoidApose => "humanoid_apose",
             Self::BipedLizard => "biped_lizard",
             Self::Quadruped => "quadruped",
         }
@@ -707,6 +712,7 @@ impl Default for SkeletonTemplatePlugin {
         Self {
             preload: vec![
                 SkeletonTemplateId::Humanoid,
+                SkeletonTemplateId::HumanoidApose,
                 SkeletonTemplateId::BipedLizard,
             ],
         }

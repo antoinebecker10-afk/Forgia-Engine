@@ -248,6 +248,10 @@ impl Plugin for ForgiaRpgPlugin {
                     // Rpg + démo Cyber City (Rex 3P réutilise ce pipeline).
                     .run_if(rex_third_person_active),
             )
+            // Démo Cyber City : overlay debug rig ON (rings + transparence) pour
+            // voir le squelette à travers Cyber, OFF en sortie → RPG reste opaque.
+            .add_systems(OnEnter(GameMode::CyberCity), character::enable_rig_overlay)
+            .add_systems(OnExit(GameMode::CyberCity), character::disable_rig_overlay)
             // Story-583 (2026-06-08) — pose idle « bras le long » des PNJ (sort la
             // T-pose). Système séparé du cœur locomotion (mono-perso .single) pour
             // ne PAS toucher l'anim de Rex. Idempotent (NpcPosed), retry jusqu'à

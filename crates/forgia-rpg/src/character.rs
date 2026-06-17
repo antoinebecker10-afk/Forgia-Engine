@@ -35,6 +35,7 @@ use forgia_anim_locomotion::{
 };
 use forgia_auto_rig::{AutoRigGizmosConfig, AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
+use forgia_core::prelude::GameMode;
 use forgia_player::prelude::{FpsCamera, Player};
 use forgia_skeleton_template::SkeletonTemplateId;
 use std::f32::consts::TAU;
@@ -93,6 +94,7 @@ pub(crate) fn spawn_rex_character(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mode: Res<TestCharacterMode>,
+    state: Res<State<GameMode>>,
     q_player: Query<Entity, With<Player>>,
     q_existing_rex: Query<(), With<RexCharacter>>,
     mut q_fps_cam: Query<&mut Camera, With<FpsCamera>>,
@@ -126,13 +128,43 @@ pub(crate) fn spawn_rex_character(
             // Rex.glb Meshy ont pivot pas exactement à 0.85 sous le mesh top.
             // Fix proprement avec calibration AABB en Phase 4 (foot IK +
             // ground snap). Pour cette session, on accepte le Y offset par défaut.
+            //
+            // 2026-06-16 — Cyber City démo : en GameMode::CyberCity le perso animé
+            // est Cyber.glb (androïde humanoïde) au lieu de Rex (BipedLizard). Même
+            // pipeline auto-rig Pinocchio — Cyber.glb = mesh brut sans skin, comme
+            // Rex (vérifié GLB : 0 skin / 1 mesh). Calibration mesurée sur le GLB :
+            // foot_at_Y = -0.949 (Rex -0.873) → offset -0.95 ; template Humanoid
+            // (Cyber n'a ni queue ni jambes digitigrades). Dette : sélection perso
+            // hardcodée par mode — à terme genome per-character (cf audit anim 2026-06-07).
+            let (char_glb, char_y, auto_tpl, loco_tpl) =
+                if matches!(state.get(), GameMode::CyberCity) {
+                    (
+                        // Story-601 incr.2 : LOD décimé 281k→56k verts (gltf-transform
+                        // weld+simplify) pour passer sous le cap skinning 200k
+                        // (skinning.rs:320). Original Cyber.glb conservé, même bbox.
+                        "models/characters/Cyber_lod.glb#Scene0",
+                        -0.95_f32,
+                        // Story-601 incr.1 : Cyber est généré bras le long du corps
+                        // → template A-pose (bind arms-down) au lieu du Humanoid
+                        // T-pose, pour que le squelette/skinning collent au mesh.
+                        AutoRigTemplate::HumanoidApose,
+                        SkeletonTemplateId::HumanoidApose,
+                    )
+                } else {
+                    (
+                        "models/characters/Rex.glb#Scene0",
+                        -0.85_f32,
+                        AutoRigTemplate::BipedLizard,
+                        SkeletonTemplateId::BipedLizard,
+                    )
+                };
             commands.entity(player_entity).with_children(|parent| {
                 parent.spawn((
                     RexCharacter,
-                    SceneRoot(asset_server.load("models/characters/Rex.glb#Scene0")),
-                    Transform::from_xyz(0.0, -0.85, 0.0)
+                    SceneRoot(asset_server.load(char_glb)),
+                    Transform::from_xyz(0.0, char_y, 0.0)
                         .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-                    NeedsAutoRig::Template(AutoRigTemplate::BipedLizard),
+                    NeedsAutoRig::Template(auto_tpl),
                     // ── 2026-06-02 — Anim pipeline RÉACTIVÉ (story-496 Incrément 1) ──
                     // Cause historique (T-pose + pied déformé) corrigée : proc_walk
                     // ne suppose plus que le X local d'un os est l'axe de flexion.
@@ -145,7 +177,7 @@ pub(crate) fn spawn_rex_character(
                     LocomotionTarget,
                     LocomotionBoneCache::default(),
                     ProcBodyAnim::default(),
-                    LocomotionTemplate(SkeletonTemplateId::BipedLizard),
+                    LocomotionTemplate(loco_tpl),
                 ));
             });
         }
@@ -551,6 +583,20 @@ pub(crate) fn calibrate_rex_y_one_shot(
             );
         }
     }
+}
+
+/// Active l'overlay debug du rig (rings gizmos + transparence du mesh) le temps
+/// de la démo Cyber City, pour voir le squelette auto-rigué à travers Cyber.
+/// Couplé à `AutoRigGizmosConfig.enabled` (rings via `draw_rig_gizmos`,
+/// transparence via `rex_make_transparent_one_shot`). Remis OFF en sortie
+/// (`disable_rig_overlay`) → le RPG reste opaque (rendu final validé 2026-06-07).
+pub(crate) fn enable_rig_overlay(mut gizmos: ResMut<AutoRigGizmosConfig>) {
+    gizmos.enabled = true;
+}
+
+/// Restaure l'overlay rig OFF en quittant la démo Cyber City (cf `enable_rig_overlay`).
+pub(crate) fn disable_rig_overlay(mut gizmos: ResMut<AutoRigGizmosConfig>) {
+    gizmos.enabled = false;
 }
 
 /// Marker idempotence pour `rex_make_transparent_one_shot`.
