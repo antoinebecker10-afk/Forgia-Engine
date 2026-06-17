@@ -3,8 +3,11 @@
 //! Track player movement (position xyz + velocity m/s + grounded) ET collision
 //! state (KCC contact count + max effective_translation vs requested).
 //! "stuck" = velocity_planar < 0.05 m/s pendant > 30 frames consécutives
-//! malgré présence d'input mouvement (proxy : last_dt_ms relevant — pas
-//! d'input direct query ici pour rester cross-crate light).
+//! **ET intention de mouvement** (le KCC a demandé un déplacement planaire via
+//! `KinematicCharacterController.translation` mais le joueur n'a pas bougé).
+//! Sans intention (idle, dialogue, viser sans bouger) → PAS stuck. Corrige le
+//! faux positif 2026-06-17 (idle flaggé "critical" à tort). Reste cross-crate
+//! light (Rapier déjà importé, aucune dep input).
 //!
 //! Bloc canonique pour distinguer :
 //! - freeze visuel (lag frame, player en mouvement mais render hang)
@@ -14,11 +17,14 @@
 //! Story-526 — Diagnostic freeze RPG+Roguelite (2026-05-26).
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::KinematicCharacterControllerOutput;
+use bevy_rapier3d::prelude::{KinematicCharacterController, KinematicCharacterControllerOutput};
 use forgia_player::Player;
 
 const STUCK_VEL_EPSILON: f32 = 0.05; // m/s
 const STUCK_FRAMES_THRESHOLD: u32 = 30; // ~0.5s @ 60fps
+/// Déplacement planaire demandé/frame (m) au-dessus duquel on considère qu'il y
+/// a INTENTION de bouger. En-dessous = idle (pas d'input planaire) → jamais stuck.
+const MOVE_INTENT_EPSILON: f32 = 0.001;
 
 #[derive(Resource, Default)]
 pub struct PlayerStateAccum {
@@ -30,6 +36,7 @@ pub struct PlayerStateAccum {
     pub last_velocity_y_m_s: f32,
     pub last_grounded: bool,
     pub last_kcc_collisions: usize,
+    pub last_move_intent: f32,
     pub frames_observed: u64,
 }
 
@@ -37,10 +44,17 @@ pub struct PlayerStateAccum {
 pub fn sys_track_player_state(
     time: Res<Time>,
     mut accum: ResMut<PlayerStateAccum>,
-    q_player: Query<(&Transform, Option<&KinematicCharacterControllerOutput>), With<Player>>,
+    q_player: Query<
+        (
+            &Transform,
+            Option<&KinematicCharacterControllerOutput>,
+            Option<&KinematicCharacterController>,
+        ),
+        With<Player>,
+    >,
 ) {
     let dt = time.delta_secs().max(1e-6);
-    let Ok((tf, kcc_out)) = q_player.single() else {
+    let Ok((tf, kcc_out, kcc)) = q_player.single() else {
         // Pas de player (Menu/Pause/AppNotInGame) — reset stuck counter.
         accum.stuck_frames_consecutive = 0;
         accum.last_pos_recorded = false;
@@ -69,7 +83,16 @@ pub fn sys_track_player_state(
         accum.last_kcc_collisions = out.collisions.len();
     }
 
-    if vel_planar < STUCK_VEL_EPSILON {
+    // Intention de mouvement = déplacement planaire demandé par le KCC ce frame.
+    let move_intent = kcc
+        .and_then(|c| c.translation)
+        .map(|t| (t.x * t.x + t.z * t.z).sqrt())
+        .unwrap_or(0.0);
+    accum.last_move_intent = move_intent;
+
+    // Stuck UNIQUEMENT si le joueur VOULAIT bouger (intent) mais n'a pas bougé.
+    // Idle / dialogue / viser sans bouger (intent ~0) → reset (jamais stuck).
+    if vel_planar < STUCK_VEL_EPSILON && move_intent > MOVE_INTENT_EPSILON {
         accum.stuck_frames_consecutive = accum.stuck_frames_consecutive.saturating_add(1);
         if accum.stuck_frames_consecutive == STUCK_FRAMES_THRESHOLD {
             accum.stuck_events_session = accum.stuck_events_session.saturating_add(1);
@@ -117,7 +140,7 @@ pub fn sys_write_player_state_sensor(
     );
 
     let json = format!(
-        r#"{{"id":"player_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"position":[{:.3},{:.3},{:.3}],"velocity_planar_m_s":{:.3},"velocity_y_m_s":{:.3},"grounded":{},"kcc_collisions":{},"stuck_frames_consecutive":{},"stuck_events_session":{},"frames_observed":{}}}"#,
+        r#"{{"id":"player_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"position":[{:.3},{:.3},{:.3}],"velocity_planar_m_s":{:.3},"velocity_y_m_s":{:.3},"grounded":{},"kcc_collisions":{},"move_intent_planar":{:.4},"stuck_frames_consecutive":{},"stuck_events_session":{},"frames_observed":{}}}"#,
         time.elapsed_secs(),
         accum.last_pos.x,
         accum.last_pos.y,
@@ -126,6 +149,7 @@ pub fn sys_write_player_state_sensor(
         accum.last_velocity_y_m_s,
         accum.last_grounded,
         accum.last_kcc_collisions,
+        accum.last_move_intent,
         accum.stuck_frames_consecutive,
         accum.stuck_events_session,
         accum.frames_observed,
