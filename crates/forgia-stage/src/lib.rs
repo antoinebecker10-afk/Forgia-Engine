@@ -1213,8 +1213,13 @@ pub fn cleanup_stage_arena(
     mut result: ResMut<StageLoadResult>,
 ) {
     let n = despawn_stage_entities(&mut commands, &q, &stats, &mut result);
+    // Story-600 (re-appliqué 2026-06-17) : retirer NOTRE propre requête de spawn —
+    // sinon le système ungated `spawn_stage_arena_on_request` la revoit à la frame
+    // suivante (state reset ≠ Ready) et RE-spawne le stage Roguelite dans le mode
+    // suivant (arène crypts_of_anvil dans CyberCity, confirmé runtime 2026-06-17).
+    commands.remove_resource::<StageLoadRequest>();
     if n > 0 {
-        info!("[stage-arena] cleanup: despawned {n} stage entities");
+        info!("[stage-arena] cleanup: despawned {n} stage entities + StageLoadRequest retirée");
     }
 }
 

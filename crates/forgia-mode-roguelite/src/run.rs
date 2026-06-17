@@ -131,6 +131,11 @@ pub fn sys_stage_dispatch(
     mut commands: Commands,
     run_state: Option<Res<State<RunState>>>,
     run_seed: Option<Res<RunSeed>>,
+    // Story-600 (re-appliqué 2026-06-17) : la requête peut avoir été retirée par
+    // `cleanup_stage_arena` (OnExit Roguelite). À la ré-entrée au MÊME depth, le
+    // `Local` idempotent bloquerait la ré-insertion → arène vide. On la (ré)insère
+    // donc si absente, même si le depth n'a pas changé.
+    request: Option<Res<forgia_stage::StageLoadRequest>>,
     mut last_depth: Local<Option<(u8, bool)>>,
 ) {
     let Some(state) = run_state.as_deref().map(|s| s.get()) else {
@@ -143,7 +148,8 @@ pub fn sys_stage_dispatch(
         // Defeat/Victory : keep last stage visible (no-op).
         _ => return,
     };
-    if key == *last_depth {
+    // Idempotent SAUF si la requête a disparu (cleanup) → auto-réparation ré-entrée.
+    if key == *last_depth && request.is_some() {
         return;
     }
     let Some((depth, is_boss)) = key else {
