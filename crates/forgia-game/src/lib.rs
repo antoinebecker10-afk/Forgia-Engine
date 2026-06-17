@@ -18,6 +18,9 @@ use forgia_core::prelude::*;
 /// Démo perf moteur (2026-06-15) — "Cyber City démo" : charge un GLB lourd +
 /// flycam libre pour stress-tester le rendu. Entrée via le menu principal.
 mod cyber_city;
+/// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
+/// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
+mod color_grading;
 
 /// Build the App with all Forgia plugins wired, then run it. Returns `AppExit`.
 pub fn run_game() -> AppExit {
@@ -134,6 +137,10 @@ pub fn run_game() -> AppExit {
     // 7e. Démo perf "Cyber City" (2026-06-15) — GLB lourd + flycam libre,
     // entrée menu dédiée. Mode self-contained (GameMode::CyberCity).
     app.add_plugins(cyber_city::CyberCityDemoPlugin);
+
+    // 7f. Color grading filmique par mode (story-602) — ColorGrading par GameMode,
+    // hot-reload assets/genomes/color_grading.toml. Sensor forgia2_color_grading.json.
+    app.add_plugins(color_grading::ColorGradingPlugin);
 
     // 7c. Village data-driven (story-441) — Prefab + Village Loader.
     // 2026-05-20 fix : ForgiaPrefabPlugin peut déjà être ajouté transitivement

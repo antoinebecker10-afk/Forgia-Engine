@@ -1,0 +1,40 @@
+# Color grading par mode de jeu — hot-reload (mtime 1Hz, Shift+F12 inutile,
+# le poll détecte le changement de fichier). Tune les LOOKS live sans rebuild.
+#
+# Valeurs = DELTAS depuis le neutre :
+#   exposure        EV offset (0 = neutre, + plus clair)        [-3..3]
+#   temperature     + = chaud/rouge, - = froid/bleu             [-1..1]
+#   tint            + = magenta, - = vert                       [-1..1]
+#   post_saturation + = couleurs plus vives (après tonemapping) [-1..3] (1.0 ajouté)
+#   contrast        + = midtones plus contrastés                [-1..3] (1.0 ajouté)
+#   saturation      + = midtones plus saturés                   [-1..3] (1.0 ajouté)
+#
+# La courbe (Tonemapping) reste le réglage user global (ESC → Profil colorimétrique).
+# Modes sans section ici (Menu/Fps) → grading neutre (reset, pas de fuite).
+
+[roguelite]
+# Forge volcanique, cartoon : chaud, punchy.
+exposure = 0.0
+temperature = 0.20
+tint = 0.0
+post_saturation = 0.10
+contrast = 0.08
+saturation = 0.05
+
+[cybercity]
+# Cyberpunk néon : froid/bleu, highlights pop, contrasté.
+exposure = 0.0
+temperature = -0.15
+tint = 0.05
+post_saturation = 0.15
+contrast = 0.12
+saturation = 0.08
+
+[rpg]
+# Open world nature : naturel, équilibré, doux.
+exposure = 0.0
+temperature = 0.05
+tint = 0.0
+post_saturation = 0.0
+contrast = 0.0
+saturation = 0.0

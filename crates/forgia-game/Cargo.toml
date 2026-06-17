@@ -52,3 +52,6 @@ forgia-worldgen = { workspace = true }
 # Story-581 — debug overlay dev-loop (monitor perf/mémoire/VRAM egui). La crate
 # existait (story-547) mais n'était jamais branchée dans le jeu → monitor invisible.
 forgia-debug = { workspace = true }
+# Story-602 — color grading par mode (genome TOML hot-reload).
+serde = { workspace = true }
+toml = { workspace = true }
