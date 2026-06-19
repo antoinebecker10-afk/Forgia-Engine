@@ -6,12 +6,13 @@
 //! 3. `sys_wave_orchestrator` poll Query<&ArenaBot> chaque frame :
 //!    - si bots_alive == 0 ET wave en cours : démarre break (3s)
 //!    - quand break_secs_left <= 0 : spawn next wave (current_wave +=1)
-//!    - quand current_wave > WAVES_TOTAL : emit `EndRunEvent(Victory)`
+//!    - quand current_wave >= WAVES_TOTAL : `boss_defeated=true` → la porte du
+//!      socle s'ouvre (story-603 ; plus d'`EndRunEvent(Victory)` auto)
 //!
 //! Scaling : wave 1 = 8 ennemis (3T/3R/2S), wave 2 = 12 (4T/4R/4S), wave 3 = 16 (6T/6R/4S).
 
 use crate::enemies::{self, EnemyArchetype};
-use crate::run::{EndRunEvent, RogueliteRunMarker, RunResult};
+use crate::run::RogueliteRunMarker;
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody, Sensor};
@@ -46,6 +47,11 @@ pub struct RogueliteWave {
     /// True quand on est en train d'attendre le prochain spawn (entre 2 vagues).
     pub in_break: bool,
     pub victory_emitted: bool,
+    /// Story-603 — true dès que la vague finale (boss) est nettoyée. Ouvre la
+    /// porte du socle (`loot_room::sys_reconcile_boss_gate`). Remplace l'ancienne
+    /// émission `EndRunEvent(Victory)` (décision user 2026-06-17 : pas de victoire
+    /// auto, boucle boss → porte → parcours → arène). Reset au start de run.
+    pub boss_defeated: bool,
 }
 
 impl Default for RogueliteWave {
@@ -56,6 +62,7 @@ impl Default for RogueliteWave {
             break_secs_left: 0.0,
             in_break: false,
             victory_emitted: false,
+            boss_defeated: false,
         }
     }
 }
@@ -210,7 +217,6 @@ pub fn sys_wave_orchestrator(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
-    mut end_run: MessageWriter<EndRunEvent>,
     mut open_coffre: MessageWriter<OpenCoffreRequest>,
     mut seen_alive: Local<bool>,
     // Story-571 — gain de Souls méta en fin de wave/boss (persistant).
@@ -234,12 +240,16 @@ pub fn sys_wave_orchestrator(
             // Story-571 — bonus Souls méta pour le boss/finale (persistant).
             meta.current = meta.current.saturating_add(crate::run::SOULS_PER_BOSS);
             meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_BOSS);
+            // Story-603 — décision user 2026-06-17 : PLUS d'écran Victoire auto.
+            // Tuer le boss ouvre la porte du socle (`loot_room::sys_reconcile_boss_gate`
+            // lit `boss_defeated`). `victory_emitted` reste le latch qui stoppe
+            // l'orchestrateur (no-op au prochain tick) + gèle `obs_roguelite_player_death`.
+            // Boucle : boss → porte → parcours → portail Retour → arène. Condition de
+            // fin de run à brancher plus tard.
             wave.victory_emitted = true;
-            end_run.write(EndRunEvent {
-                result: RunResult::Victory,
-            });
+            wave.boss_defeated = true;
             info!(
-                "[roguelite] All {WAVES_TOTAL} waves cleared — VICTORY (+{} Souls méta boss)",
+                "[roguelite] All {WAVES_TOTAL} waves cleared — BOSS DEFEATED (+{} Souls méta) → porte du socle s'ouvre",
                 crate::run::SOULS_PER_BOSS
             );
             return;
@@ -370,6 +380,7 @@ mod tests {
         assert_eq!(w.bots_alive, 0);
         assert!(!w.in_break);
         assert!(!w.victory_emitted);
+        assert!(!w.boss_defeated);
     }
 
     #[test]

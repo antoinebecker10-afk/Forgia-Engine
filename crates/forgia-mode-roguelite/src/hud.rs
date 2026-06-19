@@ -31,7 +31,7 @@ use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
 use forgia_player::FpsCamera;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
-use forgia_stage::graph::{RunGraph, StageKind};
+use forgia_stage::graph::StageKind;
 // TODO(story-471..479): SystemTime/UNIX_EPOCH utilisés par draw_bark_bubble — désactivé
 // use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -43,7 +43,6 @@ pub(crate) fn draw_wave_counter(
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
     wave: Res<RogueliteWave>,
-    run_graph: Option<Res<RunGraph>>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -74,10 +73,9 @@ pub(crate) fn draw_wave_counter(
     );
     chunky_rect_filled(&painter, panel_rect, C_BG_DARK, 3.0, 10.0);
 
-    // Texte principal "WAVE X / N".
-    // TODO(story-471..479): current_stage_kind + current_stage_depth supprimés de RogueliteWave
-    // — remplacés par current_wave (plus simple, pas de stage graph).
-    let total = run_graph.as_deref().map(|g| g.total_stages).unwrap_or(5);
+    // Texte principal "WAVE X / N". Story-603 — N = WAVES_TOTAL (3, dont la 3e =
+    // boss), pas `RunGraph.total_stages` (4, nœuds du graphe) qui affichait "X/4".
+    let total = crate::waves::WAVES_TOTAL;
     let main_text = format!("WAVE {} / {}", wave.current_wave, total);
     text_with_outline(
         &painter,
