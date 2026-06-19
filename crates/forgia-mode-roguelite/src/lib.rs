@@ -24,6 +24,7 @@ use forgia_core::prelude::*;
 pub mod atmosphere;
 pub mod audio;
 pub mod boons_apply;
+pub mod boss_portal;
 pub mod boucherie_rocket;
 pub mod coffre_sensor;
 pub mod decor;
