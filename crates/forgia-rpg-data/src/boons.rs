@@ -46,6 +46,36 @@ pub enum BoonRarity {
     Legendary,
 }
 
+/// Paliers de boons débloqués en permanence (méta-progression, story-616).
+/// Common toujours offert ; Uncommon/Rare/Legendary se débloquent à l'Enclume
+/// (en Âmes). Set par `forgia-mode-roguelite` depuis `MetaShopSave`. Le gate
+/// légendaire INTRA-RUN (`ActiveBoons.unlocked_legendary`, 3 tags) s'applique EN PLUS.
+// Départ minimal (décision user 2026-06-24) : tout false = seul le pool Common
+// est offert (derive Default).
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
+pub struct UnlockedBoonTiers {
+    pub uncommon: bool,
+    pub rare: bool,
+    pub legendary: bool,
+}
+
+impl UnlockedBoonTiers {
+    /// Tout débloqué (vétéran / tests).
+    pub fn all() -> Self {
+        Self { uncommon: true, rare: true, legendary: true }
+    }
+
+    /// Le palier de cette rareté est-il offert ? Common toujours vrai.
+    pub fn allows(&self, rarity: BoonRarity) -> bool {
+        match rarity {
+            BoonRarity::Common => true,
+            BoonRarity::Uncommon => self.uncommon,
+            BoonRarity::Rare => self.rare,
+            BoonRarity::Legendary => self.legendary,
+        }
+    }
+}
+
 /// Tags used for synergy / legendary unlock. New tags can be added freely —
 /// `BoonTag::from_str` falls back to `BoonTag::Other(String)` so the TOML is
 /// forward-compatible.
@@ -270,12 +300,15 @@ pub struct CoffrePickedEvent {
 pub fn roll_candidates(
     catalogue: &BoonsCatalogue,
     active: &ActiveBoons,
+    tiers: &UnlockedBoonTiers,
     count: usize,
     mut next_index: impl FnMut(usize) -> usize,
 ) -> Vec<BoonId> {
     let mut pool: Vec<&BoonDef> = catalogue
         .entries
         .iter()
+        // Palier méta débloqué (Common toujours ; Uncommon/Rare/Legendary gated) — story-616.
+        .filter(|b| tiers.allows(b.rarity))
         .filter(|b| match b.rarity {
             BoonRarity::Legendary => active.unlocked_legendary.contains(&b.id),
             _ => true,
@@ -318,6 +351,7 @@ pub fn sys_handle_open_coffre(
     mut requests: MessageReader<OpenCoffreRequest>,
     catalogue: Res<BoonsCatalogue>,
     active: Res<ActiveBoons>,
+    tiers: Res<UnlockedBoonTiers>,
     mut session: ResMut<CoffreSession>,
     mut rng: ResMut<CoffreRng>,
 ) {
@@ -327,7 +361,7 @@ pub fn sys_handle_open_coffre(
             continue;
         }
         let mut idx_fn = rng_next_index(&mut rng.0);
-        let candidates = roll_candidates(&catalogue, &active, req.count, &mut idx_fn);
+        let candidates = roll_candidates(&catalogue, &active, &tiers, req.count, &mut idx_fn);
         if candidates.is_empty() {
             warn!(
                 "[boons] coffre open '{}' but eligible pool empty ({} entries)",
@@ -459,6 +493,7 @@ impl Plugin for ForgiaBoonsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BoonsCatalogue>()
             .init_resource::<ActiveBoons>()
+            .init_resource::<UnlockedBoonTiers>()
             .init_resource::<CoffreSession>()
             .init_resource::<CoffreRng>()
             .add_message::<BoonAppliedEvent>()
@@ -654,7 +689,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
         };
         let active = ActiveBoons::default();
         // Force any RNG output — pool should be 2 commons only.
-        let out = roll_candidates(&cat, &active, 3, fake_seq(vec![0, 0, 0, 0]));
+        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, fake_seq(vec![0, 0, 0, 0]));
         assert_eq!(out.len(), 2, "legendary locked → pool=2 → only 2 picks");
         for id in &out {
             assert_ne!(id.0, "l1", "locked legendary must never appear");
@@ -675,7 +710,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
             unlocked_legendary: vec![leg.id.clone()],
             ..Default::default()
         };
-        let out = roll_candidates(&cat, &active, 3, fake_seq(vec![2, 0, 0]));
+        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, fake_seq(vec![2, 0, 0]));
         assert_eq!(out.len(), 3);
         assert!(out.iter().any(|id| id.0 == "l1"));
     }
@@ -691,7 +726,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
         };
         let active = ActiveBoons::default();
         // Force same index every time — swap_remove ensures no repeat anyway.
-        let out = roll_candidates(&cat, &active, 3, |_| 0);
+        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, |_| 0);
         let mut sorted = out.iter().map(|id| id.0.clone()).collect::<Vec<_>>();
         sorted.sort();
         sorted.dedup();
@@ -704,7 +739,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
             entries: vec![def("only", BoonRarity::Common, &[])],
         };
         let active = ActiveBoons::default();
-        let out = roll_candidates(&cat, &active, 3, |_| 0);
+        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, |_| 0);
         assert_eq!(out.len(), 1);
     }
 
@@ -712,8 +747,38 @@ effect = { kind = "damage_mul", factor = 1.15 }
     fn roll_empty_pool_returns_empty() {
         let cat = BoonsCatalogue::default();
         let active = ActiveBoons::default();
-        let out = roll_candidates(&cat, &active, 3, |_| 0);
+        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, |_| 0);
         assert!(out.is_empty());
+    }
+
+    #[test]
+    fn roll_tier_gate_excludes_locked_tiers() {
+        // Story-616 — gating méta des paliers (Common toujours, autres déblocables).
+        let cat = BoonsCatalogue {
+            entries: vec![
+                def("c1", BoonRarity::Common, &[]),
+                def("u1", BoonRarity::Uncommon, &[]),
+                def("r1", BoonRarity::Rare, &[]),
+            ],
+        };
+        let active = ActiveBoons::default();
+        // Défaut = seul Common offert.
+        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::default(), 3, |_| 0);
+        assert_eq!(out.len(), 1, "tiers verrouillés → seul Common éligible");
+        assert_eq!(out[0].0, "c1");
+        // Uncommon débloqué → 2 éligibles (Common + Uncommon), Rare encore exclu.
+        let tiers = UnlockedBoonTiers { uncommon: true, rare: false, legendary: false };
+        let out2 = roll_candidates(&cat, &active, &tiers, 3, |_| 0);
+        assert_eq!(out2.len(), 2);
+        assert!(!out2.iter().any(|id| id.0 == "r1"), "Rare verrouillé exclu");
+    }
+
+    #[test]
+    fn unlocked_boon_tiers_allows_common_always() {
+        let t = UnlockedBoonTiers::default();
+        assert!(t.allows(BoonRarity::Common));
+        assert!(!t.allows(BoonRarity::Uncommon));
+        assert!(UnlockedBoonTiers::all().allows(BoonRarity::Legendary));
     }
 
     #[test]

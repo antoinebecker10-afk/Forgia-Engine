@@ -31,19 +31,25 @@ pub mod decor;
 pub mod element_vfx;
 pub mod elements;
 pub mod enemies;
+pub mod ftue;
 pub mod hud;
 pub mod intro_dialogue;
 pub mod kill_popup;
+pub mod load_timing;
 pub mod loot_room;
+pub mod merchant;
 pub mod meta_shop;
 pub mod parcours_obstacles;
+pub mod persist;
 pub mod poi;
 pub mod run;
 pub mod sensor;
 pub mod shockwave;
 pub mod stations;
+pub mod status_vfx;
 pub mod toon_config;
 pub mod waves;
+pub mod weapon_select;
 
 pub use enemies::{EnemyArchetype, EnemyStats};
 pub use waves::RogueliteWave;
@@ -77,6 +83,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-558 Phase 4 — Boons apply : recompute PlayerCombatMods +
         // observer heal_on_kill.
         app.init_resource::<boons_apply::HealOnKillCumul>();
+        // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
+        // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
+        app.init_resource::<load_timing::LoadTimingState>();
+        app.add_systems(
+            Update,
+            load_timing::sys_load_timing
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         app.add_systems(
             Update,
             (
@@ -222,7 +237,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         );
         app.add_systems(
             Update,
-            elements::sys_hot_reload_element_genome
+            (
+                elements::sys_hot_reload_element_genome,
+                elements::sys_enforce_always_on,
+            )
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
@@ -260,8 +278,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             (
                 element_vfx::sys_refresh_vfx_materials,
                 element_vfx::sys_spawn_element_impact,
-                element_vfx::sys_dot_pulse_vfx,
+                element_vfx::sys_spawn_combustion_vfx,
                 element_vfx::sys_tick_element_sparks,
+                // story-611 VFX — vraies particules hanabi de DoT (remplace le
+                // dot-pulse sphère) : flamme sur brûlure, nuage toxique sur poison.
+                status_vfx::sys_attach_burn_vfx,
+                status_vfx::sys_detach_burn_vfx,
+                status_vfx::sys_attach_poison_vfx,
+                status_vfx::sys_detach_poison_vfx,
+                status_vfx::sys_follow_status_vfx,
             )
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -382,6 +407,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
+            .add_message::<elements::CombustionEvent>()
             // P3 — telegraph boss enrage (UI banner + camera shake punch).
             .add_message::<waves::BossEnrageTriggeredEvent>()
             .add_systems(OnEnter(GameMode::Roguelite), run::sys_spawn_roguelite_scene)
@@ -451,6 +477,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_plugins(parcours_obstacles::ParcoursObstaclesPlugin)
             // Story-591 — L'Enclume des Âmes : méta-progression permanente (hub Lobby).
             .add_plugins(meta_shop::MetaShopPlugin)
+            // Story-612 — Wizard de choix d'arme de départ (carte de stats réelles
+            // + élément + matchup au Lobby, à côté de L'Enclume). Phase 0.
+            .add_plugins(weapon_select::WeaponSelectPlugin)
+            // Story-610 — Commerçant d'arène : sink in-run (Or = munitions/soin,
+            // Âmes = Second souffle revive) + sensor forgia2_merchant.json.
+            .add_plugins(merchant::MerchantPlugin)
+            // Story-597 Phase B — FTUE « mort = centre de gravité » : récap pédago 1re mort
+            // (FtueSave persistée) + sensor forgia2_ftue.json.
+            .add_plugins(ftue::FtuePlugin)
             // Story-558 P2 Vlambeer juice — kill popup cartoon par archetype.
             .add_plugins(kill_popup::RogueliteKillPopupPlugin)
             // Sensor cross-mode : tourne en tout état (menu = run_state "none").

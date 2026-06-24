@@ -25,7 +25,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_core::prelude::*;
 
-use crate::elements::{Element, ElementConfig, ElementUnlocks, StatusBurn, StatusPoison};
+use crate::elements::{CombustionEvent, Element, ElementConfig, ElementUnlocks};
 
 const SENSOR_PATH: &str = "forgia2_element_vfx.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
@@ -57,6 +57,7 @@ pub struct ElementSpark {
 pub struct ElementVfxStats {
     pub sparks_spawned: u32,
     pub dot_pulses: u32,
+    pub combustion_bursts: u32,
 }
 
 /// Configure un matériau d'élément (unlit + émissif coloré + blend). Partagé →
@@ -178,52 +179,64 @@ pub fn sys_spawn_element_impact(
     }
 }
 
-// ─── Pulse sur les ennemis en DoT ───────────────────────────────────────────
+// ─── Pulse DoT sur l'ennemi ─────────────────────────────────────────────────
+// REMPLACÉ (story-611) par `status_vfx.rs` : vraies particules hanabi continues
+// (flamme sur StatusBurn, nuage toxique sur StatusPoison, attachées à l'ennemi).
+// L'ancien dot-pulse sphère jetable est retiré. `stats.dot_pulses` est ré-
+// incrémenté par les systèmes d'attache → le sensor reste honnête.
 
-/// Tous les `dot_pulse_period`, spawn un petit pulse coloré (SANS lumière) sur
-/// chaque ennemi en feu (orange) / empoisonné (vert) → l'état est lisible.
-pub fn sys_dot_pulse_vfx(
-    time: Res<Time>,
-    mut accum: Local<f32>,
+// ─── Burst de Combustion (réaction Feu+Poison) ──────────────────────────────
+
+/// Lit `CombustionEvent` (émis par `elements::sys_apply_elements_on_hit`) et
+/// spawn un burst orange (feu, grand + lumineux) + un halo vert (poison, plus
+/// petit) → la fusion est lisible. Throttlé en amont (cooldown/cible) donc pas
+/// de cap anti-spam ici.
+pub fn sys_spawn_combustion_vfx(
+    mut events: MessageReader<CombustionEvent>,
     config: Res<ElementConfig>,
     assets: Option<Res<ElementVfxAssets>>,
     mut stats: ResMut<ElementVfxStats>,
-    q_burn: Query<&GlobalTransform, With<StatusBurn>>,
-    q_poison: Query<&GlobalTransform, With<StatusPoison>>,
     mut commands: Commands,
 ) {
-    if !config.vfx.enabled {
-        return;
-    }
     let Some(assets) = assets else {
         return;
     };
-    *accum += time.delta_secs();
-    if *accum < config.vfx.dot_pulse_period {
+    if !config.vfx.enabled {
         return;
     }
-    *accum = 0.0;
-
-    let s = config.vfx.dot_pulse_scale;
-    let ttl = config.vfx.impact_ttl;
-    let spawn_pulse = |pos: Vec3, element: Element, commands: &mut Commands| {
+    let ttl = config.vfx.impact_ttl * 2.0;
+    for ev in events.read() {
+        let [r, g, b] = Element::Fire.rgb(&config.vfx);
+        let light0 = config.vfx.light_intensity * 3.0;
+        // Burst orange (feu) — grand + lumineux.
         commands.spawn((
             Mesh3d(assets.sphere.clone()),
-            MeshMaterial3d(assets.mats[element.idx()].clone()),
-            Transform::from_translation(pos + Vec3::Y).with_scale(Vec3::splat(s)),
-            ElementSpark { age: 0.0, ttl, start_scale: s, light0: 0.0 },
+            MeshMaterial3d(assets.mats[Element::Fire.idx()].clone()),
+            Transform::from_translation(ev.pos).with_scale(Vec3::splat(ev.radius)),
+            PointLight {
+                color: Color::srgb(r, g, b),
+                intensity: light0,
+                range: ev.radius * 2.0,
+                shadows_enabled: false,
+                ..default()
+            },
+            ElementSpark { age: 0.0, ttl, start_scale: ev.radius, light0 },
             DespawnOnExit(GameMode::Roguelite),
         ));
-    };
-    for gt in &q_burn {
-        spawn_pulse(gt.translation(), Element::Fire, &mut commands);
-        stats.dot_pulses = stats.dot_pulses.saturating_add(1);
-    }
-    for gt in &q_poison {
-        spawn_pulse(gt.translation(), Element::Poison, &mut commands);
-        stats.dot_pulses = stats.dot_pulses.saturating_add(1);
+        // Halo vert (poison) plus petit, sans lumière.
+        let halo = ev.radius * 0.6;
+        commands.spawn((
+            Mesh3d(assets.sphere.clone()),
+            MeshMaterial3d(assets.mats[Element::Poison.idx()].clone()),
+            Transform::from_translation(ev.pos).with_scale(Vec3::splat(halo)),
+            ElementSpark { age: 0.0, ttl, start_scale: halo, light0: 0.0 },
+            DespawnOnExit(GameMode::Roguelite),
+        ));
+        stats.combustion_bursts = stats.combustion_bursts.saturating_add(1);
     }
 }
+
+// ─── Flammes de bouche de Bourrasque (élément Feu) ──────────────────────────
 
 // ─── Tick : fade + despawn ──────────────────────────────────────────────────
 
@@ -278,11 +291,12 @@ pub fn sys_write_element_vfx_sensor(
 
     let v = &config.vfx;
     let json = format!(
-        r#"{{"id":"element_vfx","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"sparks_spawned":{},"dot_pulses":{},"active_sparks":{active},"colors":{{"fire":[{:.2},{:.2},{:.2}],"poison":[{:.2},{:.2},{:.2}],"explosive":[{:.2},{:.2},{:.2}],"armor_pierce":[{:.2},{:.2},{:.2}]}}}}"#,
+        r#"{{"id":"element_vfx","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"sparks_spawned":{},"dot_pulses":{},"combustion_bursts":{},"active_sparks":{active},"colors":{{"fire":[{:.2},{:.2},{:.2}],"poison":[{:.2},{:.2},{:.2}],"explosive":[{:.2},{:.2},{:.2}],"armor_pierce":[{:.2},{:.2},{:.2}]}}}}"#,
         time.elapsed_secs(),
         v.enabled,
         stats.sparks_spawned,
         stats.dot_pulses,
+        stats.combustion_bursts,
         v.fire_rgb[0], v.fire_rgb[1], v.fire_rgb[2],
         v.poison_rgb[0], v.poison_rgb[1], v.poison_rgb[2],
         v.explosive_rgb[0], v.explosive_rgb[1], v.explosive_rgb[2],

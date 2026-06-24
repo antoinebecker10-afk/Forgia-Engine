@@ -12,13 +12,16 @@
 //!   joueur + ses descendants (viewmodel/armes ont des colliders).
 //! - **Explosion** : `shockwave::aoe_strike` (dégâts + Knockback pop +
 //!   CombatHitEvent attribué RocketLauncher → barks/killfeed/loot) +
-//!   `shockwave::spawn_disc_vfx` orange + CameraTrauma.
+//!   `shockwave::spawn_disc_vfx` VERT poison + CameraTrauma.
+//!
+//! VFX = identité élément **Poison** (vert) : roquette, explosion et preview de
+//! trajectoire sont verts (étaient orange = feu → confusion avec Bourrasque).
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_combat::combat_juice::{CameraTrauma, CombatHitEvent, WeaponFiredEvent};
-use forgia_combat::weapons::WeaponType;
+use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
 use forgia_core::prelude::*;
 use forgia_player::{FpsCamera, Player};
@@ -29,8 +32,10 @@ use crate::shockwave::{spawn_disc_vfx, Knockback};
 const SENSOR_PATH: &str = "forgia2_boucherie.json";
 
 // ─── Constantes balistique/explosion (V1 — genome story-566 avec les sorts) ──
-/// GDD : 12 m/s — lent et lisible, le skill ceiling est dans l'anticipation.
-const ROCKET_SPEED: f32 = 12.0;
+/// Vitesse roquette (user 2026-06-20 : 12 → 30 m/s, plus rapide/tendu). Le
+/// preview de trajectoire montre désormais l'impact, donc la lisibilité ne
+/// dépend plus d'une vitesse lente. Ajustable ici (hardcode V1 ; genome story-566).
+const ROCKET_SPEED: f32 = 30.0;
 /// Gravité projectile dédiée (pas la gravité monde) : lob parabolique doux.
 const ROCKET_GRAVITY: f32 = 5.0;
 /// Petit coup de pouce vertical au lancement (l'arc « festif »).
@@ -100,9 +105,11 @@ fn sys_spawn_rockets(
         let Ok(cam) = q_cam.single() else { continue };
         let fwd: Vec3 = cam.forward().into();
         let origin = cam.translation() + fwd * SPAWN_AHEAD;
+        // Vert POISON (identité élément Boucherie) — était orange = feu, source de
+        // confusion avec Bourrasque. VFX aligné sur l'élément (cf story-611).
         let mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(0.95, 0.45, 0.15),
-            emissive: LinearRgba::rgb(4.0, 1.2, 0.2),
+            base_color: Color::srgb(0.30, 0.95, 0.18),
+            emissive: LinearRgba::rgb(0.6, 4.0, 0.3),
             unlit: true,
             ..default()
         });
@@ -264,10 +271,96 @@ fn explode(
     stats.enemies_hit_run += affected;
     spawn_disc_vfx(
         commands, meshes, materials, center, 0.5, EXPLOSION_RADIUS,
-        Srgba::new(0.95, 0.40, 0.15, 0.90), LinearRgba::rgb(3.5, 1.0, 0.2),
+        // Vert POISON (cf roquette) — distinct de l'AOE Pépin (jaune) et du feu.
+        Srgba::new(0.35, 0.95, 0.20, 0.90), LinearRgba::rgb(0.6, 3.5, 0.3),
     );
     trauma.add(0.5);
     info!("[boucherie] BOUM ! roquette → {affected} touchés (r={EXPLOSION_RADIUS}m)");
+}
+
+// ─── Preview de trajectoire (aide de visée Boucherie) ────────────────────────
+
+/// Pas de simulation du preview (dt grossier = moins de raycasts qu'à 60 fps).
+const PREVIEW_DT: f32 = 1.0 / 30.0;
+/// Plafond de pas (~3 s de vol) — early-break dès l'impact en pratique.
+const PREVIEW_MAX_STEPS: usize = 90;
+
+/// Trace l'arc balistique prévu + le cercle de la zone d'explosion au point
+/// d'arrivée, tant que la roquette (RocketLauncher) est en main. Rejoue la MÊME
+/// balistique que la vraie roquette (`launch_velocity` + `integrate` +
+/// segment-raycast) → la projection ne ment pas. Hot path borné : gated arme en
+/// main, early-break à l'impact, 0 allocation (gizmos immediate-mode).
+fn sys_draw_trajectory_preview(
+    mut gizmos: Gizmos,
+    equipped: Res<EquippedWeapons>,
+    rapier: ReadRapierContext,
+    q_cam: Query<&GlobalTransform, With<FpsCamera>>,
+    q_player: Query<Entity, With<Player>>,
+    q_child_of: Query<&ChildOf>,
+) {
+    if equipped.current != WeaponType::RocketLauncher {
+        return;
+    }
+    let Ok(cam) = q_cam.single() else { return };
+    let Ok(player_e) = q_player.single() else { return };
+    // Exclut le joueur + ses descendants (mêmes règles que la roquette réelle).
+    let is_world = |e: Entity| -> bool {
+        let mut cur = e;
+        for _ in 0..8 {
+            if cur == player_e {
+                return false;
+            }
+            match q_child_of.get(cur) {
+                Ok(parent) => cur = parent.parent(),
+                Err(_) => return true,
+            }
+        }
+        true
+    };
+    let ctx = rapier.single().ok();
+    let fwd: Vec3 = cam.forward().into();
+    let mut pos = cam.translation() + fwd * SPAWN_AHEAD;
+    let mut vel = launch_velocity(fwd);
+
+    let arc = Color::srgb(0.35, 0.95, 0.20); // vert poison (cf roquette/explosion)
+    let mut impact: Option<Vec3> = None;
+    for _ in 0..PREVIEW_MAX_STEPS {
+        let (next, v) = integrate(pos, vel, PREVIEW_DT);
+        let step = next - pos;
+        let len = step.length();
+        let hit = if len > 1e-4 {
+            ctx.as_ref().and_then(|c| {
+                let filter = QueryFilter::default().predicate(&is_world);
+                c.cast_ray(pos, step / len, len, true, filter)
+                    .map(|(_, toi)| pos + (step / len) * toi)
+            })
+        } else {
+            None
+        };
+        match hit {
+            Some(point) => {
+                gizmos.line(pos, point, arc);
+                impact = Some(point);
+                break;
+            }
+            None => {
+                gizmos.line(pos, next, arc);
+                pos = next;
+                vel = v;
+            }
+        }
+    }
+    // Marqueur d'arrivée : cercle = rayon d'explosion (la zone qui va sauter).
+    if let Some(point) = impact {
+        gizmos.circle(
+            bevy::math::Isometry3d::new(
+                point + Vec3::Y * 0.03,
+                Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+            ),
+            EXPLOSION_RADIUS,
+            Color::srgb(0.25, 0.90, 0.18), // vert poison — zone d'explosion
+        );
+    }
 }
 
 /// Nouvelle run = compteurs à zéro.
@@ -324,6 +417,12 @@ impl Plugin for BoucherieRocketPlugin {
                 Update,
                 (sys_spawn_rockets, sys_fly_rockets, sys_count_kills)
                     .chain()
+                    .in_set(GameSet::Effects)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
+            .add_systems(
+                Update,
+                sys_draw_trajectory_preview
                     .in_set(GameSet::Effects)
                     .run_if(in_state(GameMode::Roguelite)),
             )

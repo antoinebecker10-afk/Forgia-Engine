@@ -26,8 +26,9 @@ pub mod skybox_genome;
 pub mod prelude {
     pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
     pub use crate::{
-        CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning, MovementSpeedMultiplier,
-        Player, PlayerMovementTuning,
+        CameraFov, CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning,
+        MovementSpeedMultiplier,
+        Player, PlayerMovementTuning, ViewmodelCamera,
     };
 }
 
@@ -223,9 +224,34 @@ impl Default for Player {
 #[derive(Component)]
 pub struct FpsCamera;
 
+/// Story-618 — caméra dédiée au rendu du viewmodel (arme + bras) avec un FOV
+/// séparé (RenderLayers::layer(1)), enfant de la FpsCamera. Marquée ici (à côté
+/// de FpsCamera) car forgia-viewmodel (qui la spawn) ET forgia-mode-roguelite
+/// (qui l'exclut du toon) dépendent tous deux de forgia-player → zéro cycle.
+/// Exclue du skybox (`attach_skybox_to_camera`) et du toon (roguelite).
+#[derive(Component)]
+pub struct ViewmodelCamera;
+
 #[derive(Resource, Default)]
 pub struct CameraMode {
     pub is_third_person: bool,
+}
+
+/// Story-615 — FOV hipfire de la caméra FPS, en degrés. Source de vérité partagée
+/// entre `forgia-ui-lib` (slider menu ESC → écrit ici) et `forgia-viewmodel`
+/// (`apply_ads_camera_fov` lit ici comme base, puis lerp vers l'ADS). Vit dans
+/// `forgia-player` car c'est la dépendance commune des deux crates (zéro cycle).
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct CameraFov {
+    pub hipfire_deg: f32,
+}
+
+impl Default for CameraFov {
+    fn default() -> Self {
+        // 90° = défaut UserSettings.fov_deg. Plus large que l'ancien hipfire 45°
+        // (≈73° H, étroit) — fenêtre FPS rapide recommandée ~90-110° horizontal.
+        Self { hipfire_deg: 90.0 }
+    }
 }
 
 pub struct ForgiaPlayerPlugin;
@@ -233,6 +259,7 @@ pub struct ForgiaPlayerPlugin;
 impl Plugin for ForgiaPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraMode>()
+            .init_resource::<CameraFov>()
             .init_resource::<MovementSpeedMultiplier>()
             .init_resource::<MouseLookTuning>()
             .init_resource::<PlayerMovementTuning>()
@@ -357,7 +384,9 @@ fn attach_skybox_to_camera(
     // Story 2026-05-17 : query relaxée à toute Camera3d sans Skybox (couvre
     // RpgOrbitCamera RPG en plus de FpsCamera FPS). MenuCamera2d est Camera2d
     // donc exclue naturellement.
-    q_cam: Query<Entity, (With<Camera3d>, Without<Skybox>)>,
+    // Story-618 : exclure la ViewmodelCamera — sinon elle peindrait un skybox
+    // plein écran par-dessus le monde (elle ne doit rendre QUE le viewmodel).
+    q_cam: Query<Entity, (With<Camera3d>, Without<Skybox>, Without<ViewmodelCamera>)>,
 ) {
     let Some(pending) = pending else { return };
 

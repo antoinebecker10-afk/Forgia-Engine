@@ -3378,6 +3378,8 @@ dependencies = [
  "forgia-village-loader",
  "forgia-water",
  "forgia-worldgen",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -3510,7 +3512,9 @@ dependencies = [
  "forgia-audio",
  "forgia-combat",
  "forgia-core",
+ "forgia-crosshair",
  "forgia-damage",
+ "forgia-effects",
  "forgia-input",
  "forgia-mode-fps-arena",
  "forgia-player",
@@ -8969,6 +8973,7 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "toml",
 ]
 
 [[package]]

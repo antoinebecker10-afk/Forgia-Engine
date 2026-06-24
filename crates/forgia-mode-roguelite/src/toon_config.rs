@@ -11,6 +11,7 @@
 //! Bible v1 (cartoon family-friendly) : 4 bands + outline Sobel noir 0.8.
 
 use bevy::prelude::*;
+use forgia_player::prelude::ViewmodelCamera;
 use forgia_postprocess::outline::OutlineSettings;
 use forgia_postprocess::toon::ToonSettings;
 use serde::Deserialize;
@@ -197,8 +198,11 @@ pub fn sys_apply_toon_settings(
     mut commands: Commands,
     cfg: Res<RogueliteToonConfig>,
     mut watch: ResMut<ToonGenomeWatch>,
-    q_cam_all: Query<Entity, With<Camera3d>>,
-    q_cam_new: Query<Entity, Added<Camera3d>>,
+    // Story-618 : exclure la ViewmodelCamera — le toon sur une 2e caméra rejoue le
+    // crash render-graph documenté (dual-pass même surface). Le viewmodel n'est
+    // donc pas cel-shadé (caveat assumé v1).
+    q_cam_all: Query<Entity, (With<Camera3d>, Without<ViewmodelCamera>)>,
+    q_cam_new: Query<Entity, (Added<Camera3d>, Without<ViewmodelCamera>)>,
 ) {
     let cfg_changed = cfg.is_changed();
     let toon = cfg.to_toon();
@@ -229,7 +233,7 @@ pub fn sys_force_apply_toon_settings(
     mut commands: Commands,
     cfg: Res<RogueliteToonConfig>,
     mut watch: ResMut<ToonGenomeWatch>,
-    q_cam: Query<Entity, With<Camera3d>>,
+    q_cam: Query<Entity, (With<Camera3d>, Without<ViewmodelCamera>)>,
 ) {
     let toon = cfg.to_toon();
     let outline = cfg.to_outline();

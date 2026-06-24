@@ -65,7 +65,7 @@ infinite_ammo = false
 low_ammo_threshold = 0.25      # flash <= 3 bullets
 
 [weapons.bourrasque]
-# Slot 2 (Digit2) — Lance-rafales de vent, auto 4/s × 5 pellets (story-532 AC1 v2) — Bourrasque
+# Slot 2 (Digit2) — Mitraillette classique (SMG full-auto, 1 balle/tir) — Bourrasque
 target_size = 0.90              # ★ réduit hipfire 1.10→0.90
 offset_x = 0.22
 offset_y = -0.35
@@ -89,36 +89,36 @@ scope_glass_alpha_ads = 0.20
 # ADS visibility & feel (Phase E 2026-05-18)
 ads_viewmodel_fade_alpha = 0.40   # body semi-transparent SMG
 ads_mouse_sensitivity_factor = 0.70  # cadence rapide, précision moyenne
-# Fire behavior — story-532 AC1 v2 (feedback user 2026-06-11 : le pump 1.5/s
-# « fait trop fusil à pompe » = redondant Boucherie). Bourrasque = LANCE-RAFALES :
-# jet de vent CONTINU, auto 4/s × 5 pellets en cône serré — unique au roster
-# (Pépin semi précis, Lenoir sniper, Boucherie pump lourd, Bourrasque = souffle).
-# 5×6 = 30/rafale bout portant (DPS 120 close), ×0.25 à 12 m = 7.5.
+# Fire behavior — mitraillette classique (feedback user 2026-06-19 : la gerbe de
+# pellets dispersés ne plaît pas). Bourrasque = SMG STANDARD : 1 balle par tir,
+# full-auto rapide, cône quasi nul. DPS conservé vs lance-rafales (≈120 close).
+# 1×11 × 11/s = 121 DPS soutenu ; falloff doux 18→30 m.
 fire_mode = "auto"
 burst_count = 0
-damage = 6.0            # par pellet (5×6 = 30 par rafale)
-fire_rate = 4.0         # rafales de vent continues — ni SMG 16/s ni pump 1.5/s
-range = 12.0            # courte portée identitaire (l'air s'essouffle)
-pellets = 5             # petite gerbe par rafale
-spread_deg = 12.0       # cône serré = jet de vent, pas blast de pompe
+damage = 11.0           # par balle (1 balle/tir, plus de gerbe)
+fire_rate = 11.0        # cadence SMG soutenue (full-auto)
+range = 80.0            # ★ portée alignée sur Pépin (user 2026-06-24)
+pellets = 1             # balle unique — plus de dispersion
+spread_deg = 1.5        # quasi précis en auto (léger cône de cadence)
 sniper_scope_fullscreen = false
-head_damage_mul = 1.2          # cone weapon = pas focus headshot
-damage_falloff_start = 5.0     # full damage 0-5m (cœur de la danse)
-damage_falloff_end = 12.0      # mort des pellets à 12m
-damage_falloff_min = 0.25
-# Juice vent : léger et vibrant (auto 4/s — pas de gros kick pump)
+head_damage_mul = 1.5          # balle unique = headshot redevient payant
+# Portée de dégâts alignée sur Pépin (user 2026-06-24) : full 0-30 m, -40% à 80 m.
+damage_falloff_start = 30.0    # full damage 0-30 m (= Pépin)
+damage_falloff_end = 80.0      # min damage 80 m+ (= Pépin)
+damage_falloff_min = 0.60      # -40% au-delà (= Pépin)
+# Juice SMG : recul vertical léger, wobble horizontal réduit (arme contrôlée)
 shake_trauma = 0.05
-recoil_pitch_deg = 0.35
-recoil_yaw_random_deg = 0.25   # wobble horizontal — chaos joyeux signature
+recoil_pitch_deg = 0.40
+recoil_yaw_random_deg = 0.10   # wobble horizontal réduit (précision SMG)
 fov_punch_deg = 0.0
 ads_scale_factor = 0.65        # -35% taille en full ADS
-# Ammo v2 : mag 20 = 5 s de vent continu, recharge vive
-mag_size = 20
-reserve_max = 100              # 5 mags total
+# Ammo : mag 30 (~2,7 s de tir auto à 11/s), recharge vive SMG
+mag_size = 30
+reserve_max = 120              # 4 mags total
 reload_time_secs = 1.6
 reload_kind = "mag"
 infinite_ammo = false
-low_ammo_threshold = 0.25      # flash <= 5 ("Saperlipopette, faut recharger !")
+low_ammo_threshold = 0.25      # flash <= 7 ("Saperlipopette, faut recharger !")
 
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir

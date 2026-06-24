@@ -29,6 +29,7 @@ use forgia_damage::Health;
 use forgia_player::Player;
 use forgia_rpg_data::boons::{
     rng_next_index, roll_candidates, ActiveBoons, BoonId, BoonsCatalogue, CoffreRng,
+    UnlockedBoonTiers,
 };
 use forgia_rpg_data::loot_tables::Pickup;
 
@@ -825,6 +826,7 @@ fn sys_roll_zone_reward(
     mut reward: ResMut<ZoneReward>,
     catalogue: Option<Res<BoonsCatalogue>>,
     active: Res<ActiveBoons>,
+    tiers: Res<UnlockedBoonTiers>,
     unlocks: Res<ElementUnlocks>,
     mut rng: ResMut<CoffreRng>,
     mut state: ResMut<LootRoomState>,
@@ -848,7 +850,7 @@ fn sys_roll_zone_reward(
     // 2) Tous éléments armés → choix de boon stat (comportement story-585).
     let candidates = catalogue
         .as_deref()
-        .map(|cat| roll_candidates(cat, &active, 3, &mut rng_next_index(&mut rng.0)))
+        .map(|cat| roll_candidates(cat, &active, &tiers, 3, &mut rng_next_index(&mut rng.0)))
         .unwrap_or_default();
     if candidates.is_empty() {
         // Aucune option → pas de choix, on TP directement.

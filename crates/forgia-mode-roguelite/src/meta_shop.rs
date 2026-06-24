@@ -86,9 +86,29 @@ impl MetaUpgrade {
     }
 }
 
+/// Déblocage permanent d'une arme (story-613). Pépin = gratuit (jamais listé).
+#[derive(Clone, Debug)]
+pub struct WeaponUnlock {
+    /// Clé genome viewmodel (pepin/bourrasque/madame_lenoir/boucherie).
+    pub key: String,
+    pub name: String,
+    pub cost: u32,
+}
+
 #[derive(Resource, Clone, Debug)]
 pub struct MetaShopCatalogue {
     pub upgrades: Vec<MetaUpgrade>,
+    /// Armes déblocables en Âmes (story-613).
+    pub weapon_unlocks: Vec<WeaponUnlock>,
+    /// Paliers d'atouts (boons) déblocables en Âmes (story-616) — réutilise key/name/cost.
+    pub boon_tier_unlocks: Vec<WeaponUnlock>,
+}
+
+impl MetaShopCatalogue {
+    /// Coût/nom de déblocage d'une arme par clé genome (None = Pépin / inconnue).
+    pub fn weapon_unlock(&self, key: &str) -> Option<&WeaponUnlock> {
+        self.weapon_unlocks.iter().find(|w| w.key == key)
+    }
 }
 
 impl Default for MetaShopCatalogue {
@@ -125,6 +145,18 @@ impl Default for MetaShopCatalogue {
                     costs: vec![15, 35, 60],
                 },
             ],
+            // Miroir EXACT des [[weapon_unlocks]] du genome (story-613).
+            weapon_unlocks: vec![
+                WeaponUnlock { key: "bourrasque".into(), name: "Bourrasque".into(), cost: 60 },
+                WeaponUnlock { key: "madame_lenoir".into(), name: "Madame Lenoir".into(), cost: 150 },
+                WeaponUnlock { key: "boucherie".into(), name: "Boucherie".into(), cost: 250 },
+            ],
+            // Miroir EXACT des [[boon_tier_unlocks]] du genome (story-616).
+            boon_tier_unlocks: vec![
+                WeaponUnlock { key: "uncommon".into(), name: "Atouts Peu communs".into(), cost: 80 },
+                WeaponUnlock { key: "rare".into(), name: "Atouts Rares".into(), cost: 200 },
+                WeaponUnlock { key: "legendary".into(), name: "Atouts Légendaires".into(), cost: 400 },
+            ],
         }
     }
 }
@@ -140,9 +172,20 @@ struct UpgradeToml {
 }
 
 #[derive(Deserialize)]
+struct WeaponUnlockToml {
+    key: String,
+    name: String,
+    cost: u32,
+}
+
+#[derive(Deserialize)]
 struct CatalogueToml {
     #[serde(default)]
     upgrades: Vec<UpgradeToml>,
+    #[serde(default)]
+    weapon_unlocks: Vec<WeaponUnlockToml>,
+    #[serde(default)]
+    boon_tier_unlocks: Vec<WeaponUnlockToml>,
 }
 
 impl MetaShopCatalogue {
@@ -164,10 +207,30 @@ impl MetaShopCatalogue {
                 })
             })
             .collect();
-        if upgrades.is_empty() {
-            Self::default()
-        } else {
-            Self { upgrades }
+        let weapon_unlocks: Vec<WeaponUnlock> = parsed
+            .weapon_unlocks
+            .into_iter()
+            .map(|w| WeaponUnlock { key: w.key, name: w.name, cost: w.cost })
+            .collect();
+        let boon_tier_unlocks: Vec<WeaponUnlock> = parsed
+            .boon_tier_unlocks
+            .into_iter()
+            .map(|w| WeaponUnlock { key: w.key, name: w.name, cost: w.cost })
+            .collect();
+        // Fallback PAR CHAMP : un genome partiel ne perd pas les autres listes.
+        let d = Self::default();
+        Self {
+            upgrades: if upgrades.is_empty() { d.upgrades } else { upgrades },
+            weapon_unlocks: if weapon_unlocks.is_empty() {
+                d.weapon_unlocks
+            } else {
+                weapon_unlocks
+            },
+            boon_tier_unlocks: if boon_tier_unlocks.is_empty() {
+                d.boon_tier_unlocks
+            } else {
+                boon_tier_unlocks
+            },
         }
     }
 
@@ -186,6 +249,17 @@ pub struct MetaShopSave {
     pub version: u32,
     pub souls_total: u32,
     pub ranks: HashMap<String, u32>,
+    /// Armes débloquées en permanence (clés genome). Story-613 — défaut = Pépin seul.
+    #[serde(default = "default_unlocked_weapons")]
+    pub unlocked_weapons: Vec<String>,
+    /// Paliers d'atouts débloqués (uncommon/rare/legendary). Story-616 — défaut vide (Common only).
+    #[serde(default)]
+    pub unlocked_boon_tiers: Vec<String>,
+}
+
+/// Pépin = arme de départ : toujours débloquée (story-613).
+fn default_unlocked_weapons() -> Vec<String> {
+    vec!["pepin".to_string()]
 }
 
 impl Default for MetaShopSave {
@@ -194,6 +268,8 @@ impl Default for MetaShopSave {
             version: SAVE_VERSION,
             souls_total: 0,
             ranks: HashMap::new(),
+            unlocked_weapons: default_unlocked_weapons(),
+            unlocked_boon_tiers: Vec::new(),
         }
     }
 }
@@ -219,6 +295,30 @@ impl MetaShopSave {
         self.ranks.get(id).copied().unwrap_or(0)
     }
 
+    /// Pépin toujours débloquée ; les autres selon le save (story-613).
+    pub fn is_weapon_unlocked(&self, key: &str) -> bool {
+        key == "pepin" || self.unlocked_weapons.iter().any(|k| k == key)
+    }
+
+    /// Débloque une arme (idempotent). Story-613.
+    pub fn unlock_weapon(&mut self, key: &str) {
+        if !self.is_weapon_unlocked(key) {
+            self.unlocked_weapons.push(key.to_string());
+        }
+    }
+
+    /// Palier d'atouts débloqué ? Story-616 (Common toujours offert ailleurs).
+    pub fn is_boon_tier_unlocked(&self, key: &str) -> bool {
+        self.unlocked_boon_tiers.iter().any(|k| k == key)
+    }
+
+    /// Débloque un palier d'atouts (idempotent). Story-616.
+    pub fn unlock_boon_tier(&mut self, key: &str) {
+        if !self.is_boon_tier_unlocked(key) {
+            self.unlocked_boon_tiers.push(key.to_string());
+        }
+    }
+
     fn save_path() -> PathBuf {
         config_dir().join(SAVE_FILE)
     }
@@ -231,14 +331,7 @@ impl MetaShopSave {
     }
 
     pub fn save(&self) {
-        match toml::to_string_pretty(self) {
-            Ok(s) => {
-                if let Err(e) = std::fs::write(Self::save_path(), s) {
-                    warn!("[meta-shop] save failed: {e}");
-                }
-            }
-            Err(e) => warn!("[meta-shop] serialize failed: {e}"),
-        }
+        crate::persist::save_toml_atomic(&Self::save_path(), self, "meta-shop");
     }
 
     // ── Bonus cumulés (lus au run-start) ──
@@ -320,6 +413,23 @@ pub fn sys_flush_meta_save(meta: Res<MetaSouls>, mut save: ResMut<MetaShopSave>)
     save.save();
 }
 
+/// Story-616 — propage les paliers d'atouts débloqués (`MetaShopSave`) vers la
+/// Resource `forgia_rpg_data::boons::UnlockedBoonTiers`, que le roll de boons lit
+/// pour filtrer les candidats. Écrit seulement si différent (pas de churn change-detection).
+pub fn sys_sync_unlocked_boon_tiers(
+    save: Res<MetaShopSave>,
+    mut tiers: ResMut<forgia_rpg_data::boons::UnlockedBoonTiers>,
+) {
+    let want = forgia_rpg_data::boons::UnlockedBoonTiers {
+        uncommon: save.is_boon_tier_unlocked("uncommon"),
+        rare: save.is_boon_tier_unlocked("rare"),
+        legendary: save.is_boon_tier_unlocked("legendary"),
+    };
+    if *tiers != want {
+        *tiers = want;
+    }
+}
+
 /// OnEnter Lobby — hub PROPRE : purge les ennemis survivants (après une Defeat
 /// avec des bots vivants) et ressuscite le joueur (HP au max) pour qu'il puisse
 /// shopper tranquillement avant de relancer.
@@ -360,7 +470,33 @@ pub fn sys_meta_shop_input(
         start_run.write(StartRunEvent { seed: None });
         return;
     }
-    // Achat 1..=4.
+    // Déblocage paliers d'atouts (Digit5/6/7) — story-616.
+    let tier_idx = [KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7]
+        .iter()
+        .position(|k| keys.just_pressed(*k));
+    if let Some(ti) = tier_idx {
+        if let Some(bt) = cat.boon_tier_unlocks.get(ti) {
+            if save.is_boon_tier_unlocked(&bt.key) {
+                info!("[meta-shop] palier d'atouts {} déjà débloqué", bt.name);
+            } else if meta.current < bt.cost {
+                info!(
+                    "[meta-shop] pas assez d'âmes pour {} ({}/{})",
+                    bt.name, meta.current, bt.cost
+                );
+            } else {
+                meta.current -= bt.cost;
+                save.unlock_boon_tier(&bt.key);
+                save.souls_total = meta.current;
+                save.save();
+                info!(
+                    "[meta-shop] palier d'atouts débloqué : {} (-{} âmes, reste {})",
+                    bt.name, bt.cost, meta.current
+                );
+            }
+        }
+        return;
+    }
+    // Achat upgrades 1..=4.
     let idx = [
         KeyCode::Digit1,
         KeyCode::Digit2,
@@ -417,8 +553,10 @@ pub fn draw_meta_shop_lobby(
         return;
     };
 
+    // Story-614 — déplacée à DROITE : le wizard occupe le centre (arme 3D) + la
+    // gauche (stats). L'Enclume (upgrades permanents) tient la colonne droite.
     egui::Area::new(egui::Id::new("forgia_meta_shop"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+        .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(-40.0, 0.0))
         .show(ctx, |ui| {
             // Story-596 — couleurs palette Forge partagée (étaient des littéraux
             // locaux dupliquant FORGE_OR & co) + titre display font.
@@ -468,9 +606,32 @@ pub fn draw_meta_shop_lobby(
                             ui.label(egui::RichText::new(text).size(19.0).color(col));
                             ui.add_space(4.0);
                         }
+                        // Paliers d'atouts (boons) — story-616 (touches 5/6/7).
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new("— ATOUTS (paliers de boons) —")
+                                .size(16.0)
+                                .strong()
+                                .color(FORGE_TEAL),
+                        );
+                        ui.add_space(4.0);
+                        for (i, bt) in cat.boon_tier_unlocks.iter().enumerate() {
+                            let owned = save.is_boon_tier_unlocked(&bt.key);
+                            let (text, col) = if owned {
+                                (format!("[—]  {} — DÉBLOQUÉ", bt.name), C_HP_HIGH)
+                            } else {
+                                let afford = meta.current >= bt.cost;
+                                (
+                                    format!("[{}]  {}  ·  {} âmes", i + 5, bt.name, bt.cost),
+                                    if afford { FORGE_OR } else { C_TEXT_MUTED },
+                                )
+                            };
+                            ui.label(egui::RichText::new(text).size(19.0).color(col));
+                            ui.add_space(4.0);
+                        }
                         ui.add_space(14.0);
                         ui.label(
-                            egui::RichText::new("Touches 1-4 = acheter   ·   ENTRÉE = lancer la run")
+                            egui::RichText::new("1-4 stats · 5-7 atouts · ENTRÉE = lancer")
                                 .size(18.0)
                                 .color(C_TEXT_MUTED),
                         );
@@ -498,6 +659,12 @@ impl Plugin for MetaShopPlugin {
                 .run_if(in_state(RunState::Lobby)),
         );
         app.add_systems(EguiPrimaryContextPass, draw_meta_shop_lobby);
+        // Story-616 — propage les paliers d'atouts débloqués vers forgia-rpg-data
+        // (le roll de boons filtre alors les candidats par palier débloqué).
+        app.add_systems(
+            Update,
+            sys_sync_unlocked_boon_tiers.run_if(in_state(GameMode::Roguelite)),
+        );
         // Hub propre : purge ennemis + revive joueur en entrant au Lobby.
         app.add_systems(OnEnter(RunState::Lobby), sys_lobby_cleanup);
         // Flush save aux moments-clés (réconciliation Âmes → disque).
@@ -570,5 +737,93 @@ mod tests {
         let back: MetaShopSave = toml::from_str(&s).unwrap();
         assert_eq!(back.souls_total, 123);
         assert_eq!(back.rank("max_hp"), 2);
+    }
+
+    // ── Story-613 — déblocage permanent des armes ──
+
+    #[test]
+    fn default_unlocks_only_pepin() {
+        let save = MetaShopSave::default();
+        assert!(save.is_weapon_unlocked("pepin"));
+        assert!(!save.is_weapon_unlocked("bourrasque"));
+        assert!(!save.is_weapon_unlocked("madame_lenoir"));
+        assert!(!save.is_weapon_unlocked("boucherie"));
+    }
+
+    #[test]
+    fn unlock_weapon_is_idempotent() {
+        let mut save = MetaShopSave::default();
+        save.unlock_weapon("bourrasque");
+        save.unlock_weapon("bourrasque");
+        assert!(save.is_weapon_unlocked("bourrasque"));
+        assert_eq!(
+            save.unlocked_weapons.iter().filter(|k| *k == "bourrasque").count(),
+            1
+        );
+    }
+
+    #[test]
+    fn catalogue_has_three_weapon_unlocks_with_costs() {
+        let cat = MetaShopCatalogue::default();
+        assert_eq!(cat.weapon_unlocks.len(), 3);
+        assert_eq!(cat.weapon_unlock("bourrasque").map(|w| w.cost), Some(60));
+        assert!(cat.weapon_unlock("pepin").is_none()); // Pépin jamais listée
+    }
+
+    #[test]
+    fn old_save_without_field_defaults_to_pepin() {
+        // Un save d'avant story-613 (sans `unlocked_weapons`) doit retomber sur Pépin.
+        let old = r#"version = 1
+souls_total = 500
+[ranks]
+max_hp = 3
+"#;
+        let save: MetaShopSave = toml::from_str(old).unwrap();
+        assert!(save.is_weapon_unlocked("pepin"));
+        assert!(!save.is_weapon_unlocked("boucherie"));
+    }
+
+    #[test]
+    fn save_roundtrip_preserves_unlocks() {
+        let mut save = MetaShopSave::default();
+        save.unlock_weapon("madame_lenoir");
+        let s = toml::to_string_pretty(&save).unwrap();
+        let back: MetaShopSave = toml::from_str(&s).unwrap();
+        assert!(back.is_weapon_unlocked("madame_lenoir"));
+        assert!(back.is_weapon_unlocked("pepin"));
+        assert!(!back.is_weapon_unlocked("boucherie"));
+    }
+
+    // ── Story-616 — paliers d'atouts (boons) ──
+
+    #[test]
+    fn boon_tiers_default_locked_and_unlock() {
+        let mut save = MetaShopSave::default();
+        assert!(!save.is_boon_tier_unlocked("uncommon"));
+        save.unlock_boon_tier("uncommon");
+        save.unlock_boon_tier("uncommon"); // idempotent
+        assert!(save.is_boon_tier_unlocked("uncommon"));
+        assert!(!save.is_boon_tier_unlocked("legendary"));
+        assert_eq!(save.unlocked_boon_tiers.len(), 1);
+    }
+
+    #[test]
+    fn catalogue_has_three_boon_tier_unlocks() {
+        let cat = MetaShopCatalogue::default();
+        assert_eq!(cat.boon_tier_unlocks.len(), 3);
+        assert_eq!(cat.boon_tier_unlocks[0].key, "uncommon");
+        assert_eq!(cat.boon_tier_unlocks[2].cost, 400);
+    }
+
+    #[test]
+    fn old_save_defaults_boon_tiers_empty() {
+        // Un save d'avant 616 (sans `unlocked_boon_tiers`) → Common only.
+        let old = r#"version = 1
+souls_total = 500
+unlocked_weapons = ["pepin"]
+[ranks]
+"#;
+        let save: MetaShopSave = toml::from_str(old).unwrap();
+        assert!(!save.is_boon_tier_unlocked("uncommon"));
     }
 }

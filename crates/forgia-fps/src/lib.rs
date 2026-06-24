@@ -20,7 +20,7 @@ use forgia_combat::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponFireCooldown};
 use forgia_core::prelude::*;
 use forgia_crosshair::CrosshairTuning;
-use forgia_damage::{DamageKind, DeathEvent};
+use forgia_damage::{DamageKind, DeathEvent, Mortal};
 use forgia_effects::prelude::{
     spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources, WeaponVfxEffects,
 };
@@ -34,7 +34,8 @@ use forgia_mode_fps_arena::TargetCube;
 use forgia_player::prelude::MouseLookTuning;
 use forgia_player::prelude::*;
 use forgia_viewmodel::{
-    AdsState, AdsTuning, ForgiaViewmodelPlugin, ViewmodelGenomeCtx, ViewmodelGenomeEntry,
+    AdsState, AdsTuning, ForgiaViewmodelPlugin, ViewmodelArmsTuning, ViewmodelFovTuning,
+    ViewmodelGenomeCtx, ViewmodelGenomeEntry, ViewmodelMotionTuning,
 };
 use serde::Deserialize;
 
@@ -126,21 +127,106 @@ pub struct FpsTuning {
     // Story-528 AC1 — aim assist accessibility (Roblox kids + casual).
     #[serde(default)]
     pub aim_assist: FtAimAssist,
+    // Story-617 — présence viewmodel (sway/bob/idle).
+    #[serde(default)]
+    pub viewmodel_motion: FtViewmodelMotion,
+    // Story-617 inc.2 — placement des bras procéduraux.
+    #[serde(default)]
+    pub viewmodel_arms: FtViewmodelArms,
+    // Story-618 — FOV viewmodel séparé.
+    #[serde(default)]
+    pub viewmodel_fov: FtViewmodelFov,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtViewmodelFov {
+    pub enabled: bool,
+    pub fov_deg: f32,
+}
+
+impl Default for FtViewmodelFov {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            fov_deg: 68.0,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtViewmodelArms {
+    pub enabled: bool,
+    pub scale: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+    pub offset_z: f32,
+}
+
+impl Default for FtViewmodelArms {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            scale: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+            offset_z: 0.0,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtViewmodelMotion {
+    pub sway_pos_per_px: f32,
+    pub sway_pos_max: f32,
+    pub sway_rot_per_px_deg: f32,
+    pub sway_rot_max_deg: f32,
+    pub sway_smooth: f32,
+    pub bob_pos: f32,
+    pub bob_freq: f32,
+    pub bob_speed_ref: f32,
+    pub idle_amp: f32,
+    pub idle_freq: f32,
+}
+
+impl Default for FtViewmodelMotion {
+    fn default() -> Self {
+        // Miroir exact de ViewmodelMotionTuning::default (forgia-viewmodel).
+        Self {
+            sway_pos_per_px: 0.0009,
+            sway_pos_max: 0.03,
+            sway_rot_per_px_deg: 0.03,
+            sway_rot_max_deg: 2.5,
+            sway_smooth: 9.0,
+            bob_pos: 0.014,
+            bob_freq: 8.0,
+            bob_speed_ref: 6.0,
+            idle_amp: 0.004,
+            idle_freq: 1.1,
+        }
+    }
 }
 
 #[derive(Deserialize, Clone)]
 pub struct FtAimAssist {
     pub strength: f32,
     pub max_angle_deg: f32,
+    /// Story-615 — borne dure sur la correction de tir (degrés), anti-aimbot.
+    #[serde(default = "default_aa_max_correction")]
+    pub max_correction_deg: f32,
     pub engage_distance_m: f32,
+}
+
+fn default_aa_max_correction() -> f32 {
+    5.0
 }
 
 impl Default for FtAimAssist {
     fn default() -> Self {
         Self {
-            strength: 0.5,
-            max_angle_deg: 5.0,
-            engage_distance_m: 50.0,
+            strength: 0.6,
+            max_angle_deg: 7.0,
+            max_correction_deg: 5.0,
+            engage_distance_m: 60.0,
         }
     }
 }
@@ -164,7 +250,6 @@ pub struct FtFovPunch {
 #[derive(Deserialize, Clone)]
 pub struct FtAds {
     pub lerp_speed: f32,
-    pub default_fov_deg: f32,
     pub punch_attenuation: f32,
 }
 
@@ -294,6 +379,14 @@ pub struct HitscanCtx<'w, 's> {
     /// Story-531 — jauge + tuning lus pour le payoff dégâts (neutre hors Pépin).
     pub pepin_conf: Res<'w, forgia_combat::confidence::PepinConfidence>,
     pub pepin_tuning: Res<'w, pepin::PepinTuning>,
+    /// Story-615 — bullet magnetism : cibles candidates (cross-mode, découplé du
+    /// type `Health` — `Mortal Without<Player>` matche ennemis FPS + Roguelite).
+    pub aim_targets:
+        Query<'w, 's, &'static GlobalTransform, (With<Mortal>, Without<Player>, Without<FpsCamera>)>,
+    pub aim_tuning: Res<'w, aim_assist::AimAssistTuning>,
+    pub aim_metrics: ResMut<'w, aim_assist::AimAssistMetrics>,
+    /// Compteur d'engagements agrégé (forgia2_fps_feel.json).
+    pub feel_metrics: ResMut<'w, FpsFeelMetrics>,
 }
 
 /// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
@@ -367,13 +460,14 @@ impl Plugin for ForgiaFpsPlugin {
             //
             // Fix : sync system tourne en permanence (idempotent, no-op si handle absent).
             .add_systems(Update, ammo_systems::sync_ammo_slots_from_genome)
-            // Story-528 AC1 — aim assist : tourne dans GameSet::Camera (après mouse_look
-            // qui est en Update.chain() côté forgia-player, avant Combat). Gating cross-mode
-            // FPS + Roguelite — RPG est exclu (3P pas concerné).
+            // Story-615 — bullet magnetism : la correction se fait DANS le fire path
+            // (cf. fire_weapon_minimal via HitscanCtx), pas en système caméra. Ici on
+            // ne branche que le sensor d'observabilité (forgia2_aimassist.json, 1Hz).
+            .init_resource::<aim_assist::AimAssistMetrics>()
+            .init_resource::<aim_assist::AimAssistSensorState>()
             .add_systems(
                 Update,
-                aim_assist::aim_assist_system
-                    .in_set(GameSet::Camera)
+                aim_assist::write_aim_assist_sensor
                     .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
             )
             .add_systems(
@@ -615,7 +709,24 @@ fn fire_weapon_minimal(
     }
 
     let origin = cam_tf.translation();
-    let direction = cam_tf.forward().as_vec3();
+    // Story-615 — bullet magnetism : on courbe la DIRECTION DU TIR vers la cible la
+    // plus centrée dans le cône (jamais la caméra — modèle souris). strength=0 ⇒ no-op.
+    let (direction, correction_rad) = aim_assist::bend_fire_direction(
+        origin,
+        cam_tf.forward().as_vec3(),
+        hitscan_ctx.aim_targets.iter().map(|gt| gt.translation()),
+        &hitscan_ctx.aim_tuning,
+    );
+    hitscan_ctx.aim_metrics.shots_total = hitscan_ctx.aim_metrics.shots_total.saturating_add(1);
+    if correction_rad > 0.0 {
+        hitscan_ctx.aim_metrics.shots_corrected =
+            hitscan_ctx.aim_metrics.shots_corrected.saturating_add(1);
+        hitscan_ctx.aim_metrics.last_correction_deg = correction_rad.to_degrees();
+        hitscan_ctx.feel_metrics.aim_assist_engagements_total = hitscan_ctx
+            .feel_metrics
+            .aim_assist_engagements_total
+            .saturating_add(1);
+    }
 
     // Story-559 slice B — son de tir propre à l'arme (hit OU miss). Émis ici : le
     // tir est désormais engagé (trigger OK + munition consommée). Lu par
@@ -943,15 +1054,41 @@ fn sync_fps_tuning(
     mut ch_tuning: ResMut<CrosshairTuning>,
     mut ads_tuning: ResMut<AdsTuning>,
     mut aa_tuning: ResMut<aim_assist::AimAssistTuning>,
+    mut vm_tuning: ResMut<ViewmodelMotionTuning>,
+    mut arms_tuning: ResMut<ViewmodelArmsTuning>,
+    mut vm_fov_tuning: ResMut<ViewmodelFovTuning>,
 ) {
     let Some(g) = handle.as_deref().and_then(|h| assets.get(&h.0)) else {
         return;
     };
     let t = &g.data;
-    // Story-528 AC1 — aim assist hot-reload.
+    // Story-615 — bullet magnetism hot-reload.
     aa_tuning.strength = t.aim_assist.strength;
     aa_tuning.max_angle_deg = t.aim_assist.max_angle_deg;
+    aa_tuning.max_correction_deg = t.aim_assist.max_correction_deg;
     aa_tuning.engage_distance_m = t.aim_assist.engage_distance_m;
+    // Story-617 — présence viewmodel (sway/bob/idle) hot-reload.
+    let vm = &t.viewmodel_motion;
+    vm_tuning.sway_pos_per_px = vm.sway_pos_per_px;
+    vm_tuning.sway_pos_max = vm.sway_pos_max;
+    vm_tuning.sway_rot_per_px_deg = vm.sway_rot_per_px_deg;
+    vm_tuning.sway_rot_max_deg = vm.sway_rot_max_deg;
+    vm_tuning.sway_smooth = vm.sway_smooth;
+    vm_tuning.bob_pos = vm.bob_pos;
+    vm_tuning.bob_freq = vm.bob_freq;
+    vm_tuning.bob_speed_ref = vm.bob_speed_ref;
+    vm_tuning.idle_amp = vm.idle_amp;
+    vm_tuning.idle_freq = vm.idle_freq;
+    // Story-617 inc.2 — placement bras (hot-reload : ajuste sans rebuild).
+    let arms = &t.viewmodel_arms;
+    arms_tuning.enabled = arms.enabled;
+    arms_tuning.scale = arms.scale;
+    arms_tuning.offset_x = arms.offset_x;
+    arms_tuning.offset_y = arms.offset_y;
+    arms_tuning.offset_z = arms.offset_z;
+    // Story-618 — FOV viewmodel séparé (hot-reload).
+    vm_fov_tuning.enabled = t.viewmodel_fov.enabled;
+    vm_fov_tuning.fov_deg = t.viewmodel_fov.fov_deg;
     // Camera shake
     cs_tuning.default_decay = t.camera_shake.default_decay;
     cs_tuning.default_max_rotation = t.camera_shake.default_max_rotation_rad;
@@ -965,9 +1102,9 @@ fn sync_fps_tuning(
     // Mouse look
     ml_tuning.base_sensitivity = t.mouse_look.base_sensitivity;
     ml_tuning.recoil_decay_per_sec = t.mouse_look.recoil_decay_per_sec;
-    // ADS
+    // ADS (story-615 : default_fov_deg retiré — le FOV hipfire est une préf joueur
+    // via forgia_player::CameraFov, plus un gène genome).
     ads_tuning.lerp_speed = t.ads.lerp_speed;
-    ads_tuning.default_fov_deg = t.ads.default_fov_deg;
     ads_tuning.punch_attenuation = t.ads.punch_attenuation;
     // Crosshair
     ch_tuning.hipfire_cross_len = t.crosshair_hipfire.cross_len;

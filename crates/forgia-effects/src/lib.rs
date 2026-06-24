@@ -43,6 +43,9 @@ pub mod prelude {
         spawn_impact_vfx, spawn_muzzle_flash, ImpactVfxMarker, Lifetime, MuzzleVfxMarker,
         WeaponVfxEffects,
     };
+    // Re-export pour les consommateurs (ex. forgia-mode-roguelite status_vfx) qui
+    // spawnent une aura sans dépendre directement de bevy_hanabi.
+    pub use bevy_hanabi::ParticleEffect;
     pub use crate::ForgiaEffectsPlugin;
     // Story-523 re-exports des modules fusionnés.
     pub use crate::damage_numbers::ForgiaDamageNumbersPlugin;
@@ -137,6 +140,8 @@ fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::Weap
         &effects.impact_sparks,
         &effects.impact_dust,
         &effects.impact_flash,
+        &effects.status_flame,
+        &effects.status_poison_cloud,
     ];
     for handle in handles {
         commands.spawn((
@@ -146,7 +151,7 @@ fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::Weap
             weapon_vfx::Lifetime(Timer::from_seconds(5.0, TimerMode::Once)),
         ));
     }
-    info!("[forgia-effects] prespawn 8 hanabi dummies (shader warmup, story-594)");
+    info!("[forgia-effects] prespawn 10 hanabi dummies (shader warmup, story-594)");
 }
 
 fn effects_tick() {

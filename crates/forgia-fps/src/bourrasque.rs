@@ -1,11 +1,13 @@
 //! Bourrasque — stats de tir + sensor (story-532 AC9).
 //!
-//! Bourrasque = `WeaponType::AssaultRifle` (slot Digit2). AC1 (7 pellets cone
-//! 20°, 8 dmg/pellet, 10 m, mag 5, 1.5/s) vit dans la couche definition :
-//! `assets/genomes/viewmodel_arena.toml [weapons.bourrasque]` — rien à coder.
+//! Bourrasque = `WeaponType::AssaultRifle` (slot Digit2). Depuis 2026-06-19 =
+//! mitraillette classique (SMG full-auto, 1 balle/tir, ~11/s) — la gerbe de
+//! pellets dispersés a été retirée (feedback user). Les stats vivent dans la
+//! couche definition : `assets/genomes/viewmodel_arena.toml [weapons.bourrasque]`
+//! — rien à coder côté gameplay.
 //!
 //! Ce module observe le fire path SANS le toucher : `ShotResolved` (1/tir) +
-//! `CombatHitEvent` (1/pellet qui touche) sont MULTICAST — lecteurs killfeed/
+//! `CombatHitEvent` (1/balle qui touche) sont MULTICAST — lecteurs killfeed/
 //! confidence/barks non affectés. Le sort F « Coup de Bourrasque » (gust,
 //! story-572) reste dans forgia-mode-roguelite/shockwave.rs.
 
@@ -21,8 +23,8 @@ pub const BOURRASQUE_WEAPON: WeaponType = WeaponType::AssaultRifle;
 
 const SENSOR_PATH: &str = "forgia2_bourrasque.json";
 /// Doit suivre `pellets` du genome (sensor only — le gameplay lit le genome).
-/// v2 lance-rafales 2026-06-11 : 5 pellets (le pump 7 « faisait trop pompe »).
-const PELLETS_PER_SHOT: u32 = 5;
+/// 2026-06-19 : mitraillette classique = 1 balle/tir (plus de gerbe de pellets).
+const PELLETS_PER_SHOT: u32 = 1;
 
 /// Stats de la run courante — Resource globale (1 joueur).
 #[derive(Resource, Debug, Default, Clone, Copy)]

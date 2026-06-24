@@ -20,7 +20,7 @@ use bevy::window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_audio::UserMasterVolume;
 use forgia_core::prelude::*;
-use forgia_player::{FpsCamera, MouseLookTuning};
+use forgia_player::{CameraFov, FpsCamera, MouseLookTuning};
 use crate::style::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -259,25 +259,21 @@ pub fn apply_settings_to_tuning(
     *applied_once = true;
 }
 
-/// BUG-455-03 fix : apply FOV à la `FpsCamera` quand on entre InGame OU quand
-/// `UserSettings.fov_deg` change. Run en `Update` avec `run_if(in_state(InGame))`
-/// pour couvrir les 2 cas (spawn caméra + slider mutation) sans dépendre du timing
-/// d'OnEnter (FpsCamera spawn pas garantie à OnEnter exact, async asset load).
+/// Story-615 — propage `UserSettings.fov_deg` → `forgia_player::CameraFov` (FOV
+/// hipfire). C'est désormais `apply_ads_camera_fov` (forgia-viewmodel) qui écrit le
+/// `Projection` chaque frame en lerpant `CameraFov.hipfire_deg` → ADS. Avant, ce
+/// système écrivait `Projection` directement et était clobbé chaque frame par l'ADS
+/// (FOV joueur mort, bloqué à 45°). Event-driven (Changed) + sync initiale forcée.
 pub fn apply_fov_to_camera(
     settings: Res<UserSettings>,
-    mut q_cam: Query<&mut Projection, With<FpsCamera>>,
-    mut last_applied: Local<f32>,
+    mut camera_fov: ResMut<CameraFov>,
+    mut applied_once: Local<bool>,
 ) {
-    if !settings.is_changed() && (*last_applied - settings.fov_deg).abs() < 0.01 {
+    if !settings.is_changed() && *applied_once {
         return;
     }
-    let Ok(mut proj) = q_cam.single_mut() else {
-        return;
-    };
-    if let Projection::Perspective(ref mut p) = *proj {
-        p.fov = settings.fov_deg.to_radians();
-        *last_applied = settings.fov_deg;
-    }
+    camera_fov.hipfire_deg = settings.fov_deg;
+    *applied_once = true;
 }
 
 // ─── Story-599 inc.1 — profil colorimétrique (tonemapping) ────────────
@@ -741,7 +737,9 @@ impl Plugin for ForgiaUiPauseMenuPlugin {
                 Update,
                 (
                     apply_settings_to_tuning,
-                    apply_fov_to_camera.run_if(in_state(AppMode::InGame)),
+                    // Story-615 — écrit CameraFov (préf joueur). Plus de run_if InGame :
+                    // doit être prêt avant le spawn caméra (apply_ads_camera_fov lit la base).
+                    apply_fov_to_camera,
                     // Story-595 (M2-B1) : propagation volume + fenêtre, même
                     // pattern event-driven Changed<UserSettings>.
                     apply_settings_to_volume,

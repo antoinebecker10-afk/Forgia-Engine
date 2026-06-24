@@ -1,0 +1,74 @@
+# roguelite_meta_shop.toml — Story-591. L'Enclume des Âmes (méta-progression).
+# Miroir EXACT de MetaShopCatalogue::default() (meta_shop.rs). Chargé au boot.
+#
+# effect : max_hp | damage_mul | damage_reduction | start_gold
+# amount : valeur ajoutée PAR RANG (cumul). costs : coût par rang (len = rang max).
+
+[[upgrades]]
+id = "max_hp"
+name = "Vitalité"
+desc = "+15 PV max"
+effect = "max_hp"
+amount = 15.0
+costs = [20, 40, 70, 110, 160]
+
+[[upgrades]]
+id = "damage"
+name = "Puissance"
+desc = "+8% dégâts"
+effect = "damage_mul"
+amount = 0.08
+costs = [25, 50, 85, 130, 190]
+
+[[upgrades]]
+id = "armor"
+name = "Armure"
+desc = "+5% réduction de dégâts"
+effect = "damage_reduction"
+amount = 0.05
+costs = [30, 60, 100, 150]
+
+[[upgrades]]
+id = "gold"
+name = "Pactole"
+desc = "+50 Or de départ"
+effect = "start_gold"
+amount = 50.0
+costs = [15, 35, 60]
+
+# ── Déblocage permanent des armes (Âmes) — story-613 ──
+# Pépin = arme de départ : toujours débloquée, jamais listée ici.
+# key = clé genome viewmodel (pepin/bourrasque/madame_lenoir/boucherie).
+# Coûts croissants = courbe « évolutive » (nouveau joueur = Pépin seul).
+[[weapon_unlocks]]
+key = "bourrasque"
+name = "Bourrasque"
+cost = 60
+
+[[weapon_unlocks]]
+key = "madame_lenoir"
+name = "Madame Lenoir"
+cost = 150
+
+[[weapon_unlocks]]
+key = "boucherie"
+name = "Boucherie"
+cost = 250
+
+# ── Déblocage permanent des paliers d'ATOUTS (boons), en Âmes — story-616 ──
+# Common = toujours offert (jamais listé). key = uncommon | rare | legendary.
+# Coûts croissants > armes (les boons = profondeur de build).
+[[boon_tier_unlocks]]
+key = "uncommon"
+name = "Atouts Peu communs"
+cost = 80
+
+[[boon_tier_unlocks]]
+key = "rare"
+name = "Atouts Rares"
+cost = 200
+
+[[boon_tier_unlocks]]
+key = "legendary"
+name = "Atouts Légendaires"
+cost = 400

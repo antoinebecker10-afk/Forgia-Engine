@@ -19,12 +19,13 @@
 //! (hot-reload mtime, Shift+F12-like). Le `Default` Rust est le miroir exact du
 //! TOML livré (zéro régression si le fichier disparaît).
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -214,6 +215,38 @@ pub struct ExecuteParams {
     pub hp_ratio_threshold: f32,
 }
 
+/// Réaction **Combustion** (Feu + Poison co-présents sur la cible). Voie "Gunfire
+/// Reborn" (genre-validée 2026-06-23) : burst AOE dont les dégâts = **% du tir
+/// déclencheur** (PAS des stacks), qui **garde** les statuts (re-pulse aux hits
+/// suivants), throttlé par `retrigger_cooldown` par cible (anti-spam fire-rate).
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct CombustionParams {
+    /// Master switch (le sensor flag si off).
+    pub enabled: bool,
+    /// Dégâts sur la cible = `target_pct × dégâts du tir` (2.0 = 200%, modèle Gunfire).
+    pub target_pct: f32,
+    /// Dégâts aux voisins dans le rayon = `area_pct × dégâts du tir` (1.0 = 100%).
+    pub area_pct: f32,
+    /// Rayon (m) du splash autour de la cible.
+    pub radius: f32,
+    /// Délai min (s) entre deux combustions sur la MÊME cible (anti-spam fire-rate).
+    pub retrigger_cooldown: f32,
+}
+
+impl Default for CombustionParams {
+    fn default() -> Self {
+        // Miroir EXACT de la section [combustion] de roguelite_elements.toml.
+        Self {
+            enabled: true,
+            target_pct: 2.0,
+            area_pct: 1.0,
+            radius: 3.5,
+            retrigger_cooldown: 0.8,
+        }
+    }
+}
+
 /// Paramètres VFX (story-588) — couleurs + tailles du flash d'impact et du pulse
 /// DoT. `#[serde(default)]` : si la section `[vfx]` manque du TOML, fallback sur
 /// ces valeurs (backward-compat avec les genomes Phase A). Hot-reload : les
@@ -237,6 +270,10 @@ pub struct VfxParams {
     pub dot_pulse_scale: f32,
     /// Période (s) entre deux pulses DoT.
     pub dot_pulse_period: f32,
+    /// Hauteur (m) de l'aura de statut (flamme/poison) au-dessus de l'origine du
+    /// mob (≈ pieds). Hot-reload : règle l'anti-occlusion (trop bas = caché dans
+    /// le mesh ; capsule mob ~2 m). Lu par `status_vfx`.
+    pub status_y: f32,
     pub fire_rgb: [f32; 3],
     pub poison_rgb: [f32; 3],
     pub explosive_rgb: [f32; 3],
@@ -255,6 +292,7 @@ impl Default for VfxParams {
             light_range: 6.0,
             dot_pulse_scale: 0.3,
             dot_pulse_period: 0.45,
+            status_y: 1.4,
             fire_rgb: [1.0, 0.42, 0.06],
             poison_rgb: [0.42, 1.0, 0.16],
             explosive_rgb: [1.0, 0.82, 0.12],
@@ -281,6 +319,9 @@ pub struct ElementConfig {
     /// VFX (story-588) — optionnel dans le TOML (backward-compat Phase A).
     #[serde(default)]
     pub vfx: VfxParams,
+    /// Réaction Combustion (Feu+Poison) — optionnel dans le TOML (backward-compat).
+    #[serde(default)]
+    pub combustion: CombustionParams,
 }
 
 impl Default for ElementConfig {
@@ -312,6 +353,7 @@ impl Default for ElementConfig {
             aoe: AoeParams { radius: 3.5, damage_factor: 0.5 },
             execute: ExecuteParams { hp_ratio_threshold: 0.25 },
             vfx: VfxParams::default(),
+            combustion: CombustionParams::default(),
         }
     }
 }
@@ -416,6 +458,7 @@ pub struct ElementStats {
     pub poisons_applied: u32,
     pub aoe_hits: u32,
     pub executes: u32,
+    pub combustions: u32,
 }
 
 impl ElementStats {
@@ -527,6 +570,43 @@ pub fn sys_reset_element_unlocks(
     }
 }
 
+/// Override dev `always_on` **LIVE** : si le genome passe `always_on=true`
+/// (hot-reload mtime), arme les 4 éléments immédiatement SANS relancer le run.
+/// Cheap (check `count`). Ship = `always_on=false` → no-op total, la progression
+/// (départ armé + portails) reste maître. Évite la friction « rien ne s'applique ».
+pub fn sys_enforce_always_on(config: Res<ElementConfig>, mut unlocks: ResMut<ElementUnlocks>) {
+    if config.always_on && unlocks.count() < Element::all().len() {
+        for e in Element::all() {
+            unlocks.0.insert(e);
+        }
+    }
+}
+
+// ─── Combustion (réaction Feu+Poison) ───────────────────────────────────────
+
+/// Émis quand une Combustion se déclenche — consommé par
+/// `element_vfx::sys_spawn_combustion_vfx` pour le burst visuel (orange/vert).
+#[derive(Message, Debug, Clone, Copy)]
+pub struct CombustionEvent {
+    pub pos: Vec3,
+    pub radius: f32,
+}
+
+/// Params dédiés Combustion regroupés en bundle (reste sous la limite de params
+/// Bevy — règle scalability §params). `cooldowns` borné : décrément + purge/frame.
+#[derive(SystemParam)]
+pub struct CombustionCtx<'w, 's> {
+    pub time: Res<'w, Time>,
+    /// Présence d'un `StatusBurn` existant sur la cible (avant le hit courant).
+    pub q_burn: Query<'w, 's, (), With<StatusBurn>>,
+    /// Buffer voisins réutilisé (0 alloc/hit).
+    pub buf: Local<'s, Vec<Entity>>,
+    /// Cooldown par cible (s restantes) — anti-spam fire-rate.
+    pub cooldowns: Local<'s, HashMap<Entity, f32>>,
+    /// Émet le `CombustionEvent` pour le VFX.
+    pub vfx_events: MessageWriter<'w, CombustionEvent>,
+}
+
 // ─── System : application des éléments au hit ───────────────────────────────
 
 /// Décision PURE (testable headless) d'un hit élémentaire sur la cible. `cur_hp`
@@ -551,6 +631,15 @@ pub fn resolve_target_hit(
     }
 }
 
+/// PUR (testable) — dégâts de Combustion (voie Gunfire) : `(cible, zone)` =
+/// `(target_pct, area_pct) × dégâts du tir déclencheur`. Clampé ≥ 0.
+pub fn combustion_damage(base_damage: f32, target_pct: f32, area_pct: f32) -> (f32, f32) {
+    (
+        (base_damage * target_pct).max(0.0),
+        (base_damage * area_pct).max(0.0),
+    )
+}
+
 /// Lit `CombatHitEvent` (le hit de base est DÉJÀ appliqué par forgia-fps) et
 /// ajoute la couche élémentaire sur `forgia_combat::Health` :
 /// - **bonus de matchup** (× selon archetype, ampli par shred poison),
@@ -570,7 +659,15 @@ pub fn sys_apply_elements_on_hit(
     mut q_poison: Query<&mut StatusPoison>,
     // Buffer AOE réutilisé (0 alloc dans le chemin combat — règle scalability §hot).
     mut aoe_buf: Local<Vec<Entity>>,
+    // Combustion (Feu+Poison) — bundle pour rester sous la limite de params.
+    mut combust: CombustionCtx,
 ) {
+    // Décrémente les cooldowns de Combustion par cible (borné : purge des expirés).
+    let cd_dt = combust.time.delta_secs();
+    combust.cooldowns.retain(|_, t| {
+        *t -= cd_dt;
+        *t > 0.0
+    });
     for ev in events.read() {
         let Some(weapon) = ev.weapon else {
             continue;
@@ -591,6 +688,11 @@ pub fn sys_apply_elements_on_hit(
         // (`ev.is_kill`). Sinon : `try_insert` sur entité en cours de despawn +
         // stats faussées. Un bonus/exécution qui amène la cible à 0 PV est balayé
         // par `despawn_dead_cubes` (sweep par frame, forgia-fps) → DeathEvent/loot.
+        // Présence des statuts AVANT ce hit (combustion = co-présence Feu+Poison).
+        // Calculé HORS du guard is_kill : la combustion détone aussi au coup fatal.
+        let had_burn = combust.q_burn.contains(ev.target);
+        let had_poison = q_poison.contains(ev.target);
+
         if !ev.is_kill {
             let matchup = config.matchup_for(element, archetype);
             // Shred : tant que des stacks de poison sont actifs, le bonus est amplifié.
@@ -641,6 +743,46 @@ pub fn sys_apply_elements_on_hit(
                     stats.poisons_applied = stats.poisons_applied.saturating_add(1);
                 }
                 Element::Explosive | Element::ArmorPierce => {}
+            }
+        }
+
+        // ── Combustion (Feu + Poison co-présents) — voie Gunfire : burst AOE
+        //    = % du tir déclencheur, GARDE les statuts (re-pulse), throttle par
+        //    cible. Détone AUSSI au coup fatal (frappe les voisins), comme l'AOE
+        //    explosif. Guard `ev.damage > 0` : un tir sans dégât (ex. roquette
+        //    genome damage=0) ne brûle ni cooldown ni VFX. Event-driven, 0 scan/frame.
+        if config.combustion.enabled && ev.damage > 0.0 {
+            let now_burn = had_burn || element == Element::Fire;
+            let now_poison = had_poison || element == Element::Poison;
+            if now_burn && now_poison && !combust.cooldowns.contains_key(&ev.target) {
+                combust
+                    .cooldowns
+                    .insert(ev.target, config.combustion.retrigger_cooldown);
+                let (tgt_dmg, area_dmg) = combustion_damage(
+                    ev.damage,
+                    config.combustion.target_pct,
+                    config.combustion.area_pct,
+                );
+                if let Ok(mut hp) = q_health.get_mut(ev.target) {
+                    hp.current = (hp.current - tgt_dmg).max(0.0);
+                }
+                let origin = ev.hit_world_pos;
+                let r2 = config.combustion.radius * config.combustion.radius;
+                combust.buf.clear();
+                combust.buf.extend(q_pos.iter().filter_map(|(e, gt)| {
+                    (e != ev.target && (gt.translation() - origin).length_squared() <= r2)
+                        .then_some(e)
+                }));
+                for &e in &*combust.buf {
+                    if let Ok(mut hp) = q_health.get_mut(e) {
+                        hp.current = (hp.current - area_dmg).max(0.0);
+                    }
+                }
+                stats.combustions = stats.combustions.saturating_add(1);
+                combust.vfx_events.write(CombustionEvent {
+                    pos: origin,
+                    radius: config.combustion.radius,
+                });
             }
         }
 
@@ -754,7 +896,7 @@ pub fn sys_write_elements_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"aoe_hits":{},"executes":{},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks}}}"#,
+        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"explosive":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"aoe_hits":{},"executes":{},"combustions":{},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks}}}"#,
         time.elapsed_secs(),
         config.always_on,
         unlocks.is_unlocked(Element::Fire),
@@ -774,6 +916,7 @@ pub fn sys_write_elements_sensor(
         stats.poisons_applied,
         stats.aoe_hits,
         stats.executes,
+        stats.combustions,
     );
 
     if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
@@ -918,6 +1061,37 @@ mod tests {
         // base 18, bonus = 18×(1.68−1)=12.24, cur 100 → 87.76.
         let (hp, _) = resolve_target_hit(Element::Poison, 100.0, 120.0, 18.0, 1.4, 1.2, 0.25);
         assert!((hp - 87.76).abs() < 1e-2);
+    }
+
+    // ── Combustion (réaction Feu+Poison, voie Gunfire) ──
+
+    #[test]
+    fn combustion_scales_on_triggering_shot_not_stacks() {
+        // Voie Gunfire : burst = % du tir. base 50 → cible ×2.0 = 100, zone ×1.0 = 50.
+        let (tgt, area) = combustion_damage(50.0, 2.0, 1.0);
+        assert_eq!(tgt, 100.0);
+        assert_eq!(area, 50.0);
+    }
+
+    #[test]
+    fn combustion_damage_clamps_non_negative() {
+        let (tgt, area) = combustion_damage(-5.0, 2.0, 1.0);
+        assert_eq!(tgt, 0.0);
+        assert_eq!(area, 0.0);
+    }
+
+    #[test]
+    fn combustion_enabled_by_default_gunfire_shape() {
+        let c = ElementConfig::default();
+        assert!(c.combustion.enabled);
+        assert!(
+            c.combustion.target_pct > c.combustion.area_pct,
+            "cible > zone (modèle Gunfire 200/100%)"
+        );
+        assert!(
+            c.combustion.retrigger_cooldown > 0.0,
+            "throttle anti-spam fire-rate requis"
+        );
     }
 
     // ── VFX (story-588) ──

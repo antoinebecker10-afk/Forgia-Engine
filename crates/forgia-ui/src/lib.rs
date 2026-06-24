@@ -98,7 +98,7 @@ impl Plugin for ForgiaUiPlugin {
             // Story-558 Phase 7 follow-up (2026-05-29) — sync cursor avec
             // CoffreSession.is_open : pendant le break Coffre, libérer la
             // souris pour cliquer Skip/Reroll/cartes sans pivoter la caméra.
-            .add_systems(Update, sys_sync_cursor_with_coffre)
+            .add_systems(Update, (sys_sync_cursor_with_coffre, sys_regrab_cursor_on_focus))
             // Story-455 Phase G — paused_overlay_ui retiré (remplacé par forgia-ui-pause-menu
             // cliquable Resume / Settings / Quit). Le handler ESC/Q reste ici (escape_handler).
             .add_systems(EguiPrimaryContextPass, main_menu_ui)
@@ -132,7 +132,6 @@ fn main_menu_ui(
     mut next_app: ResMut<NextState<AppMode>>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut exit: MessageWriter<AppExit>,
-    mut start_run: MessageWriter<forgia_mode_roguelite::StartRunEvent>,
     mut video: Option<ResMut<MenuVideoState>>,
     asset_server: Res<AssetServer>,
     mut last_state: Local<Option<AppMode>>,
@@ -210,9 +209,12 @@ fn main_menu_ui(
                 }
                 ui.add_space(20.0);
                 if cartoon_btn(ui, "🎲  ROGUELITE RUN", FORGE_OR).clicked() {
+                    // Story-591/612 — n'AUTO-DÉMARRE PLUS la run : on entre au Lobby
+                    // (L'Enclume des Âmes + carte de choix d'arme). La run ne part que
+                    // sur ENTRÉE (meta_shop::sys_meta_shop_input). Sans ça, le Lobby
+                    // était sauté et ni l'Enclume ni le wizard n'apparaissaient.
                     next_game.set(GameMode::Roguelite);
                     next_app.set(AppMode::InGame);
-                    start_run.write(forgia_mode_roguelite::StartRunEvent { seed: None });
                 }
                 ui.add_space(20.0);
                 // Démo perf moteur (2026-06-15) — charge un GLB lourd (cyberpunk
@@ -401,6 +403,31 @@ fn sys_sync_cursor_with_coffre(
             blockers.block_fire = false;
             info!("[forgia-ui] Coffre CLOSED — cursor grabbed, look+fire unblocked");
         }
+    }
+}
+
+/// Re-grab le curseur au RETOUR DE FOCUS fenêtre (alt-tab). winit relâche le
+/// grab `Locked` à la perte de focus, mais `CursorOptions.grab_mode` reste à
+/// `Locked` → Bevy ne détecte aucun changement et ne ré-pousse rien à winit → le
+/// curseur reste libre au retour (il « sort de l'écran »). On force la ré-
+/// application (l'accès `&mut` marque le composant changé) UNIQUEMENT en gameplay
+/// actif : `AppMode::InGame` + `!block_look` — ce qui exclut Pause / Coffre /
+/// Lobby / écran fin-de-run, où le curseur DOIT rester libre (`block_look` y est
+/// déjà à `true`).
+fn sys_regrab_cursor_on_focus(
+    mut focus: MessageReader<bevy::window::WindowFocused>,
+    app_state: Res<State<AppMode>>,
+    blockers: Res<InputBlockers>,
+    mut q_cursor: Query<&mut CursorOptions, With<PrimaryWindow>>,
+) {
+    let regained = focus.read().any(|ev| ev.focused);
+    if !regained || *app_state.get() != AppMode::InGame || blockers.block_look {
+        return;
+    }
+    if let Ok(mut opts) = q_cursor.single_mut() {
+        opts.grab_mode = CursorGrabMode::Locked;
+        opts.visible = false;
+        info!("[forgia-ui] focus regagné — curseur re-grabbed (anti alt-tab)");
     }
 }
 

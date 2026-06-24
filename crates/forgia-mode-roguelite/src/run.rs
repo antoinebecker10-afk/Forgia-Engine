@@ -230,6 +230,8 @@ pub fn obs_roguelite_player_death(
     run_state: Option<Res<State<RunState>>>,
     mut end_run: MessageWriter<EndRunEvent>,
     mut wave: ResMut<crate::waves::RogueliteWave>,
+    mut revive: ResMut<crate::merchant::ReviveTokens>,
+    mut commands: Commands,
 ) {
     // Filter : death cible le Player (pas un bot).
     let Ok(player_entity) = q_player.single() else {
@@ -248,6 +250,22 @@ pub fn obs_roguelite_player_death(
     }
     // Anti double-emit (si Victory déjà fired = run finie, n'override pas).
     if wave.victory_emitted {
+        return;
+    }
+    // Story-610 — « Second souffle » : consomme un jeton revive (acheté au
+    // commerçant en Âmes) au lieu de mourir. Restaure forgia_damage::Health,
+    // source de vérité du DeathEvent (forgia-damage : HP<=0 → DeathEvent).
+    if revive.0 > 0 {
+        revive.0 -= 1;
+        commands.queue(move |world: &mut World| {
+            if let Some(mut hp) = world.get_mut::<forgia_damage::Health>(player_entity) {
+                hp.current = hp.max;
+            }
+        });
+        info!(
+            "[roguelite] Second souffle — joueur ressuscité (revives restants {})",
+            revive.0
+        );
         return;
     }
     wave.victory_emitted = true; // bloque transitions further en orchestrator

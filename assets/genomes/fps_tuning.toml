@@ -23,21 +23,59 @@ decay_secs = 0.150     # 150ms ease-out
 
 [ads]
 lerp_speed = 12.0       # 1/12s ≈ 80ms hipfire ↔ ADS transition
-default_fov_deg = 45.0  # FOV cam hipfire base
 punch_attenuation = 0.7 # -70% fov_punch en ADS (precise aim protection)
+# NB (story-615) : le FOV hipfire n'est plus ici — c'est une préférence joueur
+# (slider menu ESC → forgia_player::CameraFov, défaut 90°), plus un gène genome.
 
 [mouse_look]
 base_sensitivity = 0.002  # rad/pixel
 recoil_decay_per_sec = 8.0
 
-# Story-528 AC1 — accessibility (Roblox kids + casual + femmes 20-35).
-# strength = 0.0 = off / 0.5 = default / 1.0 = max drag.
-# max_angle_deg = demi-cône d'engagement frontal.
-# engage_distance_m = portée max.
+# Story-615 — BULLET MAGNETISM (modèle souris : on corrige le TIR, jamais la caméra).
+# strength       = 0.0 off / 0.6 défaut / 1.0 = referme tout l'écart (borné ci-dessous).
+# max_angle_deg  = demi-cône de candidature : au-delà, la cible est ignorée.
+# max_correction_deg = borne dure sur la correction par tir (anti-aimbot).
+# engage_distance_m  = portée max.
 [aim_assist]
-strength = 0.5
-max_angle_deg = 5.0
-engage_distance_m = 50.0
+strength = 0.6
+max_angle_deg = 7.0
+max_correction_deg = 5.0
+engage_distance_m = 60.0
+
+# Story-617 — PRÉSENCE viewmodel (couche additive par-dessus l'ADS, n'affecte PAS le tir).
+# sway = l'arme traîne quand on tourne la souris ; bob = oscillation de marche ;
+# idle = micro-respiration à l'arrêt. Augmente sway_pos_max/bob_pos pour plus de vie,
+# baisse-les pour une arme plus posée. Hot-reload Shift+F12.
+[viewmodel_motion]
+sway_pos_per_px = 0.0009     # offset (m) par pixel de souris
+sway_pos_max = 0.03          # clamp offset positionnel (m)
+sway_rot_per_px_deg = 0.03   # tilt (deg) par pixel
+sway_rot_max_deg = 2.5       # clamp tilt (deg)
+sway_smooth = 9.0            # vitesse retour au centre (1/s)
+bob_pos = 0.014              # amplitude bob marche (m)
+bob_freq = 8.0               # cycles/s à pleine vitesse
+bob_speed_ref = 6.0          # vitesse (m/s) = bob plein
+idle_amp = 0.004             # amplitude respiration (m)
+idle_freq = 1.1              # cycles/s respiration
+
+# Story-617 inc.2 — placement des MAINS/BRAS procéduraux (hot-reload Shift+F12).
+# Ajuste sans rebuild : offset = décale tout l'ensemble, scale = grossit/réduit.
+# enabled=false pour masquer les bras. NB : un FOV élevé (slider 120°) grossit le
+# viewmodel près de la caméra — baisser scale si les mains paraissent énormes.
+[viewmodel_arms]
+enabled = true
+scale = 1.0
+offset_x = 0.0   # + = droite
+offset_y = 0.0   # + = haut
+offset_z = 0.0   # + = vers soi / - = vers l'avant
+
+# Story-618 — FOV viewmodel SÉPARÉ (arme + bras rendus par une caméra dédiée, FOV
+# fixe indépendant du FOV monde) → plus de déformation « gros tubes » au FOV 120°.
+# fov_deg bas = arme plus « zoomée »/plate ; haut = plus large. enabled=false pour
+# revenir au rendu d'avant (arme au FOV monde). Hot-reload Shift+F12.
+[viewmodel_fov]
+enabled = true
+fov_deg = 68.0
 
 [crosshair_hipfire]
 cross_len = 7.0

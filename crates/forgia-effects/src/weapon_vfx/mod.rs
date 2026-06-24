@@ -7,6 +7,7 @@
 
 pub mod impact;
 pub mod muzzle;
+pub mod status;
 pub mod tracer;
 
 use bevy::prelude::*;
@@ -119,6 +120,9 @@ pub struct WeaponVfxEffects {
     pub impact_sparks: Handle<EffectAsset>,
     pub impact_dust: Handle<EffectAsset>,
     pub impact_flash: Handle<EffectAsset>,
+    // Status DoT continus (flamme sur brûlure, nuage sur poison) — story-611 VFX.
+    pub status_flame: Handle<EffectAsset>,
+    pub status_poison_cloud: Handle<EffectAsset>,
 }
 
 /// Marker: muzzle VFX entity (for cleanup)
@@ -138,6 +142,8 @@ pub fn setup_weapon_vfx(mut commands: Commands, mut effects: ResMut<Assets<Effec
     let impact_sparks = impact::create_impact_sparks(&mut effects);
     let impact_dust = impact::create_impact_dust(&mut effects);
     let impact_flash = impact::create_impact_flash(&mut effects);
+    let status_flame = status::create_status_flame(&mut effects);
+    let status_poison_cloud = status::create_status_poison_cloud(&mut effects);
 
     commands.insert_resource(WeaponVfxEffects {
         muzzle_core_flash,
@@ -148,6 +154,8 @@ pub fn setup_weapon_vfx(mut commands: Commands, mut effects: ResMut<Assets<Effec
         impact_sparks,
         impact_dust,
         impact_flash,
+        status_flame,
+        status_poison_cloud,
     });
 
     info!("Weapon VFX initialises (5-layer muzzle + 3-layer impact)");

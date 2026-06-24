@@ -19,12 +19,16 @@ forgia-damage = { workspace = true }
 forgia-combat = { workspace = true }
 # Story-470 M2 fix — TargetCube marker requis par HitApplyCtx + despawn_dead_cubes (forgia-fps)
 forgia-mode-fps-arena = { workspace = true }
+# story-611 VFX — EffectAsset hanabi de statut (flamme/poison) + ParticleEffect via prelude.
+forgia-effects = { workspace = true }
 # Story-470 M2 step 3 — drop loot on death + Souls currency
 forgia-rpg-data = { workspace = true }
 # Player marker requis pour tag PickupCollector
 forgia-player = { workspace = true }
 # 2026-06-03 — InputBlockers (block_look) pour le clic-hors-panel → caméra pendant le choix.
 forgia-input = { workspace = true }
+# Story-617 — masquer le crosshair au Lobby (CrosshairHidden flag).
+forgia-crosshair = { workspace = true }
 # Story-470 V7 M1 — RunSeed déterministe (host-authoritative, choix audit §0.2)
 rand_xoshiro = "0.7"
 # Story-470 V7 M2.5 — HUD Roguelite (Wave/Souls + Defeat/Victory overlays).

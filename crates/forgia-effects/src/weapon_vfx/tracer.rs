@@ -77,14 +77,21 @@ impl TracerResources {
 /// Story-451 (2026-05-18) — palette refresh AAA :
 /// - Core blanc-chaud très bright (15-20 HDR) → "tracer head" lisible
 /// - Glow color per-arme modeste (2-4 HDR) → trail subtil sans bloom blowout
-/// - Pépin/Bourrasque jaune, Boucherie warm orange, Lenoir red-hot (sniper),
-///   plasma cyan electric, rocket red-yellow (sera unused car projectile).
+/// - Pépin jaune, Bourrasque orange FEU (élément), plasma cyan electric ;
+///   rocket (Boucherie) unused car projectile (visuel vert poison côté
+///   `forgia-mode-roguelite/boucherie_rocket.rs`).
 pub fn tracer_color(weapon: &WeaponType) -> (LinearRgba, LinearRgba) {
     match weapon {
-        // SMG/AR — yellow-white head, warm orange trail
-        WeaponType::ModernAR | WeaponType::AssaultRifle | WeaponType::AK47 => (
+        // Pépin (ModernAR) / AK47 — yellow-white head, warm orange trail
+        WeaponType::ModernAR | WeaponType::AK47 => (
             LinearRgba::new(15.0, 12.0, 5.0, 1.0),
             LinearRgba::new(3.0, 1.8, 0.5, 0.55),
+        ),
+        // Bourrasque (AssaultRifle) = élément FEU → orange chaud saturé, distinct
+        // du jaune de Pépin (story-611 follow-up : tracer aligné sur l'élément).
+        WeaponType::AssaultRifle => (
+            LinearRgba::new(16.0, 7.0, 1.5, 1.0),
+            LinearRgba::new(4.0, 1.4, 0.3, 0.55),
         ),
         // Shotgun (Boucherie) — warm orange pellet trail
         WeaponType::Shotgun => (

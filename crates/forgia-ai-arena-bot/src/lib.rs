@@ -121,6 +121,47 @@ pub struct BotTracer {
     pub life_remaining: f32,
 }
 
+// ─── Boule de feu ennemie (projectile visible, story-617) ───────────────────
+// Vitesse modérée = visible + esquivable à distance (feel mage Gunfire). Mesh
+// émissif (pas hanabi) → toujours visible en plein air (cf boucherie_rocket).
+const FIREBALL_SPEED: f32 = 26.0; // m/s
+const FIREBALL_RADIUS: f32 = 0.3; // taille de la sphère visible
+const FIREBALL_LIFETIME: f32 = 3.0; // s avant despawn si rien touché
+const FIREBALL_HIT_RADIUS: f32 = 0.9; // proximité joueur pour infliger les dégâts
+
+/// Projectile boule de feu lancé par un bot vers le joueur (intégration manuelle,
+/// dégâts à l'arrivée → esquivable). Remplace le hitscan instantané.
+#[derive(Component)]
+pub struct BotFireball {
+    pub vel: Vec3,
+    pub age: f32,
+    pub damage: f32,
+    pub source: Entity,
+}
+
+/// Mesh + matériau partagés de la boule de feu (créés 1× au Startup → 0 alloc/tir).
+#[derive(Resource)]
+pub struct BotFireballAssets {
+    pub mesh: Handle<Mesh>,
+    pub mat: Handle<StandardMaterial>,
+}
+
+/// Startup — construit le mesh sphère + matériau émissif orange de la boule de feu.
+fn setup_bot_fireball_assets(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mesh = meshes.add(Sphere::new(FIREBALL_RADIUS));
+    let mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(1.0, 0.45, 0.1),
+        emissive: LinearRgba::rgb(6.0, 2.0, 0.4),
+        unlit: true,
+        ..default()
+    });
+    commands.insert_resource(BotFireballAssets { mesh, mat });
+}
+
 #[derive(Component, Debug, Clone, Copy)]
 pub struct BotSpawnPoint {
     pub position: Vec3,
@@ -171,6 +212,7 @@ impl Plugin for ForgiaAiArenaBotPlugin {
             .init_resource::<BotShootRng>()
             .init_resource::<TacticalTuning>()
             .init_resource::<BotAiSensor>()
+            .add_systems(Startup, setup_bot_fireball_assets)
             .add_systems(
                 Update,
                 (
@@ -187,6 +229,7 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     tactical::bot_separation,
                     bot_attack_cooldown,
                     bot_shoot_at_target,
+                    bot_fireball_fly,
                     bot_tracer_lifetime,
                     // Story-466 — handle_bot_deaths migré vers Observer
                     // `on_bot_death` (cf .add_observer ci-dessous).
@@ -271,19 +314,14 @@ fn bot_attack_cooldown(time: Res<Time>, mut bots: Query<&mut ArenaBot>) {
 #[allow(clippy::too_many_arguments)]
 fn bot_shoot_at_target(
     mut bots: Query<(Entity, &mut ArenaBot, &GlobalTransform, &BotShootConfig)>,
-    targets: Query<(Entity, &GlobalTransform), With<BotTarget>>,
-    rapier: ReadRapierContext,
+    targets: Query<&GlobalTransform, With<BotTarget>>,
     mut rng: ResMut<BotShootRng>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut damage_events: MessageWriter<DamageEvent>,
-    q_child_of: Query<&ChildOf>,
+    fireball_assets: Res<BotFireballAssets>,
 ) {
-    let Some((target_entity, target_tf)) = targets.iter().next() else {
-        return;
-    };
-    let Ok(ctx) = rapier.single() else {
+    let Some(target_tf) = targets.iter().next() else {
         return;
     };
 
@@ -328,52 +366,29 @@ fn bot_shoot_at_target(
             continue;
         }
 
-        // Story-545 (2026-05-27) — self-hit fix : `exclude_rigid_body` traverse
-        // toute la chaîne collider→RigidBody (vs predicate root-only). Nécessaire
-        // pour Roguelite enemies SceneRoot KayKit Skeleton avec child collider.
-        let filter = QueryFilter::default().exclude_rigid_body(bot_entity);
-        let hit = ctx.cast_ray(origin, shot_dir, config.range, true, filter);
+        // Boule de feu projectile (story-617) — remplace le hitscan instantané :
+        // VISIBLE + esquivable. Les dégâts sont infligés à l'arrivée par
+        // `bot_fireball_fly`. Aimée via `shot_dir` (LOS déjà garantie ci-dessus).
+        commands.spawn((
+            Mesh3d(fireball_assets.mesh.clone()),
+            MeshMaterial3d(fireball_assets.mat.clone()),
+            Transform::from_translation(origin),
+            BotFireball {
+                vel: shot_dir * FIREBALL_SPEED,
+                age: 0.0,
+                damage: config.damage,
+                source: bot_entity,
+            },
+        ));
 
-        let hit_dist = if let Some((hit_entity, toi)) = hit {
-            // Story-545 — walk ChildOf max 4 niveaux pour matcher target_entity
-            // sur ancestor (Player root). Pattern miroir forgia-fps:find_health_ancestor.
-            let mut current = hit_entity;
-            let mut matched = current == target_entity;
-            for _ in 0..4 {
-                if matched {
-                    break;
-                }
-                match q_child_of.get(current) {
-                    Ok(co) => {
-                        current = co.parent();
-                        if current == target_entity {
-                            matched = true;
-                        }
-                    }
-                    Err(_) => break,
-                }
-            }
-            if matched {
-                damage_events.write(DamageEvent {
-                    target: target_entity,
-                    source: Some(bot_entity),
-                    amount: config.damage,
-                    kind: DamageKind::Physical,
-                });
-            }
-            toi
-        } else {
-            config.range
-        };
-
-        // Tracer visuel : cuboid stretché entre origin et hit point.
+        // Flash de bouche court au tireur (feedback ; longueur fixe, plus de raycast).
         spawn_tracer(
             &mut commands,
             &mut meshes,
             &mut materials,
             origin,
             shot_dir,
-            hit_dist,
+            4.0,
             config.tracer_emissive,
         );
 
@@ -432,6 +447,45 @@ fn bot_tracer_lifetime(
     for (e, mut tracer) in &mut q {
         tracer.life_remaining -= dt;
         if tracer.life_remaining <= 0.0 {
+            if let Ok(mut ec) = commands.get_entity(e) {
+                ec.try_despawn();
+            }
+        }
+    }
+}
+
+/// Fait voler les boules de feu ennemies en ligne droite. Dégâts à l'ARRIVÉE
+/// (proximité du joueur) → esquivable si on bouge. Despawn à l'impact ou en fin
+/// de vie. (story-617). La boule vise où était le joueur au tir → bouger = esquive.
+fn bot_fireball_fly(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut fireballs: Query<(Entity, &mut Transform, &mut BotFireball)>,
+    targets: Query<(Entity, &GlobalTransform), With<BotTarget>>,
+    mut damage_events: MessageWriter<DamageEvent>,
+) {
+    let dt = time.delta_secs();
+    let target = targets.iter().next();
+    for (e, mut tf, mut fb) in &mut fireballs {
+        fb.age += dt;
+        tf.translation += fb.vel * dt;
+
+        let mut hit = false;
+        if let Some((player_e, player_tf)) = target {
+            // Torse joueur ≈ +1 m (cohérent avec `target_torso_y` du tir).
+            let torso = player_tf.translation() + Vec3::Y;
+            if tf.translation.distance(torso) <= FIREBALL_HIT_RADIUS {
+                damage_events.write(DamageEvent {
+                    target: player_e,
+                    source: Some(fb.source),
+                    amount: fb.damage,
+                    kind: DamageKind::Physical,
+                });
+                hit = true;
+            }
+        }
+
+        if hit || fb.age >= FIREBALL_LIFETIME {
             if let Ok(mut ec) = commands.get_entity(e) {
                 ec.try_despawn();
             }

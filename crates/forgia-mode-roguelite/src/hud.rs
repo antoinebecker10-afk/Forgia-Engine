@@ -373,6 +373,10 @@ pub(crate) fn draw_defeat_overlay(
     mut next_app: ResMut<NextState<AppMode>>,
     // Story-558 Phase 5 — résumé carry-over Souls.
     last_defeat: Res<crate::run::LastDefeatSummary>,
+    // Story-597 Phase B — Âmes forgées cette run + récap 1re mort one-shot.
+    meta: Res<MetaSouls>,
+    mut ftue: ResMut<crate::ftue::FtueSave>,
+    timer: Res<crate::run::RunTimer>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -399,35 +403,81 @@ pub(crate) fn draw_defeat_overlay(
                         // (bible v1 — vocab CE2, vocabulaire poétique enfants).
                         ui.heading(display_text("LA FORGE T'A BRISÉ", 56.0, FORGE_BRAISE).strong());
                         ui.add_space(18.0);
-                        // Encouragement (anti "Game Over" dépressif)
-                        ui.label(
-                            egui::RichText::new("Mais le marteau t'attend.")
-                                .size(22.0)
-                                .italics()
-                                .color(FORGE_CHARBON),
-                        );
-                        // Story-571 — Or perdu mais Âmes (méta) conservées (encourageant).
+                        // Story-597 Phase B — la 1re mort ENSEIGNE la méta-boucle
+                        // (voix Maître Forgeron, ≤8 mots/ligne) ; les fois suivantes,
+                        // juste l'encouragement court. Flag persisté (FtueSave), marqué
+                        // vu à la SORTIE de l'écran (ftue::sys_mark_first_death_seen).
+                        let first_death = !ftue.first_death_recap_seen;
+                        if first_death {
+                            for line in [
+                                "Tes Âmes restent quand tu tombes.",
+                                "Dépense-les à L'Enclume.",
+                                "Reviens plus fort. Toujours.",
+                            ] {
+                                ui.add_space(6.0);
+                                ui.label(
+                                    egui::RichText::new(line)
+                                        .size(22.0)
+                                        .strong()
+                                        .color(FORGE_CHARBON),
+                                );
+                            }
+                        } else {
+                            ui.label(
+                                egui::RichText::new("Mais le marteau t'attend.")
+                                    .size(22.0)
+                                    .italics()
+                                    .color(FORGE_CHARBON),
+                            );
+                        }
+
+                        // Story-597 — « toute run paie » : Âmes FORGÉES cette run
+                        // (meta.earned_run), gardées. + total + Or perdu (secondaire).
                         ui.add_space(20.0);
                         ui.label(
                             egui::RichText::new(format!(
-                                "Ton Or s'envole ({} perdus)… mais tu gardes tes ◇ {} âmes !",
-                                last_defeat.or_lost, last_defeat.souls_persistent
+                                "Cette run t'a forgé ◇ {} Âmes — gardées !",
+                                meta.earned_run
                             ))
-                            .size(20.0)
+                            .size(22.0)
                             .strong()
                             .color(FORGE_CHARBON)
                             .background_color(FORGE_OR),
+                        );
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Total ◇ {} âmes  ·  Or perdu : {}",
+                                last_defeat.souls_persistent, last_defeat.or_lost
+                            ))
+                            .size(16.0)
+                            .color(FORGE_CHARBON),
                         );
                         ui.add_space(36.0);
 
                         // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
                         if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR).clicked() {
                             info!("[roguelite-hud] Defeat → Lobby (Enclume)");
+                            // Story-597 — marque le récap vu (couvre ce chemin de sortie).
+                            ftue.mark_first_death(timer.secs);
                             next_run.set(RunState::Lobby);
+                        }
+                        // Story-597 — 1re mort : flèche guide explicite vers l'Enclume.
+                        if first_death {
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new("↑ dépense tes Âmes ici, puis repars")
+                                    .size(15.0)
+                                    .italics()
+                                    .color(FORGE_BRAISE),
+                            );
                         }
                         ui.add_space(10.0);
                         if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
                             info!("[roguelite-hud] Defeat → Menu");
+                            // Story-597 — marque aussi le récap vu sur le chemin Menu
+                            // (OnExit SubState ne fire pas ici → fix qa BUG-597-B-01).
+                            ftue.mark_first_death(timer.secs);
                             next_app.set(AppMode::Menu);
                             next_game.set(GameMode::None);
                         }
@@ -953,6 +1003,7 @@ pub(crate) fn draw_weapon_slots(
     run_state: Option<Res<State<RunState>>>,
     equipped: Option<Res<EquippedWeapons>>,
     ammo_tuning: Option<Res<AmmoHudTuning>>,
+    save: Option<Res<crate::meta_shop::MetaShopSave>>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -1007,10 +1058,27 @@ pub(crate) fn draw_weapon_slots(
         let x = start_x + i as f32 * (slot_w + gap);
         let rect = egui::Rect::from_min_size(egui::pos2(x, bottom_y), egui::vec2(slot_w, slot_h));
         let active = *w == current;
-        let fill = if active { FORGE_OR } else { C_BG_DARK };
+        // Story-613 — arme verrouillée (non débloquée à l'Enclume) : slot grisé.
+        let owned = save
+            .as_ref()
+            .map(|s| s.is_weapon_unlocked(crate::weapon_select::vm_key(*w)))
+            .unwrap_or(true);
+        let fill = if active {
+            FORGE_OR
+        } else if owned {
+            C_BG_DARK
+        } else {
+            C_BG_DARK.gamma_multiply(0.45)
+        };
         chunky_rect_filled(&painter, rect, fill, if active { 4.0 } else { 2.0 }, 8.0);
 
-        let txt_color = if active { FORGE_CHARBON } else { C_TEXT_LIGHT };
+        let txt_color = if active {
+            FORGE_CHARBON
+        } else if owned {
+            C_TEXT_LIGHT
+        } else {
+            C_TEXT_MUTED
+        };
         // Touche (1..N) en haut-gauche.
         text_with_outline(
             &painter,
@@ -1305,6 +1373,16 @@ pub(crate) fn draw_zone_reward_cards(
         });
 }
 
+/// Story-617 — run-condition : vrai uniquement en combat (InRun/Boss). Sert à
+/// masquer TOUT le HUD de combat au Lobby (écran de sélection) — un seul système
+/// (`draw_wave_counter`) appliquait ce gate, tous les autres l'avaient oublié.
+fn in_run_or_boss(run_state: Option<Res<State<RunState>>>) -> bool {
+    matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    )
+}
+
 impl Plugin for RogueliteHudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BossEnrageBannerState>()
@@ -1314,6 +1392,7 @@ impl Plugin for RogueliteHudPlugin {
                     .in_set(GameSet::Effects)
                     .run_if(in_state(GameMode::Roguelite)),
             )
+            // HUD de COMBAT : masqué hors InRun/Boss (story-617 — propreté du Lobby).
             .add_systems(
                 EguiPrimaryContextPass,
                 (
@@ -1324,13 +1403,21 @@ impl Plugin for RogueliteHudPlugin {
                     draw_wave_counter,
                     draw_currency_counters,
                     draw_active_boons,
+                    draw_enemy_archetype_labels,
+                )
+                    .run_if(in_run_or_boss),
+            )
+            // Overlays auto-gatés par leur propre état/événement (Defeat/Victory/
+            // portail/reward/bark…) — affichables hors combat selon leur logique.
+            .add_systems(
+                EguiPrimaryContextPass,
+                (
                     draw_portal_overlay,
                     draw_zone_reward_cards,
                     draw_defeat_overlay,
                     draw_victory_overlay,
                     draw_bark_bubble,
                     draw_stage_notification,
-                    draw_enemy_archetype_labels,
                     draw_boss_enrage_banner,
                 ),
             );

@@ -15,8 +15,14 @@ use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 
 pub mod prelude {
-    pub use crate::{CrosshairMode, CrosshairTuning, ForgiaCrosshairPlugin};
+    pub use crate::{CrosshairHidden, CrosshairMode, CrosshairTuning, ForgiaCrosshairPlugin};
 }
+
+/// Story-617 — masque le crosshair (hipfire + scope) quand `true`. Piloté de
+/// l'extérieur (`forgia-mode-roguelite`) pour cacher le réticule au Lobby
+/// (écran de sélection d'arme), où il n'a aucun sens et pollue la mise en scène.
+#[derive(Resource, Default)]
+pub struct CrosshairHidden(pub bool);
 
 /// Resource Tuning hot-reload pour TOUS les paramètres de rendu crosshair
 /// (hipfire / ADS dot / sniper overlay). Push depuis fps_tuning.toml par forgia-fps.
@@ -101,6 +107,7 @@ impl Plugin for ForgiaCrosshairPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CrosshairMode>()
             .init_resource::<CrosshairTuning>()
+            .init_resource::<CrosshairHidden>()
             .add_systems(
                 EguiPrimaryContextPass,
                 (draw_crosshair, draw_sniper_scope_overlay),
@@ -113,8 +120,9 @@ fn draw_crosshair(
     app_state: Res<State<AppMode>>,
     mode: Res<CrosshairMode>,
     tuning: Res<CrosshairTuning>,
+    hidden: Res<CrosshairHidden>,
 ) {
-    if *app_state.get() != AppMode::InGame {
+    if *app_state.get() != AppMode::InGame || hidden.0 {
         return;
     }
     // En sniper ADS fullscreen, le crosshair classique est remplacé par l'overlay scope.
@@ -190,8 +198,9 @@ fn draw_sniper_scope_overlay(
     app_state: Res<State<AppMode>>,
     mode: Res<CrosshairMode>,
     tuning: Res<CrosshairTuning>,
+    hidden: Res<CrosshairHidden>,
 ) {
-    if *app_state.get() != AppMode::InGame {
+    if *app_state.get() != AppMode::InGame || hidden.0 {
         return;
     }
     if !mode.sniper_fullscreen || mode.ads_progress <= 0.01 {

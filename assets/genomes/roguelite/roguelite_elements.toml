@@ -14,7 +14,10 @@
 # Story-589 : SHIP = progression. always_on=false → les éléments s'arment au fil
 # du run (départ = élément de l'arme de départ, +1 par portail de fin de zone).
 # Mets à `true` (override dev / test Phase A) pour armer les 4 éléments d'office.
-always_on = false
+# 2026-06-23 : armé en mode TEST (les 4 éléments actifs d'office, re-arm live via
+# sys_enforce_always_on) pour voir feu/poison sur les ennemis sans débloquer au
+# portail. SHIP = repasser à `false` (progression : départ armé + portails).
+always_on = true
 
 [mapping]
 modern_ar = "explosive"
@@ -76,9 +79,22 @@ impact_ttl = 0.28         # durée de vie (s) — fade par scale -> 0
 explosive_scale = 2.4     # × taille du flash pour un hit explosif (splash)
 light_intensity = 40000.0 # lumens de la lumière d'impact (fade avec le flash)
 light_range = 6.0         # portée (m) de la lumière d'impact
-dot_pulse_scale = 0.3     # rayon (m) du pulse sur un ennemi en DoT
-dot_pulse_period = 0.45   # période (s) entre 2 pulses DoT
+dot_pulse_scale = 0.5     # rayon (m) du pulse sur un ennemi en DoT (gros = lisible)
+dot_pulse_period = 0.25   # période (s) entre 2 pulses DoT (rapide = flammes vivantes)
+status_y = 1.4            # hauteur (m) de l'aura feu/poison sur le mob (anti-occlusion ; capsule ~2 m)
 fire_rgb = [1.0, 0.42, 0.06]          # 🔥 feu — orange (SMG Bourrasque)
 poison_rgb = [0.42, 1.0, 0.16]        # 🟣 poison — vert (pompe Boucherie)
 explosive_rgb = [1.0, 0.82, 0.12]     # 💥 explosif — jaune (pistolet Pépin)
 armor_pierce_rgb = [0.30, 0.85, 1.0]  # 🎯 perforant — cyan (sniper Lenoir)
+
+# ── Combustion (réaction Feu + Poison) — voie Gunfire Reborn ─────────────────
+# Quand un ennemi porte À LA FOIS Feu (burn) ET Poison, un hit déclenche un burst
+# AOE. Modèle "Gunfire" (genre-validé 2026-06-23) : dégâts = % du TIR déclencheur,
+# GARDE les statuts (re-pulse aux tirs suivants), throttlé par cible.
+# Pour passer en "finisher façon PoE" : voir story (scaling par stacks + consume).
+[combustion]
+enabled = true
+target_pct = 2.0          # dégâts sur la cible = 200% du tir (Gunfire Combustion)
+area_pct = 1.0            # dégâts aux voisins dans le rayon = 100% du tir
+radius = 3.5              # rayon (m) du splash
+retrigger_cooldown = 0.8  # délai min (s) entre 2 combustions sur la même cible
