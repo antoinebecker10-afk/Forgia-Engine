@@ -35,6 +35,7 @@ fn main() {
         "asset-load" => asset_load(&args),
         "arch-drift" => arch_drift(),
         "story-ids" => story_ids(),
+        "validate-genomes" => validate_genomes(&args),
         _ => {
             print_help();
             0
@@ -58,6 +59,189 @@ fn print_help() {
     println!("  asset-load [--fix]       Lock L1 ratchet : fail if asset-load call-sites drift above per-file baseline. Allowlist in xtask/asset-load-allowlist.toml.");
     println!("  arch-drift               Fail si ARCHITECTURE.md ne liste pas exactement les crates members de Cargo.toml (story-593).");
     println!("  story-ids                Fail sur tout NOUVEAU doublon d'ID story dans docs/stories/ (9 collisions historiques grandfathered).");
+    println!("  validate-genomes         Gate QA couche 1 : parse tous les assets/genomes/**/*.toml + bornes gènes (min<=default<=max) + ids uniques + cross-refs déclarées.");
+}
+
+// ─────────────────────────── validate-genomes (story-619, M0.5 QA) ───────────────────────────
+
+/// Gate de validation du contenu genome (couche 1 du QA intégré, cf
+/// docs/plan/rpg-qa-integrated-plan-2026-06-24.md §2). Trois niveaux :
+///   L1  — chaque `assets/genomes/**/*.toml` parse en TOML valide (rien ne le
+///         vérifiait : une erreur de syntaxe/NBSP ne sortait qu'au runtime).
+///   L1b — pour les fichiers à `[[genes]]` : chaque gène a un `id` unique dans le
+///         fichier, et si min/max/default sont numériques alors min<=default<=max
+///         (classe de bug réelle : default hors bornes = balance cassée).
+///   L2  — cross-références inter/intra-fichier DÉCLARÉES explicitement. Jamais
+///         inventées : chaque règle est vérifiée green sur le contenu réel avant
+///         ajout. Étendre via `check_*` ci-dessous + l'appel dans validate_genomes.
+fn validate_genomes(_args: &[String]) -> i32 {
+    let root = Path::new("assets/genomes");
+    if !root.is_dir() {
+        eprintln!(
+            "[validate-genomes] FAIL — dossier `assets/genomes` introuvable (lancer depuis la racine workspace ?)"
+        );
+        return 1;
+    }
+    let mut files = Vec::new();
+    collect_toml(root, &mut files);
+    if files.is_empty() {
+        eprintln!("[validate-genomes] FAIL — `assets/genomes` ne contient aucun .toml");
+        return 1;
+    }
+    // Tri normalisé `/` : ordre de rapport identique Windows/Linux.
+    files.sort_by_cached_key(|p| norm_path(p));
+
+    let mut problems = 0usize;
+    let mut gene_count = 0usize;
+
+    for path in &files {
+        let rel = norm_path(path);
+        let src = match fs::read_to_string(path) {
+            Ok(s) => s,
+            Err(e) => {
+                let hint = if e.kind() == std::io::ErrorKind::InvalidData {
+                    "encodage non-UTF-8 (NBSP U+00A0 ?)"
+                } else {
+                    "fichier illisible (droits ?)"
+                };
+                eprintln!("[validate-genomes] FAIL lecture {rel} : {hint} ({e})");
+                problems += 1;
+                continue;
+            }
+        };
+        // L1 — parse TOML
+        let value: toml::Value = match toml::from_str(&src) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[validate-genomes] FAIL parse {rel} : {e}");
+                problems += 1;
+                continue;
+            }
+        };
+        // L1b — validation des gènes [[genes]]
+        if let Some(genes) = value.get("genes").and_then(toml::Value::as_array) {
+            let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+            for (i, gene) in genes.iter().enumerate() {
+                gene_count += 1;
+                let Some(id) = gene.get("id").and_then(toml::Value::as_str) else {
+                    eprintln!("[validate-genomes] FAIL {rel} : gène #{i} sans champ `id`");
+                    problems += 1;
+                    continue;
+                };
+                if !seen.insert(id) {
+                    eprintln!("[validate-genomes] FAIL {rel} : id de gène dupliqué `{id}`");
+                    problems += 1;
+                }
+                // bornes : valeurs finies, puis min<=max (si les 2 présents), puis
+                // min<=default<=max (si les 3 présents). Chaque check est indépendant
+                // pour ne pas avaler une inversion min>max quand `default` est absent.
+                let min = gene.get("min").and_then(toml_num);
+                let max = gene.get("max").and_then(toml_num);
+                let def = gene.get("default").and_then(toml_num);
+                for (field, val) in [("min", min), ("max", max), ("default", def)] {
+                    if let Some(v) = val {
+                        if !v.is_finite() {
+                            eprintln!(
+                                "[validate-genomes] FAIL {rel} : gène `{id}` {field} non fini ({v})"
+                            );
+                            problems += 1;
+                        }
+                    }
+                }
+                if let (Some(min), Some(max)) = (min, max) {
+                    if min > max {
+                        eprintln!(
+                            "[validate-genomes] FAIL {rel} : gène `{id}` min ({min}) > max ({max})"
+                        );
+                        problems += 1;
+                    } else if let Some(def) = def {
+                        if def < min || def > max {
+                            eprintln!(
+                                "[validate-genomes] FAIL {rel} : gène `{id}` default ({def}) hors [{min}, {max}]"
+                            );
+                            problems += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // L2 — cross-refs déclarées (vérifiées green sur le contenu réel le 2026-06-24)
+    problems += check_elements_matchup(root);
+
+    if problems == 0 {
+        println!(
+            "[validate-genomes] OK — {} fichiers parsés, {} gènes validés (bornes + ids uniques), cross-refs elements OK",
+            files.len(),
+            gene_count
+        );
+        0
+    } else {
+        eprintln!(
+            "[validate-genomes] FAIL — {problems} problème(s). Corriger avant DONE (gate QA couche 1)."
+        );
+        1
+    }
+}
+
+/// L2 : dans `roguelite_elements.toml`, chaque élément mappé sur une arme dans
+/// `[mapping]` doit avoir sa table `[matchup.<element>]` (sinon le « fort contre »
+/// retombe silencieusement sur le défaut code). Vérifié green 4/4 le 2026-06-24.
+/// Retourne le nombre de problèmes trouvés.
+fn check_elements_matchup(root: &Path) -> usize {
+    let path = root.join("roguelite/roguelite_elements.toml");
+    let Ok(src) = fs::read_to_string(&path) else {
+        // Absence du fichier = pas une faille de ce gate (peut être retiré volontairement).
+        return 0;
+    };
+    let Ok(value) = toml::from_str::<toml::Value>(&src) else {
+        return 0; // fichier invalide — non vérifiable ici, L1 l'a déjà compté en FAIL
+    };
+    let Some(mapping) = value.get("mapping").and_then(toml::Value::as_table) else {
+        // Schéma changé (renommage de [mapping]) : visible mais non bloquant.
+        eprintln!(
+            "[validate-genomes] WARN roguelite_elements.toml : section [mapping] absente, cross-ref L2 non vérifiée"
+        );
+        return 0;
+    };
+    let matchup = value.get("matchup").and_then(toml::Value::as_table);
+    let mut problems = 0usize;
+    for (weapon, elem) in mapping {
+        let Some(elem) = elem.as_str() else { continue };
+        if !matchup.is_some_and(|m| m.contains_key(elem)) {
+            eprintln!(
+                "[validate-genomes] FAIL roguelite_elements.toml : arme `{weapon}` mappée sur élément `{elem}` sans table [matchup.{elem}]"
+            );
+            problems += 1;
+        }
+    }
+    problems
+}
+
+/// f64 depuis un `toml::Value` qu'il soit float (`1.0`) ou integer (`1`).
+fn toml_num(v: &toml::Value) -> Option<f64> {
+    v.as_float().or_else(|| v.as_integer().map(|i| i as f64))
+}
+
+/// Chemin en `/` : messages cliquables + tri identique Windows/Linux.
+fn norm_path(p: &Path) -> String {
+    p.to_string_lossy().replace('\\', "/")
+}
+
+/// Collecte récursivement tous les `*.toml` sous `dir`.
+fn collect_toml(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_toml(&path, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("toml") {
+            out.push(path);
+        }
+    }
 }
 
 // ─────────────────────────── story-ids (story-593 M1.5) ───────────────────────────

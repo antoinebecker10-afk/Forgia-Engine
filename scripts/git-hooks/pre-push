@@ -9,10 +9,11 @@
 
 set -e
 
-echo "[pre-push] gates xtask (arch-drift / no-scaffold / sensor-audit / story-ids / asset-load)..."
+echo "[pre-push] gates xtask (arch-drift / no-scaffold / sensor-audit / story-ids / asset-load / validate-genomes)..."
 cargo xtask arch-drift
 cargo xtask no-scaffold
 cargo xtask sensor-audit
 cargo xtask story-ids
 cargo xtask asset-load
+cargo xtask validate-genomes
 echo "[pre-push] OK — push autorise"

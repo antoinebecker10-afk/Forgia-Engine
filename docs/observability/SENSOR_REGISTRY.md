@@ -106,6 +106,12 @@
 | `forgia2_vram.json` | T0 | forgia-observability | `src/vram_sensor.rs:201` | 5s | VRAM estimée + top images/meshes — story-581 | active |
 | `forgia2_walk_dir_probe.json` | T0 | forgia-anim-locomotion | `src/locomotion.rs:1361` | event | sonde direction de marche (debug) | active |
 | `forgia2_worldgen.json` | T0 | forgia-worldgen | `src/sensor.rs:54` | 1Hz | SpawnQueue drainée, worldgen stats — story-578 | active |
+| `forgia2_aimassist.json` | T0 | forgia-fps | `src/aim_assist.rs:122` | 1Hz | bullet magnetism : pull/bend, sélection cible Mortal, rate de correction — story-615 | active |
+| `forgia2_color_grading.json` | T0 | forgia-game | `src/color_grading.rs:26` | 1Hz | tonemapping / color grade params, rendu terne | active |
+| `forgia2_ftue.json` | T0 | forgia-mode-roguelite | `src/ftue.rs:19` | 1Hz | funnel FTUE (first_death_run_secs, hints vus) — story-597 | active |
+| `forgia2_load_timing.json` | T0 | forgia-mode-roguelite | `src/load_timing.rs:115` | event | freeze/stutter au load de stage (total_freezes, recent) | active |
+| `forgia2_merchant.json` | T0 | forgia-mode-roguelite | `src/merchant.rs:50` | 1Hz | marchand : offres, proximité, achats Or/Âmes, revives — story-591 | active |
+| `forgia2_render.json` | T0 | forgia-observability | `src/render_sensor.rs:137` | 1Hz | mesh3d_visible vs total (écran vide/brun), caméras 3D actives, clear_color | active |
 
 ## Producteurs retirés — historique (story-593, audit 2026-06-10)
 

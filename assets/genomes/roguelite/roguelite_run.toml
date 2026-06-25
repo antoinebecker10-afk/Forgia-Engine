@@ -97,8 +97,8 @@ label = "RNG xor constant for derive(stage, encounter)"
 chromosome = "RNG"
 target = "Value"
 min = 1.0
-max = 999999.0
-default = 2654435769.0  # Knuth multiplicative hash constant
+max = 4294967295.0  # u32::MAX — constante de hash 32-bit, pas un slider créateur (cf creator-simplicity). Gène MORT : run.rs:76 hardcode 0x9E3779B97F4A7C15 et ne lit jamais ce gène. À wirer OU convertir en const nommée + retirer le hardcode → Phase 0.1 (discipline seed).
+default = 2654435769.0  # Knuth multiplicative hash constant (0x9E3779B9)
 layer = "roguelite"
 
 # === Coop / Revive ===
