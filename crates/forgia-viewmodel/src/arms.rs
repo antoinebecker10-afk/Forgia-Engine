@@ -1,156 +1,317 @@
-//! arms.rs — Mains + avant-bras FPS **générés proceduralement** (story-617 inc.2,
-//! refonte v2 après retour visuel : v1 = « gros tubes »).
+//! arms.rs — Mains + avant-bras FPS **procéduraux**, placement **auto par-arme**
+//! (story-617 inc.2 ; story-618 live ; story-619 per-weapon).
 //!
-//! Aucun asset externe. Chaque bras = un **poing** (paume + 4 doigts repliés +
-//! pouce, en peau) au bout d'un **avant-bras court à manche** (capsule, tissu),
-//! enfant de la `FpsCamera` (taille CONSTANTE, ≠ arme auto-scalée). Reçoit l'offset
-//! sway/bob partagé ([`crate::pose::ViewmodelMotionOffset`]).
+//! Chaque bras = un poing (dos de main arrondi + 4 doigts repliés + pouce) au bout
+//! d'un avant-bras peau à **manche relevée** (cuff sombre), enfant de la FpsCamera
+//! (rendu par la caméra viewmodel à FOV séparé). Reçoit l'offset sway/bob partagé.
 //!
-//! Plafond assumé : procédural = **stylisé cartoon** (cohérent toon shader), pas
-//! photoréaliste. Réalisme poussé = importer un mesh de mains riggé (asset).
+//! **Placement auto par-arme** : les poignets sont dérivés de la position + taille
+//! RÉELLES de l'arme équipée (genome : `offset_*` + `target_size`) → main droite sur
+//! la crosse (arrière), main gauche sous le canon (avant), pour N'IMPORTE quelle arme.
+//! Le tuning `[viewmodel_arms]` ne donne que des **fractions/décalages** (agnostiques
+//! à l'arme), hot-reload.
 //!
-//! Placement global (offset + échelle) **réglable à chaud** via
-//! `fps_tuning.toml [viewmodel_arms]` → itération sans rebuild. La géométrie fine
-//! (proportions du poing) reste en constantes cosmétiques (non exposées créateur).
+//! Plafond assumé : procédural = stylisé. Réalisme poussé = mesh de mains riggé (asset).
 
+use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::GameMode;
+use forgia_genome_core::Genome;
 use forgia_player::prelude::FpsCamera;
 
-use crate::pose::{apply_viewmodel_sway_bob, ViewmodelMotionOffset};
+use crate::calibration::{viewmodel_target_size, viewmodel_transform};
+use crate::genome::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle};
+use crate::pose::{apply_viewmodel_sway_bob, AdsState, ViewmodelMotionOffset};
 
 /// Marker sur le root des bras (enfant de la FpsCamera).
 #[derive(Component)]
 pub struct ViewmodelArms;
 
-/// Placement global des bras — réglable à chaud (`fps_tuning.toml [viewmodel_arms]`).
-/// Offset + échelle du root → ajuster où les mains se posent sans rebuild.
+/// Une main. `mirror` = +1 (droite, crosse) / -1 (gauche, sous le canon).
+#[derive(Component, Clone, Copy)]
+pub struct ViewmodelHand {
+    pub mirror: f32,
+}
+
+/// Placement des bras — **fractions/décalages agnostiques à l'arme** (hot-reload
+/// `fps_tuning.toml [viewmodel_arms]`). La position absolue est dérivée par-arme.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct ViewmodelArmsTuning {
     pub enabled: bool,
     pub scale: f32,
-    pub offset_x: f32,
-    pub offset_y: f32,
-    pub offset_z: f32,
+    /// Main crosse (droite) : décalage latéral, vertical, et recul (fraction de la
+    /// longueur de l'arme, vers l'arrière/caméra).
+    pub grip_x: f32,
+    pub grip_drop: f32,
+    pub grip_back: f32,
+    /// Main soutien (gauche) : latéral, vertical, avancée (fraction longueur, vers le canon).
+    pub barrel_x: f32,
+    pub barrel_drop: f32,
+    pub barrel_fwd: f32,
+    /// Orientation des avant-bras (coude relatif au poignet).
+    pub elbow_drop: f32,
+    pub elbow_back: f32,
+    /// Écartement latéral du coude — séparé par main (droite crosse / gauche soutien)
+    /// pour un contrôle CoD-style : avant-bras gauche bien sorti vers le bas-gauche.
+    pub grip_elbow_out: f32,
+    pub barrel_elbow_out: f32,
 }
 
 impl Default for ViewmodelArmsTuning {
     fn default() -> Self {
         Self {
             enabled: true,
-            scale: 1.0,
-            offset_x: 0.0,
-            offset_y: 0.0,
-            offset_z: 0.0,
+            scale: 2.0,
+            grip_x: 0.0,
+            grip_drop: -0.08,
+            grip_back: 0.30,
+            barrel_x: -0.04,
+            barrel_drop: -0.06,
+            barrel_fwd: 0.30,
+            elbow_drop: 0.30,
+            elbow_back: 0.45,
+            grip_elbow_out: 0.12,
+            barrel_elbow_out: 0.34,
         }
     }
 }
 
-// ── Couleurs cartoon (cel-shadées par le toon post-process), RGB sRGB ──
-const SKIN: [f32; 3] = [0.80, 0.58, 0.42];
-const SLEEVE: [f32; 3] = [0.20, 0.23, 0.30];
+// ── Couleurs cartoon (RGB sRGB). Éclaircies + emissive : le viewmodel n'est PAS
+// toon-shadé (caméra séparée) et n'est éclairé que par la scène → au crépuscule il
+// devenait sombre. base_color clair + léger emissive = toujours lisible.
+const SKIN: [f32; 3] = [0.93, 0.73, 0.57];
+const CUFF: [f32; 3] = [0.34, 0.37, 0.45];
 
-// ── Proportions du poing (mètres, repère main-local : +Y = vers les doigts,
-//    X = largeur, Z = épaisseur). Réalistes : paume ~7cm, avant-bras ~15cm. ──
-const PALM: Vec3 = Vec3::new(0.072, 0.055, 0.038);
-const FINGER: Vec3 = Vec3::new(0.014, 0.042, 0.022);
-const THUMB: Vec3 = Vec3::new(0.016, 0.038, 0.022);
-const FOREARM_RADIUS: f32 = 0.034;
-const FOREARM_LEN: f32 = 0.15;
+// ── Proportions du poing (mètres, main-local : +Y = vers les doigts) ──
+const FOREARM_RADIUS: f32 = 0.036;
+// Allongé (0.16→0.26) : avant-bras visible qui remonte du coin bas vers l'arme (style CoD).
+const FOREARM_LEN: f32 = 0.26;
+// Profil de longueur des 4 doigts (index→auriculaire) : majeur le plus long.
+const FINGER_PROFILE: [f32; 4] = [0.88, 1.0, 0.95, 0.78];
 
-// Ancrages des 2 poignets + coudes (camera-local : -Z avant, +X droite, -Y bas).
-// Coude → poignet définit l'orientation de l'avant-bras. Main dominante (droite,
-// gâchette) un peu en retrait ; main de soutien (gauche) plus en avant (foregrip).
-const WRIST_R: Vec3 = Vec3::new(0.075, -0.215, -0.40);
-const ELBOW_R: Vec3 = Vec3::new(0.20, -0.42, -0.20);
-const WRIST_L: Vec3 = Vec3::new(-0.02, -0.185, -0.52);
-const ELBOW_L: Vec3 = Vec3::new(-0.19, -0.40, -0.26);
-
-fn cuboid(meshes: &mut Assets<Mesh>, s: Vec3) -> Handle<Mesh> {
-    meshes.add(Cuboid::new(s.x, s.y, s.z))
+/// Hash → [0,1] déterministe (pour la texture procédurale).
+fn hash01(n: u32) -> f32 {
+    let mut x = n.wrapping_mul(0x27d4_eb2d).wrapping_add(0x9e37_79b9);
+    x ^= x >> 16;
+    x = x.wrapping_mul(0x21f0_aaad);
+    x ^= x >> 15;
+    x as f32 / u32::MAX as f32
 }
 
-/// Construit un poing complet (paume + doigts repliés + pouce + avant-bras),
-/// tout en repère main-local, enfant d'une entité « hand » placée au poignet.
+/// Value-noise lissé (bilinéaire + smoothstep) sur une grille `cells×cells`.
+fn smooth_noise(px: u32, py: u32, size: f32, cells: f32) -> f32 {
+    let fx = px as f32 / size * cells;
+    let fy = py as f32 / size * cells;
+    let (x0, y0) = (fx.floor() as u32, fy.floor() as u32);
+    let (tx, ty) = (fx - x0 as f32, fy - y0 as f32);
+    let corner = |cx: u32, cy: u32| {
+        hash01(cx.wrapping_mul(374_761_393).wrapping_add(cy.wrapping_mul(668_265_263)))
+    };
+    let (v00, v10) = (corner(x0, y0), corner(x0 + 1, y0));
+    let (v01, v11) = (corner(x0, y0 + 1), corner(x0 + 1, y0 + 1));
+    let sx = tx * tx * (3.0 - 2.0 * tx);
+    let sy = ty * ty * (3.0 - 2.0 * ty);
+    let a = v00 + (v10 - v00) * sx;
+    let b = v01 + (v11 - v01) * sx;
+    a + (b - a) * sy
+}
+
+/// Texture de détail peau procédurale (multipliée par la base_color) : casse
+/// l'aspect plastique uni avec une variation organique — taches basse-fréquence
+/// (sang/teint) + grain fin. Générée une fois au spawn (pas de hot path).
+fn skin_detail_texture() -> Image {
+    const N: u32 = 128;
+    let mut data = vec![0u8; (N * N * 4) as usize];
+    for y in 0..N {
+        for x in 0..N {
+            let blotch = smooth_noise(x, y, N as f32, 5.0); // grandes taches
+            let grain = hash01(x.wrapping_mul(73).wrapping_add(y.wrapping_mul(151)));
+            // Variation multiplicative douce, légèrement chaude.
+            let v = ((0.86 + 0.14 * blotch) * (0.97 + 0.03 * grain)).clamp(0.0, 1.0);
+            let idx = ((y * N + x) * 4) as usize;
+            data[idx] = (v * 255.0) as u8;
+            data[idx + 1] = (v * 0.985 * 255.0) as u8;
+            data[idx + 2] = (v * 0.955 * 255.0) as u8;
+            data[idx + 3] = 255;
+        }
+    }
+    Image::new(
+        Extent3d {
+            width: N,
+            height: N,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    )
+}
+
+/// Doigt à 2 phalanges (courbure progressive) enfant de `hand`. `base` = jointure
+/// (hand-local), `base_rot` = orientation de base (utile pour le pouce en travers),
+/// `curl1/curl2` = flexion proximale puis distale → bout du doigt qui s'enroule.
 #[allow(clippy::too_many_arguments)]
-fn spawn_fist(
+fn spawn_finger(
     commands: &mut Commands,
-    parent: Entity,
+    hand: Entity,
     meshes: &mut Assets<Mesh>,
     skin: &Handle<StandardMaterial>,
-    sleeve: &Handle<StandardMaterial>,
-    elbow: Vec3,
-    wrist: Vec3,
-    mirror: f32, // +1 = main droite, -1 = main gauche (miroir du pouce)
+    base: Vec3,
+    base_rot: Quat,
+    width: f32,
+    l1: f32,
+    l2: f32,
+    curl1: f32,
+    curl2: f32,
 ) {
-    // Repère main : +Y aligné sur l'avant-bras (coude→poignet).
-    let fwd = (wrist - elbow).normalize_or_zero();
-    let hand_rot = Quat::from_rotation_arc(Vec3::Y, fwd);
+    let root = commands
+        .spawn((
+            Transform::from_translation(base).with_rotation(base_rot * Quat::from_rotation_x(curl1)),
+            Visibility::Inherited,
+            Name::new("Finger"),
+        ))
+        .id();
+    let prox = commands
+        .spawn((
+            Mesh3d(meshes.add(Cuboid::new(width, l1, width * 0.95))),
+            MeshMaterial3d(skin.clone()),
+            Transform::from_xyz(0.0, l1 * 0.5, 0.0),
+        ))
+        .id();
+    // Pivot distal au bout de la phalange proximale, flexion additionnelle.
+    let pivot = commands
+        .spawn((
+            Transform::from_xyz(0.0, l1, 0.0).with_rotation(Quat::from_rotation_x(curl2)),
+            Visibility::Inherited,
+        ))
+        .id();
+    let dist = commands
+        .spawn((
+            Mesh3d(meshes.add(Cuboid::new(width * 0.9, l2, width * 0.85))),
+            MeshMaterial3d(skin.clone()),
+            Transform::from_xyz(0.0, l2 * 0.5, 0.0),
+        ))
+        .id();
+    commands.entity(pivot).add_child(dist);
+    commands.entity(root).add_children(&[prox, pivot]);
+    commands.entity(hand).add_child(root);
+}
+
+fn spawn_hand(
+    commands: &mut Commands,
+    root: Entity,
+    meshes: &mut Assets<Mesh>,
+    skin: &Handle<StandardMaterial>,
+    cuff: &Handle<StandardMaterial>,
+    mirror: f32,
+) {
     let hand = commands
         .spawn((
-            Transform::from_translation(wrist).with_rotation(hand_rot),
+            ViewmodelHand { mirror },
+            Transform::IDENTITY,
             Visibility::Inherited,
             Name::new("ViewmodelHand"),
         ))
         .id();
-    commands.entity(parent).add_child(hand);
+    commands.entity(root).add_child(hand);
 
-    let mut kids: Vec<Entity> = Vec::with_capacity(8);
-
-    // Avant-bras (manche) : capsule le long de -Y (vers le coude).
-    kids.push(
+    // Pièces simples (avant-bras, manche, poignet, paume, dos de main).
+    let kids = [
         commands
             .spawn((
                 Mesh3d(meshes.add(Capsule3d::new(FOREARM_RADIUS, FOREARM_LEN))),
-                MeshMaterial3d(sleeve.clone()),
+                MeshMaterial3d(skin.clone()),
                 Transform::from_xyz(0.0, -FOREARM_LEN * 0.55, 0.0),
                 Name::new("Forearm"),
             ))
             .id(),
-    );
-    // Paume.
-    kids.push(
         commands
             .spawn((
-                Mesh3d(cuboid(meshes, PALM)),
+                Mesh3d(meshes.add(Cylinder::new(FOREARM_RADIUS * 1.25, 0.035))),
+                MeshMaterial3d(cuff.clone()),
+                Transform::from_xyz(0.0, -FOREARM_LEN * 0.92, 0.0),
+                Name::new("Cuff"),
+            ))
+            .id(),
+        // Poignet : raccord doux avant-bras → main.
+        commands
+            .spawn((
+                Mesh3d(meshes.add(Sphere::new(0.034))),
                 MeshMaterial3d(skin.clone()),
-                Transform::from_xyz(0.0, 0.028, 0.0),
+                Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::new(1.0, 0.8, 0.85)),
+                Name::new("Wrist"),
+            ))
+            .id(),
+        // Paume (corps de la main).
+        commands
+            .spawn((
+                Mesh3d(meshes.add(Cuboid::new(0.070, 0.058, 0.030))),
+                MeshMaterial3d(skin.clone()),
+                Transform::from_xyz(0.0, 0.028, 0.004),
                 Name::new("Palm"),
             ))
             .id(),
-    );
-    // 4 doigts repliés (rotation -X = courbés vers la paume) en avant de la paume.
-    let curl = Quat::from_rotation_x(-1.15);
-    for i in 0..4 {
-        let x = (i as f32 - 1.5) * 0.0165;
-        kids.push(
-            commands
-                .spawn((
-                    Mesh3d(cuboid(meshes, FINGER)),
-                    MeshMaterial3d(skin.clone()),
-                    Transform::from_xyz(x, 0.066, 0.012).with_rotation(curl),
-                    Name::new("Finger"),
-                ))
-                .id(),
-        );
-    }
-    // Pouce sur le côté (miroir selon la main), légèrement replié.
-    let thumb_rot = Quat::from_rotation_z(mirror * 0.7) * Quat::from_rotation_x(-0.5);
-    kids.push(
+        // Dos de la main : galbe arrondi (côté -Z).
         commands
             .spawn((
-                Mesh3d(cuboid(meshes, THUMB)),
+                Mesh3d(meshes.add(Sphere::new(0.038))),
                 MeshMaterial3d(skin.clone()),
-                Transform::from_xyz(mirror * 0.042, 0.04, 0.016).with_rotation(thumb_rot),
-                Name::new("Thumb"),
+                Transform::from_xyz(0.0, 0.030, -0.008).with_scale(Vec3::new(1.0, 0.6, 1.0)),
+                Name::new("HandBack"),
             ))
             .id(),
-    );
-
+    ];
     commands.entity(hand).add_children(&kids);
+
+    // 4 doigts à 2 phalanges, longueurs variées (FINGER_PROFILE), enroulés (grip).
+    let knuckle_y = 0.056;
+    for (i, &p) in FINGER_PROFILE.iter().enumerate() {
+        let x = (i as f32 - 1.5) * 0.0175;
+        spawn_finger(
+            commands,
+            hand,
+            meshes,
+            skin,
+            Vec3::new(x, knuckle_y, 0.010),
+            Quat::IDENTITY,
+            0.013,
+            0.026 * p,
+            0.022 * p,
+            -0.55,
+            -1.05,
+        );
+        // Bosse de jointure (relief du poing).
+        let bump = commands
+            .spawn((
+                Mesh3d(meshes.add(Sphere::new(0.0105))),
+                MeshMaterial3d(skin.clone()),
+                Transform::from_xyz(x, knuckle_y, 0.004),
+                Name::new("Knuckle"),
+            ))
+            .id();
+        commands.entity(hand).add_child(bump);
+    }
+
+    // Pouce : 2 segments, orienté en travers (rotation Z miroir), peu enroulé.
+    spawn_finger(
+        commands,
+        hand,
+        meshes,
+        skin,
+        Vec3::new(mirror * 0.040, 0.020, 0.016),
+        Quat::from_rotation_z(mirror * 0.95),
+        0.016,
+        0.024,
+        0.020,
+        -0.35,
+        -0.70,
+    );
 }
 
-/// Spawn le root des bras (enfant FpsCamera) une fois la caméra présente. Idempotent.
+/// Spawn root + 2 mains une fois la FpsCamera présente. Idempotent.
 pub fn spawn_arms(
     mut commands: Commands,
     tuning: Res<ViewmodelArmsTuning>,
@@ -158,6 +319,7 @@ pub fn spawn_arms(
     q_arms: Query<(), With<ViewmodelArms>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     if !tuning.enabled || !q_arms.is_empty() {
         return;
@@ -165,20 +327,25 @@ pub fn spawn_arms(
     let Ok(cam) = q_cam.single() else {
         return;
     };
-
+    // Texture de détail procédurale (variation organique) — partagée skin + cuff.
+    let detail = images.add(skin_detail_texture());
     let skin = materials.add(StandardMaterial {
         base_color: Color::srgb(SKIN[0], SKIN[1], SKIN[2]),
+        base_color_texture: Some(detail.clone()),
+        // Léger auto-éclairage : visible même dans une scène sombre (crépuscule).
+        emissive: LinearRgba::rgb(0.10, 0.06, 0.04),
+        // Peau = mat doux (un peu de relief spéculaire, pas plastique).
+        perceptual_roughness: 0.72,
+        reflectance: 0.35,
+        ..default()
+    });
+    let cuff = materials.add(StandardMaterial {
+        base_color: Color::srgb(CUFF[0], CUFF[1], CUFF[2]),
+        base_color_texture: Some(detail),
+        emissive: LinearRgba::rgb(0.03, 0.035, 0.05),
         perceptual_roughness: 0.9,
-        metallic: 0.0,
         ..default()
     });
-    let sleeve = materials.add(StandardMaterial {
-        base_color: Color::srgb(SLEEVE[0], SLEEVE[1], SLEEVE[2]),
-        perceptual_roughness: 0.95,
-        metallic: 0.0,
-        ..default()
-    });
-
     let root = commands
         .spawn((
             ViewmodelArms,
@@ -188,34 +355,94 @@ pub fn spawn_arms(
         ))
         .id();
     commands.entity(cam).add_child(root);
-
-    spawn_fist(
-        &mut commands, root, &mut meshes, &skin, &sleeve, ELBOW_R, WRIST_R, 1.0,
-    );
-    spawn_fist(
-        &mut commands, root, &mut meshes, &skin, &sleeve, ELBOW_L, WRIST_L, -1.0,
-    );
-
-    info!("[forgia-viewmodel] poings cartoon procéduraux spawnés (v2)");
+    spawn_hand(&mut commands, root, &mut meshes, &skin, &cuff, 1.0);
+    spawn_hand(&mut commands, root, &mut meshes, &skin, &cuff, -1.0);
+    info!("[forgia-viewmodel] mains procédurales spawnées (placement auto par-arme)");
 }
 
-/// Applique placement réglable (offset + échelle) + offset sway/bob partagé au root.
-/// Pose absolue chaque frame → pas d'accumulation. APRÈS `apply_viewmodel_sway_bob`.
-pub fn apply_arms_motion(
+/// Positionne chaque main depuis la position + taille RÉELLES de l'arme équipée
+/// (genome) → s'adapte à chaque arme. Live (chaque frame) : hot-reload instantané.
+pub fn position_hands(
     tuning: Res<ViewmodelArmsTuning>,
+    equipped: Res<EquippedWeapons>,
+    genome_handle: Option<Res<ViewmodelGenomeHandle>>,
+    genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    mut q: Query<(&mut Transform, &ViewmodelHand)>,
+) {
+    let entry = genome_handle
+        .as_deref()
+        .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
+    // Centre + longueur de l'arme en camera-local (mêmes helpers que l'attach).
+    let gun = viewmodel_transform(equipped.current, entry).translation;
+    let len = viewmodel_target_size(equipped.current, entry);
+
+    for (mut tf, hand) in &mut q {
+        let wrist = if hand.mirror > 0.0 {
+            // Main crosse : arrière (+Z vers caméra), sous l'arme.
+            gun + Vec3::new(tuning.grip_x, tuning.grip_drop, tuning.grip_back * len)
+        } else {
+            // Main soutien : avant (-Z vers le canon), sous l'arme.
+            gun + Vec3::new(tuning.barrel_x, tuning.barrel_drop, -tuning.barrel_fwd * len)
+        };
+        let elbow_out = if hand.mirror > 0.0 {
+            tuning.grip_elbow_out
+        } else {
+            tuning.barrel_elbow_out
+        };
+        let elbow = wrist
+            + Vec3::new(
+                hand.mirror * elbow_out,
+                -tuning.elbow_drop,
+                tuning.elbow_back,
+            );
+        let fwd = (wrist - elbow).normalize_or_zero();
+        let rot = Quat::from_rotation_arc(Vec3::Y, fwd);
+        *tf = Transform::from_translation(wrist)
+            .with_rotation(rot)
+            .with_scale(Vec3::splat(tuning.scale.max(0.01)));
+    }
+}
+
+/// Applique l'offset sway/bob partagé au root (les mains héritent). Root scale 1.0.
+pub fn apply_arms_motion(
     offset: Res<ViewmodelMotionOffset>,
     mut q: Query<&mut Transform, With<ViewmodelArms>>,
 ) {
     for mut tf in &mut q {
-        tf.translation = Vec3::new(tuning.offset_x, tuning.offset_y, tuning.offset_z)
-            + offset.translation;
+        tf.translation = offset.translation;
         tf.rotation = offset.rotation;
-        tf.scale = Vec3::splat(tuning.scale.max(0.01));
     }
 }
 
-/// Plugin bras : spawn + placement/motion. Gated FPS + Roguelite. Les bras se
-/// despawnent automatiquement avec la FpsCamera (enfants).
+/// Cache les bras en visée sniper plein écran (même condition que le masquage de
+/// l'arme dans `apply_ads_viewmodel`) → sinon les mains flottent devant le scope.
+/// Visibility::Hidden sur le root se propage aux enfants (poings).
+pub fn update_arms_visibility(
+    ads: Res<AdsState>,
+    equipped: Res<EquippedWeapons>,
+    genome_handle: Option<Res<ViewmodelGenomeHandle>>,
+    genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    mut q: Query<&mut Visibility, With<ViewmodelArms>>,
+) {
+    let entry = genome_handle
+        .as_deref()
+        .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
+    let hide = entry
+        .map(|e| e.sniper_scope_fullscreen && ads.progress > 0.5)
+        .unwrap_or(false);
+    let target = if hide {
+        Visibility::Hidden
+    } else {
+        Visibility::Inherited
+    };
+    for mut vis in &mut q {
+        if *vis != target {
+            *vis = target;
+        }
+    }
+}
+
+/// Plugin bras : spawn + placement auto par-arme + motion. Gated FPS + Roguelite.
 pub struct ForgiaViewmodelArmsPlugin;
 
 impl Plugin for ForgiaViewmodelArmsPlugin {
@@ -224,7 +451,9 @@ impl Plugin for ForgiaViewmodelArmsPlugin {
             Update,
             (
                 spawn_arms,
+                position_hands,
                 apply_arms_motion.after(apply_viewmodel_sway_bob),
+                update_arms_visibility,
             )
                 .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
         );

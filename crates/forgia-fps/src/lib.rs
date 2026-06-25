@@ -157,19 +157,34 @@ impl Default for FtViewmodelFov {
 pub struct FtViewmodelArms {
     pub enabled: bool,
     pub scale: f32,
-    pub offset_x: f32,
-    pub offset_y: f32,
-    pub offset_z: f32,
+    pub grip_x: f32,
+    pub grip_drop: f32,
+    pub grip_back: f32,
+    pub barrel_x: f32,
+    pub barrel_drop: f32,
+    pub barrel_fwd: f32,
+    pub elbow_drop: f32,
+    pub elbow_back: f32,
+    pub grip_elbow_out: f32,
+    pub barrel_elbow_out: f32,
 }
 
 impl Default for FtViewmodelArms {
     fn default() -> Self {
+        // Miroir de ViewmodelArmsTuning::default (forgia-viewmodel).
         Self {
             enabled: true,
-            scale: 1.0,
-            offset_x: 0.0,
-            offset_y: 0.0,
-            offset_z: 0.0,
+            scale: 2.0,
+            grip_x: 0.0,
+            grip_drop: -0.08,
+            grip_back: 0.30,
+            barrel_x: -0.04,
+            barrel_drop: -0.06,
+            barrel_fwd: 0.30,
+            elbow_drop: 0.30,
+            elbow_back: 0.45,
+            grip_elbow_out: 0.12,
+            barrel_elbow_out: 0.34,
         }
     }
 }
@@ -197,11 +212,11 @@ impl Default for FtViewmodelMotion {
             sway_rot_per_px_deg: 0.03,
             sway_rot_max_deg: 2.5,
             sway_smooth: 9.0,
-            bob_pos: 0.014,
-            bob_freq: 8.0,
+            bob_pos: 0.010,
+            bob_freq: 2.0,
             bob_speed_ref: 6.0,
             idle_amp: 0.004,
-            idle_freq: 1.1,
+            idle_freq: 0.4,
         }
     }
 }
@@ -1079,13 +1094,20 @@ fn sync_fps_tuning(
     vm_tuning.bob_speed_ref = vm.bob_speed_ref;
     vm_tuning.idle_amp = vm.idle_amp;
     vm_tuning.idle_freq = vm.idle_freq;
-    // Story-617 inc.2 — placement bras (hot-reload : ajuste sans rebuild).
+    // Story-617/618 — placement bras par-main (hot-reload : ajuste sans rebuild).
     let arms = &t.viewmodel_arms;
     arms_tuning.enabled = arms.enabled;
     arms_tuning.scale = arms.scale;
-    arms_tuning.offset_x = arms.offset_x;
-    arms_tuning.offset_y = arms.offset_y;
-    arms_tuning.offset_z = arms.offset_z;
+    arms_tuning.grip_x = arms.grip_x;
+    arms_tuning.grip_drop = arms.grip_drop;
+    arms_tuning.grip_back = arms.grip_back;
+    arms_tuning.barrel_x = arms.barrel_x;
+    arms_tuning.barrel_drop = arms.barrel_drop;
+    arms_tuning.barrel_fwd = arms.barrel_fwd;
+    arms_tuning.elbow_drop = arms.elbow_drop;
+    arms_tuning.elbow_back = arms.elbow_back;
+    arms_tuning.grip_elbow_out = arms.grip_elbow_out;
+    arms_tuning.barrel_elbow_out = arms.barrel_elbow_out;
     // Story-618 — FOV viewmodel séparé (hot-reload).
     vm_fov_tuning.enabled = t.viewmodel_fov.enabled;
     vm_fov_tuning.fov_deg = t.viewmodel_fov.fov_deg;

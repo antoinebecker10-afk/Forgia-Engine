@@ -75,8 +75,29 @@ pub fn manage_viewmodel_camera(
             ))
             .id();
         commands.entity(fps).add_child(cam);
+
+        // Lumière dédiée viewmodel (layer 1) : dans Bevy les lumières respectent les
+        // RenderLayers → le soleil (layer 0) n'éclaire PAS le viewmodel (layer 1), il
+        // restait sombre au crépuscule. Cette directional sur layer 1, enfant de la
+        // caméra (direction view-relative), éclaire arme + mains de façon CONSTANTE
+        // quelle que soit l'heure du jeu (pattern viewmodel AAA). Pas d'ombres (inutile
+        // + coûteux sur un layer isolé). Auto-despawn avec la caméra (enfant).
+        let light = commands
+            .spawn((
+                DirectionalLight {
+                    illuminance: 9000.0,
+                    shadows_enabled: false,
+                    ..default()
+                },
+                // Vient d'en haut-avant-droite (modelé doux sur le poing + l'arme).
+                Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.85, 0.5, 0.0)),
+                RenderLayers::layer(VIEWMODEL_LAYER),
+                Name::new("ViewmodelLight"),
+            ))
+            .id();
+        commands.entity(cam).add_child(light);
         info!(
-            "[forgia-viewmodel] ViewmodelCamera spawnée (FOV {:.0}°, layer {VIEWMODEL_LAYER})",
+            "[forgia-viewmodel] ViewmodelCamera + light spawnées (FOV {:.0}°, layer {VIEWMODEL_LAYER})",
             tuning.fov_deg
         );
     } else if !tuning.enabled && exists {

@@ -199,7 +199,10 @@ fn regen_skybox_image(
     mut commands: Commands,
     current: Res<CurrentSkyPalette>,
     mut images: ResMut<Assets<Image>>,
-    q_cam: Query<Entity, With<Camera3d>>,
+    // Story-618 : exclure la ViewmodelCamera — sinon elle reçoit un Skybox et,
+    // en ClearColorConfig::None + order 1, le peint plein écran PAR-DESSUS le
+    // monde rendu par la caméra monde → la map disparaît (bug observé).
+    q_cam: Query<Entity, (With<Camera3d>, Without<crate::ViewmodelCamera>)>,
 ) {
     if !current.is_changed() {
         return;

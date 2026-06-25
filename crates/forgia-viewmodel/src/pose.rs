@@ -94,11 +94,11 @@ impl Default for ViewmodelMotionTuning {
             sway_rot_per_px_deg: 0.03,
             sway_rot_max_deg: 2.5,
             sway_smooth: 9.0,
-            bob_pos: 0.014,
-            bob_freq: 8.0,
+            bob_pos: 0.010,
+            bob_freq: 2.0,
             bob_speed_ref: 6.0,
             idle_amp: 0.004,
-            idle_freq: 1.1,
+            idle_freq: 0.4,
         }
     }
 }
