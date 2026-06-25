@@ -40,6 +40,11 @@ use crate::config::RpgMonitorConfig;
 use crate::state::{CheckResult, RpgHealthState, Severity as ObsSeverity};
 
 const QA_SENSOR_PATH: &str = "forgia2_qa.json";
+/// Sensor crash legacy écrit par le panic hook (src/main.rs, story-592), hors `crates/`.
+const CRASH_SENSOR_PATH: &str = "forgia2_crash.json";
+/// Archive après consommation : évite la réémission au boot suivant. Matché par
+/// `.gitignore forgia2_*.json` ; invisible à sensor-audit (rename, pas write).
+const CRASH_SENSOR_ARCHIVE: &str = "forgia2_crash.previous.json";
 
 /// État du pont : edge-detection par check + résumé pour `forgia2_qa.json`.
 #[derive(Resource, Default)]
@@ -190,6 +195,67 @@ pub fn sys_write_qa_sensor(
     }
 }
 
+/// Parse le sensor crash legacy → `(message, location)`. `None` si JSON illisible
+/// ou si ce n'est pas un sensor crash (`id != "crash"`). Pur/testable.
+fn parse_crash_json(src: &str) -> Option<(String, String)> {
+    let v: serde_json::Value = serde_json::from_str(src).ok()?;
+    if v.get("id").and_then(serde_json::Value::as_str) != Some("crash") {
+        return None;
+    }
+    let message = v
+        .get("message")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("panic inconnu")
+        .to_string();
+    let location = v
+        .get("location")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("inconnue")
+        .to_string();
+    Some((message, location))
+}
+
+/// Startup — 2e producteur : bridge le crash de la session **précédente**
+/// (`forgia2_crash.json`, écrit par le panic hook de src/main.rs qui tourne hors
+/// ECS) vers le bus QA, UNE fois, puis archive le fichier (→ `.previous.json`)
+/// pour ne pas réémettre au prochain boot. Le crash est la classe de bug la plus
+/// précieuse : il survit au process qui meurt et remonte au démarrage suivant.
+pub fn sys_crash_bridge_startup(
+    config: Res<RpgMonitorConfig>,
+    mut bridge: ResMut<QaBridgeState>,
+    mut writer: MessageWriter<BugReport>,
+) {
+    if !config.qa_bridge.enabled {
+        return;
+    }
+    let Ok(src) = std::fs::read_to_string(CRASH_SENSOR_PATH) else {
+        return; // pas de crash en attente — cas nominal
+    };
+    let Some((message, location)) = parse_crash_json(&src) else {
+        return;
+    };
+    writer.write(BugReport::new(
+        BugCategory::Panic {
+            message,
+            location: location.clone(),
+        },
+        // Crash = échelle QA Blocker ; le sensor T0 affichera `critical`.
+        QaSeverity::Blocker,
+        DetectionSource::LegacySensor {
+            sensor_file: CRASH_SENSOR_PATH.to_string(),
+        },
+    ));
+    bridge.emitted_total += 1;
+    bridge.last_severity = "critical";
+    bridge.last_next_step =
+        format!("crash session précédente @ {location} — voir {CRASH_SENSOR_ARCHIVE}");
+    bridge.last_emit_secs = 0.0;
+    // Consomme : archive le crash (best-effort, ne bloque jamais le boot).
+    if let Err(e) = std::fs::rename(CRASH_SENSOR_PATH, CRASH_SENSOR_ARCHIVE) {
+        warn!("[forgia-observability] crash archive failed: {e}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +321,32 @@ mod tests {
         prune_ghost_seen(&mut seen, &present);
         assert!(!seen.contains_key("RGL-1"), "fantôme non purgé");
         assert!(seen.contains_key("CHK-1"), "clé présente purgée à tort");
+    }
+
+    #[test]
+    fn parse_crash_extracts_message_and_location() {
+        let src = r#"{"id":"crash","severity":"critical","message":"index out of bounds: len 3 index 7","location":"crates\\forgia-fps\\src\\lib.rs:612:9"}"#;
+        let (m, l) = parse_crash_json(src).expect("crash valide");
+        assert!(m.contains("index out of bounds"));
+        assert!(l.contains("lib.rs:612"));
+    }
+
+    #[test]
+    fn parse_crash_rejects_non_crash_sensor() {
+        // Un autre sensor (ex: forgia2_qa) ne doit pas être pris pour un crash.
+        assert!(parse_crash_json(r#"{"id":"qa","severity":"ok"}"#).is_none());
+    }
+
+    #[test]
+    fn parse_crash_rejects_garbage() {
+        assert!(parse_crash_json("pas du json").is_none());
+        assert!(parse_crash_json("").is_none());
+    }
+
+    #[test]
+    fn parse_crash_defaults_on_missing_fields() {
+        let (m, l) = parse_crash_json(r#"{"id":"crash"}"#).expect("id crash suffit");
+        assert_eq!(m, "panic inconnu");
+        assert_eq!(l, "inconnue");
     }
 }

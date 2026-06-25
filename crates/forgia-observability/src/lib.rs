@@ -113,6 +113,9 @@ impl Plugin for ForgiaObservabilityPlugin {
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
         app.add_systems(Startup, migration_baseline::sys_load_previous_baseline);
+        // story-622 inc.2 — bridge le crash de la session précédente (forgia2_crash.json)
+        // vers le bus QA au démarrage, puis archive le fichier (anti-réémission).
+        app.add_systems(Startup, qa_bridge::sys_crash_bridge_startup);
         app.add_systems(
             Update,
             migration_baseline::sys_capture_and_compare_baseline.in_set(GameSet::Sensors),

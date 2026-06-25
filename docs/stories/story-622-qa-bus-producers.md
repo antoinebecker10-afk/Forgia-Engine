@@ -38,12 +38,21 @@ Premier producteur réel du bus + activation du drain + observabilité.
    Toggle + fenêtre config-driven (`QaBridgeConfig` dans
    [config.rs](../../crates/forgia-observability/src/config.rs), hot-reload Shift+F12).
 
+4. **2e producteur (inc.2) — crash bridge** : `sys_crash_bridge_startup` (Startup) lit le
+   `forgia2_crash.json` de la **session précédente** (écrit par le panic hook de `src/main.rs`,
+   story-592, qui tourne hors ECS) → `BugReport { Panic { message, location }, severity: Blocker,
+   source: LegacySensor }`. Émis **une seule fois** puis archive `forgia2_crash.json` →
+   `forgia2_crash.previous.json` (anti-réémission au boot suivant ; rename invisible à sensor-audit,
+   archive matchée par `.gitignore forgia2_*.json`). Le crash — classe de bug la plus précieuse —
+   survit au process mort et remonte au démarrage suivant.
+
 ## Vérification (preuve)
 - `cargo check -p forgia-observability` → exit 0.
 - `cargo check -p forgia-game` (feature `qa` ON) → exit 0 (drain compile).
 - `cargo check -p forgia` + `cargo tree` → `forgia-qa-core [default,qa-runtime]` résolu dans le binaire.
-- `cargo test -p forgia-observability qa_bridge` → **7/7 passent** (fronts montants, escalade, steady,
-  descente, ok-never-emits, mapping sévérité, repr courte JSON-safe).
+- `cargo test -p forgia-observability qa_bridge` → **12/12 passent** (fronts montants, escalade,
+  steady, descente, ok-never-emits, mapping T0, ghost-entries purge + crash parse valide/non-crash/
+  garbage/defaults).
 - `cargo clippy -p forgia-observability` → **0 warning sur mon code** (warning pré-existant hors scope
   `forgia-core/src/lib.rs:58` doc_lazy_continuation, non touché).
 
@@ -84,8 +93,9 @@ Passe BMAD Standard. qa-lead a trouvé 4 défauts (0 bloquant) :
   documenté dans lib.rs + qa_bridge.rs à la place.
 
 ## Suite (incréments Phase 0.2)
-- 🟡 **2e producteur — panic hook** : bridger `forgia2_crash.json` (story-592, déjà existant, racine
-  Cargo.toml:207) → `BugReport::Panic`. Capte les crashes (classe de bug la plus précieuse).
+- ✅ **2e producteur — crash bridge** : LIVRÉ (inc.2 ci-dessus).
 - 🟢 **3e producteur — anomalie télémétrie** : seuils sur `forgia2_perf`/`memory` → `BugReport`
   (`TelemetryAnomaly`/`FrameTimeSpike`).
 - 🟢 **Sink fichier** : activer `qa-record` (FileSink RON) pour persister les BugReport sur disque.
+- 🟡 **Couverture gate** : ajouter `forgia2_qa.json` à `CANONICAL_SENSORS` (xtask) une fois la
+  coordination churn possible (le sensor émet déjà du T0-valide, donc l'ajout sera vert).
