@@ -8,11 +8,12 @@ description = "Forgia V2 — Binaire principal. Wire tous les plugins, gate FPS/
 workspace = true
 
 [features]
-# Story-622 (Phase 0.2) — `qa` active le drain runtime du bus QA (BugReport).
-# ON par défaut : pré-ship on veut voir les bugs (drain = 1 system PreUpdate,
-# coût négligeable). Une story release pourra gater la perf via `--no-default-features`.
+# Story-622 (Phase 0.2) — `qa` active le bus QA : drain runtime (qa-runtime) +
+# persistance disque RON (qa-record → target/forgia_qa/inbox/). ON par défaut :
+# pré-ship on veut voir + persister les bugs (drain = 1 system PreUpdate, sink =
+# 1 write/bug distinct). Une story release pourra gater via `--no-default-features`.
 default = ["qa"]
-qa = ["forgia-qa-core/qa-runtime"]
+qa = ["forgia-qa-core/qa-runtime", "forgia-qa-core/qa-record"]
 
 [dependencies]
 bevy = { workspace = true }

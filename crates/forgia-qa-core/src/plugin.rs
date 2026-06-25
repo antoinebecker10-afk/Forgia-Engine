@@ -50,6 +50,30 @@ impl Plugin for ForgiaQaCorePlugin {
                     .chain()
                     .in_set(QaCoreSet::Drain),
             );
+
+        // story-622 inc.3 — sous `qa-record`, on remplace le NullSink par défaut par
+        // un FileSink RON : chaque BugReport distinct persiste en
+        // `target/forgia_qa/inbox/<id>.bug.ron` (lisible/triable). Sans la feature,
+        // le bus garde le NullSink (collecte = compteurs seulement).
+        #[cfg(feature = "qa-record")]
+        app.add_systems(bevy::app::Startup, install_record_sink);
+    }
+}
+
+/// Installe le `FileSink` RON au démarrage (remplace le `NullSink` par défaut).
+/// Best-effort : si la création du dossier échoue, le bus reste fonctionnel
+/// (NullSink conservé) — la collecte QA ne doit jamais casser le boot du jeu.
+#[cfg(feature = "qa-record")]
+fn install_record_sink(mut bus: ResMut<BugBus>) {
+    use crate::sink::FileSink;
+    match FileSink::default_inbox() {
+        Ok(sink) => {
+            bus.set_sinks(vec![Box::new(sink)]);
+            bevy::log::info!("[qa-core] FileSink RON actif → target/forgia_qa/inbox/");
+        }
+        Err(e) => {
+            bevy::log::warn!("[qa-core] FileSink init échoué ({e}) — NullSink conservé");
+        }
     }
 }
 

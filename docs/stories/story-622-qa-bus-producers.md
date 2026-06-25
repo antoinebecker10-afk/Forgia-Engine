@@ -92,10 +92,20 @@ Passe BMAD Standard. qa-lead a trouvé 4 défauts (0 bloquant) :
   (double `add_message`) risque de dédoubler le system de clear → régression pire que le bug ; coupling
   documenté dans lib.rs + qa_bridge.rs à la place.
 
+## inc.3 — Sink fichier (sortie lisible du bus)
+Les producteurs émettaient dans un `NullSink` (compteurs seulement, bugs évaporés). inc.3 ferme la
+boucle : sous la feature `qa-record` (incluse dans `qa`, donc ON par défaut),
+`install_record_sink` (Startup, dans [forgia-qa-core/plugin.rs](../../crates/forgia-qa-core/src/plugin.rs))
+remplace le NullSink par un `FileSink` RON → chaque `BugReport` distinct persiste en
+**`target/forgia_qa/inbox/<id>.bug.ron`** (dédup respectée ; `target/` gitignoré). Vérifié :
+binaire `forgia` résout `[default,qa-record,qa-runtime]` ; `forgia-qa-core --features qa-record`
+clippy-clean (40 tests) ; build default (sans feature) 0 warning. Limite connue : un dédup-hit ne
+rafraîchit pas le compteur d'occurrences sur disque (1er fichier persiste) — acceptable, le bug est capté.
+
 ## Suite (incréments Phase 0.2)
-- ✅ **2e producteur — crash bridge** : LIVRÉ (inc.2 ci-dessus).
+- ✅ **2e producteur — crash bridge** : LIVRÉ (inc.2).
+- ✅ **Sink fichier RON** : LIVRÉ (inc.3).
 - 🟢 **3e producteur — anomalie télémétrie** : seuils sur `forgia2_perf`/`memory` → `BugReport`
   (`TelemetryAnomaly`/`FrameTimeSpike`).
-- 🟢 **Sink fichier** : activer `qa-record` (FileSink RON) pour persister les BugReport sur disque.
 - 🟡 **Couverture gate** : ajouter `forgia2_qa.json` à `CANONICAL_SENSORS` (xtask) une fois la
   coordination churn possible (le sensor émet déjà du T0-valide, donc l'ajout sera vert).
