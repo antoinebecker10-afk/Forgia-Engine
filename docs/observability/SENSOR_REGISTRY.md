@@ -67,6 +67,7 @@
 | `forgia2_migration_baseline.json` | T0 | forgia-observability | `src/migration_baseline.rs:33` | once | baseline E1/E2 forgia_*→forgia2_* migration tracking | active |
 | `forgia2_perf.json` | T0 | forgia-observability | `src/perf_sensor.rs:73` | 1Hz | FPS, frame_time, smooth | active |
 | `forgia2_physics.json` | T0 | forgia-observability | `src/physics_sensor.rs` | 1Hz | rigid bodies par type, colliders, sensors, KCC, joints — story-540 KCC stuck, story-545 raycast self-hit | active |
+| `forgia2_qa.json` | T0 | forgia-observability | `src/qa_bridge.rs:130` | 1Hz | activité bus QA : emitted_total, bus_ingested, dedup_hits + dernière émission (pont santé→BugReport, story-622) | active |
 | `forgia2_rpg_player.json` | T0 | forgia-observability | `src/rpg_player_sensor.rs` | 1Hz | player ↔ biome/water — biome_current, is_swimming, depth_below_surface, head_above_water | active |
 | `forgia2_quests.json` | T0 | forgia-observability | `src/quests_sensor.rs` | 1Hz | QuestCatalogue total + QuestLog active/completed/turned_in/failed counts + top 10 active quests avec completion_percent | active |
 | `forgia2_inventory.json` | T0 | forgia-observability | `src/inventory_sensor.rs` | 1Hz | LOCK-INV-1 audit (capacity≤80) + slots_used/free + is_full + top 5 items (id/count/max_stack) | active |

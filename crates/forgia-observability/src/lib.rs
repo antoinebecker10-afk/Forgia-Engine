@@ -59,6 +59,8 @@ pub mod fps_feel_sensor;
 // Story-529 Phase 1 — boons foundation (catalogue + active + tag unlocks).
 pub mod boons_sensor;
 pub mod render_sensor;
+// Story-622 (Phase 0.2) — pont santé → bus QA (premier producteur BugReport).
+pub mod qa_bridge;
 
 pub mod prelude {
     pub use crate::ForgiaObservabilityPlugin;
@@ -106,6 +108,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<npcs_sensor::NpcsSensorState>()
             .init_resource::<fps_feel_sensor::FpsFeelSensorState>()
             .init_resource::<boons_sensor::BoonsSensorState>()
+            .init_resource::<qa_bridge::QaBridgeState>()
             .insert_resource(RpgMonitorConfig::load_or_default());
 
         // Migration baseline : Startup load previous, Update capture+compare at T+5s.
@@ -184,6 +187,19 @@ impl Plugin for ForgiaObservabilityPlugin {
         app.add_systems(
             Update,
             render_sensor::sys_write_render_sensor.in_set(GameSet::Sensors),
+        );
+        // story-622 (Phase 0.2) — réveil du bus QA : pont santé→BugReport
+        // (edge-trigger sur les checks RpgHealthState) + sensor forgia2_qa.json.
+        // Cross-mode (RpgHealthState peuplé par RPG via CHK-* ou Roguelite via RGL-*).
+        // Le pont exige Messages<BugReport> = garanti par ForgiaQaCorePlugin
+        // (toujours ajouté dans forgia-game).
+        app.add_systems(
+            Update,
+            (
+                qa_bridge::sys_qa_health_bridge,
+                qa_bridge::sys_write_qa_sensor,
+            )
+                .in_set(GameSet::Sensors),
         );
         // story-621 (Phase 0.6 A) — checks santé Roguelite (RGL-1 écran vide /
         // RGL-2 vague figée) qui peuplent RpgHealthState. Gaté Roguelite : les

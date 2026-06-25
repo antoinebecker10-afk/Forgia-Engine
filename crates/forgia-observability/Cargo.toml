@@ -22,6 +22,10 @@ forgia-audio = { workspace = true }
 forgia-input = { workspace = true }
 forgia-rpg-data = { workspace = true }
 forgia-rpg = { workspace = true }
+# Story-622 (Phase 0.2) — pont santé → bus QA (BugReport). Direction saine :
+# l'observabilité PRODUIT des BugReport ; qa-core ne dépend pas d'observability
+# (aucun cycle). Types seulement (BugBus/BugReport/DetectionSource/Severity).
+forgia-qa-core = { workspace = true }
 bevy_kira_audio = "0.25"
 bevy_water = "0.18"
 leafwing-input-manager = "0.20"

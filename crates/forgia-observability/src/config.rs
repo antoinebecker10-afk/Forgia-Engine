@@ -272,6 +272,33 @@ impl Default for RogueliteHealthConfig {
     }
 }
 
+// ─────────────────── QaBridgeConfig (story-622, pont santé → bus QA) ───────────────────
+
+/// Pont santé → bus QA : chaque check `RpgHealthState` qui passe Warn/Critical
+/// émet un `BugReport` (edge-trigger). Toggle + fenêtre du sensor `forgia2_qa.json`.
+#[derive(Clone, Debug, Deserialize)]
+pub struct QaBridgeConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// `forgia2_qa.json` : durée pendant laquelle la dernière émission tient la
+    /// sévérité du sensor ; au-delà, le sensor retombe à `ok`.
+    #[serde(default = "default_qa_recent_secs")]
+    pub recent_secs: f32,
+}
+
+fn default_qa_recent_secs() -> f32 {
+    30.0
+}
+
+impl Default for QaBridgeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            recent_secs: default_qa_recent_secs(),
+        }
+    }
+}
+
 // ─────────────────────────── RpgMonitorConfig ───────────────────────────
 
 const CONFIG_PATH: &str = "config/genomes/rpg_monitor.toml";
@@ -296,6 +323,8 @@ pub struct RpgMonitorConfig {
     pub health_consistency: HealthConsistencyConfig,
     #[serde(default)]
     pub roguelite_health: RogueliteHealthConfig,
+    #[serde(default)]
+    pub qa_bridge: QaBridgeConfig,
 }
 
 impl RpgMonitorConfig {
