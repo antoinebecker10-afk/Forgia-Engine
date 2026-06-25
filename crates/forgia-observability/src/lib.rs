@@ -25,6 +25,7 @@ pub mod config;
 pub mod exporter;
 pub mod forgia2_aggregator;
 pub mod health_sensor;
+pub mod roguelite_health;
 pub mod sensor_reader;
 pub mod state;
 // Story-467 V5 Session B — perf / entities / memory producers
@@ -183,6 +184,15 @@ impl Plugin for ForgiaObservabilityPlugin {
         app.add_systems(
             Update,
             render_sensor::sys_write_render_sensor.in_set(GameSet::Sensors),
+        );
+        // story-621 (Phase 0.6 A) — checks santé Roguelite (RGL-1 écran vide /
+        // RGL-2 vague figée) qui peuplent RpgHealthState. Gaté Roguelite : les
+        // checks RPG (CHK-*) sont gatés Rpg → aucun conflit d'écriture.
+        app.add_systems(
+            Update,
+            roguelite_health::sys_roguelite_health
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Roguelite)),
         );
         // Story-465 — forgia2 aggregator Tier 1 : combat + arena.
         // V7 M1 (story-470) : gate étendu Fps OU Roguelite — V7 réutilise le firing

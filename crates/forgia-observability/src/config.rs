@@ -230,6 +230,48 @@ impl Default for HealthConsistencyConfig {
     }
 }
 
+// ─────────────────── RogueliteHealthConfig (story-621, RGL-1/2) ───────────────────
+
+/// Seuils des checks santé Roguelite (forgia2_health.json actif en `GameMode::Roguelite`).
+#[derive(Clone, Debug, Deserialize)]
+pub struct RogueliteHealthConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// RGL-1 : nombre de Mesh3d présents au-dessus duquel « 0 visible » = écran vide
+    /// (aligné sur render_sensor : mesh_total>50 && visible==0).
+    #[serde(default = "default_blank_mesh_floor")]
+    pub blank_mesh_floor: u64,
+    /// RGL-2 : secondes en run actif (in_run/boss), hors break, sans aucun bot vivant,
+    /// avant de flaguer une vague figée.
+    #[serde(default = "default_stuck_wave_secs")]
+    pub stuck_wave_secs: f32,
+    /// RGL-2 : au-delà de ce délai sans MAJ de forgia2_roguelite_state.json, le capteur
+    /// est stale → on skip (diagnostic invalide, cf multi-terminal §5).
+    #[serde(default = "default_state_stale_secs")]
+    pub state_stale_secs: f32,
+}
+
+fn default_blank_mesh_floor() -> u64 {
+    50
+}
+fn default_stuck_wave_secs() -> f32 {
+    8.0
+}
+fn default_state_stale_secs() -> f32 {
+    3.0
+}
+
+impl Default for RogueliteHealthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            blank_mesh_floor: default_blank_mesh_floor(),
+            stuck_wave_secs: default_stuck_wave_secs(),
+            state_stale_secs: default_state_stale_secs(),
+        }
+    }
+}
+
 // ─────────────────────────── RpgMonitorConfig ───────────────────────────
 
 const CONFIG_PATH: &str = "config/genomes/rpg_monitor.toml";
@@ -252,6 +294,8 @@ pub struct RpgMonitorConfig {
     pub critical_assets: CriticalAssetsConfig,
     #[serde(default)]
     pub health_consistency: HealthConsistencyConfig,
+    #[serde(default)]
+    pub roguelite_health: RogueliteHealthConfig,
 }
 
 impl RpgMonitorConfig {
