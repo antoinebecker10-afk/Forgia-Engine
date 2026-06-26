@@ -45,6 +45,7 @@ pub mod parcours_obstacles;
 pub mod perf_diag;
 pub mod persist;
 pub mod poi;
+pub mod progress;
 pub mod run;
 pub mod sensor;
 pub mod shockwave;
@@ -503,6 +504,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // Hub d'accueil à onglets (design home-hub 2026-06-26, P2) : regroupe
             // Forgeron/Armes/Enclume en onglets + bandeau Âmes/niveau + bouton LANCER.
             .add_plugins(hub::HubPlugin)
+            // Progression joueur (P4) : niveau + XP de participation (fin de run) +
+            // points de talent (P5). Distinct des Âmes.
+            .add_plugins(progress::PlayerProgressPlugin)
             // Story-610 — Commerçant d'arène : sink in-run (Or = munitions/soin,
             // Âmes = Second souffle revive) + sensor forgia2_merchant.json.
             .add_plugins(merchant::MerchantPlugin)

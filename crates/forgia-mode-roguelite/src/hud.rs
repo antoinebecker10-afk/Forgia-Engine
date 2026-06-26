@@ -1180,6 +1180,7 @@ pub(crate) fn draw_player_identity_badge(
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
     save: Option<Res<crate::identity::IdentitySave>>,
+    progress: Option<Res<crate::progress::PlayerProgress>>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -1217,11 +1218,12 @@ pub(crate) fn draw_player_identity_badge(
         C_TEXT_LIGHT,
         1.8,
     );
+    let lvl_text = format!("Niv. {}", progress.as_ref().map(|p| p.level).unwrap_or(1));
     text_with_outline(
         &painter,
         egui::pos2(text_x, portrait_center.y + 13.0),
         egui::Align2::LEFT_CENTER,
-        "Niv. 1",
+        &lvl_text,
         egui::FontId::monospace(14.0),
         FORGE_OR,
         1.2,

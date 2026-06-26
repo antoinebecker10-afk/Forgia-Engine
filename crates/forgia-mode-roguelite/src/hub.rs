@@ -20,6 +20,7 @@ use forgia_ui_lib::style::{cartoon_btn, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FO
 use forgia_ui_lib::theme::display_text;
 
 use crate::identity::IdentitySave;
+use crate::progress::PlayerProgress;
 use crate::run::{MetaSouls, StartRunEvent};
 use crate::RunState;
 
@@ -121,6 +122,7 @@ fn draw_hub_chrome(
     mut hub: ResMut<HubTab>,
     souls: Option<Res<MetaSouls>>,
     identity: Option<Res<IdentitySave>>,
+    progress: Option<Res<PlayerProgress>>,
     mut start_run: MessageWriter<StartRunEvent>,
 ) {
     let Ok(ctx) = contexts.ctx_mut() else {
@@ -160,6 +162,17 @@ fn draw_hub_chrome(
         .show(ctx, |ui| {
             chip_frame().show(ui, |ui| {
                 ui.vertical(|ui| {
+                    let (level, xp, xp_next, frac) = progress
+                        .as_ref()
+                        .map(|p| {
+                            (
+                                p.level,
+                                p.xp,
+                                PlayerProgress::xp_to_next(p.level),
+                                p.xp_fraction(),
+                            )
+                        })
+                        .unwrap_or((1, 0, 80, 0.0));
                     ui.horizontal(|ui| {
                         ui.label(
                             egui::RichText::new(name)
@@ -168,7 +181,7 @@ fn draw_hub_chrome(
                                 .strong(),
                         );
                         ui.label(
-                            egui::RichText::new("· Niv. 1")
+                            egui::RichText::new(format!("· Niv. {level}"))
                                 .size(14.0)
                                 .color(C_TEXT_MUTED),
                         );
@@ -176,8 +189,10 @@ fn draw_hub_chrome(
                     ui.add_space(4.0);
                     ui.add_sized(
                         egui::vec2(180.0, 10.0),
-                        egui::ProgressBar::new(0.0).fill(FORGE_OR).text(
-                            egui::RichText::new("0 / 100 XP").size(10.0).color(FORGE_CREME),
+                        egui::ProgressBar::new(frac).fill(FORGE_OR).text(
+                            egui::RichText::new(format!("{xp} / {xp_next} XP"))
+                                .size(10.0)
+                                .color(FORGE_CREME),
                         ),
                     );
                 });
@@ -245,6 +260,14 @@ fn draw_hub_chrome(
                                 )
                                 .size(16.0)
                                 .color(FORGE_CREME),
+                            );
+                            ui.add_space(10.0);
+                            let pts = progress.as_ref().map(|p| p.talent_points).unwrap_or(0);
+                            ui.label(
+                                egui::RichText::new(format!("{pts} point(s) de talent en attente"))
+                                    .size(17.0)
+                                    .strong()
+                                    .color(FORGE_OR),
                             );
                         });
                     });
