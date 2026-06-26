@@ -604,6 +604,11 @@ struct LobbyPreviewWeapon {
     weapon: WeaponType,
 }
 
+/// Scène GLB de l'aperçu = enfant du pivot `LobbyPreviewWeapon`, recentrée (-center)
+/// + scalée par `sys_calibrate_preview` → l'arme tourne AUTOUR DE SON CENTRE.
+#[derive(Component)]
+struct LobbyPreviewScene;
+
 /// Sphère de pré-chauffe d'un matériau d'élément : rendue 1× au Lobby (occluse par
 /// l'arme) pour compiler son pipeline `unlit/blend` AVANT le 1er impact en combat
 /// (sinon freeze au 1er hit élémentaire). Despawn à la sortie du Lobby (story-618).
@@ -673,15 +678,27 @@ fn sys_lobby_weapon_preview(
         let key = vm_key(w);
         let scene = asset_server
             .load(GltfAssetLabel::Scene(0).from_asset(format!("models/weapons/forgia/{key}.glb")));
+        // Pivot = point de rotation + position (PREVIEW_Y, devant la caméra). La scène
+        // GLB est un enfant RECENTRÉ dessus → l'arme tourne autour de son centre (pas
+        // d'orbite) et est centrée X/Y quelle que soit l'origine du GLB.
+        let pivot = commands
+            .spawn((
+                Name::new(format!("LobbyPreview_{key}")),
+                LobbyPreviewWeapon { weapon: w },
+                Transform::from_xyz(0.0, PREVIEW_Y, -PREVIEW_DIST),
+                Visibility::Hidden,
+                ChildOf(cam),
+            ))
+            .id();
         commands.spawn((
-            Name::new(format!("LobbyPreview_{key}")),
-            LobbyPreviewWeapon { weapon: w },
+            Name::new(format!("LobbyPreviewScene_{key}")),
+            LobbyPreviewScene,
             NeedsPreviewCalibrate { target: PREVIEW_TARGET },
             SceneRoot(scene),
             // Échelle initiale minuscule → pas de flash géant avant calibrage AABB.
-            Transform::from_xyz(0.0, PREVIEW_Y, -PREVIEW_DIST).with_scale(Vec3::splat(0.001)),
-            Visibility::Hidden,
-            ChildOf(cam),
+            Transform::from_scale(Vec3::splat(0.001)),
+            Visibility::Inherited,
+            ChildOf(pivot),
         ));
     }
     // Pré-chauffe des 4 matériaux d'élément (unlit/blend) : rendus 1× (sphères
@@ -744,11 +761,11 @@ fn sys_calibrate_preview(
             if let Ok(mut tf) = q_tf.get_mut(e) {
                 let scale = needs.target / max_dim;
                 tf.scale = Vec3::splat(scale);
-                // Recentrage vertical : le centre géométrique de l'arme est placé à
-                // PREVIEW_Y → l'arme est centrée dans le viewport quelle que soit
-                // l'origine du GLB (Pépin centré, Boucherie origine au sol, etc.).
-                let center_y = (min.y + max.y) * 0.5;
-                tf.translation.y = PREVIEW_Y - center_y * scale;
+                // Recentrage COMPLET (X/Y/Z) : place le centre géométrique de l'arme sur
+                // l'origine du pivot → arme centrée ET rotation autour de son centre
+                // (pas d'orbite), quelle que soit l'origine du GLB.
+                let center = (min + max) * 0.5;
+                tf.translation = -center * scale;
             }
         }
         commands.entity(e).remove::<NeedsPreviewCalibrate>();
