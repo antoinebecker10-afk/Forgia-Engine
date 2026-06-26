@@ -17,7 +17,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::ClearColorConfig;
 use bevy::prelude::*;
-use forgia_core::prelude::GameMode;
+use forgia_core::prelude::{GameMode, GameplayHudVisible};
 use forgia_player::prelude::{FpsCamera, ViewmodelCamera};
 
 use crate::arms::ViewmodelArms;
@@ -154,6 +154,22 @@ pub fn propagate_viewmodel_layer(
     }
 }
 
+/// Coupe la caméra viewmodel quand le HUD de gameplay est masqué (ex. Lobby
+/// Roguelite, home-hub P2.1) : l'arme + les bras (layer 1) disparaissent, MAIS le
+/// monde ET l'aperçu 3D du hub (layer 0, caméra principale) restent visibles.
+/// `is_active` set-if-different ; lue depuis `GameplayHudVisible` (forgia-core).
+pub fn sync_viewmodel_camera_active(
+    hud_visible: Option<Res<GameplayHudVisible>>,
+    mut q: Query<&mut Camera, With<ViewmodelCamera>>,
+) {
+    let want = hud_visible.map(|h| h.0).unwrap_or(true);
+    for mut cam in &mut q {
+        if cam.is_active != want {
+            cam.is_active = want;
+        }
+    }
+}
+
 /// Plugin FOV viewmodel séparé. Gated FPS + Roguelite.
 pub struct ForgiaViewmodelCameraPlugin;
 
@@ -165,6 +181,7 @@ impl Plugin for ForgiaViewmodelCameraPlugin {
                 manage_viewmodel_camera,
                 update_viewmodel_camera_fov,
                 propagate_viewmodel_layer,
+                sync_viewmodel_camera_active,
             )
                 .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
         );

@@ -24,7 +24,6 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_ui_lib::style::{C_HP_HIGH, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL};
-use forgia_ui_lib::theme::display_text;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -553,10 +552,10 @@ pub fn draw_meta_shop_lobby(
         return;
     };
 
-    // Story-614 — déplacée à DROITE : le wizard occupe le centre (arme 3D) + la
-    // gauche (stats). L'Enclume (upgrades permanents) tient la colonne droite.
+    // Home-hub P2.1 — onglet ENCLUME : panneau CENTRÉ (le hub gère les onglets,
+    // un seul panneau visible à la fois). Titre « L'ENCLUME DES ÂMES » = onglet hub.
     egui::Area::new(egui::Id::new("forgia_meta_shop"))
-        .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(-40.0, 0.0))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 10.0))
         .show(ctx, |ui| {
             // Story-596 — couleurs palette Forge partagée (étaient des littéraux
             // locaux dupliquant FORGE_OR & co) + titre display font.
@@ -567,8 +566,6 @@ pub fn draw_meta_shop_lobby(
                 .stroke(egui::Stroke::new(4.0, FORGE_OR))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
-                        ui.heading(display_text("L'ENCLUME DES ÂMES", 40.0, FORGE_OR).strong());
-                        ui.add_space(6.0);
                         ui.label(
                             egui::RichText::new(format!("◇ Âmes : {}", meta.current))
                                 .size(24.0)
@@ -658,7 +655,11 @@ impl Plugin for MetaShopPlugin {
                 .in_set(GameSet::UI)
                 .run_if(in_state(RunState::Lobby)),
         );
-        app.add_systems(EguiPrimaryContextPass, draw_meta_shop_lobby);
+        // Hub à onglets (P2) : L'Enclume ne s'affiche que sur l'onglet ENCLUME.
+        app.add_systems(
+            EguiPrimaryContextPass,
+            draw_meta_shop_lobby.run_if(crate::hub::on_enclume_tab),
+        );
         // Story-616 — propage les paliers d'atouts débloqués vers forgia-rpg-data
         // (le roll de boons filtre alors les candidats par palier débloqué).
         app.add_systems(

@@ -427,6 +427,10 @@ impl Plugin for ForgiaUiHudAmmoPlugin {
                     sensor::write_ammo_hud_sensor,
                 ),
             )
-            .add_systems(EguiPrimaryContextPass, (draw_ammo_counter, draw_slot_strip));
+            // Masqués au Lobby Roguelite (et tout écran-menu in-game) via GameplayHudVisible.
+            .add_systems(
+                EguiPrimaryContextPass,
+                (draw_ammo_counter, draw_slot_strip).run_if(gameplay_hud_visible),
+            );
     }
 }

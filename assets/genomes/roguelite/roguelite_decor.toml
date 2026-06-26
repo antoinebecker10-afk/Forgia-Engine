@@ -177,3 +177,12 @@ default = 76.0
 [[genes]]
 id = "decor_target_building"
 default = 12.0
+
+# ─── Anti-freeze (story-619 follow-up) : étalement du spawn décor ─────────────
+# Le décor est planifié d'un coup mais instancié par budget/frame. Sans ça, ~800
+# props GLB s'instancient en 1 frame à l'entrée de stage = freeze de 65 ms. Plus
+# haut = remplissage plus rapide mais hitch plus gros ; plus bas = pop-in plus
+# long mais 0 freeze. 12/frame ≈ 1,1 s pour ~800 props, chaque frame < 16 ms.
+[[genes]]
+id = "decor_spawn_budget_per_frame"
+default = 12.0

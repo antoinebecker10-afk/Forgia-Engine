@@ -99,6 +99,9 @@ pub struct ConfidenceHudPlugin;
 
 impl Plugin for ConfidenceHudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(EguiPrimaryContextPass, draw_confidence_hearts);
+        app.add_systems(
+            EguiPrimaryContextPass,
+            draw_confidence_hearts.run_if(gameplay_hud_visible),
+        );
     }
 }

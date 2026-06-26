@@ -10,9 +10,36 @@ use bevy::prelude::*;
 
 pub mod prelude {
     pub use crate::fps_feel::FpsFeelMetrics;
+    pub use crate::hud_visibility::{gameplay_hud_visible, GameplayHudVisible};
     pub use crate::states::{AppMode, GameMode, WorldMode};
     pub use crate::system_set::GameSet;
     pub use crate::ForgiaCorePlugin;
+}
+
+pub mod hud_visibility {
+    use bevy::prelude::*;
+
+    /// Visibilité du HUD de GAMEPLAY (ammo, PV, énergie, confiance, viewmodel…).
+    /// `false` = écran-menu in-game (ex. Lobby Roguelite) → masquer tout le HUD de
+    /// combat pour ne garder que l'UI de menu. `true` partout ailleurs.
+    ///
+    /// Vit dans forgia-core (DAG-libre) pour que les crates HUD partagées
+    /// (forgia-ui-lib, forgia-viewmodel) la lisent SANS dépendre du crate de mode
+    /// (forgia-mode-roguelite) qui la pilote — évite un cycle de dépendances.
+    #[derive(Resource, Debug, Clone, Copy)]
+    pub struct GameplayHudVisible(pub bool);
+
+    impl Default for GameplayHudVisible {
+        fn default() -> Self {
+            Self(true)
+        }
+    }
+
+    /// Run-condition : le HUD de gameplay doit-il s'afficher ? (défaut `true` si la
+    /// resource n'est pas encore initialisée — ordre d'init safe).
+    pub fn gameplay_hud_visible(v: Option<Res<GameplayHudVisible>>) -> bool {
+        v.map(|r| r.0).unwrap_or(true)
+    }
 }
 
 pub mod fps_feel {
@@ -54,7 +81,7 @@ pub mod states {
         // Story-470 V7 M1 — 3e jeu Forgia : roguelite FPS coop 1-3j (cible Next Fest)
         Roguelite,
         /// Démo perf moteur (2026-06-15) — charge un GLB lourd (cyberpunk city)
-        /// + flycam libre pour stress-tester rendu/VRAM. Pas de gameplay.
+        /// avec flycam libre pour stress-tester rendu/VRAM. Pas de gameplay.
         /// Géré par `forgia_game::cyber_city::CyberCityDemoPlugin`.
         CyberCity,
     }
@@ -104,6 +131,7 @@ impl Plugin for ForgiaCorePlugin {
             .init_state::<states::GameMode>()
             .init_state::<states::WorldMode>()
             .init_resource::<fps_feel::FpsFeelMetrics>()
+            .init_resource::<hud_visibility::GameplayHudVisible>()
             .configure_sets(
                 Update,
                 (

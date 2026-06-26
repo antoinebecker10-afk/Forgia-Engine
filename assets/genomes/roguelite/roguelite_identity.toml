@@ -1,0 +1,43 @@
+# Identité joueur (story-623 Phase E) — presets de NOM + COULEURS cosmétiques.
+# Hot-éditable. Couleurs = cosmétique pur (zéro impact gameplay). souls_cost réservé
+# (backlog) — au MVP toutes les couleurs sont gratuites/débloquées.
+
+default_name = "Forgeron Écarlate"
+
+[[name_preset]]
+label = "Forgeron Écarlate"
+[[name_preset]]
+label = "Petit Marteau"
+[[name_preset]]
+label = "Braise"
+[[name_preset]]
+label = "Enclumette"
+[[name_preset]]
+label = "Cendre"
+[[name_preset]]
+label = "Fournaise"
+
+[[colors]]
+id = "default"
+label = "Apprenti"
+rgb = [0.80, 0.50, 0.20]
+
+[[colors]]
+id = "azur"
+label = "Azur"
+rgb = [0.20, 0.45, 0.90]
+
+[[colors]]
+id = "emeraude"
+label = "Émeraude"
+rgb = [0.20, 0.70, 0.40]
+
+[[colors]]
+id = "pourpre"
+label = "Pourpre"
+rgb = [0.70, 0.20, 0.55]
+
+[[colors]]
+id = "or"
+label = "Or"
+rgb = [0.95, 0.78, 0.25]

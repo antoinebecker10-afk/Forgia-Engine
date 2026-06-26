@@ -123,6 +123,10 @@ pub struct PlayerHpPlugin;
 
 impl Plugin for PlayerHpPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(EguiPrimaryContextPass, draw_player_hp);
+        // Masqué au Lobby Roguelite (et tout écran-menu in-game) via GameplayHudVisible.
+        app.add_systems(
+            EguiPrimaryContextPass,
+            draw_player_hp.run_if(gameplay_hud_visible),
+        );
     }
 }

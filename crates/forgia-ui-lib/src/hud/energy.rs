@@ -183,7 +183,8 @@ impl Plugin for EnergyOverlayPlugin {
         app.init_resource::<EnergyExhaustionLatch>()
             .add_systems(
                 EguiPrimaryContextPass,
-                (draw_energy_label_overlay, draw_warm_orange_fade),
+                (draw_energy_label_overlay, draw_warm_orange_fade)
+                    .run_if(gameplay_hud_visible),
             )
             .add_systems(Update, sys_energy_exhaustion_voiceline);
     }

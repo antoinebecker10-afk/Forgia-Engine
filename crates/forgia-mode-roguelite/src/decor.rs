@@ -191,6 +191,10 @@ pub struct RogueliteDecorConfig {
     pub building_radius_min: f32,
     pub building_radius_max: f32,
     pub target_building: f32,
+    /// Anti-freeze (story-619 follow-up) : nb de props GLB instanciés par frame.
+    /// Le décor est planifié d'un coup mais spawné par budget → un hitch de 65 ms
+    /// (797 instanciations SceneSpawner en 1 frame) devient ~80 frames < 16 ms.
+    pub spawn_budget_per_frame: u32,
 }
 
 impl Default for RogueliteDecorConfig {
@@ -234,6 +238,9 @@ impl Default for RogueliteDecorConfig {
             building_radius_min: 52.0,
             building_radius_max: 76.0,
             target_building: 12.0,
+            // 12 props/frame → ~67 frames (~1,1 s) pour ~800 props, chaque frame
+            // bien sous le budget 16 ms. Hot-reload via genome.
+            spawn_budget_per_frame: 12,
         }
     }
 }
@@ -315,6 +322,9 @@ impl RogueliteDecorConfig {
                     c.building_radius_max = gene.default.clamp(10.0, 200.0)
                 }
                 "decor_target_building" => c.target_building = gene.default.clamp(3.0, 40.0),
+                "decor_spawn_budget_per_frame" => {
+                    c.spawn_budget_per_frame = gene.default.clamp(1.0, 200.0) as u32
+                }
                 _ => {}
             }
         }
@@ -394,6 +404,136 @@ pub struct NeedsHullCollider {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct SolidDecorObstacle {
     pub radius: f32,
+}
+
+// ─── File de spawn étalé (anti-freeze story-619 follow-up) ────────────────────
+
+/// Un prop décor résolu (handle + transform + params), prêt à spawner. Produit
+/// en bloc par `plan_decor_set` (RNG only, pas d'instanciation), puis drainé par
+/// `sys_drain_decor_queue` à `spawn_budget_per_frame` par frame — c'est l'étalement
+/// qui supprime le hitch de 65 ms (797 instanciations SceneSpawner en 1 frame).
+enum DecorSpec {
+    /// Silhouette de fond (un seul `SceneRoot`, sans collider).
+    Background {
+        handle: Handle<Scene>,
+        name: &'static str,
+        pos: Vec3,
+        yaw: f32,
+        target_m: f32,
+    },
+    /// Prop solide (parent RigidBody + enfant visuel + hull collider + brasero).
+    Perimeter {
+        handle: Handle<Scene>,
+        name: &'static str,
+        pos: Vec3,
+        yaw: f32,
+        target_m: f32,
+        user_scale: f32,
+        brazier: bool,
+        col_radius_factor: f32,
+    },
+    /// Petit prop au sol sans collider (scatter / rubble) — diffèrent par le nom.
+    Loose {
+        handle: Handle<Scene>,
+        name: &'static str,
+        pos: Vec3,
+        yaw: f32,
+        user_scale: f32,
+        target_m: f32,
+    },
+    /// Segment de mur (coin ou bras de salle en L) — hull collider + obstacle.
+    WallPiece {
+        handle: Handle<Scene>,
+        pos: Vec3,
+        yaw: f32,
+        obstacle_radius: f32,
+    },
+}
+
+/// File des props planifiés mais pas encore instanciés. Drainée par budget/frame.
+/// `cursor` évite le `Vec::remove(0)` O(n) ; le `Vec` est vidé une fois épuisé.
+#[derive(Resource, Default)]
+pub struct DecorSpawnQueue {
+    pending: Vec<DecorSpec>,
+    cursor: usize,
+}
+
+impl DecorSpawnQueue {
+    fn remaining(&self) -> usize {
+        self.pending.len().saturating_sub(self.cursor)
+    }
+}
+
+/// Instancie UN prop résolu (route vers le helper adéquat). C'est le seul endroit
+/// qui appelle `commands.spawn` pour le décor → le coût (SceneSpawner) est ainsi
+/// étalable par le drain.
+fn spawn_one(commands: &mut Commands, spec: &DecorSpec) {
+    match spec {
+        DecorSpec::Background {
+            handle,
+            name,
+            pos,
+            yaw,
+            target_m,
+        } => spawn_background_silhouette(commands, handle, name, *pos, *yaw, *target_m),
+        DecorSpec::Perimeter {
+            handle,
+            name,
+            pos,
+            yaw,
+            target_m,
+            user_scale,
+            brazier,
+            col_radius_factor,
+        } => spawn_perimeter_prop(
+            commands,
+            handle,
+            name,
+            *pos,
+            *yaw,
+            *target_m,
+            *user_scale,
+            *brazier,
+            *col_radius_factor,
+        ),
+        DecorSpec::Loose {
+            handle,
+            name,
+            pos,
+            yaw,
+            user_scale,
+            target_m,
+        } => {
+            commands.spawn((
+                decor_markers(*name),
+                SceneRoot(handle.clone()),
+                Transform::from_translation(*pos).with_rotation(Quat::from_rotation_y(*yaw)),
+                NeedsDecorCalibrate {
+                    target_m: *target_m,
+                    user_scale: *user_scale,
+                },
+            ));
+        }
+        DecorSpec::WallPiece {
+            handle,
+            pos,
+            yaw,
+            obstacle_radius,
+        } => {
+            commands.spawn((
+                decor_markers("Decor_Wall"),
+                SceneRoot(handle.clone()),
+                Transform::from_translation(*pos).with_rotation(Quat::from_rotation_y(*yaw)),
+                NeedsHullCollider {
+                    fallback_target_m: WALL_HEIGHT,
+                    fallback_radius_factor: 0.3,
+                },
+                SolidDecorObstacle {
+                    radius: *obstacle_radius,
+                },
+            ));
+        }
+    }
 }
 
 // ─── Systems : init genome + assets + hot-reload ──────────────────────────────
@@ -657,13 +797,13 @@ pub fn sys_unstick_bots_from_decor(
 
 #[allow(clippy::too_many_arguments)]
 pub fn sys_reconcile_decor(
-    mut commands: Commands,
     cfg: Option<Res<RogueliteDecorConfig>>,
     assets: Option<Res<DecorAssets>>,
     run_seed: Option<Res<RunSeed>>,
     stage_result: Option<Res<StageLoadResult>>,
     q_anchors: Query<&AnchorPoint>,
     q_decor: Query<(), With<DecorProp>>,
+    mut queue: ResMut<DecorSpawnQueue>,
 ) {
     let Some(cfg) = cfg else {
         return;
@@ -677,7 +817,8 @@ pub fn sys_reconcile_decor(
     if !q_anchors.iter().any(|a| a.kind == AnchorKind::PlayerSpawn) {
         return;
     }
-    if q_decor.iter().next().is_some() {
+    // Décor déjà présent OU déjà planifié (drain en cours) → ne pas re-planifier.
+    if q_decor.iter().next().is_some() || queue.remaining() > 0 {
         return;
     }
     let seed = run_seed.map(|s| s.seed).unwrap_or(0xDEC0_F00D);
@@ -685,8 +826,43 @@ pub fn sys_reconcile_decor(
         .map(|r| r.biome.clone())
         .unwrap_or_else(|| "default".to_string());
 
-    let count = spawn_decor_set(&mut commands, &cfg, &assets, seed);
-    info!("[decor] spawned {count} GLB props (biome={biome})");
+    // Planifie tout (RNG only, pas d'instanciation) → le drain spawne par budget.
+    let specs = plan_decor_set(&cfg, &assets, seed);
+    let count = specs.len();
+    queue.pending = specs;
+    queue.cursor = 0;
+    info!(
+        "[decor] planned {count} GLB props (biome={biome}) — étalés à {}/frame",
+        cfg.spawn_budget_per_frame.max(1)
+    );
+}
+
+/// Draine la file de props à `spawn_budget_per_frame` par frame. C'est l'étalement
+/// qui supprime le hitch d'entrée de stage : au lieu de ~800 instanciations
+/// SceneSpawner d'un coup (65 ms), N par frame jusqu'à épuisement (~1 s, < 16 ms/frame).
+pub fn sys_drain_decor_queue(
+    mut commands: Commands,
+    cfg: Option<Res<RogueliteDecorConfig>>,
+    mut queue: ResMut<DecorSpawnQueue>,
+) {
+    if queue.remaining() == 0 {
+        // File épuisée → libère la mémoire une seule fois.
+        if !queue.pending.is_empty() {
+            queue.pending.clear();
+            queue.cursor = 0;
+        }
+        return;
+    }
+    let budget = cfg
+        .as_ref()
+        .map(|c| c.spawn_budget_per_frame)
+        .unwrap_or(12)
+        .max(1) as usize;
+    let end = (queue.cursor + budget).min(queue.pending.len());
+    for i in queue.cursor..end {
+        spawn_one(&mut commands, &queue.pending[i]);
+    }
+    queue.cursor = end;
 }
 
 #[inline]
@@ -798,15 +974,14 @@ fn spawn_perimeter_prop(
     }
 }
 
-/// Spawn l'ensemble du décor. Retourne le nombre de props posés.
-fn spawn_decor_set(
-    commands: &mut Commands,
-    cfg: &RogueliteDecorConfig,
-    assets: &DecorAssets,
-    seed: u64,
-) -> u32 {
+/// Planifie l'ensemble du décor (RNG only, AUCUNE instanciation). Retourne les
+/// specs résolues, à drainer par budget/frame via `sys_drain_decor_queue`.
+/// Préserve EXACTEMENT le stream RNG de l'ancien `spawn_decor_set` (les salles
+/// sont décomposées en pièces via `plan_wall_room`, consommant le RNG à
+/// l'identique) → layout décor inchangé, juste étalé dans le temps.
+fn plan_decor_set(cfg: &RogueliteDecorConfig, assets: &DecorAssets, seed: u64) -> Vec<DecorSpec> {
     let mut rng = Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEC0_DEC0_F00D_BEEF);
-    let mut count = 0u32;
+    let mut specs: Vec<DecorSpec> = Vec::new();
 
     // ── Fond « Cratère de la Forge » : crête volcanique + pics géants ─────────
     // Anneau lointain de falaises ÉNORMES (hors-map, SANS collider) → silhouette
@@ -827,8 +1002,13 @@ fn spawn_decor_set(
         // Hauteur variée (0.7..1.4× la cible) → crête déchiquetée, pas un mur plat.
         let target = cfg.target_background * (0.7 + rng01(&mut rng) * 0.7);
         if let Some(handle) = pick(&assets.big, &mut rng) {
-            spawn_background_silhouette(commands, handle, "Decor_Background", pos, yaw, target);
-            count += 1;
+            specs.push(DecorSpec::Background {
+                handle: handle.clone(),
+                name: "Decor_Background",
+                pos,
+                yaw,
+                target_m: target,
+            });
         }
     }
     let peaks = cfg.giant_peak_count.max(1);
@@ -841,15 +1021,13 @@ fn spawn_decor_set(
         );
         let yaw = rng01(&mut rng) * TAU;
         if let Some(handle) = pick(&assets.big, &mut rng) {
-            spawn_background_silhouette(
-                commands,
-                handle,
-                "Decor_GiantPeak",
+            specs.push(DecorSpec::Background {
+                handle: handle.clone(),
+                name: "Decor_GiantPeak",
                 pos,
                 yaw,
-                cfg.target_giant_peak,
-            );
-            count += 1;
+                target_m: cfg.target_giant_peak,
+            });
         }
     }
 
@@ -866,18 +1044,16 @@ fn spawn_decor_set(
         );
         let yaw = rng01(&mut rng) * TAU;
         if let Some(handle) = pick(&assets.braziers, &mut rng) {
-            spawn_perimeter_prop(
-                commands,
-                handle,
-                "Decor_ForgeBrazier",
+            specs.push(DecorSpec::Perimeter {
+                handle: handle.clone(),
+                name: "Decor_ForgeBrazier",
                 pos,
                 yaw,
-                cfg.target_brazier,
-                1.0,
-                true,
-                0.3,
-            );
-            count += 1;
+                target_m: cfg.target_brazier,
+                user_scale: 1.0,
+                brazier: true,
+                col_radius_factor: 0.3,
+            });
         }
     }
     for i in 0..cfg.forge_monument_count {
@@ -886,18 +1062,16 @@ fn spawn_decor_set(
         let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
         let yaw = rng01(&mut rng) * TAU;
         if let Some(handle) = pick(&assets.landmarks, &mut rng) {
-            spawn_perimeter_prop(
-                commands,
-                handle,
-                "Decor_ForgeMonument",
+            specs.push(DecorSpec::Perimeter {
+                handle: handle.clone(),
+                name: "Decor_ForgeMonument",
                 pos,
                 yaw,
-                cfg.forge_monument_target,
-                1.0,
-                false,
-                0.16,
-            );
-            count += 1;
+                target_m: cfg.forge_monument_target,
+                user_scale: 1.0,
+                brazier: false,
+                col_radius_factor: 0.16,
+            });
         }
     }
 
@@ -914,18 +1088,16 @@ fn spawn_decor_set(
         let yaw = angle + std::f32::consts::PI; // face au centre
         let target = cfg.target_building * (0.85 + rng01(&mut rng) * 0.4);
         if let Some(handle) = pick(&assets.buildings, &mut rng) {
-            spawn_perimeter_prop(
-                commands,
-                handle,
-                "Decor_Building",
+            specs.push(DecorSpec::Perimeter {
+                handle: handle.clone(),
+                name: "Decor_Building",
                 pos,
                 yaw,
-                target,
-                1.0,
-                false,
-                0.32,
-            );
-            count += 1;
+                target_m: target,
+                user_scale: 1.0,
+                brazier: false,
+                col_radius_factor: 0.32,
+            });
         }
     }
 
@@ -983,8 +1155,16 @@ fn spawn_decor_set(
         let Some(handle) = pick(pool, &mut rng) else {
             continue;
         };
-        spawn_perimeter_prop(commands, handle, name, pos, yaw, target, us, brazier, crf);
-        count += 1;
+        specs.push(DecorSpec::Perimeter {
+            handle: handle.clone(),
+            name,
+            pos,
+            yaw,
+            target_m: target,
+            user_scale: us,
+            brazier,
+            col_radius_factor: crf,
+        });
     }
 
     // ── Petits props dispersés au sol (sans collider) ─────────────────────────
@@ -999,16 +1179,14 @@ fn spawn_decor_set(
         let yaw = rng01(&mut rng) * TAU;
         let us = 0.75 + rng01(&mut rng) * 0.5;
 
-        commands.spawn((
-            decor_markers("Decor_Scatter"),
-            SceneRoot(handle.clone()),
-            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
-            NeedsDecorCalibrate {
-                target_m: cfg.target_scatter,
-                user_scale: us,
-            },
-        ));
-        count += 1;
+        specs.push(DecorSpec::Loose {
+            handle: handle.clone(),
+            name: "Decor_Scatter",
+            pos,
+            yaw,
+            user_scale: us,
+            target_m: cfg.target_scatter,
+        });
     }
 
     // ── Salles en L (coin + 2 bras de mur KayKit, 1 collider cuboid par bras) ─
@@ -1017,7 +1195,7 @@ fn spawn_decor_set(
         let radius = lerp(cfg.room_radius_min, cfg.room_radius_max, rng01(&mut rng));
         let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
         let yaw0 = rng01(&mut rng) * TAU;
-        count += spawn_wall_room(commands, assets, &mut rng, pos, yaw0, cfg.room_arm_segments);
+        plan_wall_room(&mut specs, assets, &mut rng, pos, yaw0, cfg.room_arm_segments);
     }
 
     // ── Gravats au sol (masque la répétition des dalles, sans collider) ───────
@@ -1031,101 +1209,77 @@ fn spawn_decor_set(
         let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
         let yaw = rng01(&mut rng) * TAU;
         let us = 0.8 + rng01(&mut rng) * 0.6;
-        commands.spawn((
-            decor_markers("Decor_Rubble"),
-            SceneRoot(handle.clone()),
-            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
-            NeedsDecorCalibrate {
-                target_m: cfg.target_rubble,
-                user_scale: us,
-            },
-        ));
-        count += 1;
+        specs.push(DecorSpec::Loose {
+            handle: handle.clone(),
+            name: "Decor_Rubble",
+            pos,
+            yaw,
+            user_scale: us,
+            target_m: cfg.target_rubble,
+        });
     }
 
-    count
+    specs
 }
 
-/// Spawn une "salle" en L : coin + 2 bras perpendiculaires de murs KayKit.
-/// Layout OUVERT (pas d'enceinte fermée) → les bots peuvent contourner. 1
-/// collider cuboid par bras (efficace, cf forgia-stage ramparts).
-fn spawn_wall_room(
-    commands: &mut Commands,
+/// Planifie une "salle" en L : coin + 2 bras perpendiculaires de murs KayKit.
+/// Layout OUVERT (pas d'enceinte fermée) → les bots peuvent contourner. Pousse
+/// des `WallPiece` (chacune = 1 instanciation, drainable) ; consomme le RNG à
+/// l'identique de l'ancien `spawn_wall_room` → layout inchangé.
+fn plan_wall_room(
+    specs: &mut Vec<DecorSpec>,
     assets: &DecorAssets,
     rng: &mut Xoshiro256StarStar,
     origin: Vec3,
     yaw0: f32,
     arm_segments: u32,
-) -> u32 {
+) {
     if arm_segments == 0 || assets.walls.is_empty() {
-        return 0;
+        return;
     }
     let rot = Quat::from_rotation_y(yaw0);
-    let mut count = 0u32;
 
-    // Coin au pivot (visuel seulement).
+    // Coin au pivot (visuel seulement ; ne consomme PAS de RNG — `first()`).
     if let Some(corner) = assets.wall_corner.first() {
-        commands.spawn((
-            decor_markers("Decor_Wall"),
-            SceneRoot(corner.clone()),
-            Transform::from_translation(origin).with_rotation(rot),
-            // Collider ConvexHull du coin (comble le gap d'angle des salles).
-            NeedsHullCollider {
-                fallback_target_m: WALL_HEIGHT,
-                fallback_radius_factor: 0.3,
-            },
-            SolidDecorObstacle {
-                radius: WALL_SEG_W * 0.7,
-            },
-        ));
-        count += 1;
+        specs.push(DecorSpec::WallPiece {
+            handle: corner.clone(),
+            pos: origin,
+            yaw: yaw0,
+            obstacle_radius: WALL_SEG_W * 0.7,
+        });
     }
 
     // Deux bras perpendiculaires (local +X et local +Z).
     for dir in [rot * Vec3::X, rot * Vec3::Z] {
-        count += spawn_wall_arm(commands, assets, rng, origin, dir, arm_segments);
+        plan_wall_arm(specs, assets, rng, origin, dir, arm_segments);
     }
-    count
 }
 
 /// Aligne `n` segments de mur le long de `dir` (normalisé), espacés de
-/// `WALL_SEG_W`. Chaque mur reçoit son propre collider ConvexHull (épouse le
-/// mesh) — plus de cuboïde unique par-bras désaligné.
-fn spawn_wall_arm(
-    commands: &mut Commands,
+/// `WALL_SEG_W`. Chaque mur = un `WallPiece` (hull collider). Consomme le RNG
+/// (`pick`) à l'identique de l'ancien `spawn_wall_arm`.
+fn plan_wall_arm(
+    specs: &mut Vec<DecorSpec>,
     assets: &DecorAssets,
     rng: &mut Xoshiro256StarStar,
     origin: Vec3,
     dir: Vec3,
     n: u32,
-) -> u32 {
+) {
     // Convention KayKit : axe X = largeur du mur. yaw aligne X sur dir.
     let yaw = (-dir.z).atan2(dir.x);
-    let q = Quat::from_rotation_y(yaw);
-    let mut count = 0u32;
     for s in 1..=n {
         let Some(handle) = pick(&assets.walls, rng) else {
             break;
         };
         let p = origin + dir * (s as f32 * WALL_SEG_W);
-        commands.spawn((
-            decor_markers("Decor_Wall"),
-            SceneRoot(handle.clone()),
-            Transform::from_translation(p).with_rotation(q),
-            // Collider ConvexHull PAR mur (épouse exactement le mesh, via
-            // sys_decor_build_hull_colliders). Remplace l'ancien cuboïde unique
-            // par-bras qui était décalé de ½ segment → gap au bout d'arme + coin.
-            NeedsHullCollider {
-                fallback_target_m: WALL_HEIGHT,
-                fallback_radius_factor: 0.3,
-            },
-            SolidDecorObstacle {
-                radius: WALL_SEG_W * 0.6,
-            },
-        ));
-        count += 1;
+        specs.push(DecorSpec::WallPiece {
+            handle: handle.clone(),
+            pos: p,
+            yaw,
+            obstacle_radius: WALL_SEG_W * 0.6,
+        });
     }
-    count
 }
 
 // ─── Sensor ────────────────────────────────────────────────────────────────────
@@ -1271,5 +1425,41 @@ default = 40.0
     fn lerp_endpoints() {
         assert_eq!(lerp(10.0, 20.0, 0.0), 10.0);
         assert_eq!(lerp(10.0, 20.0, 1.0), 20.0);
+    }
+
+    #[test]
+    fn parse_spawn_budget_default_and_clamp() {
+        // Défaut = 12 (fallback Default).
+        assert_eq!(RogueliteDecorConfig::default().spawn_budget_per_frame, 12);
+        // Clamp min 1 (0 interdit → sinon drain bloqué).
+        let c = RogueliteDecorConfig::parse_toml(
+            "[[genes]]\nid = \"decor_spawn_budget_per_frame\"\ndefault = 0.0\n",
+        );
+        assert_eq!(c.spawn_budget_per_frame, 1);
+    }
+
+    #[test]
+    fn plan_decor_set_deterministic_and_budgetable() {
+        // Handles factices (le plan ne touche aucun asset, juste du RNG + clone).
+        let h = || vec![Handle::<Scene>::default()];
+        let assets = DecorAssets {
+            landmarks: h(),
+            big: h(),
+            braziers: h(),
+            scatter: h(),
+            walls: h(),
+            wall_corner: h(),
+            rubble: h(),
+            buildings: h(),
+        };
+        let cfg = RogueliteDecorConfig::default();
+        let a = plan_decor_set(&cfg, &assets, 0xABCD);
+        let b = plan_decor_set(&cfg, &assets, 0xABCD);
+        // Même seed → même nombre de props (RNG préservé).
+        assert_eq!(a.len(), b.len());
+        // Le décor par défaut produit beaucoup de props (sinon pas de freeze à étaler).
+        assert!(a.len() > 100, "plan trop petit: {}", a.len());
+        // Le budget par défaut est bien < total → drainage en plusieurs frames.
+        assert!((cfg.spawn_budget_per_frame as usize) < a.len());
     }
 }

@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::time::SystemTime;
 
+use crate::element_vfx::ElementVfxAssets;
 use crate::elements::{Element, ElementConfig};
 use crate::enemies::EnemyArchetype;
 use crate::meta_shop::{MetaShopCatalogue, MetaShopSave};
@@ -390,35 +391,33 @@ pub fn draw_weapon_select(
     let card = cards.cards.get(&w);
     let element = elem_cfg.element_for(w);
 
-    // ── HAUT : titre + Âmes (centré plein écran) ──
-    egui::Area::new(egui::Id::new("ws_top"))
-        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 36.0))
-        .show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.heading(display_text("CHOISIS TON ARME", 46.0, FORGE_OR).strong());
-                ui.label(
-                    egui::RichText::new(format!("‹ {}/{} ›", sel + 1, n))
-                        .size(20.0)
-                        .color(FORGE_TEAL),
-                );
-            });
-        });
-
-    // ── GAUCHE : carte de stats de l'arme sélectionnée ──
-    egui::Area::new(egui::Id::new("ws_left"))
-        .anchor(egui::Align2::LEFT_CENTER, egui::vec2(40.0, 0.0))
+    // ── Carte centrale (vitrine d'arme) : l'aperçu 3D (preview agrandi) flotte AU-DESSUS,
+    // la carte stats + sélecteur ◄ ► est centrée juste dessous. Le titre « CHOISIS TON
+    // ARME » est fourni par le hub (onglet) ; le bas-centre est libre pour LANCER (hub).
+    // Home-hub P2.1 : avant = 3 zones (titre haut / stats gauche / sélecteur bas).
+    egui::Area::new(egui::Id::new("ws_card"))
+        .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -98.0))
         .show(ctx, |ui| {
             egui::Frame::new()
                 .fill(FORGE_PANEL)
-                .inner_margin(egui::Margin::symmetric(26, 22))
+                .inner_margin(egui::Margin::symmetric(26, 18))
                 .corner_radius(egui::CornerRadius::same(12))
                 .stroke(egui::Stroke::new(3.0, accent))
                 .show(ui, |ui| {
-                    ui.set_min_width(280.0);
+                    ui.set_min_width(360.0);
+                    ui.set_max_width(440.0);
                     ui.vertical(|ui| {
-                        ui.heading(display_text(name, 30.0, accent).strong());
+                        // En-tête : nom + index parcouru + tagline.
+                        ui.horizontal(|ui| {
+                            ui.heading(display_text(name, 28.0, accent).strong());
+                            ui.label(
+                                egui::RichText::new(format!("‹ {}/{} ›", sel + 1, n))
+                                    .size(16.0)
+                                    .color(FORGE_TEAL),
+                            );
+                        });
                         ui.label(
-                            egui::RichText::new(tagline).size(15.0).italics().color(C_TEXT_MUTED),
+                            egui::RichText::new(tagline).size(14.0).italics().color(C_TEXT_MUTED),
                         );
                         // Bandeau verrou (story-613).
                         if !owned {
@@ -498,22 +497,11 @@ pub fn draw_weapon_select(
                             );
                         }
 
-                    });
-                });
-        });
-
-    // ── BAS : sélecteur des 4 armes + contrôles (centré) ──
-    egui::Area::new(egui::Id::new("ws_bottom"))
-        .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -36.0))
-        .show(ctx, |ui| {
-            egui::Frame::new()
-                .fill(FORGE_PANEL)
-                .inner_margin(egui::Margin::symmetric(26, 14))
-                .corner_radius(egui::CornerRadius::same(12))
-                .stroke(egui::Stroke::new(2.0, FORGE_OR))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.horizontal(|ui| {
+                        // ── Sélecteur des 4 armes (intégré à la carte ; ◄ ► clavier) ──
+                        ui.add_space(10.0);
+                        ui.separator();
+                        ui.add_space(4.0);
+                        ui.horizontal_wrapped(|ui| {
                             for (i, aw) in ARENA_V1_WEAPONS.iter().enumerate() {
                                 let (pn, _) = persona(*aw);
                                 let aw_owned = save.is_weapon_unlocked(vm_key(*aw));
@@ -532,33 +520,25 @@ pub fn draw_weapon_select(
                                 } else {
                                     format!("  {pn} *  ")
                                 };
-                                ui.label(egui::RichText::new(txt).size(18.0).color(col).strong());
+                                ui.label(egui::RichText::new(txt).size(17.0).color(col).strong());
                             }
                         });
-                        ui.add_space(4.0);
+                        ui.add_space(2.0);
                         let footer = if owned {
-                            "‹ ›  choisir       ·       ENTRÉE  lancer la run".to_string()
+                            "‹ ›  choisir l'arme".to_string()
                         } else if let Some(u) = unlock {
                             if meta.current >= u.cost {
-                                format!(
-                                    "‹ ›  parcourir       ·       [U]  débloquer ({} Âmes)",
-                                    u.cost
-                                )
+                                format!("‹ ›  parcourir   ·   [U]  débloquer ({} Âmes)", u.cost)
                             } else {
                                 format!(
-                                    "‹ ›  parcourir       ·       verrou : {} Âmes manquantes",
+                                    "‹ ›  parcourir   ·   verrou : {} Âmes manquantes",
                                     u.cost.saturating_sub(meta.current)
                                 )
                             }
                         } else {
-                            "‹ ›  choisir       ·       ENTRÉE  lancer la run".to_string()
+                            "‹ ›  choisir l'arme".to_string()
                         };
-                        ui.label(egui::RichText::new(footer).size(16.0).color(FORGE_TEAL));
-                        ui.label(
-                            egui::RichText::new("(*) arme verrouillée")
-                                .size(12.0)
-                                .color(C_TEXT_MUTED),
-                        );
+                        ui.label(egui::RichText::new(footer).size(14.0).color(FORGE_TEAL));
                     });
                 });
         });
@@ -581,17 +561,26 @@ fn stat_row_strong(ui: &mut egui::Ui, label: &str, val: &str, col: egui::Color32
 // ─── Aperçu 3D de l'arme (parentée caméra, tourne) — story-614 ───────────────
 
 /// Distance (m) de l'arme devant la caméra (réglable si trop loin/près).
-const PREVIEW_DIST: f32 = 1.4;
-/// Décalage vertical local (m).
-const PREVIEW_Y: f32 = -0.05;
-/// Taille cible (plus grande dimension, m) après calibrage AABB.
-const PREVIEW_TARGET: f32 = 0.55;
+const PREVIEW_DIST: f32 = 1.5;
+/// Décalage vertical local (m) — relevé pour poser l'arme AU-DESSUS de la carte stats (vitrine hub P2.1).
+const PREVIEW_Y: f32 = 0.15;
+/// Taille cible (plus grande dimension, m) après calibrage AABB — agrandie (vitrine hub P2.1).
+const PREVIEW_TARGET: f32 = 0.95;
 /// Vitesse de rotation (rad/s).
 const PREVIEW_SPIN: f32 = 0.9;
 
-/// Marqueur sur l'arme 3D affichée au Lobby (parentée caméra, tourne).
+/// Marqueur sur une arme 3D d'aperçu (parentée caméra). Porte l'arme représentée
+/// → le toggle de visibilité montre uniquement la sélectionnée (story-618).
 #[derive(Component)]
-struct LobbyPreviewWeapon;
+struct LobbyPreviewWeapon {
+    weapon: WeaponType,
+}
+
+/// Sphère de pré-chauffe d'un matériau d'élément : rendue 1× au Lobby (occluse par
+/// l'arme) pour compiler son pipeline `unlit/blend` AVANT le 1er impact en combat
+/// (sinon freeze au 1er hit élémentaire). Despawn à la sortie du Lobby (story-618).
+#[derive(Component)]
+struct LobbyPrewarmSphere;
 
 /// Calibrage AABB en attente (taille GLB native inconnue) — miroir merchant/boss_portal.
 #[derive(Component)]
@@ -599,11 +588,12 @@ struct NeedsPreviewCalibrate {
     target: f32,
 }
 
-/// Suit l'arme affichée pour éviter le respawn chaque frame.
+/// Story-618 — les 4 aperçus sont spawnés UNE fois à l'entrée du Lobby (plus de
+/// despawn/respawn par ‹ › = plus de ré-instanciation de scène/hitch) ; le ‹ › ne
+/// fait que **toggle la visibilité** (cycle instantané).
 #[derive(Resource, Default)]
 struct PreviewState {
-    entity: Option<Entity>,
-    shown: Option<WeaponType>,
+    spawned: bool,
 }
 
 /// Walk récursif des Children pour le 1er `Aabb` ; `max(half_extents)*2`.
@@ -631,47 +621,70 @@ fn preview_aabb_max_dim(
 fn sys_lobby_weapon_preview(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    choice: Res<StartingWeaponChoice>,
     mut state: ResMut<PreviewState>,
     q_cam: Query<(Entity, &Camera), With<Camera3d>>,
-    q_exists: Query<(), With<LobbyPreviewWeapon>>,
+    vfx: Option<Res<ElementVfxAssets>>,
 ) {
-    let w = ARENA_V1_WEAPONS[choice.idx % ARENA_V1_WEAPONS.len()];
-    // Déjà la bonne arme et l'entité vit encore → rien à faire.
-    if state.shown == Some(w) {
-        if let Some(e) = state.entity {
-            if q_exists.get(e).is_ok() {
-                return;
-            }
-        }
+    if state.spawned {
+        return;
     }
-    // Despawn l'ancienne preview (changement d'arme).
-    if let Some(e) = state.entity.take() {
-        if let Ok(mut ec) = commands.get_entity(e) {
-            ec.despawn();
-        }
-    }
-    // Caméra 3D active = parent.
+    // Caméra 3D active = parent. Pas encore prête → retry frame suivante.
     let Some((cam, _)) = q_cam.iter().find(|(_, c)| c.is_active) else {
-        return; // pas encore de caméra → retry frame suivante
+        return;
     };
-    let key = vm_key(w);
-    let scene = asset_server
-        .load(GltfAssetLabel::Scene(0).from_asset(format!("models/weapons/forgia/{key}.glb")));
-    let e = commands
-        .spawn((
+    // Spawn les 4 armes UNE fois (toutes cachées ; le toggle révèle la sélectionnée).
+    for w in ARENA_V1_WEAPONS {
+        let key = vm_key(w);
+        let scene = asset_server
+            .load(GltfAssetLabel::Scene(0).from_asset(format!("models/weapons/forgia/{key}.glb")));
+        commands.spawn((
             Name::new(format!("LobbyPreview_{key}")),
-            LobbyPreviewWeapon,
+            LobbyPreviewWeapon { weapon: w },
             NeedsPreviewCalibrate { target: PREVIEW_TARGET },
             SceneRoot(scene),
             // Échelle initiale minuscule → pas de flash géant avant calibrage AABB.
             Transform::from_xyz(0.0, PREVIEW_Y, -PREVIEW_DIST).with_scale(Vec3::splat(0.001)),
+            Visibility::Hidden,
             ChildOf(cam),
-        ))
-        .id();
-    state.entity = Some(e);
-    state.shown = Some(w);
-    info!("[weapon-select] aperçu 3D : {key} (cam={cam:?})");
+        ));
+    }
+    // Pré-chauffe des 4 matériaux d'élément (unlit/blend) : rendus 1× (sphères
+    // minuscules, occluses par l'arme) → leur pipeline compile au Lobby, pas au
+    // 1er impact élémentaire en combat. Despawn à la sortie du Lobby.
+    if let Some(vfx) = vfx {
+        for mat in &vfx.mats {
+            commands.spawn((
+                Name::new("LobbyPrewarmElem"),
+                LobbyPrewarmSphere,
+                Mesh3d(vfx.sphere.clone()),
+                MeshMaterial3d(mat.clone()),
+                Transform::from_xyz(0.0, PREVIEW_Y, -PREVIEW_DIST).with_scale(Vec3::splat(0.03)),
+                ChildOf(cam),
+            ));
+        }
+    }
+    state.spawned = true;
+    info!("[weapon-select] aperçu 3D : 4 armes + pré-chauffe éléments (spawn-once, story-618)");
+}
+
+/// Story-618 — toggle la visibilité : seule l'arme sélectionnée est visible. Cycle
+/// instantané (aucun spawn/despawn). La 1ère apparition de chaque arme paie sa
+/// compile de pipeline une fois, puis c'est caché.
+fn sys_toggle_preview_visibility(
+    choice: Res<StartingWeaponChoice>,
+    mut q: Query<(&LobbyPreviewWeapon, &mut Visibility)>,
+) {
+    let sel = ARENA_V1_WEAPONS[choice.idx % ARENA_V1_WEAPONS.len()];
+    for (pw, mut vis) in &mut q {
+        let want = if pw.weapon == sel {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        if *vis != want {
+            *vis = want;
+        }
+    }
 }
 
 /// Calibre l'échelle une fois l'AABB chargée (miroir `sys_calibrate_merchant`).
@@ -710,14 +723,14 @@ fn sys_spin_lobby_preview(
 fn sys_clear_lobby_preview(
     mut commands: Commands,
     mut state: ResMut<PreviewState>,
-    q: Query<Entity, With<LobbyPreviewWeapon>>,
+    q: Query<Entity, Or<(With<LobbyPreviewWeapon>, With<LobbyPrewarmSphere>)>>,
 ) {
     for e in &q {
         if let Ok(mut ec) = commands.get_entity(e) {
             ec.despawn();
         }
     }
-    *state = PreviewState::default();
+    state.spawned = false;
 }
 
 // ─── Crosshair off au Lobby (story-617) ─────────────────────────────────────
@@ -766,13 +779,19 @@ impl Plugin for WeaponSelectPlugin {
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        app.add_systems(EguiPrimaryContextPass, draw_weapon_select);
+        // Hub à onglets (P2) : le wizard d'arme ne s'affiche que sur l'onglet ARMES.
+        // L'aperçu 3D reste toujours visible (hero du hub), seul le panneau egui est gaté.
+        app.add_systems(
+            EguiPrimaryContextPass,
+            draw_weapon_select.run_if(crate::hub::on_armes_tab),
+        );
         // Aperçu 3D de l'arme (parentée caméra, tourne) — story-614.
         app.init_resource::<PreviewState>();
         app.add_systems(
             Update,
             (
                 sys_lobby_weapon_preview,
+                sys_toggle_preview_visibility,
                 sys_calibrate_preview,
                 sys_spin_lobby_preview,
             )

@@ -32,7 +32,9 @@ pub mod element_vfx;
 pub mod elements;
 pub mod enemies;
 pub mod ftue;
+pub mod hub;
 pub mod hud;
+pub mod identity;
 pub mod intro_dialogue;
 pub mod kill_popup;
 pub mod load_timing;
@@ -40,6 +42,7 @@ pub mod loot_room;
 pub mod merchant;
 pub mod meta_shop;
 pub mod parcours_obstacles;
+pub mod perf_diag;
 pub mod persist;
 pub mod poi;
 pub mod run;
@@ -83,12 +86,25 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-558 Phase 4 — Boons apply : recompute PlayerCombatMods +
         // observer heal_on_kill.
         app.init_resource::<boons_apply::HealOnKillCumul>();
+        // Story-623 Phase E (MVP) — identité joueur : nom + couleur (module isolé,
+        // save séparée identity_save.toml, panneau Lobby non-bloquant).
+        app.add_plugins(identity::IdentityPlugin);
         // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
         // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
         app.init_resource::<load_timing::LoadTimingState>();
         app.add_systems(
             Update,
             load_timing::sys_load_timing
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Story-619 — capteur de charge combat : corrèle les spikes de frame avec
+        // le breakdown entités/VFX/lumières/auras au même instant → vision complète
+        // des freezes (forgia2_perf_diag.json, severity=warn sur seconde fautive).
+        app.init_resource::<perf_diag::PerfDiagState>();
+        app.add_systems(
+            Update,
+            perf_diag::sys_perf_diag
                 .in_set(GameSet::Sensors)
                 .run_if(in_state(GameMode::Roguelite)),
         );
@@ -298,6 +314,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-562b (2026-06-03) — props décoratifs procéduraux pour remplir
         // l'arène (rochers/cristaux/piliers en anneau + débris au sol). Crate
         // libre, zéro touche forgia-stage. Genome roguelite_decor.toml hot-reload.
+        app.init_resource::<decor::DecorSpawnQueue>();
         app.add_systems(
             Startup,
             (decor::sys_init_decor_genome, decor::sys_load_decor_assets),
@@ -307,6 +324,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             (
                 decor::sys_hot_reload_decor_genome,
                 decor::sys_reconcile_decor,
+                // Anti-freeze (story-619 follow-up) : draine la file de props après
+                // reconcile → instanciation étalée à spawn_budget_per_frame/frame.
+                decor::sys_drain_decor_queue.after(decor::sys_reconcile_decor),
                 decor::sys_calibrate_decor,
                 decor::sys_decor_build_hull_colliders,
                 decor::sys_unstick_bots_from_decor,
@@ -480,6 +500,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // Story-612 — Wizard de choix d'arme de départ (carte de stats réelles
             // + élément + matchup au Lobby, à côté de L'Enclume). Phase 0.
             .add_plugins(weapon_select::WeaponSelectPlugin)
+            // Hub d'accueil à onglets (design home-hub 2026-06-26, P2) : regroupe
+            // Forgeron/Armes/Enclume en onglets + bandeau Âmes/niveau + bouton LANCER.
+            .add_plugins(hub::HubPlugin)
             // Story-610 — Commerçant d'arène : sink in-run (Or = munitions/soin,
             // Âmes = Second souffle revive) + sensor forgia2_merchant.json.
             .add_plugins(merchant::MerchantPlugin)
