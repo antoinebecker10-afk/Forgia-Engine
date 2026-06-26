@@ -17,6 +17,7 @@ use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_input::prelude::InputBlockers;
+use forgia_ui_lib::pause_menu::{draw_settings_controls, save_user_settings, UserSettings};
 use forgia_ui_lib::style::{
     cartoon_btn, C_PRIMARY, FORGE_BOIS_CLAIR, FORGE_CREME, FORGE_METAL_CHAUD, FORGE_OR,
 };
@@ -54,13 +55,15 @@ impl Plugin for ForgiaUiPlugin {
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
         // Anti-trap V1 : éviter le frame où aucune caméra n'existe (ESC bug).
-        app.add_systems(Startup, (spawn_menu_camera_permanent, menu_video::setup_menu_video))
+        app.init_resource::<MenuPage>()
+            .add_systems(Startup, (spawn_menu_camera_permanent, menu_video::setup_menu_video))
             // Fond vidéo menu : tick (avance frame) + sensor (forgia2_menu_video.json).
             .add_systems(
                 Update,
                 (menu_video::menu_video_tick, menu_video::menu_video_sensor),
             )
-            .add_systems(OnEnter(AppMode::Menu), release_cursor)
+            // Menu titre : curseur libre + reset à la page racine à chaque retour menu.
+            .add_systems(OnEnter(AppMode::Menu), (release_cursor, reset_menu_page))
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
             .add_systems(OnEnter(AppMode::Paused), (release_cursor, pause_time))
             .add_systems(OnExit(AppMode::Paused), resume_time)
@@ -99,6 +102,19 @@ impl Plugin for ForgiaUiPlugin {
             // CoffreSession.is_open : pendant le break Coffre, libérer la
             // souris pour cliquer Skip/Reroll/cartes sans pivoter la caméra.
             .add_systems(Update, (sys_sync_cursor_with_coffre, sys_regrab_cursor_on_focus))
+            // Fix « pas de souris au lancement » (design: roguelite-home-hub-proposal
+            // 2026-06-26, P1) : à l'entrée Roguelite, OnEnter(InGame)→grab_cursor (LOCK)
+            // et OnEnter(RunState::Lobby)→release_cursor (FREE) tirent la même frame sur
+            // deux schedules SANS ordre → le grab gagnait, curseur verrouillé alors que
+            // le wizard d'arme est affiché. Ce réconciliateur par-frame est l'unique
+            // source de vérité du curseur au Lobby (set-if-different, zéro churn).
+            .add_systems(
+                Update,
+                sys_force_lobby_cursor_free
+                    .run_if(in_state(AppMode::InGame))
+                    .run_if(in_state(GameMode::Roguelite))
+                    .run_if(in_state(forgia_mode_roguelite::RunState::Lobby)),
+            )
             // Story-455 Phase G — paused_overlay_ui retiré (remplacé par forgia-ui-pause-menu
             // cliquable Resume / Settings / Quit). Le handler ESC/Q reste ici (escape_handler).
             .add_systems(EguiPrimaryContextPass, main_menu_ui)
@@ -126,6 +142,21 @@ fn spawn_menu_camera_permanent(mut commands: Commands, q: Query<Entity, With<Men
     }
 }
 
+/// Sous-page du menu titre (design: roguelite-home-hub-proposal 2026-06-26, P1).
+/// Navigation purement UI-locale : PAS un variant d'`AppMode` (qui vit dans
+/// forgia-core et est partagé). Reset à `Root` sur OnEnter(AppMode::Menu).
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+enum MenuPage {
+    #[default]
+    Root,
+    Options,
+}
+
+/// Revient à la page racine du menu à chaque entrée dans le menu (retour jeu→menu).
+fn reset_menu_page(mut page: ResMut<MenuPage>) {
+    *page = MenuPage::Root;
+}
+
 fn main_menu_ui(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
@@ -134,6 +165,9 @@ fn main_menu_ui(
     mut exit: MessageWriter<AppExit>,
     mut video: Option<ResMut<MenuVideoState>>,
     asset_server: Res<AssetServer>,
+    mut page: ResMut<MenuPage>,
+    mut settings: ResMut<UserSettings>,
+    meta_save: Option<Res<forgia_mode_roguelite::meta_shop::MetaShopSave>>,
     mut last_state: Local<Option<AppMode>>,
 ) {
     let current = app_state.get().clone();
@@ -181,56 +215,143 @@ fn main_menu_ui(
                 scrim.add_triangle(0, 2, 3);
                 ui.painter().add(egui::Shape::mesh(scrim));
             }
-            ui.vertical_centered(|ui| {
-                ui.add_space(120.0);
-                // Story-596 — titre display (Lilita One) + orange Forgia canon.
-                ui.heading(display_text("FORGIA", 84.0, C_PRIMARY).strong());
-                ui.add_space(20.0);
-                ui.label(
-                    egui::RichText::new("Choisis ton mode")
-                        .size(24.0)
-                        .color(FORGE_CREME),
-                );
-                ui.add_space(60.0);
+            match *page {
+                // ── Page racine : menu joueur Roguelite (design home-hub P1) ──
+                MenuPage::Root => {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(96.0);
+                        // titre display (Lilita One) + orange Forgia canon.
+                        ui.heading(display_text("FORGIA", 84.0, C_PRIMARY).strong());
+                        ui.add_space(8.0);
+                        ui.label(
+                            egui::RichText::new("ROGUELITE")
+                                .size(22.0)
+                                .color(FORGE_CREME)
+                                .strong(),
+                        );
+                        ui.add_space(44.0);
 
-                // Mode "FPS Arena" retiré du menu (2026-06-04, décision user) :
-                // l'arène nue était redondante avec Roguelite (arène décorée =
-                // seule arène de jeu désormais). Le variant `GameMode::Fps` reste
-                // dans l'enum : de nombreux systèmes partagés (HUD ammo/hp/wave,
-                // viewmodel, killfeed, screen-flash, sensors, système de vagues)
-                // sont gatés `Fps | Roguelite`, et `forgia-mode-roguelite` réutilise
-                // `forgia-mode-fps-arena` (TargetCube/WaveState). Sans entrée menu,
-                // `OnEnter(Fps)` ne tire plus jamais → l'arène nue ne se spawn pas.
-                // Suppression complète du crate = refactor séparé (Roguelite en dépend).
-                // Story-596 — boutons cartoon partagés (bois / or CTA / métal).
-                if cartoon_btn(ui, "🗺  RPG OPENWORLD", FORGE_BOIS_CLAIR).clicked() {
-                    next_game.set(GameMode::Rpg);
-                    next_app.set(AppMode::InGame);
+                        // « A déjà joué » = méta persistée (Âmes / upgrades achetés /
+                        // armes débloquées au-delà de Pépin). Pilote Continuer actif +
+                        // quel bouton porte le CTA principal (or).
+                        let has_save = meta_save.as_ref().is_some_and(|s| {
+                            s.souls_total > 0
+                                || !s.ranks.is_empty()
+                                || s.unlocked_weapons.len() > 1
+                        });
+
+                        // CONTINUER — relance avec la progression méta (L'Enclume).
+                        // Grisé tant qu'aucune partie n'a laissé de méta.
+                        let mut continue_clicked = false;
+                        ui.add_enabled_ui(has_save, |ui| {
+                            continue_clicked =
+                                cartoon_btn(ui, "▶  CONTINUER", FORGE_OR).clicked();
+                        });
+                        if continue_clicked {
+                            next_game.set(GameMode::Roguelite);
+                            next_app.set(AppMode::InGame);
+                        }
+                        ui.add_space(16.0);
+
+                        // NOUVELLE PARTIE — entre au Lobby (le wizard nom+style est la
+                        // phase suivante du design). CTA or quand pas de save, sinon
+                        // bois pour laisser Continuer primer.
+                        let nouvelle_color = if has_save { FORGE_BOIS_CLAIR } else { FORGE_OR };
+                        if cartoon_btn(ui, "✦  NOUVELLE PARTIE", nouvelle_color).clicked() {
+                            next_game.set(GameMode::Roguelite);
+                            next_app.set(AppMode::InGame);
+                        }
+                        ui.add_space(16.0);
+
+                        if cartoon_btn(ui, "⚙  OPTIONS", FORGE_BOIS_CLAIR).clicked() {
+                            *page = MenuPage::Options;
+                        }
+                        ui.add_space(16.0);
+
+                        if cartoon_btn(ui, "✕  QUITTER", FORGE_METAL_CHAUD).clicked() {
+                            exit.write(AppExit::Success);
+                        }
+
+                        // Démos moteur (dev) — secondaires/discrètes. Conservées pour
+                        // l'accès dev (RPG openworld / stress-test GLB cyber city),
+                        // hors parcours joueur Roguelite.
+                        ui.add_space(32.0);
+                        ui.label(
+                            egui::RichText::new("— Démos moteur (dev) —")
+                                .size(12.0)
+                                .color(egui::Color32::from_gray(150)),
+                        );
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            if ui
+                                .add(
+                                    egui::Button::new(egui::RichText::new("🗺 RPG").size(15.0))
+                                        .min_size(egui::vec2(120.0, 32.0)),
+                                )
+                                .clicked()
+                            {
+                                next_game.set(GameMode::Rpg);
+                                next_app.set(AppMode::InGame);
+                            }
+                            ui.add_space(10.0);
+                            if ui
+                                .add(
+                                    egui::Button::new(
+                                        egui::RichText::new("🏙 Cyber City").size(15.0),
+                                    )
+                                    .min_size(egui::vec2(140.0, 32.0)),
+                                )
+                                .clicked()
+                            {
+                                next_game.set(GameMode::CyberCity);
+                                next_app.set(AppMode::InGame);
+                            }
+                        });
+                    });
                 }
-                ui.add_space(20.0);
-                if cartoon_btn(ui, "🎲  ROGUELITE RUN", FORGE_OR).clicked() {
-                    // Story-591/612 — n'AUTO-DÉMARRE PLUS la run : on entre au Lobby
-                    // (L'Enclume des Âmes + carte de choix d'arme). La run ne part que
-                    // sur ENTRÉE (meta_shop::sys_meta_shop_input). Sans ça, le Lobby
-                    // était sauté et ni l'Enclume ni le wizard n'apparaissaient.
-                    next_game.set(GameMode::Roguelite);
-                    next_app.set(AppMode::InGame);
+                // ── Page Options : réutilise les contrôles du pause menu (DRY) ──
+                MenuPage::Options => {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(52.0);
+                        ui.heading(display_text("OPTIONS", 56.0, C_PRIMARY).strong());
+                    });
+                    ui.add_space(14.0);
+                    // Conteneur centré largeur bornée (lisibilité des sliders).
+                    let avail = ui.available_width();
+                    let panel_w = 520.0_f32.min((avail - 40.0).max(280.0));
+                    let margin = ((avail - panel_w) * 0.5).max(0.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(margin);
+                        ui.vertical(|ui| {
+                            ui.set_max_width(panel_w);
+                            // Anti-crash : bypass + set_changed() SEULEMENT si un
+                            // contrôle change (sinon apply_window_settings boucle →
+                            // resize → race wgpu, cf draw_pause_menu).
+                            let dirty =
+                                draw_settings_controls(ui, settings.bypass_change_detection());
+                            if dirty {
+                                settings.set_changed();
+                            }
+                            ui.add_space(16.0);
+                            let mut save_clicked = false;
+                            let mut back_clicked = false;
+                            ui.horizontal(|ui| {
+                                save_clicked =
+                                    cartoon_btn(ui, "💾 Sauvegarder", FORGE_BOIS_CLAIR).clicked();
+                                ui.add_space(12.0);
+                                back_clicked =
+                                    cartoon_btn(ui, "← Retour", FORGE_METAL_CHAUD).clicked();
+                            });
+                            if save_clicked {
+                                save_user_settings(settings.bypass_change_detection());
+                            }
+                            if back_clicked {
+                                *page = MenuPage::Root;
+                            }
+                        });
+                    });
                 }
-                ui.add_space(20.0);
-                // Démo perf moteur (2026-06-15) — charge un GLB lourd (cyberpunk
-                // city) + flycam libre pour stress-tester rendu/VRAM. Bleu cyber
-                // pour la distinguer des modes de jeu.
-                if cartoon_btn(ui, "🏙  CYBER CITY DÉMO", egui::Color32::from_rgb(70, 130, 200))
-                    .clicked()
-                {
-                    next_game.set(GameMode::CyberCity);
-                    next_app.set(AppMode::InGame);
-                }
-                ui.add_space(40.0);
-                if cartoon_btn(ui, "QUITTER", FORGE_METAL_CHAUD).clicked() {
-                    exit.write(AppExit::Success);
-                }
-            });
+            }
         });
 }
 
@@ -439,6 +560,33 @@ fn release_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
         info!("[forgia-ui] Cursor released (None + visible)");
     } else {
         warn!("[forgia-ui] release_cursor: PrimaryWindow CursorOptions not found");
+    }
+}
+
+/// Réconciliateur curseur du Lobby Roguelite — fix « pas de souris au lancement »
+/// (design home-hub 2026-06-26, P1). À l'entrée Roguelite, `grab_cursor`
+/// (OnEnter InGame) et `release_cursor` (OnEnter RunState::Lobby) tirent la même
+/// frame sur deux schedules SANS ordre → le grab pouvait gagner, curseur
+/// verrouillé sous le wizard d'arme. Ce système est l'unique source de vérité du
+/// curseur AU LOBBY : par-frame, set-if-different (zéro churn), il garantit
+/// curseur libre + look/fire bloqués quelle que soit l'ordre des OnEnter ou le
+/// timing de 1ʳᵉ activation du SubState. Gaté (InGame + Roguelite + Lobby) au
+/// wire-up → no-op partout ailleurs.
+fn sys_force_lobby_cursor_free(
+    mut q: Query<&mut CursorOptions, With<PrimaryWindow>>,
+    mut blockers: ResMut<InputBlockers>,
+) {
+    if let Ok(mut opts) = q.single_mut() {
+        if opts.grab_mode != CursorGrabMode::None || !opts.visible {
+            opts.grab_mode = CursorGrabMode::None;
+            opts.visible = true;
+        }
+    }
+    if !blockers.block_look {
+        blockers.block_look = true;
+    }
+    if !blockers.block_fire {
+        blockers.block_fire = true;
     }
 }
 

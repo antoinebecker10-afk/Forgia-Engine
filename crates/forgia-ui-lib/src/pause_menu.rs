@@ -469,23 +469,13 @@ fn draw_root(
     );
 }
 
-/// Retourne `true` si un réglage a RÉELLEMENT été modifié (le caller déclenche
-/// alors `set_changed()` — voir le commentaire anti-crash dans draw_pause_menu).
-fn draw_settings(
-    ui: &mut egui::Ui,
-    state: &mut PauseMenuState,
-    settings: &mut UserSettings,
-    sensor: &mut PauseMenuSensor,
-    now: f32,
-) -> bool {
+/// Dessine les contrôles de réglages (sensibilité / FOV / volume / affichage /
+/// tonemapping / MSAA / VSync / aide touches). Retourne `true` si un contrôle a
+/// RÉELLEMENT changé — le caller déclenche alors `set_changed()` (cf anti-crash
+/// dans draw_pause_menu). Partagé entre le pause menu (in-game) et la page
+/// Options du menu titre (forgia-ui) → source unique des réglages (DRY).
+pub fn draw_settings_controls(ui: &mut egui::Ui, settings: &mut UserSettings) -> bool {
     let mut dirty = false;
-    ui.heading(
-        egui::RichText::new("OPTIONS")
-            .size(40.0)
-            .color(C_PRIMARY)
-            .strong(),
-    );
-    ui.add_space(16.0);
 
     // BUG-455-03/04 fix : les sliders mutent UserSettings ONLY. La propagation
     // (MouseLookTuning, FpsCamera::Projection, UserMasterVolume, Window) est
@@ -623,6 +613,29 @@ fn draw_settings(
                 .color(egui::Color32::from_gray(140)),
         );
     });
+
+    dirty
+}
+
+/// Panneau OPTIONS du pause menu : heading + contrôles partagés
+/// (`draw_settings_controls`) + boutons Sauvegarder / Retour. Retourne `true`
+/// si un contrôle a changé (le caller déclenche `set_changed()`).
+fn draw_settings(
+    ui: &mut egui::Ui,
+    state: &mut PauseMenuState,
+    settings: &mut UserSettings,
+    sensor: &mut PauseMenuSensor,
+    now: f32,
+) -> bool {
+    ui.heading(
+        egui::RichText::new("OPTIONS")
+            .size(40.0)
+            .color(C_PRIMARY)
+            .strong(),
+    );
+    ui.add_space(16.0);
+
+    let dirty = draw_settings_controls(ui, settings);
     ui.add_space(16.0);
 
     ui.horizontal(|ui| {
@@ -659,7 +672,7 @@ fn draw_settings(
     dirty
 }
 
-fn save_user_settings(settings: &UserSettings) -> bool {
+pub fn save_user_settings(settings: &UserSettings) -> bool {
     let path = settings_path();
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
