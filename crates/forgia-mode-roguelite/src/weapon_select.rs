@@ -253,13 +253,18 @@ pub fn sys_weapon_select_input(
     }
 }
 
-/// OnExit(Lobby) = run-start : applique le choix à `EquippedWeapons.current` →
-/// le joueur démarre avec son arme en main (et `sys_reset_element_unlocks` armera
-/// l'élément correspondant au reset suivant). No-op si la Resource est absente.
+/// Bonus de dégâts par niveau de maîtrise d'arme (P3). Balance — à externaliser en
+/// genome (cf `run::SOULS_PER_BOSS`). +4%/niveau → niveau 6 = +20% de dégâts.
+const WEAPON_MASTERY_DMG_PER_LEVEL: f32 = 0.04;
+
+/// OnExit(Lobby) = run-start : applique le choix à `EquippedWeapons.current` + calcule
+/// le bonus de maîtrise (niveau de l'arme) dans `WeaponMasteryMods`. No-op si la
+/// Resource est absente.
 pub fn sys_apply_weapon_choice(
     choice: Res<StartingWeaponChoice>,
     save: Res<MetaShopSave>,
     equipped: Option<ResMut<EquippedWeapons>>,
+    mut mastery: ResMut<crate::meta_shop::WeaponMasteryMods>,
 ) {
     let Some(mut eq) = equipped else {
         return;
@@ -272,7 +277,13 @@ pub fn sys_apply_weapon_choice(
         WeaponType::ModernAR
     };
     eq.current = w;
-    info!("[weapon-select] run start — arme de départ = {:?}", w);
+    // P3 — bonus de maîtrise : +WEAPON_MASTERY_DMG_PER_LEVEL par niveau au-dessus de 1.
+    let level = save.weapon_level(vm_key(w));
+    mastery.damage_mul = 1.0 + level.saturating_sub(1) as f32 * WEAPON_MASTERY_DMG_PER_LEVEL;
+    info!(
+        "[weapon-select] run start — arme = {:?} (niv {level}, dmg ×{:.2})",
+        w, mastery.damage_mul
+    );
 }
 
 /// En run, empêche d'UTILISER une arme verrouillée : le switch Digit2-4
@@ -468,8 +479,11 @@ pub fn draw_weapon_select(
                                         .color(C_TEXT_MUTED),
                                 );
                             }
+                            let lvl = save.weapon_level(key);
+                            let bonus =
+                                lvl.saturating_sub(1) as f32 * WEAPON_MASTERY_DMG_PER_LEVEL * 100.0;
                             ui.label(
-                                egui::RichText::new(format!("·  Niveau {}", save.weapon_level(key)))
+                                egui::RichText::new(format!("·  Niveau {lvl}  (+{bonus:.0}% dégâts)"))
                                     .size(15.0)
                                     .strong()
                                     .color(FORGE_OR),

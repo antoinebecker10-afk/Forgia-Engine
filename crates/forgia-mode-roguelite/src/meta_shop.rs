@@ -404,6 +404,20 @@ impl Default for PermanentPlayerMods {
     }
 }
 
+/// Bonus de dégâts issu du NIVEAU de maîtrise de l'arme équipée (P3). Recalculé au
+/// run-start (`sys_apply_weapon_choice`) ; composé dans `PlayerCombatMods.damage_mul`
+/// par `boons_apply` (en plus des boons per-run et des mods méta permanents).
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct WeaponMasteryMods {
+    pub damage_mul: f32,
+}
+
+impl Default for WeaponMasteryMods {
+    fn default() -> Self {
+        Self { damage_mul: 1.0 }
+    }
+}
+
 // ─── Systems ─────────────────────────────────────────────────────────────────
 
 /// Startup — charge le save disque (1×) → `MetaSouls.current` + insère les
@@ -662,6 +676,7 @@ impl Plugin for MetaShopPlugin {
         app.init_resource::<MetaShopSave>();
         app.init_resource::<MetaShopCatalogue>();
         app.init_resource::<PermanentPlayerMods>();
+        app.init_resource::<WeaponMasteryMods>();
         // Charge le disque une fois au boot (écrase les Default).
         app.add_systems(Startup, sys_load_meta_shop);
         // Hub Lobby : achats + lancement.
