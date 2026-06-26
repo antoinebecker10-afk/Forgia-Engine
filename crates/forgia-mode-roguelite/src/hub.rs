@@ -213,12 +213,15 @@ fn draw_hub_chrome(
         });
 
     // ── Titre de l'onglet actif — AU-DESSUS de la barre d'onglets (demande user) ──
+    // wrap_mode Extend → titre sur UNE seule ligne (sinon la 2e ligne « ARME » était
+    // masquée par les onglets dessous). L'Area centre le label complet horizontalement.
     egui::Area::new(egui::Id::new("hub_tab_title"))
-        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 16.0))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 14.0))
         .show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.label(display_text(hub.title(), 42.0, FORGE_OR).strong());
-            });
+            ui.add(
+                egui::Label::new(display_text(hub.title(), 40.0, FORGE_OR).strong())
+                    .wrap_mode(egui::TextWrapMode::Extend),
+            );
         });
 
     // ── Onglet Talents : placeholder (arbres = phase P5) ──

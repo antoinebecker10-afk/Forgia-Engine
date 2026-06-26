@@ -396,7 +396,7 @@ pub fn draw_weapon_select(
     // ARME » est fourni par le hub (onglet) ; le bas-centre est libre pour LANCER (hub).
     // Home-hub P2.1 : avant = 3 zones (titre haut / stats gauche / sélecteur bas).
     egui::Area::new(egui::Id::new("ws_card"))
-        .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -98.0))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
             // Cadre EXTÉRIEUR transparent + bordure : son HAUT est un viewport vide
             // (transparent) où l'aperçu 3D (layer 0, rendu derrière egui) apparaît →
@@ -418,6 +418,10 @@ pub fn draw_weapon_select(
                             .corner_radius(egui::CornerRadius::same(10))
                             .show(ui, |ui| {
                                 ui.set_min_width(380.0);
+                                // Taille UNIFIÉE : hauteur stats fixe → carte identique
+                                // pour toutes les armes (design cohérent + viewport 3D
+                                // stable, ne bouge plus selon l'arme).
+                                ui.set_min_height(STATS_PANEL_H);
                                 ui.vertical(|ui| {
                         // En-tête : nom + index parcouru + tagline.
                         ui.horizontal(|ui| {
@@ -576,16 +580,20 @@ fn stat_row_strong(ui: &mut egui::Ui, label: &str, val: &str, col: egui::Color32
 
 /// Distance (m) de l'arme devant la caméra (réglable si trop loin/près).
 const PREVIEW_DIST: f32 = 1.6;
-/// Décalage vertical local (m) — positionne l'arme DANS le viewport en haut de la
-/// carte stats (l'arme apparaît "dans" l'interface, hub P2.1).
-const PREVIEW_Y: f32 = 0.27;
+/// Position cible (m, camera-local) du CENTRE de l'arme — le recentrage AABB place
+/// le centre géométrique de chaque arme ici. Calé sur la carte centrée (CENTER_CENTER)
+/// pour que l'arme tombe dans le viewport en haut de la carte.
+const PREVIEW_Y: f32 = 0.55;
 /// Taille cible (plus grande dimension, m) après calibrage AABB — calibrée pour que
 /// l'arme tienne ENTIÈREMENT dans le viewport (pas de coupe aux bords).
-const PREVIEW_TARGET: f32 = 0.82;
+const PREVIEW_TARGET: f32 = 0.80;
 /// Hauteur (px) du viewport transparent en haut de la carte où l'aperçu 3D apparaît
 /// (exception layout cosmétique de no-hardcode). L'arme (layer 0) rend DERRIÈRE egui
 /// → visible dans ce vide ; le panneau stats opaque est dessous.
-const WEAPON_VIEWPORT_H: f32 = 240.0;
+const WEAPON_VIEWPORT_H: f32 = 250.0;
+/// Hauteur (px) FIXE du panneau stats → carte de taille identique pour toutes les
+/// armes (rendu design cohérent ; layout cosmétique, exception no-hardcode).
+const STATS_PANEL_H: f32 = 360.0;
 /// Vitesse de rotation (rad/s).
 const PREVIEW_SPIN: f32 = 0.9;
 
@@ -616,25 +624,33 @@ struct PreviewState {
     spawned: bool,
 }
 
-/// Walk récursif des Children pour le 1er `Aabb` ; `max(half_extents)*2`.
-fn preview_aabb_max_dim(
+/// Walk les descendants → `(min, max)` de l'AABB combinée (espace local du root,
+/// approx : ignore les transforms intermédiaires, suffisant pour des GLB d'arme).
+/// Sert au scale (extent max) ET au RECENTRAGE vertical dans le viewport.
+fn preview_aabb_bounds(
     root: Entity,
     q_aabb: &Query<&Aabb>,
     q_children: &Query<&Children>,
-) -> Option<f32> {
-    if let Ok(a) = q_aabb.get(root) {
-        return Some(a.half_extents.max_element() * 2.0);
-    }
-    let children = q_children.get(root).ok()?;
-    let mut max = 0.0_f32;
+) -> Option<(Vec3, Vec3)> {
+    let mut min = Vec3::splat(f32::MAX);
+    let mut max = Vec3::splat(f32::MIN);
     let mut found = false;
-    for child in children.iter() {
-        if let Some(d) = preview_aabb_max_dim(child, q_aabb, q_children) {
-            max = max.max(d);
+    let mut stack = vec![root];
+    while let Some(e) = stack.pop() {
+        if let Ok(a) = q_aabb.get(e) {
+            let c = Vec3::from(a.center);
+            let h = Vec3::from(a.half_extents);
+            min = min.min(c - h);
+            max = max.max(c + h);
             found = true;
         }
+        if let Ok(children) = q_children.get(e) {
+            for child in children.iter() {
+                stack.push(child);
+            }
+        }
     }
-    found.then_some(max)
+    found.then_some((min, max))
 }
 
 /// Spawn / swap l'arme 3D selon la sélection, parentée à la caméra 3D active.
@@ -720,12 +736,19 @@ fn sys_calibrate_preview(
     mut q_tf: Query<&mut Transform>,
 ) {
     for (e, needs) in &q_needs {
-        let Some(max_dim) = preview_aabb_max_dim(e, &q_aabb, &q_children) else {
+        let Some((min, max)) = preview_aabb_bounds(e, &q_aabb, &q_children) else {
             continue; // scène pas encore chargée → retry
         };
+        let max_dim = (max - min).max_element();
         if max_dim > 0.0 && max_dim.is_finite() {
             if let Ok(mut tf) = q_tf.get_mut(e) {
-                tf.scale = Vec3::splat(needs.target / max_dim);
+                let scale = needs.target / max_dim;
+                tf.scale = Vec3::splat(scale);
+                // Recentrage vertical : le centre géométrique de l'arme est placé à
+                // PREVIEW_Y → l'arme est centrée dans le viewport quelle que soit
+                // l'origine du GLB (Pépin centré, Boucherie origine au sol, etc.).
+                let center_y = (min.y + max.y) * 0.5;
+                tf.translation.y = PREVIEW_Y - center_y * scale;
             }
         }
         commands.entity(e).remove::<NeedsPreviewCalibrate>();
