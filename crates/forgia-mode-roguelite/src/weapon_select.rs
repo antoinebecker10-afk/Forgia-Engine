@@ -575,16 +575,17 @@ fn stat_row_strong(ui: &mut egui::Ui, label: &str, val: &str, col: egui::Color32
 // ─── Aperçu 3D de l'arme (parentée caméra, tourne) — story-614 ───────────────
 
 /// Distance (m) de l'arme devant la caméra (réglable si trop loin/près).
-const PREVIEW_DIST: f32 = 1.5;
-/// Décalage vertical local (m) — relevé pour poser l'arme dans le VIEWPORT en haut
-/// de la carte stats (l'arme apparaît "dans" l'interface, hub P2.1).
-const PREVIEW_Y: f32 = 0.30;
-/// Taille cible (plus grande dimension, m) après calibrage AABB — agrandie (vitrine hub P2.1).
-const PREVIEW_TARGET: f32 = 0.95;
+const PREVIEW_DIST: f32 = 1.6;
+/// Décalage vertical local (m) — positionne l'arme DANS le viewport en haut de la
+/// carte stats (l'arme apparaît "dans" l'interface, hub P2.1).
+const PREVIEW_Y: f32 = 0.27;
+/// Taille cible (plus grande dimension, m) après calibrage AABB — calibrée pour que
+/// l'arme tienne ENTIÈREMENT dans le viewport (pas de coupe aux bords).
+const PREVIEW_TARGET: f32 = 0.82;
 /// Hauteur (px) du viewport transparent en haut de la carte où l'aperçu 3D apparaît
 /// (exception layout cosmétique de no-hardcode). L'arme (layer 0) rend DERRIÈRE egui
 /// → visible dans ce vide ; le panneau stats opaque est dessous.
-const WEAPON_VIEWPORT_H: f32 = 200.0;
+const WEAPON_VIEWPORT_H: f32 = 240.0;
 /// Vitesse de rotation (rad/s).
 const PREVIEW_SPIN: f32 = 0.9;
 
