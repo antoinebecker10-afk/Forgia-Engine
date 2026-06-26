@@ -30,6 +30,7 @@
 //! - Forgia memory `[[reference-loader-request-result-pattern]]` (story-441).
 //! - Forgia memory `[[reference-pattern-genome-driven-plugin-with-sensor]]`.
 
+pub mod authored;
 pub mod graph;
 pub mod layout;
 pub mod layout_sensor;
@@ -48,6 +49,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const STAGES_GENOME_PATH: &str = "genomes/roguelite_stages.toml";
 const POIS_GENOME_PATH: &str = "genomes/roguelite_pois.toml";
+/// Story-625 - coquille authored data-driven (modele Returnal hybride).
+const ARENA_LAYOUTS_GENOME_PATH: &str = "genomes/arena_layouts.toml";
 const SENSOR_PATH: &str = "forgia2_stage.json";
 const SENSOR_WRITE_PERIOD_SEC: f64 = 1.0;
 
@@ -245,6 +248,8 @@ pub struct StageLoadResult {
 pub struct StageGenomeHandles {
     pub stages: Handle<Genome<RogueliteStagesGenome>>,
     pub pois: Handle<Genome<RoguelitePoisGenome>>,
+    /// Story-625 - layouts authored par stage (arena_layouts.toml).
+    pub arena_layouts: Handle<Genome<authored::ArenaLayoutsGenome>>,
 }
 
 // Note story-485 phase 3 : `LevelModulesGenome` n'est pas stocké ici. Le
@@ -268,6 +273,12 @@ pub struct LayoutResult {
     /// exhausted ou id inconnu). Si élevé → palette trop dense ou TOML cassé.
     pub instances_skipped: u32,
     pub module_palette_used: Vec<String>,
+    /// Story-625 - provenance : "authored" si des pieces authored posees, sinon "procedural".
+    pub layout_source: String,
+    /// Story-625 - nombre de pieces authored posees (0 = layout procedural pur).
+    pub authored_pieces: u32,
+    /// Story-625 - nombre de sections authored distinctes (bible).
+    pub authored_sections: u32,
 }
 
 // ─── LayoutParams SystemParam bundle (évite limite Bevy 16 params) ──────────
@@ -279,6 +290,9 @@ pub struct LayoutParams<'w> {
     pub handles: Res<'w, LevelModulesHandles>,
     pub assets: Res<'w, Assets<Genome<LevelModulesGenome>>>,
     pub result: ResMut<'w, LayoutResult>,
+    /// Story-625 - assets des layouts authored (lookup par stage_id via le
+    /// handle `StageGenomeHandles::arena_layouts`).
+    pub arena_assets: Res<'w, Assets<Genome<authored::ArenaLayoutsGenome>>>,
 }
 
 // ─── Marker Component ───────────────────────────────────────────────────────
@@ -313,6 +327,9 @@ impl Plugin for ForgiaStageArenaPlugin {
             .register_asset_loader(GenomeLoader::<RogueliteStagesGenome>::default())
             .init_asset::<Genome<RoguelitePoisGenome>>()
             .register_asset_loader(GenomeLoader::<RoguelitePoisGenome>::default())
+            // Story-625 - coquille authored data-driven.
+            .init_asset::<Genome<authored::ArenaLayoutsGenome>>()
+            .register_asset_loader(GenomeLoader::<authored::ArenaLayoutsGenome>::default())
             .init_resource::<StageLoadResult>()
             .init_resource::<StageGenomeHandles>()
             .init_resource::<StageArenaTuning>()
@@ -328,6 +345,14 @@ impl Plugin for ForgiaStageArenaPlugin {
                 Update,
                 spawn_stage_arena_on_request
                     .in_set(forgia_core::prelude::GameSet::Movement),
+            )
+            // Story-625 - collider differe des pieces authored walkable/blocker
+            // (GLB async -> retry jusqu'a mesh pret). Apres le spawn.
+            .add_systems(
+                Update,
+                authored::sys_collide_authored_pieces
+                    .in_set(forgia_core::prelude::GameSet::Movement)
+                    .after(spawn_stage_arena_on_request),
             )
             .add_systems(
                 Update,
@@ -355,9 +380,10 @@ impl Plugin for ForgiaStageArenaPlugin {
 fn load_stage_genomes(asset_server: Res<AssetServer>, mut handles: ResMut<StageGenomeHandles>) {
     handles.stages = asset_server.load(STAGES_GENOME_PATH);
     handles.pois = asset_server.load(POIS_GENOME_PATH);
+    handles.arena_layouts = asset_server.load(ARENA_LAYOUTS_GENOME_PATH);
     info!(
-        "[forgia-stage-arena] Genome handles loading: stages={} pois={}",
-        STAGES_GENOME_PATH, POIS_GENOME_PATH
+        "[forgia-stage-arena] Genome handles loading: stages={} pois={} arena_layouts={}",
+        STAGES_GENOME_PATH, POIS_GENOME_PATH, ARENA_LAYOUTS_GENOME_PATH
     );
 }
 
@@ -798,6 +824,21 @@ fn spawn_stage_arena_on_request(
         }
         return;
     };
+    // Story-625 (BUG-625-01) — attendre AUSSI le genome des layouts authored.
+    // Sinon race : si arena_layouts.toml charge apres stages/pois, le stage
+    // passe Ready en procedural pur et la garde idempotente bloque la re-entree
+    // -> la coquille authored ne s'applique jamais. Meme pattern d'attente.
+    if layout_params
+        .arena_assets
+        .get(&handles.arena_layouts)
+        .is_none()
+    {
+        if result.state != StageState::Loading {
+            result.state = StageState::Loading;
+            result.loading_started_secs = now_secs();
+        }
+        return;
+    }
 
     let Some(stage_def) = stages_genome.data.stages.get(&req.stage_id) else {
         result.state = StageState::Error;
@@ -933,6 +974,73 @@ fn spawn_stage_arena_on_request(
         props_spawned += 1;
     }
 
+    // 2.5 Coquille AUTHORED (story-625) - composition data-driven depuis
+    //     arena_layouts.toml. Si presente, c'est la STRUCTURE de l'arene ; le
+    //     scatter procedural (5.5) est coupe si suppress_procedural_modules.
+    //     Pieces = GLB atomiques Inferno/KayKit existants, instancies par prefab.
+    let authored_layout = layout_params
+        .arena_assets
+        .get(&handles.arena_layouts)
+        .and_then(|g| g.data.layouts.get(&req.stage_id))
+        .cloned();
+    let suppress_procedural = authored_layout
+        .as_ref()
+        .map(|l| l.suppress_procedural_modules)
+        .unwrap_or(false);
+    let mut authored_pieces_spawned: u32 = 0;
+    let mut authored_sections: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+    if let Some(layout) = authored_layout.as_ref() {
+        for (i, piece) in layout.pieces.iter().enumerate() {
+            let pos = Vec3::new(piece.pos[0], piece.pos[1], piece.pos[2]);
+            let anchor = authored::role_to_anchor(&piece.role);
+            // melee_pit : nom `Module_melee_pit_authored` pour que `boss_portal`
+            // solidifie le dais + y pose la porte (synergie story-603).
+            let name = if anchor == Some(AnchorKind::MeleePit) {
+                "Module_melee_pit_authored".to_string()
+            } else {
+                let sec = if piece.section.is_empty() {
+                    "x"
+                } else {
+                    piece.section.as_str()
+                };
+                format!("AuthoredPiece_{sec}_{i}")
+            };
+            let spawn = PrefabSpawn::new(&piece.prefab, pos)
+                .with_yaw_deg(piece.rot_deg)
+                .with_scale(piece.scale)
+                .with_name(name);
+            let e = spawn_gltf_prefab(
+                &mut commands,
+                &asset_server,
+                &prefab_stats,
+                spawn,
+                (StageArenaMarker,),
+            );
+            // Anchor gameplay depuis la data (pose au point de la piece).
+            if let Some(kind) = anchor {
+                commands.entity(e).insert(AnchorPoint::new(kind, i as u32));
+                anchor_stats.record(kind);
+            }
+            // Collider differe pour pieces walkable/blocker (perchoir, etc.).
+            if piece.walkable || piece.blocker {
+                commands.entity(e).insert(authored::AuthoredNeedsCollider);
+            }
+            if !piece.section.is_empty() {
+                authored_sections.insert(piece.section.clone());
+            }
+            authored_pieces_spawned += 1;
+            props_spawned += 1;
+        }
+        info!(
+            "[stage-arena] Authored shell '{}' : {} pieces, {} sections, suppress_procedural={}",
+            req.stage_id,
+            authored_pieces_spawned,
+            authored_sections.len(),
+            suppress_procedural
+        );
+    }
+
     // 3. PlayerSpawn anchor (just a marker entity, no visual).
     commands.spawn((
         Name::new("StagePlayerSpawn"),
@@ -1054,7 +1162,12 @@ fn spawn_stage_arena_on_request(
     let mut layout_placements: Vec<layout::ModulePlacement> = Vec::new();
     let mut instances_skipped: u32 = 0;
     let mut palette_used: Vec<String> = Vec::new();
-    if let Some(modules_genome) = modules_genome_opt {
+    if suppress_procedural {
+        info!(
+            "[stage-arena] Authored layout '{}' present -> scatter procedural de modules coupe",
+            req.stage_id
+        );
+    } else if let Some(modules_genome) = modules_genome_opt {
         let expected_total: u32 = stage_def.module_palette.iter().map(|e| e.count).sum();
         layout_placements = layout::place_modules(
             extent,
@@ -1125,6 +1238,13 @@ fn spawn_stage_arena_on_request(
     layout_params.result.min_cover_spacing_m = min_cover_spacing_m;
     layout_params.result.instances_skipped = instances_skipped;
     layout_params.result.module_palette_used = palette_used;
+    layout_params.result.authored_pieces = authored_pieces_spawned;
+    layout_params.result.authored_sections = authored_sections.len() as u32;
+    layout_params.result.layout_source = if authored_pieces_spawned > 0 {
+        "authored".to_string()
+    } else {
+        "procedural".to_string()
+    };
 
     // 6. Lighting cartoon biome-tuned — bible v1 direction artistique
     //    family-friendly. Pattern key+fill : Sun (key, shadows) + Fill

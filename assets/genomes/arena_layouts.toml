@@ -1,0 +1,111 @@
+# Authored arena layouts — Tier 1 (story-625). Modèle Returnal hybride.
+#
+# Chaque [layouts.<stage_id>] compose une arène depuis des GLB atomiques
+# (kit Inferno / KayKit déjà présents), placés À LA MAIN (data-driven, 0 hardcode
+# Rust). stage_id matche `roguelite_stages.toml`. Cible art-direction :
+# `docs/lore/locations/crypts_of_anvil.md`.
+#
+# Consommé par `forgia-stage::spawn_stage_arena_on_request` via AssetServer.
+# IMPORTANT : les pièces sont spawnées au CHARGEMENT du stage (pas live) — éditer
+# ce fichier demande de RE-ENTRER dans l'arène pour voir le changement.
+#
+# Schema d'une pièce :
+#   prefab/pos/rot_deg/scale/role/walkable/blocker/section (cf authored.rs)
+#
+# ⚠️ FOOTPRINTS RÉELS MESURÉS (AABB GLB, scratchpad/measure_glb_aabb.py) — espacer
+# avec dist(A,B) > footprint_r(A)+footprint_r(B) sinon z-fighting / chevauchement :
+#   CirclePlatformSmall_001 : 19m large, top 3.67m, r=9.6
+#   Brazier_002 r=1.0 (top 2.7) · Brazier_004 r=1.3 (plat)
+#   ColumnBigBroken_001 r=2.3 (h4.6) · ColumnBigBroken_002 r=1.2 (h3.7)
+#   Vase_001 r=0.67 · Vase_002 r=0.56
+#   TowerBig_001 : 15m large, 47m haut, r=7.5
+#   StairsMiddle_001 : 10x12m, h5.5, r=6.2
+#   StatueKnight_002 : 21m large, 37m haut, r=10.8
+#   PedestalBig_001 : 21m large, h6, r=10.7
+#   (RockBig_001/003 = blocs 25-35m → RETIRÉS Tier 1, inadaptés comme cover ;
+#    Tier 2 : sourcer de vrais petits rochers de cover.)
+#
+# NOTE : seuls les stages listés ici ont une coquille authored. forge_sanctum
+# n'est PAS listé → il reste 100% procédural (non-régression).
+
+[layouts.crypts_of_anvil]
+suppress_procedural_modules = true
+
+# ── La fosse à mêlée (centrale) ───────────────────────────────────────────────
+# Plateforme ronde 19m, surface à 3.67m. role melee_pit → AnchorKind MeleePit +
+# nom Module_melee_pit_authored : la porte du boss s'y pose (boss_portal raycaste
+# la surface, exige > 0.5m → OK à 3.67m). scale 1.0 = valeur prouvée (le procédural
+# l'utilisait ainsi). Ne PAS remonter le scale (à 2.0 la porte se pose à ~7m en l'air).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/CirclePlatformSmall_001.glb"
+pos = [0.0, 0.0, -16.0]
+scale = 1.0
+role = "melee_pit"
+section = "fosse_melee"
+
+# Braseros AU SOL, à côté de la plateforme (r9.6) — pas dessus (sinon enfoncés
+# sous la surface à 3.67m). dist au centre platform ~14m > 9.6+1.3.
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Brazier_002.glb"
+pos = [13.0, 0.0, -22.0]
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Brazier_004.glb"
+pos = [-13.0, 0.0, -22.0]
+section = "fosse_melee"
+
+# ── La cour des forges éteintes (colonnes brisées, cover haut) ────────────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/ColumnBigBroken_001.glb"
+pos = [26.0, 0.0, 2.0]
+role = "cover_high"
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/ColumnBigBroken_002.glb"
+pos = [-26.0, 0.0, 2.0]
+rot_deg = 20.0
+role = "cover_high"
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Vase_001.glb"
+pos = [16.0, 0.0, -32.0]
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Vase_002.glb"
+pos = [-16.0, 0.0, -32.0]
+section = "cour_forges"
+
+# ── Le perchoir du contremaître (bord, grande tour + escalier d'accès) ───────
+# Tour 15m large / 47m haut. dist tour↔escalier ~16m > 7.5+6.2 (pas de z-fight).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/TowerBig_001.glb"
+pos = [-52.0, 0.0, 40.0]
+rot_deg = 90.0
+role = "sniper_perch"
+walkable = true
+section = "perchoir"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/StairsMiddle_001.glb"
+pos = [-39.0, 0.0, 31.0]
+rot_deg = 90.0
+walkable = true
+section = "perchoir"
+
+# ── L'entrée (landmarks, à l'arrière de l'arène) ─────────────────────────────
+# Statue 21m large/37m haut + piédestal 21m large : très espacés (dist 48m).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/StatueKnight_002.glb"
+pos = [24.0, 0.0, 52.0]
+rot_deg = 180.0
+role = "landmark"
+section = "entree"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/PedestalBig_001.glb"
+pos = [-24.0, 0.0, 52.0]
+section = "entree"

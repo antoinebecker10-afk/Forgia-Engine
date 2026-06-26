@@ -102,6 +102,12 @@ struct LayoutSensorJson<'a> {
     min_cover_spacing_m: f32,
     instances_skipped: u32,
     module_palette_used: &'a [String],
+    /// Story-625 - provenance du layout : "authored" | "procedural".
+    layout_source: &'a str,
+    /// Story-625 - pieces authored posees (coquille data-driven).
+    authored_pieces: u32,
+    /// Story-625 - sections authored distinctes (bible).
+    authored_sections: u32,
     next_step: &'a str,
 }
 
@@ -142,22 +148,41 @@ pub fn write_layout_sensor(layout: Res<LayoutResult>, mut last_write: Local<f64>
         -1.0 // sentinel JSON-friendly pour "< 2 CoverLow placés"
     };
 
-    let severity = severity_for_layout(
-        layout.longest_sightline_m,
-        layout.min_cover_spacing_m,
-        cover_low_count,
-        palette_expects_cover_low,
-        layout.instances_skipped,
-        placed.len(),
-    );
-    let next_step = next_step_for_layout(
-        layout.longest_sightline_m,
-        layout.min_cover_spacing_m,
-        cover_low_count,
-        palette_expects_cover_low,
-        layout.instances_skipped,
-        placed.len(),
-    );
+    // Story-625 (BUG-625-04/05) — un stage authored ne passe pas par place_modules
+    // (placements vides) : la severity/next_step procedurale serait trompeuse
+    // ("0 module"). On bascule sur un diagnostic authored quand layout_source l'est.
+    let (severity, next_step): (&str, &str) = if layout.layout_source == "authored" {
+        if layout.authored_pieces > 0 {
+            (
+                "ok",
+                "Authored shell active (coquille data-driven). Pieces posees depuis arena_layouts.toml.",
+            )
+        } else {
+            (
+                "warn",
+                "Layout 'authored' attendu mais 0 piece posee - verifier arena_layouts.toml (stage_id present ? prefabs GLB existants ?).",
+            )
+        }
+    } else {
+        (
+            severity_for_layout(
+                layout.longest_sightline_m,
+                layout.min_cover_spacing_m,
+                cover_low_count,
+                palette_expects_cover_low,
+                layout.instances_skipped,
+                placed.len(),
+            ),
+            next_step_for_layout(
+                layout.longest_sightline_m,
+                layout.min_cover_spacing_m,
+                cover_low_count,
+                palette_expects_cover_low,
+                layout.instances_skipped,
+                placed.len(),
+            ),
+        )
+    };
 
     let payload = LayoutSensorJson {
         id: "stage_layout",
@@ -174,6 +199,13 @@ pub fn write_layout_sensor(layout: Res<LayoutResult>, mut last_write: Local<f64>
         min_cover_spacing_m: min_spacing_finite,
         instances_skipped: layout.instances_skipped,
         module_palette_used: &layout.module_palette_used,
+        layout_source: if layout.layout_source.is_empty() {
+            "procedural"
+        } else {
+            &layout.layout_source
+        },
+        authored_pieces: layout.authored_pieces,
+        authored_sections: layout.authored_sections,
         next_step,
     };
 
