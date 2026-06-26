@@ -170,9 +170,9 @@ fn draw_hub_chrome(
             });
         });
 
-    // ── Barre d'onglets (haut-centre) ──
+    // ── Barre d'onglets (sous le titre — demande user : titre AU-DESSUS de l'onglet) ──
     egui::Area::new(egui::Id::new("hub_tabs"))
-        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 12.0))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 74.0))
         .show(ctx, |ui| {
             egui::Frame::new()
                 .fill(FORGE_PANEL)
@@ -198,9 +198,9 @@ fn draw_hub_chrome(
                 });
         });
 
-    // ── Titre de l'onglet actif (sous la barre d'onglets, sans chevauchement) ──
+    // ── Titre de l'onglet actif — AU-DESSUS de la barre d'onglets (demande user) ──
     egui::Area::new(egui::Id::new("hub_tab_title"))
-        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 64.0))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 16.0))
         .show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.label(display_text(hub.title(), 42.0, FORGE_OR).strong());

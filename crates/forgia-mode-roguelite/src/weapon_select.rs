@@ -398,15 +398,27 @@ pub fn draw_weapon_select(
     egui::Area::new(egui::Id::new("ws_card"))
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -98.0))
         .show(ctx, |ui| {
+            // Cadre EXTÉRIEUR transparent + bordure : son HAUT est un viewport vide
+            // (transparent) où l'aperçu 3D (layer 0, rendu derrière egui) apparaît →
+            // l'arme est "dans" la carte. Le panneau stats (fill opaque) est dessous.
             egui::Frame::new()
-                .fill(FORGE_PANEL)
-                .inner_margin(egui::Margin::symmetric(26, 18))
-                .corner_radius(egui::CornerRadius::same(12))
+                .fill(egui::Color32::TRANSPARENT)
+                .inner_margin(egui::Margin::same(6))
+                .corner_radius(egui::CornerRadius::same(14))
                 .stroke(egui::Stroke::new(3.0, accent))
                 .show(ui, |ui| {
-                    ui.set_min_width(360.0);
-                    ui.set_max_width(440.0);
-                    ui.vertical(|ui| {
+                    ui.set_min_width(420.0);
+                    ui.set_max_width(460.0);
+                    ui.vertical_centered(|ui| {
+                        // Viewport d'arme : espace vide (l'aperçu 3D rend derrière egui).
+                        ui.add_space(WEAPON_VIEWPORT_H);
+                        egui::Frame::new()
+                            .fill(FORGE_PANEL)
+                            .inner_margin(egui::Margin::symmetric(24, 16))
+                            .corner_radius(egui::CornerRadius::same(10))
+                            .show(ui, |ui| {
+                                ui.set_min_width(380.0);
+                                ui.vertical(|ui| {
                         // En-tête : nom + index parcouru + tagline.
                         ui.horizontal(|ui| {
                             ui.heading(display_text(name, 28.0, accent).strong());
@@ -538,10 +550,12 @@ pub fn draw_weapon_select(
                         } else {
                             "‹ ›  choisir l'arme".to_string()
                         };
-                        ui.label(egui::RichText::new(footer).size(14.0).color(FORGE_TEAL));
+                                    ui.label(egui::RichText::new(footer).size(14.0).color(FORGE_TEAL));
+                                });
+                            });
+                        });
                     });
                 });
-        });
 }
 
 fn stat_row(ui: &mut egui::Ui, label: &str, val: &str) {
@@ -562,10 +576,15 @@ fn stat_row_strong(ui: &mut egui::Ui, label: &str, val: &str, col: egui::Color32
 
 /// Distance (m) de l'arme devant la caméra (réglable si trop loin/près).
 const PREVIEW_DIST: f32 = 1.5;
-/// Décalage vertical local (m) — relevé pour poser l'arme AU-DESSUS de la carte stats (vitrine hub P2.1).
-const PREVIEW_Y: f32 = 0.15;
+/// Décalage vertical local (m) — relevé pour poser l'arme dans le VIEWPORT en haut
+/// de la carte stats (l'arme apparaît "dans" l'interface, hub P2.1).
+const PREVIEW_Y: f32 = 0.30;
 /// Taille cible (plus grande dimension, m) après calibrage AABB — agrandie (vitrine hub P2.1).
 const PREVIEW_TARGET: f32 = 0.95;
+/// Hauteur (px) du viewport transparent en haut de la carte où l'aperçu 3D apparaît
+/// (exception layout cosmétique de no-hardcode). L'arme (layer 0) rend DERRIÈRE egui
+/// → visible dans ce vide ; le panneau stats opaque est dessous.
+const WEAPON_VIEWPORT_H: f32 = 200.0;
 /// Vitesse de rotation (rad/s).
 const PREVIEW_SPIN: f32 = 0.9;
 
