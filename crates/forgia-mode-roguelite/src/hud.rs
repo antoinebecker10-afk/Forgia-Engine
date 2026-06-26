@@ -1170,6 +1170,64 @@ pub(crate) fn draw_player_portrait(
     );
 }
 
+// ─── Nameplate joueur en jeu (nom + niveau, à droite du portrait) ──────────
+
+/// Affiche le nom + niveau du forgeron pendant la run (demande user — voir son
+/// personnage en jeu). Placé à droite du portrait (bas-gauche, même repère que
+/// `draw_player_portrait`). Niveau = placeholder « Niv. 1 » (le système d'XP = P4).
+pub(crate) fn draw_player_identity_badge(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    save: Option<Res<crate::identity::IdentitySave>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_identity_badge"),
+    ));
+    let name = save
+        .as_ref()
+        .map(|s| {
+            if s.player_name.is_empty() {
+                "Forgeron"
+            } else {
+                s.player_name.as_str()
+            }
+        })
+        .unwrap_or("Forgeron");
+    // Même repère que le portrait : à sa droite, nom au-dessus / niveau en dessous.
+    let pad = 24.0;
+    let r = 34.0;
+    let hp_outer_top = screen.max.y - pad - 32.0 - 6.0;
+    let portrait_center = egui::pos2(screen.min.x + pad + r, hp_outer_top - 10.0 - r);
+    let text_x = portrait_center.x + r + 14.0;
+    text_with_outline(
+        &painter,
+        egui::pos2(text_x, portrait_center.y - 11.0),
+        egui::Align2::LEFT_CENTER,
+        name,
+        display_font(20.0),
+        C_TEXT_LIGHT,
+        1.8,
+    );
+    text_with_outline(
+        &painter,
+        egui::pos2(text_x, portrait_center.y + 13.0),
+        egui::Align2::LEFT_CENTER,
+        "Niv. 1",
+        egui::FontId::monospace(14.0),
+        FORGE_OR,
+        1.2,
+    );
+}
+
 // ─── Indicateur sort F « Onde de choc » (bas-centre) ───────────────────────
 
 /// Story-572 — pastille du sort F (bas-centre). Prêt = anneau + « F » dorés ;
@@ -1399,6 +1457,7 @@ impl Plugin for RogueliteHudPlugin {
                     draw_minimap,
                     draw_weapon_slots,
                     draw_player_portrait,
+                    draw_player_identity_badge,
                     draw_shockwave_indicator,
                     draw_wave_counter,
                     draw_currency_counters,

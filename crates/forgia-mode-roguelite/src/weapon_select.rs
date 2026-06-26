@@ -519,10 +519,14 @@ pub fn draw_weapon_select(
                         ui.add_space(8.0);
                         ui.vertical_centered(|ui| {
                             ui.horizontal(|ui| {
+                                // Centrage manuel : la rangée prend toute la largeur →
+                                // on pousse de (largeur - contenu)/2 à gauche.
+                                let lead = ((ui.available_width() - 280.0) * 0.5).max(0.0);
+                                ui.add_space(lead);
                                 let prev = ui
                                     .add(
                                         egui::Button::new(
-                                            egui::RichText::new("◄").size(24.0).strong(),
+                                            egui::RichText::new("‹").size(30.0).strong(),
                                         )
                                         .min_size(egui::vec2(64.0, 42.0)),
                                     )
@@ -538,7 +542,7 @@ pub fn draw_weapon_select(
                                 let next = ui
                                     .add(
                                         egui::Button::new(
-                                            egui::RichText::new("►").size(24.0).strong(),
+                                            egui::RichText::new("›").size(30.0).strong(),
                                         )
                                         .min_size(egui::vec2(64.0, 42.0)),
                                     )
@@ -562,7 +566,7 @@ pub fn draw_weapon_select(
                                             .add(
                                                 egui::Button::new(
                                                     egui::RichText::new(format!(
-                                                        "🔓 Débloquer ({} Âmes)",
+                                                        "Débloquer ({} Âmes)",
                                                         u.cost
                                                     ))
                                                     .size(16.0)
