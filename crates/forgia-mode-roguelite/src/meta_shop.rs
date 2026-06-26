@@ -254,6 +254,10 @@ pub struct MetaShopSave {
     /// Paliers d'atouts débloqués (uncommon/rare/legendary). Story-616 — défaut vide (Common only).
     #[serde(default)]
     pub unlocked_boon_tiers: Vec<String>,
+    /// Niveau de maîtrise par arme (clé genome → niveau). P3 — défaut 1, +1 par run
+    /// terminée avec l'arme. Vide = toutes niveau 1.
+    #[serde(default)]
+    pub weapon_levels: HashMap<String, u32>,
 }
 
 /// Pépin = arme de départ : toujours débloquée (story-613).
@@ -269,6 +273,7 @@ impl Default for MetaShopSave {
             ranks: HashMap::new(),
             unlocked_weapons: default_unlocked_weapons(),
             unlocked_boon_tiers: Vec::new(),
+            weapon_levels: HashMap::new(),
         }
     }
 }
@@ -292,6 +297,17 @@ fn config_dir() -> PathBuf {
 impl MetaShopSave {
     pub fn rank(&self, id: &str) -> u32 {
         self.ranks.get(id).copied().unwrap_or(0)
+    }
+
+    /// Niveau de maîtrise de l'arme (P3) — défaut 1.
+    pub fn weapon_level(&self, key: &str) -> u32 {
+        self.weapon_levels.get(key).copied().unwrap_or(1)
+    }
+
+    /// +1 niveau de maîtrise (run terminée avec l'arme). Idempotent par appel.
+    pub fn level_up_weapon(&mut self, key: &str) {
+        let lvl = self.weapon_levels.entry(key.to_string()).or_insert(1);
+        *lvl = lvl.saturating_add(1);
     }
 
     /// Pépin toujours débloquée ; les autres selon le save (story-613).

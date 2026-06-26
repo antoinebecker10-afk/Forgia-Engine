@@ -341,6 +341,21 @@ pub fn sys_weapon_unlock_input(
     );
 }
 
+/// Run terminée (Defeat/Victory) → l'arme équipée gagne 1 niveau de maîtrise (P3,
+/// persisté). Chaque arme progresse indépendamment selon son usage.
+pub fn sys_level_up_equipped_weapon(
+    equipped: Option<Res<EquippedWeapons>>,
+    mut save: ResMut<MetaShopSave>,
+) {
+    let Some(eq) = equipped else {
+        return;
+    };
+    let key = vm_key(eq.current);
+    save.level_up_weapon(key);
+    save.save();
+    info!("[weapon-select] {key} → niveau {}", save.weapon_level(key));
+}
+
 /// Dessine la carte de choix d'arme au Lobby (à droite de L'Enclume).
 pub fn draw_weapon_select(
     mut contexts: EguiContexts,
@@ -435,19 +450,31 @@ pub fn draw_weapon_select(
                         ui.label(
                             egui::RichText::new(tagline).size(14.0).italics().color(C_TEXT_MUTED),
                         );
-                        // Bandeau verrou (story-613).
-                        if !owned {
-                            if let Some(u) = unlock {
-                                let afford = meta.current >= u.cost;
-                                ui.add_space(4.0);
+                        // Statut verrou + NIVEAU de maîtrise (P3) — visible par arme.
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            if owned {
                                 ui.label(
-                                    egui::RichText::new(format!("◈ VERROUILLÉE — {} Âmes", u.cost))
-                                        .size(16.0)
+                                    egui::RichText::new("DÉBLOQUÉE")
+                                        .size(15.0)
                                         .strong()
-                                        .color(if afford { FORGE_OR } else { C_TEXT_MUTED }),
+                                        .color(C_HP_HIGH),
+                                );
+                            } else {
+                                ui.label(
+                                    egui::RichText::new("VERROUILLÉE")
+                                        .size(15.0)
+                                        .strong()
+                                        .color(C_TEXT_MUTED),
                                 );
                             }
-                        }
+                            ui.label(
+                                egui::RichText::new(format!("·  Niveau {}", save.weapon_level(key)))
+                                    .size(15.0)
+                                    .strong()
+                                    .color(FORGE_OR),
+                            );
+                        });
                         ui.add_space(8.0);
 
                         if let Some(e) = element {
@@ -911,6 +938,9 @@ impl Plugin for WeaponSelectPlugin {
                 sys_show_crosshair_off_lobby,
             ),
         );
+        // P3 — niveau de maîtrise par arme : +1 à chaque fin de run (Defeat/Victory).
+        app.add_systems(OnEnter(RunState::Defeat), sys_level_up_equipped_weapon);
+        app.add_systems(OnEnter(RunState::Victory), sys_level_up_equipped_weapon);
     }
 }
 
