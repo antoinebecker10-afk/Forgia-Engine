@@ -347,12 +347,12 @@ pub fn draw_weapon_select(
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
-    choice: Res<StartingWeaponChoice>,
+    mut choice: ResMut<StartingWeaponChoice>,
     cards: Res<WeaponCards>,
     elem_cfg: Res<ElementConfig>,
-    save: Res<MetaShopSave>,
+    mut save: ResMut<MetaShopSave>,
     cat: Res<MetaShopCatalogue>,
-    meta: Res<MetaSouls>,
+    mut meta: ResMut<MetaSouls>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -513,48 +513,84 @@ pub fn draw_weapon_select(
                             );
                         }
 
-                        // ── Sélecteur des 4 armes (intégré à la carte ; ◄ ► clavier) ──
-                        ui.add_space(10.0);
+                        // ── Navigation par BOUTONS ◄ ► (clavier ← → toujours dispo) ──
+                        ui.add_space(12.0);
                         ui.separator();
-                        ui.add_space(4.0);
-                        ui.horizontal_wrapped(|ui| {
-                            for (i, aw) in ARENA_V1_WEAPONS.iter().enumerate() {
-                                let (pn, _) = persona(*aw);
-                                let aw_owned = save.is_weapon_unlocked(vm_key(*aw));
-                                let selected = i == sel;
-                                let col = if !aw_owned {
-                                    C_TEXT_MUTED
-                                } else if selected {
-                                    accent
-                                } else {
-                                    FORGE_TEAL
-                                };
-                                let txt = if selected {
-                                    format!("‹ {pn} ›")
-                                } else if aw_owned {
-                                    format!("  {pn}  ")
-                                } else {
-                                    format!("  {pn} *  ")
-                                };
-                                ui.label(egui::RichText::new(txt).size(17.0).color(col).strong());
+                        ui.add_space(8.0);
+                        ui.vertical_centered(|ui| {
+                            ui.horizontal(|ui| {
+                                let prev = ui
+                                    .add(
+                                        egui::Button::new(
+                                            egui::RichText::new("◄").size(24.0).strong(),
+                                        )
+                                        .min_size(egui::vec2(64.0, 42.0)),
+                                    )
+                                    .on_hover_text("Arme précédente")
+                                    .clicked();
+                                ui.add_space(10.0);
+                                ui.label(
+                                    egui::RichText::new("Changer d'arme")
+                                        .size(15.0)
+                                        .color(C_TEXT_MUTED),
+                                );
+                                ui.add_space(10.0);
+                                let next = ui
+                                    .add(
+                                        egui::Button::new(
+                                            egui::RichText::new("►").size(24.0).strong(),
+                                        )
+                                        .min_size(egui::vec2(64.0, 42.0)),
+                                    )
+                                    .on_hover_text("Arme suivante")
+                                    .clicked();
+                                if prev {
+                                    choice.idx = (sel + n - 1) % n;
+                                }
+                                if next {
+                                    choice.idx = (sel + 1) % n;
+                                }
+                            });
+                            // Déblocage CLIQUABLE si l'arme courante est verrouillée.
+                            if !owned {
+                                if let Some(u) = unlock {
+                                    ui.add_space(8.0);
+                                    let afford = meta.current >= u.cost;
+                                    let mut unlock_clicked = false;
+                                    ui.add_enabled_ui(afford, |ui| {
+                                        unlock_clicked = ui
+                                            .add(
+                                                egui::Button::new(
+                                                    egui::RichText::new(format!(
+                                                        "🔓 Débloquer ({} Âmes)",
+                                                        u.cost
+                                                    ))
+                                                    .size(16.0)
+                                                    .strong(),
+                                                )
+                                                .min_size(egui::vec2(220.0, 36.0)),
+                                            )
+                                            .clicked();
+                                    });
+                                    if unlock_clicked {
+                                        meta.current -= u.cost;
+                                        save.unlock_weapon(key);
+                                        save.souls_total = meta.current;
+                                        save.save();
+                                    }
+                                    if !afford {
+                                        ui.label(
+                                            egui::RichText::new(format!(
+                                                "{} Âmes manquantes",
+                                                u.cost.saturating_sub(meta.current)
+                                            ))
+                                            .size(12.0)
+                                            .color(C_TEXT_MUTED),
+                                        );
+                                    }
+                                }
                             }
                         });
-                        ui.add_space(2.0);
-                        let footer = if owned {
-                            "‹ ›  choisir l'arme".to_string()
-                        } else if let Some(u) = unlock {
-                            if meta.current >= u.cost {
-                                format!("‹ ›  parcourir   ·   [U]  débloquer ({} Âmes)", u.cost)
-                            } else {
-                                format!(
-                                    "‹ ›  parcourir   ·   verrou : {} Âmes manquantes",
-                                    u.cost.saturating_sub(meta.current)
-                                )
-                            }
-                        } else {
-                            "‹ ›  choisir l'arme".to_string()
-                        };
-                                    ui.label(egui::RichText::new(footer).size(14.0).color(FORGE_TEAL));
                                 });
                             });
                         });
