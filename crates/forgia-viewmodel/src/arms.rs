@@ -17,7 +17,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use forgia_combat::weapons::EquippedWeapons;
-use forgia_core::prelude::GameMode;
+use forgia_core::prelude::{ArmCosmetics, ArmStyle, GameMode};
 use forgia_genome_core::Genome;
 use forgia_player::prelude::FpsCamera;
 
@@ -28,6 +28,76 @@ use crate::pose::{apply_viewmodel_sway_bob, AdsState, ViewmodelMotionOffset};
 /// Marker sur le root des bras (enfant de la FpsCamera).
 #[derive(Component)]
 pub struct ViewmodelArms;
+
+/// Handles des matériaux peau+manche des bras (stockés sur le root) → permet de
+/// ré-appliquer la cosmétique (couleur/style choisie dans l'onglet Forge) en mutant
+/// l'asset partagé, sans re-spawn. Lu par `sync_arm_cosmetics`.
+#[derive(Component)]
+pub struct ArmMaterialHandles {
+    pub skin: Handle<StandardMaterial>,
+    pub cuff: Handle<StandardMaterial>,
+}
+
+/// Applique couleur + style à un matériau de bras (peau ou manche `is_cuff`).
+/// Le style varie metallic/roughness/emissive ; la couleur teinte la base.
+fn apply_arm_style(mat: &mut StandardMaterial, color: [f32; 3], style: ArmStyle, is_cuff: bool) {
+    let [r, g, b] = color;
+    // Manche = variante assombrie de la teinte (cohérence peau/manche).
+    let (r, g, b) = if is_cuff {
+        (r * 0.45, g * 0.47, b * 0.52)
+    } else {
+        (r, g, b)
+    };
+    match style {
+        ArmStyle::Peau => {
+            mat.base_color = Color::srgb(r, g, b);
+            mat.metallic = 0.0;
+            mat.perceptual_roughness = if is_cuff { 0.9 } else { 0.72 };
+            mat.reflectance = 0.35;
+            mat.emissive = if is_cuff {
+                LinearRgba::rgb(0.03, 0.035, 0.05)
+            } else {
+                LinearRgba::rgb(0.10, 0.06, 0.04)
+            };
+        }
+        ArmStyle::Gantelet => {
+            mat.base_color = Color::srgb(r * 0.8, g * 0.8, b * 0.82);
+            mat.metallic = 0.85;
+            mat.perceptual_roughness = 0.38;
+            mat.reflectance = 0.6;
+            mat.emissive = LinearRgba::rgb(0.02, 0.02, 0.03);
+        }
+        ArmStyle::Cyber => {
+            mat.base_color = Color::srgb(r * 0.25, g * 0.25, b * 0.30);
+            mat.metallic = 0.4;
+            mat.perceptual_roughness = 0.3;
+            mat.reflectance = 0.5;
+            // Glow de la teinte choisie (gant cyber lumineux).
+            mat.emissive = LinearRgba::rgb(r * 1.4, g * 1.4, b * 1.4);
+        }
+    }
+}
+
+/// Ré-applique la cosmétique aux matériaux des bras quand `ArmCosmetics` change
+/// (choix dans l'onglet Forge). Mute les assets partagés → paume/doigts/manche
+/// suivent. Event-driven (`is_changed`).
+pub fn sync_arm_cosmetics(
+    cosmetics: Res<ArmCosmetics>,
+    q_handles: Query<&ArmMaterialHandles>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    if !cosmetics.is_changed() {
+        return;
+    }
+    for h in &q_handles {
+        if let Some(m) = materials.get_mut(&h.skin) {
+            apply_arm_style(m, cosmetics.color, cosmetics.style, false);
+        }
+        if let Some(m) = materials.get_mut(&h.cuff) {
+            apply_arm_style(m, cosmetics.color, cosmetics.style, true);
+        }
+    }
+}
 
 /// Une main. `mirror` = +1 (droite, crosse) / -1 (gauche, sous le canon).
 #[derive(Component, Clone, Copy)]
@@ -78,11 +148,9 @@ impl Default for ViewmodelArmsTuning {
     }
 }
 
-// ── Couleurs cartoon (RGB sRGB). Éclaircies + emissive : le viewmodel n'est PAS
-// toon-shadé (caméra séparée) et n'est éclairé que par la scène → au crépuscule il
-// devenait sombre. base_color clair + léger emissive = toujours lisible.
-const SKIN: [f32; 3] = [0.93, 0.73, 0.57];
-const CUFF: [f32; 3] = [0.34, 0.37, 0.45];
+// Couleurs/matériaux des bras = `apply_arm_style` (couleur + style cosmétiques choisis
+// dans l'onglet Forge). Le viewmodel n'est PAS toon-shadé (caméra séparée) et n'est
+// éclairé que par la scène → emissive léger gardé pour rester lisible au crépuscule.
 
 // ── Proportions du poing (mètres, main-local : +Y = vers les doigts) ──
 const FOREARM_RADIUS: f32 = 0.036;
@@ -315,6 +383,7 @@ fn spawn_hand(
 pub fn spawn_arms(
     mut commands: Commands,
     tuning: Res<ViewmodelArmsTuning>,
+    cosmetics: Res<ArmCosmetics>,
     q_cam: Query<Entity, With<FpsCamera>>,
     q_arms: Query<(), With<ViewmodelArms>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -329,26 +398,27 @@ pub fn spawn_arms(
     };
     // Texture de détail procédurale (variation organique) — partagée skin + cuff.
     let detail = images.add(skin_detail_texture());
-    let skin = materials.add(StandardMaterial {
-        base_color: Color::srgb(SKIN[0], SKIN[1], SKIN[2]),
+    // Couleur + style initiaux = cosmétique courante (choix Forge, persistée).
+    // Les changements live sont appliqués par `sync_arm_cosmetics`.
+    let mut skin_mat = StandardMaterial {
         base_color_texture: Some(detail.clone()),
-        // Léger auto-éclairage : visible même dans une scène sombre (crépuscule).
-        emissive: LinearRgba::rgb(0.10, 0.06, 0.04),
-        // Peau = mat doux (un peu de relief spéculaire, pas plastique).
-        perceptual_roughness: 0.72,
-        reflectance: 0.35,
         ..default()
-    });
-    let cuff = materials.add(StandardMaterial {
-        base_color: Color::srgb(CUFF[0], CUFF[1], CUFF[2]),
+    };
+    apply_arm_style(&mut skin_mat, cosmetics.color, cosmetics.style, false);
+    let skin = materials.add(skin_mat);
+    let mut cuff_mat = StandardMaterial {
         base_color_texture: Some(detail),
-        emissive: LinearRgba::rgb(0.03, 0.035, 0.05),
-        perceptual_roughness: 0.9,
         ..default()
-    });
+    };
+    apply_arm_style(&mut cuff_mat, cosmetics.color, cosmetics.style, true);
+    let cuff = materials.add(cuff_mat);
     let root = commands
         .spawn((
             ViewmodelArms,
+            ArmMaterialHandles {
+                skin: skin.clone(),
+                cuff: cuff.clone(),
+            },
             Transform::IDENTITY,
             Visibility::Inherited,
             Name::new("ViewmodelArms"),
@@ -454,6 +524,7 @@ impl Plugin for ForgiaViewmodelArmsPlugin {
                 position_hands,
                 apply_arms_motion.after(apply_viewmodel_sway_bob),
                 update_arms_visibility,
+                sync_arm_cosmetics,
             )
                 .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
         );

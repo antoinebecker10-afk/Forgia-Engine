@@ -9,6 +9,7 @@
 use bevy::prelude::*;
 
 pub mod prelude {
+    pub use crate::cosmetics::{ArmCosmetics, ArmStyle, ViewmodelForcedVisible};
     pub use crate::fps_feel::FpsFeelMetrics;
     pub use crate::hud_visibility::{gameplay_hud_visible, GameplayHudVisible};
     pub use crate::states::{AppMode, GameMode, WorldMode};
@@ -40,6 +41,70 @@ pub mod hud_visibility {
     pub fn gameplay_hud_visible(v: Option<Res<GameplayHudVisible>>) -> bool {
         v.map(|r| r.0).unwrap_or(true)
     }
+}
+
+pub mod cosmetics {
+    use bevy::prelude::*;
+
+    /// Style esthétique des bras procéduraux (variation de matériau). Choisi dans
+    /// l'onglet Forge. `key()`/`from_key()` = (dé)sérialisation TOML/save.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub enum ArmStyle {
+        /// Mat doux (peau).
+        #[default]
+        Peau,
+        /// Métal (gantelet de forge).
+        Gantelet,
+        /// Émissif (gant cyber).
+        Cyber,
+    }
+
+    impl ArmStyle {
+        pub fn from_key(s: &str) -> Self {
+            match s {
+                "gantelet" => ArmStyle::Gantelet,
+                "cyber" => ArmStyle::Cyber,
+                _ => ArmStyle::Peau,
+            }
+        }
+        pub fn key(self) -> &'static str {
+            match self {
+                ArmStyle::Peau => "peau",
+                ArmStyle::Gantelet => "gantelet",
+                ArmStyle::Cyber => "cyber",
+            }
+        }
+        pub fn label(self) -> &'static str {
+            match self {
+                ArmStyle::Peau => "Peau",
+                ArmStyle::Gantelet => "Gantelet",
+                ArmStyle::Cyber => "Cyber",
+            }
+        }
+    }
+
+    /// Cosmétique des bras procéduraux (couleur + style). Pilotée par l'onglet Forge
+    /// (forgia-mode-roguelite), appliquée au matériau par forgia-viewmodel — via
+    /// forgia-core (DAG-libre) pour éviter un cycle de dépendances.
+    #[derive(Resource, Debug, Clone, Copy, PartialEq)]
+    pub struct ArmCosmetics {
+        /// Teinte (sRGB) appliquée à la peau/aux gants.
+        pub color: [f32; 3],
+        pub style: ArmStyle,
+    }
+    impl Default for ArmCosmetics {
+        fn default() -> Self {
+            Self {
+                color: [0.93, 0.73, 0.57],
+                style: ArmStyle::Peau,
+            }
+        }
+    }
+
+    /// Force l'affichage du viewmodel (bras) hors gameplay — ex. APERÇU dans l'onglet
+    /// Forge du hub. `false` = le viewmodel suit `GameplayHudVisible` normalement.
+    #[derive(Resource, Debug, Clone, Copy, Default)]
+    pub struct ViewmodelForcedVisible(pub bool);
 }
 
 pub mod fps_feel {
@@ -132,6 +197,8 @@ impl Plugin for ForgiaCorePlugin {
             .init_state::<states::WorldMode>()
             .init_resource::<fps_feel::FpsFeelMetrics>()
             .init_resource::<hud_visibility::GameplayHudVisible>()
+            .init_resource::<cosmetics::ArmCosmetics>()
+            .init_resource::<cosmetics::ViewmodelForcedVisible>()
             .configure_sets(
                 Update,
                 (

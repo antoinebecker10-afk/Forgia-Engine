@@ -691,11 +691,15 @@ fn sys_lobby_weapon_preview(
 /// compile de pipeline une fois, puis c'est caché.
 fn sys_toggle_preview_visibility(
     choice: Res<StartingWeaponChoice>,
+    hub: Res<crate::hub::HubTab>,
     mut q: Query<(&LobbyPreviewWeapon, &mut Visibility)>,
 ) {
     let sel = ARENA_V1_WEAPONS[choice.idx % ARENA_V1_WEAPONS.len()];
+    // L'aperçu d'arme ne s'affiche que sur l'onglet ARMES (vitrine de la carte) ;
+    // sur Forge on montre les bras, ailleurs rien (home-hub P2.1).
+    let on_armes = *hub == crate::hub::HubTab::Armes;
     for (pw, mut vis) in &mut q {
-        let want = if pw.weapon == sel {
+        let want = if on_armes && pw.weapon == sel {
             Visibility::Visible
         } else {
             Visibility::Hidden

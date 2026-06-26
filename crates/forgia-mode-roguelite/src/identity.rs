@@ -108,6 +108,19 @@ pub struct IdentitySave {
     pub equipped_color: String,
     #[serde(default)]
     pub unlocked_colors: Vec<String>,
+    /// Cosmétique des bras procéduraux (onglet Forge, P3) : id couleur (réf
+    /// `cfg.colors`) + style (`peau`/`gantelet`/`cyber`).
+    #[serde(default = "default_arm_color")]
+    pub arm_color: String,
+    #[serde(default = "default_arm_style")]
+    pub arm_style: String,
+}
+
+fn default_arm_color() -> String {
+    "default".to_string()
+}
+fn default_arm_style() -> String {
+    "peau".to_string()
 }
 
 impl Default for IdentitySave {
@@ -118,6 +131,8 @@ impl Default for IdentitySave {
             name_edited: false,
             equipped_color: "default".to_string(),
             unlocked_colors: vec!["default".to_string()],
+            arm_color: default_arm_color(),
+            arm_style: default_arm_style(),
         }
     }
 }
@@ -156,7 +171,11 @@ impl IdentitySave {
 
 /// Boot : si aucun nom (1re partie), attribue le nom par défaut SILENCIEUSEMENT
 /// (P7 : pas de prompt). Débloque toutes les couleurs MVP (gratuites).
-fn sys_init_identity(mut save: ResMut<IdentitySave>, cfg: Res<IdentityConfig>) {
+fn sys_init_identity(
+    mut save: ResMut<IdentitySave>,
+    cfg: Res<IdentityConfig>,
+    mut arm_cosmetics: ResMut<ArmCosmetics>,
+) {
     let mut dirty = false;
     if save.player_name.trim().is_empty() {
         save.player_name = cfg.default_name.clone();
@@ -176,6 +195,9 @@ fn sys_init_identity(mut save: ResMut<IdentitySave>, cfg: Res<IdentityConfig>) {
     if dirty {
         save.save();
     }
+    // Applique la cosmétique bras persistée (couleur + style) au boot.
+    arm_cosmetics.color = cfg.color_rgb(&save.arm_color);
+    arm_cosmetics.style = ArmStyle::from_key(&save.arm_style);
 }
 
 /// Panneau d'identité au Lobby (non-bloquant, P7). Nom + bouton crayon (presets
@@ -185,6 +207,7 @@ fn draw_identity_panel(
     run_state: Option<Res<State<RunState>>>,
     cfg: Res<IdentityConfig>,
     mut save: ResMut<IdentitySave>,
+    mut arm_cosmetics: ResMut<ArmCosmetics>,
     mut editing: Local<bool>,
     mut shown: ResMut<IdentityPanelShown>,
 ) {
@@ -276,6 +299,56 @@ fn draw_identity_panel(
                             }
                             if resp.on_hover_text(&c.label).clicked() {
                                 save.equipped_color = c.id.clone();
+                                save.save();
+                            }
+                        }
+                    });
+
+                    // ── Cosmétique des BRAS procéduraux (couleur + style, P3) ──
+                    // Aperçu live : le viewmodel est forcé visible sur l'onglet Forge.
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.label(egui::RichText::new("Bras — couleur :").size(13.0));
+                    ui.horizontal_wrapped(|ui| {
+                        let unlocked = save.unlocked_colors.clone();
+                        let cur = save.arm_color.clone();
+                        for c in &cfg.colors {
+                            if !unlocked.contains(&c.id) {
+                                continue;
+                            }
+                            let col = egui::Color32::from_rgb(
+                                (c.rgb[0] * 255.0) as u8,
+                                (c.rgb[1] * 255.0) as u8,
+                                (c.rgb[2] * 255.0) as u8,
+                            );
+                            let selected = c.id == cur;
+                            let size = if selected { 30.0 } else { 24.0 };
+                            let (r, resp) =
+                                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+                            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
+                            if selected {
+                                ui.painter().rect_stroke(
+                                    r,
+                                    egui::CornerRadius::same(5),
+                                    egui::Stroke::new(2.5, egui::Color32::WHITE),
+                                    egui::StrokeKind::Outside,
+                                );
+                            }
+                            if resp.on_hover_text(&c.label).clicked() {
+                                save.arm_color = c.id.clone();
+                                arm_cosmetics.color = c.rgb;
+                                save.save();
+                            }
+                        }
+                    });
+                    ui.add_space(6.0);
+                    ui.label(egui::RichText::new("Bras — style :").size(13.0));
+                    ui.horizontal_wrapped(|ui| {
+                        for style in [ArmStyle::Peau, ArmStyle::Gantelet, ArmStyle::Cyber] {
+                            let selected = save.arm_style == style.key();
+                            if ui.selectable_label(selected, style.label()).clicked() {
+                                save.arm_style = style.key().to_string();
+                                arm_cosmetics.style = style;
                                 save.save();
                             }
                         }

@@ -87,9 +87,23 @@ fn lobby_hide_gameplay_hud(mut v: ResMut<GameplayHudVisible>) {
     v.0 = false;
 }
 
-/// À la sortie du Lobby (run lancée OU retour menu) : ré-affiche le HUD de gameplay.
-fn lobby_show_gameplay_hud(mut v: ResMut<GameplayHudVisible>) {
+/// À la sortie du Lobby (run lancée OU retour menu) : ré-affiche le HUD de gameplay
+/// + coupe l'aperçu bras forcé (onglet Forge).
+fn lobby_show_gameplay_hud(
+    mut v: ResMut<GameplayHudVisible>,
+    mut forced: ResMut<ViewmodelForcedVisible>,
+) {
     v.0 = true;
+    forced.0 = false;
+}
+
+/// Aperçu des bras dans l'onglet FORGE : force le viewmodel (bras) visible quand
+/// l'onglet Forge est actif (sinon masqué au Lobby) → on voit la couleur/style choisis.
+fn sync_forge_arm_preview(hub: Res<HubTab>, mut forced: ResMut<ViewmodelForcedVisible>) {
+    let want = *hub == HubTab::Forge;
+    if forced.0 != want {
+        forced.0 = want;
+    }
 }
 
 /// Petit cadre panneau cohérent avec les autres panneaux du Lobby (FORGE_PANEL).
@@ -270,6 +284,11 @@ impl Plugin for HubPlugin {
             )
             // Sortie Lobby (run lancée ou retour menu) → ré-affiche le HUD de gameplay.
             .add_systems(OnExit(RunState::Lobby), lobby_show_gameplay_hud)
+            // Aperçu bras dans l'onglet Forge (force le viewmodel visible).
+            .add_systems(
+                Update,
+                sync_forge_arm_preview.run_if(in_state(RunState::Lobby)),
+            )
             // Chrome du hub : visible au Lobby uniquement.
             .add_systems(
                 EguiPrimaryContextPass,

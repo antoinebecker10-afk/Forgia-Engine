@@ -17,7 +17,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::ClearColorConfig;
 use bevy::prelude::*;
-use forgia_core::prelude::{GameMode, GameplayHudVisible};
+use forgia_core::prelude::{GameMode, GameplayHudVisible, ViewmodelForcedVisible};
 use forgia_player::prelude::{FpsCamera, ViewmodelCamera};
 
 use crate::arms::ViewmodelArms;
@@ -160,9 +160,12 @@ pub fn propagate_viewmodel_layer(
 /// `is_active` set-if-different ; lue depuis `GameplayHudVisible` (forgia-core).
 pub fn sync_viewmodel_camera_active(
     hud_visible: Option<Res<GameplayHudVisible>>,
+    forced: Option<Res<ViewmodelForcedVisible>>,
     mut q: Query<&mut Camera, With<ViewmodelCamera>>,
 ) {
-    let want = hud_visible.map(|h| h.0).unwrap_or(true);
+    // Visible si gameplay (HUD) OU aperçu forcé (onglet Forge du hub).
+    let want =
+        hud_visible.map(|h| h.0).unwrap_or(true) || forced.map(|f| f.0).unwrap_or(false);
     for mut cam in &mut q {
         if cam.is_active != want {
             cam.is_active = want;
