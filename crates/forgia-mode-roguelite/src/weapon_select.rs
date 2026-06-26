@@ -581,9 +581,9 @@ fn stat_row_strong(ui: &mut egui::Ui, label: &str, val: &str, col: egui::Color32
 /// Distance (m) de l'arme devant la caméra (réglable si trop loin/près).
 const PREVIEW_DIST: f32 = 1.6;
 /// Position cible (m, camera-local) du CENTRE de l'arme — le recentrage AABB place
-/// le centre géométrique de chaque arme ici. Calé sur la carte centrée (CENTER_CENTER)
-/// pour que l'arme tombe dans le viewport en haut de la carte.
-const PREVIEW_Y: f32 = 0.55;
+/// le centre géométrique de chaque arme ici. Calé sur le viewport (haut de la carte
+/// centrée) → l'arme est centrée verticalement dans son cadre, pour toutes les armes.
+const PREVIEW_Y: f32 = 0.70;
 /// Taille cible (plus grande dimension, m) après calibrage AABB — calibrée pour que
 /// l'arme tienne ENTIÈREMENT dans le viewport (pas de coupe aux bords).
 const PREVIEW_TARGET: f32 = 0.80;
