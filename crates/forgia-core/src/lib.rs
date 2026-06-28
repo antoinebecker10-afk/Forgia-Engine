@@ -213,6 +213,28 @@ impl Plugin for ForgiaCorePlugin {
                     GameSet::UI,
                 )
                     .chain(),
+            )
+            // Keystone 0.1a-1 (sim déterministe) — MÊME chaîne ordonnée aussi en
+            // `FixedUpdate`, prérequis bloquant avant de migrer le moindre système
+            // (sans ça l'ordre en FixedUpdate serait indéfini, cf spike R1).
+            // Déclaration PURE : aucun système n'est encore `.in_set` sur FixedUpdate
+            // (migration des ~35 systèmes en 0.1a-2) → zéro effet runtime ici.
+            // Hz : on garde le défaut Bevy `Time<Fixed>` = 64 Hz, qui EST déjà le
+            // timestep de Rapier (FixedUpdate) → aucun changement de feel physique.
+            .configure_sets(
+                FixedUpdate,
+                (
+                    GameSet::Network,
+                    GameSet::Input,
+                    GameSet::Movement,
+                    GameSet::Physics,
+                    GameSet::Camera,
+                    GameSet::Combat,
+                    GameSet::Effects,
+                    GameSet::Sensors,
+                    GameSet::UI,
+                )
+                    .chain(),
             );
     }
 }
