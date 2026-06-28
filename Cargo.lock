@@ -3542,6 +3542,7 @@ dependencies = [
  "forgia-input",
  "forgia-mode-fps-arena",
  "forgia-player",
+ "forgia-qa-core",
  "forgia-rpg",
  "forgia-rpg-data",
  "forgia-terrain",

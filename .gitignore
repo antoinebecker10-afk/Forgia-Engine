@@ -73,3 +73,14 @@ tmp/
 docker/sdk/*.tar.bz2
 docker/sdk/*.tar.xz
 docker/sdk/*.tar.gz
+.grepai/
+
+# Demo assets lourds — local-only (cf cyber city demo)
+assets/models/characters/Cyber.glb
+assets/models/characters/Cyber_lod.glb
+assets/models/environment/cyberpunk_city.glb
+# Artefacts générés / runtime
+worldgen_baked_city.ron
+assets/user_settings.toml
+config/*_save.toml
+assets/audio/roguelite/weapons/_preroll_backup/
