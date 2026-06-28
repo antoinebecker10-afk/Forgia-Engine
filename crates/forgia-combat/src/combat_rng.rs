@@ -27,6 +27,9 @@ pub const CRIT_SALT: u64 = 0x0000_0000_C217_0001;
 /// Sel du flux recoil (yaw aléatoire du recul) — décorrélé du crit pour le même tir.
 pub const RECOIL_SALT: u64 = 0x0000_0000_2EC0_1100;
 
+/// Sel du flux loot (drop conditionnel à la mort d'un ennemi) — flux `drop_*`.
+pub const LOOT_SALT: u64 = 0x0000_0000_0107_7000;
+
 /// État RNG combat déterministe. `Default` = seed 0 (déterministe hors run, ex.
 /// FPS arena) ; reseedé depuis `RunSeed` au démarrage de run (Roguelite).
 #[derive(Resource, Debug, Clone, Default)]
@@ -35,19 +38,41 @@ pub struct CombatRng {
     pub seed: u64,
     /// Compteur monotone de tirs résolus (nonce déterministe). Reset au reseed.
     pub shot_counter: u64,
+    /// Compteur monotone de drops (1 par mort d'ennemi). Nonce du flux loot.
+    /// NB : sa reproductibilité dépend de l'ordre des morts (DeathEvent) —
+    /// pleinement déterministe une fois l'ordre d'itération figé (0.1b-2).
+    pub drop_counter: u64,
 }
 
 impl CombatRng {
-    /// (Re)seed au démarrage d'une run. Remet le compteur de tirs à zéro.
+    /// (Re)seed au démarrage d'une run. Remet les compteurs à zéro.
     pub fn reseed(&mut self, seed: u64) {
         self.seed = seed;
         self.shot_counter = 0;
+        self.drop_counter = 0;
     }
 
     /// À appeler EXACTEMENT 1× par tir résolu (en tête de résolution), avant de
     /// tirer les flux dérivés du tir. Avance le nonce.
     pub fn begin_shot(&mut self) {
         self.shot_counter = self.shot_counter.wrapping_add(1);
+    }
+
+    /// À appeler EXACTEMENT 1× par mort d'ennemi (avant le roll de loot). Avance
+    /// le nonce de drop.
+    pub fn begin_drop(&mut self) {
+        self.drop_counter = self.drop_counter.wrapping_add(1);
+    }
+
+    /// `Rng` éphémère déterministe pour le drop courant (loot). Dérive de
+    /// (`seed`, `drop_counter`, `salt`) — jamais de l'horloge ni de l'adresse
+    /// entité (`Entity::to_bits`, non reproductible).
+    pub fn drop_stream(&self, salt: u64) -> forgia_rng::Rng {
+        let mixed = self
+            .seed
+            ^ self.drop_counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            ^ salt.wrapping_mul(0x2545_F491_4F6C_DD1D);
+        forgia_rng::Rng::new(mixed)
     }
 
     /// `Rng` éphémère déterministe pour (tir courant, `sub_index`, `salt`).
@@ -74,10 +99,34 @@ mod tests {
         let mut r = CombatRng::default();
         r.begin_shot();
         r.begin_shot();
+        r.begin_drop();
         assert_eq!(r.shot_counter, 2);
+        assert_eq!(r.drop_counter, 1);
         r.reseed(123);
         assert_eq!(r.seed, 123);
         assert_eq!(r.shot_counter, 0);
+        assert_eq!(r.drop_counter, 0);
+    }
+
+    #[test]
+    fn drop_stream_reproducible_and_advances() {
+        let (mut a, mut b) = (CombatRng::default(), CombatRng::default());
+        a.reseed(42);
+        b.reseed(42);
+        a.begin_drop();
+        b.begin_drop();
+        assert_eq!(
+            a.drop_stream(LOOT_SALT).range_u32(0, 100),
+            b.drop_stream(LOOT_SALT).range_u32(0, 100),
+            "même seed + même drop → même roll"
+        );
+        let r1 = a.drop_stream(LOOT_SALT).range_u32(0, 100);
+        a.begin_drop();
+        let r2 = a.drop_stream(LOOT_SALT).range_u32(0, 100);
+        // (rolls peuvent coïncider par hasard sur 0..100, mais le flux avance :
+        //  on vérifie surtout que le compteur a bougé)
+        assert_eq!(a.drop_counter, 2);
+        let _ = (r1, r2);
     }
 
     #[test]

@@ -286,10 +286,12 @@ pub fn obs_roguelite_enemy_death(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     enemies_q: Query<(&Transform, &crate::EnemyArchetype)>,
-    time: Res<Time>,
     q_player_hp: Query<&forgia_damage::Health, With<forgia_player::Player>>,
     equipped: Option<Res<EquippedWeapons>>,
     asset_server: Res<AssetServer>,
+    // Keystone 0.1b (story-634) — flux loot déterministe (remplace elapsed_secs ^
+    // entity.to_bits()). Reseedé depuis RunSeed au StartRunEvent.
+    mut combat_rng: ResMut<forgia_combat::combat_rng::CombatRng>,
 ) {
     let target = event.target;
     let Ok((xf, archetype)) = enemies_q.get(target) else {
@@ -309,13 +311,16 @@ pub fn obs_roguelite_enemy_death(
         .map(|h| if h.max > 0.0 { h.current / h.max } else { 1.0 })
         .unwrap_or(1.0);
 
-    // Seed pseudo-deterministic from time + entity bits (cheap xorshift).
-    let entity_seed: u64 = target.to_bits();
-    let mut seed =
-        (time.elapsed_secs_f64() * 1000.0) as u64 ^ entity_seed.wrapping_mul(2_654_435_761);
-    seed ^= seed << 13;
-    seed ^= seed >> 7;
-    seed ^= seed << 17;
+    // Keystone 0.1b (story-634) — roll loot DÉTERMINISTE : dérivé de (RunSeed,
+    // n° de drop) au lieu de elapsed_secs ^ target.to_bits() (temps de frame +
+    // adresse entité, non reproductibles). Drop reproductible à seed égal (à
+    // l'ordre des morts près — figé en 0.1b-2).
+    combat_rng.begin_drop();
+    // u64 déterministe du drop courant — sert au roll (%100) ET aux offsets des
+    // soul-wisps (réutilisé plus bas, comme l'ancien `seed`).
+    let seed = combat_rng
+        .drop_stream(forgia_combat::combat_rng::LOOT_SALT)
+        .next_u64();
     let roll = (seed % 100) as u32; // 0..99
 
     // TODO(story-471..479): PickupKind supprimé de forgia_loot_tables — kind remplacé par bool is_heart
