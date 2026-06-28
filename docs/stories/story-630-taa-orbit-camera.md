@@ -1,4 +1,4 @@
-# Story-598 — Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity)
+# Story-630 — Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity)
 
 > **Statut** : ABANDONNÉE 2026-06-16 — tout AA ajouté (TAA puis SMAA, avec `Msaa::Off`)
 > sur `RpgOrbitCamera` CASSE le rendu de la scène (géométrie absente, seul le skybox

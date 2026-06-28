@@ -1,4 +1,4 @@
-# Story-617 — Présence viewmodel : sway/bob + bras cartoon procéduraux
+# Story-631 — Présence viewmodel : sway/bob + bras cartoon procéduraux
 
 **Statut** : CODE COMPLETE — en attente validation runtime + commit
 **Niveau BMAD** : Standard (forgia-viewmodel + forgia-fps + genome)

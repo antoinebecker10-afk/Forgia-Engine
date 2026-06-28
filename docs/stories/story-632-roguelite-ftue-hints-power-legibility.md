@@ -1,4 +1,4 @@
-# Story-597 — FTUE Roguelite : hints contextuels + première mort + lisibilité de puissance (DPS)
+# Story-632 — FTUE Roguelite : hints contextuels + première mort + lisibilité de puissance (DPS)
 
 **Statut** : EN COURS — **Phase B incrément 1 livré** (2026-06-19) : « mort = centre de gravité ». Reste Phase A (hints), C (sensor funnel complet), D (DPS).
 

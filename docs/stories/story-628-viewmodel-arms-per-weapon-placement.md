@@ -1,4 +1,4 @@
-# Story-619 — Placement des mains AUTO par-arme + géométrie bras améliorée
+# Story-628 — Placement des mains AUTO par-arme + géométrie bras améliorée
 
 **Statut** : CODE COMPLETE — en attente validation runtime
 **Niveau BMAD** : Quick→Standard (forgia-viewmodel arms + forgia-fps sync + genome)
