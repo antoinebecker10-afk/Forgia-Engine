@@ -34,6 +34,14 @@ const PORTAL_Y_OFFSET: f32 = 0.0;
 const PORTAL_YAW_OFFSET: f32 = std::f32::consts::PI;
 const PORTAL_CLOSED_GLB: &str = "models/environment/portal/portal_closed.glb";
 const PORTAL_OPEN_GLB: &str = "models/environment/portal/portal_open.glb";
+/// Nb de frames d'échec du raycast de surface AVANT le fallback AABB durci. Le cas
+/// normal résout en < 10 frames ; ce seuil (~2 s @ 60 fps) ne déclenche que si le
+/// collider du dais ne s'enregistre jamais (charge authored 11 GLB = ordre variable,
+/// cf disparition intermittente de la porte). Évite le `return` éternel = porte fantôme.
+const RAYCAST_MAX_ATTEMPTS: u32 = 120;
+/// Seuil health-check : dais trouvé mais porte non posée depuis > N s → severity warn
+/// dans `forgia2_boss_gate.json` (rend la disparition intermittente diagnosticable).
+const GATE_STUCK_WARN_SECS: f32 = 5.0;
 /// Positions (locales au centre-base du portail = `portal_pos`) des 4 yeux des 2
 /// crânes flanquant l'arche. Tunable : si les flammes ne sont pas pile dans les
 /// orbites, ajuster X (écart crânes), Y (hauteur), Z (avancée face joueur, +Z).
@@ -99,6 +107,42 @@ pub struct BossGate {
     pub(crate) dais_top_y: Option<f32>,
     pub(crate) portal_pos: Vec3,
     pub parcours_entry: Vec3,
+    /// Diag (exposé `forgia2_boss_gate.json`) — étape courante de pose de la porte.
+    pub(crate) diag_stage: GateStage,
+    /// Compteur de frames d'échec du raycast de surface depuis la dernière (re)pose.
+    /// Déclenche le fallback AABB au-delà de [`RAYCAST_MAX_ATTEMPTS`]. Reset à la repose.
+    pub(crate) raycast_attempts: u32,
+}
+
+/// Étape courante de pose de la porte du dais (diag — miroir `forgia2_boss_gate.json`).
+/// Rend la disparition intermittente de la porte observable : on voit à QUELLE étape
+/// la cascade `find_dais → solidify → raycast → pose` bloque sur un run malchanceux.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(crate) enum GateStage {
+    /// `find_dais_root` échoue — module melee_pit pas (encore) spawné, ou hors run.
+    #[default]
+    NoDais,
+    /// Dais trouvé, colliders TriMesh en cours d'ajout (attend chargement meshes).
+    Solidifying,
+    /// Colliders prêts, raycast de surface en cours (attend enregistrement rapier).
+    Raycasting,
+    /// Porte FERMÉE posée sur le dais.
+    Placed,
+    /// Porte OUVERTE (boss vaincu → parcours débloqué).
+    Open,
+}
+
+impl GateStage {
+    /// Label stable (snake_case) pour le sensor JSON.
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            GateStage::NoDais => "no_dais",
+            GateStage::Solidifying => "solidifying",
+            GateStage::Raycasting => "raycasting",
+            GateStage::Placed => "placed",
+            GateStage::Open => "open",
+        }
+    }
 }
 
 // ── Helpers privés ────────────────────────────────────────────────────────────
@@ -345,6 +389,49 @@ fn collect_world_min_y(
     }
 }
 
+/// Walk récursif : MAX Y monde sur tous les `Aabb` du sous-arbre (8 coins
+/// transformés). Symétrique de [`collect_world_min_y`].
+fn collect_world_max_y(
+    e: Entity,
+    q_children: &Query<&Children>,
+    q_gt_aabb: &Query<(&GlobalTransform, &Aabb)>,
+    acc: &mut f32,
+    found: &mut bool,
+) {
+    if let Ok((gt, aabb)) = q_gt_aabb.get(e) {
+        let c = Vec3::from(aabb.center);
+        let he = Vec3::from(aabb.half_extents);
+        for sx in [-1.0_f32, 1.0] {
+            for sy in [-1.0_f32, 1.0] {
+                for sz in [-1.0_f32, 1.0] {
+                    let corner = c + Vec3::new(sx * he.x, sy * he.y, sz * he.z);
+                    *acc = acc.max(gt.transform_point(corner).y);
+                }
+            }
+        }
+        *found = true;
+    }
+    if let Ok(children) = q_children.get(e) {
+        for child in children.iter() {
+            collect_world_max_y(child, q_children, q_gt_aabb, acc, found);
+        }
+    }
+}
+
+/// Sommet monde du SOUS-ARBRE du dais (sa propre géométrie seulement, pas les
+/// décos voisines). Fallback durci du raycast quand le collider ne s'enregistre
+/// jamais : un sommet approximatif vaut mieux qu'une porte fantôme absente.
+fn dais_aabb_top(
+    root: Entity,
+    q_children: &Query<&Children>,
+    q_gt_aabb: &Query<(&GlobalTransform, &Aabb)>,
+) -> Option<f32> {
+    let mut acc = f32::MIN;
+    let mut found = false;
+    collect_world_max_y(root, q_children, q_gt_aabb, &mut acc, &mut found);
+    found.then_some(acc)
+}
+
 /// Walk récursif des Children pour le 1er `Aabb` ; `max(half_extents)*2`.
 fn portal_aabb_max_dim(
     root: Entity,
@@ -391,6 +478,8 @@ pub(crate) fn sys_reconcile_boss_gate(
     q_closed: Query<Entity, With<ClosedPortal>>,
     q_open: Query<Entity, With<OpenPortal>>,
     rapier: ReadRapierContext,
+    // Fallback durci : sommet AABB du dais si le raycast ne résout jamais.
+    q_gt_aabb: Query<(&GlobalTransform, &Aabb)>,
 ) {
     // 1. Centre du dais = ancre MeleePit (suit le seed) ; sinon garde la place
     //    actuelle ; sinon repli central (1re frame, avant chargement du stage).
@@ -418,6 +507,8 @@ pub(crate) fn sys_reconcile_boss_gate(
         gate.dais_ready = false;
         gate.dais_top_y = None;
         gate.opened = false;
+        gate.raycast_attempts = 0;
+        gate.diag_stage = GateStage::NoDais;
         return;
     }
 
@@ -425,12 +516,15 @@ pub(crate) fn sys_reconcile_boss_gate(
     //     marchable, F10). Attend 1 frame ensuite que rapier l'enregistre.
     if !gate.dais_ready {
         let Some(root) = find_dais_root(&q_named) else {
+            gate.diag_stage = GateStage::NoDais;
             return; // module melee_pit pas encore spawné
         };
         if !solidify_dais(&mut commands, root, &q_children, &q_mesh3d, &q_has_col, &meshes) {
+            gate.diag_stage = GateStage::Solidifying;
             return; // meshes du dais pas tous chargés → retry
         }
         gate.dais_ready = true;
+        gate.diag_stage = GateStage::Raycasting;
         return;
     }
 
@@ -438,22 +532,37 @@ pub(crate) fn sys_reconcile_boss_gate(
     //     porte posée PILE sur le sol. Fini l'AABB max qui captait une déco haute
     //     (totem/braséro) → top=3.67 m alors que le sol est ~1 m.
     if gate.dais_top_y.is_none() {
-        let Some(top) = raycast_dais_surface(dais_center, &rapier) else {
-            return; // colliders pas encore enregistrés par rapier → retry
+        gate.diag_stage = GateStage::Raycasting;
+        gate.raycast_attempts = gate.raycast_attempts.saturating_add(1);
+        // Voie normale : raycast de la surface (sol du stage à y≈0 → un hit ≤ 0.5 =
+        // collider du dais pas encore enregistré, rayon traversé jusqu'au sol).
+        let raycast_top = raycast_dais_surface(dais_center, &rapier).filter(|t| *t > 0.5);
+        // Fallback DURCI : si après RAYCAST_MAX_ATTEMPTS le raycast n'a jamais résolu
+        // (collider du dais authored jamais enregistré → cause de la disparition
+        // intermittente), on retombe sur le sommet AABB du SOUS-ARBRE du dais. Un
+        // sommet approximatif vaut mieux qu'une porte fantôme absente.
+        let (top, via_fallback) = match raycast_top {
+            Some(t) => (Some(t), false),
+            None if gate.raycast_attempts >= RAYCAST_MAX_ATTEMPTS => {
+                let aabb_top = find_dais_root(&q_named)
+                    .and_then(|root| dais_aabb_top(root, &q_children, &q_gt_aabb))
+                    .filter(|t| *t > 0.5);
+                (aabb_top, aabb_top.is_some())
+            }
+            None => (None, false),
         };
-        // Garde : sol du stage à y≈0. Un hit ≤ 0.5 = le collider du dais n'est pas
-        // encore enregistré (rayon traversé jusqu'au sol) → on retente (évite de
-        // poser la porte sous terre).
-        if top <= 0.5 {
-            return;
-        }
+        let Some(top) = top else {
+            return; // pas encore résolu (sous le seuil d'attempts) → retry
+        };
         let portal_pos = Vec3::new(dais_center.x, top + PORTAL_Y_OFFSET, dais_center.z);
         spawn_closed_portal(&mut commands, &asset_server, &mut meshes, &mut materials, portal_pos, yaw);
         gate.dais_top_y = Some(top);
         gate.portal_pos = portal_pos;
+        gate.diag_stage = GateStage::Placed;
         info!(
-            "[boss-gate] surface dais (raycast) y={top:.2}m → porte posée @ ({:.1},{:.1},{:.1}), yaw={:.0}°",
-            portal_pos.x, portal_pos.y, portal_pos.z, yaw.to_degrees()
+            "[boss-gate] surface dais y={top:.2}m ({}) → porte posée @ ({:.1},{:.1},{:.1}), yaw={:.0}° (après {} tentatives)",
+            if via_fallback { "FALLBACK AABB" } else { "raycast" },
+            portal_pos.x, portal_pos.y, portal_pos.z, yaw.to_degrees(), gate.raycast_attempts
         );
         return;
     }
@@ -473,6 +582,7 @@ pub(crate) fn sys_reconcile_boss_gate(
             yaw,
         );
         gate.opened = true;
+        gate.diag_stage = GateStage::Open;
         info!("[boss-gate] BOSS VAINCU → porte du dais OUVERTE (parcours débloqué)");
     } else if !wave.boss_defeated && gate.opened {
         for e in &q_open {
@@ -480,6 +590,7 @@ pub(crate) fn sys_reconcile_boss_gate(
         }
         spawn_closed_portal(&mut commands, &asset_server, &mut meshes, &mut materials, gate.portal_pos, yaw);
         gate.opened = false;
+        gate.diag_stage = GateStage::Placed;
         info!("[boss-gate] nouveau run → porte du dais REFERMÉE");
     }
 }
@@ -554,6 +665,71 @@ pub(crate) fn sys_flicker_portal_flames(
     }
 }
 
+// ── Sensor (forgia2_boss_gate.json — observabilité de la pose de la porte) ──────
+
+/// Pur (testable headless) : severity + next_step selon l'étape et le temps bloqué.
+/// `stuck_secs` = temps écoulé avec le dais trouvé mais la porte pas encore posée.
+pub(crate) fn severity_for_boss_gate(stage: GateStage, stuck_secs: f32) -> (&'static str, String) {
+    match stage {
+        GateStage::Placed => ("ok", "Porte fermée posée sur le dais.".to_string()),
+        GateStage::Open => ("ok", "Porte ouverte — parcours débloqué.".to_string()),
+        GateStage::NoDais => (
+            "info",
+            "Pas de dais melee_pit (hors run, ou stage sans fosse à mêlée).".to_string(),
+        ),
+        GateStage::Solidifying | GateStage::Raycasting if stuck_secs > GATE_STUCK_WARN_SECS => (
+            "warn",
+            format!(
+                "Dais trouvé mais porte non posée depuis {stuck_secs:.0}s (étape {}) — raycast/collider du dais authored échoue ; le fallback AABB doit prendre le relais.",
+                stage.label()
+            ),
+        ),
+        _ => ("ok", "Pose de la porte en cours.".to_string()),
+    }
+}
+
+/// Sensor 1Hz `forgia2_boss_gate.json` — rend la disparition intermittente de la
+/// porte diagnosticable (étape de la cascade, tentatives de raycast, temps bloqué).
+pub(crate) fn sys_write_boss_gate_sensor(
+    time: Res<Time>,
+    mut accum: Local<f32>,
+    mut stuck_secs: Local<f32>,
+    gate: Res<BossGate>,
+) {
+    // Compteur de blocage temps-réel (chaque frame) : dais trouvé mais porte pas
+    // encore posée. Reset dès que posée / ouverte / pas de dais.
+    let waiting = matches!(
+        gate.diag_stage,
+        GateStage::Solidifying | GateStage::Raycasting
+    );
+    if waiting {
+        *stuck_secs += time.delta_secs();
+    } else {
+        *stuck_secs = 0.0;
+    }
+
+    *accum += time.delta_secs();
+    if *accum < 1.0 {
+        return;
+    }
+    *accum = 0.0;
+
+    let (severity, next_step) = severity_for_boss_gate(gate.diag_stage, *stuck_secs);
+    let placed = gate.dais_top_y.is_some();
+    let top = gate.dais_top_y.unwrap_or(0.0);
+    let json = format!(
+        r#"{{"id":"boss_gate","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"stage":"{}","placed":{placed},"opened":{},"dais_top_y":{top:.2},"raycast_attempts":{},"stuck_secs":{:.1}}}"#,
+        time.elapsed_secs(),
+        gate.diag_stage.label(),
+        gate.opened,
+        gate.raycast_attempts,
+        *stuck_secs,
+    );
+    if let Err(e) = std::fs::write("forgia2_boss_gate.json", &json) {
+        warn!("[boss-gate] sensor write failed: {e}");
+    }
+}
+
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 pub struct BossPortalPlugin;
@@ -576,6 +752,51 @@ impl Plugin for BossPortalPlugin {
             sys_flicker_portal_flames
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Observabilité (observability-required) : sensor 1Hz de la pose de la porte.
+        app.add_systems(
+            Update,
+            sys_write_boss_gate_sensor.run_if(in_state(GameMode::Roguelite)),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stage_default_is_no_dais() {
+        assert_eq!(GateStage::default(), GateStage::NoDais);
+        assert_eq!(GateStage::default().label(), "no_dais");
+    }
+
+    #[test]
+    fn severity_ok_when_placed_or_open() {
+        assert_eq!(severity_for_boss_gate(GateStage::Placed, 0.0).0, "ok");
+        assert_eq!(severity_for_boss_gate(GateStage::Open, 999.0).0, "ok");
+    }
+
+    #[test]
+    fn severity_info_when_no_dais_even_long() {
+        // Hors run : pas de dais ≠ erreur, même après longtemps.
+        assert_eq!(severity_for_boss_gate(GateStage::NoDais, 9999.0).0, "info");
+    }
+
+    #[test]
+    fn severity_warn_when_stuck_past_threshold() {
+        let (sev, next) =
+            severity_for_boss_gate(GateStage::Raycasting, GATE_STUCK_WARN_SECS + 0.1);
+        assert_eq!(sev, "warn");
+        assert!(next.contains("raycast"));
+    }
+
+    #[test]
+    fn severity_ok_while_waiting_under_threshold() {
+        // En cours de pose (sous le seuil) = normal, pas de warn.
+        assert_eq!(
+            severity_for_boss_gate(GateStage::Solidifying, GATE_STUCK_WARN_SECS - 0.1).0,
+            "ok"
         );
     }
 }
