@@ -160,8 +160,13 @@ impl Plugin for ForgiaCombatPlugin {
                     combat_juice::setup_hit_flash_cache,
                 ),
             )
+            // Keystone 0.1a-2 slice 2 (story-634) — cooldowns d'arme/melee = timers
+            // PURS (Res<Time> seul, 0 input) → migrés en FixedUpdate (sim déterministe).
+            // En FixedUpdate, Res<Time> == Time<Fixed> ; le hit-stop (Time<Virtual>
+            // ralenti → moins de steps fixes accumulés) ralentit toujours le cooldown
+            // → feel identique. Ordre via la chaîne GameSet aussi en FixedUpdate (0.1a-1).
             .add_systems(
-                Update,
+                FixedUpdate,
                 (
                     weapons::weapon_cooldown_tick_system
                         .run_if(|cd: Option<Res<weapons::WeaponFireCooldown>>| cd.is_some())
@@ -169,6 +174,13 @@ impl Plugin for ForgiaCombatPlugin {
                     melee::melee_cooldown_tick_system
                         .run_if(resource_exists::<melee::MeleeCooldown>)
                         .in_set(GameSet::Combat),
+                ),
+            )
+            .add_systems(
+                Update,
+                (
+                    // trauma/hit_flash (cat B hit-stop) restent Update : validation
+                    // hit-stop reportée slice 3/4. Sensor reste Update (télémétrie).
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),

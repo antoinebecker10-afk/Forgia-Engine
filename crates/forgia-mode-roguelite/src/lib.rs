@@ -268,8 +268,13 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
         );
+        // Keystone 0.1a-2 slice 2 (story-634) — DoT élémentaire = timer PUR
+        // (Res<Time> + accumulateur d'intervalle, 0 input) → FixedUpdate (sim
+        // déterministe). Cadence par STATUS_TICK_INTERVAL = schedule-agnostique ;
+        // la mort (despawn_dead_cubes, Update) reste détectée après (RunFixedMainLoop
+        // tourne avant Update dans le frame). Feel DoT identique.
         app.add_systems(
-            Update,
+            FixedUpdate,
             elements::sys_tick_element_status
                 .in_set(GameSet::Combat)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -380,8 +385,11 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // (cf meta_shop::sys_meta_shop_input). Victory/Defeat → retour Lobby.
         // (ancien : app.add_systems(OnEnter(Roguelite), auto_start_run_on_enter))
         // Chrono de run — tick pendant InRun/Boss (pause-safe).
+        // Keystone 0.1a-2 slice 2 (story-634) — chrono = timer PUR → FixedUpdate.
+        // States (AppMode/RunState) lus en FixedUpdate OK (StateTransition tourne
+        // avant RunFixedMainLoop). Temps de run accumulé en Time<Fixed>.
         app.add_systems(
-            Update,
+            FixedUpdate,
             run::sys_tick_run_timer
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
