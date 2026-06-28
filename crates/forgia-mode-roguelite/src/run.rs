@@ -650,6 +650,9 @@ pub fn sys_start_run(
     meta_save: Res<crate::meta_shop::MetaShopSave>,
     meta_cat: Res<crate::meta_shop::MetaShopCatalogue>,
     mut perm_mods: ResMut<crate::meta_shop::PermanentPlayerMods>,
+    // Keystone 0.1b (story-634) — reseed du flux RNG combat déterministe au seed
+    // de run (même graine → mêmes crits, indépendamment de l'horloge).
+    mut combat_rng: ResMut<forgia_combat::combat_rng::CombatRng>,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -664,6 +667,9 @@ pub fn sys_start_run(
         }
         first = false;
         let seed = ev.seed.unwrap_or_else(default_seed_from_clock);
+        // Keystone 0.1b (story-634) — le flux RNG combat (crit, …) dérive de CE
+        // seed → même graine de run ⇒ mêmes rolls (reproductible/auditable).
+        combat_rng.reseed(seed);
         let graph = forgia_stage::graph::generate_run_graph(&stage_graph_config, seed);
         let total_stages = graph.total_stages;
         let boss_depth = graph.boss_depth();

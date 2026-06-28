@@ -18,6 +18,7 @@ use forgia_core::prelude::*;
 pub mod ammo;
 pub mod combat_juice;
 pub mod combat_mods;
+pub mod combat_rng;
 pub mod confidence;
 pub mod melee;
 pub mod sensor;
@@ -41,6 +42,7 @@ pub mod prelude {
         CameraTrauma, CombatHitEvent, HitFlashCache, HitFlashTimer, WeaponRecoilDebt,
         WeaponRecoilImpulse,
     };
+    pub use crate::combat_rng::{CombatRng, CRIT_SALT};
     pub use crate::confidence::{PepinConfidence, ShotResolved};
     pub use crate::melee::MeleeCooldown;
     pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
@@ -147,6 +149,9 @@ impl Plugin for ForgiaCombatPlugin {
             // par forgia-fps (damage_mul + fire_rate_mul) et forgia-damage
             // (damage_reduction — Phase 4b).
             .init_resource::<combat_mods::PlayerCombatMods>()
+            // Keystone 0.1b (story-634) — flux RNG combat déterministe (crit, …).
+            // Reseedé depuis RunSeed au StartRunEvent par forgia-mode-roguelite.
+            .init_resource::<combat_rng::CombatRng>()
             // Story-531 AC9 — jauge de confiance Pépin (state partagé fps↔HUD).
             .init_resource::<confidence::PepinConfidence>()
             .add_message::<confidence::ShotResolved>()

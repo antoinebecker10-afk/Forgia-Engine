@@ -387,6 +387,10 @@ pub struct HitscanCtx<'w, 's> {
     /// Story-558 Phase 4 — boons multiplicateurs (damage_mul, fire_rate_mul,
     /// damage_reduction). Default neutre 1.0/1.0/0.0 si pas de boon actif.
     pub combat_mods: Res<'w, forgia_combat::combat_mods::PlayerCombatMods>,
+    /// Keystone 0.1b (story-634) — flux RNG combat DÉTERMINISTE (crit). Reseedé
+    /// depuis RunSeed au StartRunEvent (Roguelite) ; seed 0 déterministe hors run.
+    /// `begin_shot()` 1×/tir, puis `shot_stream(pellet, salt)` par roll.
+    pub combat_rng: ResMut<'w, forgia_combat::combat_rng::CombatRng>,
     /// Story-559 slice B — émet `WeaponFiredEvent` par tir (son d'arme propre).
     pub fired: MessageWriter<'w, forgia_combat::combat_juice::WeaponFiredEvent>,
     /// Story-531 AC9 — résolution hit/miss par tir (jauge confiance Pépin).
@@ -850,6 +854,10 @@ fn fire_weapon_minimal(
 
     let mut hit_record: Option<(Entity, f32)> = None;
 
+    // Keystone 0.1b (story-634) — avance le nonce déterministe : 1× par tir
+    // résolu. Les rolls crit (et flux futurs) dérivent de (seed, ce tir, pellet).
+    hitscan_ctx.combat_rng.begin_shot();
+
     for pellet_idx in 0..pellets {
         let pellet_dir = if pellets > 1 && spread_rad > 0.0 {
             let seed = seed_base
@@ -962,9 +970,15 @@ fn fire_weapon_minimal(
                         0.0
                     };
                     let effective_zone = zone_mul + head_bonus;
-                    let crit_seed = (timing.time.elapsed_secs() * 1000.0) as u32
-                        ^ (toi.to_bits()).rotate_left(13);
-                    let crit_roll = (crit_seed % 10_000) as f32 / 10_000.0;
+                    // Keystone 0.1b (story-634) — roll crit DÉTERMINISTE : flux
+                    // dérivé de (RunSeed, ce tir, pellet) au lieu de
+                    // elapsed_secs ^ toi.to_bits() (temps de frame + ordre BVH
+                    // Rapier, non reproductibles). Distribution inchangée
+                    // (uniforme [0,1)), donc taux de crit identique.
+                    let crit_roll = hitscan_ctx
+                        .combat_rng
+                        .shot_stream(u32::from(pellet_idx), forgia_combat::combat_rng::CRIT_SALT)
+                        .next_f32();
                     let crit_mul = if crit_roll < hitscan_ctx.combat_mods.crit_chance {
                         2.0
                     } else {
