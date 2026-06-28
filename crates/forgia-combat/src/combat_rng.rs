@@ -24,6 +24,9 @@ use bevy::prelude::*;
 /// Valeur arbitraire fixe : seule la stabilité (jamais re-changée) compte.
 pub const CRIT_SALT: u64 = 0x0000_0000_C217_0001;
 
+/// Sel du flux recoil (yaw aléatoire du recul) — décorrélé du crit pour le même tir.
+pub const RECOIL_SALT: u64 = 0x0000_0000_2EC0_1100;
+
 /// État RNG combat déterministe. `Default` = seed 0 (déterministe hors run, ex.
 /// FPS arena) ; reseedé depuis `RunSeed` au démarrage de run (Roguelite).
 #[derive(Resource, Debug, Clone, Default)]

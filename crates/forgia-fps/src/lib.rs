@@ -721,9 +721,20 @@ fn fire_weapon_minimal(
         return;
     };
 
-    // Juice per-arme : shake + recoil + FOV punch.
+    // Keystone 0.1b (story-634) — avance le nonce déterministe : 1× par tir résolu,
+    // AVANT le juice (recoil) ET le crit (pellet loop) → les deux dérivent du MÊME
+    // n° de tir, sels distincts. Placé ici (après les early-returns trigger/ammo/
+    // cam/ctx) : tout tir atteignant ce point résout recoil + pellets.
+    hitscan_ctx.combat_rng.begin_shot();
+
+    // Juice per-arme : shake + recoil + FOV punch. Yaw recoil DÉTERMINISTE — seed
+    // dérivé de (RunSeed, ce tir) au lieu de elapsed_secs*1000 (temps de frame, non
+    // reproductible). Distribution inchangée (pseudo_rand sur le seed).
     if let Some(e) = entry {
-        let juice_seed = (timing.time.elapsed_secs() * 1000.0) as u32;
+        let juice_seed = hitscan_ctx
+            .combat_rng
+            .shot_stream(0, forgia_combat::combat_rng::RECOIL_SALT)
+            .next_u64() as u32;
         juice.emit_from_genome(e, juice_seed);
     }
 
@@ -853,10 +864,6 @@ fn fire_weapon_minimal(
         ^ (origin.y.abs() * 1000.0) as u32;
 
     let mut hit_record: Option<(Entity, f32)> = None;
-
-    // Keystone 0.1b (story-634) — avance le nonce déterministe : 1× par tir
-    // résolu. Les rolls crit (et flux futurs) dérivent de (seed, ce tir, pellet).
-    hitscan_ctx.combat_rng.begin_shot();
 
     for pellet_idx in 0..pellets {
         let pellet_dir = if pellets > 1 && spread_rad > 0.0 {
