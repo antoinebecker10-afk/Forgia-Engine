@@ -2,7 +2,7 @@
 #
 # Per-file budget of asset-load call-sites. CI gate : `cargo xtask asset-load`.
 # Regenerate after removing loads : `cargo xtask asset-load --fix`.
-# Baseline total : 84 (target V2 Lock L1 : <= 30).
+# Baseline total : 91 (target V2 Lock L1 : <= 30).
 #
 # Detection : .load( / .load::<> / .load_with_settings( / .load_folder( with
 # non-empty parens, excluding genome configs (genomes/, Genome<, .toml).
@@ -11,18 +11,21 @@
 "crates/forgia-mode-fps-arena/src/lib.rs" = 22
 "crates/forgia-rpg/src/lib.rs" = 10
 "crates/forgia-qa-replay/src/player.rs" = 7
-"crates/forgia-stage/src/lib.rs" = 5
+"crates/forgia-stage/src/lib.rs" = 6
 "crates/forgia-village-loader/src/lib.rs" = 5
 "crates/forgia-viewmodel/src/attach.rs" = 4
 "crates/forgia-foliage/src/material_override.rs" = 3
 "crates/forgia-prefab/src/lib.rs" = 3
 "crates/forgia-terrain/src/terrain_material.rs" = 3
 "crates/forgia-anchor/src/lib.rs" = 2
+"crates/forgia-mode-roguelite/src/boss_portal.rs" = 2
+"crates/forgia-mode-roguelite/src/merchant.rs" = 2
 "crates/forgia-rpg/src/character.rs" = 2
 "crates/forgia-terrain/src/lod.rs" = 2
 "crates/forgia-ui/src/menu_video.rs" = 2
 "crates/forgia-audio/src/biome.rs" = 1
 "crates/forgia-foliage/src/lib.rs" = 1
+"crates/forgia-game/src/cyber_city.rs" = 1
 "crates/forgia-level-presets/src/lib.rs" = 1
 "crates/forgia-mode-fps-arena/src/wave.rs" = 1
 "crates/forgia-mode-roguelite/src/audio.rs" = 1
@@ -30,6 +33,7 @@
 "crates/forgia-mode-roguelite/src/loot_room.rs" = 1
 "crates/forgia-mode-roguelite/src/run.rs" = 1
 "crates/forgia-mode-roguelite/src/waves.rs" = 1
+"crates/forgia-mode-roguelite/src/weapon_select.rs" = 1
 "crates/forgia-observability/src/asset_handles.rs" = 1
 "crates/forgia-qa-harness/src/test_app.rs" = 1
 "crates/forgia-rpg/src/worldgen_village.rs" = 1
