@@ -1,6 +1,8 @@
 # Story-634 — Keystone : simulation déterministe (FixedUpdate + RunRng)
 
-> **Statut** : 🔵 IN_PROGRESS — 0.1a-1 fait, 0.1a-2 slice 2 fait (feel-test user en attente), reste slice 3-5 + 0.1b.
+> **Statut** : 🔵 IN_PROGRESS — 0.1a-1 fait ; 0.1a-2 slice 2 fait ; **0.1b-1 fait** (RNG combat hors
+> horloge : crit/recoil/loot/spread via CombatRng + fix boons inertes, runtime validé). Reste : 0.1a-2
+> slices 3-5 (mouvement/tir en FixedUpdate, **différé** = besoin Rapier en FixedUpdate) + 0.1b-2 ordre d'itération.
 >
 > **🔎 MISE À JOUR 2026-06-28 (exécution + finding majeur)** : le piège `just_pressed` en
 > FixedUpdate **est déjà corrigé en amont par leafwing 0.20** (preuve dure : `leafwing-input-manager`
@@ -97,17 +99,39 @@ slice 3/4 : si le hit-stop marche via le couplage Virtual→Fixed, ne rien chang
 `mouse_look` reste Update → écrit la rotation caméra dans une Resource (déjà le cas via CameraFov
 pipeline ? à vérifier) lisible en FixedUpdate si besoin.
 
-### 🔲 0.1b — Déterminisme (RunRng, le vrai morceau)
-`forgia-rng` n'est PAS utilisé par combat/roguelite (seeds horloge). Sites P0 :
-`run.rs:845 default_seed_from_clock`, `fps/lib.rs:742/985` (juice/crit seeds, `toi.to_bits()`),
-`run.rs:315` loot seed, `elements.rs:772` ordre AOE. → un seul `RunRng` seedé au `StartRunEvent`,
-consommé séquentiellement + ordre d'itération stabilisé. **Preuve** : `run()==run()` (même seed → même état) en test headless.
+### 🔄 0.1b — Déterminisme (RunRng)
+Découverte exécution : `RunSeed` (xoshiro) **existe déjà** + seed capturé/exposé
+(`forgia2_roguelite_state.json:"seed"`). Le vrai P0 = la RNG mid-run qui **contournait** RunSeed
+(seeds horloge/`toi`/adresse). Résolu par **`CombatRng`** (forgia-combat, DAG-safe, `forgia_rng::Rng`
+éphémère par événement via compteur+sel — pas un Rng partagé fragile), reseedé au `StartRunEvent`.
+
+#### ✅ 0.1b-1 — Sources RNG hors horloge (FAIT 2026-06-28, 4 commits)
+- ✅ **crit** (`fps/lib.rs`) : `elapsed_secs ^ toi.to_bits()` → `shot_stream(pellet, CRIT_SALT)`.
+- ✅ **recoil yaw** (`fps` juice) : `elapsed_secs*1000` → `shot_stream(0, RECOIL_SALT)`. `begin_shot()` avant juice.
+- ✅ **loot drop** (`run.rs` observer mort) : `elapsed_secs ^ entity.to_bits()` → `drop_stream(LOOT_SALT)`.
+- ✅ **pellet spread** (`fps`) : seed position f32 → `shot_stream(0, SPREAD_SALT)`.
+- `default_seed_from_clock` **conservé** (variété run, seed capturé dans RunSeed → rejouable).
+- Runtime validé : crit proc à 20% avec boon Œil de Lynx (4× `CRIT! dmg`) ; distribution unit-prouvée uniforme.
+
+#### 🐛 Bug latéral corrigé (commit `6dceb32`)
+`sys_recompute_boon_mods` avait une garde `is_changed` qui ratait les picks → **boons inertes**
+(crit/damage jamais appliqués). Recompute rendu **inconditionnel** (log au changement). Sans ce fix,
+0.1b-1 crit était invalidable (crit_chance figé à 0%).
+
+#### 🔲 0.1b-2 — Ordre d'itération (death/AOE) — DIFFÉRÉ avec la physique
+Reste : ordre des `DeathEvent` (despawn_dead_cubes archetype-iter) + AOE combustion (`elements.rs`,
+trier `combust.buf` par `Entity::to_bits`). **Couplé au déterminisme de la sim** (mouvement/physique en
+FixedUpdate, différé) : sans ordre de systèmes/physique déterministe, `run()==run()` bit-exact reste
+hors de portée. À faire avec le workstream physique-FixedUpdate.
 
 ## Acceptance criteria
 - [x] 0.1a-1 : chaîne GameSet déclarée en FixedUpdate, forgia-core compile, 0 effet runtime.
 - [ ] 0.1a-2 : systèmes sim en FixedUpdate, feel validé (latence + hit-stop OK). Slice 2 (4 timers) faite,
   feel-test user en attente ; slices 3-5 à faire (lecture `just_pressed` directe, pas de couche FixedInput).
-- [ ] 0.1b : RunRng remplace tous les seeds-horloge ; test `run()==run()` vert.
+- [~] 0.1b-1 : sources RNG combat hors horloge (crit/recoil/loot/spread via CombatRng) — FAIT,
+  runtime validé (crit proc 20% via boon). + fix boons inertes (`sys_recompute` inconditionnel).
+- [ ] 0.1b-2 : ordre d'itération (DeathEvent/AOE) — différé avec le workstream physique-FixedUpdate.
+- [ ] 0.1b-3 : test `run()==run()` headless vert (nécessite 0.1b-2 + sim/physique déterministe).
 
 ## Cross-refs
 - Spike de-risking (surface + ruptures déterminisme).
