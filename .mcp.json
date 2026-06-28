@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "grepai": {
+      "type": "stdio",
+      "command": "C:/Users/Antoi/.cargo/bin/grepai.exe",
+      "args": ["mcp-serve", "C:/Users/Antoi/Desktop/Forgia Rewrite"]
+    },
+    "mempalace": {
+      "type": "stdio",
+      "command": "C:/Users/Antoi/AppData/Local/Programs/Python/Python314/python.exe",
+      "args": ["-m", "mempalace.mcp_server", "--palace", "D:/Mémoire claude/mempalace"],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+    },
+    "ollama": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "ollama-mcp-server"],
+      "env": {
+        "OLLAMA_HOST": "http://localhost:11434"
+      }
+    }
+  }
+}
