@@ -51,6 +51,10 @@
 | `forgia_village.json` | T1 | forgia-village-loader | `src/lib.rs:481` | 1Hz | village spawn, prefab loading | active |
 | `forgia_village_debug.json` | T1 | forgia-village-loader | `src/lib.rs:846,897` | event | village placement debug — ⚠ pipeline DÉBRANCHÉ (story-586), écrit `village:null`, dépose prévue | **duplicate-writer** |
 | `forgia2_anchor.json` | T0 | forgia-anchor | `src/lib.rs:30` | 1Hz | AnchorKind stats, props_spawned counter | active |
+| `forgia2_boss_gate.json` | T0 | forgia-mode-roguelite | `src/boss_portal.rs:728` | event | boss gate door open/closed, dais detection (story-603) | active |
+| `forgia2_identity.json` | T0 | forgia-mode-roguelite | `src/identity.rs:26` | 1Hz | forgeron identity/level state | active |
+| `forgia2_perf_diag.json` | T0 | forgia-mode-roguelite | `src/perf_diag.rs:37` | 1Hz | roguelite perf diagnostics | active |
+| `forgia2_render_fx.json` | T0 | forgia-mode-roguelite | `src/render_quality.rs:29` | 1Hz | SSAO + atmosphere state, render guardrail (story-625 Tier 4) | active |
 | `forgia2_arena.json` | T0 | forgia-observability | `src/forgia2_aggregator.rs:136` | 1Hz | Arena unified (arena_feedback + arena_waves agrégés) | active |
 | `forgia2_assets.json` | T0 | forgia-observability | `src/assets_load_sensor.rs:98` | 1Hz | LoadState::Failed silencieux, scene_failed, mesh_failed | active |
 | `forgia2_audio.json` | T0 | forgia-observability | `src/audio_sensor.rs:56` | 1Hz | audio channels, music_state, voicelines | active |
