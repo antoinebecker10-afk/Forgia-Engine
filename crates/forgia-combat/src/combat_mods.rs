@@ -24,7 +24,7 @@ use bevy::prelude::*;
 /// - `chain_extra_targets` (Phase 4b) : N raycasts cascade après 1er hit.
 ///
 /// Default neutre (= no-op). Recompute idempotent par les modes qui mutent.
-#[derive(Resource, Debug, Clone, Copy)]
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub struct PlayerCombatMods {
     pub damage_mul: f32,
     pub fire_rate_mul: f32,

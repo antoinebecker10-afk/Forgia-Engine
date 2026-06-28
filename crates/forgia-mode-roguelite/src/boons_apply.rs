@@ -37,13 +37,13 @@ pub fn sys_recompute_boon_mods(
     mut mods: ResMut<PlayerCombatMods>,
     mut heal: ResMut<HealOnKillCumul>,
 ) {
-    if !active.is_changed()
-        && !catalogue.is_changed()
-        && !perm.is_changed()
-        && !mastery.is_changed()
-    {
-        return;
-    }
+    // Fix 2026-06-28 — PLUS de garde `is_changed` : la détection de changement sur
+    // ActiveBoons ratait les picks en runtime (boons inertes — crit/damage jamais
+    // appliqués malgré boon actif ; diag : forgia2_run.log, recompute figé à boot
+    // `crit=0% (active 0)` alors que le capteur montrait 2 boons actifs). Recompute
+    // INCONDITIONNEL (coût négligeable : ≤18 boons + compose perm/mastery chaque
+    // frame Roguelite) → PlayerCombatMods reflète TOUJOURS l'état réel. Log ci-dessous
+    // uniquement quand le résultat change (pas de spam every-frame).
     let mut new_mods = PlayerCombatMods::default();
     let mut new_heal = 0.0_f32;
     for id in &active.active {
@@ -87,20 +87,25 @@ pub fn sys_recompute_boon_mods(
     // P3 — maîtrise d'arme (niveau) : multiplicatif comme les autres bonus de dégâts.
     new_mods.damage_mul *= mastery.damage_mul;
     new_mods.damage_reduction = (new_mods.damage_reduction + perm.damage_reduction).min(0.85);
+    // Log seulement au changement (recompute tourne chaque frame désormais).
+    let changed =
+        *mods != new_mods || (heal.hp_per_kill - new_heal).abs() > f32::EPSILON;
     *mods = new_mods;
     heal.hp_per_kill = new_heal;
-    info!(
-        "[boons] mods recomputed — damage×{:.2} fire_rate×{:.2} reduction={:.0}% crit={:.0}% head+{:.2} knockback={:.1} chain+{} heal={:.1}/kill (active {})",
-        mods.damage_mul,
-        mods.fire_rate_mul,
-        mods.damage_reduction * 100.0,
-        mods.crit_chance * 100.0,
-        mods.headshot_bonus_mul,
-        mods.knockback_strength,
-        mods.chain_extra_targets,
-        heal.hp_per_kill,
-        active.active.len()
-    );
+    if changed {
+        info!(
+            "[boons] mods recomputed — damage×{:.2} fire_rate×{:.2} reduction={:.0}% crit={:.0}% head+{:.2} knockback={:.1} chain+{} heal={:.1}/kill (active {})",
+            mods.damage_mul,
+            mods.fire_rate_mul,
+            mods.damage_reduction * 100.0,
+            mods.crit_chance * 100.0,
+            mods.headshot_bonus_mul,
+            mods.knockback_strength,
+            mods.chain_extra_targets,
+            heal.hp_per_kill,
+            active.active.len()
+        );
+    }
 }
 
 /// Story-558 Phase 4b — synchronise HealthGuard sur Player avec
