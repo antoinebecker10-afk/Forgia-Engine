@@ -14,6 +14,7 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 use forgia_player::FpsCamera;
+use crate::render_quality::RogueliteRenderConfig;
 
 // ── Réglages (tunables — me demander pour ajuster ; genome possible plus tard) ──
 /// Couleur de la brume = ce vers quoi le lointain se fond (fumée volcanique).
@@ -28,21 +29,19 @@ const FOG_SUN_COLOR: (f32, f32, f32) = (1.0, 0.55, 0.25);
 const AMBIENT_COLOR: (f32, f32, f32) = (1.0, 0.45, 0.22);
 const AMBIENT_BRIGHTNESS: f32 = 300.0;
 
-fn volcanic_fog() -> DistanceFog {
+fn volcanic_fog(density: f32) -> DistanceFog {
     DistanceFog {
         color: Color::srgb(FOG_COLOR.0, FOG_COLOR.1, FOG_COLOR.2),
         directional_light_color: Color::srgb(FOG_SUN_COLOR.0, FOG_SUN_COLOR.1, FOG_SUN_COLOR.2),
         directional_light_exponent: 30.0,
-        falloff: FogFalloff::Exponential {
-            density: FOG_DENSITY,
-        },
+        falloff: FogFalloff::Exponential { density },
     }
 }
 
-fn volcanic_ambient() -> AmbientLight {
+fn volcanic_ambient(brightness: f32) -> AmbientLight {
     AmbientLight {
         color: Color::srgb(AMBIENT_COLOR.0, AMBIENT_COLOR.1, AMBIENT_COLOR.2),
-        brightness: AMBIENT_BRIGHTNESS,
+        brightness,
         ..default()
     }
 }
@@ -65,12 +64,31 @@ impl Plugin for RogueliteAtmospherePlugin {
 /// Roguelite (robuste à un éventuel respawn caméra). N'insère que si absente.
 fn sys_ensure_atmosphere(
     mut commands: Commands,
-    q_cam: Query<Entity, (With<FpsCamera>, Without<DistanceFog>)>,
+    cfg: Option<Res<RogueliteRenderConfig>>,
+    q_cam: Query<Entity, With<FpsCamera>>,
+    q_has_fog: Query<(), (With<FpsCamera>, With<DistanceFog>)>,
 ) {
+    // Atmosphère pilotée par roguelite_render.toml (story-625 Tier 4). Fallback
+    // sur les consts si la config n'est pas encore insérée (ordre Startup).
+    let (fog_enabled, density, brightness) = match cfg.as_deref() {
+        Some(c) => (c.fog_enabled, c.fog_density, c.ambient_brightness),
+        None => (true, FOG_DENSITY, AMBIENT_BRIGHTNESS),
+    };
+    let cfg_changed = cfg.as_ref().map(|c| c.is_changed()).unwrap_or(false);
     for cam in &q_cam {
-        commands
-            .entity(cam)
-            .insert((volcanic_fog(), volcanic_ambient()));
+        if !fog_enabled {
+            commands
+                .entity(cam)
+                .remove::<DistanceFog>()
+                .remove::<AmbientLight>();
+            continue;
+        }
+        // Insère si absent, OU ré-applique si config changée (hot-reload densité).
+        if cfg_changed || q_has_fog.get(cam).is_err() {
+            commands
+                .entity(cam)
+                .insert((volcanic_fog(density), volcanic_ambient(brightness)));
+        }
     }
 }
 

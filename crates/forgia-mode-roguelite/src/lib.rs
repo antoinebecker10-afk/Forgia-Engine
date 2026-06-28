@@ -22,6 +22,7 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod atmosphere;
+pub mod render_quality;
 pub mod audio;
 pub mod boons_apply;
 pub mod boss_portal;
@@ -492,6 +493,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_plugins(audio::RogueliteAudioPlugin)
             // Incrément 4 — atmosphère volcanique (brume DistanceFog + ambiante chaude).
             .add_plugins(atmosphere::RogueliteAtmospherePlugin)
+            // Story-625 Tier 4 : SSAO + contrôle/observabilité rendu (garde-fou data-driven).
+            .add_plugins(render_quality::ForgiaRogueliteRenderPlugin)
             // Portail → salle de loot verticale (2026-06-06).
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).

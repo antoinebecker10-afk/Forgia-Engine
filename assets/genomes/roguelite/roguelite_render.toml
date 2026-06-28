@@ -1,0 +1,34 @@
+# roguelite_render.toml — story-625 Tier 4 : contrôle du rendu (SSAO + atmosphère).
+#
+# Garde-fou : chaque effet est toggleable EN DATA (hot-reload mtime 1Hz). Si un
+# effet casse en jeu (crash GPU, perf), mettre son *_enabled à 0.0 et sauver →
+# l'effet se coupe SANS rebuild. État runtime visible dans forgia2_render_fx.json.
+#
+# Consommé par forgia-mode-roguelite::render_quality + atmosphere.rs.
+
+# ── SSAO (ambient occlusion — ancre les props au sol, profondeur) ────────────
+# Effet compute natif (PbrPlugin), pas de FullscreenMaterial → pas du piège outline.
+[[genes]]
+id = "roguelite_ssao_enabled"
+default = 1.0   # 1 = ON, 0 = OFF (couper ici si crash/perf)
+
+[[genes]]
+id = "roguelite_ssao_quality"
+default = 2.0   # 0 Low · 1 Medium · 2 High · 3 Ultra
+
+[[genes]]
+id = "roguelite_ssao_thickness"
+default = 0.25  # épaisseur estimée des objets (occlusion), 0.01..2.0
+
+# ── Atmosphère volcanique (brume DistanceFog + ambiante chaude) ──────────────
+[[genes]]
+id = "roguelite_fog_enabled"
+default = 1.0
+
+[[genes]]
+id = "roguelite_fog_density"
+default = 0.008  # ~1/density ≈ distance de demi-brume (0.008 → ~125 m)
+
+[[genes]]
+id = "roguelite_ambient_brightness"
+default = 300.0  # lumière ambiante chaude (teinte volcanique)
