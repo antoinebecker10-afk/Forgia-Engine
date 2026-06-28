@@ -60,6 +60,7 @@ section = "fosse_melee"
 prefab = "models/environment/inferno/ColumnBigBroken_001.glb"
 pos = [26.0, 0.0, 2.0]
 role = "cover_high"
+blocker = true
 section = "cour_forges"
 
 [[layouts.crypts_of_anvil.pieces]]
@@ -67,6 +68,7 @@ prefab = "models/environment/inferno/ColumnBigBroken_002.glb"
 pos = [-26.0, 0.0, 2.0]
 rot_deg = 20.0
 role = "cover_high"
+blocker = true
 section = "cour_forges"
 
 [[layouts.crypts_of_anvil.pieces]]
@@ -109,3 +111,110 @@ section = "entree"
 prefab = "models/environment/inferno/PedestalBig_001.glb"
 pos = [-24.0, 0.0, 52.0]
 section = "entree"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COVER DENSE — identité crypts (story-625, bible §"cover dense" + "cages
+# renversées en cover bas"). Footprints RÉELS mesurés (measure_glb_aabb.py),
+# espacement validé pairwise (validate_cover_spacing.py : 0 chevauchement / 24).
+#   Mound_005/008 : r1.95, top 0.5-0.7m  → cover BAS (s'accroupir derrière)
+#   Box_001       : r0.79, top 1.35m     → caisse, cover taille
+#   RockMid_001   : r6.34, top 6.28m     → cover HAUT
+#   RockMid_003   : r4.86, top 8.37m     → cover haut
+#   Crag_001      : r5.09, top 7.74m     → cover haut
+# `blocker = true` → collider TriMesh (lib.rs:1026) : le cover BLOQUE réellement.
+# Props narratifs (Chest/Well/Gold) = decor non-bloquant ("foutoir d'âmes").
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Cover bas en anneau autour de la fosse à mêlée (plateforme r9.6) ──────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Mound_005.glb"
+pos = [14.0, 0.0, -8.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Mound_008.glb"
+pos = [-14.0, 0.0, -8.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [7.0, 0.0, -3.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [-7.0, 0.0, -3.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Mound_005.glb"
+pos = [0.0, 0.0, -1.0]
+rot_deg = 35.0
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+# ── Champ de cover haut dans la cour des forges (sight-lines cassées) ─────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/RockMid_001.glb"
+pos = [13.0, 0.0, 9.0]
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/RockMid_003.glb"
+pos = [-13.0, 0.0, 9.0]
+rot_deg = 45.0
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Crag_001.glb"
+pos = [0.0, 0.0, 20.0]
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+# Caisses sur les flancs (cover bas latéral).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [19.0, 0.0, -3.0]
+rot_deg = 25.0
+role = "cover_low"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [-19.0, 0.0, -3.0]
+rot_deg = -15.0
+role = "cover_low"
+blocker = true
+section = "cour_forges"
+
+# ── Props narratifs (le foutoir d'âmes — decor non-bloquant) ─────────────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/ChestBig_001.glb"
+pos = [21.0, 0.0, 15.0]
+rot_deg = 200.0
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/WellSmall_001.glb"
+pos = [-21.0, 0.0, 16.0]
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/GoldPileSmall_001.glb"
+pos = [5.0, 0.0, 1.0]
+section = "fosse_melee"

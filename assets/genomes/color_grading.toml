@@ -13,12 +13,16 @@
 # Modes sans section ici (Menu/Fps) → grading neutre (reset, pas de fuite).
 
 [roguelite]
-# Forge volcanique, cartoon : chaud, punchy.
-exposure = 0.0
-temperature = 0.20
-tint = 0.0
+# Cryptes de l'Enclume : forge volcanique cartoon + touche ROSE PASTEL (story-625
+# identité crypts). Bible `crypts_of_anvil.md` : "rouge braise + noir suie + touches
+# roses pastel ; le rose c'est le secret — il rend le lieu accueillant". Cult of the
+# Lamb : sinistre digestible. tint+ = magenta/rose (LE secret), expo+ léger (anti
+# "trop sombre"), contrast adouci (pastel), temp gardée chaude (braise).
+exposure = 0.05
+temperature = 0.16
+tint = 0.10
 post_saturation = 0.10
-contrast = 0.08
+contrast = 0.05
 saturation = 0.05
 
 [cybercity]
