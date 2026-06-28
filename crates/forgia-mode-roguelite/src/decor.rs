@@ -388,13 +388,19 @@ pub struct NeedsDecorCalibrate {
 }
 
 /// Posé sur le PARENT d'un prop : `sys_decor_build_hull_colliders` attache un
-/// `Collider` **ConvexHull** construit depuis chaque mesh chargé (suit la
-/// silhouette du prop ; fiable car bâti APRÈS chargement, pas le souci async de
-/// `AsyncSceneCollider`). Fallback cylindre si aucun hull n'est productible.
+/// `Collider` mesh-fidèle construit depuis chaque mesh chargé (bâti APRÈS
+/// chargement, pas le souci async de `AsyncSceneCollider`). La forme dépend de
+/// `precise`. Fallback cylindre si aucun collider n'est productible.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct NeedsHullCollider {
     pub fallback_target_m: f32,
     pub fallback_radius_factor: f32,
+    /// `true` → **TriMesh** (épouse exactement la géométrie : les creux sont
+    /// préservés, on peut passer entre les jambes d'une statue). Réservé aux gros
+    /// props concaves (statues, colonnes brisées). `false` → **ConvexHull**
+    /// (enveloppe convexe : plus léger + fallback cylindre plus sûr, pour les murs
+    /// qui n'ont pas de creux à préserver).
+    pub precise: bool,
 }
 
 /// Marqueur sur un décor SOLIDE (prop/mur/coin) avec son rayon de footprint
@@ -527,6 +533,7 @@ fn spawn_one(commands: &mut Commands, spec: &DecorSpec) {
                 NeedsHullCollider {
                     fallback_target_m: WALL_HEIGHT,
                     fallback_radius_factor: 0.3,
+                    precise: false, // mur = convexe (pas de creux à préserver, fallback sûr)
                 },
                 SolidDecorObstacle {
                     radius: *obstacle_radius,
@@ -700,10 +707,10 @@ fn collect_mesh_entities(
 }
 
 /// Pour chaque prop marqué `NeedsHullCollider`, une fois ses meshes chargés,
-/// attache un `Collider` ConvexHull sur chaque entité `Mesh3d` (rapier le scale
-/// via le `GlobalTransform` = le scale appliqué par la calibration). Si aucun
-/// hull n'est productible, pose un cylindre de secours. Retry tant que les
-/// meshes ne sont pas chargés. Gated Roguelite.
+/// attache un `Collider` mesh-fidèle (TriMesh si `precise`, sinon ConvexHull) sur
+/// chaque entité `Mesh3d` (rapier le scale via le `GlobalTransform` = le scale
+/// appliqué par la calibration). Si aucun collider n'est productible, pose un
+/// cylindre de secours. Retry tant que les meshes ne sont pas chargés. Gated Roguelite.
 pub fn sys_decor_build_hull_colliders(
     mut commands: Commands,
     q_needs: Query<(Entity, &NeedsHullCollider)>,
@@ -728,13 +735,19 @@ pub fn sys_decor_build_hull_colliders(
         if !all_loaded {
             continue;
         }
+        // Forme mesh-fidèle : TriMesh (creux préservés, p.ex. entre les jambes
+        // d'une statue) pour les gros props concaves, ConvexHull (plus léger/sûr)
+        // pour les murs. Cf le champ `precise` de `NeedsHullCollider`.
+        let shape = if needs.precise {
+            ComputedColliderShape::TriMesh(default())
+        } else {
+            ComputedColliderShape::ConvexHull
+        };
         let mut built = 0u32;
         for &me in &mesh_entities {
             if let Ok(m3d) = q_mesh.get(me) {
                 if let Some(mesh) = meshes.get(&m3d.0) {
-                    if let Some(col) =
-                        Collider::from_bevy_mesh(mesh, &ComputedColliderShape::ConvexHull)
-                    {
+                    if let Some(col) = Collider::from_bevy_mesh(mesh, &shape) {
                         commands.entity(me).insert(col);
                         built += 1;
                     }
@@ -953,6 +966,7 @@ fn spawn_perimeter_prop(
         NeedsHullCollider {
             fallback_target_m: target_m,
             fallback_radius_factor: col_radius_factor,
+            precise: true, // gros prop concave (statue, colonne) = TriMesh exact
         },
         // Footprint approx (rayon ~0.4× la taille cible) pour le clear-spawn ennemis.
         SolidDecorObstacle {
