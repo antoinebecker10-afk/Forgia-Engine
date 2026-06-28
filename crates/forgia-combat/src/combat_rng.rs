@@ -30,6 +30,9 @@ pub const RECOIL_SALT: u64 = 0x0000_0000_2EC0_1100;
 /// Sel du flux loot (drop conditionnel à la mort d'un ennemi) — flux `drop_*`.
 pub const LOOT_SALT: u64 = 0x0000_0000_0107_7000;
 
+/// Sel du flux spread (cône multi-pellets, ex. pompe) — décorrélé du crit/recoil.
+pub const SPREAD_SALT: u64 = 0x0000_0000_5984_EAD0;
+
 /// État RNG combat déterministe. `Default` = seed 0 (déterministe hors run, ex.
 /// FPS arena) ; reseedé depuis `RunSeed` au démarrage de run (Roguelite).
 #[derive(Resource, Debug, Clone, Default)]

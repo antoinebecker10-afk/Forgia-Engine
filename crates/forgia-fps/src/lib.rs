@@ -858,10 +858,13 @@ fn fire_weapon_minimal(
     let right = cam_tf.right().as_vec3();
     let up = cam_tf.up().as_vec3();
 
-    // Seed PRNG basé sur position cam + ms hash — reproductibilité par tir.
-    let seed_base = (origin.x.abs() * 1000.0) as u32
-        ^ (origin.z.abs() * 1000.0) as u32
-        ^ (origin.y.abs() * 1000.0) as u32;
+    // Keystone 0.1b (story-634) — base de seed du spread DÉTERMINISTE : dérivée du
+    // tir courant (CombatRng) au lieu de la position f32 (non reproductible cross-
+    // plateforme + dépend de la position joueur). pseudo_rand inchangé → cône identique.
+    let seed_base = hitscan_ctx
+        .combat_rng
+        .shot_stream(0, forgia_combat::combat_rng::SPREAD_SALT)
+        .next_u64() as u32;
 
     let mut hit_record: Option<(Entity, f32)> = None;
 
