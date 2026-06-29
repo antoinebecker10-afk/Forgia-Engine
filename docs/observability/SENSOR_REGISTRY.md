@@ -55,6 +55,7 @@
 | `forgia2_identity.json` | T0 | forgia-mode-roguelite | `src/identity.rs:26` | 1Hz | forgeron identity/level state | active |
 | `forgia2_perf_diag.json` | T0 | forgia-mode-roguelite | `src/perf_diag.rs:37` | 1Hz | roguelite perf diagnostics | active |
 | `forgia2_render_fx.json` | T0 | forgia-mode-roguelite | `src/render_quality.rs:29` | 1Hz | SSAO + atmosphere state, render guardrail (story-625 Tier 4) | active |
+| `forgia2_mushrooms.json` | T0 | forgia-mode-roguelite | `src/mushrooms.rs:30` | 1Hz | champignons émissifs crypts : clusters/counts + health (story-625) | active |
 | `forgia2_arena.json` | T0 | forgia-observability | `src/forgia2_aggregator.rs:136` | 1Hz | Arena unified (arena_feedback + arena_waves agrégés) | active |
 | `forgia2_assets.json` | T0 | forgia-observability | `src/assets_load_sensor.rs:98` | 1Hz | LoadState::Failed silencieux, scene_failed, mesh_failed | active |
 | `forgia2_audio.json` | T0 | forgia-observability | `src/audio_sensor.rs:56` | 1Hz | audio channels, music_state, voicelines | active |

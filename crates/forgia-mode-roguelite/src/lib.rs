@@ -42,6 +42,7 @@ pub mod load_timing;
 pub mod loot_room;
 pub mod merchant;
 pub mod meta_shop;
+pub mod mushrooms;
 pub mod parcours_obstacles;
 pub mod perf_diag;
 pub mod persist;
@@ -503,6 +504,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_plugins(atmosphere::RogueliteAtmospherePlugin)
             // Story-625 Tier 4 : SSAO + contrôle/observabilité rendu (garde-fou data-driven).
             .add_plugins(render_quality::ForgiaRogueliteRenderPlugin)
+            // Story-625 identité crypts : champignons lumineux émissifs (data-driven + capteur).
+            .add_plugins(mushrooms::ForgiaRogueliteMushroomsPlugin)
             // Portail → salle de loot verticale (2026-06-06).
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).
