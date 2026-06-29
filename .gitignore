@@ -4,6 +4,9 @@ Cargo.lock.bak
 **/*.rs.bk
 *.pdb
 
+# Build distribuable (scripts/build-dist.ps1)
+dist/
+
 # IDE
 .vscode/
 .idea/
