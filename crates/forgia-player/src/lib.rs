@@ -28,7 +28,7 @@ pub mod prelude {
     pub use crate::{
         CameraFov, CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning,
         MovementSpeedMultiplier,
-        Player, PlayerMovementTuning, ViewmodelCamera,
+        Player, PlayerLocomotion, PlayerMovementTuning, ViewmodelCamera,
     };
 }
 
@@ -96,6 +96,16 @@ fn sync_player_movement_tuning(
         return;
     };
     *tuning = g.data.clone();
+}
+
+/// Vitesse horizontale réelle du joueur (m/s), mesurée **en FixedUpdate** (= au
+/// rythme où le mouvement se fait) pour fournir un signal PROPRE aux consommateurs
+/// qui tournent en Update (ex. bob du viewmodel). Keystone 0.1a-2 slice 3 : mesurer
+/// le delta de position en Update donnait un signal bruité (0 si aucun step fixe
+/// cette frame, élevé sinon) → tremblement/à-coups du viewmodel. Ici c'est lisse.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct PlayerLocomotion {
+    pub horizontal_speed: f32,
 }
 
 /// Multiplicateur global sur la vitesse de déplacement player.
@@ -260,6 +270,7 @@ impl Plugin for ForgiaPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraMode>()
             .init_resource::<CameraFov>()
+            .init_resource::<PlayerLocomotion>()
             .init_resource::<MovementSpeedMultiplier>()
             .init_resource::<MouseLookTuning>()
             .init_resource::<PlayerMovementTuning>()
@@ -277,12 +288,24 @@ impl Plugin for ForgiaPlayerPlugin {
             // ce qui despawn le player et perdait position/HP/ammo au resume.
             // Memory ref : reference_player_lifecycle_pause_safe.md.
             .add_systems(OnEnter(AppMode::Menu), despawn_player)
+            // Caméra (mouse_look + recoil) + sync genome restent en Update (cadence
+            // rendu, fluidité de visée). Lock L7 : DANS GameSet::Movement (Update).
             .add_systems(
                 Update,
+                (sync_player_movement_tuning, mouse_look, weapon_recoil_apply)
+                    .chain()
+                    .in_set(GameSet::Movement)
+                    .run_if(in_state(AppMode::InGame)),
+            )
+            // Keystone 0.1a-2 slice 3 (story-634) — la SIM (mouvement + dash + safety)
+            // passe en FixedUpdate (timestep fixe déterministe, aligné Rapier en
+            // FixedUpdate). mouse_look écrit player.yaw/rotation en Update ;
+            // player_movement (FixedUpdate, AVANT Update dans la frame) lit la rotation
+            // de la frame précédente (~lag négligeable, pattern fixed-timestep standard).
+            // `just_pressed(Jump)` lu DIRECT : leafwing 0.20 gère l'edge par step fixe.
+            .add_systems(
+                FixedUpdate,
                 (
-                    sync_player_movement_tuning,
-                    mouse_look,
-                    weapon_recoil_apply,
                     // Dash phase 1 : input AVANT player_movement (consume Jump),
                     // motion APRÈS pour écraser horizontal KCC tout en préservant
                     // le vertical_step calculé par player_movement (gravité/jump).
@@ -291,11 +314,11 @@ impl Plugin for ForgiaPlayerPlugin {
                     dash::dash_motion_system,
                     dash::dash_recharge_system,
                     player_floor_safety_net,
+                    // Mesure la vitesse horizontale au rythme du mouvement (signal
+                    // propre pour le bob viewmodel en Update). APRÈS le move.
+                    track_player_speed,
                 )
                     .chain()
-                    // Story-594 (M2-B4) : chaîne player DANS GameSet::Movement
-                    // (Lock L7 — était hors set : ordre vs aim_assist/Camera non
-                    // garanti par le scheduler, audit 2026-06-10 P1).
                     .in_set(GameSet::Movement)
                     .run_if(in_state(AppMode::InGame)),
             );
@@ -626,6 +649,32 @@ fn player_movement(
     let move_vec = Vec3::new(horizontal.x * dt, vertical_step, horizontal.z * dt);
 
     kcc.translation = Some(move_vec);
+}
+
+/// Mesure la vitesse horizontale réelle du joueur (m/s) en FixedUpdate, depuis le
+/// delta de position par step fixe (dt constant → signal propre, sans le jitter
+/// 0/élevé qu'aurait une mesure en Update). Lue par le bob du viewmodel. Keystone
+/// 0.1a-2 slice 3.
+fn track_player_speed(
+    time: Res<Time>,
+    q: Query<&Transform, With<Player>>,
+    mut last: Local<Option<Vec3>>,
+    mut loco: ResMut<PlayerLocomotion>,
+) {
+    let Ok(tf) = q.single() else {
+        *last = None;
+        loco.horizontal_speed = 0.0;
+        return;
+    };
+    let p = tf.translation;
+    let dt = time.delta_secs().max(1e-5);
+    loco.horizontal_speed = last
+        .map(|lp| {
+            let d = p - lp;
+            Vec2::new(d.x, d.z).length() / dt
+        })
+        .unwrap_or(0.0);
+    *last = Some(p);
 }
 
 /// Story-453 floor safety net (2026-05-18) — si le player KinematicCharacterController

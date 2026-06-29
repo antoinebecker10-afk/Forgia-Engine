@@ -54,8 +54,26 @@ pub fn run_game() -> AppExit {
     // 2. Forgia Core (init_state nécessite StatesPlugin déjà chargé)
     app.add_plugins(ForgiaCorePlugin);
 
-    // 3. Rapier physique (après DefaultPlugins)
-    app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default());
+    // 3. Rapier physique (après DefaultPlugins).
+    // Keystone 0.1a-2 slice 3 (story-634) — physique en FixedUpdate (au lieu du
+    // défaut PostUpdate) pour la sim déterministe : alignée sur la chaîne GameSet
+    // FixedUpdate (0.1a-1) et sur le mouvement joueur. `TimestepMode::Fixed` est requis
+    // quand la physique est en FixedUpdate (sinon dt variable dans un step fixe). dt
+    // physique = période `Time<Fixed>` → physique et FixedUpdate avancent au même pas.
+    const PHYSICS_HZ: f64 = 64.0; // = défaut Bevy Time<Fixed> ; invariant tick sim.
+    app.insert_resource(Time::<Fixed>::from_hz(PHYSICS_HZ));
+    app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default().in_fixed_schedule());
+    app.insert_resource(TimestepMode::Fixed {
+        dt: (1.0 / PHYSICS_HZ) as f32,
+        substeps: 1,
+    });
+    // La chaîne gameplay DOIT précéder le step Rapier en FixedUpdate : `player_movement`
+    // (GameSet::Movement) écrit `kcc.translation`, consommé par `PhysicsSet::SyncBackend`.
+    // forgia-core (DAG-libre) ignore PhysicsSet → ordre câblé ici (forgia-game a rapier).
+    app.configure_sets(
+        FixedUpdate,
+        GameSet::Movement.before(PhysicsSet::SyncBackend),
+    );
 
     // 4. Hanabi VFX (requis par forgia-effects::setup_weapon_vfx)
     app.add_plugins(bevy_hanabi::HanabiPlugin);
