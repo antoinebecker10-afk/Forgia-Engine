@@ -21,7 +21,7 @@ use forgia_core::prelude::GameMode;
 use forgia_genome_core::Genome;
 use forgia_input::prelude::MouseSensitivityMultiplier;
 use forgia_juice_lib::fov_punch::FovPunchState;
-use forgia_player::prelude::{CameraFov, FpsCamera, MovementSpeedMultiplier, Player};
+use forgia_player::prelude::{CameraFov, FpsCamera, MovementSpeedMultiplier, PlayerLocomotion};
 use forgia_ui::prelude::CrosshairMode;
 
 use crate::attach::{NeedsAutoScale, ViewmodelBaseScale, WeaponViewmodel};
@@ -109,7 +109,9 @@ pub struct SwayBobState {
     sway: Vec2,
     sway_rot: Vec2,
     bob_phase: f32,
-    last_player_pos: Option<Vec3>,
+    /// Vitesse horizontale lissée (low-pass) pour un ramp start/stop naturel.
+    /// La vitesse brute vient de `PlayerLocomotion` (mesurée en FixedUpdate = propre).
+    smoothed_speed: f32,
 }
 
 /// Offset sway/bob/idle partagé (translation locale + rotation), calculé une fois
@@ -128,7 +130,9 @@ pub fn apply_viewmodel_sway_bob(
     time: Res<Time>,
     mut motion: MessageReader<MouseMotion>,
     tuning: Res<ViewmodelMotionTuning>,
-    q_player: Query<&Transform, (With<Player>, Without<WeaponViewmodel>)>,
+    // Vitesse propre mesurée en FixedUpdate (forgia-player) — pas de delta de position
+    // en Update (qui jitterait : 0/élevé selon qu'un step fixe a tourné cette frame).
+    loco: Res<PlayerLocomotion>,
     // Without<NeedsAutoScale> : miroir d'apply_ads_viewmodel — pendant la fenêtre
     // d'auto-scale la base n'est pas réécrite, donc on n'ajoute pas (anti-drift).
     mut q_vm: Query<&mut Transform, (With<WeaponViewmodel>, Without<NeedsAutoScale>)>,
@@ -151,25 +155,20 @@ pub fn apply_viewmodel_sway_bob(
     state.sway_rot = state.sway_rot.lerp(target_rot, a);
 
     // ── Bob de marche (amplitude ∝ vitesse horizontale, phase figée à l'arrêt) ──
-    let speed = if let Ok(ptf) = q_player.single() {
-        let p = ptf.translation;
-        let s = state
-            .last_player_pos
-            .map(|lp| {
-                let d = p - lp;
-                Vec2::new(d.x, d.z).length() / dt
-            })
-            .unwrap_or(0.0);
-        state.last_player_pos = Some(p);
-        s
-    } else {
-        0.0
-    };
-    let speed_frac = (speed / tuning.bob_speed_ref.max(0.01)).clamp(0.0, 1.0);
+    // Keystone 0.1a-2 slice 3 (story-634) : la vitesse vient de `PlayerLocomotion`,
+    // mesurée en FixedUpdate (au rythme du mouvement) = signal PROPRE. Avant : delta de
+    // position en Update → bruité (0/élevé) → bob qui tremble/à-coups. Léger low-pass
+    // (`a`, lissage sway) pour un ramp start/stop naturel — l'entrée étant déjà propre,
+    // la phase du bob avance à cadence stable → cycle lisse.
+    state.smoothed_speed = state.smoothed_speed.lerp(loco.horizontal_speed, a);
+    let speed_frac = (state.smoothed_speed / tuning.bob_speed_ref.max(0.01)).clamp(0.0, 1.0);
     if speed_frac > 0.05 {
         state.bob_phase += tuning.bob_freq * speed_frac * dt * std::f32::consts::TAU;
-        // Wrap pour éviter la perte de précision f32 en très longue session.
-        state.bob_phase %= std::f32::consts::TAU;
+        // Wrap à 2×TAU (PAS TAU) : `bob_x = cos(phase*0.5)` est à demi-fréquence
+        // (figure-8 du bob), de période 2×TAU. Wrapper à TAU couperait ce cosinus
+        // (cos(PI)→cos(0) = -1→+1) → saut ~1 cm de l'arme en x à chaque cycle = l'à-coup
+        // « quand la loop reprend ». À 2×TAU, sin(phase) ET cos(phase*0.5) sont continus.
+        state.bob_phase %= 2.0 * std::f32::consts::TAU;
     }
     let bob_y = state.bob_phase.sin() * tuning.bob_pos * speed_frac;
     let bob_x = (state.bob_phase * 0.5).cos() * tuning.bob_pos * 0.5 * speed_frac;
