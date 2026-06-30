@@ -32,6 +32,8 @@ pub mod decor;
 pub mod element_vfx;
 pub mod elements;
 pub mod enemies;
+pub mod enemy_anim;
+pub mod enemy_rig_debug;
 pub mod ftue;
 pub mod hub;
 pub mod hud;
@@ -57,6 +59,7 @@ pub mod toon_config;
 pub mod ultimate_apply;
 pub mod ultimate_config;
 pub mod ultimate_tech;
+pub mod ultimate_vfx;
 pub mod waves;
 pub mod weapon_select;
 
@@ -321,6 +324,21 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             Update,
             ultimate_apply::sys_write_ultimate_tech_sensor.in_set(GameSet::Sensors),
         );
+        // Story-596 T4b — VFX des techniques d'Ultime : flash émissif coloré par
+        // technique (sphère partagée + 4 matériaux, 0 alloc/hit), animé/despawné
+        // par element_vfx::sys_tick_element_sparks. Couleurs data-driven [vfx]
+        // (hot-reload). Event-driven : sys_apply émet, sys_spawn consomme.
+        app.add_message::<ultimate_vfx::UltimateVfxEvent>();
+        app.add_systems(Startup, ultimate_vfx::sys_init_ultimate_vfx_assets);
+        app.add_systems(
+            Update,
+            (
+                ultimate_vfx::sys_refresh_ultimate_vfx_materials,
+                ultimate_vfx::sys_spawn_ultimate_vfx.after(ultimate_apply::sys_apply_ultimate_technique),
+            )
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         // Story-588 (2026-06-09) — VFX colorés des éléments (flash d'impact +
         // pulse DoT) pour rendre le système d'éléments VISIBLE. Mesh + 4
         // matériaux partagés (0 alloc/hit), fade par scale, hot-reload couleurs.
@@ -543,6 +561,11 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_plugins(render_quality::ForgiaRogueliteRenderPlugin)
             // Story-625 identité crypts : champignons lumineux émissifs (data-driven + capteur).
             .add_plugins(mushrooms::ForgiaRogueliteMushroomsPlugin)
+            // Story-636 — animation squelettique des ennemis (clips KayKit bakés via
+            // AnimationPlayer, pilotés par ArenaBot.state) + viz de contrôle du rig
+            // (mesh translucide + gizmos de bones, toggle hot-reload). Capteur
+            // forgia2_enemy_anim.json.
+            .add_plugins(enemy_anim::ForgiaRogueliteEnemyAnimPlugin)
             // Portail → salle de loot verticale (2026-06-06).
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).

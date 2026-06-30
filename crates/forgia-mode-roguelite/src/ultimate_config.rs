@@ -94,6 +94,41 @@ impl Default for FreezeParams {
     }
 }
 
+/// VFX (T4b) — couleurs/tailles du flash émissif par technique. Data-driven
+/// (genome `[vfx]`), hot-reload des couleurs. Index couleur : 0=explosion,
+/// 1=chaîne, 2=perforation, 3=gel (aligné sur [`crate::ultimate_vfx`]).
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(default)]
+pub struct UltimateVfxParams {
+    pub enabled: bool,
+    pub ttl: f32,
+    pub light_intensity: f32,
+    pub light_range: f32,
+    pub explosion_scale: f32,
+    pub hit_scale: f32,
+    pub explosion_rgb: [f32; 3],
+    pub chain_rgb: [f32; 3],
+    pub pierce_rgb: [f32; 3],
+    pub freeze_rgb: [f32; 3],
+}
+impl Default for UltimateVfxParams {
+    fn default() -> Self {
+        // Miroir EXACT de la section [vfx] de roguelite_ultimate.toml.
+        Self {
+            enabled: true,
+            ttl: 0.35,
+            light_intensity: 30_000.0,
+            light_range: 7.0,
+            explosion_scale: 2.5,
+            hit_scale: 0.7,
+            explosion_rgb: [1.0, 0.5, 0.12],
+            chain_rgb: [0.35, 0.75, 1.0],
+            pierce_rgb: [0.75, 0.30, 1.0],
+            freeze_rgb: [0.55, 0.85, 1.0],
+        }
+    }
+}
+
 /// Tuning complet des Ultimes (Resource + parsé du TOML, mtime hot-reload).
 #[derive(Resource, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(default)]
@@ -104,6 +139,7 @@ pub struct UltimateConfig {
     pub chain: ChainParams,
     pub pierce: PierceParams,
     pub freeze: FreezeParams,
+    pub vfx: UltimateVfxParams,
 }
 
 impl Default for UltimateConfig {
@@ -115,6 +151,7 @@ impl Default for UltimateConfig {
             chain: ChainParams::default(),
             pierce: PierceParams::default(),
             freeze: FreezeParams::default(),
+            vfx: UltimateVfxParams::default(),
         }
     }
 }
@@ -211,6 +248,25 @@ pub fn sys_hot_reload_ultimate_genome(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vfx_default_enabled_and_distinct_colors() {
+        let v = UltimateVfxParams::default();
+        assert!(v.enabled);
+        assert!(v.ttl > 0.0 && v.explosion_scale > v.hit_scale);
+        // 4 couleurs distinctes (une par technique).
+        assert_ne!(v.explosion_rgb, v.chain_rgb);
+        assert_ne!(v.chain_rgb, v.freeze_rgb);
+        assert_ne!(v.pierce_rgb, v.explosion_rgb);
+    }
+
+    #[test]
+    fn vfx_section_absent_falls_back_to_default() {
+        // Un TOML T4a (sans [vfx]) doit parser et obtenir le VfxParams par défaut.
+        let toml = "duration = 10.0\n[freeze]\nsecs = 2.5\nslow_factor = 0.0\naoe_radius = 5.0\n";
+        let c = UltimateConfig::parse_toml(toml);
+        assert_eq!(c.vfx, UltimateVfxParams::default());
+    }
 
     #[test]
     fn default_mirrors_consts() {

@@ -35,3 +35,18 @@ damage_factor = 0.7   # fraction des dégâts transmise aux perforés
 secs = 2.5            # durée du gel (s)
 slow_factor = 0.0     # facteur de vitesse pendant le gel (0 = immobile)
 aoe_radius = 5.0      # rayon de la zone de gel (m)
+
+# VFX (T4b) — flash émissif par technique (sphère, fade par scale + lumière).
+# 1re passe placeholder en-moteur (sprite-sheet/Hanabi = polish ultérieur).
+# Hot-reload : les couleurs se ré-appliquent en place sur les matériaux partagés.
+[vfx]
+enabled = true             # master switch (off = Ultime invisible mais actif)
+ttl = 0.35                 # durée de vie d'un flash (s)
+light_intensity = 30000.0  # lumens du point light d'impact (explosion)
+light_range = 7.0          # portée (m) de la lumière
+explosion_scale = 2.5      # rayon (m) de la sphère d'explosion (Pépin)
+hit_scale = 0.7            # rayon (m) des pops par ennemi (chaîne/perfo/gel)
+explosion_rgb = [1.0, 0.5, 0.12]   # orange (Pépin)
+chain_rgb = [0.35, 0.75, 1.0]      # cyan électrique (Bourrasque)
+pierce_rgb = [0.75, 0.30, 1.0]     # violet (Mme Lenoir)
+freeze_rgb = [0.55, 0.85, 1.0]     # glace (Pompe)

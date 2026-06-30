@@ -37,6 +37,7 @@ use crate::elements::{ElementConfig, StatusPoison};
 use crate::enemies::EnemyArchetype;
 use crate::ultimate_config::UltimateConfig;
 use crate::ultimate_tech::{chain_targets, freeze_secs_after_tick, frozen_speed_factor, pierce_targets};
+use crate::ultimate_vfx::{UltimateVfxEvent, VFX_CHAIN, VFX_EXPLOSION, VFX_FREEZE, VFX_PIERCE};
 
 const SENSOR_PATH: &str = "forgia2_ultimate_tech.json";
 const SENSOR_PERIOD_SECS: f32 = 1.0;
@@ -73,6 +74,7 @@ pub fn sys_apply_ultimate_technique(
     config: Res<ElementConfig>,
     ult_cfg: Res<UltimateConfig>,
     mut commands: Commands,
+    mut vfx_w: MessageWriter<UltimateVfxEvent>,
     mut stats: ResMut<UltimateTechStats>,
     q_cam: Query<&GlobalTransform, With<FpsCamera>>,
     q_pos: Query<(Entity, &GlobalTransform), With<EnemyArchetype>>,
@@ -124,6 +126,13 @@ pub fn sys_apply_ultimate_technique(
                 }
                 stats.explosions = stats.explosions.saturating_add(1);
                 stats.explosion_hits = stats.explosion_hits.saturating_add(n);
+                // VFX : grosse sphère orange + lumière au centre de l'explosion.
+                vfx_w.write(UltimateVfxEvent {
+                    pos: origin,
+                    technique: VFX_EXPLOSION,
+                    scale: ult_cfg.vfx.explosion_scale,
+                    light: true,
+                });
             }
 
             // ── Bourrasque : chaîne électrique ────────────────────────────
@@ -148,6 +157,15 @@ pub fn sys_apply_ultimate_technique(
                     if let Ok(mut hp) = q_health.get_mut(e) {
                         hp.current = (hp.current - dmg).max(0.0);
                         n += 1;
+                    }
+                    // VFX : flash cyan sur chaque maillon (position récupérée du buffer).
+                    if let Some(&(_, p)) = cand.iter().find(|(c, _)| *c == e) {
+                        vfx_w.write(UltimateVfxEvent {
+                            pos: p,
+                            technique: VFX_CHAIN,
+                            scale: ult_cfg.vfx.hit_scale,
+                            light: false,
+                        });
                     }
                 }
                 stats.chains = stats.chains.saturating_add(1);
@@ -178,6 +196,15 @@ pub fn sys_apply_ultimate_technique(
                     if let Ok(mut hp) = q_health.get_mut(e) {
                         hp.current = (hp.current - dmg).max(0.0);
                         n += 1;
+                    }
+                    // VFX : flash violet sur chaque ennemi perforé.
+                    if let Some(&(_, p)) = cand.iter().find(|(c, _)| *c == e) {
+                        vfx_w.write(UltimateVfxEvent {
+                            pos: p,
+                            technique: VFX_PIERCE,
+                            scale: ult_cfg.vfx.hit_scale,
+                            light: false,
+                        });
                     }
                     // Poison (réutilise les params genome de l'élément).
                     if let Ok(mut p) = q_poison.get_mut(e) {
@@ -210,6 +237,13 @@ pub fn sys_apply_ultimate_technique(
                             secs_left: ult_cfg.freeze.secs,
                             slow_factor: ult_cfg.freeze.slow_factor,
                             pin: pos,
+                        });
+                        // VFX : flash glace sur chaque ennemi gelé.
+                        vfx_w.write(UltimateVfxEvent {
+                            pos,
+                            technique: VFX_FREEZE,
+                            scale: ult_cfg.vfx.hit_scale,
+                            light: false,
                         });
                         n += 1;
                     }
