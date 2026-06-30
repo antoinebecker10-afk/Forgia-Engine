@@ -64,8 +64,16 @@ pub mod prelude {
 /// `held` = bouton actuellement enfoncé (mode auto).
 #[derive(Resource, Default)]
 pub struct LeftMouseState {
+    /// Edge clic RÉSOLU pour le step FixedUpdate courant (rempli par
+    /// `drain_left_click_edge`, lu par `fire_weapon_minimal`). Vrai sur exactement
+    /// 1 step après un press (semi/pump/burst).
     pub just_pressed: bool,
     pub held: bool,
+    /// Latch interne (keystone 0.1a-2 slice 4) : passe `true` sur un press, posé en
+    /// `RunFixedMainLoop::BeforeFixedMainLoop` (avant la boucle fixe) et consommé 1×
+    /// par le drain. Survit aux frames SANS step fixe (anti-perte) et n'est lu qu'une
+    /// fois (anti-doublé) — l'équivalent manuel de ce que leafwing fait pour ActionState.
+    pressed_latch: bool,
 }
 
 /// État d'une rafale en cours (fire_mode = "burst").
@@ -489,22 +497,44 @@ impl Plugin for ForgiaFpsPlugin {
                 aim_assist::write_aim_assist_sensor
                     .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
             )
+            // Keystone 0.1a-2 slice 4 (story-634) — clic gauche latché en
+            // `RunFixedMainLoop::BeforeFixedMainLoop` (lit `MouseButtonInput` brut,
+            // non-leafwing → l'edge doit survivre aux frames sans step fixe), puis
+            // résolu 1×/step par `drain_left_click_edge` (FixedUpdate, Input).
+            .add_systems(
+                bevy::app::RunFixedMainLoop,
+                track_left_mouse_state
+                    .in_set(bevy::app::RunFixedMainLoopSystems::BeforeFixedMainLoop)
+                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+            )
+            // Input/UI non-twitch (switch arme, reload key, despawn morts) restent Update.
             .add_systems(
                 Update,
                 (
-                    track_left_mouse_state,
                     weapon_select_system,
                     ammo_systems::cancel_reload_on_weapon_switch,
                     ammo_systems::reload_key_input,
-                    ammo_systems::tick_ammo_reload,
-                    fire_weapon_minimal.run_if(fire_allowed),
                     despawn_dead_cubes,
                 )
                     .chain()
                     .in_set(GameSet::Combat)
-                    .run_if(
-                        in_state(GameMode::Fps).or(in_state(GameMode::Roguelite)),
-                    ),
+                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+            )
+            // Tir + ammo en FixedUpdate (sim déterministe, aligné mouvement/physique).
+            // drain (Input) avant fire (Combat) via la chaîne GameSet. tick_ammo_reload
+            // = timer pur (ex-slice 2 déféré ici car chaîné au tir).
+            .add_systems(
+                FixedUpdate,
+                (
+                    drain_left_click_edge.in_set(GameSet::Input),
+                    (
+                        ammo_systems::tick_ammo_reload,
+                        fire_weapon_minimal.run_if(fire_allowed),
+                    )
+                        .chain()
+                        .in_set(GameSet::Combat),
+                )
+                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
             );
     }
 }
@@ -599,18 +629,21 @@ fn weapon_select_system(keys: Res<ButtonInput<KeyCode>>, mut equipped: ResMut<Eq
     }
 }
 
-/// Maintien `LeftMouseState` (held + just_pressed) via MessageReader<MouseButtonInput>.
+/// Latch `LeftMouseState` (held niveau + `pressed_latch` edge) via
+/// MessageReader<MouseButtonInput>. Keystone 0.1a-2 slice 4 : tourne en
+/// `RunFixedMainLoop::BeforeFixedMainLoop` (1×/frame, avant la boucle fixe) →
+/// l'edge clic survit aux frames sans step fixe ; il sera résolu/consommé 1× par
+/// `drain_left_click_edge`. NE reset PAS `just_pressed` (c'est le rôle du drain).
 fn track_left_mouse_state(
     mut evs: MessageReader<MouseButtonInput>,
     mut state: ResMut<LeftMouseState>,
 ) {
-    state.just_pressed = false; // reset chaque frame
     for ev in evs.read() {
         if ev.button == MouseButton::Left {
             match ev.state {
                 ButtonState::Pressed => {
                     state.held = true;
-                    state.just_pressed = true;
+                    state.pressed_latch = true; // latch (OR-accumulé jusqu'au drain)
                 }
                 ButtonState::Released => {
                     state.held = false;
@@ -618,6 +651,15 @@ fn track_left_mouse_state(
             }
         }
     }
+}
+
+/// FixedUpdate (tête de `GameSet::Input`) : résout l'edge clic POUR CE step fixe —
+/// `just_pressed = pressed_latch` puis CLEAR le latch (consommé 1×). Garantit qu'un
+/// press déclenche exactement 1 tir semi/pump/burst, quel que soit le nombre de
+/// steps fixes dans la frame (0 → survit ; N → 1 seul step voit l'edge).
+fn drain_left_click_edge(mut state: ResMut<LeftMouseState>) {
+    state.just_pressed = state.pressed_latch;
+    state.pressed_latch = false;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1249,7 +1291,7 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, track_left_mouse_state);
+            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Left,
@@ -1268,7 +1310,7 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, track_left_mouse_state);
+            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Left,
@@ -1288,7 +1330,7 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, track_left_mouse_state);
+            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Left,
@@ -1418,7 +1460,7 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, track_left_mouse_state);
+            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Right,

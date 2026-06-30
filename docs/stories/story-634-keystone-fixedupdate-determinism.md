@@ -1,8 +1,8 @@
 # Story-634 — Keystone : simulation déterministe (FixedUpdate + RunRng)
 
-> **Statut** : 🔵 IN_PROGRESS — 0.1a-1 fait ; 0.1a-2 slice 2 + **slice 3 fait** (mouvement+PHYSIQUE en
-> FixedUpdate, Rapier migré, feel validé) ; **0.1b-1 fait** (RNG combat hors horloge + fix boons). Reste :
-> slices 4 (tir+ammo) + 5 (damage+waves) en FixedUpdate, 0.1b-2 ordre d'itération, harness `run()==run()`.
+> **Statut** : 🔵 IN_PROGRESS — 0.1a-1 fait ; 0.1a-2 slice 2 + **slices 3 & 4 faits** (mouvement+PHYSIQUE
+> + tir+ammo en FixedUpdate, Rapier migré, feel validé) ; **0.1b-1 fait** (RNG combat hors horloge + fix
+> boons). Reste : slice 5 (damage+waves) en FixedUpdate, 0.1b-2 ordre d'itération, harness `run()==run()`.
 >
 > **🔎 MISE À JOUR 2026-06-28 (exécution + finding majeur)** : le piège `just_pressed` en
 > FixedUpdate **est déjà corrigé en amont par leafwing 0.20** (preuve dure : `leafwing-input-manager`
@@ -93,9 +93,13 @@ slice 3/4 : si le hit-stop marche via le couplage Virtual→Fixed, ne rien chang
   mouse_look+recoil restent Update. **Mouvement confirmé fluide** runtime. 2 régressions viewmodel
   corrigées (bob) : vitesse via `PlayerLocomotion` (mesurée FixedUpdate, signal propre) + wrap bob 2×TAU
   (cos demi-fréquence continu). Commits : slice 3 + fix bob. → **le gros morceau de la keystone est passé.**
-- 🔲 **Slice 4 — tir + ammo** : `fire_weapon_minimal` (via `LeftClickState`/`MouseButtonInput` brut,
-  non-leafwing → vérifier le comportement `MessageReader` en FixedUpdate) + `tick_ammo_reload` → FixedUpdate.
-  Feel : tir, burst, semi/pump, hit-stop.
+- ✅ **Slice 4 — tir + ammo → FixedUpdate. FAIT 2026-06-29, feel tir validé.** `fire_weapon_minimal` +
+  `tick_ammo_reload` → FixedUpdate `GameSet::Combat`. Le clic gauche (`LeftMouseState` via `MouseButtonInput`
+  brut, **non-leafwing** → pas couvert par la garantie « 1 edge = 1 step » de leafwing) est **latché** en
+  `RunFixedMainLoop`/`BeforeFixedMainLoop` (`pressed_latch`) puis **drainé 1× par step** (`drain_left_click_edge`,
+  FixedUpdate `GameSet::Input`) → 1 clic = 1 tir, jamais doublé/perdu malgré N≠1 steps/frame (= le buffer
+  fait-main pour le **seul** input non-leafwing restant). `weapon_select`/`reload_key_input`/`cancel_reload`/
+  `despawn_dead_cubes` restent Update. Vérif : check ✓ / clippy 0 ✓ / test 34 ✓.
 - 🔲 **Slice 5 — damage + cooldowns combat + waves roguelite** : `apply_damage` (forgia-damage),
   `sys_wave_orchestrator`, `sys_tick_shockwave_cooldown` → FixedUpdate.
 - 🔲 **Test déterminisme** (transition vers 0.1b) : préparer le harness `run()==run()`.
@@ -131,7 +135,8 @@ hors de portée. À faire avec le workstream physique-FixedUpdate.
 ## Acceptance criteria
 - [x] 0.1a-1 : chaîne GameSet déclarée en FixedUpdate, forgia-core compile, 0 effet runtime.
 - [~] 0.1a-2 : systèmes sim en FixedUpdate. Slice 2 (timers) + slice 3 (mouvement + PHYSIQUE Rapier,
-  feel validé fluide) FAITES. Reste slices 4 (tir+ammo) + 5 (damage+waves). Pas de couche FixedInput (leafwing).
+  feel validé fluide) + slice 4 (tir+ammo, clic latché/drainé, feel tir validé) FAITES. Reste slice 5
+  (damage+waves). Pas de couche FixedInput pour leafwing (clic gauche = seul input buffé à la main).
 - [~] 0.1b-1 : sources RNG combat hors horloge (crit/recoil/loot/spread via CombatRng) — FAIT,
   runtime validé (crit proc 20% via boon). + fix boons inertes (`sys_recompute` inconditionnel).
 - [ ] 0.1b-2 : ordre d'itération (DeathEvent/AOE) — différé avec le workstream physique-FixedUpdate.
