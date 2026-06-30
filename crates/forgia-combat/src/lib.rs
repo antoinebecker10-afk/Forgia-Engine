@@ -179,6 +179,7 @@ impl Plugin for ForgiaCombatPlugin {
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
+                    ultimate::sys_write_ultimate_sensor.in_set(GameSet::Sensors),
                     // hitstop_tick_system : wired par forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
                 ),
             );

@@ -97,6 +97,17 @@ impl UltimateState {
         self.cd_left = (self.cd_left - dt).max(0.0);
     }
 
+    /// Libellé d'état pour le sensor / HUD : `ready` / `active` / `cooldown`.
+    pub fn state_str(&self) -> &'static str {
+        if self.is_active() {
+            "active"
+        } else if self.cd_left > 0.0 {
+            "cooldown"
+        } else {
+            "ready"
+        }
+    }
+
     /// Remet à neutre (OnExit Roguelite — comme `PlayerCombatMods::reset`).
     pub fn reset(&mut self) {
         let (d, c) = (self.duration, self.cooldown);
@@ -111,6 +122,42 @@ impl UltimateState {
 /// Tick des timers de l'Ultime (GameSet::Combat). Léger, inconditionnel.
 pub fn sys_tick_ultimate(time: Res<Time>, mut ult: ResMut<UltimateState>) {
     ult.tick(time.delta_secs());
+}
+
+// ─── Sensor forgia2_ultimate.json ───────────────────────────────────────────
+
+const SENSOR_PATH: &str = "forgia2_ultimate.json";
+const SENSOR_PERIOD_SECS: f32 = 1.0;
+
+/// Écrit `forgia2_ultimate.json` 1Hz : état (ready/active/cooldown), timers,
+/// nombre d'activations, remplissage HUD. Permet à un agent de diagnostiquer
+/// l'Ultime sans lancer le rendu (point de validation T1b).
+pub fn sys_write_ultimate_sensor(
+    time: Res<Time>,
+    mut accum: Local<f32>,
+    ult: Res<UltimateState>,
+) {
+    *accum += time.delta_secs();
+    if *accum < SENSOR_PERIOD_SECS {
+        return;
+    }
+    *accum = 0.0;
+
+    let json = format!(
+        r#"{{"id":"ultimate","severity":"ok","next_step":"","state":"{}","active":{},"active_left":{:.2},"cd_left":{:.2},"duration":{:.1},"cooldown":{:.1},"activations":{},"hud_fill":{:.3}}}"#,
+        ult.state_str(),
+        ult.is_active(),
+        ult.active_left,
+        ult.cd_left,
+        ult.duration,
+        ult.cooldown,
+        ult.activations,
+        ult.hud_fill(),
+    );
+
+    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+        warn!("[ultimate] sensor write failed: {e}");
+    }
 }
 
 #[cfg(test)]
@@ -179,6 +226,18 @@ mod tests {
         assert!(u.hud_fill() < 0.1, "début cooldown = quasi vide");
         u.tick(u.cooldown); // cooldown écoulé
         assert!((u.hud_fill() - 1.0).abs() < 1e-3, "cd fini = rechargé");
+    }
+
+    #[test]
+    fn state_str_tracks_cycle() {
+        let mut u = UltimateState::default();
+        assert_eq!(u.state_str(), "ready");
+        u.try_activate();
+        assert_eq!(u.state_str(), "active");
+        u.tick(u.duration); // fin de la fenêtre active → cooldown
+        assert_eq!(u.state_str(), "cooldown");
+        u.tick(u.cooldown);
+        assert_eq!(u.state_str(), "ready");
     }
 
     #[test]
