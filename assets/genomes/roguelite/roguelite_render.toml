@@ -10,7 +10,12 @@
 # Effet compute natif (PbrPlugin), pas de FullscreenMaterial → pas du piège outline.
 [[genes]]
 id = "roguelite_ssao_enabled"
-default = 1.0   # 1 = ON, 0 = OFF (couper ici si crash/perf)
+# 0 = OFF par défaut. Le SSAO ACTIF (Msaa::Off requis) est INCOMPATIBLE avec le
+# post-process toon du roguelite → arène blanchie (meshes dans le frustum mais non
+# dessinés). Confirmé runtime 2026-06-30 : SSAO off → monde rend. Le code force
+# correctement Msaa::Off si on remet 1.0 (cf render_quality::apply_ssao_to + health-
+# check ssao_msaa_conflict), mais ne le faire QU'APRÈS avoir réglé la compat toon+SSAO.
+default = 0.0   # 1 = ON, 0 = OFF
 
 [[genes]]
 id = "roguelite_ssao_quality"
