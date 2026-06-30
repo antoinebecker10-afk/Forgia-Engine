@@ -28,6 +28,9 @@ use crate::run::RunState;
 use crate::waves::RogueliteWave;
 use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonId, BoonsCatalogue};
 use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
+use forgia_combat::ultimate::UltimateState;
+use crate::ultimate_config::UltimateConfig;
+use crate::ultimate_vfx::{weapon_technique_label, weapon_vfx_color};
 use forgia_player::FpsCamera;
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
@@ -1230,6 +1233,95 @@ pub(crate) fn draw_player_identity_badge(
     );
 }
 
+// ─── Bandeau Ultime (touche F, 10 s) — story-596 T4b ────────────────────────
+
+/// Feedback joueur quand l'Ultime est ACTIF : bordure d'écran + bandeau haut +
+/// barre de temps, **couleur liée à la technique de l'arme** (orange=explosion,
+/// cyan=chaîne, violet=perforation, glace=gel). Bien visible (l'effet ennemi est
+/// secondaire). Gaté `in_run_or_boss` (tuple) + `is_active`.
+pub(crate) fn draw_ultimate_banner(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    ult: Res<UltimateState>,
+    ult_cfg: Option<Res<UltimateConfig>>,
+    equipped: Option<Res<EquippedWeapons>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    if !ult.is_active() {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_ultimate"),
+    ));
+
+    let cfg = ult_cfg.map(|c| *c).unwrap_or_default();
+    let weapon = equipped.as_ref().map(|e| e.current).unwrap_or_default();
+    let [r, g, b] = weapon_vfx_color(&cfg, weapon);
+    let col = egui::Color32::from_rgb(
+        (r.clamp(0.0, 1.0) * 255.0) as u8,
+        (g.clamp(0.0, 1.0) * 255.0) as u8,
+        (b.clamp(0.0, 1.0) * 255.0) as u8,
+    );
+
+    // 1) Bordure d'écran (4 barres) — pulse colorée pendant l'Ultime.
+    let t = 12.0;
+    let bar = |min: egui::Pos2, max: egui::Pos2| {
+        painter.rect_filled(egui::Rect::from_min_max(min, max), 0.0, col);
+    };
+    bar(screen.min, egui::pos2(screen.max.x, screen.min.y + t)); // haut
+    bar(egui::pos2(screen.min.x, screen.max.y - t), screen.max); // bas
+    bar(screen.min, egui::pos2(screen.min.x + t, screen.max.y)); // gauche
+    bar(egui::pos2(screen.max.x - t, screen.min.y), screen.max); // droite
+
+    // 2) Bandeau haut-centre : « ULTIME · <technique> ».
+    let cx = screen.center().x;
+    let ty = screen.min.y + 72.0;
+    let label = format!("ULTIME · {}", weapon_technique_label(weapon));
+    text_with_outline(
+        &painter,
+        egui::pos2(cx, ty),
+        egui::Align2::CENTER_CENTER,
+        &label,
+        display_font(36.0),
+        col,
+        3.0,
+    );
+
+    // 3) Barre de temps (se vide sur 10 s).
+    let frac = ult.hud_fill();
+    let (bw, bh) = (320.0, 14.0);
+    let by = ty + 34.0;
+    painter.rect_filled(
+        egui::Rect::from_min_size(egui::pos2(cx - bw * 0.5, by), egui::vec2(bw, bh)),
+        4.0,
+        C_BG_DARK,
+    );
+    painter.rect_filled(
+        egui::Rect::from_min_size(egui::pos2(cx - bw * 0.5, by), egui::vec2(bw * frac, bh)),
+        4.0,
+        col,
+    );
+
+    // 4) Secondes restantes.
+    text_with_outline(
+        &painter,
+        egui::pos2(cx, by + bh + 16.0),
+        egui::Align2::CENTER_CENTER,
+        &format!("{:.0}s", ult.active_left.ceil()),
+        egui::FontId::monospace(20.0),
+        col,
+        1.5,
+    );
+}
+
 // ─── Indicateur sort F « Onde de choc » (bas-centre) ───────────────────────
 
 /// Story-572 — pastille du sort F (bas-centre). Prêt = anneau + « F » dorés ;
@@ -1461,6 +1553,7 @@ impl Plugin for RogueliteHudPlugin {
                     draw_player_portrait,
                     draw_player_identity_badge,
                     draw_shockwave_indicator,
+                    draw_ultimate_banner,
                     draw_wave_counter,
                     draw_currency_counters,
                     draw_active_boons,

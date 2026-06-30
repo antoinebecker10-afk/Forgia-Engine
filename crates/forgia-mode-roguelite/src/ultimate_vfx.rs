@@ -16,6 +16,7 @@
 
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
+use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::*;
 
 use crate::element_vfx::ElementSpark;
@@ -72,6 +73,37 @@ fn colors(cfg: &UltimateConfig) -> [[f32; 3]; 4] {
         cfg.vfx.pierce_rgb,
         cfg.vfx.freeze_rgb,
     ]
+}
+
+/// Index de technique de l'arme équipée (None si non mappée). Sert au HUD et à
+/// la lueur d'arme pour lier la couleur à l'effet produit.
+pub fn weapon_technique_idx(w: WeaponType) -> Option<usize> {
+    match w {
+        WeaponType::ModernAR => Some(VFX_EXPLOSION),
+        WeaponType::AssaultRifle => Some(VFX_CHAIN),
+        WeaponType::Shotgun => Some(VFX_PIERCE),
+        WeaponType::RocketLauncher => Some(VFX_FREEZE),
+        _ => None,
+    }
+}
+
+/// Couleur RGB de la technique d'Ultime de l'arme (blanc si non mappée).
+pub fn weapon_vfx_color(cfg: &UltimateConfig, w: WeaponType) -> [f32; 3] {
+    match weapon_technique_idx(w) {
+        Some(i) => colors(cfg)[i],
+        None => [1.0, 1.0, 1.0],
+    }
+}
+
+/// Libellé court de la technique (HUD).
+pub fn weapon_technique_label(w: WeaponType) -> &'static str {
+    match w {
+        WeaponType::ModernAR => "EXPLOSION",
+        WeaponType::AssaultRifle => "CHAÎNE ÉLEC",
+        WeaponType::Shotgun => "PERFORATION",
+        WeaponType::RocketLauncher => "GEL",
+        _ => "ULTIME",
+    }
 }
 
 /// Startup (après `ultimate_config::sys_init_ultimate_genome`) : construit le mesh
@@ -191,5 +223,14 @@ mod tests {
         let rgb = colors(&c);
         assert_eq!(rgb[VFX_EXPLOSION], c.vfx.explosion_rgb);
         assert_eq!(rgb[VFX_FREEZE], c.vfx.freeze_rgb);
+    }
+
+    #[test]
+    fn weapon_maps_to_its_technique_color() {
+        let c = UltimateConfig::default();
+        assert_eq!(weapon_technique_idx(WeaponType::ModernAR), Some(VFX_EXPLOSION));
+        assert_eq!(weapon_technique_idx(WeaponType::RocketLauncher), Some(VFX_FREEZE));
+        assert_eq!(weapon_vfx_color(&c, WeaponType::AssaultRifle), c.vfx.chain_rgb);
+        assert_eq!(weapon_technique_label(WeaponType::Shotgun), "PERFORATION");
     }
 }
