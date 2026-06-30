@@ -15,6 +15,7 @@
 
 use bevy::prelude::*;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::pbr::ScreenSpaceAmbientOcclusion;
 use bevy::render::view::Msaa;
 use bevy::window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
@@ -318,7 +319,11 @@ pub fn apply_tonemapping_to_cameras(
 /// Idempotent (set-if-different).
 pub fn apply_msaa_to_cameras(
     settings: Res<UserSettings>,
-    mut q_cam: Query<&mut Msaa, With<FpsCamera>>,
+    // `Without<ScreenSpaceAmbientOcclusion>` : ne PAS écraser le `Msaa::Off` forcé
+    // par le SSAO (render_quality, Roguelite) — SSAO+MSAA = incompatible Bevy. Dès
+    // que le SSAO est retiré (OnExit Roguelite / config off), la cam re-match ici
+    // et le MSAA utilisateur est restauré automatiquement.
+    mut q_cam: Query<&mut Msaa, (With<FpsCamera>, Without<ScreenSpaceAmbientOcclusion>)>,
 ) {
     let target = match settings.msaa_samples {
         1 => Msaa::Off,

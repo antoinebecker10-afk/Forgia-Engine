@@ -18,6 +18,7 @@
 
 use bevy::pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel};
 use bevy::prelude::*;
+use bevy::render::view::Msaa;
 use forgia_core::prelude::*;
 use forgia_player::prelude::ViewmodelCamera;
 use serde::Deserialize;
@@ -186,6 +187,11 @@ pub fn sys_hot_reload_render_genome(
 fn apply_ssao_to(commands: &mut Commands, e: Entity, cfg: &RogueliteRenderConfig) {
     if cfg.ssao_enabled {
         commands.entity(e).insert(cfg.to_ssao());
+        // SSAO et MSAA sont MUTUELLEMENT EXCLUSIFS dans Bevy (sinon ERROR b0004 à
+        // chaque frame + SSAO inopérant). On force `Msaa::Off` sur la caméra qui
+        // porte le SSAO. `apply_msaa_to_cameras` (forgia-ui-lib) ignore les cams
+        // avec SSAO et restaure le MSAA utilisateur dès que le SSAO est retiré.
+        commands.entity(e).insert(Msaa::Off);
     } else {
         commands.entity(e).remove::<ScreenSpaceAmbientOcclusion>();
     }
@@ -255,12 +261,23 @@ pub fn sys_detach_ssao(
 // ─── Sensor ─────────────────────────────────────────────────────────────────
 
 /// Pur — severity/next_step du capteur rendu.
+///
+/// `ssao_msaa_conflict` : une cam porte SSAO **et** un MSAA actif (≠ Off). C'est
+/// l'unique combinaison qui spamme `ERROR b0004` chaque frame + rend le SSAO
+/// inopérant (incompatibilité Bevy). Health-check prioritaire : sans lui, le
+/// conflit n'est visible que dans les erreurs wgpu brutes, pas dans un capteur.
 pub fn severity_for_render(
     ssao_enabled: bool,
     ssao_attached: u32,
     camera_present: bool,
+    ssao_msaa_conflict: bool,
 ) -> (&'static str, &'static str) {
-    if ssao_enabled && camera_present && ssao_attached == 0 {
+    if ssao_msaa_conflict {
+        (
+            "warn",
+            "Conflit SSAO+MSAA sur la meme camera (ERROR b0004 chaque frame, SSAO inoperant). apply_ssao_to doit forcer Msaa::Off ; apply_msaa_to_cameras doit exclure les cams SSAO.",
+        )
+    } else if ssao_enabled && camera_present && ssao_attached == 0 {
         (
             "warn",
             "SSAO active en config mais 0 camera attachee — effet invisible. Verifier la Camera3d Roguelite.",
@@ -280,6 +297,7 @@ pub fn sys_write_render_sensor(
     watch: Option<Res<RenderGenomeWatch>>,
     q_cam: Query<(), (With<Camera3d>, Without<ViewmodelCamera>)>,
     q_fog: Query<(), With<DistanceFog>>,
+    q_ssao_msaa: Query<&Msaa, With<ScreenSpaceAmbientOcclusion>>,
 ) {
     *accum += time.delta_secs();
     if *accum < POLL_PERIOD_SEC {
@@ -291,15 +309,22 @@ pub fn sys_write_render_sensor(
     };
     let camera_count = q_cam.iter().count() as u32;
     let fog_attached = q_fog.iter().count() as u32;
-    let (severity, next_step) =
-        severity_for_render(cfg.ssao_enabled, watch.ssao_attached, camera_count > 0);
+    // Conflit = une cam SSAO avec un MSAA ≠ Off (b0004 + SSAO inopérant).
+    let ssao_msaa_conflict = q_ssao_msaa.iter().any(|m| !matches!(m, Msaa::Off));
+    let (severity, next_step) = severity_for_render(
+        cfg.ssao_enabled,
+        watch.ssao_attached,
+        camera_count > 0,
+        ssao_msaa_conflict,
+    );
 
     let json = format!(
-        r#"{{"id":"render_fx","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"camera_count":{},"ssao_enabled":{},"ssao_attached":{},"ssao_quality":{},"ssao_thickness":{:.2},"fog_enabled":{},"fog_density":{:.3},"fog_attached":{},"ambient_brightness":{:.0},"reload_count":{}}}"#,
+        r#"{{"id":"render_fx","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"camera_count":{},"ssao_enabled":{},"ssao_attached":{},"ssao_msaa_conflict":{},"ssao_quality":{},"ssao_thickness":{:.2},"fog_enabled":{},"fog_density":{:.3},"fog_attached":{},"ambient_brightness":{:.0},"reload_count":{}}}"#,
         time.elapsed_secs(),
         camera_count,
         cfg.ssao_enabled,
         watch.ssao_attached,
+        ssao_msaa_conflict,
         cfg.ssao_quality,
         cfg.ssao_thickness,
         cfg.fog_enabled,
@@ -384,11 +409,21 @@ default = 0.05
 
     #[test]
     fn severity_warn_when_enabled_but_unattached() {
-        assert_eq!(severity_for_render(true, 0, true).0, "warn");
-        assert_eq!(severity_for_render(true, 1, true).0, "ok");
-        assert_eq!(severity_for_render(false, 0, true).0, "ok");
+        assert_eq!(severity_for_render(true, 0, true, false).0, "warn");
+        assert_eq!(severity_for_render(true, 1, true, false).0, "ok");
+        assert_eq!(severity_for_render(false, 0, true, false).0, "ok");
         // pas de caméra encore → pas de warn (transitoire boot)
-        assert_eq!(severity_for_render(true, 0, false).0, "ok");
+        assert_eq!(severity_for_render(true, 0, false, false).0, "ok");
+    }
+
+    #[test]
+    fn severity_warn_on_ssao_msaa_conflict() {
+        // SSAO + MSAA sur la même cam = b0004 + SSAO inopérant → warn prioritaire.
+        let (sev, next) = severity_for_render(true, 1, true, true);
+        assert_eq!(sev, "warn");
+        assert!(next.contains("b0004"));
+        // Conflit prioritaire même si le reste paraît "ok" (SSAO attaché, cam présente).
+        assert_eq!(severity_for_render(false, 0, false, true).0, "warn");
     }
 
     #[test]
