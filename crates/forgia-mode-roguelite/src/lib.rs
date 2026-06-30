@@ -54,6 +54,9 @@ pub mod shockwave;
 pub mod stations;
 pub mod status_vfx;
 pub mod toon_config;
+pub mod ultimate_apply;
+pub mod ultimate_config;
+pub mod ultimate_tech;
 pub mod waves;
 pub mod weapon_select;
 
@@ -283,6 +286,40 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             elements::sys_write_elements_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-596 T4a — genome de tuning des Ultimes (durées/rayons/dégâts),
+        // hot-reload Shift+F12-like → réglage live sans rebuild. Charge au Startup
+        // (+ applique durée/cooldown à UltimateState), re-parse mtime en Update.
+        app.add_systems(Startup, ultimate_config::sys_init_ultimate_genome);
+        app.add_systems(
+            Update,
+            ultimate_config::sys_hot_reload_ultimate_genome
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Story-596 T3 — techniques d'Ultime (touche F, 10s) : explosion (Pépin),
+        // chaîne élec (Bourrasque), perforation+poison (Lenoir), gel (Pompe).
+        // Application sur le hit (Effects, après l'élément passif) ; gel pinné
+        // après l'AI (Effects) ; reset OnEnter ; sensor forgia2_ultimate_tech.json.
+        app.init_resource::<ultimate_apply::UltimateTechStats>();
+        app.add_systems(
+            OnEnter(GameMode::Roguelite),
+            ultimate_apply::sys_reset_ultimate_tech_stats,
+        );
+        app.add_systems(
+            Update,
+            (
+                ultimate_apply::sys_apply_ultimate_technique
+                    .after(elements::sys_apply_elements_on_hit),
+                ultimate_apply::sys_tick_ultimate_freeze
+                    .after(shockwave::sys_apply_knockback),
+            )
+                .in_set(GameSet::Effects)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            ultimate_apply::sys_write_ultimate_tech_sensor.in_set(GameSet::Sensors),
         );
         // Story-588 (2026-06-09) — VFX colorés des éléments (flash d'impact +
         // pulse DoT) pour rendre le système d'éléments VISIBLE. Mesh + 4

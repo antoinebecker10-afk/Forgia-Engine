@@ -22,6 +22,7 @@ pub mod combat_rng;
 pub mod confidence;
 pub mod melee;
 pub mod sensor;
+pub mod ultimate;
 pub mod weapons;
 
 // TODO: port from V1 — viewmodel, reload, health, rpg_systems, targeting, boss, gcd
@@ -46,6 +47,7 @@ pub mod prelude {
     pub use crate::confidence::{PepinConfidence, ShotResolved};
     pub use crate::melee::MeleeCooldown;
     pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
+    pub use crate::ultimate::{UltimateState, ULTIMATE_COOLDOWN_SECS, ULTIMATE_DURATION_SECS};
     pub use crate::weapons::{
         damage_falloff, CasingResources, EquippedWeapons, WeaponFireCooldown, WeaponType,
         ARENA_V1_WEAPONS,
@@ -152,6 +154,10 @@ impl Plugin for ForgiaCombatPlugin {
             // Keystone 0.1b (story-634) — flux RNG combat déterministe (crit, …).
             // Reseedé depuis RunSeed au StartRunEvent par forgia-mode-roguelite.
             .init_resource::<combat_rng::CombatRng>()
+            // État Ultime (touche F) — timer/cooldown partagé fps↔roguelite↔HUD.
+            // L'input F + le branchement technique-par-arme vivent dans
+            // forgia-mode-roguelite (combat = dep root, neutre ici).
+            .init_resource::<ultimate::UltimateState>()
             // Story-531 AC9 — jauge de confiance Pépin (state partagé fps↔HUD).
             .init_resource::<confidence::PepinConfidence>()
             .add_message::<confidence::ShotResolved>()
@@ -179,6 +185,10 @@ impl Plugin for ForgiaCombatPlugin {
                     melee::melee_cooldown_tick_system
                         .run_if(resource_exists::<melee::MeleeCooldown>)
                         .in_set(GameSet::Combat),
+                    // Story-596 — sys_tick_ultimate = timer PUR (comme les cooldowns
+                    // d'arme/melee) → FixedUpdate aussi, pour le déterminisme keystone
+                    // (story-634). is_active() consommé par les techniques (Effects).
+                    ultimate::sys_tick_ultimate.in_set(GameSet::Combat),
                 ),
             )
             .add_systems(
@@ -189,6 +199,7 @@ impl Plugin for ForgiaCombatPlugin {
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
+                    ultimate::sys_write_ultimate_sensor.in_set(GameSet::Sensors),
                     // hitstop_tick_system : wired par forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
                 ),
             );

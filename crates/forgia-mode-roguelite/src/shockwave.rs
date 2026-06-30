@@ -18,6 +18,7 @@
 use bevy::prelude::*;
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_combat::combat_juice::{CameraTrauma, CombatHitEvent};
+use forgia_combat::ultimate::UltimateState;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
 use forgia_core::prelude::*;
@@ -116,6 +117,7 @@ pub fn sys_shockwave_input(
     app_state: Res<State<AppMode>>,
     run_state: Option<Res<State<RunState>>>,
     mut ab: ResMut<ShockwaveAbility>,
+    mut ult: ResMut<UltimateState>,
     q_player: Query<(Entity, &Transform), With<Player>>,
     q_cam: Query<&GlobalTransform, With<FpsCamera>>,
     q_bots: Query<(Entity, &Transform), With<ArenaBot>>,
@@ -136,6 +138,16 @@ pub fn sys_shockwave_input(
     );
     if !in_run || !keys.just_pressed(KeyCode::KeyF) {
         return;
+    }
+    // T1b (story-596) — F ouvre l'État Ultime 10s (gaté par SON cooldown propre,
+    // indépendant du cooldown par-arme du sort d'ouverture ci-dessous). Pendant la
+    // fenêtre active, T3 branchera la technique signature par-tir. Le sort instantané
+    // reste pour l'instant le "burst d'ouverture" — sa fusion/retrait = T3.
+    if ult.try_activate() {
+        info!(
+            "[roguelite] ULTIME activé — {}s (cooldown {}s)",
+            ult.duration as u32, ult.cooldown as u32
+        );
     }
     let current = equipped.as_ref().map(|e| e.current).unwrap_or_default();
     if ab.cooldowns.get(&current).copied().unwrap_or(0.0) > 0.0 {
