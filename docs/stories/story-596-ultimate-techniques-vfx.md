@@ -26,11 +26,11 @@
 
 | Tier | Contenu | Crates | Risk | Statut |
 |---|---|---|---|---|
-| **T1** | `UltimateState` (timer 10 s + cooldown + sensor) + tick | forgia-combat | 🟢 Low | en cours |
-| **T1b** | Input F → `try_activate` (gate AppMode+run), retrait du cast instantané `shockwave.rs` | forgia-mode-roguelite | 🟡 Med | à faire |
-| **T2** | Mécaniques : `StatusFreeze` + chaîne électrique (helper) + params genome | forgia-mode-roguelite | 🟡 Med | à faire |
-| **T3** | Branchement Ultime→technique sur le hit (gaté `UltimateState.is_active`) | roguelite, combat | 🟠 High | à faire |
-| **T4** | VFX flipbook billboard + SFX par technique (assets CC0) | forgia-effects, assets | 🟡 Med | à faire |
+| **T1** | `UltimateState` (timer 10 s + cooldown + sensor) + tick | forgia-combat | 🟢 Low | ✅ done |
+| **T1b** | Input F → `try_activate` + sensor `forgia2_ultimate.json` | forgia-mode-roguelite | 🟡 Med | ✅ done |
+| **T2** | Logique pure : chaîne électrique + modèle de gel + tunables | forgia-mode-roguelite | 🟡 Med | ✅ done |
+| **T3** | Branchement Ultime→technique sur le hit (gaté `is_active`) + gel runtime + sensor `forgia2_ultimate_tech.json` | roguelite | 🟠 High | ✅ done (mécanique ; tuning/VFX = T4 VS Code) |
+| **T4** | VFX flipbook billboard + SFX par technique (assets CC0) + tuning genome | forgia-effects, assets | 🟡 Med | à faire (VS Code) |
 
 ## Critères d'acceptance
 

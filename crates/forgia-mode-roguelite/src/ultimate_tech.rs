@@ -34,6 +34,18 @@ pub const ULTIMATE_FREEZE_SLOW: f32 = 0.0;
 /// Pompe — rayon (m) de la zone de gel autour de l'impact.
 pub const ULTIMATE_FREEZE_AOE_RADIUS: f32 = 5.0;
 
+/// Pépin — rayon (m) du splash d'explosion autour de l'impact.
+pub const ULTIMATE_EXPLOSION_RADIUS: f32 = 4.5;
+/// Pépin — fraction des dégâts du tir transmise aux voisins de l'explosion.
+pub const ULTIMATE_EXPLOSION_DAMAGE_FACTOR: f32 = 0.8;
+
+/// Mme Lenoir — portée (m) de la perforation derrière la cible touchée.
+pub const ULTIMATE_PIERCE_RANGE: f32 = 25.0;
+/// Mme Lenoir — demi-largeur (m) du couloir de perforation.
+pub const ULTIMATE_PIERCE_HALF_WIDTH: f32 = 1.5;
+/// Mme Lenoir — fraction des dégâts du tir transmise aux ennemis perforés.
+pub const ULTIMATE_PIERCE_DAMAGE_FACTOR: f32 = 0.7;
+
 // ─── Bourrasque : chaîne électrique (sélection des cibles) ──────────────────
 
 /// Construit la **chaîne d'arc électrique** depuis `start` (point d'impact du
@@ -75,6 +87,41 @@ pub fn chain_targets<T: Copy + PartialEq>(
         };
         out.push(candidates[i].0);
         cur = candidates[i].1;
+    }
+}
+
+// ─── Mme Lenoir : perforation (couloir de ligne) ────────────────────────────
+
+/// Sélectionne les ennemis **perforés** : ceux dans un couloir de longueur
+/// `range` et demi-largeur `half_width` partant de `origin` le long de `dir`
+/// (projeté sur le plan XZ). Mêmes maths que l'ancien `line_strike` (shockwave)
+/// mais pur et générique (testable sans `Entity`). `out` est vidé puis rempli
+/// (buffer réutilisé — 0 alloc hot path). L'appelant exclut la cible primaire.
+pub fn pierce_targets<T: Copy>(
+    origin: Vec3,
+    dir: Vec3,
+    range: f32,
+    half_width: f32,
+    candidates: &[(T, Vec3)],
+    out: &mut Vec<T>,
+) {
+    out.clear();
+    let fwd = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
+    if fwd == Vec3::ZERO || range <= 0.0 {
+        return;
+    }
+    // Perpendiculaire au forward dans le plan XZ (rotation -90°).
+    let perp = Vec3::new(fwd.z, 0.0, -fwd.x);
+    for (id, pos) in candidates {
+        let rel = Vec3::new(pos.x - origin.x, 0.0, pos.z - origin.z);
+        let along = rel.dot(fwd);
+        if along < 0.0 || along > range {
+            continue;
+        }
+        if rel.dot(perp).abs() > half_width {
+            continue;
+        }
+        out.push(*id);
     }
 }
 
@@ -165,6 +212,30 @@ mod tests {
         let mut out = Vec::new();
         chain_targets(v(0.0, 0.0), &cands, 2, 3.0, &mut out);
         assert_eq!(out[0], 2, "le plus proche d'abord (id 2 à 0.5 m)");
+    }
+
+    #[test]
+    fn pierce_hits_enemies_in_corridor_only() {
+        // Forward = +X. Trois ennemis : 2 alignés dans le couloir, 1 décalé hors largeur.
+        let cands = [
+            (1usize, v(5.0, 0.0)),  // dans l'axe, à 5 m → touché
+            (2, v(10.0, 1.0)),      // à 10 m, décalé 1 m < 1.5 → touché
+            (3, v(8.0, 3.0)),       // décalé 3 m > 1.5 → raté
+        ];
+        let mut out = Vec::new();
+        pierce_targets(v(0.0, 0.0), v(1.0, 0.0), 25.0, 1.5, &cands, &mut out);
+        assert_eq!(out, vec![1, 2], "seuls les ennemis dans le couloir sont perforés");
+    }
+
+    #[test]
+    fn pierce_excludes_behind_and_out_of_range() {
+        let cands = [
+            (1usize, v(-3.0, 0.0)), // DERRIÈRE le tireur (along < 0) → raté
+            (2, v(30.0, 0.0)),      // au-delà de range 25 → raté
+        ];
+        let mut out = Vec::new();
+        pierce_targets(v(0.0, 0.0), v(1.0, 0.0), 25.0, 1.5, &cands, &mut out);
+        assert!(out.is_empty(), "ni derrière, ni hors portée");
     }
 
     #[test]
