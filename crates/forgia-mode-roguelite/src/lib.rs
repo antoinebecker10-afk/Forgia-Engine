@@ -42,6 +42,7 @@ pub mod sensor;
 pub mod shockwave;
 pub mod stations;
 pub mod toon_config;
+pub mod ultimate_tech;
 pub mod waves;
 
 pub use enemies::{EnemyArchetype, EnemyStats};
