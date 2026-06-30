@@ -21,6 +21,7 @@ pub mod combat_mods;
 pub mod confidence;
 pub mod melee;
 pub mod sensor;
+pub mod ultimate;
 pub mod weapons;
 
 // TODO: port from V1 — viewmodel, reload, health, rpg_systems, targeting, boss, gcd
@@ -44,6 +45,7 @@ pub mod prelude {
     pub use crate::confidence::{PepinConfidence, ShotResolved};
     pub use crate::melee::MeleeCooldown;
     pub use crate::sensor::{CombatSensorCounters, LocalPlayerMarker};
+    pub use crate::ultimate::{UltimateState, ULTIMATE_COOLDOWN_SECS, ULTIMATE_DURATION_SECS};
     pub use crate::weapons::{
         damage_falloff, CasingResources, EquippedWeapons, WeaponFireCooldown, WeaponType,
         ARENA_V1_WEAPONS,
@@ -147,6 +149,10 @@ impl Plugin for ForgiaCombatPlugin {
             // par forgia-fps (damage_mul + fire_rate_mul) et forgia-damage
             // (damage_reduction — Phase 4b).
             .init_resource::<combat_mods::PlayerCombatMods>()
+            // État Ultime (touche F) — timer/cooldown partagé fps↔roguelite↔HUD.
+            // L'input F + le branchement technique-par-arme vivent dans
+            // forgia-mode-roguelite (combat = dep root, neutre ici).
+            .init_resource::<ultimate::UltimateState>()
             // Story-531 AC9 — jauge de confiance Pépin (state partagé fps↔HUD).
             .init_resource::<confidence::PepinConfidence>()
             .add_message::<confidence::ShotResolved>()
@@ -169,6 +175,7 @@ impl Plugin for ForgiaCombatPlugin {
                     melee::melee_cooldown_tick_system
                         .run_if(resource_exists::<melee::MeleeCooldown>)
                         .in_set(GameSet::Combat),
+                    ultimate::sys_tick_ultimate.in_set(GameSet::Combat),
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
