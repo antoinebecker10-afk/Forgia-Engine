@@ -30,7 +30,8 @@
 | **T1b** | Input F → `try_activate` + sensor `forgia2_ultimate.json` | forgia-mode-roguelite | 🟡 Med | ✅ done |
 | **T2** | Logique pure : chaîne électrique + modèle de gel + tunables | forgia-mode-roguelite | 🟡 Med | ✅ done |
 | **T3** | Branchement Ultime→technique sur le hit (gaté `is_active`) + gel runtime + sensor `forgia2_ultimate_tech.json` | roguelite | 🟠 High | ✅ done (mécanique ; tuning/VFX = T4 VS Code) |
-| **T4** | VFX flipbook billboard + SFX par technique (assets CC0) + tuning genome | forgia-effects, assets | 🟡 Med | à faire (VS Code) |
+| **T4a** | Genome de tuning `roguelite_ultimate.toml` (hot-reload durées/rayons/dégâts) | forgia-mode-roguelite, assets | 🟡 Med | ✅ done (15 tests, 0 warning) |
+| **T4b** | VFX flipbook billboard + SFX par technique (assets CC0) | forgia-effects, assets | 🟡 Med | à faire (VS Code, GPU + œil) |
 
 ## Critères d'acceptance
 

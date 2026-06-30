@@ -43,6 +43,7 @@ pub mod shockwave;
 pub mod stations;
 pub mod toon_config;
 pub mod ultimate_apply;
+pub mod ultimate_config;
 pub mod ultimate_tech;
 pub mod waves;
 
@@ -242,6 +243,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             elements::sys_write_elements_sensor.in_set(GameSet::Sensors),
+        );
+        // Story-596 T4a — genome de tuning des Ultimes (durées/rayons/dégâts),
+        // hot-reload Shift+F12-like → réglage live sans rebuild. Charge au Startup
+        // (+ applique durée/cooldown à UltimateState), re-parse mtime en Update.
+        app.add_systems(Startup, ultimate_config::sys_init_ultimate_genome);
+        app.add_systems(
+            Update,
+            ultimate_config::sys_hot_reload_ultimate_genome
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
         );
         // Story-596 T3 — techniques d'Ultime (touche F, 10s) : explosion (Pépin),
         // chaîne élec (Bourrasque), perforation+poison (Lenoir), gel (Pompe).

@@ -35,13 +35,8 @@ use std::fs;
 
 use crate::elements::{ElementConfig, StatusPoison};
 use crate::enemies::EnemyArchetype;
-use crate::ultimate_tech::{
-    chain_targets, freeze_secs_after_tick, frozen_speed_factor, pierce_targets,
-    ULTIMATE_CHAIN_DAMAGE_FACTOR, ULTIMATE_CHAIN_HOP_RADIUS, ULTIMATE_CHAIN_MAX_EXTRA,
-    ULTIMATE_EXPLOSION_DAMAGE_FACTOR, ULTIMATE_EXPLOSION_RADIUS, ULTIMATE_FREEZE_AOE_RADIUS,
-    ULTIMATE_FREEZE_SECS, ULTIMATE_FREEZE_SLOW, ULTIMATE_PIERCE_DAMAGE_FACTOR,
-    ULTIMATE_PIERCE_HALF_WIDTH, ULTIMATE_PIERCE_RANGE,
-};
+use crate::ultimate_config::UltimateConfig;
+use crate::ultimate_tech::{chain_targets, freeze_secs_after_tick, frozen_speed_factor, pierce_targets};
 
 const SENSOR_PATH: &str = "forgia2_ultimate_tech.json";
 const SENSOR_PERIOD_SECS: f32 = 1.0;
@@ -76,6 +71,7 @@ pub fn sys_apply_ultimate_technique(
     mut events: MessageReader<CombatHitEvent>,
     ult: Res<UltimateState>,
     config: Res<ElementConfig>,
+    ult_cfg: Res<UltimateConfig>,
     mut commands: Commands,
     mut stats: ResMut<UltimateTechStats>,
     q_cam: Query<&GlobalTransform, With<FpsCamera>>,
@@ -112,8 +108,8 @@ pub fn sys_apply_ultimate_technique(
         match weapon {
             // ── Pépin : explosion AOE ─────────────────────────────────────
             WeaponType::ModernAR => {
-                let r2 = ULTIMATE_EXPLOSION_RADIUS * ULTIMATE_EXPLOSION_RADIUS;
-                let dmg = (ev.damage * ULTIMATE_EXPLOSION_DAMAGE_FACTOR).max(0.0);
+                let r2 = ult_cfg.explosion.radius * ult_cfg.explosion.radius;
+                let dmg = (ev.damage * ult_cfg.explosion.damage_factor).max(0.0);
                 hits.clear();
                 hits.extend(q_pos.iter().filter_map(|(e, gt)| {
                     (e != ev.target && (gt.translation() - origin).length_squared() <= r2)
@@ -142,11 +138,11 @@ pub fn sys_apply_ultimate_technique(
                 chain_targets(
                     origin,
                     &cand,
-                    ULTIMATE_CHAIN_MAX_EXTRA,
-                    ULTIMATE_CHAIN_HOP_RADIUS,
+                    ult_cfg.chain.max_extra,
+                    ult_cfg.chain.hop_radius,
                     &mut hits,
                 );
-                let dmg = (ev.damage * ULTIMATE_CHAIN_DAMAGE_FACTOR).max(0.0);
+                let dmg = (ev.damage * ult_cfg.chain.damage_factor).max(0.0);
                 let mut n = 0u32;
                 for &e in &*hits {
                     if let Ok(mut hp) = q_health.get_mut(e) {
@@ -170,12 +166,12 @@ pub fn sys_apply_ultimate_technique(
                 pierce_targets(
                     origin,
                     cam_fwd,
-                    ULTIMATE_PIERCE_RANGE,
-                    ULTIMATE_PIERCE_HALF_WIDTH,
+                    ult_cfg.pierce.range,
+                    ult_cfg.pierce.half_width,
                     &cand,
                     &mut hits,
                 );
-                let dmg = (ev.damage * ULTIMATE_PIERCE_DAMAGE_FACTOR).max(0.0);
+                let dmg = (ev.damage * ult_cfg.pierce.damage_factor).max(0.0);
                 let mut n = 0u32;
                 let mut poisoned = 0u32;
                 for &e in &*hits {
@@ -205,14 +201,14 @@ pub fn sys_apply_ultimate_technique(
 
             // ── Pompe : gel de zone ───────────────────────────────────────
             WeaponType::RocketLauncher => {
-                let r2 = ULTIMATE_FREEZE_AOE_RADIUS * ULTIMATE_FREEZE_AOE_RADIUS;
+                let r2 = ult_cfg.freeze.aoe_radius * ult_cfg.freeze.aoe_radius;
                 let mut n = 0u32;
                 for (e, gt) in q_pos.iter() {
                     let pos = gt.translation();
                     if (pos - origin).length_squared() <= r2 {
                         commands.entity(e).try_insert(StatusFreeze {
-                            secs_left: ULTIMATE_FREEZE_SECS,
-                            slow_factor: ULTIMATE_FREEZE_SLOW,
+                            secs_left: ult_cfg.freeze.secs,
+                            slow_factor: ult_cfg.freeze.slow_factor,
                             pin: pos,
                         });
                         n += 1;
