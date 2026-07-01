@@ -12,8 +12,17 @@
 //!
 //! Hot-reload TOML : reporté M2 step 3 (`config/genomes/roguelite_enemies.toml`).
 
+use bevy::color::LinearRgba;
 use bevy::prelude::*;
 use forgia_ai_arena_bot::ArenaBot;
+use serde::Deserialize;
+use std::fs;
+use std::path::PathBuf;
+use std::time::SystemTime;
+
+const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_enemies.toml";
+const POLL_PERIOD_SEC: f32 = 1.0;
+const SENSOR_PATH: &str = "forgia2_enemies.json";
 
 /// Marker Component pour identifier l'archetype runtime (debug + futur loot/xp).
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,8 +46,8 @@ impl EnemyArchetype {
     }
 }
 
-/// Stats d'un archetype — data pure (struct = source of truth, pas de TOML M2 step 2).
-#[derive(Debug, Clone, Copy)]
+/// Stats d'un archetype — data-driven (genome `roguelite_enemies.toml`, hot-reload).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct EnemyStats {
     pub hp: f32,
     pub speed: f32,
@@ -53,66 +62,132 @@ pub struct EnemyStats {
     pub color_rgb: [f32; 3],
     /// Couleur émissive RGB linéaire (faible — silhouette pop sans flash).
     pub emissive_rgb: [f32; 3],
+    /// Dégâts du tir du bot (`BotShootConfig.damage`).
+    pub shoot_damage: f32,
+    /// Portée effective du tir (m).
+    pub shoot_range: f32,
+    /// Dispersion du tir (degrés → radians à la conversion).
+    pub shoot_jitter_deg: f32,
 }
 
-/// Stats par archetype — pure, testable, data-driven.
-pub fn stats_for(archetype: EnemyArchetype) -> EnemyStats {
-    match archetype {
-        EnemyArchetype::Tank => EnemyStats {
-            hp: 120.0,
-            speed: 2.8,
-            stop_distance: 3.0,
-            attack_range: 4.0,
-            detect_range: 22.0,
-            attack_cooldown: 1.8,
-            warmup_secs: 2.0,
-            capsule_radius: 0.55,
-            capsule_half_height: 0.75,
-            color_rgb: [0.55, 0.10, 0.10],
-            emissive_rgb: [0.25, 0.03, 0.03],
-        },
-        EnemyArchetype::Runner => EnemyStats {
-            hp: 35.0,
-            speed: 7.0,
-            stop_distance: 6.0,
-            attack_range: 7.0,
-            detect_range: 40.0,
-            attack_cooldown: 0.7,
-            warmup_secs: 1.2,
-            capsule_radius: 0.32,
-            capsule_half_height: 0.60,
-            color_rgb: [0.95, 0.45, 0.10],
-            emissive_rgb: [0.40, 0.18, 0.04],
-        },
-        EnemyArchetype::Sniper => EnemyStats {
-            hp: 45.0,
-            speed: 3.2,
-            stop_distance: 22.0,
-            attack_range: 24.0,
-            detect_range: 55.0,
-            attack_cooldown: 1.6,
-            warmup_secs: 1.8,
-            capsule_radius: 0.30,
-            capsule_half_height: 0.85,
-            color_rgb: [0.55, 0.20, 0.80],
-            emissive_rgb: [0.22, 0.08, 0.35],
-        },
-        // M3 step 1 — boss : tanky, mi-range, intimidant. Capsule géante 3×Tank.
-        // Phase 2 enrage à 50% HP : speed×1.8, cooldown×0.55 (cf sys_boss_enrage).
-        EnemyArchetype::Boss => EnemyStats {
-            hp: 800.0,
-            speed: 3.5,
-            stop_distance: 10.0,
-            attack_range: 30.0,
-            detect_range: 80.0,
-            attack_cooldown: 1.3,
-            warmup_secs: 2.5,
-            capsule_radius: 1.4,
-            capsule_half_height: 2.2,
-            color_rgb: [0.90, 0.10, 0.50],
-            emissive_rgb: [0.50, 0.05, 0.25],
-        },
+/// Config des stats ennemis — Resource data-driven (genome TOML, hot-reload mtime).
+/// `Default` = miroir EXACT des valeurs historiques (M2 step 2) → zéro régression si
+/// le TOML disparaît. Calqué sur `elements.rs` / `ultimate_config.rs`.
+#[derive(Resource, Deserialize, Clone, Debug, PartialEq)]
+pub struct EnemyStatsConfig {
+    pub tank: EnemyStats,
+    pub runner: EnemyStats,
+    pub sniper: EnemyStats,
+    pub boss: EnemyStats,
+}
+
+impl Default for EnemyStatsConfig {
+    fn default() -> Self {
+        Self {
+            tank: EnemyStats {
+                hp: 120.0, speed: 2.8, stop_distance: 3.0, attack_range: 4.0,
+                detect_range: 22.0, attack_cooldown: 1.8, warmup_secs: 2.0,
+                capsule_radius: 0.55, capsule_half_height: 0.75,
+                color_rgb: [0.55, 0.10, 0.10], emissive_rgb: [0.25, 0.03, 0.03],
+                shoot_damage: 25.0, shoot_range: 5.0, shoot_jitter_deg: 6.0,
+            },
+            runner: EnemyStats {
+                hp: 35.0, speed: 7.0, stop_distance: 6.0, attack_range: 7.0,
+                detect_range: 40.0, attack_cooldown: 0.7, warmup_secs: 1.2,
+                capsule_radius: 0.32, capsule_half_height: 0.60,
+                color_rgb: [0.95, 0.45, 0.10], emissive_rgb: [0.40, 0.18, 0.04],
+                shoot_damage: 8.0, shoot_range: 8.0, shoot_jitter_deg: 5.0,
+            },
+            sniper: EnemyStats {
+                hp: 45.0, speed: 3.2, stop_distance: 22.0, attack_range: 24.0,
+                detect_range: 55.0, attack_cooldown: 1.6, warmup_secs: 1.8,
+                capsule_radius: 0.30, capsule_half_height: 0.85,
+                color_rgb: [0.55, 0.20, 0.80], emissive_rgb: [0.22, 0.08, 0.35],
+                shoot_damage: 18.0, shoot_range: 28.0, shoot_jitter_deg: 1.5,
+            },
+            // Boss : tanky, mi-range, intimidant. Capsule géante 3×Tank. Phase 2
+            // enrage à 50% HP : speed×1.8, cooldown×0.55 (cf sys_boss_enrage).
+            boss: EnemyStats {
+                hp: 800.0, speed: 3.5, stop_distance: 10.0, attack_range: 30.0,
+                detect_range: 80.0, attack_cooldown: 1.3, warmup_secs: 2.5,
+                capsule_radius: 1.4, capsule_half_height: 2.2,
+                color_rgb: [0.90, 0.10, 0.50], emissive_rgb: [0.50, 0.05, 0.25],
+                shoot_damage: 22.0, shoot_range: 32.0, shoot_jitter_deg: 3.0,
+            },
+        }
     }
+}
+
+impl EnemyStatsConfig {
+    /// Stats de l'archétype (data live).
+    pub fn for_archetype(&self, a: EnemyArchetype) -> EnemyStats {
+        match a {
+            EnemyArchetype::Tank => self.tank,
+            EnemyArchetype::Runner => self.runner,
+            EnemyArchetype::Sniper => self.sniper,
+            EnemyArchetype::Boss => self.boss,
+        }
+    }
+
+    /// `ArenaBot` configuré depuis les stats live de l'archétype.
+    pub fn arena_bot(&self, a: EnemyArchetype) -> ArenaBot {
+        let s = self.for_archetype(a);
+        ArenaBot {
+            speed: s.speed,
+            detect_range: s.detect_range,
+            attack_range: s.attack_range,
+            attack_cooldown: s.attack_cooldown,
+            attack_left: s.warmup_secs,
+            stop_distance: s.stop_distance,
+            ..ArenaBot::default()
+        }
+    }
+
+    /// `BotShootConfig` : scalaires de combat depuis le genome ; couleur du tracer +
+    /// hauteur d'épaule restent en code (visuel, non gameplay).
+    pub fn bot_shoot(&self, a: EnemyArchetype) -> forgia_ai_arena_bot::BotShootConfig {
+        use forgia_ai_arena_bot::BotShootConfig;
+        let s = self.for_archetype(a);
+        let (tracer_emissive, shoulder_y) = match a {
+            EnemyArchetype::Tank => (LinearRgba::new(5.0, 0.5, 0.5, 1.0), 1.2),
+            EnemyArchetype::Runner => (LinearRgba::new(4.0, 2.0, 0.5, 1.0), 0.9),
+            EnemyArchetype::Sniper => (LinearRgba::new(3.0, 0.5, 5.0, 1.0), 1.1),
+            EnemyArchetype::Boss => (LinearRgba::new(5.0, 0.5, 3.0, 1.0), 2.4),
+        };
+        BotShootConfig {
+            damage: s.shoot_damage,
+            range: s.shoot_range,
+            jitter_rad: s.shoot_jitter_deg.to_radians(),
+            tracer_emissive,
+            shoulder_y,
+            target_torso_y: 1.0,
+        }
+    }
+
+    /// Pur — testable headless. Fallback `Default` sur toute erreur de parse.
+    pub fn parse_toml(content: &str) -> Self {
+        toml::from_str(content).unwrap_or_else(|_| Self::default())
+    }
+
+    fn load_or_default() -> Self {
+        match fs::read_to_string(PathBuf::from(GENOME_PATH)) {
+            Ok(content) => Self::parse_toml(&content),
+            Err(_) => Self::default(),
+        }
+    }
+}
+
+/// Watch mtime du TOML (hot-reload, miroir `ElementGenomeWatch`).
+#[derive(Resource, Default, Debug)]
+pub struct EnemyGenomeWatch {
+    pub last_mtime: Option<SystemTime>,
+    pub reload_count: u32,
+}
+
+/// Stats par archetype — délègue au `Default` de la config (compat tests + appelants
+/// purs). Le spawn LIVE lit `Res<EnemyStatsConfig>` (cf `waves.rs`).
+pub fn stats_for(archetype: EnemyArchetype) -> EnemyStats {
+    EnemyStatsConfig::default().for_archetype(archetype)
 }
 
 /// KayKit Skeleton GLB asset path par archetype (story-517 fix).
@@ -138,47 +213,11 @@ pub fn skeleton_scale(archetype: EnemyArchetype) -> f32 {
     }
 }
 
-/// BotShootConfig par archetype (story-517 fix combat differentiation).
-/// Tank = melee (range courte, dmg élevé), Runner = mid (dmg moyen),
-/// Sniper = long range (dmg élevé spread faible), Boss = mid range high-dmg.
-/// Stats matchent les `attack_range` de [`stats_for`] pour cohérence AI.
+/// BotShootConfig par archetype — délègue au `Default` de la config (scalaires de
+/// combat data-driven ; couleur tracer + épaule = visuel en code). Le spawn LIVE
+/// passe par `EnemyStatsConfig::bot_shoot` pour le hot-reload.
 pub fn bot_shoot_for(archetype: EnemyArchetype) -> forgia_ai_arena_bot::BotShootConfig {
-    use forgia_ai_arena_bot::BotShootConfig;
-    use bevy::color::LinearRgba;
-    match archetype {
-        EnemyArchetype::Tank => BotShootConfig {
-            damage: 25.0,
-            range: 5.0,
-            jitter_rad: 6.0_f32.to_radians(),
-            tracer_emissive: LinearRgba::new(5.0, 0.5, 0.5, 1.0), // rouge sombre
-            shoulder_y: 1.2,
-            target_torso_y: 1.0,
-        },
-        EnemyArchetype::Runner => BotShootConfig {
-            damage: 8.0,
-            range: 8.0,
-            jitter_rad: 5.0_f32.to_radians(),
-            tracer_emissive: LinearRgba::new(4.0, 2.0, 0.5, 1.0), // orange
-            shoulder_y: 0.9,
-            target_torso_y: 1.0,
-        },
-        EnemyArchetype::Sniper => BotShootConfig {
-            damage: 18.0,
-            range: 28.0,
-            jitter_rad: 1.5_f32.to_radians(),
-            tracer_emissive: LinearRgba::new(3.0, 0.5, 5.0, 1.0), // violet
-            shoulder_y: 1.1,
-            target_torso_y: 1.0,
-        },
-        EnemyArchetype::Boss => BotShootConfig {
-            damage: 22.0,
-            range: 32.0,
-            jitter_rad: 3.0_f32.to_radians(),
-            tracer_emissive: LinearRgba::new(5.0, 0.5, 3.0, 1.0), // magenta
-            shoulder_y: 2.4,
-            target_torso_y: 1.0,
-        },
-    }
+    EnemyStatsConfig::default().bot_shoot(archetype)
 }
 
 /// Construit un `ArenaBot` configuré pour l'archetype donné.
@@ -193,6 +232,87 @@ pub fn arena_bot_for(archetype: EnemyArchetype) -> ArenaBot {
         attack_left: s.warmup_secs,
         stop_distance: s.stop_distance,
         ..ArenaBot::default()
+    }
+}
+
+// ─── Systems : genome load + hot-reload + sensor (story-638) ─────────────────
+
+/// Startup : charge le TOML + init le watch mtime.
+pub fn sys_init_enemy_genome(mut commands: Commands) {
+    let cfg = EnemyStatsConfig::load_or_default();
+    let mtime = fs::metadata(GENOME_PATH).and_then(|m| m.modified()).ok();
+    info!(
+        "[enemies] genome chargé — tank hp{:.0}/spd{:.1} runner hp{:.0} sniper hp{:.0} boss hp{:.0}",
+        cfg.tank.hp, cfg.tank.speed, cfg.runner.hp, cfg.sniper.hp, cfg.boss.hp,
+    );
+    commands.insert_resource(cfg);
+    commands.insert_resource(EnemyGenomeWatch {
+        last_mtime: mtime,
+        ..default()
+    });
+}
+
+/// Poll mtime 1Hz, re-parse si changé (hot-reload).
+pub fn sys_hot_reload_enemy_genome(
+    time: Res<Time>,
+    mut accum: Local<f32>,
+    mut cfg: ResMut<EnemyStatsConfig>,
+    mut watch: ResMut<EnemyGenomeWatch>,
+) {
+    *accum += time.delta_secs();
+    if *accum < POLL_PERIOD_SEC {
+        return;
+    }
+    *accum = 0.0;
+    let Ok(meta) = fs::metadata(GENOME_PATH) else {
+        return;
+    };
+    let Ok(mtime) = meta.modified() else {
+        return;
+    };
+    if watch.last_mtime == Some(mtime) {
+        return;
+    }
+    let Ok(content) = fs::read_to_string(GENOME_PATH) else {
+        return;
+    };
+    let new_cfg = EnemyStatsConfig::parse_toml(&content);
+    watch.last_mtime = Some(mtime);
+    if new_cfg != *cfg {
+        watch.reload_count = watch.reload_count.saturating_add(1);
+        info!(
+            "[enemies] HOT-RELOADED #{} — tank hp{:.0} runner hp{:.0} sniper hp{:.0} boss hp{:.0}",
+            watch.reload_count, new_cfg.tank.hp, new_cfg.runner.hp, new_cfg.sniper.hp, new_cfg.boss.hp,
+        );
+        *cfg = new_cfg;
+    }
+}
+
+/// Sensor `forgia2_enemies.json` 1Hz : stats live par archétype + reload_count.
+pub fn sys_write_enemies_sensor(
+    time: Res<Time>,
+    mut accum: Local<f32>,
+    cfg: Res<EnemyStatsConfig>,
+    watch: Res<EnemyGenomeWatch>,
+) {
+    *accum += time.delta_secs();
+    if *accum < POLL_PERIOD_SEC {
+        return;
+    }
+    *accum = 0.0;
+    // spawn_live=false : P0-1 charge la config + hot-reload, mais le SPAWN lit encore
+    // le Default (waves.rs) → un hot-reload change le sensor, pas les ennemis en jeu.
+    // P0-2 (défense tri-couche) réécrit le spawn pour consommer la config live.
+    let json = format!(
+        r#"{{"id":"enemies","severity":"ok","next_step":"","spawn_live":false,"reload_count":{},"tank":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"runner":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"sniper":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"boss":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}}}}"#,
+        watch.reload_count,
+        cfg.tank.hp, cfg.tank.speed, cfg.tank.shoot_damage,
+        cfg.runner.hp, cfg.runner.speed, cfg.runner.shoot_damage,
+        cfg.sniper.hp, cfg.sniper.speed, cfg.sniper.shoot_damage,
+        cfg.boss.hp, cfg.boss.speed, cfg.boss.shoot_damage,
+    );
+    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+        warn!("[enemies] sensor write failed: {e}");
     }
 }
 
@@ -249,5 +369,111 @@ mod tests {
         assert!((bot.stop_distance - stats.stop_distance).abs() < 0.001);
         assert!((bot.attack_range - stats.attack_range).abs() < 0.001);
         assert!((bot.attack_left - stats.warmup_secs).abs() < 0.001);
+    }
+
+    // ── Config data-driven (story-638) ──
+
+    #[test]
+    fn config_default_mirrors_free_stats_for() {
+        // Le Default de la config == les valeurs historiques exposées par stats_for.
+        let c = EnemyStatsConfig::default();
+        for a in [
+            EnemyArchetype::Tank,
+            EnemyArchetype::Runner,
+            EnemyArchetype::Sniper,
+            EnemyArchetype::Boss,
+        ] {
+            assert_eq!(c.for_archetype(a), stats_for(a));
+        }
+        assert_eq!(c.tank.hp, 120.0);
+        assert_eq!(c.boss.hp, 800.0);
+        assert_eq!(c.runner.shoot_damage, 8.0);
+    }
+
+    #[test]
+    fn config_parse_garbage_falls_back_to_default() {
+        assert_eq!(
+            EnemyStatsConfig::parse_toml("pas du TOML [[["),
+            EnemyStatsConfig::default()
+        );
+    }
+
+    #[test]
+    fn config_parse_full_toml_roundtrip() {
+        let toml = r#"
+[tank]
+hp = 200.0
+speed = 2.0
+stop_distance = 3.0
+attack_range = 4.0
+detect_range = 22.0
+attack_cooldown = 1.8
+warmup_secs = 2.0
+capsule_radius = 0.55
+capsule_half_height = 0.75
+color_rgb = [0.5, 0.1, 0.1]
+emissive_rgb = [0.2, 0.0, 0.0]
+shoot_damage = 30.0
+shoot_range = 5.0
+shoot_jitter_deg = 6.0
+[runner]
+hp = 35.0
+speed = 7.0
+stop_distance = 6.0
+attack_range = 7.0
+detect_range = 40.0
+attack_cooldown = 0.7
+warmup_secs = 1.2
+capsule_radius = 0.32
+capsule_half_height = 0.60
+color_rgb = [0.9, 0.4, 0.1]
+emissive_rgb = [0.4, 0.1, 0.0]
+shoot_damage = 8.0
+shoot_range = 8.0
+shoot_jitter_deg = 5.0
+[sniper]
+hp = 45.0
+speed = 3.2
+stop_distance = 22.0
+attack_range = 24.0
+detect_range = 55.0
+attack_cooldown = 1.6
+warmup_secs = 1.8
+capsule_radius = 0.30
+capsule_half_height = 0.85
+color_rgb = [0.5, 0.2, 0.8]
+emissive_rgb = [0.2, 0.0, 0.3]
+shoot_damage = 18.0
+shoot_range = 28.0
+shoot_jitter_deg = 1.5
+[boss]
+hp = 800.0
+speed = 3.5
+stop_distance = 10.0
+attack_range = 30.0
+detect_range = 80.0
+attack_cooldown = 1.3
+warmup_secs = 2.5
+capsule_radius = 1.4
+capsule_half_height = 2.2
+color_rgb = [0.9, 0.1, 0.5]
+emissive_rgb = [0.5, 0.0, 0.2]
+shoot_damage = 22.0
+shoot_range = 32.0
+shoot_jitter_deg = 3.0
+"#;
+        let c = EnemyStatsConfig::parse_toml(toml);
+        assert_eq!(c.tank.hp, 200.0, "override tank hp lu du TOML");
+        assert_eq!(c.tank.shoot_damage, 30.0);
+        assert_ne!(c, EnemyStatsConfig::default(), "diff du Default → hot-reload déclenchable");
+    }
+
+    #[test]
+    fn config_bot_shoot_reads_genome_scalars() {
+        let c = EnemyStatsConfig::default();
+        let bs = c.bot_shoot(EnemyArchetype::Sniper);
+        assert_eq!(bs.damage, c.sniper.shoot_damage);
+        assert_eq!(bs.range, c.sniper.shoot_range);
+        assert!((bs.jitter_rad - c.sniper.shoot_jitter_deg.to_radians()).abs() < 1e-6);
     }
 }

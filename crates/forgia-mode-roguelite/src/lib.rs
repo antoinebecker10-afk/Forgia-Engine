@@ -290,6 +290,22 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             Update,
             elements::sys_write_elements_sensor.in_set(GameSet::Sensors),
         );
+        // Story-638 P0-1 — stats ennemis data-driven (genome roguelite_enemies.toml,
+        // hot-reload) + sensor forgia2_enemies.json. Charge au Startup, re-parse mtime.
+        // (spawn-live = P0-2 défense tri-couche ; ici = config + observabilité.)
+        app.add_systems(Startup, enemies::sys_init_enemy_genome);
+        app.add_systems(
+            Update,
+            enemies::sys_hot_reload_enemy_genome
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            enemies::sys_write_enemies_sensor
+                .in_set(GameSet::Sensors)
+                .run_if(resource_exists::<enemies::EnemyStatsConfig>),
+        );
         // Story-596 T4a — genome de tuning des Ultimes (durées/rayons/dégâts),
         // hot-reload Shift+F12-like → réglage live sans rebuild. Charge au Startup
         // (+ applique durée/cooldown à UltimateState), re-parse mtime en Update.

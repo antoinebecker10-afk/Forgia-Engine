@@ -1,0 +1,292 @@
+id = "roguelite_enemies"
+name = "Roguelite Enemies MVP"
+domain = "Creature"
+category = "Creature"
+description = "3 ennemis MVP (Runt mêlée fast, Tireur hitscan, Brute tank) + 1 boss (Le Forgeron Noir, phase 1+enrage). Pattern Director RoR2 par cost."
+version = "0.1.0"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ RUNT — petit mêlée rapide, cost cheap                        ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "runt_hp_base"
+label = "Runt HP base (before player scaling)"
+chromosome = "Stats"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 35.0
+layer = "runt"
+
+[[genes]]
+id = "runt_damage_melee"
+label = "Runt melee damage"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 7.0
+layer = "runt"
+
+[[genes]]
+id = "runt_move_speed_mps"
+label = "Runt movement speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 1.0
+max = 12.0
+default = 5.5
+layer = "runt"
+
+[[genes]]
+id = "runt_attack_cooldown_sec"
+label = "Runt time between melee swings"
+chromosome = "Combat"
+target = "Value"
+min = 0.3
+max = 3.0
+default = 0.9
+layer = "runt"
+
+[[genes]]
+id = "runt_reach_m"
+label = "Runt melee reach (m)"
+chromosome = "Combat"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 1.8
+layer = "runt"
+
+[[genes]]
+id = "runt_director_cost"
+label = "Runt director credit cost"
+chromosome = "Spawn"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 4.0
+layer = "runt"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ TIREUR — hitscan distance, cost moyen                        ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "tireur_hp_base"
+label = "Tireur HP base"
+chromosome = "Stats"
+target = "Value"
+min = 20.0
+max = 300.0
+default = 60.0
+layer = "tireur"
+
+[[genes]]
+id = "tireur_damage_hitscan"
+label = "Tireur hitscan damage per shot"
+chromosome = "Combat"
+target = "Value"
+min = 2.0
+max = 25.0
+default = 8.0
+layer = "tireur"
+
+[[genes]]
+id = "tireur_move_speed_mps"
+label = "Tireur movement speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 0.5
+max = 6.0
+default = 2.5
+layer = "tireur"
+
+[[genes]]
+id = "tireur_attack_cooldown_sec"
+label = "Tireur time between shots"
+chromosome = "Combat"
+target = "Value"
+min = 0.3
+max = 4.0
+default = 1.2
+layer = "tireur"
+
+[[genes]]
+id = "tireur_range_m"
+label = "Tireur effective range (m)"
+chromosome = "Combat"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 30.0
+layer = "tireur"
+
+[[genes]]
+id = "tireur_director_cost"
+label = "Tireur director credit cost"
+chromosome = "Spawn"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 8.0
+layer = "tireur"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ BRUTE — tank lent, cost élevé                                ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "brute_hp_base"
+label = "Brute HP base"
+chromosome = "Stats"
+target = "Value"
+min = 100.0
+max = 1000.0
+default = 280.0
+layer = "brute"
+
+[[genes]]
+id = "brute_damage_melee"
+label = "Brute melee damage (slow heavy)"
+chromosome = "Combat"
+target = "Value"
+min = 10.0
+max = 100.0
+default = 35.0
+layer = "brute"
+
+[[genes]]
+id = "brute_move_speed_mps"
+label = "Brute movement speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 2.0
+layer = "brute"
+
+[[genes]]
+id = "brute_attack_cooldown_sec"
+label = "Brute time between heavy swings"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.3
+layer = "brute"
+
+[[genes]]
+id = "brute_reach_m"
+label = "Brute melee reach (m)"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "brute"
+
+[[genes]]
+id = "brute_director_cost"
+label = "Brute director credit cost"
+chromosome = "Spawn"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 18.0
+layer = "brute"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ FORGERON NOIR — Boss MVP, phase 1 + enrage phase 2           ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "boss_forgeron_hp_base"
+label = "Forgeron Noir total HP"
+chromosome = "Stats"
+target = "Value"
+min = 500.0
+max = 10000.0
+default = 2400.0
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_enrage_threshold_pct"
+label = "HP % below which boss enters phase 2 enrage"
+chromosome = "Combat"
+target = "Value"
+min = 0.1
+max = 0.6
+default = 0.35
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_phase1_melee_dmg"
+label = "Phase 1 melee swing damage"
+chromosome = "Combat"
+target = "Value"
+min = 10.0
+max = 100.0
+default = 32.0
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_phase1_aoe_dmg"
+label = "Phase 1 hammer slam AoE damage"
+chromosome = "Combat"
+target = "Value"
+min = 20.0
+max = 150.0
+default = 55.0
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_phase1_aoe_radius_m"
+label = "Phase 1 hammer slam radius"
+chromosome = "Combat"
+target = "Value"
+min = 2.0
+max = 15.0
+default = 6.0
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_phase2_speed_mult"
+label = "Phase 2 speed multiplier (enrage)"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 3.0
+default = 1.6
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_phase2_dmg_mult"
+label = "Phase 2 damage multiplier"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 3.0
+default = 1.4
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_phase2_spawn_runts_count"
+label = "Phase 2 adds: number of Runts spawned"
+chromosome = "Combat"
+target = "Value"
+min = 0.0
+max = 12.0
+default = 4.0
+layer = "boss_forgeron"
+
+[[genes]]
+id = "boss_forgeron_director_cost"
+label = "Forgeron Noir director credit cost (boss tier)"
+chromosome = "Spawn"
+target = "Value"
+min = 50.0
+max = 1000.0
+default = 200.0
+layer = "boss_forgeron"

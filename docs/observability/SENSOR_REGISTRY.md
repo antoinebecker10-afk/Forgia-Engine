@@ -105,6 +105,7 @@
 | `forgia2_ui_theme.json` | T0 | forgia-ui-lib | `src/theme.rs:153` | once | thème global Forge (fonts+style egui) apply-once — story-596 Phase A | active |
 | `forgia2_ultimate.json` | T0 | forgia-combat | `src/ultimate.rs:129` | 1Hz | état Ultime (F) : ready/active/cooldown, timers, activations, hud_fill — story-596 T1b | active |
 | `forgia2_ultimate_tech.json` | T0 | forgia-mode-roguelite | `src/ultimate_apply.rs:41` | 1Hz | techniques d'Ultime : compteurs explosion/chaîne/perfo/poison/gel + gels actifs — story-596 T3 | active |
+| `forgia2_enemies.json` | T0 | forgia-mode-roguelite | `src/enemies.rs:19` | 1Hz | stats ennemis data-driven (hp/speed/dmg par archétype) + reload_count + spawn_live — story-638 P0-1 | active |
 | `forgia2_bourrasque.json` | T0 | forgia-fps | `src/bourrasque.rs` | 1Hz | tirs Bourrasque : shots/shots_hit/shot_accuracy, pellets_fired/hits/ratio, kills — story-532 AC9 | active |
 | `forgia2_lenoir.json` | T0 | forgia-fps | `src/lenoir.rs` | 1Hz | précision Lenoir : shots/hits/accuracy, headshots/hs_ratio (cible GDD >40%), kills — story-533 AC10 | active |
 | `forgia2_pepin.json` | T0 | forgia-fps | `src/pepin.rs` | 1Hz | jauge confiance Pépin : stacks/peak/accuracy/damage_mul — story-531 AC10 | active |
