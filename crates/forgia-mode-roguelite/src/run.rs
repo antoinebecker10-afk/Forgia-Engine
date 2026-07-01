@@ -641,8 +641,6 @@ pub fn sys_start_run(
     mut events: MessageReader<StartRunEvent>,
     mut next: ResMut<NextState<RunState>>,
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
     stage_graph_config: Res<forgia_stage::graph::RunGraphConfig>,
     mut wave: ResMut<crate::waves::RogueliteWave>,
@@ -658,6 +656,9 @@ pub fn sys_start_run(
     // Keystone 0.1b (story-634) — reseed du flux RNG combat déterministe au seed
     // de run (même graine → mêmes crits, indépendamment de l'horloge).
     mut combat_rng: ResMut<forgia_combat::combat_rng::CombatRng>,
+    // Story-640 P0-2 — configs live pour le spawn wave 1 (stats hot-reload + défense).
+    stats_cfg: Res<crate::enemies::EnemyStatsConfig>,
+    def_cfg: Res<crate::defense::DefenseConfig>,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -741,9 +742,9 @@ pub fn sys_start_run(
             let _ = &graph; // graph utilisé pour total_stages + boss_depth ci-dessus
             let spawned = crate::waves::spawn_wave_enemies(
                 &mut commands,
-                &mut meshes,
-                &mut materials,
                 &asset_server,
+                &stats_cfg,
+                &def_cfg,
                 1, // wave 1
             );
             info!("[roguelite] sys_start_run fallback — wave 1 spawned {spawned} enemies");

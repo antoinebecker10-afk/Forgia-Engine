@@ -379,6 +379,10 @@ pub struct HitApplyCtx<'w, 's> {
         ),
         With<TargetCube>,
     >,
+    /// Story-640 P0-2 — couche défensive optionnelle de la cible (Bouclier/Armure).
+    /// Le hit de base la draine (canal `Physical`) avant de fuir vers `combat::Health`.
+    /// Champ distinct de `health` → double emprunt disjoint autorisé.
+    pub defense: Query<'w, 's, &'static mut forgia_damage::DefenseLayer, With<TargetCube>>,
 }
 
 /// Bundle hitscan diagnostic — q_children pour predicate récursif + sensor state.
@@ -1045,7 +1049,16 @@ fn fire_weapon_minimal(
                     if crit_mul > 1.0 {
                         info!("[fire] CRIT! dmg ×2");
                     }
-                    hp.current = (hp.current - effective_dmg).max(0.0);
+                    // Story-640 P0-2 — la couche défensive (Bouclier → Armure) absorbe
+                    // le hit de base avant la Vie ; le résidu seul entame `combat::Health`.
+                    // Tout coup gèle la régén (`note_hit`), même entièrement absorbé.
+                    let to_health = if let Ok(mut dl) = hit_ctx.defense.get_mut(entity) {
+                        dl.note_hit();
+                        dl.absorb(effective_dmg, forgia_damage::DamageChannel::Physical)
+                    } else {
+                        effective_dmg
+                    };
+                    hp.current = (hp.current - to_health).max(0.0);
                     let dead = hp.is_dead();
                     let new_hp = hp.current;
 

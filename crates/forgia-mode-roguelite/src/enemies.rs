@@ -300,11 +300,12 @@ pub fn sys_write_enemies_sensor(
         return;
     }
     *accum = 0.0;
-    // spawn_live=false : P0-1 charge la config + hot-reload, mais le SPAWN lit encore
-    // le Default (waves.rs) → un hot-reload change le sensor, pas les ennemis en jeu.
-    // P0-2 (défense tri-couche) réécrit le spawn pour consommer la config live.
+    // spawn_live=true (story-640 P0-2) : le SPAWN consomme désormais `Res<EnemyStatsConfig>`
+    // live (waves.rs::spawn_wave_enemies) → un hot-reload de `roguelite_enemies.toml`
+    // change les ennemis des prochaines vagues (HP/speed/dmg/capsule) + attache la
+    // DefenseLayer. Les vagues déjà spawnées gardent leurs stats (pas de re-bain live).
     let json = format!(
-        r#"{{"id":"enemies","severity":"ok","next_step":"","spawn_live":false,"reload_count":{},"tank":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"runner":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"sniper":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"boss":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}}}}"#,
+        r#"{{"id":"enemies","severity":"ok","next_step":"","spawn_live":true,"reload_count":{},"tank":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"runner":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"sniper":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"boss":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}}}}"#,
         watch.reload_count,
         cfg.tank.hp, cfg.tank.speed, cfg.tank.shoot_damage,
         cfg.runner.hp, cfg.runner.speed, cfg.runner.shoot_damage,

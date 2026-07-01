@@ -12,6 +12,9 @@ use bevy::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
 
+pub mod defense;
+pub use defense::{DamageChannel, DefenseLayer};
+
 /// Per-entity health. Add to any entity that can take damage.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Health {
@@ -245,6 +248,9 @@ fn apply_damage(
     mut events: MessageReader<DamageEvent>,
     mut healths: Query<&mut Health>,
     guards: Query<&HealthGuard>,
+    // Story-640 P0-2 — couche défensive optionnelle (Bouclier/Armure) sur la cible
+    // (typiquement le joueur, attaché par forgia-mode-roguelite). Absorbe AVANT la Vie.
+    mut defenses: Query<&mut DefenseLayer>,
     mut applied: MessageWriter<DamageAppliedEvent>,
     mut commands: Commands,
 ) {
@@ -264,7 +270,21 @@ fn apply_damage(
             .map(|g| g.reduction.clamp(0.0, 1.0))
             .unwrap_or(0.0);
         let effective_amount = ev.amount * (1.0 - reduction);
-        hp.current = (hp.current - effective_amount).max(0.0);
+        // Story-640 P0-2 — la couche défensive absorbe Bouclier → Armure avant la Vie.
+        // Canal dérivé du `kind` : Feu/Poison bypassent (couplage « Feu→Vie »,
+        // « Poison DoT pur ») ; le reste (physique/explosion/chute) est absorbé. Tout
+        // coup gèle la régénération (`note_hit`), même entièrement absorbé.
+        let to_health = if let Ok(mut dl) = defenses.get_mut(ev.target) {
+            let channel = match ev.kind {
+                DamageKind::Fire | DamageKind::Poison => DamageChannel::TrueHealth,
+                _ => DamageChannel::Physical,
+            };
+            dl.note_hit();
+            dl.absorb(effective_amount, channel)
+        } else {
+            effective_amount
+        };
+        hp.current = (hp.current - to_health).max(0.0);
         let is_kill = hp.current <= 0.0;
         applied.write(DamageAppliedEvent {
             target: ev.target,

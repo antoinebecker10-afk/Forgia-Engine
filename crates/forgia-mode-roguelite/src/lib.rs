@@ -29,6 +29,7 @@ pub mod boss_portal;
 pub mod boucherie_rocket;
 pub mod coffre_sensor;
 pub mod decor;
+pub mod defense;
 pub mod element_vfx;
 pub mod elements;
 pub mod enemies;
@@ -306,6 +307,41 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Sensors)
                 .run_if(resource_exists::<enemies::EnemyStatsConfig>),
         );
+        // Story-640 P0-2 — défense tri-couche (Vie/Bouclier/Armure). Le mécanisme
+        // (`DefenseLayer`, absorption, régén) vit dans forgia-damage ; ici : genome
+        // `roguelite_defense.toml` (hot-reload), régén du bouclier hors combat,
+        // attache joueur, sensor `forgia2_shield.json`. Les ennemis reçoivent leur
+        // couche au spawn (waves.rs consomme `DefenseConfig`).
+        app.add_systems(Startup, defense::sys_init_defense_genome);
+        app.add_systems(
+            Update,
+            (
+                defense::sys_hot_reload_defense_genome,
+                defense::sys_attach_player_defense,
+            )
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Régén du bouclier = FixedUpdate/Combat (cadence déterministe, comme le DoT
+        // élémentaire — story-634).
+        app.add_systems(
+            FixedUpdate,
+            defense::sys_regen_defense
+                .in_set(GameSet::Combat)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            OnExit(GameMode::Roguelite),
+            defense::sys_remove_player_defense,
+        );
+        app.add_systems(
+            Update,
+            defense::sys_write_shield_sensor
+                .in_set(GameSet::Sensors)
+                // Gaté Roguelite (cohérent avec attach/hot-reload/regen du même bloc) :
+                // hors mode, aucun EnemyArchetype/DefenseLayer → le sensor n'a rien à écrire.
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         // Story-596 T4a — genome de tuning des Ultimes (durées/rayons/dégâts),
         // hot-reload Shift+F12-like → réglage live sans rebuild. Charge au Startup
         // (+ applique durée/cooldown à UltimateState), re-parse mtime en Update.
@@ -373,7 +409,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             (
                 element_vfx::sys_refresh_vfx_materials,
                 element_vfx::sys_spawn_element_impact,
-                element_vfx::sys_spawn_combustion_vfx,
+                element_vfx::sys_spawn_reaction_vfx,
                 element_vfx::sys_tick_element_sparks,
                 // story-611 VFX — vraies particules hanabi de DoT (remplace le
                 // dot-pulse sphère) : flamme sur brûlure, nuage toxique sur poison.
@@ -509,7 +545,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_sub_state::<RunState>()
             .add_message::<StartRunEvent>()
             .add_message::<EndRunEvent>()
-            .add_message::<elements::CombustionEvent>()
+            .add_message::<elements::ReactionEvent>()
             // P3 — telegraph boss enrage (UI banner + camera shake punch).
             .add_message::<waves::BossEnrageTriggeredEvent>()
             .add_systems(OnEnter(GameMode::Roguelite), run::sys_spawn_roguelite_scene)

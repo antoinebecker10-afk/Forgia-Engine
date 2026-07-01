@@ -24,6 +24,8 @@ use forgia_rpg_data::boons::OpenCoffreRequest;
 // `Query<&mut forgia_combat::Health, With<TargetCube>>`). Sans ce swap, type
 // mismatch silencieux → hits classifiés `BlockerNonZone` au lieu de damage.
 // cf memory [[reference-dual-health-type-trap]] et [[reference-bevy-rapier-child-collider-pattern-2026-05-20]].
+use crate::defense::DefenseConfig;
+use crate::enemies::EnemyStatsConfig;
 use forgia_combat::Health;
 use forgia_damage::Mortal;
 use forgia_mode_fps_arena::TargetCube;
@@ -97,16 +99,19 @@ pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
 /// `forgia_damage::HitZoneTag`). Capsule physique conservée (collision OK).
 pub fn spawn_wave_enemies(
     commands: &mut Commands,
-    _meshes: &mut Assets<Mesh>,
-    _materials: &mut Assets<StandardMaterial>,
     asset_server: &AssetServer,
+    // Story-640 P0-2 — stats LIVE (hot-reload) au lieu du Default : un hot-reload de
+    // `roguelite_enemies.toml` change désormais les ennemis spawnés (spawn_live=true).
+    stats_cfg: &EnemyStatsConfig,
+    // Story-640 P0-2 — couche défensive par archétype (bouclier/armure).
+    def_cfg: &DefenseConfig,
     wave: u8,
 ) -> u32 {
     let composition = wave_composition(wave);
     let mut yaw_rng = Xoshiro256StarStar::seed_from_u64(WAVE_BASE_SEED ^ u64::from(wave));
     let mut total = 0u32;
     for (archetype, count, ring_radius) in &composition {
-        let stats = enemies::stats_for(*archetype);
+        let stats = stats_cfg.for_archetype(*archetype);
         let skeleton_handle: Handle<Scene> = asset_server.load(
             // KayKit GLB scene root : `#Scene0` est la convention Bevy GltfLoader.
             format!("{}#Scene0", enemies::skeleton_asset_path(*archetype)),
@@ -140,11 +145,16 @@ pub fn spawn_wave_enemies(
                     Transform::from_xyz(x, y, z),
                     RigidBody::KinematicPositionBased,
                     Health::new(stats.hp),
+                    // Story-640 P0-2 — couche défensive (bouclier bleu / armure jaune)
+                    // AU-DESSUS de la Vie. Le hit de base (forgia-fps) la draine avant
+                    // `combat::Health` ; régén hors combat par `defense::sys_regen_defense`.
+                    def_cfg.layer_for(*archetype),
                     Mortal,
-                    enemies::arena_bot_for(*archetype),
+                    // Story-640 P0-2 — bot config depuis la config LIVE (hot-reload).
+                    stats_cfg.arena_bot(*archetype),
                     // Story-517 fix : ennemis n'avaient pas BotShootConfig → ne
                     // tiraient pas. Damage + range différencié par archetype.
-                    enemies::bot_shoot_for(*archetype),
+                    stats_cfg.bot_shoot(*archetype),
                     // Story-636 — échantillon de vitesse pour le driver d'anim
                     // squelettique (marche vs course selon le déplacement réel).
                     crate::enemy_anim::EnemyLocoSample::default(),
@@ -220,14 +230,15 @@ pub fn sys_wave_orchestrator(
     time: Res<Time>,
     mut wave: ResMut<RogueliteWave>,
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
     mut open_coffre: MessageWriter<OpenCoffreRequest>,
     mut seen_alive: Local<bool>,
     // Story-571 — gain de Souls méta en fin de wave/boss (persistant).
     mut meta: ResMut<crate::run::MetaSouls>,
+    // Story-640 P0-2 — configs live pour le spawn (stats hot-reload + défense).
+    stats_cfg: Res<EnemyStatsConfig>,
+    def_cfg: Res<DefenseConfig>,
 ) {
     let alive = q_bots.iter().count() as u32;
     wave.bots_alive = alive;
@@ -297,9 +308,9 @@ pub fn sys_wave_orchestrator(
             wave.break_secs_left = 0.0;
             spawn_wave_enemies(
                 &mut commands,
-                &mut meshes,
-                &mut materials,
                 &asset_server,
+                &stats_cfg,
+                &def_cfg,
                 wave.current_wave,
             );
             // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.

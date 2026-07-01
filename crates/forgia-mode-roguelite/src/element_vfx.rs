@@ -25,7 +25,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_core::prelude::*;
 
-use crate::elements::{CombustionEvent, Element, ElementConfig, ElementUnlocks};
+use crate::elements::{Element, ElementConfig, ElementUnlocks, ReactionEvent};
 
 const SENSOR_PATH: &str = "forgia2_element_vfx.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
@@ -39,7 +39,7 @@ const EMISSIVE_BOOST: f32 = 3.0;
 #[derive(Resource)]
 pub struct ElementVfxAssets {
     pub sphere: Handle<Mesh>,
-    /// Indexé par [`Element::idx`] (Fire=0, Poison=1, Explosive=2, ArmorPierce=3).
+    /// Indexé par [`Element::idx`] (Fire=0, Poison=1, Shock=2, ArmorPierce=3).
     pub mats: [Handle<StandardMaterial>; 4],
 }
 
@@ -57,7 +57,8 @@ pub struct ElementSpark {
 pub struct ElementVfxStats {
     pub sparks_spawned: u32,
     pub dot_pulses: u32,
-    pub combustion_bursts: u32,
+    /// Bursts de réaction spawnés (Combustion + Surcharge). Miasma (DoT) n'en émet pas.
+    pub reaction_bursts: u32,
 }
 
 /// Configure un matériau d'élément (unlit + émissif coloré + blend). Partagé →
@@ -73,7 +74,7 @@ fn apply_element_material(m: &mut StandardMaterial, rgb: [f32; 3]) {
 const ALL_ELEMENTS: [Element; 4] = [
     Element::Fire,
     Element::Poison,
-    Element::Explosive,
+    Element::Shock,
     Element::ArmorPierce,
 ];
 
@@ -156,9 +157,10 @@ pub fn sys_spawn_element_impact(
         if !unlocks.is_unlocked(element) {
             continue;
         }
-        let explosive = element == Element::Explosive;
-        let scale = config.vfx.impact_scale * if explosive { config.vfx.explosive_scale } else { 1.0 };
-        let light0 = config.vfx.light_intensity * if explosive { 2.0 } else { 1.0 };
+        // Arc électrique (ex-explosif) : flash plus large + lumière ×2 (remap story-641).
+        let arc = element == Element::Shock;
+        let scale = config.vfx.impact_scale * if arc { config.vfx.arc_scale } else { 1.0 };
+        let light0 = config.vfx.light_intensity * if arc { 2.0 } else { 1.0 };
         let [r, g, b] = element.rgb(&config.vfx);
         commands.spawn((
             Mesh3d(assets.sphere.clone()),
@@ -185,14 +187,16 @@ pub fn sys_spawn_element_impact(
 // L'ancien dot-pulse sphère jetable est retiré. `stats.dot_pulses` est ré-
 // incrémenté par les systèmes d'attache → le sensor reste honnête.
 
-// ─── Burst de Combustion (réaction Feu+Poison) ──────────────────────────────
+// ─── Burst de réaction (Combustion / Surcharge) ─────────────────────────────
 
-/// Lit `CombustionEvent` (émis par `elements::sys_apply_elements_on_hit`) et
-/// spawn un burst orange (feu, grand + lumineux) + un halo vert (poison, plus
-/// petit) → la fusion est lisible. Throttlé en amont (cooldown/cible) donc pas
-/// de cap anti-spam ici.
-pub fn sys_spawn_combustion_vfx(
-    mut events: MessageReader<CombustionEvent>,
+/// Lit `ReactionEvent` (émis par `elements::sys_apply_elements_on_hit` pour les
+/// réactions de type **décharge** : Combustion, Surcharge) et spawn un burst avec
+/// les 2 couleurs du couple d'éléments (`ReactionKind::pair`) : sphère grande +
+/// lumineuse pour le 1er élément, halo plus petit pour le 2e → la fusion est
+/// lisible. Throttlé en amont (cooldown/cible) donc pas de cap anti-spam ici.
+/// Miasma (DoT stackant) ne passe pas ici — son visuel viendra de `status_vfx` (P1).
+pub fn sys_spawn_reaction_vfx(
+    mut events: MessageReader<ReactionEvent>,
     config: Res<ElementConfig>,
     assets: Option<Res<ElementVfxAssets>>,
     mut stats: ResMut<ElementVfxStats>,
@@ -206,12 +210,13 @@ pub fn sys_spawn_combustion_vfx(
     }
     let ttl = config.vfx.impact_ttl * 2.0;
     for ev in events.read() {
-        let [r, g, b] = Element::Fire.rgb(&config.vfx);
+        let (primary, secondary) = ev.kind.pair();
+        let [r, g, b] = primary.rgb(&config.vfx);
         let light0 = config.vfx.light_intensity * 3.0;
-        // Burst orange (feu) — grand + lumineux.
+        // Burst couleur du 1er élément du couple — grand + lumineux.
         commands.spawn((
             Mesh3d(assets.sphere.clone()),
-            MeshMaterial3d(assets.mats[Element::Fire.idx()].clone()),
+            MeshMaterial3d(assets.mats[primary.idx()].clone()),
             Transform::from_translation(ev.pos).with_scale(Vec3::splat(ev.radius)),
             PointLight {
                 color: Color::srgb(r, g, b),
@@ -223,16 +228,16 @@ pub fn sys_spawn_combustion_vfx(
             ElementSpark { age: 0.0, ttl, start_scale: ev.radius, light0 },
             DespawnOnExit(GameMode::Roguelite),
         ));
-        // Halo vert (poison) plus petit, sans lumière.
+        // Halo couleur du 2e élément, plus petit, sans lumière.
         let halo = ev.radius * 0.6;
         commands.spawn((
             Mesh3d(assets.sphere.clone()),
-            MeshMaterial3d(assets.mats[Element::Poison.idx()].clone()),
+            MeshMaterial3d(assets.mats[secondary.idx()].clone()),
             Transform::from_translation(ev.pos).with_scale(Vec3::splat(halo)),
             ElementSpark { age: 0.0, ttl, start_scale: halo, light0: 0.0 },
             DespawnOnExit(GameMode::Roguelite),
         ));
-        stats.combustion_bursts = stats.combustion_bursts.saturating_add(1);
+        stats.reaction_bursts = stats.reaction_bursts.saturating_add(1);
     }
 }
 
@@ -291,15 +296,15 @@ pub fn sys_write_element_vfx_sensor(
 
     let v = &config.vfx;
     let json = format!(
-        r#"{{"id":"element_vfx","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"sparks_spawned":{},"dot_pulses":{},"combustion_bursts":{},"active_sparks":{active},"colors":{{"fire":[{:.2},{:.2},{:.2}],"poison":[{:.2},{:.2},{:.2}],"explosive":[{:.2},{:.2},{:.2}],"armor_pierce":[{:.2},{:.2},{:.2}]}}}}"#,
+        r#"{{"id":"element_vfx","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"sparks_spawned":{},"dot_pulses":{},"reaction_bursts":{},"active_sparks":{active},"colors":{{"fire":[{:.2},{:.2},{:.2}],"poison":[{:.2},{:.2},{:.2}],"shock":[{:.2},{:.2},{:.2}],"armor_pierce":[{:.2},{:.2},{:.2}]}}}}"#,
         time.elapsed_secs(),
         v.enabled,
         stats.sparks_spawned,
         stats.dot_pulses,
-        stats.combustion_bursts,
+        stats.reaction_bursts,
         v.fire_rgb[0], v.fire_rgb[1], v.fire_rgb[2],
         v.poison_rgb[0], v.poison_rgb[1], v.poison_rgb[2],
-        v.explosive_rgb[0], v.explosive_rgb[1], v.explosive_rgb[2],
+        v.shock_rgb[0], v.shock_rgb[1], v.shock_rgb[2],
         v.armor_pierce_rgb[0], v.armor_pierce_rgb[1], v.armor_pierce_rgb[2],
     );
 

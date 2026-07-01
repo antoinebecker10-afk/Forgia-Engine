@@ -3,7 +3,7 @@
 # Hot-reload mtime (Shift+F12-like). Miroir exact de ElementConfig::default().
 #
 # Élément signature par arme :
-#   pistolet Pépin (modern_ar)     -> explosif (AOE splash)
+#   pistolet Pépin (modern_ar)     -> électrique (arc + réactions, story-641)
 #   SMG Bourrasque (assault_rifle) -> feu (burn DoT)
 #   sniper Lenoir (shotgun)        -> perforant (exécution tank)
 #   pompe Boucherie (rocket_launcher) -> poison (DoT stackant + shred)
@@ -20,7 +20,7 @@
 always_on = true
 
 [mapping]
-modern_ar = "explosive"
+modern_ar = "shock"
 assault_rifle = "fire"
 shotgun = "armor_pierce"
 rocket_launcher = "poison"
@@ -38,7 +38,7 @@ runner = 1.0
 sniper = 1.1
 boss = 1.2
 
-[matchup.explosive]
+[matchup.shock]
 tank = 1.1
 runner = 1.4
 sniper = 1.2
@@ -76,7 +76,7 @@ hp_ratio_threshold = 0.25
 enabled = true
 impact_scale = 0.55       # rayon (m) du flash d'un hit normal
 impact_ttl = 0.28         # durée de vie (s) — fade par scale -> 0
-explosive_scale = 2.4     # × taille du flash pour un hit explosif (splash)
+arc_scale = 2.4           # × taille du flash pour un hit électrique (arc)
 light_intensity = 40000.0 # lumens de la lumière d'impact (fade avec le flash)
 light_range = 6.0         # portée (m) de la lumière d'impact
 dot_pulse_scale = 0.5     # rayon (m) du pulse sur un ennemi en DoT (gros = lisible)
@@ -84,7 +84,7 @@ dot_pulse_period = 0.25   # période (s) entre 2 pulses DoT (rapide = flammes vi
 status_y = 1.4            # hauteur (m) de l'aura feu/poison sur le mob (anti-occlusion ; capsule ~2 m)
 fire_rgb = [1.0, 0.42, 0.06]          # 🔥 feu — orange (SMG Bourrasque)
 poison_rgb = [0.42, 1.0, 0.16]        # 🟣 poison — vert (pompe Boucherie)
-explosive_rgb = [1.0, 0.82, 0.12]     # 💥 explosif — jaune (pistolet Pépin)
+shock_rgb = [0.35, 0.65, 1.0]         # ⚡ électrique — bleu (pistolet Pépin, story-641)
 armor_pierce_rgb = [0.30, 0.85, 1.0]  # 🎯 perforant — cyan (sniper Lenoir)
 
 # ── Combustion (réaction Feu + Poison) — voie Gunfire Reborn ─────────────────
@@ -98,3 +98,34 @@ target_pct = 2.0          # dégâts sur la cible = 200% du tir (Gunfire Combust
 area_pct = 1.0            # dégâts aux voisins dans le rayon = 100% du tir
 radius = 3.5              # rayon (m) du splash
 retrigger_cooldown = 0.8  # délai min (s) entre 2 combustions sur la même cible
+
+# ── Marque électrique (Shock) + vulnérabilité — story-641 Inc.2 ──────────────
+# Un hit électrique pose StatusShock : la cible subit +vulnérabilité (×vuln_mul)
+# sur le BONUS élémentaire (matchup) + les réactions, tant que la marque tient.
+# Le +10% sur le HIT DE BASE arrive en P0-4 (re-route via DefenseLayer).
+[shock]
+duration = 4.0   # durée (s) de la marque (rafraîchie à chaque hit électrique)
+vuln_mul = 1.1   # dégâts subis ×1.1 (= +10%) tant que la marque tient
+
+# ── Réactions Miasma & Surcharge (moteur générique) — story-641 Inc.3 ────────
+# Le moteur de réactions (ReactionTable) déclenche une réaction quand 2 statuts
+# sont co-présents sur la cible : Combustion (Feu+Poison, ci-dessus), Miasma
+# (Élec+Poison) et Surcharge (Feu+Élec). Chaque réaction a son cooldown/cible.
+
+# Miasma (Électrique + Poison) : DoT stackant en % des PV MAX → mord sur les gros
+# PV (tanks/bosses) là où les DoT plats plafonnent.
+[miasma]
+enabled = true
+pct_max_hp_per_sec = 0.03  # 3% des PV max /s /stack
+duration = 4.0             # durée (s) du nuage (rafraîchie à chaque déclenchement)
+max_stacks = 5             # plafond de stacks
+retrigger_cooldown = 0.8   # délai min (s) entre 2 déclenchements sur la même cible
+
+# Surcharge (Feu + Électrique) : décharge AOE instantanée (même forme que la
+# Combustion), identité « arc qui explose ».
+[surcharge]
+enabled = true
+target_pct = 1.5           # dégâts sur la cible = 150% du tir
+area_pct = 1.5             # dégâts aux voisins dans le rayon = 150% du tir
+radius = 4.0               # rayon (m) de la décharge
+retrigger_cooldown = 0.8   # délai min (s) entre 2 décharges sur la même cible

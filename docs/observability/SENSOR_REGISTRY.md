@@ -95,8 +95,8 @@
 | `forgia_water.json` | T1 | forgia-water | `src/lib.rs` | 1Hz | water tiles, sea level — story-552 | active |
 | `forgia2_boons.json` | T0 | forgia-observability | `src/boons_sensor.rs:32` | 1Hz | boons actifs, stacks, derniers achats | active |
 | `forgia2_coffre.json` | T0 | forgia-mode-roguelite | `src/coffre_sensor.rs:19` | 1Hz | coffre du Forgeron : offres, achats, rerolls | active |
-| `forgia2_element_vfx.json` | T0 | forgia-mode-roguelite | `src/element_vfx.rs:30` | 1Hz | sparks actifs (cap 64), hits par élément — story-588 | active |
-| `forgia2_elements.json` | T0 | forgia-mode-roguelite | `src/elements.rs:36` | 1Hz | élément par arme, DoT actifs, matchups — story-582 | active |
+| `forgia2_element_vfx.json` | T0 | forgia-mode-roguelite | `src/element_vfx.rs:30` | 1Hz | sparks actifs (cap 64), bursts de réaction — story-588/641 | active |
+| `forgia2_elements.json` | T0 | forgia-mode-roguelite | `src/elements.rs:36` | 1Hz | élément par arme, DoT actifs (burn/poison/shock/miasma), matchups, réactions (combustion/miasma/surcharge) — story-582/641 | active |
 | `forgia2_fps_feel.json` | T0 | forgia-observability | `src/fps_feel_sensor.rs:38` | 1Hz | dash uses, hit feedbacks, aim assist — story-528 | active |
 | `forgia2_menu_video.json` | T0 | forgia-ui | `src/menu_video.rs:55` | 1Hz | frames fond vidéo menu, cache LRU, preroll | active |
 | `forgia2_obstacles.json` | T0 | forgia-mode-roguelite | `src/parcours_obstacles.rs:35` | 1Hz | obstacles animés + push physique — story-590 | active |
@@ -107,6 +107,7 @@
 | `forgia2_ultimate_tech.json` | T0 | forgia-mode-roguelite | `src/ultimate_apply.rs:41` | 1Hz | techniques d'Ultime : compteurs explosion/chaîne/perfo/poison/gel + gels actifs — story-596 T3 | active |
 | `forgia2_enemies.json` | T0 | forgia-mode-roguelite | `src/enemies.rs:19` | 1Hz | stats ennemis data-driven (hp/speed/dmg par archétype) + reload_count + spawn_live — story-638 P0-1 | active |
 | `forgia2_enemy_anim.json` | T0 | forgia-mode-roguelite | `src/enemy_anim.rs:31` | 1Hz | anim squelettique ennemis : bindings/clips/état locomotion (marche/course) — story-636 (WIP) | active |
+| `forgia2_shield.json` | T0 | forgia-mode-roguelite | `src/defense.rs` | 1Hz | défense tri-couche : bouclier/armure agrégés ennemis + joueur, en régén ; alert si 0 porteur — story-640 P0-2 | active |
 | `forgia2_bourrasque.json` | T0 | forgia-fps | `src/bourrasque.rs` | 1Hz | tirs Bourrasque : shots/shots_hit/shot_accuracy, pellets_fired/hits/ratio, kills — story-532 AC9 | active |
 | `forgia2_lenoir.json` | T0 | forgia-fps | `src/lenoir.rs` | 1Hz | précision Lenoir : shots/hits/accuracy, headshots/hs_ratio (cible GDD >40%), kills — story-533 AC10 | active |
 | `forgia2_pepin.json` | T0 | forgia-fps | `src/pepin.rs` | 1Hz | jauge confiance Pépin : stacks/peak/accuracy/damage_mul — story-531 AC10 | active |
