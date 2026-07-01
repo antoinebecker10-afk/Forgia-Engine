@@ -145,6 +145,9 @@ pub fn spawn_wave_enemies(
                     // Story-517 fix : ennemis n'avaient pas BotShootConfig → ne
                     // tiraient pas. Damage + range différencié par archetype.
                     enemies::bot_shoot_for(*archetype),
+                    // Story-636 — échantillon de vitesse pour le driver d'anim
+                    // squelettique (marche vs course selon le déplacement réel).
+                    crate::enemy_anim::EnemyLocoSample::default(),
                 ))
                 .id();
             // Body collider (capsule), classified HitZone::Body par défaut.
@@ -163,21 +166,25 @@ pub fn spawn_wave_enemies(
                 Sensor,
             ));
             // Visual KayKit Skeleton SceneRoot (story-517 — remplace Capsule3d).
-            commands.spawn((
-                Name::new(format!(
-                    "RogueliteEnemy_W{wave}_{}_{i}_visual",
-                    archetype.label()
-                )),
-                ChildOf(parent),
-                SceneRoot(skeleton_handle.clone()),
-                // KayKit forward = +Z, Bevy parent yaw uses -Z → rotate PI.
-                // Y offset : KayKit pivot au sol → translate down par
-                // (capsule_half_height + capsule_radius) pour aligner les
-                // pieds avec le BAS de la capsule parent (sinon lévitation).
-                Transform::from_xyz(0.0, -(stats.capsule_half_height + stats.capsule_radius), 0.0)
-                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
-                    .with_scale(Vec3::splat(scene_scale)),
-            ));
+            commands
+                .spawn((
+                    Name::new(format!(
+                        "RogueliteEnemy_W{wave}_{}_{i}_visual",
+                        archetype.label()
+                    )),
+                    ChildOf(parent),
+                    SceneRoot(skeleton_handle.clone()),
+                    // KayKit forward = +Z, Bevy parent yaw uses -Z → rotate PI.
+                    // Y offset : KayKit pivot au sol → translate down par
+                    // (capsule_half_height + capsule_radius) pour aligner les
+                    // pieds avec le BAS de la capsule parent (sinon lévitation).
+                    Transform::from_xyz(0.0, -(stats.capsule_half_height + stats.capsule_radius), 0.0)
+                        .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
+                        .with_scale(Vec3::splat(scene_scale)),
+                ))
+                // Story-636 — au scene-ready : rend le mesh translucide (clone de
+                // matériau dédupliqué) pour la viz de contrôle du rig.
+                .observe(crate::enemy_rig_debug::on_enemy_scene_ready);
             // Head proxy sensor (story-517 headshot — sphère détectée AVANT capsule
             // body si ray traverse les deux. Tagué HitZone::Head → multiplier dégâts.
             commands.spawn((

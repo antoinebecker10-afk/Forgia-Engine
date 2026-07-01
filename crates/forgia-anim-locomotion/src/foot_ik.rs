@@ -100,7 +100,7 @@ pub fn foot_ik_system(
         return;
     }
 
-    let Ok((target_entity, cache, _target_global)) = q_target.single() else {
+    let Some((target_entity, cache, _target_global)) = q_target.iter().next() else {
         return;
     };
     if !cache.ready {

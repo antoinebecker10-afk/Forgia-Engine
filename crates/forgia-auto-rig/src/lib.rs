@@ -151,6 +151,10 @@ pub enum AutoRigTemplate {
     HumanoidApose,
     /// 20 bones bipède lézard avec tail 4-segments (Rex).
     BipedLizard,
+    /// QW2 (story-637) — laisse le pipeline choisir Humanoid (T-pose) vs
+    /// HumanoidApose (A-pose) vs BipedLizard depuis les landmarks anatomiques
+    /// (`arm_span_half_frac` + `looks_humanoid`). Résolu tôt en variante concrète.
+    HumanoidAuto,
 }
 
 // ── Sensor writer ───────────────────────────────────────────────────────────

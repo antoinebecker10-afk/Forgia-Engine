@@ -28,7 +28,8 @@ use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_anim_locomotion::{
-    LocomotionBoneCache, LocomotionState, LocomotionTarget, LocomotionTemplate, ProcBodyAnim,
+    LocomotionBoneCache, LocomotionDriver, LocomotionState, LocomotionTarget, LocomotionTemplate,
+    ProcBodyAnim,
     AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP,
     IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP, WALK_BOB_AMP,
     WALK_FREQ,
@@ -145,9 +146,11 @@ pub(crate) fn spawn_rex_character(
                         "models/characters/Cyber_lod.glb#Scene0",
                         -0.95_f32,
                         // Story-601 incr.1 : Cyber est généré bras le long du corps
-                        // → template A-pose (bind arms-down) au lieu du Humanoid
-                        // T-pose, pour que le squelette/skinning collent au mesh.
-                        AutoRigTemplate::HumanoidApose,
+                        // → template A-pose (bind arms-down). QW2 (story-637) :
+                        // HumanoidAuto laisse le pipeline DÉTECTER l'A-pose depuis
+                        // arm_span_half_frac (≈0.1 < seuil 0.30) → résout HumanoidApose
+                        // tout seul. loco_tpl reste HumanoidApose (résultat attendu).
+                        AutoRigTemplate::HumanoidAuto,
                         SkeletonTemplateId::HumanoidApose,
                     )
                 } else {
@@ -178,6 +181,9 @@ pub(crate) fn spawn_rex_character(
                     LocomotionBoneCache::default(),
                     ProcBodyAnim::default(),
                     LocomotionTemplate(loco_tpl),
+                    // QW1 (story-637) — driver = le Player (Rex/Cyber est son enfant,
+                    // suit son déplacement). Requis par la query multi-perso.
+                    LocomotionDriver(player_entity),
                 ));
             });
         }
@@ -330,6 +336,11 @@ pub(crate) fn spawn_character_lineup(
             NeedsAutoRig::Template(AutoRigTemplate::Humanoid),
             Name::new(format!("LineupChar_{name}")),
         ));
+        // Note (story-637) : le moteur locomotion est désormais multi-perso, donc
+        // animer ces PNJ ne casserait plus Rex. MAIS l'observabilité (capteurs
+        // forgia_anim_full/walk_pose/rex_bones_live) est encore mono-target et la
+        // pose statique vit dans `npc_pose.rs`. Animer le lineup = follow-up propre
+        // (observabilité multi-target + arbitrage npc_pose). Laissé statique ici.
         // Story-58x Phase 4 : le Maître Forgeron donne ET reçoit la quête gobelins
         // → marqueur ! (dispo) puis ? (à rendre) au-dessus de sa tête.
         if *name == "MaitreForgeron" {

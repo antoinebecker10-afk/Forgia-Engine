@@ -98,31 +98,53 @@ pub fn auto_rig_pinocchio_v1(
         };
         let landmarks =
             anatomy_detect::detect_landmarks_from_vertices(&positions_local, &aabb_for_landmarks);
-        // Template = explicitly requested by caller. Auto-detection is logged
-        // for diagnostic only, but does NOT override the requested template.
-        // Origine 2026-05-18 : Rex demandait BipedLizard mais looks_humanoid()
-        // basé sur has_tail (geom) faux-positivait. Le caller connaît sa
-        // morphologie, on lui fait confiance. Si auto-detection souhaitée plus
-        // tard : ajouter variant `NeedsAutoRig::Auto` opt-in.
-        if landmarks.vertex_count >= 100 {
-            let suggested = if landmarks.looks_humanoid() {
+        // QW2 (story-637) — auto-détection A/T-pose OPT-IN : si le caller demande
+        // `HumanoidAuto`, on résout la variante concrète depuis les landmarks
+        // (point d'extension anticipé 2026-05-18). Sinon on honore le caller
+        // (il connaît sa morphologie) + on logge un hint diagnostic.
+        //
+        // Seuil arm_span : un humanoïde T-pose a les bras écartés
+        // (arm_span_half_frac ≈ 0.5 = demi-envergure ≈ moitié hauteur) ; un mesh
+        // généré bras le long du corps (A-pose, ex. Cyber) ≈ 0.10. 0.30 sépare
+        // proprement les deux (heuristique morpho — exempt no-hardcode).
+        const T_POSE_ARM_SPAN_MIN: f32 = 0.30;
+        let template = if requested_template == AutoRigTemplate::HumanoidAuto {
+            let resolved = if !landmarks.looks_humanoid() {
+                AutoRigTemplate::BipedLizard
+            } else if landmarks.arm_span_half_frac >= T_POSE_ARM_SPAN_MIN {
                 AutoRigTemplate::Humanoid
             } else {
-                AutoRigTemplate::BipedLizard
+                AutoRigTemplate::HumanoidApose
             };
-            if suggested != requested_template {
-                info!(
-                    "[forgia-auto-rig::pinocchio] hint: landmarks suggest {:?} but caller requested {:?} \
-                     (aspect={:.2}, hip_y_frac={:.2}, has_tail={}) — honoring caller",
-                    suggested,
-                    requested_template,
-                    landmarks.aspect_ratio_xy,
-                    landmarks.hip_y_frac,
-                    landmarks.has_tail
-                );
+            info!(
+                "[forgia-auto-rig::pinocchio] HumanoidAuto → {:?} (arm_span_half={:.2}, humanoid={}, hip_y={:.2})",
+                resolved,
+                landmarks.arm_span_half_frac,
+                landmarks.looks_humanoid(),
+                landmarks.hip_y_frac,
+            );
+            resolved
+        } else {
+            if landmarks.vertex_count >= 100 {
+                let suggested = if landmarks.looks_humanoid() {
+                    AutoRigTemplate::Humanoid
+                } else {
+                    AutoRigTemplate::BipedLizard
+                };
+                if suggested != requested_template {
+                    info!(
+                        "[forgia-auto-rig::pinocchio] hint: landmarks suggest {:?} but caller requested {:?} \
+                         (aspect={:.2}, hip_y_frac={:.2}, has_tail={}) — honoring caller",
+                        suggested,
+                        requested_template,
+                        landmarks.aspect_ratio_xy,
+                        landmarks.hip_y_frac,
+                        landmarks.has_tail
+                    );
+                }
             }
-        }
-        let template = requested_template;
+            requested_template
+        };
 
         // 2. Voxelize
         let voxel_cfg = VoxelizerConfig {
@@ -293,6 +315,9 @@ pub fn auto_rig_to_skeleton_template_id(t: AutoRigTemplate) -> SkeletonTemplateI
         AutoRigTemplate::Humanoid => SkeletonTemplateId::Humanoid,
         AutoRigTemplate::HumanoidApose => SkeletonTemplateId::HumanoidApose,
         AutoRigTemplate::BipedLizard => SkeletonTemplateId::BipedLizard,
+        // QW2 — HumanoidAuto est résolu en variante concrète AVANT cet appel
+        // (cf résolution landmarks). Fallback sûr si appelé tel quel.
+        AutoRigTemplate::HumanoidAuto => SkeletonTemplateId::Humanoid,
     }
 }
 

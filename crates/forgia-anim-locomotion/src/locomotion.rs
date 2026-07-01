@@ -279,6 +279,13 @@ pub struct LocomotionState {
     pub gait_phase: f32,
 }
 
+/// QW1 (story-637) — lie un `LocomotionTarget` (perso animé) à l'entité qui
+/// porte son `LocomotionState` (source vitesse/gait). Pour Rex = le Player ;
+/// pour un NPC autonome = lui-même. Permet d'animer N persos (un driver chacun),
+/// au lieu de l'ancien couple unique driver/target via `.single()`.
+#[derive(Component, Clone, Copy)]
+pub struct LocomotionDriver(pub Entity);
+
 /// Animation procédurale whole-body — bob, lean, squash. Appliqué au Transform
 /// root du character (composé par procedural_whole_body_anim qui reste dans
 /// forgia-rpg car couplé à Player.vertical_velocity).
@@ -482,20 +489,22 @@ pub fn attach_locomotion_bones(
             // comme shin/foot, avec fallback topologie si le mesh ne nomme pas ses os.
             let left_leg_e = lookup("thigh_L").or(topo.left_leg);
             let right_leg_e = lookup("thigh_R").or(topo.right_leg);
-            // Name-based resolution (Pinocchio flat hierarchy).
-            // Templates Forgia humanoid : forearm_L/R, shin_L/R, foot_L/R.
-            // BipedLizard : forearm_L/R, shin_L/R, foot_L/R (mêmes noms).
-            let forearm_l_e = lookup("forearm_L");
-            let forearm_r_e = lookup("forearm_R");
-            let hand_l_e = lookup("hand_L");
-            let hand_r_e = lookup("hand_R");
+            // Résolution par NOM (templates Forgia : forearm_L/R, shin_L/R, foot_L/R)
+            // avec FALLBACK topologie (QW3 story-637) `.or(topo.child)` — comme
+            // thigh_L au-dessus. Le nom garde la priorité (rigs template inchangés) ;
+            // les rigs aux noms étrangers résolvent désormais via la chaîne 3D.
+            let forearm_l_e = lookup("forearm_L").or(topo.left_forearm);
+            let forearm_r_e = lookup("forearm_R").or(topo.right_forearm);
+            let hand_l_e = lookup("hand_L").or(topo.left_hand);
+            let hand_r_e = lookup("hand_R").or(topo.right_hand);
+            // Clavicule : pas de fallback topologie (pas une chaîne linéaire claire).
             let clavicle_l_e = lookup("clavicle_L");
             let clavicle_r_e = lookup("clavicle_R");
-            let neck_e = lookup("neck");
-            let shin_l_e = lookup("shin_L");
-            let shin_r_e = lookup("shin_R");
-            let foot_l_e = lookup("foot_L");
-            let foot_r_e = lookup("foot_R");
+            let neck_e = lookup("neck").or(topo.neck);
+            let shin_l_e = lookup("shin_L").or(topo.left_shin);
+            let shin_r_e = lookup("shin_R").or(topo.right_shin);
+            let foot_l_e = lookup("foot_L").or(topo.left_foot);
+            let foot_r_e = lookup("foot_R").or(topo.right_foot);
             info!(
                 "[anim-locomotion] Name-lookup bones : forearm L/R={}/{}, hand L/R={}/{}, clavicle L/R={}/{}, shin L/R={}/{}, foot L/R={}/{}",
                 forearm_l_e.is_some(), forearm_r_e.is_some(),
@@ -644,13 +653,16 @@ pub fn attach_locomotion_bones(
 pub fn procedural_locomotion(
     time: Res<Time>,
     mut q_driver: Query<(&Transform, &mut LocomotionState)>,
-    q_cache: Query<(&LocomotionBoneCache, Option<&StanceOffsets>), With<LocomotionTarget>>,
+    q_targets: Query<
+        (&LocomotionBoneCache, Option<&StanceOffsets>, &LocomotionDriver),
+        With<LocomotionTarget>,
+    >,
     mut bones: Query<&mut Transform, (Without<LocomotionState>, Without<LocomotionTarget>)>,
     mut stats: ResMut<AnimLayerStats>,
     freeze: Res<AnimFreezeBind>,
 ) {
     let timer = AnimTimer::start();
-    stats.locomotion_active = true;
+    stats.locomotion_active = false;
 
     let dt = time.delta_secs();
     if dt <= 0.0 {
@@ -658,11 +670,16 @@ pub fn procedural_locomotion(
         return;
     }
 
-    let Ok((driver_tf, mut state)) = q_driver.single_mut() else {
-        stats.locomotion_active = false;
-        stats.locomotion_us = timer.elapsed_us();
-        return;
+    // QW1 (story-637) — multi-perso : itère CHAQUE target, résout SON driver
+    // (entité portant LocomotionState : Player pour Rex, soi-même pour un NPC).
+    // Remplace le double `.single()` qui bridait l'anim à un seul personnage.
+    // (corps par-target volontairement non ré-indenté pour un diff minimal —
+    //  `bones` reste la Query owned, tous les helpers `&mut bones` inchangés.)
+    for (cache, stance_opt, driver_link) in &q_targets {
+    let Ok((driver_tf, mut state)) = q_driver.get_mut(driver_link.0) else {
+        continue;
     };
+    stats.locomotion_active = true;
 
     let pos = driver_tf.translation;
     let velocity = (pos - state.prev_pos) / dt;
@@ -675,14 +692,9 @@ pub fn procedural_locomotion(
     stats.locomotion_speed = speed;
     stats.locomotion_is_moving = is_moving;
 
-    let Ok((cache, stance_opt)) = q_cache.single() else {
-        stats.locomotion_us = timer.elapsed_us();
-        return;
-    };
     stats.locomotion_cache_ready = cache.ready;
     if !cache.ready {
-        stats.locomotion_us = timer.elapsed_us();
-        return;
+        continue;
     }
 
     let b = &cache.bones;
@@ -706,8 +718,7 @@ pub fn procedural_locomotion(
             slerp_to_bind(&mut bones, seg, 1.0);
         }
         stats.locomotion_gait_phase = state.gait_phase;
-        stats.locomotion_us = timer.elapsed_us();
-        return;
+        continue;
     }
 
     if !is_moving {
@@ -826,8 +837,7 @@ pub fn procedural_locomotion(
         slerp_to_bind(&mut bones, &b.neck, 0.15);
 
         stats.locomotion_gait_phase = state.gait_phase;
-        stats.locomotion_us = timer.elapsed_us();
-        return;
+        continue;
     }
 
     // Walk cycle anatomique — DIRECTION-AWARE (avancer vs reculer).
@@ -980,6 +990,7 @@ pub fn procedural_locomotion(
     }
 
     stats.locomotion_gait_phase = state.gait_phase;
+    } // fin boucle multi-perso (QW1 story-637)
     stats.locomotion_us = timer.elapsed_us();
 }
 
@@ -1272,7 +1283,7 @@ pub fn write_walk_pose_sensor(
     }
     timer.accum_s = 0.0;
 
-    let Ok(state) = q_state.single() else {
+    let Some(state) = q_state.iter().next() else {
         // Phase A.2 unconditional : pas de LocomotionState → mode RPG pas entré.
         let payload = format!(
             "{{\n  \"id\":\"walk_pose\",\n  \"severity\":\"warn\",\n  \"next_step\":\"LocomotionState absent — entrer en GameMode::Rpg pour activer locomotion\",\n  \"state\":\"no_locomotion_state\",\n  \"timestamp_secs\":{:.1}\n}}\n",
@@ -1383,10 +1394,10 @@ pub fn write_walk_dir_probe(
     if dt <= 0.0 {
         return;
     }
-    let Ok((root_e, cache)) = q_cache.single() else {
+    let Some((root_e, cache)) = q_cache.iter().next() else {
         return;
     };
-    let Ok(state) = q_state.single() else {
+    let Some(state) = q_state.iter().next() else {
         return;
     };
     if !cache.ready {
@@ -1488,14 +1499,14 @@ pub fn write_anim_full_sensor(
     st.accum_s = 0.0;
 
     let n_targets = q_root.iter().count();
-    let Ok((cache, stance_opt, root_gt)) = q_root.single() else {
+    let Some((cache, stance_opt, root_gt)) = q_root.iter().next() else {
         let _ = std::fs::write(
             ANIM_FULL_PATH,
-            format!("{{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"locomotion_target_count={n_targets}\",\"next_step\":\"single() requiert exactement 1 LocomotionTarget (RPG entré ? lineup en porte-t-il ?)\"}}\n"),
+            format!("{{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"locomotion_target_count={n_targets}\",\"next_step\":\"0 LocomotionTarget (RPG entré ? lineup spawné ?) — capteur lit le 1er target\"}}\n"),
         );
         return;
     };
-    let Ok(lstate) = q_state.single() else {
+    let Some(lstate) = q_state.iter().next() else {
         let _ = std::fs::write(
             ANIM_FULL_PATH,
             "{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"no_locomotion_state\"}\n",

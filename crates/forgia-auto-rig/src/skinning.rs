@@ -221,6 +221,27 @@ pub fn inject_skinning_for_rigged_meshes(
         // bone→bone (spawn_embedded_bones) donc q_children donne les enfants-os.
         let bone_idx: HashMap<Entity, usize> =
             bones.iter().enumerate().map(|(i, &e)| (e, i)).collect();
+        // Carte os→parent (depuis q_children) pour extrapoler le bout des os feuilles.
+        let mut parent_of: HashMap<usize, usize> = HashMap::new();
+        for (i, &e) in bones.iter().enumerate() {
+            if let Ok(children) = q_children.get(e) {
+                for child in children.iter() {
+                    if let Some(&ci) = bone_idx.get(&child) {
+                        parent_of.insert(ci, i);
+                    }
+                }
+            }
+        }
+        // 2026-06-30 (suite story-637) — os FEUILLE (main/pied/tête, sans os-enfant) :
+        // sans extrapolation, `tip == head` → segment dégénéré (point au joint) → le
+        // VOLUME de l'extrémité est capturé par le parent (forearm/shin/neck) →
+        // `count_primary = 0` (capteur forgia_skinning_weights : head/hand/foot morts,
+        // l'extrémité ne se déforme pas). Fix : on extrapole le bout le long de la
+        // direction parent→os, d'une fraction de la longueur de l'os parent → l'os
+        // feuille SPAN son extrémité et capture ses vertices. (Le pied pointe vers
+        // l'avant alors que son os pointe vers le bas → capture partielle du talon ;
+        // suffisant pour le réveiller, raffinement avant/toe = follow-up.)
+        const LEAF_BONE_EXTENSION_RATIO: f32 = 1.0;
         let bone_segments_local: Vec<(Vec3, Vec3)> = bones
             .iter()
             .enumerate()
@@ -237,6 +258,15 @@ pub fn inject_skinning_for_rigged_meshes(
                                 best_d2 = d2;
                                 tip = cpos;
                             }
+                        }
+                    }
+                }
+                // Os feuille (aucun os-enfant → tip resté == head) : extrapole.
+                if best_d2 < 1e-8 {
+                    if let Some(&pi) = parent_of.get(&i) {
+                        let dir = head - bone_positions_local[pi];
+                        if dir.length_squared() > 1e-10 {
+                            tip = head + dir * LEAF_BONE_EXTENSION_RATIO;
                         }
                     }
                 }

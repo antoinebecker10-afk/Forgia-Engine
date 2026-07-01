@@ -39,6 +39,19 @@ pub struct RigTopology {
     pub right_arm: Option<Entity>,
     pub spine: Option<Entity>,
     pub head: Option<Entity>,
+    /// QW3 (story-637) — bones enfants dérivés par chaîne (le + de descendants).
+    /// Fallback quand les noms ne matchent pas le template (rigs étrangers).
+    /// forearm = enfant du bras ; hand = enfant du forearm ; shin/foot idem jambes ;
+    /// neck = parent direct de head.
+    pub left_forearm: Option<Entity>,
+    pub left_hand: Option<Entity>,
+    pub right_forearm: Option<Entity>,
+    pub right_hand: Option<Entity>,
+    pub left_shin: Option<Entity>,
+    pub left_foot: Option<Entity>,
+    pub right_shin: Option<Entity>,
+    pub right_foot: Option<Entity>,
+    pub neck: Option<Entity>,
     /// Tail = chaîne ordonnée du root du tail vers la pointe (Vec::first() = root).
     pub tail_chain: Vec<Entity>,
     /// Diagnostic : liste de tous les bones inspectés (name + local_pos) pour log.
@@ -216,6 +229,49 @@ pub fn analyze_rig_topology(
     topo.right_arm = right_arm_best.map(|(e, _)| e);
     topo.spine = spine_best.map(|(e, _)| e);
     topo.head = head_best.map(|(e, _)| e);
+
+    // QW3 (story-637) — dérive les bones enfants par chaîne anatomique : l'enfant
+    // qui a le PLUS de descendants continue la chaîne (arm→forearm→hand,
+    // thigh→shin→foot). Fallback pour rigs aux noms non-template ; côté locomotion
+    // le NOM garde la priorité (`lookup(..).or(topo.child)`). One-shot (attach).
+    let linear_child = |e: Entity| -> Option<Entity> {
+        children_of(e)
+            .into_iter()
+            .map(|c| (c, count_descendants(c, children_of)))
+            .max_by_key(|(_, n)| *n)
+            .map(|(c, _)| c)
+    };
+    if let Some(arm) = topo.left_arm {
+        topo.left_forearm = linear_child(arm);
+        if let Some(fa) = topo.left_forearm {
+            topo.left_hand = linear_child(fa);
+        }
+    }
+    if let Some(arm) = topo.right_arm {
+        topo.right_forearm = linear_child(arm);
+        if let Some(fa) = topo.right_forearm {
+            topo.right_hand = linear_child(fa);
+        }
+    }
+    if let Some(leg) = topo.left_leg {
+        topo.left_shin = linear_child(leg);
+        if let Some(sh) = topo.left_shin {
+            topo.left_foot = linear_child(sh);
+        }
+    }
+    if let Some(leg) = topo.right_leg {
+        topo.right_shin = linear_child(leg);
+        if let Some(sh) = topo.right_shin {
+            topo.right_foot = linear_child(sh);
+        }
+    }
+    // neck = parent direct de head (le bone dont head est enfant), hors root.
+    if let Some(head) = topo.head {
+        topo.neck = bones
+            .iter()
+            .find(|b| b.entity != bone_root && children_of(b.entity).contains(&head))
+            .map(|b| b.entity);
+    }
 
     // Étape 4 : tail. Heuristique = chaîne descendante depuis un bone bas-arrière
     // (y_norm ≤ 0.1) qui pointe arrière (|z_norm|>x_norm.abs()) et a une chaîne
@@ -439,6 +495,38 @@ mod tests {
         assert_eq!(topo.right_arm, Some(b.by_name["mixamorig:RightArm"]));
         assert_eq!(topo.spine, Some(b.by_name["mixamorig:Spine"]));
         assert_eq!(topo.head, Some(b.by_name["mixamorig:Head"]));
+    }
+
+    #[test]
+    fn derives_arm_chain_and_neck_children() {
+        // QW3 (story-637) : forearm/hand dérivés par `linear_child` (enfant au + de
+        // descendants) depuis l'upper arm ; neck = parent direct de head.
+        let b = build(vec![
+            ("scene", None, Vec3::ZERO),
+            ("armature", Some("scene"), Vec3::ZERO),
+            ("bone_root", Some("armature"), Vec3::ZERO),
+            ("spine", Some("bone_root"), Vec3::new(0.0, 0.5, 0.0)),
+            ("neck", Some("spine"), Vec3::new(0.0, 0.7, 0.0)),
+            ("head", Some("neck"), Vec3::new(0.0, 0.9, 0.0)),
+            ("arm_l", Some("spine"), Vec3::new(-0.25, 0.3, 0.0)),
+            ("forearm_l", Some("arm_l"), Vec3::new(-0.45, 0.2, 0.0)),
+            ("hand_l", Some("forearm_l"), Vec3::new(-0.6, 0.1, 0.0)),
+            ("arm_r", Some("spine"), Vec3::new(0.25, 0.3, 0.0)),
+            ("forearm_r", Some("arm_r"), Vec3::new(0.45, 0.2, 0.0)),
+            ("hand_r", Some("forearm_r"), Vec3::new(0.6, 0.1, 0.0)),
+            // jambes présentes pour un humanoïde complet (assertions = bras/neck,
+            // robustes ; la dérivation jambe dépend du scoring du thigh, couvert
+            // par la priorité au NOM côté locomotion).
+            ("thigh_l", Some("bone_root"), Vec3::new(-0.15, -0.4, 0.0)),
+            ("thigh_r", Some("bone_root"), Vec3::new(0.15, -0.4, 0.0)),
+        ]);
+        let topo = analyze(&b);
+        assert_eq!(topo.left_arm, Some(b.by_name["arm_l"]), "upper arm identifié");
+        assert_eq!(topo.left_forearm, Some(b.by_name["forearm_l"]));
+        assert_eq!(topo.left_hand, Some(b.by_name["hand_l"]));
+        assert_eq!(topo.right_forearm, Some(b.by_name["forearm_r"]));
+        assert_eq!(topo.right_hand, Some(b.by_name["hand_r"]));
+        assert_eq!(topo.neck, Some(b.by_name["neck"]), "neck = parent de head");
     }
 
     #[test]
