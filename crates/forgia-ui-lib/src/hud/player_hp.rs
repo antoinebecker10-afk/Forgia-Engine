@@ -6,10 +6,15 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
-use forgia_damage::Health as DamageHealth;
+use forgia_damage::{DefenseLayer, Health as DamageHealth};
 use forgia_player::Player;
 
 use crate::style::*;
+
+/// Bouclier (bleu) / Armure (jaune) — couleurs UI cosmétiques (story-644 P1 Inc.1),
+/// alignées sur le concept DefenseLayer (Bouclier bleu régénérant, Armure jaune).
+const C_SHIELD: egui::Color32 = egui::Color32::from_rgb(70, 150, 240);
+const C_ARMOR: egui::Color32 = egui::Color32::from_rgb(235, 195, 70);
 
 // Marker `With<Player>` requis : 2026-05-27 bug HP bar disparaît début vague suivante.
 // Les ArenaBots (forgia-ai-arena-bot) portent aussi `forgia_damage::Health` → query
@@ -19,14 +24,14 @@ pub(crate) fn draw_player_hp(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
     game_mode: Res<State<GameMode>>,
-    q_player: Query<&DamageHealth, With<Player>>,
+    q_player: Query<(&DamageHealth, Option<&DefenseLayer>), With<Player>>,
 ) {
     if *app_state.get() != AppMode::InGame
         || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
     {
         return;
     }
-    let Ok(health) = q_player.single() else {
+    let Ok((health, defense)) = q_player.single() else {
         return;
     };
     let Ok(ctx) = contexts.ctx_mut() else { return };
@@ -116,6 +121,54 @@ pub(crate) fn draw_player_hp(
         egui::FontId::monospace(20.0),
         C_PRIMARY,
         1.5,
+    );
+
+    // Story-644 P1 Inc.1 — barre défensive segmentée AU-DESSUS de la HP : Bouclier
+    // (bleu) puis Armure (jaune), empilées vers le haut, chacune affichée SEULEMENT si
+    // sa couche existe (`*_max > 0`). Rend visible le `DefenseLayer` (P0-2 ; le joueur a
+    // un bouclier 50 jusqu'ici invisible). Absent hors Roguelite → pas de barre.
+    if let Some(def) = defense {
+        let seg_h = 14.0;
+        let seg_gap = 5.0;
+        let mut seg_bottom = bottom_y - seg_gap;
+        if def.shield_max > 0.5 {
+            let top = seg_bottom - seg_h;
+            draw_defense_segment(&painter, left_x, top, bar_w, seg_h, def.shield / def.shield_max, C_SHIELD);
+            seg_bottom = top - seg_gap;
+        }
+        if def.armor_max > 0.5 {
+            let top = seg_bottom - seg_h;
+            draw_defense_segment(&painter, left_x, top, bar_w, seg_h, def.armor / def.armor_max, C_ARMOR);
+        }
+    }
+}
+
+/// Barre défensive segmentée (track + fill coloré + outline), style HP bar en plus fin.
+fn draw_defense_segment(
+    painter: &egui::Painter,
+    left_x: f32,
+    top_y: f32,
+    w: f32,
+    h: f32,
+    frac: f32,
+    fill: egui::Color32,
+) {
+    let rect = egui::Rect::from_min_size(egui::pos2(left_x, top_y), egui::vec2(w, h));
+    painter.rect_filled(
+        rect,
+        3.0,
+        egui::Color32::from_rgba_unmultiplied(20, 22, 28, 230),
+    );
+    let fw = w * frac.clamp(0.0, 1.0);
+    if fw > 0.5 {
+        let fr = egui::Rect::from_min_size(rect.min, egui::vec2(fw, h));
+        painter.rect_filled(fr, 3.0, fill);
+    }
+    painter.rect_stroke(
+        rect,
+        3.0,
+        egui::Stroke::new(1.5, C_OUTLINE),
+        egui::StrokeKind::Outside,
     );
 }
 
