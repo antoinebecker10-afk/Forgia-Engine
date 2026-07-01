@@ -681,10 +681,12 @@ pub struct ElementStats {
     pub combustions: u32,
     pub miasmas: u32,
     pub surcharges: u32,
-    /// P0-4 — bonus élémentaire absorbé par Bouclier/Armure (vs fuite vers la Vie).
-    /// Signal que le routage affinité→DefenseLayer est actif (>0 dès qu'un ennemi
-    /// défendu est touché par un bonus élémentaire).
-    pub bonus_absorbed: f32,
+    /// P0-4 — dégâts élémentaires absorbés par Bouclier/Armure (vs fuite vers la
+    /// Vie). Couvre bonus de matchup (Inc.1) + bursts/arc/Miasma (Inc.2). Signal que
+    /// le routage affinité→DefenseLayer est actif (>0 dès qu'un ennemi défendu est
+    /// touché par un dégât élémentaire). Le hit de BASE (forgia-fps) reste hors compte
+    /// (routé `Physical`, sans affinité — Inc.3).
+    pub elem_absorbed: f32,
 }
 
 impl ElementStats {
@@ -856,6 +858,21 @@ impl ReactionKind {
             ReactionKind::Surcharge,
         ]
     }
+
+    /// Élément dont l'**affinité** régit les dégâts de la réaction (P0-4 Inc.2). Une
+    /// réaction naît d'un COUPLE de statuts (`pair()`) mais son burst/DoT a une seule
+    /// nature de dégât — on choisit l'élément qui la caractérise :
+    /// - **Combustion** (Feu+Poison) → **Feu** : le payoff est un burst explosif de type
+    ///   brûlure (dégât direct), pas un DoT corrosif → affinité Feu, pas Poison.
+    /// - **Surcharge** (Feu+Élec) → **Électrique** : décharge/arc.
+    /// - **Miasma** (Élec+Poison) → **Poison** : nuage corrosif → armure.
+    pub fn damage_element(self) -> Element {
+        match self {
+            ReactionKind::Combustion => Element::Fire,
+            ReactionKind::Miasma => Element::Poison,
+            ReactionKind::Surcharge => Element::Shock,
+        }
+    }
 }
 
 /// Table des réactions : mappe les statuts co-présents → les réactions déclenchées.
@@ -980,6 +997,37 @@ pub fn miasma_damage(stacks: u32, pct_max_hp_per_sec: f32, max_hp: f32, seconds:
     (stacks as f32 * pct_max_hp_per_sec * max_hp * seconds).max(0.0)
 }
 
+/// Applique `raw` dégâts **élémentaires** à un ennemi (P0-4 Inc.2) : draine sa
+/// couche défensive (affinité par couche) puis la Vie ; sans couche → direct.
+/// Cumule l'absorbé dans le sensor. Centralise le routage pour bursts/arc/Miasma
+/// (le bonus de matchup reste inline car couplé à l'exécution perforante).
+fn route_elemental_damage(
+    target: Entity,
+    raw: f32,
+    aff: &ElementAffinity,
+    q_health: &mut Query<&mut Health, With<EnemyArchetype>>,
+    q_defense: &mut Query<&mut DefenseLayer, With<EnemyArchetype>>,
+    stats: &mut ElementStats,
+) -> bool {
+    if raw <= 0.0 {
+        return false;
+    }
+    let leak = if let Ok(mut dl) = q_defense.get_mut(target) {
+        dl.note_hit();
+        let leak = dl.absorb_elemental(raw, aff);
+        stats.elem_absorbed += (raw - leak).max(0.0);
+        leak
+    } else {
+        raw
+    };
+    if let Ok(mut hp) = q_health.get_mut(target) {
+        hp.current = (hp.current - leak).max(0.0);
+        true
+    } else {
+        false
+    }
+}
+
 /// Lit `CombatHitEvent` (le hit de base est DÉJÀ appliqué par forgia-fps) et
 /// ajoute la couche élémentaire sur `forgia_combat::Health` :
 /// - **bonus de matchup** (× selon archetype, ampli par shred poison + vuln shock),
@@ -987,6 +1035,13 @@ pub fn miasma_damage(stacks: u32, pct_max_hp_per_sec: f32, max_hp: f32, seconds:
 /// - **status** burn/poison/shock,
 /// - **arc électrique** (splash aux voisins sur hit Shock),
 /// - **réactions** (Combustion/Miasma/Surcharge) via le moteur générique.
+///
+/// **Drain de couche multi-passes (P0-4)** : un même tir peut drainer le `DefenseLayer`
+/// de la cible en plusieurs passes INDÉPENDANTES (chacune avec sa propre affinité,
+/// recalculée sur l'état courant — pas de double-comptage) : (1) hit de base `Physical`
+/// (forgia-fps, hors ce fichier), (2) bonus de matchup (Inc.1), (3) burst de réaction
+/// Combustion/Surcharge (Inc.2). C'est cumulatif par design (le bouclier fond plus vite
+/// sous un tir « chargé »), pas un bug.
 #[allow(clippy::too_many_arguments)]
 pub fn sys_apply_elements_on_hit(
     mut events: MessageReader<CombatHitEvent>,
@@ -1058,7 +1113,7 @@ pub fn sys_apply_elements_on_hit(
                 let leak = if let Ok(mut dl) = q_defense.get_mut(ev.target) {
                     dl.note_hit();
                     let leak = dl.absorb_elemental(bonus, &config.affinity_for(element));
-                    stats.bonus_absorbed += (bonus - leak).max(0.0);
+                    stats.elem_absorbed += (bonus - leak).max(0.0);
                     leak
                 } else {
                     bonus
@@ -1153,9 +1208,12 @@ pub fn sys_apply_elements_on_hit(
                         let (tgt_dmg, area_dmg) =
                             combustion_damage(ev.damage, target_pct, area_pct);
                         let (tgt_dmg, area_dmg) = (tgt_dmg * vuln, area_dmg * vuln);
-                        if let Ok(mut hp) = q_health.get_mut(ev.target) {
-                            hp.current = (hp.current - tgt_dmg).max(0.0);
-                        }
+                        // P0-4 Inc.2 — le burst draine la couche défensive (affinité de
+                        // l'élément de la réaction) avant la Vie : cible + voisins.
+                        let aff = config.affinity_for(kind.damage_element());
+                        route_elemental_damage(
+                            ev.target, tgt_dmg, &aff, &mut q_health, &mut q_defense, &mut stats,
+                        );
                         let r2 = radius * radius;
                         react.buf.clear();
                         react.buf.extend(q_pos.iter().filter_map(|(e, gt)| {
@@ -1163,9 +1221,9 @@ pub fn sys_apply_elements_on_hit(
                                 .then_some(e)
                         }));
                         for &e in &*react.buf {
-                            if let Ok(mut hp) = q_health.get_mut(e) {
-                                hp.current = (hp.current - area_dmg).max(0.0);
-                            }
+                            route_elemental_damage(
+                                e, area_dmg, &aff, &mut q_health, &mut q_defense, &mut stats,
+                            );
                         }
                         react.vfx_events.write(ReactionEvent { kind, pos: origin, radius });
                     }
@@ -1192,11 +1250,13 @@ pub fn sys_apply_elements_on_hit(
 
         // Arc électrique (ex-splash explosif, remap story-641) — saute aux VOISINS,
         // indépendant de la mort de la cible (un tir qui tue doit quand même arcer).
-        // Collecte d'abord (q_pos immutable) puis applique (q_health mutable) ; buffer réutilisé.
+        // Collecte d'abord (q_pos immutable) puis applique via le DefenseLayer
+        // (affinité Shock, P0-4 Inc.2) ; buffer réutilisé.
         if element == Element::Shock {
             let origin = ev.hit_world_pos;
             let r2 = config.aoe.radius * config.aoe.radius;
             let splash = (ev.damage * config.aoe.damage_factor).max(0.0);
+            let aff = config.affinity_for(Element::Shock);
             aoe_buf.clear();
             aoe_buf.extend(q_pos.iter().filter_map(|(e, gt)| {
                 (e != ev.target && (gt.translation() - origin).length_squared() <= r2)
@@ -1204,8 +1264,8 @@ pub fn sys_apply_elements_on_hit(
             }));
             let mut hits = 0u32;
             for &e in &*aoe_buf {
-                if let Ok(mut hp) = q_health.get_mut(e) {
-                    hp.current = (hp.current - splash).max(0.0);
+                if route_elemental_damage(e, splash, &aff, &mut q_health, &mut q_defense, &mut stats)
+                {
                     hits += 1;
                 }
             }
@@ -1220,6 +1280,8 @@ pub fn sys_apply_elements_on_hit(
 pub fn sys_tick_element_status(
     time: Res<Time>,
     mut commands: Commands,
+    config: Res<ElementConfig>,
+    mut stats: ResMut<ElementStats>,
     mut q: Query<
         (
             Entity,
@@ -1228,12 +1290,17 @@ pub fn sys_tick_element_status(
             Option<&mut StatusPoison>,
             Option<&mut StatusShock>,
             Option<&mut StatusMiasma>,
+            Option<&mut DefenseLayer>,
         ),
         With<EnemyArchetype>,
     >,
 ) {
     let dt = time.delta_secs();
-    for (e, mut hp, burn, poison, shock, miasma) in &mut q {
+    // Miasma = nuage corrosif → affinité Poison (fort armure) — P0-4 Inc.2.
+    let poison_aff = config.affinity_for(Element::Poison);
+    for (e, mut hp, burn, poison, shock, miasma, mut defense) in &mut q {
+        // `total` = DoT « purs » (burn + poison) qui bypassent les couches
+        // (TrueHealth) ; Miasma est routé à part via le DefenseLayer.
         let mut total = 0.0_f32;
         let max_hp = hp.max;
 
@@ -1273,24 +1340,36 @@ pub fn sys_tick_element_status(
         }
 
         // Miasma (Élec+Poison) : DoT stackant en % des PV MAX (mord sur les gros PV).
+        // Routé via le DefenseLayer (affinité Poison → armure) — P0-4 Inc.2. Le nuage
+        // corrosif entame la couche (contrairement à burn/poison, DoT « purs »).
         if let Some(mut m) = miasma {
             m.secs_left -= dt;
             m.tick_accum += dt;
+            let mut miasma_dmg = 0.0;
             if m.tick_accum >= STATUS_TICK_INTERVAL {
                 let ticks = (m.tick_accum / STATUS_TICK_INTERVAL).floor();
                 m.tick_accum -= ticks * STATUS_TICK_INTERVAL;
-                total += miasma_damage(
-                    m.stacks,
-                    m.pct_max_hp_per_sec,
-                    max_hp,
-                    STATUS_TICK_INTERVAL * ticks,
-                );
+                miasma_dmg =
+                    miasma_damage(m.stacks, m.pct_max_hp_per_sec, max_hp, STATUS_TICK_INTERVAL * ticks);
             }
-            if m.secs_left <= 0.0 {
+            let expired = m.secs_left <= 0.0;
+            if miasma_dmg > 0.0 {
+                let leak = if let Some(dl) = defense.as_deref_mut() {
+                    dl.note_hit();
+                    let leak = dl.absorb_elemental(miasma_dmg, &poison_aff);
+                    stats.elem_absorbed += (miasma_dmg - leak).max(0.0);
+                    leak
+                } else {
+                    miasma_dmg
+                };
+                hp.current = (hp.current - leak).max(0.0);
+            }
+            if expired {
                 commands.entity(e).try_remove::<StatusMiasma>();
             }
         }
 
+        // DoT « purs » (burn + poison) — appliqués APRÈS Miasma, directement à la Vie.
         if total > 0.0 {
             hp.current = (hp.current - total).max(0.0);
         }
@@ -1336,7 +1415,7 @@ pub fn sys_write_elements_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"bonus_absorbed":{:.0},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
+        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"elem_absorbed":{:.0},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
         time.elapsed_secs(),
         config.always_on,
         unlocks.is_unlocked(Element::Fire),
@@ -1357,7 +1436,7 @@ pub fn sys_write_elements_sensor(
         stats.shocks_applied,
         stats.aoe_hits,
         stats.executes,
-        stats.bonus_absorbed,
+        stats.elem_absorbed,
         stats.combustions,
         stats.miasmas,
         stats.surcharges,
@@ -1760,6 +1839,47 @@ mod tests {
         // Contraste : le même bonus en DIRECT (cible sans couche) exécute bien.
         let (_, exec_direct) = resolve_leak_to_health(Element::ArmorPierce, 100.0, 120.0, 75.0, 0.25);
         assert!(exec_direct, "sans bouclier, 75 ramène sous le seuil → exécution");
+    }
+
+    // ── Routage bursts/arc/Miasma via DefenseLayer (story-642 P0-4 Inc.2) ──
+
+    #[test]
+    fn reaction_damage_element_maps_to_source_element() {
+        assert_eq!(ReactionKind::Combustion.damage_element(), Element::Fire);
+        assert_eq!(ReactionKind::Miasma.damage_element(), Element::Poison);
+        assert_eq!(ReactionKind::Surcharge.damage_element(), Element::Shock);
+    }
+
+    #[test]
+    fn burst_drains_shield_via_reaction_affinity() {
+        // Même burst brut (40) sur un bouclier 100 : Surcharge (électrique ×1.5)
+        // perce plus de bouclier que Combustion (feu ×0.75). Vérifie que le routage
+        // burst→couche utilise l'affinité de l'élément de la réaction.
+        let c = ElementConfig::default();
+        let mut sh_surcharge = DefenseLayer::new(100.0, 0.0, 20.0, 3.0);
+        let mut sh_combustion = DefenseLayer::new(100.0, 0.0, 20.0, 3.0);
+        let leak_s = sh_surcharge
+            .absorb_elemental(40.0, &c.affinity_for(ReactionKind::Surcharge.damage_element()));
+        let leak_c = sh_combustion
+            .absorb_elemental(40.0, &c.affinity_for(ReactionKind::Combustion.damage_element()));
+        assert_eq!(leak_s, 0.0);
+        assert_eq!(leak_c, 0.0);
+        assert!((sh_surcharge.shield - 40.0).abs() < 1e-3, "40×1.5=60 retirés → 40");
+        assert!((sh_combustion.shield - 70.0).abs() < 1e-3, "40×0.75=30 retirés → 70");
+        assert!(sh_surcharge.shield < sh_combustion.shield, "surcharge perce mieux");
+    }
+
+    #[test]
+    fn miasma_routes_via_poison_armor_affinity() {
+        // Miasma = affinité poison (forte armure ×1.5). Tick de 20 sur armure 40 →
+        // 20×1.5 = 30 retirés → armure 10, 0 fuite.
+        let c = ElementConfig::default();
+        let aff = c.affinity_for(ReactionKind::Miasma.damage_element());
+        assert!(aff.armor_mult > 1.0, "Miasma → affinité forte armure");
+        let mut armored = DefenseLayer::new(0.0, 40.0, 20.0, 3.0);
+        let leak = armored.absorb_elemental(20.0, &aff);
+        assert_eq!(leak, 0.0);
+        assert!((armored.armor - 10.0).abs() < 1e-3);
     }
 
     // ── VFX (story-588) ──

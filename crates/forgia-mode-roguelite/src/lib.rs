@@ -323,11 +323,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .run_if(in_state(GameMode::Roguelite)),
         );
         // Régén du bouclier = FixedUpdate/Combat (cadence déterministe, comme le DoT
-        // élémentaire — story-634).
+        // élémentaire — story-634). Ordre EXPLICITE après le tick des statuts : le DoT
+        // Miasma (P0-4 Inc.2) draine + `note_hit()` la couche dans `sys_tick_element_status` ;
+        // la régén doit voir ce coup du même tick → pas de régén parasite (déterminisme
+        // story-634, évite l'ambiguïté deux systèmes &mut DefenseLayer même set).
         app.add_systems(
             FixedUpdate,
             defense::sys_regen_defense
                 .in_set(GameSet::Combat)
+                .after(elements::sys_tick_element_status)
                 .run_if(in_state(GameMode::Roguelite)),
         );
         app.add_systems(

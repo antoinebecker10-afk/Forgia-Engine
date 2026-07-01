@@ -293,6 +293,25 @@ mod tests {
         assert_eq!(d.shield, 50.0);
     }
 
+    /// Documente le comportement P0-4 Inc.2 (story-642 §3, décision balance) : un DoT
+    /// qui appelle `note_hit()` à chaque tick (ex. Miasma, 2 Hz) gèle la régén tant
+    /// qu'il tient (`since_hit` remis à 0 avant d'atteindre `regen_delay`). Garde-fou :
+    /// si on décide plus tard de laisser régénérer sous DoT léger, ce test change AVEC
+    /// l'intention (pas une régression silencieuse).
+    #[test]
+    fn repeated_note_hit_freezes_regen_like_active_miasma() {
+        let mut d = layer(); // shield 50, regen 20/s, delay 3s
+        d.absorb_elemental(20.0, &ElementAffinity::new(0.75, 1.5, 0.75)); // entame le bouclier
+        let before = d.shield;
+        for _ in 0..20 {
+            // 10 s de DoT à 2 Hz : chaque tick = note_hit + regen(0.5).
+            d.note_hit();
+            d.regen(0.5);
+        }
+        assert!(d.shield <= before, "régén gelée tant que note_hit est répété (Miasma actif)");
+        assert!(!d.is_regenerating(), "since_hit remis à 0 chaque tick → jamais en régén");
+    }
+
     /// Un `mult` minuscule (genome mal réglé) dégrade proprement : la couche devient
     /// quasi-incassable mais AUCUN NaN/Inf/panic (comportement dégénéré documenté).
     #[test]

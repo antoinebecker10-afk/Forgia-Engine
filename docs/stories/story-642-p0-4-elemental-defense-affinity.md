@@ -46,10 +46,17 @@ sur la bleue ; les 228 tests élémentaires passent toujours.
   `forgia-mode-roguelite`: genome `[affinity]` (miroir Default) + le **bonus de matchup**
   (`resolve_target_hit`) draine le `DefenseLayer` de la cible via `absorb_elemental` (au
   lieu de `hp.current -=`). Sensor : affinité effective. Tests.
-- **Inc.2 — Cohérence : bursts + arc + Miasma via DefenseLayer** : router Combustion/
-  Surcharge (burst), arc électrique (Shock splash) et le DoT Miasma à travers le
-  `DefenseLayer` (affinité du kind/élément). Le hit **de base** prend aussi l'affinité de
-  son élément (canal élémentaire au lieu de `Physical`). Tests.
+- **Inc.2 — Cohérence : bursts + arc + Miasma via DefenseLayer** — ✅ **FAIT** (non commité) :
+  helper `route_elemental_damage` (couche→Vie, affinité) ; Combustion/Surcharge (burst,
+  affinité de `ReactionKind::damage_element`), arc électrique (Shock) et DoT Miasma (Poison,
+  routé dans `sys_tick_element_status` — burn/poison restent TrueHealth) drainent la couche.
+  `bonus_absorbed`→`elem_absorbed` (couvre tous les canaux routés). 263 tests, clippy 0-warn
+  touché, binaire compile. Auto-QA qa-lead **WARN→traité** : §1 ordering `sys_regen_defense`
+  `.after(sys_tick_element_status)` (déterminisme story-634) FIXÉ ; §2/§7 documentés (3 passes de
+  drain/tir, choix affinité Combustion→Feu) ; §3 **décision balance en attente user** (Miasma gèle
+  la régén du bouclier tant qu'il tient — cohérent mais fort, test garde-fou posé). §5 dette
+  télémétrie (aoe_hits ne compte pas les voisins de burst). **Le hit de base reporté Inc.3**
+  (forgia-fps ne voit pas le mapping élément → même contrainte crate que la vuln).
 - **Inc.3 — Vuln hit-de-base (StatusShock, différée P0-3)** : composant générique
   `Vulnerability{mult,secs_left}` dans `forgia-damage`, posé par le hit électrique, lu par
   `forgia-fps` (hit de base ×mult) + par elements.rs. Remplace/complète `StatusShock`. Tests.
