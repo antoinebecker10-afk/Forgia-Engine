@@ -129,3 +129,26 @@ target_pct = 1.5           # dégâts sur la cible = 150% du tir
 area_pct = 1.5             # dégâts aux voisins dans le rayon = 150% du tir
 radius = 4.0               # rayon (m) de la décharge
 retrigger_cooldown = 0.8   # délai min (s) entre 2 décharges sur la même cible
+
+# ── Affinité élément → couche de défense — story-642 P0-4 ────────────────────
+# Multiplicateur d'efficacité du bonus élémentaire contre chaque couche du
+# DefenseLayer : >1 = fort (efficace), <1 = faible. Modèle « effectiveness » :
+# 1 pt de dégât retire `mult` pts de la couche (casser une couche coûte
+# couche/mult). Critère masterplan : Feu +50% Vie, −25% Bouclier.
+#   Feu→Vie, Électrique→Bouclier, Perforant+Poison→Armure (matché 1.5 / autre 0.75).
+[affinity.fire]
+shield = 0.75
+armor = 0.75
+life = 1.5
+[affinity.poison]
+shield = 0.75
+armor = 1.5
+life = 0.75
+[affinity.shock]
+shield = 1.5
+armor = 0.75
+life = 0.75
+[affinity.armor_pierce]
+shield = 0.75
+armor = 1.5
+life = 0.75

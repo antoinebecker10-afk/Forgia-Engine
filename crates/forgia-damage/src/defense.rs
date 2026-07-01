@@ -29,6 +29,31 @@ pub enum DamageChannel {
     TrueHealth,
 }
 
+/// Affinité élémentaire par couche (story-642 P0-4). Multiplicateur d'efficacité
+/// d'un élément contre chaque couche : `mult > 1` = fort (efficace), `mult < 1` =
+/// faible. Modèle « effectiveness » : 1 point de dégât brut retire `mult` points de
+/// la couche visée (donc casser une couche coûte `couche / mult` de brut).
+/// Ex. Feu = (bouclier 0.75, armure 0.75, vie 1.5) → +50 % Vie, −25 % Bouclier.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElementAffinity {
+    pub shield_mult: f32,
+    pub armor_mult: f32,
+    pub life_mult: f32,
+}
+
+impl ElementAffinity {
+    /// Neutre — aucun bonus/malus (fallback si l'élément n'a pas d'affinité).
+    pub const NEUTRAL: Self = Self {
+        shield_mult: 1.0,
+        armor_mult: 1.0,
+        life_mult: 1.0,
+    };
+
+    pub fn new(shield_mult: f32, armor_mult: f32, life_mult: f32) -> Self {
+        Self { shield_mult, armor_mult, life_mult }
+    }
+}
+
 /// Couche défensive empilée au-dessus de la `Health`. Absorbe Bouclier → Armure → Vie.
 ///
 /// Champs `f32` plats (replication-ready pour le netcode post-ship). `since_hit`
@@ -95,6 +120,41 @@ impl DefenseLayer {
                 dmg // 3) résidu → Vie
             }
         }
+    }
+
+    /// Absorbe des dégâts **élémentaires** avec efficacité par couche (P0-4). Draine
+    /// Bouclier puis Armure avec leur multiplicateur d'affinité (1 pt de `raw` retire
+    /// `mult` pts de la couche → casser une couche coûte `couche / mult` de `raw`),
+    /// puis renvoie le résidu appliqué à la Vie, **déjà ×`life_mult`**. PUR ; n'appelle
+    /// PAS `note_hit` (le caller le fait). Un `mult ≤ 0` sur une couche = la couche est
+    /// sautée (l'élément ne peut pas l'entamer, le budget passe à la suivante).
+    pub fn absorb_elemental(&mut self, raw: f32, aff: &ElementAffinity) -> f32 {
+        if raw <= 0.0 {
+            return 0.0;
+        }
+        let mut budget = raw;
+        // 1) Bouclier
+        if self.shield > 0.0 && aff.shield_mult > 0.0 {
+            let needed = self.shield / aff.shield_mult; // brut requis pour le vider
+            if budget <= needed {
+                self.shield -= budget * aff.shield_mult;
+                return 0.0;
+            }
+            self.shield = 0.0;
+            budget -= needed;
+        }
+        // 2) Armure
+        if self.armor > 0.0 && aff.armor_mult > 0.0 {
+            let needed = self.armor / aff.armor_mult;
+            if budget <= needed {
+                self.armor -= budget * aff.armor_mult;
+                return 0.0;
+            }
+            self.armor = 0.0;
+            budget -= needed;
+        }
+        // 3) Vie : résidu ×life_mult
+        (budget * aff.life_mult).max(0.0)
     }
 
     /// Signale qu'un coup vient d'être reçu : gèle la régénération (reset du compteur).
@@ -175,6 +235,74 @@ mod tests {
         assert_eq!(d.absorb(0.0, DamageChannel::Physical), 0.0);
         assert_eq!(d.absorb(-5.0, DamageChannel::Physical), 0.0);
         assert_eq!(d.shield, 50.0);
+    }
+
+    // ── absorb_elemental (affinité par couche, story-642 P0-4) ──
+
+    /// Feu (faible vs bouclier 0.75) : 40 brut retire 40×0.75 = 30 de bouclier, 0 fuite.
+    #[test]
+    fn elemental_weak_vs_shield_drains_less() {
+        let mut d = layer(); // shield 50, armor 30
+        let fire = ElementAffinity::new(0.75, 0.75, 1.5);
+        let leak = d.absorb_elemental(40.0, &fire);
+        assert_eq!(leak, 0.0);
+        assert!((d.shield - 20.0).abs() < 1e-4, "40×0.75=30 retirés → 20");
+    }
+
+    /// Électrique (fort vs bouclier 1.5) : casse le bouclier plus vite qu'un neutre.
+    #[test]
+    fn elemental_strong_vs_shield_breaks_faster() {
+        let mut d = layer();
+        let shock = ElementAffinity::new(1.5, 0.75, 0.75);
+        // bouclier 50 : cassé en 50/1.5 = 33.33 brut. 40 brut → bouclier 0, reste 6.67
+        // → armure ×0.75 : 6.67×0.75 = 5 retirés → armure 25. 0 fuite.
+        let leak = d.absorb_elemental(40.0, &shock);
+        assert_eq!(leak, 0.0);
+        assert_eq!(d.shield, 0.0);
+        assert!((d.armor - 25.0).abs() < 1e-3, "reste 6.67 brut ×0.75 = 5 sur l'armure");
+    }
+
+    /// Feu +50 % Vie : après avoir percé bouclier+armure, le résidu frappe la Vie ×1.5.
+    #[test]
+    fn elemental_life_mult_amplifies_leak() {
+        let mut d = layer(); // shield 50, armor 30
+        let fire = ElementAffinity::new(0.75, 0.75, 1.5);
+        // vider bouclier = 50/0.75 = 66.67 ; armure = 30/0.75 = 40 ; total 106.67 brut.
+        // 120 brut → reste 13.33 → Vie ×1.5 = 20.
+        let leak = d.absorb_elemental(120.0, &fire);
+        assert!((leak - 20.0).abs() < 1e-2, "résidu 13.33 ×1.5 = 20");
+        assert_eq!(d.shield, 0.0);
+        assert_eq!(d.armor, 0.0);
+    }
+
+    /// NEUTRAL se comporte comme l'absorption physique (sanity).
+    #[test]
+    fn elemental_neutral_matches_physical() {
+        let mut d = layer();
+        let leak = d.absorb_elemental(100.0, &ElementAffinity::NEUTRAL);
+        assert!((leak - 20.0).abs() < 1e-4, "50 bouclier + 30 armure = 80, fuite 20");
+        assert_eq!(d.shield, 0.0);
+        assert_eq!(d.armor, 0.0);
+    }
+
+    #[test]
+    fn elemental_non_positive_is_noop() {
+        let mut d = layer();
+        assert_eq!(d.absorb_elemental(0.0, &ElementAffinity::NEUTRAL), 0.0);
+        assert_eq!(d.absorb_elemental(-3.0, &ElementAffinity::NEUTRAL), 0.0);
+        assert_eq!(d.shield, 50.0);
+    }
+
+    /// Un `mult` minuscule (genome mal réglé) dégrade proprement : la couche devient
+    /// quasi-incassable mais AUCUN NaN/Inf/panic (comportement dégénéré documenté).
+    #[test]
+    fn elemental_tiny_mult_degrades_gracefully() {
+        let mut d = layer(); // shield 50
+        let aff = ElementAffinity::new(0.001, 0.001, 1.0);
+        let leak = d.absorb_elemental(40.0, &aff);
+        assert!(leak.is_finite() && leak == 0.0, "budget 40 << needed → tout absorbé");
+        assert!(d.shield.is_finite() && d.shield >= 0.0);
+        assert!((d.shield - 49.96).abs() < 1e-3, "40×0.001 = 0.04 retiré du bouclier");
     }
 
     #[test]

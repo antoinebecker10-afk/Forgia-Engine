@@ -27,6 +27,7 @@ use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
+use forgia_damage::{DefenseLayer, ElementAffinity};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -337,6 +338,47 @@ impl Default for SurchargeParams {
     }
 }
 
+/// Affinité d'un élément contre les 3 couches (story-642 P0-4). Gène genome
+/// (Deserialize) miroir de [`forgia_damage::ElementAffinity`] — `mult > 1` = fort,
+/// `mult < 1` = faible. Converti en `ElementAffinity` à la consommation.
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct AffinityGene {
+    pub shield: f32,
+    pub armor: f32,
+    pub life: f32,
+}
+
+impl AffinityGene {
+    pub fn to_affinity(self) -> ElementAffinity {
+        ElementAffinity::new(self.shield, self.armor, self.life)
+    }
+}
+
+/// Table d'affinité élément→couche (un `AffinityGene` par élément). Data-driven :
+/// chaque élément est **fort** contre sa couche favorite (×1.5) et **faible**
+/// contre les autres (×0.75) — critère masterplan « Feu +50 % Vie / −25 % Bouclier ».
+/// Feu→Vie, Électrique→Bouclier, Perforant+Poison→Armure.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct AffinityTable {
+    pub fire: AffinityGene,
+    pub poison: AffinityGene,
+    pub shock: AffinityGene,
+    pub armor_pierce: AffinityGene,
+}
+
+impl Default for AffinityTable {
+    fn default() -> Self {
+        // Miroir EXACT de la section [affinity.*] de roguelite_elements.toml.
+        Self {
+            fire: AffinityGene { shield: 0.75, armor: 0.75, life: 1.5 },
+            poison: AffinityGene { shield: 0.75, armor: 1.5, life: 0.75 },
+            shock: AffinityGene { shield: 1.5, armor: 0.75, life: 0.75 },
+            armor_pierce: AffinityGene { shield: 0.75, armor: 1.5, life: 0.75 },
+        }
+    }
+}
+
 /// Paramètres VFX (story-588) — couleurs + tailles du flash d'impact et du pulse
 /// DoT. `#[serde(default)]` : si la section `[vfx]` manque du TOML, fallback sur
 /// ces valeurs (backward-compat avec les genomes Phase A). Hot-reload : les
@@ -422,6 +464,9 @@ pub struct ElementConfig {
     /// Réaction Surcharge (Feu+Élec → décharge AOE) — optionnel (backward-compat).
     #[serde(default)]
     pub surcharge: SurchargeParams,
+    /// Affinité élément→couche de défense (story-642 P0-4) — optionnel (backward-compat).
+    #[serde(default)]
+    pub affinity: AffinityTable,
 }
 
 impl Default for ElementConfig {
@@ -458,6 +503,7 @@ impl Default for ElementConfig {
             shock: ShockParams::default(),
             miasma: MiasmaParams::default(),
             surcharge: SurchargeParams::default(),
+            affinity: AffinityTable::default(),
         }
     }
 }
@@ -507,6 +553,18 @@ impl ElementConfig {
             ReactionKind::Miasma => self.miasma.retrigger_cooldown,
             ReactionKind::Surcharge => self.surcharge.retrigger_cooldown,
         }
+    }
+
+    /// Affinité élément→couche (P0-4) sous forme [`ElementAffinity`] prête pour
+    /// `DefenseLayer::absorb_elemental`.
+    pub fn affinity_for(&self, e: Element) -> ElementAffinity {
+        let g = match e {
+            Element::Fire => self.affinity.fire,
+            Element::Poison => self.affinity.poison,
+            Element::Shock => self.affinity.shock,
+            Element::ArmorPierce => self.affinity.armor_pierce,
+        };
+        g.to_affinity()
     }
 
     /// Params du burst AOE (`target_pct`, `area_pct`, `radius`) d'une réaction de
@@ -623,6 +681,10 @@ pub struct ElementStats {
     pub combustions: u32,
     pub miasmas: u32,
     pub surcharges: u32,
+    /// P0-4 — bonus élémentaire absorbé par Bouclier/Armure (vs fuite vers la Vie).
+    /// Signal que le routage affinité→DefenseLayer est actif (>0 dès qu'un ennemi
+    /// défendu est touché par un bonus élémentaire).
+    pub bonus_absorbed: f32,
 }
 
 impl ElementStats {
@@ -855,14 +917,37 @@ pub struct ReactionCtx<'w, 's> {
 
 // ─── System : application des éléments au hit ───────────────────────────────
 
-/// Décision PURE (testable headless) d'un hit élémentaire sur la cible. `cur_hp`
-/// = PV de la cible APRÈS le hit de base (déjà soustrait par forgia-fps).
-/// Retourne `(nouveaux_pv, exécuté)`. Exécution = un hit `ArmorPierce` qui amène
-/// une cible **survivante** au hit sous le seuil de PV → instakill (one-shot tank).
-///
-/// `vuln_mul` = vulnérabilité électrique (`StatusShock`) : amplifie le **bonus
-/// élémentaire** (1.0 = aucune marque). Story-641 Inc.2 : le hit de base n'est PAS
-/// amplifié ici (celui-ci passera par `DefenseLayer` en P0-4).
+/// PUR — bonus élémentaire **brut** (avant routage couches) : `base × (matchup ×
+/// shred − 1) × vuln`, clampé ≥ 0. Séparé de l'application pour permettre le
+/// routage via `DefenseLayer` (P0-4). `vuln_mul` = vulnérabilité `StatusShock`.
+pub fn elemental_bonus(base_damage: f32, matchup: f32, shred_amp: f32, vuln_mul: f32) -> f32 {
+    (base_damage * (matchup * shred_amp - 1.0)).max(0.0) * vuln_mul
+}
+
+/// PUR — applique `leak` (résidu après absorption des couches, ou bonus brut si la
+/// cible n'a pas de `DefenseLayer`) à la Vie + décide l'exécution perforante.
+/// Exécution = un hit `ArmorPierce` qui amène une cible **survivante** sous le
+/// seuil de PV → instakill (one-shot tank).
+pub fn resolve_leak_to_health(
+    element: Element,
+    cur_hp: f32,
+    max_hp: f32,
+    leak: f32,
+    execute_threshold: f32,
+) -> (f32, bool) {
+    let survives = cur_hp - leak;
+    if element == Element::ArmorPierce && survives > 0.0 && survives < execute_threshold * max_hp {
+        (0.0, true)
+    } else {
+        (survives.max(0.0), false)
+    }
+}
+
+/// PUR (testable headless) — chemin **sans couche de défense** : compose
+/// [`elemental_bonus`] + [`resolve_leak_to_health`]. `cur_hp` = PV de la cible
+/// APRÈS le hit de base (déjà soustrait par forgia-fps). Conservé pour les cibles
+/// sans `DefenseLayer` ; avec couche, le caller route le bonus via
+/// `DefenseLayer::absorb_elemental` (affinité, P0-4) puis appelle `resolve_leak_to_health`.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_target_hit(
     element: Element,
@@ -874,13 +959,8 @@ pub fn resolve_target_hit(
     vuln_mul: f32,
     execute_threshold: f32,
 ) -> (f32, bool) {
-    let bonus = (base_damage * (matchup * shred_amp - 1.0)).max(0.0) * vuln_mul;
-    let survives = cur_hp - bonus;
-    if element == Element::ArmorPierce && survives > 0.0 && survives < execute_threshold * max_hp {
-        (0.0, true)
-    } else {
-        (survives.max(0.0), false)
-    }
+    let bonus = elemental_bonus(base_damage, matchup, shred_amp, vuln_mul);
+    resolve_leak_to_health(element, cur_hp, max_hp, bonus, execute_threshold)
 }
 
 /// PUR (testable) — dégâts d'un burst de réaction (voie Gunfire) : `(cible, zone)`
@@ -918,6 +998,9 @@ pub fn sys_apply_elements_on_hit(
     mut q_health: Query<&mut Health, With<EnemyArchetype>>,
     q_pos: Query<(Entity, &GlobalTransform), With<EnemyArchetype>>,
     mut q_poison: Query<&mut StatusPoison>,
+    // P0-4 — couche défensive de la cible : le bonus élémentaire la draine (affinité)
+    // avant la Vie. Composant distinct de Health → double emprunt disjoint OK.
+    mut q_defense: Query<&mut DefenseLayer, With<EnemyArchetype>>,
     // Buffer AOE réutilisé (0 alloc dans le chemin combat — règle scalability §hot).
     mut aoe_buf: Local<Vec<Entity>>,
     // Moteur de réactions (Combustion/Miasma/Surcharge) — bundle sous la limite de params.
@@ -969,14 +1052,22 @@ pub fn sys_apply_elements_on_hit(
             let vuln_mul = if had_shock { config.shock.vuln_mul } else { 1.0 };
 
             if let Ok(mut hp) = q_health.get_mut(ev.target) {
-                let (new_hp, executed) = resolve_target_hit(
+                // P0-4 — le bonus élémentaire draine d'abord le DefenseLayer (affinité
+                // par couche) ; seul le résidu entame la Vie. Sans couche : bonus direct.
+                let bonus = elemental_bonus(ev.damage, matchup, shred_amp, vuln_mul);
+                let leak = if let Ok(mut dl) = q_defense.get_mut(ev.target) {
+                    dl.note_hit();
+                    let leak = dl.absorb_elemental(bonus, &config.affinity_for(element));
+                    stats.bonus_absorbed += (bonus - leak).max(0.0);
+                    leak
+                } else {
+                    bonus
+                };
+                let (new_hp, executed) = resolve_leak_to_health(
                     element,
                     hp.current,
                     hp.max,
-                    ev.damage,
-                    matchup,
-                    shred_amp,
-                    vuln_mul,
+                    leak,
                     config.execute.hp_ratio_threshold,
                 );
                 hp.current = new_hp;
@@ -1245,7 +1336,7 @@ pub fn sys_write_elements_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
+        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"bonus_absorbed":{:.0},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
         time.elapsed_secs(),
         config.always_on,
         unlocks.is_unlocked(Element::Fire),
@@ -1266,6 +1357,7 @@ pub fn sys_write_elements_sensor(
         stats.shocks_applied,
         stats.aoe_hits,
         stats.executes,
+        stats.bonus_absorbed,
         stats.combustions,
         stats.miasmas,
         stats.surcharges,
@@ -1595,6 +1687,79 @@ mod tests {
         let c = ElementConfig::parse_toml("always_on = true");
         assert_eq!(c.miasma, MiasmaParams::default());
         assert_eq!(c.surcharge, SurchargeParams::default());
+    }
+
+    // ── Affinité élément→couche (story-642 P0-4 Inc.1) ──
+
+    #[test]
+    fn affinity_maps_each_element_to_its_favored_layer() {
+        let c = ElementConfig::default();
+        let fire = c.affinity_for(Element::Fire);
+        assert!(fire.life_mult > 1.0 && fire.shield_mult < 1.0, "Feu → fort Vie, faible Bouclier");
+        let shock = c.affinity_for(Element::Shock);
+        assert!(shock.shield_mult > 1.0, "Électrique → fort Bouclier");
+        assert!(c.affinity_for(Element::ArmorPierce).armor_mult > 1.0, "Perforant → forte Armure");
+        assert!(c.affinity_for(Element::Poison).armor_mult > 1.0, "Poison → forte Armure");
+    }
+
+    #[test]
+    fn affinity_gene_converts_to_element_affinity() {
+        let g = AffinityGene { shield: 0.75, armor: 0.75, life: 1.5 };
+        assert_eq!(g.to_affinity(), ElementAffinity::new(0.75, 0.75, 1.5));
+    }
+
+    #[test]
+    fn elemental_bonus_matches_formula_and_vuln() {
+        // base 16, matchup 1.3, shred 1.0 → 16×0.3 = 4.8. Vuln 1.1 → 5.28.
+        assert!((elemental_bonus(16.0, 1.3, 1.0, 1.0) - 4.8).abs() < 1e-3);
+        assert!((elemental_bonus(16.0, 1.3, 1.0, 1.1) - 5.28).abs() < 1e-3);
+        // matchup ≤ 1 (neutre/faible) → aucun bonus (clamp ≥ 0).
+        assert_eq!(elemental_bonus(20.0, 1.0, 1.0, 1.0), 0.0);
+    }
+
+    #[test]
+    fn resolve_leak_executes_armor_pierce_under_threshold() {
+        // Tank 120 PV (seuil 0.25×120=30), leak 45 → survit 75... non : leak 95 → 25 < 30 → exec.
+        let (hp, exec) = resolve_leak_to_health(Element::ArmorPierce, 120.0, 120.0, 95.0, 0.25);
+        assert!(exec);
+        assert_eq!(hp, 0.0);
+        // Feu même leak : pas d'exécution (seul ArmorPierce exécute).
+        let (hp2, exec2) = resolve_leak_to_health(Element::Fire, 120.0, 120.0, 95.0, 0.25);
+        assert!(!exec2);
+        assert!((hp2 - 25.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn resolve_target_hit_composes_bonus_and_leak() {
+        // Sanity : le wrapper sans couche = bonus brut appliqué à la Vie.
+        let bonus = elemental_bonus(16.0, 1.3, 1.0, 1.0);
+        let (via_wrapper, _) = resolve_target_hit(Element::Fire, 30.0, 35.0, 16.0, 1.3, 1.0, 1.0, 0.25);
+        let (via_split, _) = resolve_leak_to_health(Element::Fire, 30.0, 35.0, bonus, 0.25);
+        assert_eq!(via_wrapper, via_split);
+    }
+
+    #[test]
+    fn config_affinity_defaults_when_section_absent() {
+        let c = ElementConfig::parse_toml("always_on = true");
+        assert_eq!(c.affinity, AffinityTable::default());
+    }
+
+    #[test]
+    fn armor_pierce_execute_blocked_by_full_shield() {
+        // Cible 100 PV (max 120, seuil exécution 30), bouclier plein 200. Bonus
+        // perforant brut 75 : en DIRECT il ramènerait à 25 (<30 → exécution). Routé
+        // via le bouclier plein (perforant ×0.75 vs bouclier) → leak 0 → PAS
+        // d'exécution, la Vie ne bouge pas (« on n'exécute pas à travers un bouclier »).
+        let mut dl = DefenseLayer::new(200.0, 0.0, 20.0, 3.0);
+        let aff = ElementConfig::default().affinity_for(Element::ArmorPierce);
+        let leak = dl.absorb_elemental(75.0, &aff);
+        assert_eq!(leak, 0.0, "bonus perforant absorbé par le bouclier plein");
+        let (hp, exec) = resolve_leak_to_health(Element::ArmorPierce, 100.0, 120.0, leak, 0.25);
+        assert!(!exec, "le bonus n'atteint pas la Vie → pas d'exécution");
+        assert_eq!(hp, 100.0);
+        // Contraste : le même bonus en DIRECT (cible sans couche) exécute bien.
+        let (_, exec_direct) = resolve_leak_to_health(Element::ArmorPierce, 100.0, 120.0, 75.0, 0.25);
+        assert!(exec_direct, "sans bouclier, 75 ramène sous le seuil → exécution");
     }
 
     // ── VFX (story-588) ──
