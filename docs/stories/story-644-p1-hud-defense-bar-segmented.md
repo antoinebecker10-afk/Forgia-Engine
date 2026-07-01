@@ -17,9 +17,12 @@ d'arme piloté par la couleur de défense de l'ennemi).
   seulement si `*_max > 0`. Lit `Option<&DefenseLayer>` sur le joueur (attaché par P0-2 ; absent
   hors Roguelite → pas de barre). Helper `draw_defense_segment` (track+fill+outline). Couleurs UI
   cosmétiques. clippy 0-warn touché, binaire compile. Le bouclier 50 du joueur est enfin visible.
-- **Inc.2 — Barres défensives ENNEMI** (`forgia-enemy-nameplate`) : sous le nameplate HP,
-  mini-barres Bouclier/Armure (billboard 3D quads, réutilise le pattern bg+fill), lues depuis
-  `DefenseLayer` du bot. Couleurs genome. Toggle visibilité si la couche manque.
+- **Inc.2 — Barres défensives ENNEMI** — ✅ **FAIT** (non commité) : `forgia-enemy-nameplate`
+  spawn des mini-barres Bouclier (bleu) / Armure (jaune) empilées AU-DESSUS de la HP, **seulement
+  si la couche existe** (Tank=armure, Runner=bouclier → 0 quad superflu). `update_defense_bars`
+  met à jour `scale.x` depuis `DefenseLayer` du bot (miroir `update_hp_fill`). Couleurs genome
+  (`shield_color`/`armor_color`, `#[serde(default)]` backward-compat). clippy 0-warn touché,
+  binaire compile. Drive le choix d'arme (élément vs couleur de couche).
 - **Inc.3 — Icônes de statut** : burn/poison/shock/miasma près du nameplate ennemi (et/ou
   joueur), lues depuis les composants StatusBurn/StatusPoison/Vulnerability/StatusMiasma.
 

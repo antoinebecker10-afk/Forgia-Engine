@@ -28,6 +28,7 @@
 use bevy::prelude::*;
 use forgia_combat::prelude::CombatHitEvent;
 use forgia_combat::Health as CombatHealth;
+use forgia_damage::DefenseLayer;
 use std::collections::HashMap;
 use std::fs;
 
@@ -66,6 +67,14 @@ pub struct NameplateFill;
 #[derive(Component)]
 pub struct NameplateBg;
 
+/// Marker du quad fill Bouclier (bleu) — scale.x = shield/shield_max (story-644 P1 Inc.2).
+#[derive(Component)]
+pub struct NameplateShieldFill;
+
+/// Marker du quad fill Armure (jaune) — scale.x = armor/armor_max (story-644 P1 Inc.2).
+#[derive(Component)]
+pub struct NameplateArmorFill;
+
 /// Index target_entity → nameplate_root_entity (évite duplication).
 #[derive(Resource, Default)]
 pub struct NameplateRegistry {
@@ -86,6 +95,7 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
                     spawn_or_refresh_on_hit,
                     keep_permanent_nameplates_alive,
                     update_hp_fill,
+                    update_defense_bars,
                     tick_lifetime_and_despawn,
                     sensor_write,
                 )
@@ -102,6 +112,7 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
 }
 
 /// Helper interne — spawn un nameplate enfant de `target`. Idempotent via registry.
+#[allow(clippy::too_many_arguments)]
 fn build_nameplate_for(
     target: Entity,
     commands: &mut Commands,
@@ -109,6 +120,9 @@ fn build_nameplate_for(
     tuning: &EnemyNameplate,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    // Story-644 P1 Inc.2 — couche défensive de la cible (au spawn) : détermine quelles
+    // barres Bouclier/Armure ajouter au-dessus de la HP (aucune si `None` / max=0).
+    defense: Option<&DefenseLayer>,
 ) -> Option<Entity> {
     if registry.map.contains_key(&target) {
         return None;
@@ -143,21 +157,74 @@ fn build_nameplate_for(
         ))
         .id();
 
+    // Story-644 P1 Inc.2 — matériaux + positions des barres défensives (Bouclier bleu,
+    // Armure jaune) empilées AU-DESSUS de la HP. Créées seulement pour les couches
+    // présentes → 0 quad superflu (Tank = armure seule, Runner = bouclier seul).
+    let shield_mat = defense.filter(|d| d.shield_max > 0.0).map(|_| {
+        materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(t.shield_color[0], t.shield_color[1], t.shield_color[2]),
+            unlit: true,
+            ..default()
+        })
+    });
+    let armor_mat = defense.filter(|d| d.armor_max > 0.0).map(|_| {
+        materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(t.armor_color[0], t.armor_color[1], t.armor_color[2]),
+            unlit: true,
+            ..default()
+        })
+    });
+    let bar_gap = t.height * 1.15;
+    let shield_y = bar_gap;
+    let armor_y = if shield_mat.is_some() { bar_gap * 2.0 } else { bar_gap };
+
     commands.entity(root_id).with_children(|p| {
         p.spawn((
             NameplateBg,
-            Mesh3d(bg_mesh),
-            MeshMaterial3d(bg_mat),
+            Mesh3d(bg_mesh.clone()),
+            MeshMaterial3d(bg_mat.clone()),
             Transform::from_xyz(0.0, 0.0, -0.005),
             Name::new("NameplateBg"),
         ));
         p.spawn((
             NameplateFill,
-            Mesh3d(fill_mesh),
+            Mesh3d(fill_mesh.clone()),
             MeshMaterial3d(fill_mat),
             Transform::from_xyz(0.0, 0.0, 0.0),
             Name::new("NameplateFill"),
         ));
+        if let Some(sm) = shield_mat {
+            p.spawn((
+                NameplateBg,
+                Mesh3d(bg_mesh.clone()),
+                MeshMaterial3d(bg_mat.clone()),
+                Transform::from_xyz(0.0, shield_y, -0.005),
+                Name::new("NameplateShieldBg"),
+            ));
+            p.spawn((
+                NameplateShieldFill,
+                Mesh3d(fill_mesh.clone()),
+                MeshMaterial3d(sm),
+                Transform::from_xyz(0.0, shield_y, 0.0),
+                Name::new("NameplateShieldFill"),
+            ));
+        }
+        if let Some(am) = armor_mat {
+            p.spawn((
+                NameplateBg,
+                Mesh3d(bg_mesh.clone()),
+                MeshMaterial3d(bg_mat.clone()),
+                Transform::from_xyz(0.0, armor_y, -0.005),
+                Name::new("NameplateArmorBg"),
+            ));
+            p.spawn((
+                NameplateArmorFill,
+                Mesh3d(fill_mesh.clone()),
+                MeshMaterial3d(am),
+                Transform::from_xyz(0.0, armor_y, 0.0),
+                Name::new("NameplateArmorFill"),
+            ));
+        }
     });
 
     registry.map.insert(target, root_id);
@@ -190,6 +257,7 @@ fn spawn_nameplate_for_targets(
     mut commands: Commands,
     mut registry: ResMut<NameplateRegistry>,
     q_targets: Query<Entity, With<NameplateTarget>>,
+    q_defense: Query<&DefenseLayer>,
     tuning: Res<EnemyNameplate>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -202,6 +270,7 @@ fn spawn_nameplate_for_targets(
             &tuning,
             &mut meshes,
             &mut materials,
+            q_defense.get(target).ok(),
         );
     }
 }
@@ -213,6 +282,7 @@ fn spawn_or_refresh_on_hit(
     mut commands: Commands,
     mut registry: ResMut<NameplateRegistry>,
     mut q_existing: Query<&mut NameplateRoot>,
+    q_defense: Query<&DefenseLayer>,
     tuning: Res<EnemyNameplate>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -232,6 +302,7 @@ fn spawn_or_refresh_on_hit(
             &tuning,
             &mut meshes,
             &mut materials,
+            q_defense.get(ev.target).ok(),
         );
     }
 }
@@ -273,6 +344,37 @@ fn update_hp_fill(
                     // décale translation.x de -(1 - frac) * half_width.
                     xf.scale.x = frac;
                 }
+            }
+        }
+    }
+}
+
+/// Story-644 P1 Inc.2 — met à jour scale.x des fills Bouclier/Armure selon la couche
+/// défensive de la cible (miroir de `update_hp_fill`). Les deux queries sont
+/// disjointes (`Without<NameplateShieldFill>` sur l'armure) → double `&mut Transform` OK.
+fn update_defense_bars(
+    q_roots: Query<(&NameplateRoot, &Children)>,
+    q_defense: Query<&DefenseLayer>,
+    mut q_shield: Query<&mut Transform, With<NameplateShieldFill>>,
+    mut q_armor: Query<&mut Transform, (With<NameplateArmorFill>, Without<NameplateShieldFill>)>,
+) {
+    for (root, children) in &q_roots {
+        let Ok(dl) = q_defense.get(root.target) else {
+            continue;
+        };
+        for child in children.iter() {
+            if let Ok(mut xf) = q_shield.get_mut(child) {
+                xf.scale.x = if dl.shield_max > 0.0 {
+                    (dl.shield / dl.shield_max).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+            } else if let Ok(mut xf) = q_armor.get_mut(child) {
+                xf.scale.x = if dl.armor_max > 0.0 {
+                    (dl.armor / dl.armor_max).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
             }
         }
     }

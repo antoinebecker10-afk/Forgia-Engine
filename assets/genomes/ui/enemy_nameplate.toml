@@ -14,3 +14,8 @@ border_color = [0.0, 0.0, 0.0]
 
 # Bord fin cartoon — 1% du width = ~1.5cm trait net (vs 8.5% lourd v1)
 border_thickness = 0.015
+
+# story-644 P1 Inc.2 — barres défensives empilées AU-DESSUS de la HP (si la couche
+# existe) : Bouclier bleu / Armure jaune. Rend lisible le choix d'arme (élément vs couche).
+shield_color = [0.28, 0.55, 0.95]   # bleu électrique
+armor_color = [0.92, 0.76, 0.24]    # jaune armure

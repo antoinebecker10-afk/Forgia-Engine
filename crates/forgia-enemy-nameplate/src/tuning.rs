@@ -7,6 +7,7 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
 
 #[derive(Deserialize, TypePath, Clone, Debug)]
+#[serde(default)]
 pub struct EnemyNameplateTuning {
     /// Largeur world-space du nameplate (m).
     pub width: f32,
@@ -26,6 +27,10 @@ pub struct EnemyNameplateTuning {
     pub border_color: [f32; 3],
     /// Épaisseur bord en UV [0..1].
     pub border_thickness: f32,
+    /// Couleur RGB du fill Bouclier (linear) — story-644 P1 Inc.2 (barre au-dessus de la HP).
+    pub shield_color: [f32; 3],
+    /// Couleur RGB du fill Armure (linear) — story-644 P1 Inc.2.
+    pub armor_color: [f32; 3],
 }
 
 impl Default for EnemyNameplateTuning {
@@ -40,6 +45,9 @@ impl Default for EnemyNameplateTuning {
             bg_color: [0.05, 0.05, 0.08],
             border_color: [0.0, 0.0, 0.0],
             border_thickness: 0.06,
+            // Bouclier bleu électrique, Armure jaune (miroir enemy_nameplate.toml).
+            shield_color: [0.28, 0.55, 0.95],
+            armor_color: [0.92, 0.76, 0.24],
         }
     }
 }
