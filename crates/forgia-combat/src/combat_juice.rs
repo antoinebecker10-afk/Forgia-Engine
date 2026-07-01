@@ -40,6 +40,12 @@ use bevy::prelude::*;
 pub struct CombatHitEvent {
     pub target: Entity,
     pub attacker: Option<Entity>,
+    /// Dégât **nominal** de l'arme (falloff + zone + crit + mods), AVANT les
+    /// modificateurs propres à la cible (vulnérabilité `Vulnerability`, absorption
+    /// `DefenseLayer`). Contrat stable : base sur laquelle la couche élémentaire
+    /// (forgia-mode-roguelite) calcule bonus/réactions SANS double-compter la vuln
+    /// (story-642 P0-4 Inc.3). Le dégât réellement retiré à la Vie peut être supérieur
+    /// (×vuln) ou inférieur (absorbé par la couche). `is_kill` reflète la mort RÉELLE.
     pub damage: f32,
     pub is_kill: bool,
     pub is_headshot: bool,

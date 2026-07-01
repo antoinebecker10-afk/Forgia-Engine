@@ -13,7 +13,7 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
 
 pub mod defense;
-pub use defense::{DamageChannel, DefenseLayer, ElementAffinity};
+pub use defense::{DamageChannel, DefenseLayer, ElementAffinity, Vulnerability};
 
 /// Per-entity health. Add to any entity that can take damage.
 #[derive(Component, Debug, Clone, Copy)]

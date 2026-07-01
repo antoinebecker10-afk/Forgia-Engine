@@ -27,7 +27,7 @@ use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
-use forgia_damage::{DefenseLayer, ElementAffinity};
+use forgia_damage::{DefenseLayer, ElementAffinity, Vulnerability};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -644,14 +644,9 @@ pub struct StatusPoison {
     pub tick_accum: f32,
 }
 
-/// Marque électrique (élément Shock, story-641 Inc.2). NON-stackante : un hit
-/// électrique rafraîchit `secs_left`. **Pas de DoT** — c'est un debuff de
-/// vulnérabilité (les dégâts de bonus/réactions subis sont ×`vuln_mul`).
-/// Tické/expiré par [`sys_tick_element_status`] (comme burn/poison, sans dégât).
-#[derive(Component, Debug, Clone, Copy)]
-pub struct StatusShock {
-    pub secs_left: f32,
-}
+// Marque électrique (ex-`StatusShock`) : remplacée story-642 P0-4 Inc.3 par le
+// composant générique `forgia_damage::Vulnerability` — visible cross-crate pour que
+// le HIT DE BASE (forgia-fps) soit aussi amplifié, pas seulement bonus/réactions.
 
 /// Nuage Miasma (réaction Élec+Poison, story-641 Inc.3). DoT **stackant en % des
 /// PV MAX** : `stacks × pct_max_hp_per_sec × max_hp` par seconde. Un déclenchement
@@ -919,9 +914,9 @@ pub struct ReactionCtx<'w, 's> {
     pub time: Res<'w, Time>,
     /// Présence d'un `StatusBurn` existant sur la cible (avant le hit courant).
     pub q_burn: Query<'w, 's, (), With<StatusBurn>>,
-    /// Présence d'un `StatusShock` existant sur la cible (avant le hit courant) —
+    /// Présence d'une `Vulnerability` (ex-`StatusShock`) sur la cible avant le hit —
     /// gate la vulnérabilité (+`vuln_mul`) + les réactions Surcharge/Miasma.
-    pub q_shock: Query<'w, 's, (), With<StatusShock>>,
+    pub q_shock: Query<'w, 's, (), With<Vulnerability>>,
     /// Nuage Miasma existant (stack + refresh à l'application).
     pub q_miasma: Query<'w, 's, &'static mut StatusMiasma>,
     /// Buffer voisins réutilisé (0 alloc/hit).
@@ -1158,9 +1153,11 @@ pub fn sys_apply_elements_on_hit(
                 }
                 Element::Shock => {
                     // Marque électrique (non-stackante) : try_insert écrase → rafraîchit.
-                    commands.entity(ev.target).try_insert(StatusShock {
-                        secs_left: config.shock.duration,
-                    });
+                    // `Vulnerability` (forgia-damage) porte le mult → lu par le hit de
+                    // base (forgia-fps) ET la couche élémentaire (P0-4 Inc.3).
+                    commands
+                        .entity(ev.target)
+                        .try_insert(Vulnerability::new(config.shock.vuln_mul, config.shock.duration));
                     stats.shocks_applied = stats.shocks_applied.saturating_add(1);
                 }
                 Element::ArmorPierce => {}
@@ -1288,7 +1285,7 @@ pub fn sys_tick_element_status(
             &mut Health,
             Option<&mut StatusBurn>,
             Option<&mut StatusPoison>,
-            Option<&mut StatusShock>,
+            Option<&mut Vulnerability>,
             Option<&mut StatusMiasma>,
             Option<&mut DefenseLayer>,
         ),
@@ -1298,7 +1295,7 @@ pub fn sys_tick_element_status(
     let dt = time.delta_secs();
     // Miasma = nuage corrosif → affinité Poison (fort armure) — P0-4 Inc.2.
     let poison_aff = config.affinity_for(Element::Poison);
-    for (e, mut hp, burn, poison, shock, miasma, mut defense) in &mut q {
+    for (e, mut hp, burn, poison, vuln, miasma, mut defense) in &mut q {
         // `total` = DoT « purs » (burn + poison) qui bypassent les couches
         // (TrueHealth) ; Miasma est routé à part via le DefenseLayer.
         let mut total = 0.0_f32;
@@ -1330,12 +1327,11 @@ pub fn sys_tick_element_status(
             }
         }
 
-        // Électrique (`StatusShock`) : pas de DoT — simple expiration de la
-        // vulnérabilité (retrait à échéance, comme burn/poison).
-        if let Some(mut s) = shock {
-            s.secs_left -= dt;
-            if s.secs_left <= 0.0 {
-                commands.entity(e).try_remove::<StatusShock>();
+        // Vulnérabilité électrique (ex-`StatusShock`, forgia-damage) : pas de DoT —
+        // simple expiration de la marque (retrait à échéance, comme burn/poison).
+        if let Some(mut v) = vuln {
+            if v.tick(dt) {
+                commands.entity(e).try_remove::<Vulnerability>();
             }
         }
 
@@ -1389,7 +1385,7 @@ pub fn sys_write_elements_sensor(
     stats: Res<ElementStats>,
     q_burn: Query<(), With<StatusBurn>>,
     q_poison: Query<&StatusPoison>,
-    q_shock: Query<(), With<StatusShock>>,
+    q_shock: Query<(), With<Vulnerability>>,
     q_miasma: Query<&StatusMiasma>,
 ) {
     *accum += time.delta_secs();

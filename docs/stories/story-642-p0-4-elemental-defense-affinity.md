@@ -57,9 +57,14 @@ sur la bleue ; les 228 tests élémentaires passent toujours.
   la régén du bouclier tant qu'il tient — cohérent mais fort, test garde-fou posé). §5 dette
   télémétrie (aoe_hits ne compte pas les voisins de burst). **Le hit de base reporté Inc.3**
   (forgia-fps ne voit pas le mapping élément → même contrainte crate que la vuln).
-- **Inc.3 — Vuln hit-de-base (StatusShock, différée P0-3)** : composant générique
-  `Vulnerability{mult,secs_left}` dans `forgia-damage`, posé par le hit électrique, lu par
-  `forgia-fps` (hit de base ×mult) + par elements.rs. Remplace/complète `StatusShock`. Tests.
+- **Inc.3 — Vuln hit-de-base** — ✅ **FAIT** (non commité) : composant générique
+  `forgia_damage::Vulnerability{mult,secs_left}` (+`tick`) **remplace `StatusShock`** (mode-only,
+  invisible à forgia-fps). Posé par le hit Shock (mode) ; lu par `forgia-fps` (hit de base ×mult,
+  `CombatHitEvent.damage` reste PRÉ-vuln → pas de double comptage avec la vuln du bonus) + gate
+  bonus/réactions (elements.rs). 298 tests, clippy 0-warn touché, binaire compile.
+  **NB périmètre** : la vuln (+10 %) est faite ; l'**affinité du hit de base** (router le hit de
+  base via `absorb_elemental` au lieu de `Physical`) reste séparée — plus gros changement de feel
+  + pont weapon→affinité (resource lisible par forgia-fps) → **Inc.3b/Inc.4** (à décider).
 - **Inc.4 (optionnel) — Réaction Manipulation** (4e réaction du masterplan) : à spécifier.
 
 ## Décisions à trancher (avant Inc.1)

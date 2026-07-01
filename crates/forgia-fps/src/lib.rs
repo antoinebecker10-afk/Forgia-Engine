@@ -383,6 +383,12 @@ pub struct HitApplyCtx<'w, 's> {
     /// Le hit de base la draine (canal `Physical`) avant de fuir vers `combat::Health`.
     /// Champ distinct de `health` → double emprunt disjoint autorisé.
     pub defense: Query<'w, 's, &'static mut forgia_damage::DefenseLayer, With<TargetCube>>,
+    /// Story-642 P0-4 Inc.3 — vulnérabilité électrique (posée par forgia-mode-roguelite
+    /// sur les hits `Shock`). Le hit de base est ×`mult` avant absorption. Lecture seule ;
+    /// composant générique `forgia-damage` (visible cross-crate, contrairement à l'ex-`StatusShock`).
+    /// `With<TargetCube>` par cohérence défensive avec `health`/`defense` (on ne lit la vuln
+    /// que des cibles frappables, jamais du joueur si un 2e producteur apparaît un jour).
+    pub vulnerability: Query<'w, 's, &'static forgia_damage::Vulnerability, With<TargetCube>>,
 }
 
 /// Bundle hitscan diagnostic — q_children pour predicate récursif + sensor state.
@@ -1049,14 +1055,25 @@ fn fire_weapon_minimal(
                     if crit_mul > 1.0 {
                         info!("[fire] CRIT! dmg ×2");
                     }
+                    // Story-642 P0-4 Inc.3 — vulnérabilité électrique : le hit de base est
+                    // ×mult si la cible porte une `Vulnerability` (posée par les hits Shock).
+                    // Appliqué au dégât ENVOYÉ à la couche/Vie ; `CombatHitEvent.damage` reste
+                    // le dégât NOMINAL (pré-vuln) → la couche élémentaire (elements.rs) applique
+                    // sa propre vuln une seule fois (pas de double comptage).
+                    let vuln_mult = hit_ctx
+                        .vulnerability
+                        .get(entity)
+                        .map(|v| v.mult)
+                        .unwrap_or(1.0);
+                    let raw = effective_dmg * vuln_mult;
                     // Story-640 P0-2 — la couche défensive (Bouclier → Armure) absorbe
                     // le hit de base avant la Vie ; le résidu seul entame `combat::Health`.
                     // Tout coup gèle la régén (`note_hit`), même entièrement absorbé.
                     let to_health = if let Ok(mut dl) = hit_ctx.defense.get_mut(entity) {
                         dl.note_hit();
-                        dl.absorb(effective_dmg, forgia_damage::DamageChannel::Physical)
+                        dl.absorb(raw, forgia_damage::DamageChannel::Physical)
                     } else {
-                        effective_dmg
+                        raw
                     };
                     hp.current = (hp.current - to_health).max(0.0);
                     let dead = hp.is_dead();

@@ -54,6 +54,32 @@ impl ElementAffinity {
     }
 }
 
+/// Marque de **vulnérabilité** générique (story-642 P0-4 Inc.3) : les dégâts subis
+/// par l'entité sont ×`mult` tant que la marque tient (`secs_left`). Vit dans
+/// `forgia-damage` (crate neutre) pour être LUE à la fois par le **hit de base**
+/// (forgia-fps) ET la **couche élémentaire** (forgia-mode-roguelite) — remplace
+/// l'ex-`StatusShock` mode-only (invisible à forgia-fps). Posée par les hits
+/// électriques (`Element::Shock`). Non-stackante : un nouveau hit rafraîchit.
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct Vulnerability {
+    /// Multiplicateur de dégâts subis (1.1 = +10 %).
+    pub mult: f32,
+    /// Secondes restantes avant expiration.
+    pub secs_left: f32,
+}
+
+impl Vulnerability {
+    pub fn new(mult: f32, secs_left: f32) -> Self {
+        Self { mult, secs_left }
+    }
+
+    /// Fait avancer le temps ; retourne `true` si la marque a expiré (à retirer).
+    pub fn tick(&mut self, dt: f32) -> bool {
+        self.secs_left -= dt;
+        self.secs_left <= 0.0
+    }
+}
+
 /// Couche défensive empilée au-dessus de la `Health`. Absorbe Bouclier → Armure → Vie.
 ///
 /// Champs `f32` plats (replication-ready pour le netcode post-ship). `since_hit`
@@ -283,6 +309,16 @@ mod tests {
         assert!((leak - 20.0).abs() < 1e-4, "50 bouclier + 30 armure = 80, fuite 20");
         assert_eq!(d.shield, 0.0);
         assert_eq!(d.armor, 0.0);
+    }
+
+    #[test]
+    fn vulnerability_ticks_and_expires() {
+        let mut v = Vulnerability::new(1.1, 1.0);
+        assert!(!v.tick(0.4), "0.4s < 1.0 → pas expiré");
+        assert!((v.secs_left - 0.6).abs() < 1e-4);
+        assert!(!v.tick(0.5), "0.9s < 1.0 → pas expiré");
+        assert!(v.tick(0.2), "1.1s ≥ 1.0 → expiré");
+        assert_eq!(v.mult, 1.1, "le mult ne change pas au tick");
     }
 
     #[test]
