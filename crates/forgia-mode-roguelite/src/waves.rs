@@ -158,6 +158,13 @@ pub fn spawn_wave_enemies(
                     // Story-636 — échantillon de vitesse pour le driver d'anim
                     // squelettique (marche vs course selon le déplacement réel).
                     crate::enemy_anim::EnemyLocoSample::default(),
+                    // Story-644 fix boss — hauteur du nameplate = sommet de la capsule
+                    // (`half_height + radius`) + marge, pour qu'il colle la tête de CHAQUE
+                    // ennemi (le boss géant, capsule ~7 m, avait son nameplate + barres
+                    // défensives DANS son corps avec l'offset genome fixe de 2.4 m).
+                    forgia_enemy_nameplate::NameplateAnchor(
+                        stats.capsule_half_height + stats.capsule_radius + 0.6,
+                    ),
                 ))
                 .id();
             // Body collider (capsule), classified HitZone::Body par défaut.

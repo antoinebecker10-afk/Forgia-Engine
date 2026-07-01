@@ -19,6 +19,9 @@ forgia-damage = { workspace = true }
 forgia-combat = { workspace = true }
 # Story-470 M2 fix — TargetCube marker requis par HitApplyCtx + despawn_dead_cubes (forgia-fps)
 forgia-mode-fps-arena = { workspace = true }
+# story-644 fix boss — NameplateAnchor : positionne le nameplate au-dessus de la tête
+# de CHAQUE ennemi (le boss géant rendait le sien dans son corps avec l'offset fixe).
+forgia-enemy-nameplate = { workspace = true }
 # story-611 VFX — EffectAsset hanabi de statut (flamme/poison) + ParticleEffect via prelude.
 forgia-effects = { workspace = true }
 # Story-470 M2 step 3 — drop loot on death + Souls currency

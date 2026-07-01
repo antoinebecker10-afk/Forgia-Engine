@@ -36,8 +36,16 @@ mod tuning;
 pub use tuning::{EnemyNameplate, EnemyNameplateTuning, EnemyNameplateTuningHandle};
 
 pub mod prelude {
-    pub use crate::{EnemyNameplate, EnemyNameplateTuning, ForgiaEnemyNameplatePlugin};
+    pub use crate::{EnemyNameplate, EnemyNameplateTuning, ForgiaEnemyNameplatePlugin, NameplateAnchor};
 }
+
+/// Override (m) de la hauteur locale du nameplate au-dessus du parent — posé par le
+/// caller au spawn (story-644 fix boss). Sans lui, le `y_offset` genome (fixe) est
+/// utilisé : OK pour les petits ennemis mais le **boss géant** (capsule ~7 m) rendait
+/// son nameplate DANS son corps. Le caller met `capsule_half_height + radius + marge`
+/// → le nameplate colle la tête de CHAQUE ennemi, taille-agnostique.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct NameplateAnchor(pub f32);
 
 /// Marker root du nameplate (enfant du bot). Lifetime reset on each hit.
 ///
@@ -123,6 +131,8 @@ fn build_nameplate_for(
     // Story-644 P1 Inc.2 — couche défensive de la cible (au spawn) : détermine quelles
     // barres Bouclier/Armure ajouter au-dessus de la HP (aucune si `None` / max=0).
     defense: Option<&DefenseLayer>,
+    // Story-644 fix boss — hauteur locale du nameplate (m). None → `y_offset` genome fixe.
+    anchor_y: Option<f32>,
 ) -> Option<Entity> {
     if registry.map.contains_key(&target) {
         return None;
@@ -151,7 +161,9 @@ fn build_nameplate_for(
                 target,
                 lifetime_left: t.lifetime,
             },
-            Transform::from_xyz(0.0, t.y_offset, 0.0),
+            // Story-644 fix boss — hauteur par-ennemi si fournie (colle la tête même
+            // sur le boss géant), sinon fallback `y_offset` genome (fixe).
+            Transform::from_xyz(0.0, anchor_y.unwrap_or(t.y_offset), 0.0),
             Name::new("EnemyNameplate"),
             ChildOf(target),
         ))
@@ -258,6 +270,7 @@ fn spawn_nameplate_for_targets(
     mut registry: ResMut<NameplateRegistry>,
     q_targets: Query<Entity, With<NameplateTarget>>,
     q_defense: Query<&DefenseLayer>,
+    q_anchor: Query<&NameplateAnchor>,
     tuning: Res<EnemyNameplate>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -271,6 +284,7 @@ fn spawn_nameplate_for_targets(
             &mut meshes,
             &mut materials,
             q_defense.get(target).ok(),
+            q_anchor.get(target).ok().map(|a| a.0),
         );
     }
 }
@@ -283,6 +297,7 @@ fn spawn_or_refresh_on_hit(
     mut registry: ResMut<NameplateRegistry>,
     mut q_existing: Query<&mut NameplateRoot>,
     q_defense: Query<&DefenseLayer>,
+    q_anchor: Query<&NameplateAnchor>,
     tuning: Res<EnemyNameplate>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -303,6 +318,7 @@ fn spawn_or_refresh_on_hit(
             &mut meshes,
             &mut materials,
             q_defense.get(ev.target).ok(),
+            q_anchor.get(ev.target).ok().map(|a| a.0),
         );
     }
 }
