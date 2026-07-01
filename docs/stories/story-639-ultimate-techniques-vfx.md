@@ -1,4 +1,8 @@
-# Story-596 — État Ultime (F) + techniques signature par arme + VFX
+# Story-639 — État Ultime (F) + techniques signature par arme + VFX
+
+> **Note ID (2026-07-01)** : renommée de story-596 → story-639 (l'ID 596 était déjà
+> pris par `story-596-roguefight-ui-modernization`). Les commits/commentaires de code
+> de cette feature portent encore « story-596 » (immuables) — dette cosmétique mineure.
 
 > **Source** : demande game-maker 2026-06-30 — « VFX complexes par arme : Pépin
 > explose, Bourrasque électrise en chaîne, Mme Lenoir perfore + empoisonne, Pompe
