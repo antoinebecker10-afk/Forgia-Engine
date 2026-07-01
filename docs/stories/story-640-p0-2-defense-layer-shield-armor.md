@@ -8,8 +8,9 @@
 > barres colorées Vie(rouge)/Bouclier(bleu)/Armure(jaune), le bouclier régénère hors combat.
 > Débloque le HUD segmenté (P1) et le couplage élémentaire (P0-3 Shock / P0-4 matchup→couche).
 > **Scale BMAD** : Standard (≥2 crates : `forgia-damage` + `forgia-mode-roguelite` + `forgia-fps`).
-> **Date** : 2026-07-01. **Statut** : CODE-COMPLETE (compile + clippy 0-warn + tests verts
-> `forgia-damage` 18/18, `forgia-mode-roguelite` 214/214 ; auto-QA verifier + qa-lead passée).
+> **Date** : 2026-07-01. **Statut** : ✅ DONE 2026-07-01 — commit `fdaec7d`, validé user (capteur
+> `forgia2_shield.json`). Compile + clippy 0-warn + tests verts `forgia-damage` 18/18,
+> `forgia-mode-roguelite` 228/228 ; auto-QA verifier + qa-lead passée ; story-gate --story 640 PASS.
 > En attente **commit** (branche partagée) + **validation runtime** avant `DONE`
 > (story-done-gate G1 exige le git-track). Défauts QA non bloquants tracés en §"Hors scope".
 

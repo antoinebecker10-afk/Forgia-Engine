@@ -700,17 +700,28 @@ fn check_git_tracked(path: &Path) -> Option<bool> {
 }
 
 fn extract_crate_name(head: &str) -> Option<String> {
-    // Cherche premier token `forgia-X` dans le header (title H1 + premières lignes)
+    // Cherche le premier token `forgia-X` du header qui correspond à une VRAIE
+    // crate (`crates/forgia-X/` existe). Un nom de doc cité — ex.
+    // `forgia-gunfire-masterplan-2026-07-01.md` (masterplan référencé en tête de
+    // story) — n'est PAS une crate : sans ce check, G3 le prenait pour une crate
+    // fantôme (0 LOC) → faux FAIL (2026-07-01, stories 640/641). Scanne toutes les
+    // occurrences par ligne (une ligne peut citer doc + crate réelle).
     for line in head.lines().take(30) {
-        if let Some(idx) = line.find("forgia-") {
-            let tail = &line[idx..];
+        let mut rest = line;
+        while let Some(idx) = rest.find("forgia-") {
+            let tail = &rest[idx..];
             let end = tail
                 .find(|c: char| !(c.is_alphanumeric() || c == '-'))
                 .unwrap_or(tail.len());
             let candidate = &tail[..end];
-            if candidate.len() > "forgia-".len() && candidate.matches('-').count() >= 1 {
+            if candidate.len() > "forgia-".len()
+                && candidate.matches('-').count() >= 1
+                && Path::new(&format!("crates/{candidate}")).is_dir()
+            {
                 return Some(candidate.to_string());
             }
+            // Avance après ce token pour scanner les suivants de la même ligne.
+            rest = &tail[end..];
         }
     }
     None

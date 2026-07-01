@@ -5,13 +5,13 @@
 > **Décision user 2026-07-01** : **Explosif → Électrique** (colle à la direction verrouillée
 > « 4 éléments : Feu/Poison/Électrique/Perforant »). Remap destructif assumé.
 > **Scale BMAD** : Standard (≥2 crates : `forgia-mode-roguelite` + `forgia-fps` + genome).
-> **Statut** : IMPLÉMENTÉ (non commité — branche partagée) — **Inc.1 + Inc.2 + Inc.3 FAITS**.
+> **Statut** : ✅ DONE 2026-07-01 — **Inc.1 + Inc.2 + Inc.3 FAITS**. Commit `fdaec7d`.
 > Compile (`forgia-mode-roguelite` + binaire `forgia` 62 crates) + clippy (0 warning sur fichiers
 > touchés) + tests **228/228** verts. Auto-QA passée (verifier PASS ; qa-lead WARN → fix #1 appliqué
 > [Miasma skip si `is_kill`], #2 additif triple-élément documenté comme payoff assumé).
-> **Reste pour DONE** : commit branche (coordination multi-terminal) puis
-> `cargo run -p xtask -- story-gate --story 641` (G1 exige le tracking git).
-> Le hit-de-base vuln (+10 %) reste P0-4 (re-route via `DefenseLayer`), comme prévu.
+> **story-gate --story 641 : PASS** (G1 tracked + G3 crate-LOC 22402). Runtime : Combustion + Miasma
+> confirmés en jeu (`forgia2_elements.json`). Le hit-de-base vuln (+10 %) reste P0-4 (re-route via
+> `DefenseLayer`), comme prévu.
 
 ## Objectif
 Passer le 4e élément d'**Explosif** à **Électrique (`Shock`)** et **généraliser le moteur de
