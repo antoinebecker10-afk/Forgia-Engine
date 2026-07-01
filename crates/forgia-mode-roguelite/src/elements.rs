@@ -25,7 +25,7 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
-use forgia_combat::weapons::{EquippedWeapons, WeaponType};
+use forgia_combat::weapons::{EquippedWeapons, WeaponAffinities, WeaponType};
 use forgia_combat::Health;
 use forgia_damage::{DefenseLayer, ElementAffinity, Vulnerability};
 use serde::Deserialize;
@@ -361,6 +361,11 @@ impl AffinityGene {
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct AffinityTable {
+    /// Toggle P0-4 Inc.3b : router le **hit de base** via l'affinité (au lieu de
+    /// `Physical`). **OFF par défaut** → hit de base neutre, 0 changement de balance.
+    /// ON = tout le tir devient affine (Feu +50 % Vie / −25 % Bouclier sur la base aussi).
+    /// Hot-reload : le sync repeuple/vide `WeaponAffinities` (forgia-combat) au changement.
+    pub base_hit: bool,
     pub fire: AffinityGene,
     pub poison: AffinityGene,
     pub shock: AffinityGene,
@@ -369,8 +374,9 @@ pub struct AffinityTable {
 
 impl Default for AffinityTable {
     fn default() -> Self {
-        // Miroir EXACT de la section [affinity.*] de roguelite_elements.toml.
+        // Miroir EXACT de la section [affinity] de roguelite_elements.toml.
         Self {
+            base_hit: false,
             fire: AffinityGene { shield: 0.75, armor: 0.75, life: 1.5 },
             poison: AffinityGene { shield: 0.75, armor: 1.5, life: 0.75 },
             shock: AffinityGene { shield: 1.5, armor: 0.75, life: 0.75 },
@@ -679,8 +685,10 @@ pub struct ElementStats {
     /// P0-4 — dégâts élémentaires absorbés par Bouclier/Armure (vs fuite vers la
     /// Vie). Couvre bonus de matchup (Inc.1) + bursts/arc/Miasma (Inc.2). Signal que
     /// le routage affinité→DefenseLayer est actif (>0 dès qu'un ennemi défendu est
-    /// touché par un dégât élémentaire). Le hit de BASE (forgia-fps) reste hors compte
-    /// (routé `Physical`, sans affinité — Inc.3).
+    /// touché par un dégât élémentaire). **Le hit de BASE (forgia-fps) n'est PAS
+    /// comptabilisé ici, même quand `[affinity] base_hit=true` route sa couche via
+    /// affinité (Inc.3b)** — cette absorption vit côté forgia-fps, hors `ElementStats`
+    /// (sous-compte connu ; pas de dépendance inverse mode←fps).
     pub elem_absorbed: f32,
 }
 
@@ -811,6 +819,53 @@ pub fn sys_enforce_always_on(config: Res<ElementConfig>, mut unlocks: ResMut<Ele
             unlocks.0.insert(e);
         }
     }
+}
+
+// ─── Affinité du hit de base (P0-4 Inc.3b) ──────────────────────────────────
+
+/// PUR (testable) — construit la table d'affinité par arme pour le **hit de base**.
+/// Vide si le toggle genome `affinity.base_hit` est OFF (→ hit de base neutre côté
+/// forgia-fps). Sinon : pour chaque arme mappée dont l'élément est **armé**, son
+/// affinité. Gate par `ElementUnlocks` (cohérent : élément non armé = pas d'effet élément).
+pub fn build_base_hit_affinities(
+    config: &ElementConfig,
+    unlocks: &ElementUnlocks,
+) -> HashMap<WeaponType, ElementAffinity> {
+    let mut map = HashMap::new();
+    if !config.affinity.base_hit {
+        return map;
+    }
+    for w in [
+        WeaponType::ModernAR,
+        WeaponType::AssaultRifle,
+        WeaponType::Shotgun,
+        WeaponType::RocketLauncher,
+    ] {
+        if let Some(e) = config.element_for(w) {
+            if unlocks.is_unlocked(e) {
+                map.insert(w, config.affinity_for(e));
+            }
+        }
+    }
+    map
+}
+
+/// Sync la table `WeaponAffinities` (forgia-combat, lue par forgia-fps) depuis le
+/// genome + les éléments armés, au changement (config hot-reload ou unlock portail).
+/// Toggle OFF ou éléments non armés → table vide → hit de base `Physical` (historique).
+pub fn sys_sync_weapon_affinities(
+    config: Res<ElementConfig>,
+    unlocks: Res<ElementUnlocks>,
+    mut table: ResMut<WeaponAffinities>,
+) {
+    if !config.is_changed() && !unlocks.is_changed() {
+        return;
+    }
+    // `build_*` renvoie un std HashMap (pur/testable) ; `WeaponAffinities` utilise le
+    // HashMap plateforme de Bevy → conversion par collect.
+    table.0 = build_base_hit_affinities(&config, &unlocks)
+        .into_iter()
+        .collect();
 }
 
 // ─── Réactions élémentaires (moteur générique, story-641 Inc.3) ──────────────
@@ -1411,9 +1466,10 @@ pub fn sys_write_elements_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"elem_absorbed":{:.0},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
+        r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"base_hit_affinity":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"elem_absorbed":{:.0},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
         time.elapsed_secs(),
         config.always_on,
+        config.affinity.base_hit,
         unlocks.is_unlocked(Element::Fire),
         unlocks.is_unlocked(Element::Poison),
         unlocks.is_unlocked(Element::Shock),
@@ -1876,6 +1932,55 @@ mod tests {
         let leak = armored.absorb_elemental(20.0, &aff);
         assert_eq!(leak, 0.0);
         assert!((armored.armor - 10.0).abs() < 1e-3);
+    }
+
+    // ── Affinité du hit de base (story-642 P0-4 Inc.3b) ──
+
+    #[test]
+    fn affinity_base_hit_defaults_off() {
+        assert!(!AffinityTable::default().base_hit, "toggle base_hit OFF par défaut");
+        assert!(!ElementConfig::default().affinity.base_hit);
+    }
+
+    #[test]
+    fn base_hit_affinities_empty_when_toggle_off() {
+        let c = ElementConfig::default(); // base_hit=false
+        let mut u = ElementUnlocks::default();
+        for e in Element::all() {
+            u.unlock(e);
+        }
+        assert!(
+            build_base_hit_affinities(&c, &u).is_empty(),
+            "toggle OFF → table vide → hit de base neutre"
+        );
+    }
+
+    #[test]
+    fn base_hit_affinities_populate_when_on_and_armed() {
+        let mut c = ElementConfig::default();
+        c.affinity.base_hit = true;
+        let mut u = ElementUnlocks::default();
+        for e in Element::all() {
+            u.unlock(e);
+        }
+        let map = build_base_hit_affinities(&c, &u);
+        assert_eq!(map.len(), 4, "4 armes mappées + armées");
+        let fire_aff = c.affinity_for(Element::Fire);
+        let shock_aff = c.affinity_for(Element::Shock);
+        assert_eq!(map.get(&WeaponType::AssaultRifle), Some(&fire_aff), "SMG=feu");
+        assert_eq!(map.get(&WeaponType::ModernAR), Some(&shock_aff), "pistolet=électrique");
+    }
+
+    #[test]
+    fn base_hit_affinities_gate_by_unlock() {
+        let mut c = ElementConfig::default();
+        c.affinity.base_hit = true;
+        let mut u = ElementUnlocks::default();
+        u.unlock(Element::Fire); // seul Feu armé
+        let map = build_base_hit_affinities(&c, &u);
+        assert_eq!(map.len(), 1, "seule l'arme dont l'élément est armé est affine");
+        assert!(map.contains_key(&WeaponType::AssaultRifle), "SMG=feu → affine");
+        assert!(!map.contains_key(&WeaponType::ModernAR), "Shock non armé → pistolet neutre");
     }
 
     // ── VFX (story-588) ──

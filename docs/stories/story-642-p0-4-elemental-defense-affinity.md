@@ -62,9 +62,15 @@ sur la bleue ; les 228 tests élémentaires passent toujours.
   invisible à forgia-fps). Posé par le hit Shock (mode) ; lu par `forgia-fps` (hit de base ×mult,
   `CombatHitEvent.damage` reste PRÉ-vuln → pas de double comptage avec la vuln du bonus) + gate
   bonus/réactions (elements.rs). 298 tests, clippy 0-warn touché, binaire compile.
-  **NB périmètre** : la vuln (+10 %) est faite ; l'**affinité du hit de base** (router le hit de
-  base via `absorb_elemental` au lieu de `Physical`) reste séparée — plus gros changement de feel
-  + pont weapon→affinité (resource lisible par forgia-fps) → **Inc.3b/Inc.4** (à décider).
+- **Inc.3b — Affinité du hit de base** — ✅ **FAIT** (non commité), **OFF par défaut** :
+  resource `forgia_combat::WeaponAffinities` (HashMap arme→affinité, config-like) peuplée par
+  `sys_sync_weapon_affinities` (mode, gate unlock + toggle) au changement (Movement < Combat) ;
+  lue par forgia-fps → hit de base via `absorb_elemental` si présent, sinon `Physical`. Toggle
+  genome `[affinity] base_hit=false` → table vide → **0 changement de balance** (activable
+  hot-reload au playtest). 352 tests, clippy 0-warn touché, binaire compile.
+- **Inc.4 — Manipulation** : **DÉFÉRÉ** — Manipulation (Gunfire) = Feu+Foudre = paire Feu+Shock
+  déjà prise par **Surcharge** (décision de contenu à trancher) + = charme/re-targeting IA
+  (`forgia-ai-arena-bot`, en cours sur l'AUTRE terminal → collision). À revisiter après coordination.
 - **Inc.4 (optionnel) — Réaction Manipulation** (4e réaction du masterplan) : à spécifier.
 
 ## Décisions à trancher (avant Inc.1)

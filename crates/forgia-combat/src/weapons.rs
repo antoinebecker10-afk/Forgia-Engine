@@ -28,6 +28,16 @@ use bevy::platform::collections::HashMap;
 
 use crate::ammo::AmmoSlot;
 
+/// Table d'affinité élément→couche PAR ARME pour le **hit de base** (story-642 P0-4
+/// Inc.3b). Peuplée par forgia-mode-roguelite (arme → élément armé × affinité genome,
+/// **uniquement si le toggle genome `[affinity] base_hit` est ON**) ; LUE par forgia-fps
+/// pour router le hit de base via `DefenseLayer::absorb_elemental` au lieu de `Physical`.
+/// **Vide (défaut) = hit de base neutre** (comportement historique, 0 changement de
+/// balance tant que le toggle est OFF). Table par type d'arme (config-like), PAS un
+/// singleton joueur → compatible multi-joueurs.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct WeaponAffinities(pub HashMap<WeaponType, forgia_damage::ElementAffinity>);
+
 // Weapon VFX constants migrated to FpsTuning (wfx_fire_shake, wfx_impact_*, wfx_muzzle_*, wfx_tracer_*, wfx_sfx_volume)
 
 // =============================================================================

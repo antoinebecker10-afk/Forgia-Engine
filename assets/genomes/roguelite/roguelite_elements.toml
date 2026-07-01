@@ -136,6 +136,12 @@ retrigger_cooldown = 0.8   # délai min (s) entre 2 décharges sur la même cibl
 # 1 pt de dégât retire `mult` pts de la couche (casser une couche coûte
 # couche/mult). Critère masterplan : Feu +50% Vie, −25% Bouclier.
 #   Feu→Vie, Électrique→Bouclier, Perforant+Poison→Armure (matché 1.5 / autre 0.75).
+[affinity]
+# P0-4 Inc.3b — router le HIT DE BASE via l'affinité (pas seulement bonus/réactions).
+# OFF = hit de base neutre (Physical), 0 changement de balance. Passe à `true` pour
+# que TOUT le tir devienne affine (hot-reload : recalculé au changement). Gros levier.
+base_hit = false
+
 [affinity.fire]
 shield = 0.75
 armor = 0.75

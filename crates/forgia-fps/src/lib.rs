@@ -389,6 +389,9 @@ pub struct HitApplyCtx<'w, 's> {
     /// `With<TargetCube>` par cohérence défensive avec `health`/`defense` (on ne lit la vuln
     /// que des cibles frappables, jamais du joueur si un 2e producteur apparaît un jour).
     pub vulnerability: Query<'w, 's, &'static forgia_damage::Vulnerability, With<TargetCube>>,
+    /// Story-642 P0-4 Inc.3b — affinité par arme du hit de base (peuplée par
+    /// forgia-mode-roguelite ; vide si le toggle genome `base_hit` est OFF → `Physical`).
+    pub weapon_affinities: Res<'w, forgia_combat::weapons::WeaponAffinities>,
 }
 
 /// Bundle hitscan diagnostic — q_children pour predicate récursif + sensor state.
@@ -482,6 +485,9 @@ impl Plugin for ForgiaFpsPlugin {
             .init_resource::<LeftMouseState>()
             .init_resource::<HitscanSensorState>()
             .init_resource::<aim_assist::AimAssistTuning>()
+            // Story-642 P0-4 Inc.3b — table d'affinité par arme pour le hit de base
+            // (peuplée par forgia-mode-roguelite ; vide par défaut = hit de base neutre).
+            .init_resource::<forgia_combat::weapons::WeaponAffinities>()
             .add_systems(Update, hitscan_sensor::write_hitscan_sensor)
             .init_asset::<Genome<FpsTuning>>()
             .register_asset_loader(GenomeLoader::<FpsTuning>::default())
@@ -1066,12 +1072,19 @@ fn fire_weapon_minimal(
                         .map(|v| v.mult)
                         .unwrap_or(1.0);
                     let raw = effective_dmg * vuln_mult;
+                    // Story-642 P0-4 Inc.3b — si l'arme a une affinité armée (table peuplée
+                    // par mode-roguelite QUAND le toggle genome `base_hit` est ON), le hit de
+                    // base draine la couche AVEC affinité ; sinon neutre (`Physical`, historique).
+                    let base_aff = hit_ctx.weapon_affinities.0.get(&ammo.equipped.current);
                     // Story-640 P0-2 — la couche défensive (Bouclier → Armure) absorbe
                     // le hit de base avant la Vie ; le résidu seul entame `combat::Health`.
                     // Tout coup gèle la régén (`note_hit`), même entièrement absorbé.
                     let to_health = if let Ok(mut dl) = hit_ctx.defense.get_mut(entity) {
                         dl.note_hit();
-                        dl.absorb(raw, forgia_damage::DamageChannel::Physical)
+                        match base_aff {
+                            Some(aff) => dl.absorb_elemental(raw, aff),
+                            None => dl.absorb(raw, forgia_damage::DamageChannel::Physical),
+                        }
                     } else {
                         raw
                     };

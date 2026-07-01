@@ -252,6 +252,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.init_resource::<elements::ElementStats>();
         app.init_resource::<elements::ElementUnlocks>();
         app.init_resource::<elements::ElementGenomeWatch>();
+        // Story-642 P0-4 Inc.3b — table d'affinité par arme du hit de base (lue par
+        // forgia-fps). init_resource idempotent (forgia-fps l'init aussi côté reader).
+        app.init_resource::<forgia_combat::weapons::WeaponAffinities>();
         app.add_systems(Startup, elements::sys_init_element_genome);
         app.add_systems(
             OnEnter(GameMode::Roguelite),
@@ -266,6 +269,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             (
                 elements::sys_hot_reload_element_genome,
                 elements::sys_enforce_always_on,
+                // P0-4 Inc.3b — repeuple WeaponAffinities au changement (Movement < Combat
+                // dans la chaîne GameSet → table fraîche quand le tir la lit).
+                elements::sys_sync_weapon_affinities,
             )
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
