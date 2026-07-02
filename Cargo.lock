@@ -3427,6 +3427,7 @@ dependencies = [
  "bevy",
  "forgia-core",
  "serde",
+ "toml",
 ]
 
 [[package]]
@@ -3516,6 +3517,7 @@ dependencies = [
  "forgia-crosshair",
  "forgia-damage",
  "forgia-effects",
+ "forgia-enemy-nameplate",
  "forgia-input",
  "forgia-mode-fps-arena",
  "forgia-player",
