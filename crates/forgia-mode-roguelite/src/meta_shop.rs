@@ -258,6 +258,15 @@ pub struct MetaShopSave {
     /// terminée avec l'arme. Vide = toutes niveau 1.
     #[serde(default)]
     pub weapon_levels: HashMap<String, u32>,
+    /// R3.3 (story-645) — meilleure victoire (s). 0.0 = aucune victoire encore.
+    #[serde(default)]
+    pub best_victory_secs: f32,
+    /// R3.3 — total de runs jouées (Defeat + Victory).
+    #[serde(default)]
+    pub runs_played: u32,
+    /// R3.3 — total de victoires.
+    #[serde(default)]
+    pub victories: u32,
 }
 
 /// Pépin = arme de départ : toujours débloquée (story-613).
@@ -274,8 +283,57 @@ impl Default for MetaShopSave {
             unlocked_weapons: default_unlocked_weapons(),
             unlocked_boon_tiers: Vec::new(),
             weapon_levels: HashMap::new(),
+            best_victory_secs: 0.0,
+            runs_played: 0,
+            victories: 0,
         }
     }
+}
+
+/// PUR (testable) — enregistre une fin de run dans le save : compteurs + record.
+/// Retourne `true` si `secs` établit un NOUVEAU record de victoire.
+pub fn record_run_result(save: &mut MetaShopSave, secs: f32, victory: bool) -> bool {
+    save.runs_played = save.runs_played.saturating_add(1);
+    if !victory {
+        return false;
+    }
+    save.victories = save.victories.saturating_add(1);
+    if save.best_victory_secs <= 0.0 || secs < save.best_victory_secs {
+        save.best_victory_secs = secs;
+        return true;
+    }
+    false
+}
+
+/// R3.3 — stats de la run qui vient de se terminer, lues par les overlays
+/// Victory/Defeat (chrono + « NOUVEAU RECORD »). Écrite par [`sys_record_run_stats`].
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct LastRunStats {
+    pub secs: f32,
+    pub new_best: bool,
+}
+
+/// OnEnter(Defeat|Victory) — fige le chrono de la run dans les stats persistantes
+/// (runs jouées, victoires, meilleure victoire) + expose `LastRunStats` aux overlays.
+/// Ordonné `.before(sys_flush_meta_save)` pour que le flush écrive les compteurs à jour.
+pub fn sys_record_run_stats(
+    run_state: Res<State<RunState>>,
+    timer: Res<crate::run::RunTimer>,
+    mut save: ResMut<MetaShopSave>,
+    mut last: ResMut<LastRunStats>,
+) {
+    let victory = matches!(run_state.get(), RunState::Victory);
+    last.secs = timer.secs;
+    last.new_best = record_run_result(&mut save, timer.secs, victory);
+    info!(
+        "[meta-shop] run #{} — {} en {:.0}s{} (victoires {}, record {:.0}s)",
+        save.runs_played,
+        if victory { "VICTOIRE" } else { "défaite" },
+        timer.secs,
+        if last.new_best { " — NOUVEAU RECORD" } else { "" },
+        save.victories,
+        save.best_victory_secs,
+    );
 }
 
 /// Walk-up depuis l'exe pour trouver `config/` (marqueur `config/biomes/`),
@@ -703,6 +761,17 @@ impl Plugin for MetaShopPlugin {
         app.add_systems(OnExit(GameMode::Roguelite), sys_flush_meta_save);
         app.add_systems(OnEnter(RunState::Victory), sys_flush_meta_save);
         app.add_systems(OnEnter(RunState::Defeat), sys_flush_meta_save);
+        // R3.3 (story-645) — stats persistantes (runs/victoires/record) figées AVANT
+        // le flush pour partir sur disque dans la même frame.
+        app.init_resource::<LastRunStats>();
+        app.add_systems(
+            OnEnter(RunState::Victory),
+            sys_record_run_stats.before(sys_flush_meta_save),
+        );
+        app.add_systems(
+            OnEnter(RunState::Defeat),
+            sys_record_run_stats.before(sys_flush_meta_save),
+        );
     }
 }
 
@@ -711,6 +780,26 @@ impl Plugin for MetaShopPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── record_run_result (R3.3, story-645) ──
+
+    #[test]
+    fn defeat_counts_run_but_no_victory_nor_record() {
+        let mut s = MetaShopSave::default();
+        assert!(!record_run_result(&mut s, 300.0, false));
+        assert_eq!((s.runs_played, s.victories), (1, 0));
+        assert_eq!(s.best_victory_secs, 0.0, "défaite ne pose pas de record");
+    }
+
+    #[test]
+    fn first_victory_sets_record_then_only_faster_beats_it() {
+        let mut s = MetaShopSave::default();
+        assert!(record_run_result(&mut s, 900.0, true), "1re victoire = record");
+        assert!(!record_run_result(&mut s, 1000.0, true), "plus lent ≠ record");
+        assert!(record_run_result(&mut s, 600.0, true), "plus rapide = record");
+        assert_eq!((s.runs_played, s.victories), (3, 3));
+        assert_eq!(s.best_victory_secs, 600.0);
+    }
 
     #[test]
     fn cumulative_bonuses_scale_with_rank() {

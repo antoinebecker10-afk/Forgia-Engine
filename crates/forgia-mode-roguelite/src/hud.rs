@@ -498,6 +498,9 @@ pub(crate) fn draw_victory_overlay(
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
     meta: Res<MetaSouls>,
+    // R3.3 (story-645) — chrono de la run + record persistant (NOUVEAU RECORD).
+    last_stats: Res<crate::meta_shop::LastRunStats>,
+    save: Res<crate::meta_shop::MetaShopSave>,
     // Story-591 — retour au hub Lobby (L'Enclume) au lieu de relancer direct.
     mut next_run: ResMut<NextState<RunState>>,
     mut next_game: ResMut<NextState<GameMode>>,
@@ -542,7 +545,37 @@ pub(crate) fn draw_victory_overlay(
                         .color(FORGE_CHARBON)
                         .background_color(FORGE_OR),
                     );
-                    ui.add_space(36.0);
+                    // R3.3 — chrono de la run + record. `LastRunStats` est figé par
+                    // `sys_record_run_stats` à l'entrée de Victory (même frame).
+                    ui.add_space(10.0);
+                    let fmt = |s: f32| format!("{} min {:02} s", (s / 60.0) as u32, (s % 60.0) as u32);
+                    if last_stats.new_best {
+                        ui.label(
+                            egui::RichText::new(format!("🏆 NOUVEAU RECORD — {} !", fmt(last_stats.secs)))
+                                .size(22.0)
+                                .strong()
+                                .color(FORGE_OR),
+                        );
+                    } else {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Temps : {}   ·   Record : {}",
+                                fmt(last_stats.secs),
+                                fmt(save.best_victory_secs)
+                            ))
+                            .size(18.0)
+                            .color(FORGE_CHARBON),
+                        );
+                    }
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Victoires : {} / {} runs",
+                            save.victories, save.runs_played
+                        ))
+                        .size(16.0)
+                        .color(FORGE_CHARBON),
+                    );
+                    ui.add_space(28.0);
 
                     if cartoon_btn(ui, "↻  L'ENCLUME DES ÂMES", FORGE_OR).clicked() {
                         info!("[roguelite-hud] Victory → Lobby (Enclume)");
