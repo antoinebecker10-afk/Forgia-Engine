@@ -230,6 +230,8 @@ pub struct RunGraphConfig {
     pub branching: u8,
     pub director_credits_base: f32,
     pub director_credits_stage_mult: f32,
+    /// Story-646 R2 — vagues par salle COMBAT (la salle Boss = 1 vague boss).
+    pub waves_per_stage: u8,
 }
 
 impl Default for RunGraphConfig {
@@ -240,6 +242,7 @@ impl Default for RunGraphConfig {
             branching: 2,
             director_credits_base: 2.0,
             director_credits_stage_mult: 1.25,
+            waves_per_stage: 2,
         }
     }
 }
@@ -259,6 +262,9 @@ impl RunGraphConfig {
                     c.boss_stage_index = gene.default.clamp(0.0, 11.0) as u8;
                 }
                 "roguelite_branching_choices" => c.branching = gene.default.clamp(1.0, 4.0) as u8,
+                "roguelite_waves_per_stage" => {
+                    c.waves_per_stage = gene.default.clamp(1.0, 5.0) as u8;
+                }
                 "roguelite_director_credits_per_sec_base" => c.director_credits_base = gene.default,
                 "roguelite_director_credits_stage_mult" => {
                     c.director_credits_stage_mult = gene.default;

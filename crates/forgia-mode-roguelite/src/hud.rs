@@ -46,6 +46,8 @@ pub(crate) fn draw_wave_counter(
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
     wave: Res<RogueliteWave>,
+    // Story-646 R2 — totaux salle/vague depuis le genome (multi-salles).
+    graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -76,10 +78,20 @@ pub(crate) fn draw_wave_counter(
     );
     chunky_rect_filled(&painter, panel_rect, C_BG_DARK, 3.0, 10.0);
 
-    // Texte principal "WAVE X / N". Story-603 — N = WAVES_TOTAL (3, dont la 3e =
-    // boss), pas `RunGraph.total_stages` (4, nœuds du graphe) qui affichait "X/4".
-    let total = crate::waves::WAVES_TOTAL;
-    let main_text = format!("WAVE {} / {}", wave.current_wave, total);
+    // Story-646 R2 — multi-salles : « SALLE s/N · VAGUE w/W » (salle Boss = BOSS).
+    let total_rooms = graph_cfg.total_stages.max(1);
+    let is_boss_room = wave.stage + 1 >= total_rooms;
+    let main_text = if is_boss_room {
+        format!("SALLE {} / {}  ·  BOSS", wave.stage + 1, total_rooms)
+    } else {
+        format!(
+            "SALLE {} / {}  ·  VAGUE {} / {}",
+            wave.stage + 1,
+            total_rooms,
+            wave.current_wave,
+            graph_cfg.waves_per_stage,
+        )
+    };
     text_with_outline(
         &painter,
         egui::pos2(center_x, top_y + 22.0),

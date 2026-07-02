@@ -32,7 +32,9 @@ use forgia_mode_fps_arena::TargetCube;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 
-pub const WAVES_TOTAL: u8 = 3;
+// Story-646 R2 — l'ex-`WAVES_TOTAL: u8 = 3` (3 vagues dont boss dans UNE salle) est
+// remplacé par la structure multi-salles : `RunGraphConfig.waves_per_stage` vagues
+// par salle combat (gene `roguelite_waves_per_stage`) × `boss_depth` salles + salle Boss.
 // Story-558 Phase 1 (2026-05-29) — break 3.0 → 15.0s.
 // 15s = window prep ammo/heal + Coffre du Forgeron (Phase 3) + HP reset (AC10).
 // Best practice industry (audit roguelite-engagement-2026-05-29 §1) : break
@@ -43,6 +45,9 @@ const WAVE_BASE_SEED: u64 = 0xC0FF_EE51_C0BA_1700;
 
 #[derive(Resource, Debug, Clone)]
 pub struct RogueliteWave {
+    /// Story-646 R2 — salle courante (0-indexed). Salles 0..boss_depth = combat
+    /// (`waves_per_stage` vagues chacune), salle boss_depth = Boss (1 vague boss).
+    pub stage: u8,
     pub current_wave: u8,
     pub bots_alive: u32,
     pub break_secs_left: f32,
@@ -54,20 +59,30 @@ pub struct RogueliteWave {
     /// émission `EndRunEvent(Victory)` (décision user 2026-06-17 : pas de victoire
     /// auto, boucle boss → porte → parcours → arène). Reset au start de run.
     pub boss_defeated: bool,
+    /// Gate anti-race (ex-`Local` de l'orchestrateur, story-646) : il faut avoir VU
+    /// ≥1 frame avec des bots vivants avant de pouvoir « clear » — resettable par
+    /// salle (le `Local` ne l'était pas → instant-clear à l'entrée d'une salle).
+    pub seen_alive: bool,
 }
 
 impl Default for RogueliteWave {
     fn default() -> Self {
         Self {
+            stage: 0,
             current_wave: 1,
             bots_alive: 0,
             break_secs_left: 0.0,
             in_break: false,
             victory_emitted: false,
             boss_defeated: false,
+            seen_alive: false,
         }
     }
 }
+
+/// Vague « boss » dans [`wave_composition`] (branche `_`). La salle Boss (story-646)
+/// spawn cette composition directement.
+pub const BOSS_WAVE_COMPOSITION: u8 = 3;
 
 /// Composition par vague : `(archetype, count, ring_radius)`.
 pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
@@ -240,18 +255,22 @@ pub fn sys_wave_orchestrator(
     asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
     mut open_coffre: MessageWriter<OpenCoffreRequest>,
-    mut seen_alive: Local<bool>,
     // Story-571 — gain de Souls méta en fin de wave/boss (persistant).
     mut meta: ResMut<crate::run::MetaSouls>,
     // Story-640 P0-2 — configs live pour le spawn (stats hot-reload + défense).
     stats_cfg: Res<EnemyStatsConfig>,
     def_cfg: Res<DefenseConfig>,
+    // Story-646 R2 — multi-salles : structure de run (genome) + graph (kinds) +
+    // transitions RunState (le dispatch d'arène crypts/forge suit tout seul).
+    graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
+    graph: Option<Res<forgia_stage::graph::RunGraph>>,
+    mut next_run: ResMut<NextState<crate::run::RunState>>,
 ) {
     let alive = q_bots.iter().count() as u32;
     wave.bots_alive = alive;
 
     if alive > 0 {
-        *seen_alive = true;
+        wave.seen_alive = true;
     }
 
     // Victory déjà émise → no-op (évite spam events).
@@ -259,9 +278,16 @@ pub fn sys_wave_orchestrator(
         return;
     }
 
-    if alive == 0 && *seen_alive && !wave.in_break {
+    // Story-646 — profondeur du boss depuis le graph (fallback config si absent).
+    let boss_stage = graph
+        .as_deref()
+        .map(|g| g.boss_depth())
+        .unwrap_or_else(|| graph_cfg.total_stages.saturating_sub(1));
+    let in_boss_stage = wave.stage >= boss_stage;
+
+    if alive == 0 && wave.seen_alive && !wave.in_break {
         // Vague nettoyée — démarre break ou victory.
-        if wave.current_wave >= WAVES_TOTAL {
+        if in_boss_stage {
             // Story-571 — bonus Souls méta pour le boss/finale (persistant).
             meta.current = meta.current.saturating_add(crate::run::SOULS_PER_BOSS);
             meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_BOSS);
@@ -274,7 +300,8 @@ pub fn sys_wave_orchestrator(
             wave.victory_emitted = true;
             wave.boss_defeated = true;
             info!(
-                "[roguelite] All {WAVES_TOTAL} waves cleared — BOSS DEFEATED (+{} Souls méta) → porte du socle s'ouvre",
+                "[roguelite] Salle boss {} nettoyée — BOSS DEFEATED (+{} Souls méta) → porte du socle s'ouvre",
+                wave.stage + 1,
                 crate::run::SOULS_PER_BOSS
             );
             return;
@@ -310,9 +337,39 @@ pub fn sys_wave_orchestrator(
     if wave.in_break {
         wave.break_secs_left -= time.delta_secs();
         if wave.break_secs_left <= 0.0 {
-            wave.current_wave += 1;
             wave.in_break = false;
             wave.break_secs_left = 0.0;
+            if wave.current_wave < graph_cfg.waves_per_stage {
+                // Vague suivante dans la MÊME salle.
+                wave.current_wave += 1;
+            } else {
+                // Story-646 R2 — salle nettoyée → SALLE SUIVANTE. La transition
+                // RunState déclenche `sys_stage_dispatch` (swap d'arène crypts/forge,
+                // même origine monde → le joueur et le ring de spawn restent valides,
+                // pattern identique au StartRunEvent).
+                wave.stage += 1;
+                wave.seen_alive = false;
+                let is_boss = wave.stage >= boss_stage;
+                let kind = graph
+                    .as_deref()
+                    .and_then(|g| g.stages.get(wave.stage as usize))
+                    .and_then(|variants| variants.first())
+                    .map(|n| n.kind);
+                if is_boss {
+                    next_run.set(crate::run::RunState::Boss { stage: wave.stage });
+                    wave.current_wave = BOSS_WAVE_COMPOSITION;
+                } else {
+                    next_run.set(crate::run::RunState::InRun { stage: wave.stage });
+                    wave.current_wave = 1;
+                }
+                info!(
+                    "[roguelite] → SALLE {}/{} ({}{:?})",
+                    wave.stage + 1,
+                    boss_stage + 1,
+                    if is_boss { "BOSS " } else { "" },
+                    kind,
+                );
+            }
             spawn_wave_enemies(
                 &mut commands,
                 &asset_server,
@@ -321,7 +378,7 @@ pub fn sys_wave_orchestrator(
                 wave.current_wave,
             );
             // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.
-            *seen_alive = false;
+            wave.seen_alive = false;
         }
     }
 }
@@ -409,8 +466,12 @@ mod tests {
     }
 
     #[test]
-    fn waves_total_is_3() {
-        assert_eq!(WAVES_TOTAL, 3);
+    fn wave_default_starts_room_zero_gated() {
+        // Story-646 R2 — départ salle 0, gate anti-race baissé (aucun bot vu).
+        let w = RogueliteWave::default();
+        assert_eq!(w.stage, 0);
+        assert!(!w.seen_alive);
+        assert_eq!(BOSS_WAVE_COMPOSITION, 3, "compos boss = branche _ de wave_composition");
     }
 
     #[test]

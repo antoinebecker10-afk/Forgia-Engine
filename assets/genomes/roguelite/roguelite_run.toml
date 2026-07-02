@@ -37,6 +37,17 @@ max = 4.0
 default = 2.0
 layer = "roguelite"
 
+# story-646 R2 — vagues par salle COMBAT (la salle Boss = 1 vague boss).
+[[genes]]
+id = "roguelite_waves_per_stage"
+label = "Vagues par salle"
+chromosome = "Run"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.0
+layer = "roguelite"
+
 # === Difficulty Director (RoR2 pattern) ===
 
 [[genes]]
