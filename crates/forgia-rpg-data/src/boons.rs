@@ -173,12 +173,45 @@ pub fn default_souls_cost(rarity: BoonRarity) -> u32 {
     }
 }
 
+/// Poids de tirage par rareté (story-645 R3.4) — le drame du « drop rare » : plus
+/// le poids est haut, plus la rareté sort souvent. **Poids 0 = jamais tiré** (exclu
+/// du pool pondéré). TOML `[rarity_weights]` ; `Default` = miroir exact du TOML.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct RarityWeights {
+    pub common: u32,
+    pub uncommon: u32,
+    pub rare: u32,
+    pub legendary: u32,
+}
+
+impl Default for RarityWeights {
+    fn default() -> Self {
+        // Miroir EXACT de [rarity_weights] dans roguelite_boons.toml.
+        Self { common: 100, uncommon: 45, rare: 18, legendary: 6 }
+    }
+}
+
+impl RarityWeights {
+    pub fn weight(&self, r: BoonRarity) -> u32 {
+        match r {
+            BoonRarity::Common => self.common,
+            BoonRarity::Uncommon => self.uncommon,
+            BoonRarity::Rare => self.rare,
+            BoonRarity::Legendary => self.legendary,
+        }
+    }
+}
+
 /// TOML-loaded catalogue. Resource (init_resource → Default empty) AND Asset
 /// payload (Genome<BoonsCatalogue>). Synced when the asset reloads.
 #[derive(Resource, Default, Debug, Clone, Deserialize, TypePath)]
 pub struct BoonsCatalogue {
     #[serde(default)]
     pub entries: Vec<BoonDef>,
+    /// Poids de tirage par rareté (R3.4) — `#[serde(default)]` backward-compat.
+    #[serde(default)]
+    pub rarity_weights: RarityWeights,
 }
 
 impl BoonsCatalogue {
@@ -293,7 +326,8 @@ pub struct CoffrePickedEvent {
 /// - **Legendary filter** : a legendary boon is eligible only if its id is in
 ///   `active.unlocked_legendary`.
 /// - **No duplicates** within a single roll.
-/// - **Uniform** pick from the eligible pool (rarity weighting can come later).
+/// - **Uniform** pick from the eligible pool — préférer
+///   [`roll_candidates_weighted`] en production (R3.4, pondération par rareté).
 /// - Returns at most `count` candidates; fewer if eligible pool is small.
 ///
 /// `next_index(upper)` is a `0..upper` RNG injection so tests can use a fake.
@@ -304,22 +338,67 @@ pub fn roll_candidates(
     count: usize,
     mut next_index: impl FnMut(usize) -> usize,
 ) -> Vec<BoonId> {
-    let mut pool: Vec<&BoonDef> = catalogue
-        .entries
-        .iter()
-        // Palier méta débloqué (Common toujours ; Uncommon/Rare/Legendary gated) — story-616.
-        .filter(|b| tiers.allows(b.rarity))
-        .filter(|b| match b.rarity {
-            BoonRarity::Legendary => active.unlocked_legendary.contains(&b.id),
-            _ => true,
-        })
-        .collect();
+    let mut pool = eligible_pool(catalogue, active, tiers);
     let mut out: Vec<BoonId> = Vec::with_capacity(count);
     while out.len() < count && !pool.is_empty() {
         let upper = pool.len();
         let idx = next_index(upper) % upper.max(1);
         let picked = pool.swap_remove(idx);
         out.push(picked.id.clone());
+    }
+    out
+}
+
+/// Pool éligible partagé par les deux tirages : palier méta débloqué (story-616)
+/// + légendaires gated par les 3-tags intra-run.
+fn eligible_pool<'a>(
+    catalogue: &'a BoonsCatalogue,
+    active: &ActiveBoons,
+    tiers: &UnlockedBoonTiers,
+) -> Vec<&'a BoonDef> {
+    catalogue
+        .entries
+        .iter()
+        .filter(|b| tiers.allows(b.rarity))
+        .filter(|b| match b.rarity {
+            BoonRarity::Legendary => active.unlocked_legendary.contains(&b.id),
+            _ => true,
+        })
+        .collect()
+}
+
+/// Tirage **pondéré par rareté** (R3.4, story-645) — remplace l'uniforme en prod :
+/// un Common sort souvent, un Legendary est un événement. Poids lus sur
+/// `catalogue.rarity_weights` (genome `[rarity_weights]`, hot-reload) ; **poids 0 =
+/// rareté jamais tirée**. Sans remise (pas de doublon dans un même roll).
+/// `next_index(upper)` = RNG uniforme `0..upper` (ici `upper` = poids total du pool).
+pub fn roll_candidates_weighted(
+    catalogue: &BoonsCatalogue,
+    active: &ActiveBoons,
+    tiers: &UnlockedBoonTiers,
+    count: usize,
+    mut next_index: impl FnMut(usize) -> usize,
+) -> Vec<BoonId> {
+    let w = &catalogue.rarity_weights;
+    let mut pool: Vec<&BoonDef> = eligible_pool(catalogue, active, tiers)
+        .into_iter()
+        .filter(|b| w.weight(b.rarity) > 0)
+        .collect();
+    let mut out: Vec<BoonId> = Vec::with_capacity(count);
+    while out.len() < count && !pool.is_empty() {
+        let total: u32 = pool.iter().map(|b| w.weight(b.rarity)).sum();
+        let mut roll = next_index(total.max(1) as usize) as u32;
+        // Marche cumulative : le tirage tombe dans le « bucket » de poids d'une entrée.
+        let mut chosen = pool.len() - 1;
+        for (i, b) in pool.iter().enumerate() {
+            let bw = w.weight(b.rarity);
+            if roll < bw {
+                chosen = i;
+                break;
+            }
+            roll -= bw;
+        }
+        out.push(pool.swap_remove(chosen).id.clone());
     }
     out
 }
@@ -361,7 +440,9 @@ pub fn sys_handle_open_coffre(
             continue;
         }
         let mut idx_fn = rng_next_index(&mut rng.0);
-        let candidates = roll_candidates(&catalogue, &active, &tiers, req.count, &mut idx_fn);
+        // R3.4 (story-645) — tirage pondéré par rareté (Common fréquent, Legendary rare).
+        let candidates =
+            roll_candidates_weighted(&catalogue, &active, &tiers, req.count, &mut idx_fn);
         if candidates.is_empty() {
             warn!(
                 "[boons] coffre open '{}' but eligible pool empty ({} entries)",
@@ -581,6 +662,7 @@ mod tests {
     fn ac5_three_identical_tags_unlock_legendary() {
         let legendary = def("legend_fire", BoonRarity::Legendary, &[BoonTag::Fire]);
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![legendary.clone()],
         };
         let mut active = ActiveBoons::default();
@@ -601,6 +683,7 @@ mod tests {
     fn legendary_unlock_is_idempotent() {
         let legendary = def("legend_chaos", BoonRarity::Legendary, &[BoonTag::Chaos]);
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![legendary.clone()],
         };
         let mut active = ActiveBoons::default();
@@ -620,6 +703,7 @@ mod tests {
         let legendary_fire = def("lf", BoonRarity::Legendary, &[BoonTag::Fire]);
         let legendary_chaos = def("lc", BoonRarity::Legendary, &[BoonTag::Chaos]);
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![legendary_fire.clone(), legendary_chaos],
         };
         let mut active = ActiveBoons::default();
@@ -678,9 +762,69 @@ effect = { kind = "damage_mul", factor = 1.15 }
         move |upper: usize| iter.next().unwrap_or(0) % upper.max(1)
     }
 
+    // ── roll_candidates_weighted (R3.4, story-645) ──
+
+    #[test]
+    fn weighted_roll_buckets_follow_cumulative_weights() {
+        // Pool : c1 (common, poids 100) puis r1 (rare, poids 18). Total 118.
+        // roll < 100 → c1 ; 100 ≤ roll < 118 → r1 (marche cumulative).
+        let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
+            entries: vec![
+                def("c1", BoonRarity::Common, &[]),
+                def("r1", BoonRarity::Rare, &[]),
+            ],
+        };
+        let active = ActiveBoons::default();
+        let tiers = UnlockedBoonTiers::all();
+        let out = roll_candidates_weighted(&cat, &active, &tiers, 1, fake_seq(vec![99]));
+        assert_eq!(out[0].0, "c1", "roll 99 < 100 → bucket common");
+        let out = roll_candidates_weighted(&cat, &active, &tiers, 1, fake_seq(vec![100]));
+        assert_eq!(out[0].0, "r1", "roll 100 → bucket rare (100..118)");
+    }
+
+    #[test]
+    fn weighted_roll_zero_weight_excludes_rarity() {
+        let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights { legendary: 0, ..Default::default() },
+            entries: vec![
+                def("c1", BoonRarity::Common, &[]),
+                def("l1", BoonRarity::Legendary, &[BoonTag::Fire]),
+            ],
+        };
+        // Légendaire pourtant unlocké — le poids 0 l'exclut quand même du tirage.
+        let active = ActiveBoons {
+            unlocked_legendary: vec![BoonId("l1".into())],
+            ..Default::default()
+        };
+        let out =
+            roll_candidates_weighted(&cat, &active, &UnlockedBoonTiers::all(), 3, |_| 0);
+        assert_eq!(out.len(), 1, "poids 0 → legendary hors pool");
+        assert_eq!(out[0].0, "c1");
+    }
+
+    #[test]
+    fn weighted_roll_no_duplicates_and_default_sane() {
+        let w = RarityWeights::default();
+        assert!(w.common > w.uncommon && w.uncommon > w.rare && w.rare > w.legendary);
+        let cat = BoonsCatalogue {
+            rarity_weights: w,
+            entries: vec![
+                def("c1", BoonRarity::Common, &[]),
+                def("c2", BoonRarity::Common, &[]),
+            ],
+        };
+        let out = roll_candidates_weighted(
+            &cat, &ActiveBoons::default(), &UnlockedBoonTiers::all(), 3, |_| 0,
+        );
+        assert_eq!(out.len(), 2, "sans remise : pas de doublon, pool épuisé");
+        assert_ne!(out[0], out[1]);
+    }
+
     #[test]
     fn roll_excludes_locked_legendaries() {
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
                 def("c2", BoonRarity::Common, &[]),
@@ -700,6 +844,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
     fn roll_includes_unlocked_legendaries() {
         let leg = def("l1", BoonRarity::Legendary, &[BoonTag::Fire]);
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
                 def("c2", BoonRarity::Common, &[]),
@@ -718,6 +863,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
     #[test]
     fn roll_no_duplicates() {
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("a", BoonRarity::Common, &[]),
                 def("b", BoonRarity::Common, &[]),
@@ -736,6 +882,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
     #[test]
     fn roll_returns_short_when_pool_smaller() {
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![def("only", BoonRarity::Common, &[])],
         };
         let active = ActiveBoons::default();
@@ -755,6 +902,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
     fn roll_tier_gate_excludes_locked_tiers() {
         // Story-616 — gating méta des paliers (Common toujours, autres déblocables).
         let cat = BoonsCatalogue {
+            rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
                 def("u1", BoonRarity::Uncommon, &[]),

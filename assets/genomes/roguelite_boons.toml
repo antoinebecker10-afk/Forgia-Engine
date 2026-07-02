@@ -30,6 +30,15 @@
 # Calibration drop economy : Tank=5, Sniper=3, Runner=2, Boss=40 souls.
 # Common pickable après ~4 Tank kills, Legendary après ~16 Tank + Boss.
 
+# ── Poids de tirage par rareté (R3.4, story-645) ────────────────────────
+# Un Common sort souvent, un Legendary est un ÉVÉNEMENT. Poids 0 = jamais tiré.
+# Hot-reload. Miroir de RarityWeights::default() (boons.rs).
+[rarity_weights]
+common = 100
+uncommon = 45
+rare = 18
+legendary = 6
+
 # ────────────────────────────────────────────────────────────────────────
 # Boons neutres (Common) — 5 minimum AC4
 # ────────────────────────────────────────────────────────────────────────
