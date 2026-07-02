@@ -498,6 +498,11 @@ fn block_look_off(mut blockers: ResMut<InputBlockers>) {
 fn sys_sync_cursor_with_coffre(
     app_state: Res<State<AppMode>>,
     session: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
+    // Story-646 Inc.2 fix caméra (2026-07-02) — le CHOIX DE PORTE est un modal au
+    // même titre que le Coffre : curseur libre pendant, re-grab + look/fire rendus
+    // au pick. Sans ça : personne ne re-verrouillait après le portail (caméra morte)
+    // et ce sync re-grabbait PENDANT le choix (bagarre avec l'override du hud).
+    wave: Option<Res<forgia_mode_roguelite::RogueliteWave>>,
     mut q_cursor: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut blockers: ResMut<InputBlockers>,
     mut was_open: Local<bool>,
@@ -505,7 +510,11 @@ fn sys_sync_cursor_with_coffre(
     if *app_state.get() != AppMode::InGame {
         return;
     }
-    let is_open = session.as_ref().is_some_and(|s| s.is_open);
+    let coffre_open = session.as_ref().is_some_and(|s| s.is_open);
+    let portal_open = wave
+        .as_ref()
+        .is_some_and(|w| !w.portal_choices.is_empty() && w.portal_pick.is_none());
+    let is_open = coffre_open || portal_open;
     if is_open == *was_open {
         return;
     }
@@ -516,13 +525,13 @@ fn sys_sync_cursor_with_coffre(
             opts.visible = true;
             blockers.block_look = true;
             blockers.block_fire = true;
-            info!("[forgia-ui] Coffre OPEN — cursor released, look+fire blocked");
+            info!("[forgia-ui] Modal (coffre/portail) OPEN — cursor released, look+fire blocked");
         } else {
             opts.grab_mode = CursorGrabMode::Locked;
             opts.visible = false;
             blockers.block_look = false;
             blockers.block_fire = false;
-            info!("[forgia-ui] Coffre CLOSED — cursor grabbed, look+fire unblocked");
+            info!("[forgia-ui] Modal CLOSED — cursor grabbed, look+fire unblocked");
         }
     }
 }
