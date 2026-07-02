@@ -63,6 +63,15 @@ pub struct RogueliteWave {
     /// ≥1 frame avec des bots vivants avant de pouvoir « clear » — resettable par
     /// salle (le `Local` ne l'était pas → instant-clear à l'entrée d'une salle).
     pub seen_alive: bool,
+    /// Story-646 Inc.2 — portes proposées après le clear (vide = pas de choix en
+    /// cours). Remplies par l'orchestrateur depuis `graph.stages[next]` ; l'overlay
+    /// (`hud::draw_portal_overlay`) affiche + capte le choix.
+    pub portal_choices: Vec<forgia_stage::graph::StageKind>,
+    /// Index de la porte choisie (écrit par l'overlay, consommé par l'orchestrateur).
+    pub portal_pick: Option<u8>,
+    /// Kind de la salle courante (porte choisie ; None = salle 0 / boss / fallback).
+    /// Inc.3 le consommera pour la composition/récompense.
+    pub room_kind: Option<forgia_stage::graph::StageKind>,
 }
 
 impl Default for RogueliteWave {
@@ -76,6 +85,9 @@ impl Default for RogueliteWave {
             victory_emitted: false,
             boss_defeated: false,
             seen_alive: false,
+            portal_choices: Vec::new(),
+            portal_pick: None,
+            room_kind: None,
         }
     }
 }
@@ -343,31 +355,51 @@ pub fn sys_wave_orchestrator(
                 // Vague suivante dans la MÊME salle.
                 wave.current_wave += 1;
             } else {
-                // Story-646 R2 — salle nettoyée → SALLE SUIVANTE. La transition
-                // RunState déclenche `sys_stage_dispatch` (swap d'arène crypts/forge,
-                // même origine monde → le joueur et le ring de spawn restent valides,
-                // pattern identique au StartRunEvent).
-                wave.stage += 1;
-                wave.seen_alive = false;
-                let is_boss = wave.stage >= boss_stage;
-                let kind = graph
-                    .as_deref()
-                    .and_then(|g| g.stages.get(wave.stage as usize))
-                    .and_then(|variants| variants.first())
-                    .map(|n| n.kind);
+                // Story-646 R2 — salle nettoyée → SALLE SUIVANTE.
+                let next = wave.stage + 1;
+                let is_boss = next >= boss_stage;
+                // Inc.2 — portes candidates : kinds des variants du graph au depth
+                // suivant (cap `branching`). Boss = chemin unique, jamais de choix.
+                let choices: Vec<forgia_stage::graph::StageKind> = if is_boss {
+                    Vec::new()
+                } else {
+                    graph
+                        .as_deref()
+                        .and_then(|g| g.stages.get(next as usize))
+                        .map(|variants| {
+                            variants
+                                .iter()
+                                .map(|n| n.kind)
+                                .take(graph_cfg.branching.max(1) as usize)
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                };
+                if choices.len() >= 2 {
+                    // Inc.2 — CHOIX DE PORTE : on gèle ici. L'overlay
+                    // (`hud::draw_portal_overlay`) affiche les portes ; le pick
+                    // (portal_pick) est consommé plus bas au tick suivant.
+                    info!(
+                        "[roguelite] Salle {} nettoyée — CHOISIS TA PORTE : {:?}",
+                        wave.stage + 1,
+                        choices,
+                    );
+                    wave.portal_choices = choices;
+                    return;
+                }
+                // Pas de choix possible (boss / graph absent / 1 seul variant) → auto.
+                advance_to_room(&mut wave, next, is_boss, choices.first().copied());
                 if is_boss {
                     next_run.set(crate::run::RunState::Boss { stage: wave.stage });
-                    wave.current_wave = BOSS_WAVE_COMPOSITION;
                 } else {
                     next_run.set(crate::run::RunState::InRun { stage: wave.stage });
-                    wave.current_wave = 1;
                 }
                 info!(
                     "[roguelite] → SALLE {}/{} ({}{:?})",
                     wave.stage + 1,
                     boss_stage + 1,
                     if is_boss { "BOSS " } else { "" },
-                    kind,
+                    wave.room_kind,
                 );
             }
             spawn_wave_enemies(
@@ -380,7 +412,51 @@ pub fn sys_wave_orchestrator(
             // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.
             wave.seen_alive = false;
         }
+        return;
     }
+
+    // Story-646 Inc.2 — le joueur a choisi sa porte (overlay hud) : transition + spawn.
+    if let Some(pick) = wave.portal_pick.take() {
+        if wave.portal_choices.is_empty() {
+            return; // pick orphelin (reset de run pendant le choix) — no-op.
+        }
+        let kind = wave
+            .portal_choices
+            .get(pick as usize)
+            .or_else(|| wave.portal_choices.first())
+            .copied();
+        wave.portal_choices.clear();
+        let next = wave.stage + 1;
+        advance_to_room(&mut wave, next, false, kind);
+        next_run.set(crate::run::RunState::InRun { stage: wave.stage });
+        info!(
+            "[roguelite] → SALLE {}/{} — porte choisie : {:?}",
+            wave.stage + 1,
+            boss_stage + 1,
+            kind,
+        );
+        spawn_wave_enemies(
+            &mut commands,
+            &asset_server,
+            &stats_cfg,
+            &def_cfg,
+            wave.current_wave,
+        );
+    }
+}
+
+/// Story-646 — avance `RogueliteWave` vers la salle `next` (compteurs + kind).
+/// La transition `RunState` + le spawn restent au caller (params Bevy).
+fn advance_to_room(
+    wave: &mut RogueliteWave,
+    next: u8,
+    is_boss: bool,
+    kind: Option<forgia_stage::graph::StageKind>,
+) {
+    wave.stage = next;
+    wave.seen_alive = false;
+    wave.room_kind = kind;
+    wave.current_wave = if is_boss { BOSS_WAVE_COMPOSITION } else { 1 };
 }
 
 /// M3 step 1 — marker enrage phase 2. Inséré quand HP boss < 50%.

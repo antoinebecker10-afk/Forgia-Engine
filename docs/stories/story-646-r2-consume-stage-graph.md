@@ -17,8 +17,12 @@ l'orchestrateur (waves.rs) joue 3 vagues dans la salle 0 et la run s'arrête là
   d'arène + alternance crypts/forge suivent tout seuls). `RogueliteWave.{stage, seen_alive}`
   (le gate anti-race devient resettable par salle). `graph.stages[depth].kind` loggé + HUD
   « SALLE s/N · VAGUE w/W ». Boucle boss→porte→parcours→Victory inchangée.
-- **Inc.2 — Portail de choix** : réactiver `draw_portal_overlay` (dead_code) — 2 portes
-  typées après clear, le choix pilote le variant du graph.
+- **Inc.2 — Portail de choix** — ✅ FAIT (non commité→commit suivant) : `draw_portal_overlay`
+  RÉVEILLÉ (stub depuis 471..479) — après le clear d'une salle (hors boss), l'orchestrateur
+  gèle et propose les kinds des variants du graph (cap `branching`) ; overlay portes typées
+  (emoji+couleur, flèches/1-4/clic) → `portal_pick` consommé → transition + spawn.
+  `RogueliteWave.{portal_choices, portal_pick, room_kind}` (room_kind = hook Inc.3).
+  Fallback auto si <2 variants. Inc.1 validé runtime user au préalable.
 - **Inc.3 — Salles typées** : consommer `kind` pour la composition (Elite/Rest/Treasure)
   + récompense typée + sensor `forgia2_run_progress.json`.
 

@@ -606,10 +606,7 @@ pub(crate) fn draw_victory_overlay(
 
 // ─── Portal overlay (M3 step 3) — dormant, voir TODO l.354 ──────────────
 
-/// Emoji + label pour un `StageKind` (UI Portal).
-/// Dormant : sera re-wiré quand `draw_portal_overlay` sera ré-implémenté
-/// (refactor story-471..479 a supprimé les champs RogueliteWave nécessaires).
-#[allow(dead_code)]
+/// Emoji + label pour un `StageKind` (UI Portal). Ré-wiré story-646 Inc.2.
 fn stage_kind_display(kind: StageKind) -> (&'static str, &'static str) {
     match kind {
         StageKind::Combat => ("⚔", "Combat"),
@@ -622,9 +619,7 @@ fn stage_kind_display(kind: StageKind) -> (&'static str, &'static str) {
     }
 }
 
-/// Couleur principale par `StageKind` (cohérence avec ennemis arena).
-/// Dormant : voir `stage_kind_display` rationale.
-#[allow(dead_code)]
+/// Couleur principale par `StageKind` (cohérence avec ennemis arena). Ré-wiré Inc.2.
 fn stage_kind_color(kind: StageKind) -> egui::Color32 {
     match kind {
         StageKind::Combat => egui::Color32::from_rgb(220, 80, 60),
@@ -641,10 +636,8 @@ fn stage_kind_color(kind: StageKind) -> egui::Color32 {
 /// - Flèche gauche → variant 0
 /// - Flèche droite → variant 1
 /// - Flèche haut/bas (3 et 4 choix éventuels) → variants 2/3
-/// - 1..4 → fallback numérique générique
-///
-/// Dormant : voir TODO portal overlay re-implémentation.
-#[allow(dead_code)]
+/// - 1..4 → fallback numérique (NB : 2-4 switchent AUSSI l'arme — cosmétique,
+///   la salle est vide pendant le choix ; les flèches sont le chemin propre).
 const PORTAL_KEYS: &[(KeyCode, u8)] = &[
     (KeyCode::ArrowLeft, 0),
     (KeyCode::ArrowRight, 1),
@@ -656,18 +649,66 @@ const PORTAL_KEYS: &[(KeyCode, u8)] = &[
     (KeyCode::Digit4, 3),
 ];
 
-// TODO(story-471..479): API removed, refactor abandonné — re-implémenter
-// draw_portal_overlay désactivé : RogueliteWave n'a plus pending_portal_choices
-// ni chosen_variant_idx (champs supprimés lors du refactor de session précédente).
-// Remplacer par stub no-op pour conserver la signature dans le plugin.
+/// Story-646 Inc.2 — RÉVEILLÉ (était stub depuis le refactor 471..479). Affiche les
+/// portes typées après le clear d'une salle (`RogueliteWave.portal_choices`) et capte
+/// le choix (flèches / 1-4 / clic) dans `portal_pick`, consommé par l'orchestrateur.
 pub(crate) fn draw_portal_overlay(
-    _contexts: EguiContexts,
-    _app_state: Res<State<AppMode>>,
-    _game_mode: Res<State<GameMode>>,
-    _keys: Res<ButtonInput<KeyCode>>,
-    _wave: ResMut<RogueliteWave>,
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut wave: ResMut<RogueliteWave>,
 ) {
-    // disabled — pending_portal_choices / chosen_variant_idx supprimés
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    if wave.portal_choices.is_empty() || wave.portal_pick.is_some() {
+        return;
+    }
+    // Input clavier (flèches prioritaires, 1-4 fallback).
+    let n = wave.portal_choices.len();
+    for (key, idx) in PORTAL_KEYS {
+        if (*idx as usize) < n && keys.just_pressed(*key) {
+            wave.portal_pick = Some(*idx);
+            return;
+        }
+    }
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+
+    let mut clicked: Option<u8> = None;
+    egui::Area::new(egui::Id::new("forgia_portal_choice"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, -40.0))
+        .show(ctx, |ui| {
+            forge_panel_frame().show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(4.0);
+                    ui.heading(display_text("CHOISIS TA PORTE", 40.0, FORGE_OR).strong());
+                    ui.add_space(14.0);
+                    ui.horizontal(|ui| {
+                        let hints = ["←", "→", "↑", "↓"];
+                        for (i, kind) in wave.portal_choices.iter().enumerate() {
+                            let (emoji, label) = stage_kind_display(*kind);
+                            let color = stage_kind_color(*kind);
+                            ui.vertical_centered(|ui| {
+                                ui.label(egui::RichText::new(emoji).size(44.0));
+                                ui.label(
+                                    egui::RichText::new(label).size(22.0).strong().color(color),
+                                );
+                                let hint = hints.get(i).copied().unwrap_or("?");
+                                if cartoon_btn(ui, &format!("{hint}  ENTRER"), color).clicked() {
+                                    clicked = Some(i as u8);
+                                }
+                            });
+                            ui.add_space(26.0);
+                        }
+                    });
+                    ui.add_space(6.0);
+                });
+            });
+        });
+    if clicked.is_some() {
+        wave.portal_pick = clicked;
+    }
 }
 
 // ─── Plugin ──────────────────────────────────────────────────────────────
