@@ -32,15 +32,20 @@ base_sensitivity = 0.002  # rad/pixel
 recoil_decay_per_sec = 8.0
 
 # Story-615 — BULLET MAGNETISM (modèle souris : on corrige le TIR, jamais la caméra).
-# strength       = 0.0 off / 0.6 défaut / 1.0 = referme tout l'écart (borné ci-dessous).
+# strength       = 0.0 off / 1.0 = fermeture max (toujours modulée par les falloffs).
 # max_angle_deg  = demi-cône de candidature : au-delà, la cible est ignorée.
 # max_correction_deg = borne dure sur la correction par tir (anti-aimbot).
 # engage_distance_m  = portée max.
+#
+# Story-649 (2026-07-03) : resserré + falloffs gradués (cohérence CoD BO6 —
+# l'aide est pleine au CENTRE du réticule et à MI-portée, dégressive vers zéro
+# au bord du cône / à bout portant / à la portée max ; jamais binaire).
+# Avant : 0.6 / 7° / 5° / 60 m = 45 % des tirs corrigés (magnétisme visible).
 [aim_assist]
-strength = 0.6
-max_angle_deg = 7.0
-max_correction_deg = 5.0
-engage_distance_m = 60.0
+strength = 0.5
+max_angle_deg = 3.5
+max_correction_deg = 2.0
+engage_distance_m = 40.0
 
 # Story-617 — PRÉSENCE viewmodel (couche additive par-dessus l'ADS, n'affecte PAS le tir).
 # sway = l'arme traîne quand on tourne la souris ; bob = oscillation de marche ;

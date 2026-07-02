@@ -8,6 +8,16 @@
 //!
 //! `strength = 0.0` ⇒ strictement off (respect strict de l'intention joueur).
 //!
+//! Story-649 (2026-07-03) — **cohérence façon CoD BO6** : l'aide n'est jamais
+//! binaire. Deux falloffs multiplient la force (réf. patch notes BO6 : « aim
+//! assist strength now linearly interpolates — much weaker at point-blank,
+//! smoothly increasing over short range ») :
+//! - **angulaire** : pleine au centre du réticule → 0 au bord du cône (fini le
+//!   « j'ai clairement raté mais ça touche » — c'était le défaut du modèle
+//!   binaire : une cible à 6.9° recevait la même aide qu'une cible à 0.5°) ;
+//! - **distance** : réduite à bout portant (le joueur contrôle), pleine à
+//!   mi-portée, dégressive vers 0 à `engage_distance_m`.
+//!
 //! Cross-mode FPS + Roguelite : la cible est filtrée par `Mortal Without<Player>`
 //! (présent sur tous les ennemis des deux modes, découplé du type `Health` — évite
 //! le piège des deux `Health` qui rendait l'ancien aim assist mort en Roguelite).
@@ -31,12 +41,44 @@ pub struct AimAssistTuning {
 
 impl Default for AimAssistTuning {
     fn default() -> Self {
+        // Story-649 : resserré (était 0.6 / 7° / 5° / 60 m — 45 % des tirs
+        // corrigés en session réelle, magnétisme visible). Le cône étroit +
+        // falloffs = l'aide finit ce que le joueur a presque réussi, jamais plus.
         Self {
-            strength: 0.6,
-            max_angle_deg: 7.0,
-            max_correction_deg: 5.0,
-            engage_distance_m: 60.0,
+            strength: 0.5,
+            max_angle_deg: 3.5,
+            max_correction_deg: 2.0,
+            engage_distance_m: 40.0,
         }
+    }
+}
+
+// ── Forme des falloffs (invariants de courbe, pas du tuning gameplay) ────────
+// Fractions de `engage_distance_m` délimitant la rampe distance (façon BO6 :
+// faible bout portant → plateau plein → fondu vers 0 à la portée max).
+/// Fin de la rampe bout-portant (aide réduite en-dessous de 20 % de la portée).
+const DIST_RAMP_END_FRAC: f32 = 0.2;
+/// Début du fondu lointain (aide pleine entre 20 % et 60 % de la portée).
+const DIST_FADE_START_FRAC: f32 = 0.6;
+
+/// Smoothstep classique 0..1 (C1-continu — pas de « cran » senti au bord).
+fn smoothstep01(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Falloff distance : rampe bout-portant → plateau → fondu (0 à la portée max).
+fn distance_falloff(dist: f32, engage: f32) -> f32 {
+    if engage <= 0.0 {
+        return 0.0;
+    }
+    let d = dist / engage;
+    if d < DIST_RAMP_END_FRAC {
+        smoothstep01(d / DIST_RAMP_END_FRAC)
+    } else if d <= DIST_FADE_START_FRAC {
+        1.0
+    } else {
+        smoothstep01((1.0 - d) / (1.0 - DIST_FADE_START_FRAC))
     }
 }
 
@@ -76,29 +118,31 @@ pub fn bend_fire_direction(
     if strength <= 0.0 {
         return (forward, 0.0);
     }
-    let max_cos = tuning.max_angle_deg.to_radians().cos();
+    let cone_rad = tuning.max_angle_deg.to_radians();
+    let max_cos = cone_rad.cos();
     let max_dist_sq = tuning.engage_distance_m * tuning.engage_distance_m;
 
     // Meilleure cible = plus grand dot (la plus centrée sur le réticule) dans le cône.
-    let mut best: Option<(Vec3, f32)> = None; // (dir unitaire vers cible, dot)
+    let mut best: Option<(Vec3, f32, f32)> = None; // (dir unitaire, dot, dist)
     for tpos in targets {
         let to = tpos - origin;
         let dist_sq = to.length_squared();
         if dist_sq < 0.01 || dist_sq > max_dist_sq {
             continue;
         }
-        let dir = to / dist_sq.sqrt();
+        let dist = dist_sq.sqrt();
+        let dir = to / dist;
         let dot = dir.dot(forward);
         if dot < max_cos {
             continue;
         }
         match best {
-            Some((_, best_dot)) if best_dot >= dot => {}
-            _ => best = Some((dir, dot)),
+            Some((_, best_dot, _)) if best_dot >= dot => {}
+            _ => best = Some((dir, dot, dist)),
         }
     }
 
-    let Some((dir, dot)) = best else {
+    let Some((dir, dot, dist)) = best else {
         return (forward, 0.0);
     };
 
@@ -106,8 +150,13 @@ pub fn bend_fire_direction(
     if full_angle < 1e-5 {
         return (forward, 0.0); // déjà pile dessus
     }
+    // Story-649 — falloffs (cohérence BO6) : l'aide est graduée, jamais binaire.
+    // Angulaire : pleine au centre du réticule, 0 au bord du cône.
+    let ang_falloff = smoothstep01(1.0 - (full_angle / cone_rad.max(1e-6)).clamp(0.0, 1.0));
+    // Distance : réduite bout portant, pleine à mi-portée, 0 à la portée max.
+    let dist_falloff = distance_falloff(dist, tuning.engage_distance_m);
     let max_corr = tuning.max_correction_deg.max(0.0).to_radians();
-    let bend = (full_angle * strength).min(max_corr);
+    let bend = (full_angle * strength * ang_falloff * dist_falloff).min(max_corr);
     if bend < 1e-5 {
         return (forward, 0.0);
     }
@@ -210,11 +259,12 @@ mod tests {
 
     #[test]
     fn default_is_bullet_magnetism_off_friendly() {
+        // Story-649 : resserré vs story-615 (0.6/7°/5°/60m → 45% de tirs corrigés).
         let t = AimAssistTuning::default();
-        assert_eq!(t.strength, 0.6);
-        assert_eq!(t.max_angle_deg, 7.0);
-        assert_eq!(t.max_correction_deg, 5.0);
-        assert_eq!(t.engage_distance_m, 60.0);
+        assert_eq!(t.strength, 0.5);
+        assert_eq!(t.max_angle_deg, 3.5);
+        assert_eq!(t.max_correction_deg, 2.0);
+        assert_eq!(t.engage_distance_m, 40.0);
     }
 
     #[test]
@@ -254,7 +304,8 @@ mod tests {
         let angle = 3.0_f32.to_radians();
         let target = Vec3::new((angle.sin()) * 20.0, 0.0, -(angle.cos()) * 20.0);
         let (dir, corr) = bend_fire_direction(Vec3::ZERO, fwd, [target].into_iter(), &tuning());
-        // strength=1, correction max 5° > 3° → on referme tout l'écart.
+        // Story-649 : l'écart n'est plus refermé en entier (falloff angulaire),
+        // mais la direction doit toujours se rapprocher de la cible.
         assert!(corr > 0.0, "doit corriger");
         let to_target = (target - Vec3::ZERO).normalize();
         // La direction bendée est plus alignée avec la cible que le forward brut.
@@ -300,6 +351,71 @@ mod tests {
         assert_eq!(evaluate_window(10, 1, 0.6).0, "ok");
         // sous le seuil de tirs → ok (pas assez d'échantillon).
         assert_eq!(evaluate_window(2, 0, 0.6).0, "ok");
+    }
+
+    // ── Story-649 : falloffs (cohérence BO6) ────────────────────────────────
+
+    #[test]
+    fn edge_of_cone_gets_almost_no_help() {
+        // Cible à 6.8° dans un cône de 7° : l'aide doit être quasi nulle —
+        // AVANT story-649 elle recevait 60-100% de fermeture (« raté net mais
+        // touché », le défaut signalé par le user).
+        let t = tuning(); // strength 1.0, cône 7°
+        let a = 6.8_f32.to_radians();
+        let target = Vec3::new(a.sin() * 20.0, 0.0, -a.cos() * 20.0);
+        let (_dir, corr) = bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [target].into_iter(), &t);
+        assert!(
+            corr.to_degrees() < 0.1,
+            "bord de cône ≈ zéro aide, got {}°",
+            corr.to_degrees()
+        );
+    }
+
+    #[test]
+    fn point_blank_help_is_reduced() {
+        // Même angle (2°), cible à 3 m (bout portant, <20% de 60 m) vs 25 m
+        // (plateau) : l'aide bout-portant doit être plus faible (pattern BO6
+        // « much weaker at point-blank range »).
+        let t = tuning();
+        let a = 2.0_f32.to_radians();
+        let near = Vec3::new(a.sin() * 3.0, 0.0, -a.cos() * 3.0);
+        let mid = Vec3::new(a.sin() * 25.0, 0.0, -a.cos() * 25.0);
+        let (_d1, corr_near) =
+            bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [near].into_iter(), &t);
+        let (_d2, corr_mid) = bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [mid].into_iter(), &t);
+        assert!(
+            corr_near < corr_mid,
+            "bout portant ({:.2}°) doit aider moins que mi-portée ({:.2}°)",
+            corr_near.to_degrees(),
+            corr_mid.to_degrees()
+        );
+    }
+
+    #[test]
+    fn long_range_help_fades_out() {
+        // Même angle, 25 m (plateau) vs 57 m (fondu final, engage 60 m).
+        let t = tuning();
+        let a = 2.0_f32.to_radians();
+        let mid = Vec3::new(a.sin() * 25.0, 0.0, -a.cos() * 25.0);
+        let far = Vec3::new(a.sin() * 57.0, 0.0, -a.cos() * 57.0);
+        let (_d1, corr_mid) = bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [mid].into_iter(), &t);
+        let (_d2, corr_far) = bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [far].into_iter(), &t);
+        assert!(
+            corr_far < corr_mid,
+            "longue portée ({:.2}°) doit fondre vs plateau ({:.2}°)",
+            corr_far.to_degrees(),
+            corr_mid.to_degrees()
+        );
+    }
+
+    #[test]
+    fn distance_falloff_shape() {
+        // Rampe bout-portant → plateau → fondu → 0 exact à la portée max.
+        assert_eq!(distance_falloff(0.0, 60.0), 0.0);
+        assert!((distance_falloff(20.0, 60.0) - 1.0).abs() < 1e-6); // plateau (33%)
+        assert!(distance_falloff(50.0, 60.0) < 1.0); // fondu entamé (83%)
+        assert!(distance_falloff(60.0, 60.0) < 1e-6); // portée max = 0
+        assert_eq!(distance_falloff(10.0, 0.0), 0.0); // engage 0 = pas d'aide
     }
 
     #[test]

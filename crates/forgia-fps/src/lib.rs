@@ -28,7 +28,7 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_input::InputBlockers;
 use forgia_juice_lib::camera_shake::{CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
 use forgia_juice_lib::fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
-use forgia_juice_lib::hit_stop::HitStopState;
+use forgia_juice_lib::hit_stop::{tier_for_shot, HitStopState, HitstopStats, HitstopTiers};
 use forgia_juice_lib::recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
 use forgia_mode_fps_arena::TargetCube;
 use forgia_player::prelude::MouseLookTuning;
@@ -332,6 +332,10 @@ pub struct FireTimingCtx<'w> {
     pub burst_state: Option<ResMut<'w, BurstState>>,
     pub time: Res<'w, Time>,
     pub virtual_time: ResMut<'w, Time<Virtual>>,
+    // Story-648 : paliers de hitstop (hit/crit/kill/multikill) + compteurs capteur.
+    // Dans ce bundle car `fn fire` est à la limite des 16 params Bevy.
+    pub hitstop_tiers: Option<Res<'w, HitstopTiers>>,
+    pub hitstop_stats: Option<ResMut<'w, HitstopStats>>,
 }
 
 /// Bundle des MessageWriters juice (shake / recoil / fov punch) pour fire system.
@@ -925,6 +929,11 @@ fn fire_weapon_minimal(
         .next_u64() as u32;
 
     let mut hit_record: Option<(Entity, f32)> = None;
+    // Story-648 — agrégation par TIR pour le palier de hitstop : kills (edge-
+    // detected, un ennemi tué 1 seule fois même touché par plusieurs pellets)
+    // + crit/weakspot vus sur au moins un pellet.
+    let mut shot_kills: u32 = 0;
+    let mut shot_crit_or_head = false;
 
     for pellet_idx in 0..pellets {
         let pellet_dir = if pellets > 1 && spread_rad > 0.0 {
@@ -1088,9 +1097,14 @@ fn fire_weapon_minimal(
                     } else {
                         raw
                     };
+                    let was_alive = !hp.is_dead();
                     hp.current = (hp.current - to_health).max(0.0);
                     let dead = hp.is_dead();
                     let new_hp = hp.current;
+                    // Story-648 — palier hitstop : kill à l'EDGE (vivant→mort) seulement.
+                    if dead && was_alive {
+                        shot_kills += 1;
+                    }
 
                     if let Some(mat_comp) = mat_opt {
                         let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
@@ -1107,6 +1121,9 @@ fn fire_weapon_minimal(
                     let attacker_entity = q_player.single().ok();
                     let hit_world = origin + pellet_dir * toi;
                     let is_headshot = zone == forgia_damage::HitZone::Head;
+                    if is_headshot || crit_mul > 1.0 {
+                        shot_crit_or_head = true;
+                    }
                     hit_events.write(CombatHitEvent {
                         target: entity,
                         attacker: attacker_entity,
@@ -1140,14 +1157,22 @@ fn fire_weapon_minimal(
         });
 
     // Hit-stop UNE FOIS par tir (pas par pellet) si au moins une cible touchée.
+    // Story-648 — paliers : base par-arme × mult genome selon l'issue du tir
+    // (hit ×1.0 = feel historique / crit / kill / multikill même tir).
     if hit_record.is_some() {
-        let hs_dur = entry.map(|e| e.hit_stop_duration).unwrap_or(0.05);
+        let hs_base = entry.map(|e| e.hit_stop_duration).unwrap_or(0.05);
         let hs_speed = entry.map(|e| e.hit_stop_speed).unwrap_or(0.05);
+        let tiers = timing.hitstop_tiers.as_deref().copied().unwrap_or_default();
+        let (mult, tier) = tier_for_shot(&tiers, shot_kills, shot_crit_or_head);
+        let hs_dur = hs_base * mult;
         timing.virtual_time.set_relative_speed(hs_speed);
         commands.insert_resource(HitStopState {
             timer: Timer::from_seconds(hs_dur, TimerMode::Once),
             restore_speed: 1.0,
         });
+        if let Some(stats) = timing.hitstop_stats.as_deref_mut() {
+            stats.record(tier, hs_dur);
+        }
     } else {
         info!(
             "[fire] miss ({} pellets, {:?})",
