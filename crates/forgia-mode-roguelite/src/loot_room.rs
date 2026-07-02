@@ -757,6 +757,9 @@ fn sys_portal_walkover(
     mut q_player: Query<(Entity, &mut Transform), With<Player>>,
     q_portals: Query<(&Transform, &Portal), Without<Player>>,
     wave: Res<RogueliteWave>,
+    // Story-603 close (2026-07-02) — le portail Return scelle la run : émet la
+    // Victoire (jusqu'ici l'event n'était JAMAIS émis → l'écran Victory était mort).
+    mut end_run: MessageWriter<crate::run::EndRunEvent>,
 ) {
     // Pendant un choix de boon (cartes affichées), on gèle les portails + la chute-respawn.
     if reward.phase != RewardPhase::Closed {
@@ -810,7 +813,18 @@ fn sys_portal_walkover(
                 ptf.translation = state.return_pos + Vec3::new(0.0, 0.0, 5.0);
                 state.in_room = false;
                 commands.entity(player).insert(BotTarget);
-                info!("[loot-room] → retour arène");
+                // Story-603 close — boss vaincu + parcours bouclé = run GAGNÉE.
+                // `sys_end_run` transitionne RunState::Victory (overlay + flush save
+                // méta + XP). Garde boss_defeated : on n'atteint le parcours que
+                // post-boss, mais un futur accès dev/debug ne doit pas gagner la run.
+                if wave.boss_defeated {
+                    end_run.write(crate::run::EndRunEvent {
+                        result: crate::run::RunResult::Victory,
+                    });
+                    info!("[loot-room] → retour arène — VICTOIRE (run scellée)");
+                } else {
+                    info!("[loot-room] → retour arène");
+                }
             }
         }
         state.cooldown = TELEPORT_COOLDOWN;
