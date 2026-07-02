@@ -25,8 +25,8 @@
 #   (RockBig_001/003 = blocs 25-35m → RETIRÉS Tier 1, inadaptés comme cover ;
 #    Tier 2 : sourcer de vrais petits rochers de cover.)
 #
-# NOTE : seuls les stages listés ici ont une coquille authored. forge_sanctum
-# n'est PAS listé → il reste 100% procédural (non-régression).
+# NOTE : seuls les stages listés ici ont une coquille authored. crypts_of_anvil
+# (story-625) + forge_sanctum « Le Bourg de l'Enclume » (story-647).
 
 [layouts.crypts_of_anvil]
 suppress_procedural_modules = true
@@ -218,3 +218,144 @@ section = "cour_forges"
 prefab = "models/environment/inferno/GoldPileSmall_001.glb"
 pos = [5.0, 0.0, 1.0]
 section = "fosse_melee"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LE BOURG DE L'ENCLUME — forge_sanctum authored (story-647, 2026-07-02).
+# DA : place de village-forge DIURNE (kit medieval_hexagon + rochers nature) —
+# température CHAUDE/claire vs Cryptes sombres roses → différenciation instantanée.
+# Règles appliquées (recherche level-art 2026-07-02, rapport gunfire-like) :
+#   · 1 focal point « weenie » : le BEFFROI (église ×10, 16.5m, visible partout)
+#   · 70/30 : 3 clusters denses (marché SE / taverne W / ruelle NE) + lanes ouvertes
+#   · centre = puits (landmark bas, combat rapproché autour)
+#   · perchoir accessible en 2 marches de rochers (walkable)
+# ⚠️ AABB MESURÉS (scratchpad/aabb.py) — kit medieval = MINIATURES table-top :
+#   church 1.03x1.65x1.16 (×10 → r~7.5) · tavern 1.17x1.40x1.33 (×9 → r~5.6)
+#   market 1.80x0.98x1.32 (×7 → r~5.5) · home_A 0.79x0.93x0.85 (×8 → r~3.3)
+#   home_B 0.87x1.28x1.10 (×8 → r~3.9) · well 0.65x0.83x0.75 (×5 → r~1.8)
+#   rock_medium_1 3.23x2.26x2.99 (r~1.6/scale) · rock_medium_2 3.05x1.90x2.48
+# Arène extent 80m (rayon 40) — pièce la plus lointaine : beffroi z-28+r7.5 = 35.5 ✓
+
+[layouts.forge_sanctum]
+suppress_procedural_modules = true
+
+# ── Le beffroi (focal point nord — visible de partout) ───────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_church_red.gltf"
+pos = [0.0, 0.0, -28.0]
+rot_deg = 180.0
+scale = 10.0
+role = "landmark"
+blocker = true
+section = "beffroi"
+
+# ── La place du puits (centre — mêlée autour du puits) ───────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_well_red.gltf"
+pos = [0.0, 0.0, 0.0]
+scale = 5.0
+role = "melee_pit"
+blocker = true
+section = "place_du_puits"
+
+# ── Le marché (cluster SE — étals + couverts bas) ────────────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_market_red.gltf"
+pos = [18.0, 0.0, 14.0]
+rot_deg = -30.0
+scale = 7.0
+role = "cover_high"
+blocker = true
+section = "marche"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [10.0, 0.0, 20.0]
+rot_deg = 70.0
+scale = 1.4
+role = "cover_low"
+blocker = true
+section = "marche"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_2.gltf"
+pos = [26.0, 0.0, 8.0]
+rot_deg = 160.0
+scale = 1.5
+role = "cover_low"
+blocker = true
+section = "marche"
+
+# ── La taverne (cluster ouest — gros bloc + cover) ───────────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_tavern_red.gltf"
+pos = [-22.0, 0.0, 6.0]
+rot_deg = 45.0
+scale = 9.0
+role = "cover_high"
+blocker = true
+section = "taverne"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_2.gltf"
+pos = [-12.0, 0.0, 14.0]
+rot_deg = 20.0
+scale = 1.3
+role = "cover_low"
+blocker = true
+section = "taverne"
+
+# ── La ruelle (cluster NE — 2 maisons serrées = couloir de flanc) ────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_home_A_red.gltf"
+pos = [16.0, 0.0, -18.0]
+rot_deg = 15.0
+scale = 8.0
+role = "cover_high"
+blocker = true
+section = "ruelle"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_home_B_red.gltf"
+pos = [26.0, 0.0, -9.0]
+rot_deg = -20.0
+scale = 8.0
+role = "cover_high"
+blocker = true
+section = "ruelle"
+
+# ── Le perchoir (SW — 2 rochers en marches, sommet ~4.3m walkable) ───────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [-13.0, 0.0, -19.0]
+rot_deg = 110.0
+scale = 1.5
+walkable = true
+section = "perchoir"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [-18.0, 0.0, -23.0]
+rot_deg = 250.0
+scale = 2.5
+role = "sniper_perch"
+walkable = true
+section = "perchoir"
+
+# ── Couverts épars dans les lanes ouvertes (busy vs open) ────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [-4.0, 0.0, 24.0]
+rot_deg = 200.0
+scale = 1.4
+role = "cover_low"
+blocker = true
+section = "lanes"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_2.gltf"
+pos = [8.0, 0.0, -10.0]
+rot_deg = 320.0
+scale = 1.3
+role = "cover_low"
+blocker = true
+section = "lanes"
