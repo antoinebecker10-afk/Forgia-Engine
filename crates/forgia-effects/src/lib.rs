@@ -45,7 +45,9 @@ pub mod prelude {
     };
     // Re-export pour les consommateurs (ex. forgia-mode-roguelite status_vfx) qui
     // spawnent une aura sans dépendre directement de bevy_hanabi.
-    pub use bevy_hanabi::ParticleEffect;
+    // Story-647 : EffectMaterial aussi — obligatoire sur toute entité ParticleEffect
+    // depuis que les EffectAsset déclarent un slot texture.
+    pub use bevy_hanabi::{EffectMaterial, ParticleEffect};
     pub use crate::ForgiaEffectsPlugin;
     // Story-523 re-exports des modules fusionnés.
     pub use crate::damage_numbers::ForgiaDamageNumbersPlugin;
@@ -131,21 +133,27 @@ fn emissive_fade_tick(
 /// Était un placeholder « TODO Phase 2 » depuis Phase 0 — implémenté story-594
 /// (audit 2026-06-10 P1, M2-B5).
 fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::WeaponVfxEffects>) {
+    // Story-647 : chaque dummy binde aussi sa texture (EffectMaterial) — un effet
+    // à slot texture sans material ne prépare pas son bind group, le warmup
+    // shader serait incomplet.
     let handles = [
-        &effects.muzzle_core_flash,
-        &effects.muzzle_sparks,
-        &effects.muzzle_smoke,
-        &effects.muzzle_heat_glow,
-        &effects.muzzle_forward_flash,
-        &effects.impact_sparks,
-        &effects.impact_dust,
-        &effects.impact_flash,
-        &effects.status_flame,
-        &effects.status_poison_cloud,
+        (&effects.muzzle_core_flash, &effects.tex_muzzle_flash),
+        (&effects.muzzle_sparks, &effects.tex_spark),
+        (&effects.muzzle_smoke, &effects.tex_smoke),
+        (&effects.muzzle_heat_glow, &effects.tex_glow),
+        (&effects.muzzle_forward_flash, &effects.tex_muzzle_tongue),
+        (&effects.impact_sparks, &effects.tex_spark),
+        (&effects.impact_dust, &effects.tex_dust),
+        (&effects.impact_flash, &effects.tex_flare),
+        (&effects.status_flame, &effects.tex_flame),
+        (&effects.status_poison_cloud, &effects.tex_poison),
     ];
-    for handle in handles {
+    for (handle, tex) in handles {
         commands.spawn((
             bevy_hanabi::ParticleEffect::new((*handle).clone()),
+            bevy_hanabi::EffectMaterial {
+                images: vec![(*tex).clone()],
+            },
             Transform::from_xyz(0.0, -10_000.0, 0.0),
             Visibility::Hidden,
             weapon_vfx::Lifetime(Timer::from_seconds(5.0, TimerMode::Once)),

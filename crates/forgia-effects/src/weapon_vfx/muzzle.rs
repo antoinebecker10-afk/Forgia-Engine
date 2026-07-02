@@ -51,16 +51,25 @@ pub(super) fn create_muzzle_core_flash(
     color_gradient.add_key(0.6, Vec4::new(1.5, 0.6, 0.15, 0.45)); // Orange
     color_gradient.add_key(1.0, Vec4::new(0.4, 0.1, 0.02, 0.0)); // Fade
 
+    // Story-647 : texture flash étoile (Kenney CC0) au lieu du billboard uni.
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         16,
         SpawnerSettings::burst(5.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("muzzle_core_flash")
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
     .init(init_lifetime)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
@@ -108,10 +117,15 @@ pub(super) fn create_muzzle_sparks(
     color_gradient.add_key(0.7, Vec4::new(0.4, 0.07, 0.015, 0.3)); // Dark red
     color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0)); // Extinct
 
+    // Story-647 : texture étincelle 4 branches (Kenney CC0).
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         32,
         SpawnerSettings::burst(10.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("muzzle_sparks")
     .init(init_pos)
@@ -120,6 +134,10 @@ pub(super) fn create_muzzle_sparks(
     .init(init_lifetime)
     .update(gravity)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
@@ -172,10 +190,15 @@ pub(super) fn create_muzzle_smoke(
     size_gradient.add_key(0.5, Vec3::splat(0.11));
     size_gradient.add_key(1.0, Vec3::splat(0.17));
 
+    // Story-647 : texture puff de fumée (Kenney CC0) — volutes au lieu de ronds.
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         48,
         SpawnerSettings::burst(15.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("muzzle_smoke")
     .init(init_pos)
@@ -184,6 +207,10 @@ pub(super) fn create_muzzle_smoke(
     .init(init_lifetime)
     .update(accel)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
@@ -229,16 +256,25 @@ pub(super) fn create_muzzle_heat_glow(
     color_gradient.add_key(0.4, Vec4::new(0.9, 0.4, 0.15, 0.10));
     color_gradient.add_key(1.0, Vec4::new(0.3, 0.1, 0.025, 0.0));
 
+    // Story-647 : texture halo doux (Kenney CC0) — glow radial au lieu d'un disque.
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         12,
         SpawnerSettings::burst(8.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("muzzle_heat_glow")
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
     .init(init_lifetime)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
@@ -288,10 +324,15 @@ pub(super) fn create_muzzle_forward_flash(
     color_gradient.add_key(0.7, Vec4::new(1.0, 0.3, 0.05, 0.4)); // Deeper orange
     color_gradient.add_key(1.0, Vec4::new(0.2, 0.05, 0.01, 0.0)); // Fade
 
+    // Story-647 : texture langue de flash (Kenney CC0), orientée canon au spawn.
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         24,
         SpawnerSettings::burst(8.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("muzzle_forward_flash")
     .init(init_pos)
@@ -299,6 +340,10 @@ pub(super) fn create_muzzle_forward_flash(
     .init(init_size)
     .init(init_lifetime)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()

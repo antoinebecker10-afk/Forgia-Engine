@@ -52,6 +52,8 @@ pub(super) fn create_status_flame(
     size_gradient.add_key(0.7, Vec3::splat(0.20));
     size_gradient.add_key(1.0, Vec3::splat(0.05));
 
+    let texture_slot = writer.lit(0u32).expr();
+
     let effect = EffectAsset::new(
         128, // ~30/s × lifetime 0.6s ≈ 18 vivants, marge confortable
         // CONTINU via burst répété (3 particules toutes les 0.1s = 30/s). On
@@ -59,7 +61,12 @@ pub(super) fn create_status_flame(
         // (muzzle/impact) ; `rate` ne rendait rien ici. La doc 0.18 confirme que
         // burst boucle à l'infini (count au début de chaque cycle, puis period).
         SpawnerSettings::burst(3.0.into(), 0.1.into()),
-        writer.finish(),
+        {
+            // Story-647 : texture léchure de flamme peinte (Kenney CC0).
+            let mut module = writer.finish();
+            module.add_texture_slot("color");
+            module
+        },
     )
     .with_name("status_flame")
     // World-space (défaut) : l'entité est repositionnée chaque frame sur l'ennemi
@@ -71,6 +78,10 @@ pub(super) fn create_status_flame(
     .init(init_lifetime)
     .update(buoyancy)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() })
     .render(SizeOverLifetimeModifier { gradient: size_gradient, screen_space_size: false });
 
@@ -119,11 +130,18 @@ pub(super) fn create_status_poison_cloud(
     size_gradient.add_key(0.7, Vec3::splat(0.17));
     size_gradient.add_key(1.0, Vec3::splat(0.20));
 
+    let texture_slot = writer.lit(0u32).expr();
+
     let effect = EffectAsset::new(
         96, // ~16/s × lifetime 1.0s ≈ 16 vivants
         // CONTINU via burst répété (2 particules toutes les 0.12s ≈ 16/s) — cf flamme.
         SpawnerSettings::burst(2.0.into(), 0.12.into()),
-        writer.finish(),
+        {
+            // Story-647 : texture volutes de fumée (Kenney CC0).
+            let mut module = writer.finish();
+            module.add_texture_slot("color");
+            module
+        },
     )
     .with_name("status_poison_cloud")
     // World-space (défaut) : repositionné chaque frame sur l'ennemi (cf flamme).
@@ -133,6 +151,10 @@ pub(super) fn create_status_poison_cloud(
     .init(init_lifetime)
     .update(buoyancy)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier { gradient: color_gradient, ..default() })
     .render(SizeOverLifetimeModifier { gradient: size_gradient, screen_space_size: false });
 

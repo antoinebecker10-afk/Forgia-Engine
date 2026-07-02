@@ -371,6 +371,13 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         children![(
             FpsCamera,
             Camera3d::default(),
+            // Story-647 : Hdr RETIRÉ (2026-07-02 soir) après essai runtime — le
+            // pipeline HDR exige que TOUTES les caméras de la fenêtre soient HDR
+            // (FpsCamera + ViewmodelCamera + MenuCamera2d, sinon passes écrasées /
+            // ghosting Text2d) ET recalibrer tout l'éclairage réglé sur l'écrêtage
+            // LDR (6 couches chaudes → rouge saturé). Bloom différé → story de
+            // calibration HDR dédiée (voir story-647 §incident). Si réactivation :
+            // Hdr À LA CRÉATION uniquement (jamais post-hoc, leçon cyber_city).
             // Story-450 wave 5 phase 2c : étendre far plane à 2000m pour
             // couvrir LOD2_MAX_M=1500m + marge. Bevy default = 1000m
             // → LOD2 tiles 1000-1500m étaient clippées (gap horizon visible).

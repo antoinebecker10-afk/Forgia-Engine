@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use forgia_core::prelude::*;
-use forgia_effects::prelude::{ParticleEffect, WeaponVfxEffects};
+use forgia_effects::prelude::{EffectMaterial, ParticleEffect, WeaponVfxEffects};
 
 use crate::element_vfx::ElementVfxStats;
 use crate::elements::{ElementConfig, StatusBurn, StatusPoison};
@@ -76,6 +76,8 @@ pub fn sys_attach_burn_vfx(
         commands.entity(enemy).insert(BurnVfxAttached);
         commands.spawn((
             ParticleEffect::new(effects.status_flame.clone()),
+            // Story-647 : texture léchure de flamme (slot "color" de l'EffectAsset).
+            EffectMaterial { images: vec![effects.tex_flame.clone()] },
             Transform::from_translation(gt.translation() + Vec3::Y * (y * factor))
                 .with_scale(Vec3::splat(factor)),
             StatusVfxLink { target: enemy, kind: StatusVfxKind::Burn, scale: factor },
@@ -111,6 +113,8 @@ pub fn sys_attach_poison_vfx(
         commands.entity(enemy).insert(PoisonVfxAttached);
         commands.spawn((
             ParticleEffect::new(effects.status_poison_cloud.clone()),
+            // Story-647 : texture volutes (slot "color" de l'EffectAsset).
+            EffectMaterial { images: vec![effects.tex_poison.clone()] },
             Transform::from_translation(gt.translation() + Vec3::Y * (y * factor))
                 .with_scale(Vec3::splat(factor)),
             StatusVfxLink { target: enemy, kind: StatusVfxKind::Poison, scale: factor },

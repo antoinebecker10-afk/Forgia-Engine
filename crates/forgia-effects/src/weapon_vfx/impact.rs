@@ -51,10 +51,15 @@ pub(super) fn create_impact_sparks(
     color_gradient.add_key(0.6, Vec4::new(0.7, 0.15, 0.03, 0.35)); // Dark red
     color_gradient.add_key(1.0, Vec4::new(0.1, 0.02, 0.01, 0.0)); // Extinct
 
+    // Story-647 : texture étincelle 4 branches (Kenney CC0).
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         96,
         SpawnerSettings::burst(40.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("impact_sparks")
     .init(init_pos)
@@ -63,6 +68,10 @@ pub(super) fn create_impact_sparks(
     .init(init_lifetime)
     .update(gravity)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
@@ -111,10 +120,15 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
     size_gradient.add_key(0.7, Vec3::splat(0.2));
     size_gradient.add_key(1.0, Vec3::splat(0.28));
 
+    // Story-647 : texture puff de poussière (Kenney CC0).
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         48,
         SpawnerSettings::burst(20.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("impact_dust")
     .init(init_pos)
@@ -123,6 +137,10 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
     .init(init_lifetime)
     .update(accel)
     .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
@@ -166,16 +184,25 @@ pub(super) fn create_impact_flash(
     color_gradient.add_key(0.4, Vec4::new(5.0, 2.5, 0.8, 0.7)); // Yellow
     color_gradient.add_key(1.0, Vec4::new(1.0, 0.3, 0.05, 0.0)); // Fade
 
+    // Story-647 : texture flare (Kenney CC0).
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
     let effect = EffectAsset::new(
         16,
         SpawnerSettings::burst(10.0.into(), 99999.0.into()),
-        writer.finish(),
+        module,
     )
     .with_name("impact_flash")
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
     .init(init_lifetime)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()

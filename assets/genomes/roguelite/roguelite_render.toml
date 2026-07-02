@@ -25,6 +25,22 @@ default = 2.0   # 0 Low · 1 Medium · 2 High · 3 Ultra
 id = "roguelite_ssao_thickness"
 default = 0.25  # épaisseur estimée des objets (occlusion), 0.01..2.0
 
+# ── Bloom (story-647 — glow des émissifs HDR : muzzle/tracers/sparks/hit-flash)
+# Natif Bevy (bevy::post_process), tourne AVANT tonemapping → pas du piège outline
+# (aucune passe FullscreenMaterial ajoutée). Le Hdr est posé à la CRÉATION de la
+# FpsCamera (forgia-player) ; seul le composant Bloom s'attache/détache à chaud.
+[[genes]]
+id = "roguelite_bloom_enabled"
+# 2026-07-02 : OFF — le Hdr a été retiré des caméras après l'essai runtime (teinte
+# rouge saturée : tout l'éclairage était calibré sur l'écrêtage LDR ; + ghosting
+# Text2d via MenuCamera2d restée LDR). Réactiver SEULEMENT avec la story de
+# calibration HDR (Hdr sur LES TROIS caméras + retune éclairage/grading).
+default = 0.0
+
+[[genes]]
+id = "roguelite_bloom_intensity"
+default = 0.15  # préset NATURAL Bevy. 0.0..0.5 (au-delà = glow soupe, clampé)
+
 # ── Atmosphère volcanique (brume DistanceFog + ambiante chaude) ──────────────
 [[genes]]
 id = "roguelite_fog_enabled"

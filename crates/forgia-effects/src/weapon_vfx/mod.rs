@@ -106,6 +106,22 @@ pub fn weapon_muzzle_light_intensity(w: &WeaponType) -> f32 {
 #[derive(Component)]
 pub struct Lifetime(pub Timer);
 
+/// Textures particules Kenney Particle Pack (CC0) — story-647.
+/// Licence : `assets/textures/vfx/kenney/LICENSE-CC0-Kenney.txt`.
+/// Textures blanches/grayscale à alpha : teintées par les gradients HDR des
+/// effets (`ImageSampleMapping::Modulate`) — une texture sert tous les éléments.
+mod tex_paths {
+    pub const MUZZLE_FLASH: &str = "textures/vfx/kenney/muzzle_01.png";
+    pub const MUZZLE_TONGUE: &str = "textures/vfx/kenney/muzzle_03.png";
+    pub const SPARK: &str = "textures/vfx/kenney/spark_04.png";
+    pub const SMOKE: &str = "textures/vfx/kenney/smoke_04.png";
+    pub const DUST: &str = "textures/vfx/kenney/smoke_01.png";
+    pub const GLOW: &str = "textures/vfx/kenney/light_01.png";
+    pub const FLARE: &str = "textures/vfx/kenney/flare_01.png";
+    pub const FLAME: &str = "textures/vfx/kenney/flame_03.png";
+    pub const POISON: &str = "textures/vfx/kenney/smoke_08.png";
+}
+
 /// Cached handles for all weapon VFX particle effects.
 /// Inserted at Startup, consumed by weapon_fire_system.
 #[derive(Resource)]
@@ -123,6 +139,18 @@ pub struct WeaponVfxEffects {
     // Status DoT continus (flamme sur brûlure, nuage sur poison) — story-611 VFX.
     pub status_flame: Handle<EffectAsset>,
     pub status_poison_cloud: Handle<EffectAsset>,
+    // Story-647 : textures particules (slot "color" de chaque EffectAsset).
+    // Bindées via `EffectMaterial { images }` sur CHAQUE entité ParticleEffect
+    // spawnée — un effet à slot texture sans EffectMaterial ne rend pas.
+    pub tex_muzzle_flash: Handle<Image>,
+    pub tex_muzzle_tongue: Handle<Image>,
+    pub tex_spark: Handle<Image>,
+    pub tex_smoke: Handle<Image>,
+    pub tex_dust: Handle<Image>,
+    pub tex_glow: Handle<Image>,
+    pub tex_flare: Handle<Image>,
+    pub tex_flame: Handle<Image>,
+    pub tex_poison: Handle<Image>,
 }
 
 /// Marker: muzzle VFX entity (for cleanup)
@@ -133,7 +161,11 @@ pub struct MuzzleVfxMarker;
 #[derive(Component)]
 pub struct ImpactVfxMarker;
 
-pub fn setup_weapon_vfx(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
+pub fn setup_weapon_vfx(
+    mut commands: Commands,
+    mut effects: ResMut<Assets<EffectAsset>>,
+    asset_server: Res<AssetServer>,
+) {
     let muzzle_core_flash = muzzle::create_muzzle_core_flash(&mut effects);
     let muzzle_sparks = muzzle::create_muzzle_sparks(&mut effects);
     let muzzle_smoke = muzzle::create_muzzle_smoke(&mut effects);
@@ -156,9 +188,18 @@ pub fn setup_weapon_vfx(mut commands: Commands, mut effects: ResMut<Assets<Effec
         impact_flash,
         status_flame,
         status_poison_cloud,
+        tex_muzzle_flash: asset_server.load(tex_paths::MUZZLE_FLASH),
+        tex_muzzle_tongue: asset_server.load(tex_paths::MUZZLE_TONGUE),
+        tex_spark: asset_server.load(tex_paths::SPARK),
+        tex_smoke: asset_server.load(tex_paths::SMOKE),
+        tex_dust: asset_server.load(tex_paths::DUST),
+        tex_glow: asset_server.load(tex_paths::GLOW),
+        tex_flare: asset_server.load(tex_paths::FLARE),
+        tex_flame: asset_server.load(tex_paths::FLAME),
+        tex_poison: asset_server.load(tex_paths::POISON),
     });
 
-    info!("Weapon VFX initialises (5-layer muzzle + 3-layer impact)");
+    info!("Weapon VFX initialises (5-layer muzzle + 3-layer impact, textures Kenney story-647)");
 }
 
 /// Spawn all 5 muzzle flash layers at the given barrel tip position.
@@ -185,6 +226,9 @@ pub fn spawn_muzzle_flash(
     // Layer 1: Core flash (world-space, at barrel tip)
     commands.spawn((
         ParticleEffect::new(effects.muzzle_core_flash.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_muzzle_flash.clone()],
+        },
         Transform::from_translation(barrel_tip).with_scale(scale_v),
         MuzzleVfxMarker,
         Lifetime(Timer::from_seconds(0.15, TimerMode::Once)),
@@ -193,6 +237,9 @@ pub fn spawn_muzzle_flash(
     // Layer 2: Spark spray (world-space)
     commands.spawn((
         ParticleEffect::new(effects.muzzle_sparks.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_spark.clone()],
+        },
         Transform::from_translation(barrel_tip).with_scale(scale_v),
         MuzzleVfxMarker,
         Lifetime(Timer::from_seconds(0.5, TimerMode::Once)),
@@ -201,6 +248,9 @@ pub fn spawn_muzzle_flash(
     // Layer 3: Smoke puff (world-space, lingers — per-arme : sniper = trail long)
     commands.spawn((
         ParticleEffect::new(effects.muzzle_smoke.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_smoke.clone()],
+        },
         Transform::from_translation(barrel_tip + shot_dir * 0.05).with_scale(scale_v),
         MuzzleVfxMarker,
         Lifetime(Timer::from_seconds(
@@ -215,6 +265,9 @@ pub fn spawn_muzzle_flash(
     // (12 particles × 0.07s = ~0.84 particles/s steady-state en auto-fire).
     commands.spawn((
         ParticleEffect::new(effects.muzzle_heat_glow.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_glow.clone()],
+        },
         Transform::from_translation(barrel_tip).with_scale(scale_v),
         MuzzleVfxMarker,
         Lifetime(Timer::from_seconds(0.12, TimerMode::Once)),
@@ -223,6 +276,9 @@ pub fn spawn_muzzle_flash(
     // Layer 5: Forward flash tongue (oriented along barrel)
     commands.spawn((
         ParticleEffect::new(effects.muzzle_forward_flash.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_muzzle_tongue.clone()],
+        },
         flash_tf,
         MuzzleVfxMarker,
         Lifetime(Timer::from_seconds(0.15, TimerMode::Once)),
@@ -265,6 +321,9 @@ pub fn spawn_impact_vfx(
     // Layer 1: Sparks (hemisphere burst)
     commands.spawn((
         ParticleEffect::new(effects.impact_sparks.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_spark.clone()],
+        },
         Transform::from_translation(impact_pos).with_scale(scale_v),
         ImpactVfxMarker,
         Lifetime(Timer::from_seconds(0.6, TimerMode::Once)),
@@ -273,6 +332,9 @@ pub fn spawn_impact_vfx(
     // Layer 2: Dust cloud
     commands.spawn((
         ParticleEffect::new(effects.impact_dust.clone()),
+        EffectMaterial {
+            images: vec![effects.tex_dust.clone()],
+        },
         Transform::from_translation(impact_pos).with_scale(scale_v),
         ImpactVfxMarker,
         Lifetime(Timer::from_seconds(1.0, TimerMode::Once)),

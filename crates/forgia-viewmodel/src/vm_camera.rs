@@ -58,6 +58,10 @@ pub fn manage_viewmodel_camera(
             .spawn((
                 ViewmodelCamera,
                 Camera3d::default(),
+                // Story-647 (leçon 2026-07-02) : si la FpsCamera repasse HDR un jour,
+                // cette caméra DOIT recevoir Hdr aussi (caméras empilées = même
+                // réglage HDR, sinon la passe viewmodel écrase la sortie monde →
+                // écran noir derrière l'arme). Idem MenuCamera2d (ghosting Text2d).
                 Camera {
                     order: 1,
                     clear_color: ClearColorConfig::None,
