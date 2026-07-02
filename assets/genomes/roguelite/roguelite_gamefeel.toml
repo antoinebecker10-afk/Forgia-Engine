@@ -19,3 +19,42 @@ default = 2.5   # exactement 1 kill dans le tir
 [[genes]]
 id = "hitstop_multikill_mult"
 default = 4.0   # ≥2 kills dans le MÊME tir (shotgun/perçant) — l'événement rare
+
+# ── Knockback (story-650) — chaque balle POUSSE l'ennemi (trick Vlambeer) ─────
+# Déplacements en MÈTRES totaux. Capteur : forgia2_knockback.json.
+
+[[genes]]
+id = "knockback_base_m"
+default = 0.3   # poussée par hit, avant multiplicateur d'arme
+
+[[genes]]
+id = "knockback_kill_mult"
+default = 3.0   # le corps part en arrière au kill
+
+[[genes]]
+id = "knockback_pop_up_m"
+default = 0.25  # composante verticale au kill — le « pop »
+
+[[genes]]
+id = "knockback_max_m"
+default = 2.5   # déplacement cumulé max (anti-éjection hors arène en full-auto)
+
+[[genes]]
+id = "knockback_mult_pepin"
+default = 0.6   # Pépin picote
+
+[[genes]]
+id = "knockback_mult_bourrasque"
+default = 0.45  # SMG : micro-poussées rapides
+
+[[genes]]
+id = "knockback_mult_lenoir"
+default = 1.6   # sniper : un seul coup qui déplace
+
+[[genes]]
+id = "knockback_mult_boucherie"
+default = 2.2   # Boucherie PROJETTE
+
+[[genes]]
+id = "knockback_mult_default"
+default = 1.0   # melee / armes sans mapping

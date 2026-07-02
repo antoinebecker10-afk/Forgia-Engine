@@ -54,6 +54,73 @@ pub struct CombatHitEvent {
     pub body_zone: forgia_damage::HitZone,
 }
 
+/// Story-650 — mult knockback par arme (mapping WeaponType legacy → arme V2,
+/// même convention que weapon_vfx). Les valeurs vivent dans le genome
+/// (`roguelite_gamefeel.toml [knockback_mult_*]`) : Boucherie PROJETTE, Pépin picote.
+fn weapon_knockback_mult(
+    w: crate::weapons::WeaponType,
+    t: &forgia_juice_lib::knockback::KnockbackTuning,
+) -> f32 {
+    use crate::weapons::WeaponType;
+    match w {
+        WeaponType::ModernAR => t.mult_pepin,           // Pépin (pistolet)
+        WeaponType::AssaultRifle => t.mult_bourrasque,  // Bourrasque (SMG)
+        WeaponType::Shotgun => t.mult_lenoir,           // Madame Lenoir (sniper)
+        WeaponType::RocketLauncher => t.mult_boucherie, // Boucherie (pump)
+        _ => t.mult_default,
+    }
+}
+
+/// Story-650 — knockback à l'impact (trick Vlambeer) : chaque `CombatHitEvent`
+/// pousse l'ennemi dans la direction attaquant→cible (horizontale), kill = plus
+/// fort + pop vertical. Les ennemis étant kinematic (waves.rs), la poussée passe
+/// par le composant `Knockback` (forgia-juice-lib) qui déplace le Transform avec
+/// décroissance — additif, compose avec le mouvement des bots.
+pub fn sys_apply_hit_knockback(
+    mut commands: Commands,
+    mut events: MessageReader<CombatHitEvent>,
+    tuning: Option<Res<forgia_juice_lib::knockback::KnockbackTuning>>,
+    mut stats: Option<ResMut<forgia_juice_lib::knockback::KnockbackStats>>,
+    q_pos: Query<&GlobalTransform>,
+    mut q_kb: Query<&mut forgia_juice_lib::knockback::Knockback>,
+) {
+    use forgia_juice_lib::knockback::{
+        accumulate_knockback, displacement_m, knockback_velocity, Knockback,
+    };
+    let Some(tuning) = tuning else { return };
+    for ev in events.read() {
+        let Some(attacker) = ev.attacker else {
+            continue; // world damage : pas de direction de poussée
+        };
+        let (Ok(a_gt), Ok(t_gt)) = (q_pos.get(attacker), q_pos.get(ev.target)) else {
+            continue;
+        };
+        let dir = t_gt.translation() - a_gt.translation();
+        let weapon_mult = ev
+            .weapon
+            .map(|w| weapon_knockback_mult(w, &tuning))
+            .unwrap_or(tuning.mult_default); // None = melee/world → défaut
+        let v = knockback_velocity(dir, &tuning, weapon_mult, ev.is_kill);
+        if v == Vec3::ZERO {
+            continue;
+        }
+        if let Ok(mut kb) = q_kb.get_mut(ev.target) {
+            kb.vel = accumulate_knockback(kb.vel, v, &tuning);
+        } else if let Ok(mut ec) = commands.get_entity(ev.target) {
+            ec.try_insert(Knockback {
+                vel: accumulate_knockback(Vec3::ZERO, v, &tuning),
+            });
+        }
+        if let Some(stats) = stats.as_mut() {
+            stats.pushes = stats.pushes.saturating_add(1);
+            if ev.is_kill {
+                stats.kill_pushes = stats.kill_pushes.saturating_add(1);
+            }
+            stats.last_displacement_m = displacement_m(v);
+        }
+    }
+}
+
 /// Story-559 slice B (2026-06-04) — émis à CHAQUE tir effectif du joueur (hit OU
 /// miss), juste après la consommation de munition. Porte le `WeaponType` courant
 /// pour jouer le son de tir propre à l'arme (audio Roguelite) + futur muzzle flash.

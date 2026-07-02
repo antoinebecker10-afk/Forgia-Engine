@@ -141,6 +141,10 @@ impl Plugin for ForgiaCombatPlugin {
         if !app.is_plugin_added::<forgia_juice_lib::recoil::ForgiaJuiceRecoilPlugin>() {
             app.add_plugins(forgia_juice_lib::recoil::ForgiaJuiceRecoilPlugin);
         }
+        // Story-650 — knockback ennemi à l'impact (composant + tick, crate dédié).
+        if !app.is_plugin_added::<forgia_juice_lib::knockback::ForgiaJuiceKnockbackPlugin>() {
+            app.add_plugins(forgia_juice_lib::knockback::ForgiaJuiceKnockbackPlugin);
+        }
         app.init_resource::<PlayerScore>()
             .init_resource::<PlayerLevel>()
             .init_resource::<sensor::CombatSensorCounters>()
@@ -198,6 +202,8 @@ impl Plugin for ForgiaCombatPlugin {
                     // hit-stop reportée slice 3/4. Sensor reste Update (télémétrie).
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
+                    // Story-650 — pousse l'ennemi à chaque CombatHitEvent (Vlambeer).
+                    combat_juice::sys_apply_hit_knockback.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
                     ultimate::sys_write_ultimate_sensor.in_set(GameSet::Sensors),
                     // hitstop_tick_system : wired par forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).

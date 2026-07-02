@@ -11,6 +11,7 @@ pub mod recoil;
 pub mod hit_stop;
 pub mod fov_punch;
 pub mod camera_shake;
+pub mod knockback;
 
 use bevy::prelude::*;
 
@@ -25,6 +26,7 @@ impl Plugin for ForgiaJuiceLibPlugin {
             hit_stop::ForgiaJuiceHitStopPlugin,
             fov_punch::ForgiaJuiceFovPunchPlugin,
             camera_shake::ForgiaJuiceCameraShakePlugin,
+            knockback::ForgiaJuiceKnockbackPlugin,
         ));
     }
 }
