@@ -678,46 +678,65 @@ pub(crate) fn draw_portal_overlay(
     }
     let Ok(ctx) = contexts.ctx_mut() else { return };
 
+    // Layout MIROIR du Coffre du Forgeron (coffre_forgeron.rs:75-135, validé
+    // runtime) : tailles EXPLICITES panel/cartes — les layouts « centrés » nus
+    // dans une Area s'étendaient à tout l'écran (bugs runtime 2026-07-02).
+    let n = wave.portal_choices.len();
+    let card_w = 210.0_f32;
+    let card_h = 190.0_f32;
+    let gap = 24.0_f32;
+    let total_w = card_w * n as f32 + gap * (n as f32 - 1.0).max(0.0);
+    let panel_w = total_w + 40.0;
+    let panel_h = card_h + 90.0;
+
     let mut clicked: Option<u8> = None;
     egui::Area::new(egui::Id::new("forgia_portal_choice"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, -40.0))
         .show(ctx, |ui| {
-            forge_panel_frame().show(ui, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(4.0);
-                    ui.heading(display_text("CHOISIS TA PORTE", 40.0, FORGE_OR).strong());
-                    ui.add_space(14.0);
+            egui::Frame::new()
+                .fill(FORGE_BOIS_CLAIR)
+                .stroke(egui::Stroke::new(5.0, FORGE_OR))
+                .corner_radius(egui::CornerRadius::same(18))
+                .inner_margin(22)
+                .show(ui, |ui| {
+                    ui.set_min_size(egui::vec2(panel_w, panel_h));
+                    ui.set_max_width(panel_w);
+                    ui.vertical_centered(|ui| {
+                        ui.label(display_text("CHOISIS TA PORTE", 32.0, FORGE_CHARBON).strong());
+                        ui.add_space(12.0);
+                    });
                     ui.horizontal(|ui| {
                         let hints = ["←", "→", "↑", "↓"];
                         for (i, kind) in wave.portal_choices.iter().enumerate() {
+                            if i > 0 {
+                                ui.add_space(gap);
+                            }
                             let (emoji, label) = stage_kind_display(*kind);
                             let color = stage_kind_color(*kind);
-                            // Carte à taille FIXE : `vertical_centered` nu avalait
-                            // toute la largeur → 2e porte poussée hors écran (bug
-                            // runtime 2026-07-02, panneau géant à 1 seule carte).
-                            ui.allocate_ui(egui::vec2(200.0, 170.0), |ui| {
-                                ui.vertical_centered(|ui| {
-                                    ui.label(egui::RichText::new(emoji).size(44.0));
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(card_w, card_h),
+                                egui::Layout::top_down(egui::Align::Center),
+                                |ui| {
+                                    ui.add_space(10.0);
+                                    ui.label(egui::RichText::new(emoji).size(46.0));
+                                    ui.add_space(4.0);
                                     ui.label(
                                         egui::RichText::new(label)
-                                            .size(22.0)
+                                            .size(24.0)
                                             .strong()
                                             .color(color),
                                     );
-                                    ui.add_space(8.0);
+                                    ui.add_space(14.0);
                                     let hint = hints.get(i).copied().unwrap_or("?");
                                     if cartoon_btn(ui, &format!("{hint}  ENTRER"), color).clicked()
                                     {
                                         clicked = Some(i as u8);
                                     }
-                                });
-                            });
-                            ui.add_space(18.0);
+                                },
+                            );
                         }
                     });
-                    ui.add_space(6.0);
                 });
-            });
         });
     if clicked.is_some() {
         wave.portal_pick = clicked;
