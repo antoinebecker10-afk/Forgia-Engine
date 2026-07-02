@@ -340,6 +340,8 @@ pub fn sys_break_look_override(
     game_mode: Res<State<GameMode>>,
     run_state: Option<Res<State<RunState>>>,
     coffre: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
+    // Story-646 Inc.2 — le choix de porte libère aussi le curseur (clic possible).
+    wave: Res<RogueliteWave>,
     mouse: Res<ButtonInput<MouseButton>>,
     mut blockers: ResMut<forgia_input::InputBlockers>,
     mut q_cursor: Query<&mut bevy::window::CursorOptions, With<bevy::window::PrimaryWindow>>,
@@ -348,11 +350,12 @@ pub fn sys_break_look_override(
         return;
     }
     let coffre_open = coffre.map(|c| c.is_open).unwrap_or(false);
+    let portal_open = !wave.portal_choices.is_empty();
     let end_screen = matches!(
         run_state.as_deref().map(|s| s.get()),
         Some(RunState::Defeat) | Some(RunState::Victory)
     );
-    if !coffre_open && !end_screen {
+    if !coffre_open && !end_screen && !portal_open {
         return; // gameplay normal — forgia-ui gère curseur/look
     }
     let Ok(ctx) = contexts.ctx_mut() else {
@@ -689,17 +692,27 @@ pub(crate) fn draw_portal_overlay(
                         for (i, kind) in wave.portal_choices.iter().enumerate() {
                             let (emoji, label) = stage_kind_display(*kind);
                             let color = stage_kind_color(*kind);
-                            ui.vertical_centered(|ui| {
-                                ui.label(egui::RichText::new(emoji).size(44.0));
-                                ui.label(
-                                    egui::RichText::new(label).size(22.0).strong().color(color),
-                                );
-                                let hint = hints.get(i).copied().unwrap_or("?");
-                                if cartoon_btn(ui, &format!("{hint}  ENTRER"), color).clicked() {
-                                    clicked = Some(i as u8);
-                                }
+                            // Carte à taille FIXE : `vertical_centered` nu avalait
+                            // toute la largeur → 2e porte poussée hors écran (bug
+                            // runtime 2026-07-02, panneau géant à 1 seule carte).
+                            ui.allocate_ui(egui::vec2(200.0, 170.0), |ui| {
+                                ui.vertical_centered(|ui| {
+                                    ui.label(egui::RichText::new(emoji).size(44.0));
+                                    ui.label(
+                                        egui::RichText::new(label)
+                                            .size(22.0)
+                                            .strong()
+                                            .color(color),
+                                    );
+                                    ui.add_space(8.0);
+                                    let hint = hints.get(i).copied().unwrap_or("?");
+                                    if cartoon_btn(ui, &format!("{hint}  ENTRER"), color).clicked()
+                                    {
+                                        clicked = Some(i as u8);
+                                    }
+                                });
                             });
-                            ui.add_space(26.0);
+                            ui.add_space(18.0);
                         }
                     });
                     ui.add_space(6.0);
