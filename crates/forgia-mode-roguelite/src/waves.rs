@@ -297,7 +297,12 @@ pub fn sys_wave_orchestrator(
         .unwrap_or_else(|| graph_cfg.total_stages.saturating_sub(1));
     let in_boss_stage = wave.stage >= boss_stage;
 
-    if alive == 0 && wave.seen_alive && !wave.in_break {
+    // Détection de clear — ARMÉE seulement si : bots vus vivants puis tous morts,
+    // pas déjà en break, et PAS en attente de choix de porte (fix boucle infinie
+    // 2026-07-02 : le portail laissait seen_alive=true → re-clear → re-break →
+    // re-Coffre → +5 Âmes toutes les 15 s, la run ne quittait jamais la salle 0).
+    if clear_detection_armed(alive, wave.seen_alive, wave.in_break, !wave.portal_choices.is_empty())
+    {
         // Vague nettoyée — démarre break ou victory.
         if in_boss_stage {
             // Story-571 — bonus Souls méta pour le boss/finale (persistant).
@@ -379,12 +384,15 @@ pub fn sys_wave_orchestrator(
                     // Inc.2 — CHOIX DE PORTE : on gèle ici. L'overlay
                     // (`hud::draw_portal_overlay`) affiche les portes ; le pick
                     // (portal_pick) est consommé plus bas au tick suivant.
+                    // seen_alive=false : ceinture+bretelles avec le guard
+                    // `clear_detection_armed` (anti re-clear pendant l'attente).
                     info!(
                         "[roguelite] Salle {} nettoyée — CHOISIS TA PORTE : {:?}",
                         wave.stage + 1,
                         choices,
                     );
                     wave.portal_choices = choices;
+                    wave.seen_alive = false;
                     return;
                 }
                 // Pas de choix possible (boss / graph absent / 1 seul variant) → auto.
@@ -443,6 +451,19 @@ pub fn sys_wave_orchestrator(
             wave.current_wave,
         );
     }
+}
+
+/// PUR (testable) — la détection « vague nettoyée » n'est armée que si : tous les
+/// bots (vus vivants) sont morts, PAS en break, PAS en attente de porte. Le 4e
+/// terme est le fix de la boucle infinie du 2026-07-02 (re-clear pendant le
+/// choix de porte → re-break/re-Coffre/farm d'Âmes, salle jamais quittée).
+pub fn clear_detection_armed(
+    alive: u32,
+    seen_alive: bool,
+    in_break: bool,
+    awaiting_portal: bool,
+) -> bool {
+    alive == 0 && seen_alive && !in_break && !awaiting_portal
 }
 
 /// Story-646 — avance `RogueliteWave` vers la salle `next` (compteurs + kind).
@@ -539,6 +560,21 @@ mod tests {
         assert!(!w.in_break);
         assert!(!w.victory_emitted);
         assert!(!w.boss_defeated);
+    }
+
+    #[test]
+    fn clear_detection_blocked_while_awaiting_portal() {
+        // Régression 2026-07-02 : pendant l'attente de porte (bots morts, pas de
+        // break), la détection de clear ne doit PAS re-fire (boucle infinie
+        // break→Coffre→Âmes). Le 4e terme la désarme.
+        assert!(clear_detection_armed(0, true, false, false), "clear normal");
+        assert!(
+            !clear_detection_armed(0, true, false, true),
+            "en attente de porte → désarmée (LE bug)"
+        );
+        assert!(!clear_detection_armed(0, true, true, false), "en break → désarmée");
+        assert!(!clear_detection_armed(0, false, false, false), "gate anti-race");
+        assert!(!clear_detection_armed(3, true, false, false), "bots vivants");
     }
 
     #[test]
