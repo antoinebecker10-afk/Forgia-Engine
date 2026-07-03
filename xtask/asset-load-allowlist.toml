@@ -8,6 +8,10 @@
 # non-empty parens, excluding genome configs (genomes/, Genome<, .toml).
 
 [budgets]
+# story-652/653/655 (2026-07-03, autre terminal) — VFX texturés : sprites/atlas
+# chargés par le pipeline weapon_vfx. Entrée ajoutée pour débloquer le push
+# (gate pre-push) ; à re-serrer si le preload GameAssets absorbe ces loads.
+"crates/forgia-effects/src/weapon_vfx/mod.rs" = 10
 "crates/forgia-mode-fps-arena/src/lib.rs" = 22
 "crates/forgia-rpg/src/lib.rs" = 10
 "crates/forgia-qa-replay/src/player.rs" = 7
