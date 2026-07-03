@@ -386,13 +386,17 @@ fn sys_sfx_on_combat_hit(
     sfx: Res<AudioChannel<SfxChannel>>,
     handles: Res<AudioHandles>,
     cfg: Res<RogueliteAudioConfig>,
+    user_vol: Res<forgia_audio::UserMasterVolume>,
     mut stats: ResMut<RogueliteAudioStats>,
     mut events: MessageReader<CombatHitEvent>,
     q_enemy: Query<(), With<ArenaBot>>,
     q_player: Query<(), With<Player>>,
     mut pitch_seed: Local<u32>,
 ) {
-    let master = cfg.master_volume;
+    // Fix 2026-07-03 : le volume user (slider ESC) est appliqué à l'INSTANCE. En
+    // bevy_kira_audio 0.25 le set_volume de canal ne compose PAS avec un with_volume
+    // par-son (prouvé via forgia2_volume.json) → il faut multiplier ici.
+    let master = cfg.master_volume * user_vol.0.clamp(0.0, 1.0);
     for ev in events.read() {
         if q_enemy.get(ev.target).is_ok() {
             // L'ennemi encaisse : impact, ou kill si HP=0. Pitch varié ±5 %
@@ -463,11 +467,15 @@ fn sys_fire_sfx(
     sfx: Res<AudioChannel<SfxChannel>>,
     handles: Res<AudioHandles>,
     cfg: Res<RogueliteAudioConfig>,
+    user_vol: Res<forgia_audio::UserMasterVolume>,
     mut stats: ResMut<RogueliteAudioStats>,
     mut events: MessageReader<WeaponFiredEvent>,
     mut pitch_seed: Local<u32>,
 ) {
-    let master = cfg.master_volume;
+    // Fix 2026-07-03 : le volume user (slider ESC) est appliqué à l'INSTANCE. En
+    // bevy_kira_audio 0.25 le set_volume de canal ne compose PAS avec un with_volume
+    // par-son (prouvé via forgia2_volume.json) → il faut multiplier ici.
+    let master = cfg.master_volume * user_vol.0.clamp(0.0, 1.0);
     for ev in events.read() {
         let def = weapon_fire_def(&cfg, ev.weapon);
         let handle = weapon_fire_handle(&handles, ev.weapon);
@@ -487,13 +495,17 @@ fn sys_ding_on_currency(
     sfx: Res<AudioChannel<SfxChannel>>,
     handles: Res<AudioHandles>,
     cfg: Res<RogueliteAudioConfig>,
+    user_vol: Res<forgia_audio::UserMasterVolume>,
     mut stats: ResMut<RogueliteAudioStats>,
     gold: Option<Res<Souls>>,
     meta: Option<Res<MetaSouls>>,
     mut last_gold: Local<Option<u32>>,
     mut last_souls: Local<Option<u32>>,
 ) {
-    let master = cfg.master_volume;
+    // Fix 2026-07-03 : le volume user (slider ESC) est appliqué à l'INSTANCE. En
+    // bevy_kira_audio 0.25 le set_volume de canal ne compose PAS avec un with_volume
+    // par-son (prouvé via forgia2_volume.json) → il faut multiplier ici.
+    let master = cfg.master_volume * user_vol.0.clamp(0.0, 1.0);
     if let Some(g) = gold {
         let cur = g.total_collected;
         if matches!(*last_gold, Some(prev) if cur > prev) {
@@ -522,6 +534,7 @@ fn sys_music_update(
     music: Res<AudioChannel<MusicChannel>>,
     handles: Res<AudioHandles>,
     cfg: Res<RogueliteAudioConfig>,
+    user_vol: Res<forgia_audio::UserMasterVolume>,
     wave: Option<Res<RogueliteWave>>,
     mut track: ResMut<MusicTrack>,
     mut stats: ResMut<RogueliteAudioStats>,
@@ -542,7 +555,7 @@ fn sys_music_update(
     music
         .play(handle.clone())
         .looped()
-        .with_volume(amp_to_db(def.volume * cfg.music_volume));
+        .with_volume(amp_to_db(def.volume * cfg.music_volume * user_vol.0.clamp(0.0, 1.0)));
     track.current = Some(handle.clone());
     stats.music_playing = true;
 }

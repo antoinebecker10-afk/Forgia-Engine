@@ -88,6 +88,43 @@ fn sys_apply_user_master_volume(
     *applied_once = true;
 }
 
+/// Sensor `forgia2_volume.json` (1Hz) — rend diagnosticable la chaîne
+/// slider→`UserMasterVolume`→canaux. Ajouté 2026-07-03 (bug « les SFX ne
+/// suivent pas le volume général » : la feature n'avait AUCUN sensor → rupture
+/// invisible). Expose la valeur user + quels canaux sont enregistrés + le dB
+/// qui serait appliqué. Localise la rupture en 1 run : si `user_master_volume`
+/// ne suit pas le slider → bug propagation (pause_menu) ; s'il suit mais un
+/// canal est absent → bug d'enregistrement ; s'il suit et canaux présents mais
+/// SFX inchangés → sémantique kira.
+fn sys_write_volume_sensor(
+    time: Res<Time>,
+    user: Res<UserMasterVolume>,
+    main: Option<Res<Audio>>,
+    sfx: Option<Res<AudioChannel<SfxChannel>>>,
+    music: Option<Res<AudioChannel<MusicChannel>>>,
+    ambient: Option<Res<AudioChannel<biome::BiomeAmbientChannel>>>,
+    mut accum: Local<f32>,
+) {
+    *accum += time.delta_secs();
+    if *accum < 1.0 {
+        return;
+    }
+    *accum = 0.0;
+    let applied_db = amp_to_db(user.0.clamp(0.0, 1.0)).0;
+    let json = format!(
+        r#"{{"id":"volume","user_master_volume":{:.3},"applied_db":{:.2},"main_present":{},"sfx_present":{},"music_present":{},"ambient_present":{}}}"#,
+        user.0,
+        applied_db,
+        main.is_some(),
+        sfx.is_some(),
+        music.is_some(),
+        ambient.is_some(),
+    );
+    if let Err(e) = std::fs::write("forgia2_volume.json", &json) {
+        warn!("[forgia-audio] volume sensor write failed: {e}");
+    }
+}
+
 /// Foundation plugin — registers `bevy_kira_audio::AudioPlugin` once + couche
 /// volume user (story-595).
 /// Sous-plugins (biome, music, sfx, …) doivent l'ajouter via `is_plugin_added::<AudioPlugin>` guard.
@@ -99,7 +136,8 @@ impl Plugin for ForgiaAudioCorePlugin {
             app.add_plugins(AudioPlugin);
         }
         app.init_resource::<UserMasterVolume>()
-            .add_systems(Update, sys_apply_user_master_volume);
+            .add_systems(Update, sys_apply_user_master_volume)
+            .add_systems(Update, sys_write_volume_sensor);
     }
 }
 
