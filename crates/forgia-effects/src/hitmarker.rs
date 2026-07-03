@@ -43,7 +43,10 @@ impl Plugin for ForgiaHitmarkerPlugin {
         app.init_resource::<HitmarkerState>()
             .add_systems(
                 EguiPrimaryContextPass,
-                (draw_hitmarker, draw_cartoon_stars, draw_white_flash, draw_pow_text),
+                // story-659 — `draw_pow_text` RETIRÉ (demande user 2026-07-03 :
+                // « les textes POW font trop avec les effets visuels ») : le
+                // chime weakspot (story-651) + le tink visuel suffisent.
+                (draw_hitmarker, draw_cartoon_stars, draw_white_flash),
             )
             .add_systems(Update, hitmarker_trigger.in_set(GameSet::UI));
     }
@@ -194,44 +197,10 @@ fn draw_star_4_branches(
     );
 }
 
-/// Story-528 AC6 — texte cartoon "POW!" pop scale au-dessus du crosshair
-/// quand `CombatHitEvent.is_headshot`. Pop scale 1.5→1.0 + fade alpha.
-fn draw_pow_text(
-    mut contexts: EguiContexts,
-    state: Res<HitmarkerState>,
-    app_state: Res<State<AppMode>>,
-) {
-    if *app_state.get() != AppMode::InGame || state.pow_time_left <= 0.0 {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else { return };
-    let center = ctx.content_rect().center();
-    let alpha_pct = state.pow_time_left / POW_DURATION;
-    let alpha = (alpha_pct * 255.0) as u8;
-    // Pop : scale 1.5 au début → 1.0 puis stable. Easing ease-out cubic.
-    let scale_phase = (1.0 - alpha_pct).clamp(0.0, 1.0);
-    let scale = 1.5 - 0.5 * scale_phase.powf(0.5);
-    let font_size = 38.0 * scale;
-    let yellow = egui::Color32::from_rgba_unmultiplied(255, 215, 0, alpha);
-    let black = egui::Color32::from_rgba_unmultiplied(0, 0, 0, alpha);
-    let pos = egui::pos2(center.x, center.y - 60.0);
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Foreground,
-        egui::Id::new("forgia_pow_text"),
-    ));
-    // Outline noir (4 offsets) + texte jaune.
-    let font = egui::FontId::proportional(font_size);
-    for (dx, dy) in [(-1.5, 0.0), (1.5, 0.0), (0.0, -1.5), (0.0, 1.5)] {
-        painter.text(
-            egui::pos2(pos.x + dx, pos.y + dy),
-            egui::Align2::CENTER_CENTER,
-            "POW!",
-            font.clone(),
-            black,
-        );
-    }
-    painter.text(pos, egui::Align2::CENTER_CENTER, "POW!", font, yellow);
-}
+// story-659 — `draw_pow_text` (texte cartoon « POW! » headshot, story-528 AC6)
+// SUPPRIMÉ à la demande user 2026-07-03 : redondant avec les VFX élémentaires +
+// le chime weakspot (story-651). L'état `pow_time_left` reste tické (inoffensif)
+// pour ne pas toucher la struct partagée.
 
 /// Story-528 AC5 — flash blanc plein écran 80ms (overlay semi-transparent).
 fn draw_white_flash(

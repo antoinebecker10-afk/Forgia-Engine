@@ -13,10 +13,13 @@ use bevy::prelude::*;
 use bevy_hanabi::prelude::*;
 use bevy_hanabi::Gradient as HanabiGradient;
 
+use super::VfxTuning;
+
 /// Layer 1: Core flash — intense white-yellow HDR burst, blooms hard.
 /// Very short lifetime (~30-50ms), small radius, max HDR.
 pub(super) fn create_muzzle_core_flash(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -37,11 +40,17 @@ pub(super) fn create_muzzle_core_flash(
 
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.015).uniform(writer.lit(0.035)).expr(),
+        writer
+            .lit(0.015 * t.size_mult)
+            .uniform(writer.lit(0.035 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.025).uniform(writer.lit(0.05)).expr(),
+        writer
+            .lit(0.025 * t.lifetime_mult)
+            .uniform(writer.lit(0.05 * t.lifetime_mult))
+            .expr(),
     );
 
     // HDR MODÉRÉ — pas de blowout bloom. 3.0 max vs 12.0 avant.
@@ -51,17 +60,20 @@ pub(super) fn create_muzzle_core_flash(
     color_gradient.add_key(0.6, Vec4::new(1.5, 0.6, 0.15, 0.45)); // Orange
     color_gradient.add_key(1.0, Vec4::new(0.4, 0.1, 0.02, 0.0)); // Fade
 
-    // Story-647 : texture flash étoile (Kenney CC0) au lieu du billboard uni.
+    // Story-647 : texture flash étoile (Kenney CC0). Diag A/B 2026-07-03 : le
+    // rendu texturé est CONFIRMÉ fonctionnel (verdict user « je vois tout ») —
+    // texture restaurée.
     let texture_slot = writer.lit(0u32).expr();
     let mut module = writer.finish();
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        16,
-        SpawnerSettings::burst(5.0.into(), 99999.0.into()),
+        (16.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((5.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("muzzle_core_flash")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
@@ -82,6 +94,7 @@ pub(super) fn create_muzzle_core_flash(
 /// Fast, gravity-affected, parabolic arcs.
 pub(super) fn create_muzzle_sparks(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -99,11 +112,17 @@ pub(super) fn create_muzzle_sparks(
 
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.008).uniform(writer.lit(0.025)).expr(),
+        writer
+            .lit(0.008 * t.size_mult)
+            .uniform(writer.lit(0.025 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.08).uniform(writer.lit(0.25)).expr(),
+        writer
+            .lit(0.08 * t.lifetime_mult)
+            .uniform(writer.lit(0.25 * t.lifetime_mult))
+            .expr(),
     );
 
     let gravity = AccelModifier::new(writer.lit(Vec3::new(0.0, -6.0, 0.0)).expr());
@@ -123,11 +142,12 @@ pub(super) fn create_muzzle_sparks(
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        32,
-        SpawnerSettings::burst(10.0.into(), 99999.0.into()),
+        (32.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((10.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("muzzle_sparks")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
@@ -149,6 +169,7 @@ pub(super) fn create_muzzle_sparks(
 /// Layer 3: Smoke puff — residual gunpowder smoke, slow drift upward.
 pub(super) fn create_muzzle_smoke(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -166,11 +187,17 @@ pub(super) fn create_muzzle_smoke(
     // Story-450 — smoke sizes /2 + lifetime plus court : moins persistant devant la cible.
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.02).uniform(writer.lit(0.05)).expr(),
+        writer
+            .lit(0.02 * t.size_mult)
+            .uniform(writer.lit(0.05 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.18).uniform(writer.lit(0.45)).expr(),
+        writer
+            .lit(0.18 * t.lifetime_mult)
+            .uniform(writer.lit(0.45 * t.lifetime_mult))
+            .expr(),
     );
 
     // Slow upward drift + lateral asymmetry
@@ -183,12 +210,12 @@ pub(super) fn create_muzzle_smoke(
     color_gradient.add_key(0.5, Vec4::new(0.25, 0.22, 0.2, 0.15));
     color_gradient.add_key(1.0, Vec4::new(0.1, 0.09, 0.08, 0.0));
 
-    // Sizes /2 — grows mais reste discret.
+    // Sizes /2 — grows mais reste discret (× size_mult story-652).
     let mut size_gradient = HanabiGradient::new();
-    size_gradient.add_key(0.0, Vec3::splat(0.02));
-    size_gradient.add_key(0.2, Vec3::splat(0.06));
-    size_gradient.add_key(0.5, Vec3::splat(0.11));
-    size_gradient.add_key(1.0, Vec3::splat(0.17));
+    size_gradient.add_key(0.0, Vec3::splat(0.02 * t.size_mult));
+    size_gradient.add_key(0.2, Vec3::splat(0.06 * t.size_mult));
+    size_gradient.add_key(0.5, Vec3::splat(0.11 * t.size_mult));
+    size_gradient.add_key(1.0, Vec3::splat(0.17 * t.size_mult));
 
     // Story-647 : texture puff de fumée (Kenney CC0) — volutes au lieu de ronds.
     let texture_slot = writer.lit(0u32).expr();
@@ -196,8 +223,8 @@ pub(super) fn create_muzzle_smoke(
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        48,
-        SpawnerSettings::burst(15.0.into(), 99999.0.into()),
+        (48.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((15.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("muzzle_smoke")
@@ -227,6 +254,7 @@ pub(super) fn create_muzzle_smoke(
 /// Few particles, big, very short lifetime, low opacity.
 pub(super) fn create_muzzle_heat_glow(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -244,11 +272,17 @@ pub(super) fn create_muzzle_heat_glow(
     // Story-450 v2 — heat glow /5 + HDR doux. Halo discret seulement.
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.06).uniform(writer.lit(0.12)).expr(),
+        writer
+            .lit(0.06 * t.size_mult)
+            .uniform(writer.lit(0.12 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.03).uniform(writer.lit(0.07)).expr(),
+        writer
+            .lit(0.03 * t.lifetime_mult)
+            .uniform(writer.lit(0.07 * t.lifetime_mult))
+            .expr(),
     );
 
     let mut color_gradient = HanabiGradient::new();
@@ -262,11 +296,12 @@ pub(super) fn create_muzzle_heat_glow(
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        12,
-        SpawnerSettings::burst(8.0.into(), 99999.0.into()),
+        (12.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((8.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("muzzle_heat_glow")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
@@ -287,6 +322,7 @@ pub(super) fn create_muzzle_heat_glow(
 /// Fast particles shot forward, drag-decelerated, bright.
 pub(super) fn create_muzzle_forward_flash(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -308,11 +344,17 @@ pub(super) fn create_muzzle_forward_flash(
     // qui créait le rendu rose pixelé.
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.008).uniform(writer.lit(0.025)).expr(),
+        writer
+            .lit(0.008 * t.size_mult)
+            .uniform(writer.lit(0.025 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.02).uniform(writer.lit(0.05)).expr(),
+        writer
+            .lit(0.02 * t.lifetime_mult)
+            .uniform(writer.lit(0.05 * t.lifetime_mult))
+            .expr(),
     );
 
     let drag = LinearDragModifier::new(writer.lit(10.0).expr());
@@ -330,11 +372,12 @@ pub(super) fn create_muzzle_forward_flash(
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        24,
-        SpawnerSettings::burst(8.0.into(), 99999.0.into()),
+        (24.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((8.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("muzzle_forward_flash")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
     .init(init_pos)
     .init(init_vel)
     .init(init_size)

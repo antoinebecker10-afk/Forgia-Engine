@@ -22,7 +22,8 @@ use forgia_core::prelude::*;
 use forgia_crosshair::CrosshairTuning;
 use forgia_damage::{DamageKind, DeathEvent, Mortal};
 use forgia_effects::prelude::{
-    spawn_hitscan_tracer, spawn_impact_vfx, spawn_muzzle_flash, TracerResources, WeaponVfxEffects,
+    spawn_hitscan_tracer, spawn_impact_vfx, spawn_kill_burst, spawn_muzzle_flash, TracerResources,
+    WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_input::InputBlockers;
@@ -971,7 +972,13 @@ fn fire_weapon_minimal(
             if let Some((_, toi)) = hit_result {
                 let impact_pos = origin + pellet_dir * toi;
                 if let Some(vfx) = weapon_vfx.as_deref() {
-                    spawn_impact_vfx(&mut commands, vfx, impact_pos, &ammo.equipped.current);
+                    spawn_impact_vfx(
+                        &mut commands,
+                        vfx,
+                        impact_pos,
+                        pellet_dir,
+                        &ammo.equipped.current,
+                    );
                 }
             }
         }
@@ -1134,6 +1141,19 @@ fn fire_weapon_minimal(
                         weapon: Some(ammo.equipped.current),
                         body_zone: zone,
                     });
+
+                    // Story-652 — burst de kill (volutes + light) à l'edge vivant→mort.
+                    if dead && was_alive {
+                        if let Some(vfx) = weapon_vfx.as_deref() {
+                            spawn_kill_burst(
+                                &mut commands,
+                                vfx,
+                                hit_world,
+                                pellet_dir,
+                                &ammo.equipped.current,
+                            );
+                        }
+                    }
 
                     if hit_record.is_none() {
                         hit_record = Some((entity, toi));

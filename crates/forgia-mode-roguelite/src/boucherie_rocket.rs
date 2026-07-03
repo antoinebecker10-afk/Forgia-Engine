@@ -97,6 +97,8 @@ fn sys_spawn_rockets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    // story-659 — traînée de volutes poison (réutilise l'asset d'aura).
+    weapon_vfx: Option<Res<forgia_effects::prelude::WeaponVfxEffects>>,
 ) {
     for ev in fired.read() {
         if ev.weapon != WeaponType::RocketLauncher {
@@ -113,16 +115,32 @@ fn sys_spawn_rockets(
             unlit: true,
             ..default()
         });
-        commands.spawn((
-            Mesh3d(meshes.add(Sphere::new(0.16))),
-            MeshMaterial3d(mat),
-            Transform::from_translation(origin),
-            RocketProjectile {
-                vel: launch_velocity(fwd),
-                age: 0.0,
-            },
-            DespawnOnExit(GameMode::Roguelite),
-        ));
+        let rocket = commands
+            .spawn((
+                Mesh3d(meshes.add(Sphere::new(0.16))),
+                MeshMaterial3d(mat),
+                Transform::from_translation(origin),
+                RocketProjectile {
+                    vel: launch_velocity(fwd),
+                    age: 0.0,
+                },
+                DespawnOnExit(GameMode::Roguelite),
+            ))
+            .id();
+        // story-659 — traînée de volutes POISON : l'émetteur (enfant) suit la
+        // roquette, la simulation world-space laisse les volutes derrière =
+        // comète verte au lieu d'une boule nue. Réutilise l'aura poison ×0.35.
+        if let Some(w) = weapon_vfx.as_deref() {
+            commands.spawn((
+                forgia_effects::prelude::ParticleEffect::new(w.status_poison_cloud.clone()),
+                forgia_effects::prelude::EffectMaterial {
+                    images: vec![w.tex_poison.clone()],
+                },
+                Transform::from_scale(Vec3::splat(0.35)),
+                ChildOf(rocket),
+                Name::new("RocketPoisonTrail"),
+            ));
+        }
         stats.rockets_fired += 1;
     }
 }

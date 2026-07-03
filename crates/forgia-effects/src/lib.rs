@@ -40,8 +40,8 @@ pub mod prelude {
     pub use crate::arena_feedback::{ArenaFeedbackPlugin, ArenaFeedbackStats};
     pub use crate::weapon_vfx::tracer::{spawn_hitscan_tracer, EmissiveFade, TracerResources};
     pub use crate::weapon_vfx::{
-        spawn_impact_vfx, spawn_muzzle_flash, ImpactVfxMarker, Lifetime, MuzzleVfxMarker,
-        WeaponVfxEffects,
+        spawn_impact_vfx, spawn_kill_burst, spawn_muzzle_flash, ImpactVfxMarker, Lifetime,
+        MuzzleVfxMarker, VfxTuning, WeaponVfxEffects,
     };
     // Re-export pour les consommateurs (ex. forgia-mode-roguelite status_vfx) qui
     // spawnent une aura sans dépendre directement de bevy_hanabi.
@@ -74,6 +74,9 @@ impl Plugin for ForgiaEffectsPlugin {
                     emissive_fade_tick,
                     lifetime_tick,
                     weapon_vfx::tracer::tick_bullets_in_flight,
+                    // Story-652 — tuning VFX hot-reload (rebuild assets) + capteur.
+                    weapon_vfx::sys_hot_reload_vfx_genome,
+                    weapon_vfx::sys_write_weapon_vfx_sensor,
                 )
                     .in_set(GameSet::Effects),
             );
@@ -147,6 +150,8 @@ fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::Weap
         (&effects.impact_flash, &effects.tex_flare),
         (&effects.status_flame, &effects.tex_flame),
         (&effects.status_poison_cloud, &effects.tex_poison),
+        (&effects.kill_burst, &effects.tex_burst),
+        (&effects.status_shock, &effects.tex_spark),
     ];
     for (handle, tex) in handles {
         commands.spawn((
@@ -159,7 +164,7 @@ fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::Weap
             weapon_vfx::Lifetime(Timer::from_seconds(5.0, TimerMode::Once)),
         ));
     }
-    info!("[forgia-effects] prespawn 10 hanabi dummies (shader warmup, story-594)");
+    info!("[forgia-effects] prespawn 12 hanabi dummies (shader warmup, story-594/652/653)");
 }
 
 fn effects_tick() {

@@ -3286,6 +3286,8 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -3507,6 +3509,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "bevy_hanabi",
  "bevy_kira_audio",
  "bevy_rapier3d",
  "forgia-ai-arena-bot",

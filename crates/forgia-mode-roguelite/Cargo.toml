@@ -23,6 +23,7 @@ forgia-mode-fps-arena = { workspace = true }
 # de CHAQUE ennemi (le boss géant rendait le sien dans son corps avec l'offset fixe).
 forgia-enemy-nameplate = { workspace = true }
 # story-611 VFX — EffectAsset hanabi de statut (flamme/poison) + ParticleEffect via prelude.
+bevy_hanabi = { workspace = true }
 forgia-effects = { workspace = true }
 # Story-470 M2 step 3 — drop loot on death + Souls currency
 forgia-rpg-data = { workspace = true }

@@ -1,0 +1,32 @@
+# roguelite_vfx.toml — story-652 : VISIBILITÉ des VFX d'armes (hot-reload 1Hz).
+#
+# La story-450 avait nerfé les effets (-35 % taille) car « trop gros, bloquaient
+# la visée » → résultat : flash de 1,5-3,5 cm sur 25-50 ms = invisible (feedback
+# user 2026-07-03 : « je ne vois aucun effet »). La visibilité est maintenant un
+# CHOIX DATA : édite pendant que le jeu tourne, les assets sont reconstruits
+# (~1 s + petit hitch shader). État runtime : forgia2_weapon_vfx.json.
+#
+# Trop envahissant en combat ? Baisse size_mult vers 1.0-1.5.
+# Toujours invisible ? Monte vers 3.0-4.0 et dis-le (autre cause).
+
+[[genes]]
+id = "vfx_size_mult"
+default = 5.0   # taille des particules (0.2..6.0) — 1.0 = l'ancien subliminal
+
+[[genes]]
+id = "vfx_count_mult"
+default = 3.0   # quantité par burst (0.2..4.0)
+
+[[genes]]
+id = "vfx_lifetime_mult"
+default = 1.6   # durée de vie (0.3..3.0) — les effets « respirent »
+
+[[genes]]
+id = "vfx_aura_width_mult"
+default = 1.8   # largeur des auras de statut AUTOUR du mob (0.5..4.0) — flammes/arcs/nuage
+
+[[genes]]
+id = "vfx_impact_offset_m"
+# Décale les effets d'impact HORS de la surface, vers le tireur (architecture
+# standard) : sans lui, la moitié des particules naît DANS le mob = occluse.
+default = 0.35  # mètres (0..1.5)

@@ -13,10 +13,13 @@ use bevy::prelude::*;
 use bevy_hanabi::prelude::*;
 use bevy_hanabi::Gradient as HanabiGradient;
 
+use super::VfxTuning;
+
 /// Layer 1: Impact sparks — directional debris bouncing off surface.
 /// Gravity-affected, parabolic arcs, longer lived than muzzle sparks.
 pub(super) fn create_impact_sparks(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -34,11 +37,17 @@ pub(super) fn create_impact_sparks(
 
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.01).uniform(writer.lit(0.03)).expr(),
+        writer
+            .lit(0.01 * t.size_mult)
+            .uniform(writer.lit(0.03 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.1).uniform(writer.lit(0.35)).expr(),
+        writer
+            .lit(0.1 * t.lifetime_mult)
+            .uniform(writer.lit(0.35 * t.lifetime_mult))
+            .expr(),
     );
 
     let gravity = AccelModifier::new(writer.lit(Vec3::new(0.0, -8.0, 0.0)).expr());
@@ -57,11 +66,12 @@ pub(super) fn create_impact_sparks(
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        96,
-        SpawnerSettings::burst(40.0.into(), 99999.0.into()),
+        (96.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((40.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("impact_sparks")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
@@ -81,7 +91,10 @@ pub(super) fn create_impact_sparks(
 }
 
 /// Layer 2: Dust cloud — kicked up at impact, expands and fades.
-pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> Handle<EffectAsset> {
+pub(super) fn create_impact_dust(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
+) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -97,11 +110,17 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
 
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.03).uniform(writer.lit(0.08)).expr(),
+        writer
+            .lit(0.03 * t.size_mult)
+            .uniform(writer.lit(0.08 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.2).uniform(writer.lit(0.6)).expr(),
+        writer
+            .lit(0.2 * t.lifetime_mult)
+            .uniform(writer.lit(0.6 * t.lifetime_mult))
+            .expr(),
     );
 
     let accel = AccelModifier::new(writer.lit(Vec3::new(0.1, 0.3, -0.05)).expr());
@@ -115,10 +134,10 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
     color_gradient.add_key(1.0, Vec4::new(0.2, 0.18, 0.15, 0.0));
 
     let mut size_gradient = HanabiGradient::new();
-    size_gradient.add_key(0.0, Vec3::splat(0.03));
-    size_gradient.add_key(0.3, Vec3::splat(0.12));
-    size_gradient.add_key(0.7, Vec3::splat(0.2));
-    size_gradient.add_key(1.0, Vec3::splat(0.28));
+    size_gradient.add_key(0.0, Vec3::splat(0.03 * t.size_mult));
+    size_gradient.add_key(0.3, Vec3::splat(0.12 * t.size_mult));
+    size_gradient.add_key(0.7, Vec3::splat(0.2 * t.size_mult));
+    size_gradient.add_key(1.0, Vec3::splat(0.28 * t.size_mult));
 
     // Story-647 : texture puff de poussière (Kenney CC0).
     let texture_slot = writer.lit(0u32).expr();
@@ -126,8 +145,8 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        48,
-        SpawnerSettings::burst(20.0.into(), 99999.0.into()),
+        (48.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((20.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("impact_dust")
@@ -156,6 +175,7 @@ pub(super) fn create_impact_dust(effects: &mut ResMut<Assets<EffectAsset>>) -> H
 /// Layer 3: Impact flash — very brief bright burst at hit point.
 pub(super) fn create_impact_flash(
     effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
 ) -> Handle<EffectAsset> {
     let writer = ExprWriter::new();
 
@@ -172,11 +192,17 @@ pub(super) fn create_impact_flash(
 
     let init_size = SetAttributeModifier::new(
         Attribute::SIZE,
-        writer.lit(0.05).uniform(writer.lit(0.12)).expr(),
+        writer
+            .lit(0.05 * t.size_mult)
+            .uniform(writer.lit(0.12 * t.size_mult))
+            .expr(),
     );
     let init_lifetime = SetAttributeModifier::new(
         Attribute::LIFETIME,
-        writer.lit(0.02).uniform(writer.lit(0.04)).expr(),
+        writer
+            .lit(0.02 * t.lifetime_mult)
+            .uniform(writer.lit(0.04 * t.lifetime_mult))
+            .expr(),
     );
 
     let mut color_gradient = HanabiGradient::new();
@@ -190,11 +216,12 @@ pub(super) fn create_impact_flash(
     module.add_texture_slot("color");
 
     let effect = EffectAsset::new(
-        16,
-        SpawnerSettings::burst(10.0.into(), 99999.0.into()),
+        (16.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((10.0 * t.count_mult).into(), 99999.0.into()),
         module,
     )
     .with_name("impact_flash")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
     .init(init_pos)
     .init(init_vel)
     .init(init_size)
@@ -206,6 +233,95 @@ pub(super) fn create_impact_flash(
     .render(ColorOverLifetimeModifier {
         gradient: color_gradient,
         ..default()
+    });
+
+    effects.add(effect)
+}
+
+/// Story-652 — burst de KILL : l'explosion lisible (volutes twirl chaudes qui
+/// s'ouvrent + retombent), spawnée à l'edge vivant→mort du fire path. C'est le
+/// « moment WoW » du kill : GROS (0.10-0.22 m × size_mult), 0.35-0.6 s, burst
+/// one-shot (jamais de rate continu — pattern mémoire hanabi mobs 2026-06-24).
+pub(super) fn create_kill_burst(
+    effects: &mut ResMut<Assets<EffectAsset>>,
+    t: &VfxTuning,
+) -> Handle<EffectAsset> {
+    let writer = ExprWriter::new();
+
+    let init_pos = SetPositionSphereModifier {
+        center: writer.lit(Vec3::new(0.0, 0.6, 0.0)).expr(), // centre torse
+        radius: writer.lit(0.15).expr(),
+        dimension: ShapeDimension::Volume,
+    };
+
+    // Radial + biais vertical : l'explosion « s'ouvre » vers le haut.
+    let init_vel = SetVelocitySphereModifier {
+        center: writer.lit(Vec3::new(0.0, 1.2, 0.0)).expr(),
+        speed: writer.lit(1.5).uniform(writer.lit(4.0)).expr(),
+    };
+
+    let init_size = SetAttributeModifier::new(
+        Attribute::SIZE,
+        writer
+            .lit(0.10 * t.size_mult)
+            .uniform(writer.lit(0.22 * t.size_mult))
+            .expr(),
+    );
+    let init_lifetime = SetAttributeModifier::new(
+        Attribute::LIFETIME,
+        writer
+            .lit(0.35 * t.lifetime_mult)
+            .uniform(writer.lit(0.6 * t.lifetime_mult))
+            .expr(),
+    );
+
+    let gravity = AccelModifier::new(writer.lit(Vec3::new(0.0, -3.0, 0.0)).expr());
+    let drag = LinearDragModifier::new(writer.lit(2.5).expr());
+
+    // Chaud neutre (le tint per-arme viendra d'une itération élémentaire) —
+    // HDR modéré (leçon story-450 : HDR fort + gros quads = blob).
+    let mut color_gradient = HanabiGradient::new();
+    color_gradient.add_key(0.0, Vec4::new(3.0, 2.2, 0.8, 1.0)); // flash chaud
+    color_gradient.add_key(0.3, Vec4::new(2.2, 0.9, 0.2, 0.9)); // orange
+    color_gradient.add_key(0.7, Vec4::new(0.8, 0.25, 0.06, 0.5)); // braise
+    color_gradient.add_key(1.0, Vec4::new(0.15, 0.05, 0.02, 0.0)); // fade
+
+    // Grossit puis se dissipe — la volute « s'ouvre ».
+    let mut size_gradient = HanabiGradient::new();
+    size_gradient.add_key(0.0, Vec3::splat(0.08 * t.size_mult));
+    size_gradient.add_key(0.35, Vec3::splat(0.30 * t.size_mult));
+    size_gradient.add_key(1.0, Vec3::splat(0.12 * t.size_mult));
+
+    // Texture volute twirl (Kenney CC0) — restaurée après le diag A/B 2026-07-03
+    // (rendu texturé confirmé fonctionnel).
+    let texture_slot = writer.lit(0u32).expr();
+    let mut module = writer.finish();
+    module.add_texture_slot("color");
+
+    let effect = EffectAsset::new(
+        (64.0_f32 * t.count_mult).ceil() as u32,
+        SpawnerSettings::burst((18.0 * t.count_mult).into(), 99999.0.into()),
+        module,
+    )
+    .with_name("kill_burst")
+    .with_alpha_mode(bevy_hanabi::AlphaMode::Add)
+    .init(init_pos)
+    .init(init_vel)
+    .init(init_size)
+    .init(init_lifetime)
+    .update(gravity)
+    .update(drag)
+    .render(ParticleTextureModifier {
+        texture_slot,
+        sample_mapping: ImageSampleMapping::Modulate,
+    })
+    .render(ColorOverLifetimeModifier {
+        gradient: color_gradient,
+        ..default()
+    })
+    .render(SizeOverLifetimeModifier {
+        gradient: size_gradient,
+        screen_space_size: false,
     });
 
     effects.add(effect)

@@ -82,21 +82,22 @@ impl TracerResources {
 ///   `forgia-mode-roguelite/boucherie_rocket.rs`).
 pub fn tracer_color(weapon: &WeaponType) -> (LinearRgba, LinearRgba) {
     match weapon {
-        // Pépin (ModernAR) / AK47 — yellow-white head, warm orange trail
+        // story-659 — tracers alignés sur les ÉLÉMENTS (demande user 2026-07-03 :
+        // cohérence visuelle projectiles↔éléments).
+        // Pépin (ModernAR) = ÉLECTRIQUE → tête blanc-bleu, trail bleu arc.
         WeaponType::ModernAR | WeaponType::AK47 => (
-            LinearRgba::new(15.0, 12.0, 5.0, 1.0),
-            LinearRgba::new(3.0, 1.8, 0.5, 0.55),
+            LinearRgba::new(6.0, 11.0, 18.0, 1.0),
+            LinearRgba::new(1.0, 2.4, 4.5, 0.55),
         ),
-        // Bourrasque (AssaultRifle) = élément FEU → orange chaud saturé, distinct
-        // du jaune de Pépin (story-611 follow-up : tracer aligné sur l'élément).
+        // Bourrasque (AssaultRifle) = élément FEU → orange chaud saturé (story-611).
         WeaponType::AssaultRifle => (
             LinearRgba::new(16.0, 7.0, 1.5, 1.0),
             LinearRgba::new(4.0, 1.4, 0.3, 0.55),
         ),
-        // Shotgun (Boucherie) — warm orange pellet trail
+        // Madame Lenoir (Shotgun legacy) = PERCE-ARMURE → cyan froid chirurgical.
         WeaponType::Shotgun => (
-            LinearRgba::new(16.0, 10.0, 3.0, 1.0),
-            LinearRgba::new(3.5, 1.4, 0.3, 0.50),
+            LinearRgba::new(5.0, 14.0, 16.0, 1.0),
+            LinearRgba::new(0.9, 2.8, 3.4, 0.50),
         ),
         // Plasma — electric cyan-blue
         WeaponType::PlasmaRifle => (
