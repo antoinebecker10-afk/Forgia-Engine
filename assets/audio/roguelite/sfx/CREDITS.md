@@ -10,6 +10,7 @@ Remplacent les anciens jingles V1 musicaux (2026-06-05).
 | Fichier Forgia | Son Kenney d'origine | Usage |
 |---|---|---|
 | `impact.ogg` | impactGeneric_light_000 | hit ennemi (court, fréquent) |
+| `weakspot.ogg` | impactMetal_light_000 | « tink » weakspot/tête (story-651, pitch fixe = signature) |
 | `kill.ogg` | impactMining_000 | kill (meaty) |
 | `hurt.ogg` | impactPlank_medium_000 | joueur touché (thud sourd) |
 | `ding_gold.ogg` | handleCoins | ramassage Or |

@@ -15,6 +15,12 @@ music_volume = 0.45
 path = "audio/roguelite/sfx/impact.ogg"
 volume = 0.45
 
+[weakspot]              # « tink » tête/weakspot (story-651) — Kenney impactMetal_light
+                        # Pitch FIXE (signature pavlovienne), couche additive à CHAQUE
+                        # headshot (même au kill — double récompense Gunfire Reborn).
+path = "audio/roguelite/sfx/weakspot.ogg"
+volume = 0.8
+
 [kill]                  # kill (meaty) — Kenney impactMining
 path = "audio/roguelite/sfx/kill.ogg"
 volume = 0.7

@@ -65,6 +65,8 @@ struct AudioGenomeToml {
     #[serde(default)]
     impact: Option<SoundEntryToml>,
     #[serde(default)]
+    weakspot: Option<SoundEntryToml>,
+    #[serde(default)]
     kill: Option<SoundEntryToml>,
     #[serde(default)]
     hurt: Option<SoundEntryToml>,
@@ -108,6 +110,9 @@ pub struct RogueliteAudioConfig {
     pub master_volume: f32,
     pub music_volume: f32,
     pub impact: SoundDef,
+    /// Story-651 — « tink » weakspot (tête) : LE son pavlovien Gunfire-like,
+    /// joué à CHAQUE headshot (en plus d'impact/kill), pitch fixe (signature).
+    pub weakspot: SoundDef,
     pub kill: SoundDef,
     pub hurt: SoundDef,
     pub ding_gold: SoundDef,
@@ -129,6 +134,7 @@ impl Default for RogueliteAudioConfig {
             master_volume: 0.9,
             music_volume: 0.45,
             impact: SoundDef::new("audio-v1/music/jingles/jingles_HIT00.ogg", 0.6),
+            weakspot: SoundDef::new("audio/roguelite/sfx/weakspot.ogg", 0.8),
             kill: SoundDef::new("audio-v1/music/jingles/jingles_HIT12.ogg", 0.85),
             hurt: SoundDef::new("audio-v1/music/jingles/jingles_NES10.ogg", 0.5),
             ding_gold: SoundDef::new("audio-v1/music/jingles/jingles_PIZZI00.ogg", 0.7),
@@ -151,6 +157,7 @@ impl Default for RogueliteAudioConfig {
 #[derive(Resource, Default)]
 pub struct AudioHandles {
     impact: Handle<AudioSource>,
+    weakspot: Handle<AudioSource>,
     kill: Handle<AudioSource>,
     hurt: Handle<AudioSource>,
     ding_gold: Handle<AudioSource>,
@@ -168,6 +175,7 @@ pub struct AudioHandles {
 pub struct RogueliteAudioStats {
     pub fires: u32,
     pub impacts: u32,
+    pub weakspots: u32,
     pub kills: u32,
     pub hurts: u32,
     pub dings_gold: u32,
@@ -242,6 +250,7 @@ fn parse_audio_genome(path: &str) -> Option<RogueliteAudioConfig> {
         cfg.music_volume = v.clamp(0.0, VOLUME_MAX);
     }
     apply_entry(&mut cfg.impact, toml.impact);
+    apply_entry(&mut cfg.weakspot, toml.weakspot);
     apply_entry(&mut cfg.kill, toml.kill);
     apply_entry(&mut cfg.hurt, toml.hurt);
     apply_entry(&mut cfg.ding_gold, toml.ding_gold);
@@ -270,6 +279,7 @@ fn load_handles(asset_server: &AssetServer, cfg: &RogueliteAudioConfig) -> Audio
     // 1 seul call-site `asset_server.load` (boucle) → drift Lock L1 minimal (+1, pas +7).
     let defs = [
         &cfg.impact,
+        &cfg.weakspot,
         &cfg.kill,
         &cfg.hurt,
         &cfg.ding_gold,
@@ -287,16 +297,17 @@ fn load_handles(asset_server: &AssetServer, cfg: &RogueliteAudioConfig) -> Audio
         .collect();
     AudioHandles {
         impact: h[0].clone(),
-        kill: h[1].clone(),
-        hurt: h[2].clone(),
-        ding_gold: h[3].clone(),
-        ding_souls: h[4].clone(),
-        music_combat: h[5].clone(),
-        music_break: h[6].clone(),
-        fire_pepin: h[7].clone(),
-        fire_bourrasque: h[8].clone(),
-        fire_lenoir: h[9].clone(),
-        fire_boucherie: h[10].clone(),
+        weakspot: h[1].clone(),
+        kill: h[2].clone(),
+        hurt: h[3].clone(),
+        ding_gold: h[4].clone(),
+        ding_souls: h[5].clone(),
+        music_combat: h[6].clone(),
+        music_break: h[7].clone(),
+        fire_pepin: h[8].clone(),
+        fire_bourrasque: h[9].clone(),
+        fire_lenoir: h[10].clone(),
+        fire_boucherie: h[11].clone(),
     }
 }
 
@@ -358,6 +369,19 @@ fn sys_hot_reload_audio_genome(
 
 // ─── SFX combat (lecture CombatHitEvent, read-only) ───────────────────────────
 
+/// Story-651 — variation de pitch ±5 % (anti-fatigue sur sons répétitifs).
+/// Xorshift local, présentation only (PAS la sim — hors keystone déterminisme).
+/// Retourne un playback_rate dans [0.95, 1.05].
+fn next_pitch(seed: &mut u32) -> f64 {
+    if *seed == 0 {
+        *seed = 0x9E37_79B9; // seed non-nul (xorshift(0) resterait 0)
+    }
+    *seed ^= *seed << 13;
+    *seed ^= *seed >> 17;
+    *seed ^= *seed << 5;
+    0.95 + 0.10 * (f64::from(*seed) / f64::from(u32::MAX))
+}
+
 fn sys_sfx_on_combat_hit(
     sfx: Res<AudioChannel<SfxChannel>>,
     handles: Res<AudioHandles>,
@@ -366,24 +390,38 @@ fn sys_sfx_on_combat_hit(
     mut events: MessageReader<CombatHitEvent>,
     q_enemy: Query<(), With<ArenaBot>>,
     q_player: Query<(), With<Player>>,
+    mut pitch_seed: Local<u32>,
 ) {
     let master = cfg.master_volume;
     for ev in events.read() {
         if q_enemy.get(ev.target).is_ok() {
-            // L'ennemi encaisse : impact, ou kill si HP=0.
+            // L'ennemi encaisse : impact, ou kill si HP=0. Pitch varié ±5 %
+            // (story-651) : ces sons jouent jusqu'à 16×/s en full-auto.
             let def = if ev.is_kill { &cfg.kill } else { &cfg.impact };
             let handle = if ev.is_kill {
                 handles.kill.clone()
             } else {
                 handles.impact.clone()
             };
-            sfx.play(handle).with_volume(amp_to_db(def.volume * master));
+            sfx.play(handle)
+                .with_volume(amp_to_db(def.volume * master))
+                .with_playback_rate(next_pitch(&mut pitch_seed));
             if ev.is_kill {
                 stats.kills += 1;
             } else {
                 stats.impacts += 1;
             }
             stats.sfx_played += 1;
+            // Story-651 — « tink » weakspot : couche ADDITIVE sur CHAQUE headshot
+            // (même au kill — double récompense Gunfire Reborn). Pitch FIXE :
+            // c'est la signature pavlovienne « vise la tête », elle doit être
+            // reconnaissable entre mille, jamais variée.
+            if ev.is_headshot {
+                sfx.play(handles.weakspot.clone())
+                    .with_volume(amp_to_db(cfg.weakspot.volume * master));
+                stats.weakspots += 1;
+                stats.sfx_played += 1;
+            }
         } else if q_player.get(ev.target).is_ok() {
             // Le joueur encaisse : son de douleur.
             sfx.play(handles.hurt.clone())
@@ -427,12 +465,17 @@ fn sys_fire_sfx(
     cfg: Res<RogueliteAudioConfig>,
     mut stats: ResMut<RogueliteAudioStats>,
     mut events: MessageReader<WeaponFiredEvent>,
+    mut pitch_seed: Local<u32>,
 ) {
     let master = cfg.master_volume;
     for ev in events.read() {
         let def = weapon_fire_def(&cfg, ev.weapon);
         let handle = weapon_fire_handle(&handles, ev.weapon);
-        sfx.play(handle).with_volume(amp_to_db(def.volume * master));
+        // Story-651 — pitch ±5 % : casse la répétition métronome en full-auto
+        // (règle Vlambeer/Destiny sound design : jamais deux tirs identiques).
+        sfx.play(handle)
+            .with_volume(amp_to_db(def.volume * master))
+            .with_playback_rate(next_pitch(&mut pitch_seed));
         stats.fires += 1;
         stats.sfx_played += 1;
     }
@@ -537,10 +580,11 @@ fn sys_write_audio_sensor(
         ("ok", "-")
     };
     let json = format!(
-        r#"{{"id":"roguelite_audio","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"fires":{},"impacts":{},"kills":{},"hurts":{},"dings_gold":{},"dings_souls":{},"sfx_played":{},"music_playing":{},"master_volume":{:.2},"music_volume":{:.2}}}"#,
+        r#"{{"id":"roguelite_audio","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"fires":{},"impacts":{},"weakspots":{},"kills":{},"hurts":{},"dings_gold":{},"dings_souls":{},"sfx_played":{},"music_playing":{},"master_volume":{:.2},"music_volume":{:.2}}}"#,
         time.elapsed_secs(),
         stats.fires,
         stats.impacts,
+        stats.weakspots,
         stats.kills,
         stats.hurts,
         stats.dings_gold,
@@ -551,4 +595,33 @@ fn sys_write_audio_sensor(
         cfg.music_volume,
     );
     let _ = fs::write(SENSOR_PATH, json);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pitch_variation_stays_in_bounds_and_varies() {
+        // ±5 % : toujours dans [0.95, 1.05], et pas constant (anti-métronome).
+        let mut seed = 0u32; // le helper doit s'auto-seeder (xorshift(0) = piège)
+        let mut prev = next_pitch(&mut seed);
+        let mut varied = false;
+        for _ in 0..64 {
+            let p = next_pitch(&mut seed);
+            assert!((0.95..=1.05).contains(&p), "pitch hors bornes : {p}");
+            if (p - prev).abs() > 1e-9 {
+                varied = true;
+            }
+            prev = p;
+        }
+        assert!(varied, "le pitch doit varier entre les tirs");
+    }
+
+    #[test]
+    fn weakspot_default_points_to_cc0_asset() {
+        let cfg = RogueliteAudioConfig::default();
+        assert_eq!(cfg.weakspot.path, "audio/roguelite/sfx/weakspot.ogg");
+        assert!(cfg.weakspot.volume > 0.0);
+    }
 }
