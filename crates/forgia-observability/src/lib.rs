@@ -91,6 +91,13 @@ impl Plugin for ForgiaObservabilityPlugin {
         if !app.is_plugin_added::<EntityCountDiagnosticsPlugin>() {
             app.add_plugins(EntityCountDiagnosticsPlugin::default());
         }
+        // Audit 2026-07-01 — RenderDiagnosticsPlugin : timings GPU par passe
+        // (Vulkan/DX12) pour le verdict CPU/GPU-bound du perf_sensor. Non inclus
+        // dans DefaultPlugins (sauf feature tracing-tracy) → ajout explicite,
+        // idempotent. Overhead timestamp-query négligeable.
+        if !app.is_plugin_added::<bevy::render::diagnostic::RenderDiagnosticsPlugin>() {
+            app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin);
+        }
 
         app.init_resource::<RpgHealthState>()
             .init_resource::<SensorSnapshots>()

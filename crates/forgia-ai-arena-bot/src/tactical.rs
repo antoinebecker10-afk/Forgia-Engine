@@ -444,16 +444,18 @@ const SEPARATION_PUSH_STRENGTH: f32 = 0.5;
 pub fn bot_separation(
     mut bots: Query<(Entity, &mut Transform), (With<ArenaBot>, Without<BotTarget>)>,
     rapier: ReadRapierContext,
+    // Perf (audit 2026-07-01) : buffers scratch réutilisés au lieu de Vec::new()/
+    // HashMap::new() par frame — 0 alloc/frame, conforme scalability.md.
+    mut positions: Local<Vec<(Entity, Vec3)>>,
+    mut deltas: Local<bevy::platform::collections::HashMap<Entity, Vec2>>,
 ) {
     let Ok(ctx) = rapier.single() else {
         return;
     };
     // Snapshot positions pour comparaison stable (sinon mutation iterative biaise).
-    let positions: Vec<(Entity, Vec3)> = bots
-        .iter()
-        .map(|(e, tf)| (e, tf.translation))
-        .collect();
-    let mut deltas: bevy::platform::collections::HashMap<Entity, Vec2> = Default::default();
+    positions.clear();
+    positions.extend(bots.iter().map(|(e, tf)| (e, tf.translation)));
+    deltas.clear();
     for i in 0..positions.len() {
         for j in (i + 1)..positions.len() {
             let (e_a, pos_a) = positions[i];

@@ -146,6 +146,16 @@ pub struct BotFireballAssets {
     pub mat: Handle<StandardMaterial>,
 }
 
+/// Mesh (constant) + cache de matériaux du tracer, indexé par couleur émissive.
+/// Le mesh est construit 1× au Startup ; les matériaux sont résolus à la volée et
+/// mis en cache par teinte → 0 alloc par tir après le 1er de chaque couleur, et
+/// les tirs d'un même archétype partagent mesh+matériau (batching auto Bevy).
+#[derive(Resource)]
+pub struct BotTracerAssets {
+    pub mesh: Handle<Mesh>,
+    pub mats: bevy::platform::collections::HashMap<[u32; 4], Handle<StandardMaterial>>,
+}
+
 /// Startup — construit le mesh sphère + matériau émissif orange de la boule de feu.
 fn setup_bot_fireball_assets(
     mut commands: Commands,
@@ -160,6 +170,14 @@ fn setup_bot_fireball_assets(
         ..default()
     });
     commands.insert_resource(BotFireballAssets { mesh, mat });
+
+    // Tracer : mesh fin constant (0.01×0.01×1.0) réutilisé par tous les tirs ;
+    // les matériaux sont résolus/cachés par couleur au 1er tir de la teinte.
+    let tracer_mesh = meshes.add(Cuboid::new(TRACER_CORE_WIDTH, TRACER_CORE_WIDTH, 1.0));
+    commands.insert_resource(BotTracerAssets {
+        mesh: tracer_mesh,
+        mats: bevy::platform::collections::HashMap::default(),
+    });
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -317,9 +335,9 @@ fn bot_shoot_at_target(
     targets: Query<&GlobalTransform, With<BotTarget>>,
     mut rng: ResMut<BotShootRng>,
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     fireball_assets: Res<BotFireballAssets>,
+    mut tracer_assets: ResMut<BotTracerAssets>,
 ) {
     let Some(target_tf) = targets.iter().next() else {
         return;
@@ -384,7 +402,7 @@ fn bot_shoot_at_target(
         // Flash de bouche court au tireur (feedback ; longueur fixe, plus de raycast).
         spawn_tracer(
             &mut commands,
-            &mut meshes,
+            &mut tracer_assets,
             &mut materials,
             origin,
             shot_dir,
@@ -396,9 +414,12 @@ fn bot_shoot_at_target(
     }
 }
 
+/// Largeur du cœur du tracer (rendering interne, cf story-452). Constant.
+const TRACER_CORE_WIDTH: f32 = 0.01;
+
 fn spawn_tracer(
     commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
+    tracer_assets: &mut ResMut<BotTracerAssets>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     origin: Vec3,
     dir: Vec3,
@@ -408,20 +429,33 @@ fn spawn_tracer(
     // Story-452 (2026-05-18 PM) — fix screenshot user : bot tracers étaient des laser
     // beams de 30m × 4cm bouchant l'écran. Solution : segment court (max 4m) au lieu
     // de full hit_dist, mesh fin (1cm), HDR /3, lifetime court.
-    let core_width = 0.01;
-    let mesh = meshes.add(Cuboid::new(core_width, core_width, 1.0));
-    let dimmed = LinearRgba::new(
-        emissive.red * 0.35,
-        emissive.green * 0.35,
-        emissive.blue * 0.35,
-        emissive.alpha,
-    );
-    let mat = materials.add(StandardMaterial {
-        emissive: dimmed,
-        alpha_mode: AlphaMode::Add,
-        unlit: true,
-        ..default()
-    });
+    //
+    // Perf (audit 2026-07-01) : mesh constant pré-warmé + matériau caché par couleur
+    // → 0 alloc `meshes.add`/`materials.add` par tir après le 1er de chaque teinte.
+    let key = [
+        emissive.red.to_bits(),
+        emissive.green.to_bits(),
+        emissive.blue.to_bits(),
+        emissive.alpha.to_bits(),
+    ];
+    let mat = tracer_assets
+        .mats
+        .entry(key)
+        .or_insert_with(|| {
+            let dimmed = LinearRgba::new(
+                emissive.red * 0.35,
+                emissive.green * 0.35,
+                emissive.blue * 0.35,
+                emissive.alpha,
+            );
+            materials.add(StandardMaterial {
+                emissive: dimmed,
+                alpha_mode: AlphaMode::Add,
+                unlit: true,
+                ..default()
+            })
+        })
+        .clone();
     // Tracer segment court (4m max) partant du canon, pas tout le ray.
     let seg_len = length.min(4.0);
     let mid = origin + dir * (seg_len * 0.5);
@@ -429,7 +463,7 @@ fn spawn_tracer(
         .looking_to(dir, Vec3::Y)
         .with_scale(Vec3::new(1.0, 1.0, seg_len));
     commands.spawn((
-        Mesh3d(mesh),
+        Mesh3d(tracer_assets.mesh.clone()),
         MeshMaterial3d(mat),
         tf,
         BotTracer {
@@ -537,6 +571,11 @@ fn tick_respawns(
     // respawns avaient été queuées avant entrée mode (race OnEnter vs ticks).
     if matches!(game_mode.as_deref().map(|s| s.get()), Some(GameMode::Roguelite)) {
         pending.queue.clear();
+        return;
+    }
+    // Perf (audit 2026-07-01) : la queue est vide la quasi-totalité des frames →
+    // early-return AVANT l'alloc `Vec::new()` (le cas non-vide est rare = respawn).
+    if pending.queue.is_empty() {
         return;
     }
     let dt = time.delta_secs();
