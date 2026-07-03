@@ -52,7 +52,11 @@
 | `forgia_village_debug.json` | T1 | forgia-village-loader | `src/lib.rs:846,897` | event | village placement debug — ⚠ pipeline DÉBRANCHÉ (story-586), écrit `village:null`, dépose prévue | **duplicate-writer** |
 | `forgia2_anchor.json` | T0 | forgia-anchor | `src/lib.rs:30` | 1Hz | AnchorKind stats, props_spawned counter | active |
 | `forgia2_boss_gate.json` | T0 | forgia-mode-roguelite | `src/boss_portal.rs:728` | event | boss gate door open/closed, dais detection (story-603) | active |
+| `forgia2_enemy_scaling.json` | T0 | forgia-mode-roguelite | `src/enemy_scaling.rs:33` | 1Hz | scaling ennemis par profondeur (story-658, autre terminal) | active |
+| `forgia2_gamefeel.json` | T0 | forgia-juice-lib | `src/hit_stop.rs:28` | 1Hz | hitstop/gamefeel tuning (story-650) | active |
+| `forgia2_head_hitbox.json` | T0 | forgia-mode-roguelite | `src/head_hitbox.rs:23` | 1Hz | proxy tete os-tracke (story-656, autre terminal) | active |
 | `forgia2_identity.json` | T0 | forgia-mode-roguelite | `src/identity.rs:26` | 1Hz | forgeron identity/level state | active |
+| `forgia2_knockback.json` | T0 | forgia-juice-lib | `src/knockback.rs:28` | 1Hz | pushes/kill_pushes knockback par hit (story-650) | active |
 | `forgia2_perf_diag.json` | T0 | forgia-mode-roguelite | `src/perf_diag.rs:37` | 1Hz | roguelite perf diagnostics | active |
 | `forgia2_render_fx.json` | T0 | forgia-mode-roguelite | `src/render_quality.rs:29` | 1Hz | SSAO + atmosphere state, render guardrail (story-625 Tier 4) | active |
 | `forgia2_mushrooms.json` | T0 | forgia-mode-roguelite | `src/mushrooms.rs:30` | 1Hz | champignons émissifs crypts : clusters/counts + health (story-625) | active |
@@ -88,6 +92,8 @@
 | `forgia2_stage.json` | T0 | forgia-anchor **+** forgia-stage **+** forgia-stage::layout_sensor | `forgia-anchor/src/lib.rs:474` **+** `forgia-stage/src/lib.rs:51` **+** `forgia-stage/src/layout_sensor.rs:248` | event | stage load, anchor record (**triple-writer** à investiguer) | **duplicate-writer** |
 | `forgia2_stage_layout.json` | T0 | forgia-stage | `src/layout_sensor.rs:16` | event | stage layout post-load (cover, sightline) | active |
 | `forgia2_stage_poi.json` | T1 | forgia-mode-roguelite | `src/poi.rs` | 1Hz | POI gameplay : counts vivants (loot_vaults/lava_hazards/forges) + cumuls (vaults_looted, souls_from_vaults, lava_kills_total, lava_player_ticks) — story-561 | active |
+| `forgia2_trempe.json` | T0 | forgia-mode-roguelite | `src/trempe.rs:40` | 1Hz | trempe arme in-run (story-657, autre terminal) | active |
+| `forgia2_volume.json` | T0 | forgia-audio | `src/lib.rs:123` | 1Hz | volumes maitre/sfx/musique (reglages audio) | active |
 | `forgia2_walk_pose.json` | T0 | forgia-anim-locomotion | `src/locomotion.rs:884` | 1Hz | walk pose phase, foot contacts | active |
 | `forgia2_watchdog.json` | T0 | forgia-observability | `src/watchdog_sensor.rs:74` | 1Hz | watchdog heartbeat, seconds_in_emergency | active |
 | `forgia_anim_full.json` | T1 | forgia-anim-locomotion | `src/locomotion.rs:1464` | 1Hz | dump anim complet (debug rig) | active |
@@ -116,6 +122,7 @@
 | `forgia2_toon.json` | T0 | forgia-mode-roguelite | `src/toon_config.rs:22` | 1Hz | toon cel-shading hot-reload — ⚠ champ `outline_attached` = état réel (story-593) | active |
 | `forgia2_vram.json` | T0 | forgia-observability | `src/vram_sensor.rs:201` | 5s | VRAM estimée + top images/meshes — story-581 | active |
 | `forgia2_walk_dir_probe.json` | T0 | forgia-anim-locomotion | `src/locomotion.rs:1361` | event | sonde direction de marche (debug) | active |
+| `forgia2_weapon_vfx.json` | T0 | forgia-effects | `src/weapon_vfx/mod.rs:123` | 1Hz | pipeline VFX armes texture (stories 652/653/655) | active |
 | `forgia2_worldgen.json` | T0 | forgia-worldgen | `src/sensor.rs:54` | 1Hz | SpawnQueue drainée, worldgen stats — story-578 | active |
 | `forgia2_aimassist.json` | T0 | forgia-fps | `src/aim_assist.rs:122` | 1Hz | bullet magnetism : pull/bend, sélection cible Mortal, rate de correction — story-615 | active |
 | `forgia2_color_grading.json` | T0 | forgia-game | `src/color_grading.rs:26` | 1Hz | tonemapping / color grade params, rendu terne | active |
