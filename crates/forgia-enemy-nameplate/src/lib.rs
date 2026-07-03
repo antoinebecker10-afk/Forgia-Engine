@@ -75,13 +75,23 @@ pub struct NameplateFill;
 #[derive(Component)]
 pub struct NameplateBg;
 
-/// Marker du quad fill Bouclier (bleu) — scale.x = shield/shield_max (story-644 P1 Inc.2).
+/// Plaque de Bouclier (bleu) — story-654 : visible tant que `shield > threshold`
+/// (les plaques « sautent » une à une, façon Apex/DRG — remplace la barre scalée).
 #[derive(Component)]
-pub struct NameplateShieldFill;
+pub struct NameplateShieldFill {
+    pub threshold: f32,
+}
 
-/// Marker du quad fill Armure (jaune) — scale.x = armor/armor_max (story-644 P1 Inc.2).
+/// Plaque d'Armure (jaune) — story-654 : visible tant que `armor > threshold`.
 #[derive(Component)]
-pub struct NameplateArmorFill;
+pub struct NameplateArmorFill {
+    pub threshold: f32,
+}
+
+/// Espace entre plaques (fraction de la largeur du nameplate) — layout UI.
+const PLATE_GAP_FRAC: f32 = 0.02;
+/// Nombre max de plaques par couche (au-delà, les plaques valent plus de PV).
+const MAX_PLATES: usize = 8;
 
 /// Index target_entity → nameplate_root_entity (évite duplication).
 #[derive(Resource, Default)]
@@ -98,6 +108,7 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
             .add_systems(
                 Update,
                 (
+                    promote_anchored_to_permanent,
                     cleanup_registry_on_target_removed,
                     spawn_nameplate_for_targets,
                     spawn_or_refresh_on_hit,
@@ -147,11 +158,15 @@ fn build_nameplate_for(
     let bg_mat = materials.add(StandardMaterial {
         base_color: Color::linear_rgb(t.bg_color[0], t.bg_color[1], t.bg_color[2]),
         unlit: true,
+        double_sided: true,
+        cull_mode: None,
         ..default()
     });
     let fill_mat = materials.add(StandardMaterial {
         base_color: Color::linear_rgb(t.fill_color[0], t.fill_color[1], t.fill_color[2]),
         unlit: true,
+        double_sided: true,
+        cull_mode: None,
         ..default()
     });
 
@@ -164,31 +179,22 @@ fn build_nameplate_for(
             // Story-644 fix boss — hauteur par-ennemi si fournie (colle la tête même
             // sur le boss géant), sinon fallback `y_offset` genome (fixe).
             Transform::from_xyz(0.0, anchor_y.unwrap_or(t.y_offset), 0.0),
+            // 2026-07-03 — Visibility OBLIGATOIRE sur le root : les quads enfants
+            // (Mesh3d → Visibility auto) ont besoin d'une chaîne d'ancêtres complète
+            // pour l'InheritedVisibility, sinon barres invisibles (classe B0004).
+            Visibility::default(),
             Name::new("EnemyNameplate"),
             ChildOf(target),
         ))
         .id();
 
-    // Story-644 P1 Inc.2 — matériaux + positions des barres défensives (Bouclier bleu,
-    // Armure jaune) empilées AU-DESSUS de la HP. Créées seulement pour les couches
-    // présentes → 0 quad superflu (Tank = armure seule, Runner = bouclier seul).
-    let shield_mat = defense.filter(|d| d.shield_max > 0.0).map(|_| {
-        materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(t.shield_color[0], t.shield_color[1], t.shield_color[2]),
-            unlit: true,
-            ..default()
-        })
-    });
-    let armor_mat = defense.filter(|d| d.armor_max > 0.0).map(|_| {
-        materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(t.armor_color[0], t.armor_color[1], t.armor_color[2]),
-            unlit: true,
-            ..default()
-        })
-    });
+    // Story-654 — la barre principale = LA VIE SEULE ; les couches défensives
+    // s'affichent en PLAQUES segmentées au-dessus (façon Apex/DRG : « il reste
+    // 2 plaques bleues » se lit d'un coup d'œil, une barre scalée non).
     let bar_gap = t.height * 1.15;
+    let has_shield = defense.map(|d| d.shield_max > 0.0).unwrap_or(false);
     let shield_y = bar_gap;
-    let armor_y = if shield_mat.is_some() { bar_gap * 2.0 } else { bar_gap };
+    let armor_y = if has_shield { bar_gap * 2.0 } else { bar_gap };
 
     commands.entity(root_id).with_children(|p| {
         p.spawn((
@@ -205,39 +211,55 @@ fn build_nameplate_for(
             Transform::from_xyz(0.0, 0.0, 0.0),
             Name::new("NameplateFill"),
         ));
-        if let Some(sm) = shield_mat {
-            p.spawn((
-                NameplateBg,
-                Mesh3d(bg_mesh.clone()),
-                MeshMaterial3d(bg_mat.clone()),
-                Transform::from_xyz(0.0, shield_y, -0.005),
-                Name::new("NameplateShieldBg"),
-            ));
-            p.spawn((
-                NameplateShieldFill,
-                Mesh3d(fill_mesh.clone()),
-                MeshMaterial3d(sm),
-                Transform::from_xyz(0.0, shield_y, 0.0),
-                Name::new("NameplateShieldFill"),
-            ));
-        }
-        if let Some(am) = armor_mat {
-            p.spawn((
-                NameplateBg,
-                Mesh3d(bg_mesh.clone()),
-                MeshMaterial3d(bg_mat.clone()),
-                Transform::from_xyz(0.0, armor_y, -0.005),
-                Name::new("NameplateArmorBg"),
-            ));
-            p.spawn((
-                NameplateArmorFill,
-                Mesh3d(fill_mesh.clone()),
-                MeshMaterial3d(am),
-                Transform::from_xyz(0.0, armor_y, 0.0),
-                Name::new("NameplateArmorFill"),
-            ));
-        }
     });
+
+    // Rangée de plaques pour une couche : n = ceil(max / segment_hp), seuil de la
+    // plaque i = i × segment_hp (visible tant que la couche dépasse le seuil).
+    let mut spawn_plate_row = |max: f32, seg_hp: f32, y: f32, color: [f32; 3], shield: bool| {
+        let seg_hp = seg_hp.max(1.0);
+        let n = ((max / seg_hp).ceil() as usize).clamp(1, MAX_PLATES);
+        let gap = t.width * PLATE_GAP_FRAC;
+        let plate_w = (t.width - gap * (n as f32 - 1.0)) / n as f32;
+        let plate_mesh = meshes.add(Rectangle::new(plate_w, t.height * 0.7));
+        let mat = materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(color[0], color[1], color[2]),
+            unlit: true,
+            double_sided: true,
+            cull_mode: None,
+            ..default()
+        });
+        for i in 0..n {
+            let x = -t.width / 2.0 + plate_w / 2.0 + i as f32 * (plate_w + gap);
+            let threshold = i as f32 * seg_hp;
+            commands.entity(root_id).with_children(|p| {
+                if shield {
+                    p.spawn((
+                        NameplateShieldFill { threshold },
+                        Mesh3d(plate_mesh.clone()),
+                        MeshMaterial3d(mat.clone()),
+                        Transform::from_xyz(x, y, 0.0),
+                        Name::new("ShieldPlate"),
+                    ));
+                } else {
+                    p.spawn((
+                        NameplateArmorFill { threshold },
+                        Mesh3d(plate_mesh.clone()),
+                        MeshMaterial3d(mat.clone()),
+                        Transform::from_xyz(x, y, 0.0),
+                        Name::new("ArmorPlate"),
+                    ));
+                }
+            });
+        }
+    };
+    if let Some(d) = defense {
+        if d.shield_max > 0.0 {
+            spawn_plate_row(d.shield_max, t.shield_segment_hp, shield_y, t.shield_color, true);
+        }
+        if d.armor_max > 0.0 {
+            spawn_plate_row(d.armor_max, t.armor_segment_hp, armor_y, t.armor_color, false);
+        }
+    }
 
     registry.map.insert(target, root_id);
     Some(root_id)
@@ -260,6 +282,22 @@ fn cleanup_registry_on_target_removed(
                 ec.try_despawn();
             }
         }
+    }
+}
+
+/// Auto-promotion (2026-07-03, feedback user « les PV des mobs ne sont pas
+/// visibles ») : toute entité qui reçoit un `NameplateAnchor` (posé au spawn des
+/// ennemis par waves.rs) devient cible PERMANENTE — barres HP/Bouclier/Armure
+/// visibles dès le spawn, pas seulement au premier hit. C'est le pattern voulu
+/// par ce crate (doc en tête : « presence-permanent » Overwatch/Apex) — aucun
+/// caller n'optait jamais dedans. Le mode legacy on-hit reste pour les entités
+/// sans anchor.
+fn promote_anchored_to_permanent(
+    mut commands: Commands,
+    q_new: Query<Entity, (Added<NameplateAnchor>, Without<NameplateTarget>)>,
+) {
+    for e in &q_new {
+        commands.entity(e).insert(NameplateTarget);
     }
 }
 
@@ -365,31 +403,35 @@ fn update_hp_fill(
     }
 }
 
-/// Story-644 P1 Inc.2 — met à jour scale.x des fills Bouclier/Armure selon la couche
-/// défensive de la cible (miroir de `update_hp_fill`). Les deux queries sont
-/// disjointes (`Without<NameplateShieldFill>` sur l'armure) → double `&mut Transform` OK.
+/// Story-654 — met à jour la VISIBILITÉ des plaques Bouclier/Armure : la plaque
+/// reste affichée tant que la couche dépasse son seuil → les plaques « sautent »
+/// une à une (remplace les barres scalées story-644). Queries disjointes
+/// (`Without<NameplateShieldFill>` sur l'armure) → double `&mut Visibility` OK.
 fn update_defense_bars(
     q_roots: Query<(&NameplateRoot, &Children)>,
     q_defense: Query<&DefenseLayer>,
-    mut q_shield: Query<&mut Transform, With<NameplateShieldFill>>,
-    mut q_armor: Query<&mut Transform, (With<NameplateArmorFill>, Without<NameplateShieldFill>)>,
+    mut q_shield: Query<(&NameplateShieldFill, &mut Visibility)>,
+    mut q_armor: Query<
+        (&NameplateArmorFill, &mut Visibility),
+        Without<NameplateShieldFill>,
+    >,
 ) {
     for (root, children) in &q_roots {
         let Ok(dl) = q_defense.get(root.target) else {
             continue;
         };
         for child in children.iter() {
-            if let Ok(mut xf) = q_shield.get_mut(child) {
-                xf.scale.x = if dl.shield_max > 0.0 {
-                    (dl.shield / dl.shield_max).clamp(0.0, 1.0)
+            if let Ok((plate, mut vis)) = q_shield.get_mut(child) {
+                *vis = if dl.shield > plate.threshold {
+                    Visibility::Inherited
                 } else {
-                    0.0
+                    Visibility::Hidden
                 };
-            } else if let Ok(mut xf) = q_armor.get_mut(child) {
-                xf.scale.x = if dl.armor_max > 0.0 {
-                    (dl.armor / dl.armor_max).clamp(0.0, 1.0)
+            } else if let Ok((plate, mut vis)) = q_armor.get_mut(child) {
+                *vis = if dl.armor > plate.threshold {
+                    Visibility::Inherited
                 } else {
-                    0.0
+                    Visibility::Hidden
                 };
             }
         }
@@ -411,7 +453,14 @@ fn billboard_to_camera(
     q_parent: Query<&GlobalTransform, Without<NameplateRoot>>,
     mut q_np: Query<(&GlobalTransform, &mut Transform, &ChildOf), With<NameplateRoot>>,
 ) {
-    let Ok(cam_xf) = q_cam.single() else { return };
+    // 2026-07-03 — BUG racine « barres invisibles » : `.single()` échouait en
+    // SILENCE dès qu'une 2e Camera3d existe (ViewmodelCamera, enfant de la
+    // FpsCamera) → billboard jamais exécuté → quads single-sided jamais tournés
+    // vers la caméra = cullés. Les deux cams partagent la même position monde
+    // (viewmodel = enfant à IDENTITY) → n'importe laquelle donne le bon yaw.
+    let Some(cam_xf) = q_cam.iter().next() else {
+        return;
+    };
     let cam_pos = cam_xf.translation();
     for (np_global, mut np_local, child_of) in &mut q_np {
         let np_world = np_global.translation();

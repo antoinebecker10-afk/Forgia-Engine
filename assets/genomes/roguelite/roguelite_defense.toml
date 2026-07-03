@@ -6,14 +6,15 @@
 # de ce fichier → zéro régression s'il disparaît.
 #
 # Design Gunfire-lite :
-#   - Tank    : lourd blindage, pas de bouclier (armure jaune épaisse).
+#   - Tank    : bouclier bleu À CASSER D'ABORD + armure jaune épaisse
+#               (user 2026-07-03 : « casser le shield avant que les PV baissent »).
 #   - Runner  : léger bouclier régénérant, pas d'armure (rusher fragile).
 #   - Sniper  : bouclier moyen, pas d'armure (back-line).
 #   - Boss    : les deux couches, épaisses.
 #   - Joueur  : bouclier bleu régénérant (Gunfire), pas d'armure au départ.
 
 [tank]
-shield_max = 0.0
+shield_max = 60.0
 armor_max = 80.0
 
 [runner]

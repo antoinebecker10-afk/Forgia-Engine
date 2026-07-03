@@ -31,6 +31,11 @@ pub struct EnemyNameplateTuning {
     pub shield_color: [f32; 3],
     /// Couleur RGB du fill Armure (linear) — story-644 P1 Inc.2.
     pub armor_color: [f32; 3],
+    /// Story-654 — PV par plaque de bouclier (couches affichées en plaques
+    /// segmentées façon Apex/DRG : lisible « il reste 2 plaques »).
+    pub shield_segment_hp: f32,
+    /// Story-654 — PV par plaque d'armure.
+    pub armor_segment_hp: f32,
 }
 
 impl Default for EnemyNameplateTuning {
@@ -48,6 +53,8 @@ impl Default for EnemyNameplateTuning {
             // Bouclier bleu électrique, Armure jaune (miroir enemy_nameplate.toml).
             shield_color: [0.28, 0.55, 0.95],
             armor_color: [0.92, 0.76, 0.24],
+            shield_segment_hp: 20.0,
+            armor_segment_hp: 20.0,
         }
     }
 }
