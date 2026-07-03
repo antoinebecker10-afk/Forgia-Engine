@@ -1,4 +1,4 @@
-# Story-647 — « Le Bourg de l'Enclume » : DA authored pour forge_sanctum (salle 2)
+# Story-660 — « Le Bourg de l'Enclume » : DA authored pour forge_sanctum (salle 2)
 
 > **Demande user 2026-07-02** : « une vraie pièce avec sa propre direction artistique,
 > différente de la première, avec d'autres packs d'assets ». Cible = `forge_sanctum`

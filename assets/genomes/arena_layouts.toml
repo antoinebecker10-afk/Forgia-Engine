@@ -26,7 +26,7 @@
 #    Tier 2 : sourcer de vrais petits rochers de cover.)
 #
 # NOTE : seuls les stages listés ici ont une coquille authored. crypts_of_anvil
-# (story-625) + forge_sanctum « Le Bourg de l'Enclume » (story-647).
+# (story-625) + forge_sanctum « Le Bourg de l'Enclume » (story-660).
 
 [layouts.crypts_of_anvil]
 suppress_procedural_modules = true
@@ -220,7 +220,7 @@ pos = [5.0, 0.0, 1.0]
 section = "fosse_melee"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# LE BOURG DE L'ENCLUME — forge_sanctum authored (story-647, 2026-07-02).
+# LE BOURG DE L'ENCLUME — forge_sanctum authored (story-660, 2026-07-02).
 # DA : place de village-forge DIURNE (kit medieval_hexagon + rochers nature) —
 # température CHAUDE/claire vs Cryptes sombres roses → différenciation instantanée.
 # Règles appliquées (recherche level-art 2026-07-02, rapport gunfire-like) :
