@@ -17,7 +17,8 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_ui_lib::style::{
-    cartoon_btn, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL, HAIR_GOLD_STRONG,
+    cartoon_btn, glass_frame_hero, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL,
+    FORGE_PANEL_LIGHT, HAIR_GOLD_STRONG,
 };
 use forgia_ui_lib::theme::display_text;
 
@@ -37,8 +38,14 @@ pub enum HubTab {
     Armes,
     /// L'Enclume des Âmes (upgrades permanents, `meta_shop`).
     Enclume,
-    /// Arbres de talents — placeholder (P5).
+    /// Arbres de talents — placeholder (gameplay = story suivante).
     Talents,
+    /// Bestiaire — archétypes ennemis (P1 shell : cartes archétypes réelles).
+    Codex,
+    /// Défis quotidiens/hebdo (P1 shell : placeholder stylé).
+    Missions,
+    /// Hauts faits / achievements (P1 shell : placeholder stylé).
+    Succes,
 }
 
 impl HubTab {
@@ -48,6 +55,9 @@ impl HubTab {
             HubTab::Armes => "🗡 ARMES",
             HubTab::Enclume => "🔨 ENCLUME",
             HubTab::Talents => "✦ TALENTS",
+            HubTab::Codex => "📖 CODEX",
+            HubTab::Missions => "🎯 MISSIONS",
+            HubTab::Succes => "🏆 SUCCÈS",
         }
     }
 
@@ -58,6 +68,9 @@ impl HubTab {
             HubTab::Armes => "CHOISIS TON ARME",
             HubTab::Enclume => "L'ENCLUME DES ÂMES",
             HubTab::Talents => "TALENTS",
+            HubTab::Codex => "CODEX · BESTIAIRE",
+            HubTab::Missions => "MISSIONS",
+            HubTab::Succes => "HAUTS FAITS",
         }
     }
 }
@@ -223,8 +236,11 @@ fn draw_hub_chrome(
                         for tab in [
                             HubTab::Forge,
                             HubTab::Armes,
-                            HubTab::Enclume,
                             HubTab::Talents,
+                            HubTab::Enclume,
+                            HubTab::Codex,
+                            HubTab::Missions,
+                            HubTab::Succes,
                         ] {
                             let selected = *hub == tab;
                             let resp = ui.add(egui::Button::selectable(
@@ -255,36 +271,51 @@ fn draw_hub_chrome(
             );
         });
 
-    // ── Onglet Talents : placeholder (arbres = phase P5) ──
-    if *hub == HubTab::Talents {
-        egui::Area::new(egui::Id::new("hub_talents_placeholder"))
+    // ── Sections « dashboard » (Talents / Codex / Missions / Succès) — panneau verre ──
+    // P1 « shell » roguelite : la navigation complète est là tout de suite ; le
+    // gameplay de chaque section arrive en stories suivantes. Codex affiche déjà les
+    // vrais archétypes ennemis (données réelles, pas un placeholder).
+    if matches!(
+        *hub,
+        HubTab::Talents | HubTab::Codex | HubTab::Missions | HubTab::Succes
+    ) {
+        let pts = progress.as_ref().map(|p| p.talent_points).unwrap_or(0);
+        egui::Area::new(egui::Id::new("hub_section_panel"))
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(ctx, |ui| {
-                egui::Frame::new()
-                    .fill(egui::Color32::from_black_alpha(190))
-                    .inner_margin(egui::Margin::symmetric(40, 28))
-                    .corner_radius(egui::CornerRadius::same(12))
-                    .stroke(egui::Stroke::new(2.0, C_PRIMARY))
+                glass_frame_hero()
+                    .inner_margin(egui::Margin::symmetric(40, 30))
                     .show(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            ui.label(display_text("Arbres de talents", 30.0, C_PRIMARY).strong());
-                            ui.add_space(10.0);
-                            ui.label(
-                                egui::RichText::new(
-                                    "Bientôt — choisis ton style (Feu / Givre / Éclair / Poison)\n\
-                                     et débloque des combos signature en jouant.",
-                                )
-                                .size(16.0)
-                                .color(FORGE_CREME),
-                            );
-                            ui.add_space(10.0);
-                            let pts = progress.as_ref().map(|p| p.talent_points).unwrap_or(0);
-                            ui.label(
-                                egui::RichText::new(format!("{pts} point(s) de talent en attente"))
-                                    .size(17.0)
-                                    .strong()
-                                    .color(FORGE_OR),
-                            );
+                        ui.set_max_width(700.0);
+                        ui.vertical_centered(|ui| match *hub {
+                            HubTab::Codex => draw_codex_section(ui),
+                            HubTab::Talents => {
+                                section_intro(
+                                    ui,
+                                    "Arbres de talents",
+                                    "Choisis ton style — Feu · Givre · Éclair · Poison — et débloque \
+                                     des combos signature en jouant.",
+                                );
+                                ui.add_space(8.0);
+                                ui.label(display_text(
+                                    format!("{pts} point(s) de talent en attente"),
+                                    18.0,
+                                    FORGE_OR,
+                                ));
+                            }
+                            HubTab::Missions => section_intro(
+                                ui,
+                                "Missions",
+                                "Des défis quotidiens & hebdomadaires. Accomplis-les pour gagner \
+                                 des Âmes et débloquer des titres.",
+                            ),
+                            HubTab::Succes => section_intro(
+                                ui,
+                                "Hauts faits",
+                                "Repousse tes limites — chaque haut fait débloqué rapporte des Âmes \
+                                 et un titre à porter.",
+                            ),
+                            _ => {}
                         });
                     });
             });
@@ -319,6 +350,61 @@ fn draw_hub_chrome(
                 );
             });
         });
+}
+
+/// Intro d'une section « à venir » (Talents / Missions / Succès) : titre display +
+/// pitch + tag discret. Le vrai contenu gameplay vient en stories suivantes.
+fn section_intro(ui: &mut egui::Ui, title: &str, desc: &str) {
+    ui.label(display_text(title, 30.0, C_PRIMARY).strong());
+    ui.add_space(12.0);
+    ui.label(egui::RichText::new(desc).size(16.0).color(FORGE_CREME));
+    ui.add_space(14.0);
+    ui.label(
+        egui::RichText::new("Contenu à venir")
+            .size(13.0)
+            .italics()
+            .color(C_TEXT_MUTED),
+    );
+}
+
+/// Codex · Bestiaire — cartes des 4 archétypes ennemis. Contenu réel (comportement
+/// aligné sur `enemies.rs`), pas un placeholder. Textes UI cosmétiques.
+fn draw_codex_section(ui: &mut egui::Ui) {
+    ui.label(display_text("Bestiaire", 28.0, C_PRIMARY).strong());
+    ui.add_space(14.0);
+    const ENTRIES: [(&str, &str); 4] = [
+        (
+            "Tank",
+            "Gros, lent, lourdement blindé. Encaisse et charge dans le tas.",
+        ),
+        (
+            "Coureur",
+            "Rapide et fragile. Fonce sur toi, souvent en meute.",
+        ),
+        (
+            "Tireur",
+            "Se tient à distance et te canarde. Garde ses distances.",
+        ),
+        (
+            "Boss — le Forgeron Noir",
+            "S'enrage sous 50 % de PV. Le combat final de la run.",
+        ),
+    ];
+    for (name, desc) in ENTRIES {
+        egui::Frame::new()
+            .fill(FORGE_PANEL_LIGHT)
+            .inner_margin(egui::Margin::symmetric(16, 10))
+            .corner_radius(egui::CornerRadius::same(10))
+            .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
+            .show(ui, |ui| {
+                ui.set_min_width(560.0);
+                ui.vertical(|ui| {
+                    ui.label(display_text(name, 18.0, FORGE_OR).strong());
+                    ui.label(egui::RichText::new(desc).size(14.0).color(FORGE_CREME));
+                });
+            });
+        ui.add_space(8.0);
+    }
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
