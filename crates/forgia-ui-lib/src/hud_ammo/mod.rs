@@ -116,7 +116,7 @@ pub(crate) fn draw_ammo_counter(
         egui::pos2(right - panel_w, bottom - panel_h),
         egui::pos2(right, bottom),
     );
-    chunky_rect_filled(&painter, panel_rect, C_BG_DARK, 3.0, 10.0);
+    glass_panel(&painter, panel_rect, 10.0);
 
     // Low-ammo flash : alpha pulse [min..max] @ low_flash_hz.
     let is_low = slot.is_low();

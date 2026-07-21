@@ -59,7 +59,7 @@ pub(crate) fn draw_player_hp(
         egui::pos2(left_x - 6.0, bottom_y - 6.0),
         egui::vec2(bar_w + 12.0, bar_h + 12.0),
     );
-    chunky_rect_filled(&painter, outer, C_BG_DARK, 3.0, 8.0);
+    glass_panel(&painter, outer, 8.0);
 
     // Bar background (track noir)
     let bar_rect =

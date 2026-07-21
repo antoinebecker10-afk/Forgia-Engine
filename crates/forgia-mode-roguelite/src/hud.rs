@@ -76,7 +76,7 @@ pub(crate) fn draw_wave_counter(
         egui::pos2(center_x - panel_w * 0.5, top_y),
         egui::vec2(panel_w, panel_h),
     );
-    chunky_rect_filled(&painter, panel_rect, C_BG_DARK, 3.0, 10.0);
+    glass_panel(&painter, panel_rect, 10.0);
 
     // Story-646 R2 — multi-salles : « SALLE s/N · VAGUE w/W » (salle Boss = BOSS).
     let total_rooms = graph_cfg.total_stages.max(1);
@@ -158,7 +158,7 @@ pub(crate) fn draw_currency_counters(
             egui::pos2(right_x - panel_w, y),
             egui::vec2(panel_w, panel_h),
         );
-        chunky_rect_filled(&painter, rect, C_BG_DARK, 3.0, 8.0);
+        glass_panel(&painter, rect, 8.0);
         // Icône monnaie à gauche du compteur.
         let icon_c = egui::pos2(rect.min.x + 24.0, rect.center().y);
         if is_soul {
@@ -281,7 +281,7 @@ pub(crate) fn draw_active_boons(
     let mut y = screen.min.y + 210.0;
 
     let header = egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(panel_w, 24.0));
-    chunky_rect_filled(&painter, header, C_BG_DARK, 3.0, 8.0);
+    glass_panel(&painter, header, 8.0);
     text_with_outline(
         &painter,
         egui::pos2(x + 12.0, y + 12.0),
@@ -1191,7 +1191,16 @@ pub(crate) fn draw_weapon_slots(
         } else {
             C_BG_DARK.gamma_multiply(0.45)
         };
-        chunky_rect_filled(&painter, rect, fill, if active { 4.0 } else { 2.0 }, 8.0);
+        painter.rect_filled(rect, 8.0, fill);
+        painter.rect_stroke(
+            rect,
+            8.0,
+            egui::Stroke::new(
+                if active { 2.0 } else { 1.2 },
+                if active { FORGE_CHARBON } else { HAIR_GOLD_STRONG },
+            ),
+            egui::StrokeKind::Inside,
+        );
 
         let txt_color = if active {
             FORGE_CHARBON
@@ -1481,8 +1490,8 @@ pub(crate) fn draw_shockwave_indicator(
     let ready = cd <= 0.0;
     let accent = speaker_color(crate::run::weapon_to_speaker(current));
 
-    painter.circle_filled(center, R, C_BG_DARK);
-    painter.circle_stroke(center, R, egui::Stroke::new(4.0, FORGE_CHARBON));
+    painter.circle_filled(center, R, VERRE_GLASS);
+    painter.circle_stroke(center, R, egui::Stroke::new(1.5, HAIR_GOLD_STRONG));
     let ring = if ready { accent } else { FORGE_METAL_CHAUD };
     painter.circle_stroke(center, R, egui::Stroke::new(2.0, ring));
 

@@ -372,10 +372,17 @@ pub fn glass_frame_hero() -> egui::Frame {
 pub fn glass_panel(painter: &egui::Painter, rect: Rect, corner: f32) {
     cartoon_drop_shadow(painter, rect, corner, egui::vec2(0.0, 5.0));
     painter.rect_filled(rect, corner, VERRE_GLASS);
+    // Reflet haut (arête claire) — vend le « verre » sans blur natif.
+    let top = Rect::from_min_max(
+        rect.min,
+        Pos2::new(rect.max.x, rect.min.y + corner.max(6.0)),
+    );
+    painter.rect_filled(top, corner, Color32::from_white_alpha(10));
+    // Liseré or net (arête premium DA Verre & Braise).
     painter.rect_stroke(
         rect,
         corner,
-        Stroke::new(1.5, HAIR_GOLD),
+        Stroke::new(1.5, HAIR_GOLD_STRONG),
         egui::StrokeKind::Inside,
     );
 }
