@@ -23,7 +23,9 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
-use forgia_ui_lib::style::{C_HP_HIGH, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL};
+use forgia_ui_lib::style::{
+    C_HP_HIGH, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL, HAIR_GOLD_STRONG,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -146,15 +148,39 @@ impl Default for MetaShopCatalogue {
             ],
             // Miroir EXACT des [[weapon_unlocks]] du genome (story-613).
             weapon_unlocks: vec![
-                WeaponUnlock { key: "bourrasque".into(), name: "Bourrasque".into(), cost: 60 },
-                WeaponUnlock { key: "madame_lenoir".into(), name: "Madame Lenoir".into(), cost: 150 },
-                WeaponUnlock { key: "boucherie".into(), name: "Boucherie".into(), cost: 250 },
+                WeaponUnlock {
+                    key: "bourrasque".into(),
+                    name: "Bourrasque".into(),
+                    cost: 60,
+                },
+                WeaponUnlock {
+                    key: "madame_lenoir".into(),
+                    name: "Madame Lenoir".into(),
+                    cost: 150,
+                },
+                WeaponUnlock {
+                    key: "boucherie".into(),
+                    name: "Boucherie".into(),
+                    cost: 250,
+                },
             ],
             // Miroir EXACT des [[boon_tier_unlocks]] du genome (story-616).
             boon_tier_unlocks: vec![
-                WeaponUnlock { key: "uncommon".into(), name: "Atouts Peu communs".into(), cost: 80 },
-                WeaponUnlock { key: "rare".into(), name: "Atouts Rares".into(), cost: 200 },
-                WeaponUnlock { key: "legendary".into(), name: "Atouts Légendaires".into(), cost: 400 },
+                WeaponUnlock {
+                    key: "uncommon".into(),
+                    name: "Atouts Peu communs".into(),
+                    cost: 80,
+                },
+                WeaponUnlock {
+                    key: "rare".into(),
+                    name: "Atouts Rares".into(),
+                    cost: 200,
+                },
+                WeaponUnlock {
+                    key: "legendary".into(),
+                    name: "Atouts Légendaires".into(),
+                    cost: 400,
+                },
             ],
         }
     }
@@ -209,17 +235,29 @@ impl MetaShopCatalogue {
         let weapon_unlocks: Vec<WeaponUnlock> = parsed
             .weapon_unlocks
             .into_iter()
-            .map(|w| WeaponUnlock { key: w.key, name: w.name, cost: w.cost })
+            .map(|w| WeaponUnlock {
+                key: w.key,
+                name: w.name,
+                cost: w.cost,
+            })
             .collect();
         let boon_tier_unlocks: Vec<WeaponUnlock> = parsed
             .boon_tier_unlocks
             .into_iter()
-            .map(|w| WeaponUnlock { key: w.key, name: w.name, cost: w.cost })
+            .map(|w| WeaponUnlock {
+                key: w.key,
+                name: w.name,
+                cost: w.cost,
+            })
             .collect();
         // Fallback PAR CHAMP : un genome partiel ne perd pas les autres listes.
         let d = Self::default();
         Self {
-            upgrades: if upgrades.is_empty() { d.upgrades } else { upgrades },
+            upgrades: if upgrades.is_empty() {
+                d.upgrades
+            } else {
+                upgrades
+            },
             weapon_unlocks: if weapon_unlocks.is_empty() {
                 d.weapon_unlocks
             } else {
@@ -330,7 +368,11 @@ pub fn sys_record_run_stats(
         save.runs_played,
         if victory { "VICTOIRE" } else { "défaite" },
         timer.secs,
-        if last.new_best { " — NOUVEAU RECORD" } else { "" },
+        if last.new_best {
+            " — NOUVEAU RECORD"
+        } else {
+            ""
+        },
         save.victories,
         save.best_victory_secs,
     );
@@ -439,7 +481,10 @@ pub struct PermanentPlayerMods {
 
 impl Default for PermanentPlayerMods {
     fn default() -> Self {
-        Self { damage_mul: 1.0, damage_reduction: 0.0 }
+        Self {
+            damage_mul: 1.0,
+            damage_reduction: 0.0,
+        }
     }
 }
 
@@ -529,10 +574,14 @@ pub fn sys_meta_shop_input(
     cat: Res<MetaShopCatalogue>,
     mut save: ResMut<MetaShopSave>,
     mut meta: ResMut<MetaSouls>,
+    warmup: Option<Res<crate::pipeline_warmup::WarmupState>>,
     mut start_run: MessageWriter<StartRunEvent>,
 ) {
     // Lancer la run (ENTRÉE) — réconcilie + sauve d'abord.
-    if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter) {
+    let launch_requested =
+        keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter);
+    let warmup_ready = warmup.as_ref().is_some_and(|state| state.done);
+    if launch_requested && warmup_ready {
         save.souls_total = meta.current;
         save.save();
         start_run.write(StartRunEvent { seed: None });
@@ -585,7 +634,10 @@ pub fn sys_meta_shop_input(
         return;
     };
     if meta.current < cost {
-        info!("[meta-shop] pas assez d'âmes pour {} ({}/{})", up.name, meta.current, cost);
+        info!(
+            "[meta-shop] pas assez d'âmes pour {} ({}/{})",
+            up.name, meta.current, cost
+        );
         return;
     }
     meta.current -= cost;
@@ -632,7 +684,7 @@ pub fn draw_meta_shop_lobby(
                 .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(44, 30))
                 .corner_radius(egui::CornerRadius::same(14))
-                .stroke(egui::Stroke::new(4.0, FORGE_OR))
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.label(
@@ -775,9 +827,18 @@ mod tests {
     #[test]
     fn first_victory_sets_record_then_only_faster_beats_it() {
         let mut s = MetaShopSave::default();
-        assert!(record_run_result(&mut s, 900.0, true), "1re victoire = record");
-        assert!(!record_run_result(&mut s, 1000.0, true), "plus lent ≠ record");
-        assert!(record_run_result(&mut s, 600.0, true), "plus rapide = record");
+        assert!(
+            record_run_result(&mut s, 900.0, true),
+            "1re victoire = record"
+        );
+        assert!(
+            !record_run_result(&mut s, 1000.0, true),
+            "plus lent ≠ record"
+        );
+        assert!(
+            record_run_result(&mut s, 600.0, true),
+            "plus rapide = record"
+        );
         assert_eq!((s.runs_played, s.victories), (3, 3));
         assert_eq!(s.best_victory_secs, 600.0);
     }
@@ -827,7 +888,10 @@ mod tests {
     #[test]
     fn parse_garbage_falls_back_to_default() {
         let c = MetaShopCatalogue::parse_toml("pas du toml [[[");
-        assert_eq!(c.upgrades.len(), MetaShopCatalogue::default().upgrades.len());
+        assert_eq!(
+            c.upgrades.len(),
+            MetaShopCatalogue::default().upgrades.len()
+        );
     }
 
     #[test]
@@ -859,7 +923,10 @@ mod tests {
         save.unlock_weapon("bourrasque");
         assert!(save.is_weapon_unlocked("bourrasque"));
         assert_eq!(
-            save.unlocked_weapons.iter().filter(|k| *k == "bourrasque").count(),
+            save.unlocked_weapons
+                .iter()
+                .filter(|k| *k == "bourrasque")
+                .count(),
             1
         );
     }

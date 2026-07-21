@@ -18,9 +18,7 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_input::prelude::InputBlockers;
 use forgia_ui_lib::pause_menu::{draw_settings_controls, save_user_settings, UserSettings};
-use forgia_ui_lib::style::{
-    cartoon_btn, C_PRIMARY, FORGE_BOIS_CLAIR, FORGE_CREME, FORGE_METAL_CHAUD, FORGE_OR,
-};
+use forgia_ui_lib::style::{cartoon_btn, glass_btn, C_PRIMARY, FORGE_CREME, FORGE_OR};
 use forgia_ui_lib::theme::display_text;
 // Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
 pub use forgia_crosshair::CrosshairMode;
@@ -268,19 +266,23 @@ fn main_menu_ui(
                         // NOUVELLE PARTIE — entre au Lobby (le wizard nom+style est la
                         // phase suivante du design). CTA or quand pas de save, sinon
                         // bois pour laisser Continuer primer.
-                        let nouvelle_color = if has_save { FORGE_BOIS_CLAIR } else { FORGE_OR };
-                        if cartoon_btn(ui, "✦  NOUVELLE PARTIE", nouvelle_color).clicked() {
+                        let nouvelle = if has_save {
+                            glass_btn(ui, "✦  NOUVELLE PARTIE")
+                        } else {
+                            cartoon_btn(ui, "✦  NOUVELLE PARTIE", FORGE_OR)
+                        };
+                        if nouvelle.clicked() {
                             next_game.set(GameMode::Roguelite);
                             next_app.set(AppMode::InGame);
                         }
                         ui.add_space(16.0);
 
-                        if cartoon_btn(ui, "⚙  OPTIONS", FORGE_BOIS_CLAIR).clicked() {
+                        if glass_btn(ui, "⚙  OPTIONS").clicked() {
                             *page = MenuPage::Options;
                         }
                         ui.add_space(16.0);
 
-                        if cartoon_btn(ui, "✕  QUITTER", FORGE_METAL_CHAUD).clicked() {
+                        if glass_btn(ui, "✕  QUITTER").clicked() {
                             exit.write(AppExit::Success);
                         }
 
@@ -351,11 +353,9 @@ fn main_menu_ui(
                             let mut save_clicked = false;
                             let mut back_clicked = false;
                             ui.horizontal(|ui| {
-                                save_clicked =
-                                    cartoon_btn(ui, "💾 Sauvegarder", FORGE_BOIS_CLAIR).clicked();
+                                save_clicked = glass_btn(ui, "💾 Sauvegarder").clicked();
                                 ui.add_space(12.0);
-                                back_clicked =
-                                    cartoon_btn(ui, "← Retour", FORGE_METAL_CHAUD).clicked();
+                                back_clicked = glass_btn(ui, "← Retour").clicked();
                             });
                             if save_clicked {
                                 save_user_settings(settings.bypass_change_detection());

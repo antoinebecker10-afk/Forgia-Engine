@@ -16,10 +16,13 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
-use forgia_ui_lib::style::{cartoon_btn, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL};
+use forgia_ui_lib::style::{
+    cartoon_btn, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL, HAIR_GOLD_STRONG,
+};
 use forgia_ui_lib::theme::display_text;
 
 use crate::identity::IdentitySave;
+use crate::pipeline_warmup::WarmupState;
 use crate::progress::PlayerProgress;
 use crate::run::{MetaSouls, StartRunEvent};
 use crate::RunState;
@@ -113,6 +116,7 @@ fn chip_frame() -> egui::Frame {
         .fill(FORGE_PANEL)
         .inner_margin(egui::Margin::symmetric(14, 8))
         .corner_radius(egui::CornerRadius::same(8))
+        .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
 }
 
 /// Chrome du hub : bandeau (Âmes / nom / niveau) + barre d'onglets + bouton LANCER.
@@ -123,6 +127,7 @@ fn draw_hub_chrome(
     souls: Option<Res<MetaSouls>>,
     identity: Option<Res<IdentitySave>>,
     progress: Option<Res<PlayerProgress>>,
+    warmup: Option<Res<WarmupState>>,
     mut start_run: MessageWriter<StartRunEvent>,
 ) {
     let Ok(ctx) = contexts.ctx_mut() else {
@@ -140,6 +145,11 @@ fn draw_hub_chrome(
             }
         })
         .unwrap_or("Forgeron");
+    // Ne jamais faire basculer le joueur en combat pendant que les pipelines
+    // PBR sont encore en compilation : ce serait déplacer les freezes du Lobby
+    // vers le premier combat. L'absence de la ressource est volontairement un
+    // gate fermé : le plugin de mode l'installe toujours en production.
+    let warmup_ready = warmup.as_ref().is_some_and(|state| state.done);
 
     // ── Bandeau Âmes (haut-droite) ──
     egui::Area::new(egui::Id::new("hub_souls"))
@@ -207,9 +217,15 @@ fn draw_hub_chrome(
                 .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(8, 6))
                 .corner_radius(egui::CornerRadius::same(10))
+                .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        for tab in [HubTab::Forge, HubTab::Armes, HubTab::Enclume, HubTab::Talents] {
+                        for tab in [
+                            HubTab::Forge,
+                            HubTab::Armes,
+                            HubTab::Enclume,
+                            HubTab::Talents,
+                        ] {
                             let selected = *hub == tab;
                             let resp = ui.add(egui::Button::selectable(
                                 selected,
@@ -281,15 +297,25 @@ fn draw_hub_chrome(
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -24.0))
         .show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                if cartoon_btn(ui, "▶  LANCER LA RUN", FORGE_OR).clicked() {
+                let launch_clicked = ui
+                    .add_enabled_ui(warmup_ready, |ui| {
+                        cartoon_btn(ui, "▶  LANCER LA RUN", FORGE_OR)
+                    })
+                    .inner
+                    .clicked();
+                if launch_clicked {
                     start_run.write(StartRunEvent { seed: None });
                     info!("[hub] LANCER cliqué → StartRunEvent");
                 }
                 ui.add_space(4.0);
                 ui.label(
-                    egui::RichText::new("ou [Entrée]")
-                        .size(13.0)
-                        .color(C_TEXT_MUTED),
+                    egui::RichText::new(if warmup_ready {
+                        "ou [Entrée]"
+                    } else {
+                        "Préparation de la Forge…"
+                    })
+                    .size(13.0)
+                    .color(C_TEXT_MUTED),
                 );
             });
         });

@@ -71,9 +71,17 @@ pub struct IntroDialogue {
 /// Séquence de secours si le TOML est absent/invalide (jamais d'écran muet).
 fn fallback_lines() -> Vec<IntroLine> {
     [
-        ("maitre_forgeron", "Maître Forgeron", "Te revoilà, apprenti. La Forge t'attendait."),
+        (
+            "maitre_forgeron",
+            "Maître Forgeron",
+            "Te revoilà, apprenti. La Forge t'attendait.",
+        ),
         ("apprenti", "L'Apprenti", "Mmh. Je vais ramener les âmes."),
-        ("maitre_forgeron", "Maître Forgeron", "Casse les cages. Et reviens entier."),
+        (
+            "maitre_forgeron",
+            "Maître Forgeron",
+            "Casse les cages. Et reviens entier.",
+        ),
     ]
     .into_iter()
     .map(|(s, n, t)| IntroLine {
@@ -175,11 +183,7 @@ fn sys_advance_intro(
 }
 
 /// Sensor `forgia2_roguelite_intro.json` (1 Hz).
-fn sys_write_intro_sensor(
-    time: Res<Time>,
-    mut accum: Local<f32>,
-    intro: Res<IntroDialogue>,
-) {
+fn sys_write_intro_sensor(time: Res<Time>, mut accum: Local<f32>, intro: Res<IntroDialogue>) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
         return;
@@ -240,19 +244,11 @@ pub(crate) fn draw_intro_bubble(
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -130.0))
         .interactable(false)
         .show(ctx, |ui| {
-            let (rect, _) =
-                ui.allocate_exact_size(egui::vec2(780.0, 172.0), egui::Sense::hover());
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(780.0, 172.0), egui::Sense::hover());
             let p = ui.painter_at(rect);
 
-            // Boîte cartoon : shadow + fond bois clair + double bordure (charbon + or).
-            cartoon_drop_shadow(&p, rect, 22.0, egui::vec2(7.0, 9.0));
-            chunky_rect_filled(&p, rect, FORGE_BOIS_CLAIR, 5.0, 22.0);
-            p.rect_stroke(
-                rect.shrink(4.0),
-                18.0,
-                egui::Stroke::new(3.0, FORGE_OR),
-                egui::StrokeKind::Inside,
-            );
+            // Boîte verre sombre translucide + liseré or (DA Verre & Braise).
+            glass_panel(&p, rect, 22.0);
 
             // Portrait persona (disque + anneau charbon + reflet).
             let pc = egui::pos2(rect.left() + 78.0, rect.center().y);
@@ -292,13 +288,13 @@ pub(crate) fn draw_intro_bubble(
                 3.0,
             );
 
-            // Réplique (charbon sur bois clair → pas d'outline, lisibilité directe).
+            // Réplique (crème sur verre sombre → lisibilité directe).
             p.text(
                 egui::pos2(rect.left() + 156.0, rect.top() + 58.0),
                 egui::Align2::LEFT_TOP,
                 &wrapped,
                 egui::FontId::proportional(25.0),
-                FORGE_CHARBON,
+                FORGE_CREME,
             );
 
             // Indice "ESPACE ▶" une fois la ligne révélée.

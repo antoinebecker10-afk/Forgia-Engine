@@ -25,13 +25,13 @@ use forgia_ui_lib::theme::{display_font, display_text};
 
 use crate::enemies::EnemyArchetype;
 use crate::run::RunState;
-use crate::waves::RogueliteWave;
-use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonId, BoonsCatalogue};
-use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
-use forgia_combat::ultimate::UltimateState;
 use crate::ultimate_config::UltimateConfig;
 use crate::ultimate_vfx::{weapon_technique_label, weapon_vfx_color};
+use crate::waves::RogueliteWave;
+use forgia_combat::ultimate::UltimateState;
+use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
 use forgia_player::FpsCamera;
+use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonId, BoonsCatalogue};
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
 use forgia_stage::graph::StageKind;
@@ -203,16 +203,21 @@ pub(crate) fn draw_currency_counters(
 
     // Or (in-run) en haut, Âmes (méta) en dessous.
     draw_counter(top_y, "OR", gold.current, FORGE_OR, false);
-    draw_counter(top_y + panel_h + gap, "ÂMES", meta.current, FORGE_TEAL, true);
+    draw_counter(
+        top_y + panel_h + gap,
+        "ÂMES",
+        meta.current,
+        FORGE_TEAL,
+        true,
+    );
 }
 
 /// Couleur + libellé court d'un effet de boon (pour le panneau Améliorations).
 fn boon_visual(effect: &BoonEffectKind) -> (egui::Color32, String) {
     match effect {
-        BoonEffectKind::DamageMul { factor } => (
-            FORGE_BRAISE,
-            format!("+{:.0}% dmg", (factor - 1.0) * 100.0),
-        ),
+        BoonEffectKind::DamageMul { factor } => {
+            (FORGE_BRAISE, format!("+{:.0}% dmg", (factor - 1.0) * 100.0))
+        }
         BoonEffectKind::FireRateMul { factor } => (
             egui::Color32::from_rgb(80, 160, 255),
             format!("+{:.0}% cadence", (factor - 1.0) * 100.0),
@@ -221,10 +226,9 @@ fn boon_visual(effect: &BoonEffectKind) -> (egui::Color32, String) {
             egui::Color32::from_rgb(80, 220, 120),
             format!("+{hp:.0} PV/kill"),
         ),
-        BoonEffectKind::DamageReduction { factor } => (
-            FORGE_OR,
-            format!("-{:.0}% reçu", factor * 100.0),
-        ),
+        BoonEffectKind::DamageReduction { factor } => {
+            (FORGE_OR, format!("-{:.0}% reçu", factor * 100.0))
+        }
         BoonEffectKind::ChainTargets { count } => (
             egui::Color32::from_rgb(180, 120, 255),
             format!("+{count} chaîne"),
@@ -413,94 +417,93 @@ pub(crate) fn draw_defeat_overlay(
             // Story-558 Phase 7 — overlay cartoon kid-friendly :
             // fond bois clair (pas noir grimdark) + border or 5px + shadow stack.
             // Anti-pattern documenté audit §8 : punition cosmétique Defeat = décourage.
-            forge_panel_frame()
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(4.0);
-                        // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
-                        // (bible v1 — vocab CE2, vocabulaire poétique enfants).
-                        ui.heading(display_text("LA FORGE T'A BRISÉ", 56.0, FORGE_BRAISE).strong());
-                        ui.add_space(18.0);
-                        // Story-597 Phase B — la 1re mort ENSEIGNE la méta-boucle
-                        // (voix Maître Forgeron, ≤8 mots/ligne) ; les fois suivantes,
-                        // juste l'encouragement court. Flag persisté (FtueSave), marqué
-                        // vu à la SORTIE de l'écran (ftue::sys_mark_first_death_seen).
-                        let first_death = !ftue.first_death_recap_seen;
-                        if first_death {
-                            for line in [
-                                "Tes Âmes restent quand tu tombes.",
-                                "Dépense-les à L'Enclume.",
-                                "Reviens plus fort. Toujours.",
-                            ] {
-                                ui.add_space(6.0);
-                                ui.label(
-                                    egui::RichText::new(line)
-                                        .size(22.0)
-                                        .strong()
-                                        .color(FORGE_CHARBON),
-                                );
-                            }
-                        } else {
+            forge_panel_frame().show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(4.0);
+                    // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
+                    // (bible v1 — vocab CE2, vocabulaire poétique enfants).
+                    ui.heading(display_text("LA FORGE T'A BRISÉ", 56.0, FORGE_BRAISE).strong());
+                    ui.add_space(18.0);
+                    // Story-597 Phase B — la 1re mort ENSEIGNE la méta-boucle
+                    // (voix Maître Forgeron, ≤8 mots/ligne) ; les fois suivantes,
+                    // juste l'encouragement court. Flag persisté (FtueSave), marqué
+                    // vu à la SORTIE de l'écran (ftue::sys_mark_first_death_seen).
+                    let first_death = !ftue.first_death_recap_seen;
+                    if first_death {
+                        for line in [
+                            "Tes Âmes restent quand tu tombes.",
+                            "Dépense-les à L'Enclume.",
+                            "Reviens plus fort. Toujours.",
+                        ] {
+                            ui.add_space(6.0);
                             ui.label(
-                                egui::RichText::new("Mais le marteau t'attend.")
+                                egui::RichText::new(line)
                                     .size(22.0)
-                                    .italics()
+                                    .strong()
                                     .color(FORGE_CHARBON),
                             );
                         }
-
-                        // Story-597 — « toute run paie » : Âmes FORGÉES cette run
-                        // (meta.earned_run), gardées. + total + Or perdu (secondaire).
-                        ui.add_space(20.0);
+                    } else {
                         ui.label(
-                            egui::RichText::new(format!(
-                                "Cette run t'a forgé ◇ {} Âmes — gardées !",
-                                meta.earned_run
-                            ))
-                            .size(22.0)
-                            .strong()
-                            .color(FORGE_CHARBON)
-                            .background_color(FORGE_OR),
+                            egui::RichText::new("Mais le marteau t'attend.")
+                                .size(22.0)
+                                .italics()
+                                .color(FORGE_CHARBON),
                         );
-                        ui.add_space(6.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "Total ◇ {} âmes  ·  Or perdu : {}",
-                                last_defeat.souls_persistent, last_defeat.or_lost
-                            ))
-                            .size(16.0)
-                            .color(FORGE_CHARBON),
-                        );
-                        ui.add_space(36.0);
+                    }
 
-                        // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
-                        if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR).clicked() {
-                            info!("[roguelite-hud] Defeat → Lobby (Enclume)");
-                            // Story-597 — marque le récap vu (couvre ce chemin de sortie).
-                            ftue.mark_first_death(timer.secs);
-                            next_run.set(RunState::Lobby);
-                        }
-                        // Story-597 — 1re mort : flèche guide explicite vers l'Enclume.
-                        if first_death {
-                            ui.add_space(4.0);
-                            ui.label(
-                                egui::RichText::new("↑ dépense tes Âmes ici, puis repars")
-                                    .size(15.0)
-                                    .italics()
-                                    .color(FORGE_BRAISE),
-                            );
-                        }
-                        ui.add_space(10.0);
-                        if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
-                            info!("[roguelite-hud] Defeat → Menu");
-                            // Story-597 — marque aussi le récap vu sur le chemin Menu
-                            // (OnExit SubState ne fire pas ici → fix qa BUG-597-B-01).
-                            ftue.mark_first_death(timer.secs);
-                            next_app.set(AppMode::Menu);
-                            next_game.set(GameMode::None);
-                        }
-                    });
+                    // Story-597 — « toute run paie » : Âmes FORGÉES cette run
+                    // (meta.earned_run), gardées. + total + Or perdu (secondaire).
+                    ui.add_space(20.0);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Cette run t'a forgé ◇ {} Âmes — gardées !",
+                            meta.earned_run
+                        ))
+                        .size(22.0)
+                        .strong()
+                        .color(FORGE_CHARBON)
+                        .background_color(FORGE_OR),
+                    );
+                    ui.add_space(6.0);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "Total ◇ {} âmes  ·  Or perdu : {}",
+                            last_defeat.souls_persistent, last_defeat.or_lost
+                        ))
+                        .size(16.0)
+                        .color(FORGE_CHARBON),
+                    );
+                    ui.add_space(36.0);
+
+                    // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
+                    if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR).clicked() {
+                        info!("[roguelite-hud] Defeat → Lobby (Enclume)");
+                        // Story-597 — marque le récap vu (couvre ce chemin de sortie).
+                        ftue.mark_first_death(timer.secs);
+                        next_run.set(RunState::Lobby);
+                    }
+                    // Story-597 — 1re mort : flèche guide explicite vers l'Enclume.
+                    if first_death {
+                        ui.add_space(4.0);
+                        ui.label(
+                            egui::RichText::new("↑ dépense tes Âmes ici, puis repars")
+                                .size(15.0)
+                                .italics()
+                                .color(FORGE_BRAISE),
+                        );
+                    }
+                    ui.add_space(10.0);
+                    if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
+                        info!("[roguelite-hud] Defeat → Menu");
+                        // Story-597 — marque aussi le récap vu sur le chemin Menu
+                        // (OnExit SubState ne fire pas ici → fix qa BUG-597-B-01).
+                        ftue.mark_first_death(timer.secs);
+                        next_app.set(AppMode::Menu);
+                        next_game.set(GameMode::None);
+                    }
                 });
+            });
         });
 }
 
@@ -563,13 +566,17 @@ pub(crate) fn draw_victory_overlay(
                     // R3.3 — chrono de la run + record. `LastRunStats` est figé par
                     // `sys_record_run_stats` à l'entrée de Victory (même frame).
                     ui.add_space(10.0);
-                    let fmt = |s: f32| format!("{} min {:02} s", (s / 60.0) as u32, (s % 60.0) as u32);
+                    let fmt =
+                        |s: f32| format!("{} min {:02} s", (s / 60.0) as u32, (s % 60.0) as u32);
                     if last_stats.new_best {
                         ui.label(
-                            egui::RichText::new(format!("🏆 NOUVEAU RECORD — {} !", fmt(last_stats.secs)))
-                                .size(22.0)
-                                .strong()
-                                .color(FORGE_OR),
+                            egui::RichText::new(format!(
+                                "🏆 NOUVEAU RECORD — {} !",
+                                fmt(last_stats.secs)
+                            ))
+                            .size(22.0)
+                            .strong()
+                            .color(FORGE_OR),
                         );
                     } else {
                         ui.label(
@@ -721,10 +728,7 @@ pub(crate) fn draw_portal_overlay(
                                     ui.label(egui::RichText::new(emoji).size(46.0));
                                     ui.add_space(4.0);
                                     ui.label(
-                                        egui::RichText::new(label)
-                                            .size(24.0)
-                                            .strong()
-                                            .color(color),
+                                        egui::RichText::new(label).size(24.0).strong().color(color),
                                     );
                                     ui.add_space(14.0);
                                     let hint = hints.get(i).copied().unwrap_or("?");
@@ -835,30 +839,18 @@ pub fn draw_enemy_archetype_labels(
             EnemyArchetype::Boss => "BOSS",
         };
         let color = match archetype {
-            EnemyArchetype::Tank => egui::Color32::from_rgba_unmultiplied(
-                240,
-                70,
-                70,
-                (255.0 * alpha) as u8,
-            ),
-            EnemyArchetype::Runner => egui::Color32::from_rgba_unmultiplied(
-                255,
-                180,
-                60,
-                (255.0 * alpha) as u8,
-            ),
-            EnemyArchetype::Sniper => egui::Color32::from_rgba_unmultiplied(
-                190,
-                100,
-                255,
-                (255.0 * alpha) as u8,
-            ),
-            EnemyArchetype::Boss => egui::Color32::from_rgba_unmultiplied(
-                255,
-                80,
-                200,
-                (255.0 * alpha) as u8,
-            ),
+            EnemyArchetype::Tank => {
+                egui::Color32::from_rgba_unmultiplied(240, 70, 70, (255.0 * alpha) as u8)
+            }
+            EnemyArchetype::Runner => {
+                egui::Color32::from_rgba_unmultiplied(255, 180, 60, (255.0 * alpha) as u8)
+            }
+            EnemyArchetype::Sniper => {
+                egui::Color32::from_rgba_unmultiplied(190, 100, 255, (255.0 * alpha) as u8)
+            }
+            EnemyArchetype::Boss => {
+                egui::Color32::from_rgba_unmultiplied(255, 80, 200, (255.0 * alpha) as u8)
+            }
         };
         let pos = egui::pos2(screen_pos.x, screen_pos.y);
         let outline = egui::Color32::from_rgba_unmultiplied(0, 0, 0, (255.0 * alpha) as u8);
@@ -973,8 +965,7 @@ pub(crate) fn draw_boss_enrage_banner(
             // Text "⚒ FORGE EN COLÈRE !" creme outline noir.
             let text_color =
                 egui::Color32::from_rgba_unmultiplied(255, 244, 220, (alpha * 255.0) as u8);
-            let outline =
-                egui::Color32::from_rgba_unmultiplied(43, 24, 16, (alpha * 255.0) as u8);
+            let outline = egui::Color32::from_rgba_unmultiplied(43, 24, 16, (alpha * 255.0) as u8);
             let size = 36.0 * pop_scale;
             let pos = rect.center();
             for dx in [-2.0_f32, 0.0, 2.0] {
@@ -1158,7 +1149,13 @@ pub(crate) fn draw_weapon_slots(
     // Lit AmmoHudTuning (genome-driven) pour rester découplé des valeurs ammo.
     let (ammo_pad_right, ammo_panel_w, ammo_pad_bottom) = ammo_tuning
         .as_ref()
-        .map(|t| (t.counter_padding_right, t.counter_panel_w, t.counter_padding_bottom))
+        .map(|t| {
+            (
+                t.counter_padding_right,
+                t.counter_panel_w,
+                t.counter_padding_bottom,
+            )
+        })
         .unwrap_or((32.0, 280.0, 28.0));
     let ammo_left = screen.max.x - ammo_pad_right - ammo_panel_w;
     let start_x = ammo_left - 14.0 - total_w; // 14px de marge entre barre et ammo
@@ -1197,7 +1194,11 @@ pub(crate) fn draw_weapon_slots(
             8.0,
             egui::Stroke::new(
                 if active { 2.0 } else { 1.2 },
-                if active { FORGE_CHARBON } else { HAIR_GOLD_STRONG },
+                if active {
+                    FORGE_CHARBON
+                } else {
+                    HAIR_GOLD_STRONG
+                },
             ),
             egui::StrokeKind::Inside,
         );
@@ -1553,36 +1554,42 @@ pub(crate) fn draw_zone_reward_cards(
         egui::Color32::from_rgb(80, 160, 255),
         egui::Color32::from_rgb(80, 220, 120),
     ];
-    let (heading, cards): (&str, Vec<(String, String, egui::Color32)>) = if reward.is_element_choice()
-    {
-        let vfx = elements_cfg.as_deref().map(|c| c.vfx.clone()).unwrap_or_default();
-        let cards = reward
-            .element_candidates
-            .iter()
-            .map(|e| {
-                let [r, g, b] = e.rgb(&vfx);
-                let col =
-                    egui::Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8);
-                (e.fr_name().to_string(), e.tag().to_string(), col)
-            })
-            .collect();
-        ("ARME UN ÉLÉMENT", cards)
-    } else {
-        let cat = catalogue.as_deref();
-        let cards = reward
-            .candidates
-            .iter()
-            .enumerate()
-            .map(|(i, id)| {
-                let name = cat
-                    .and_then(|c| c.entries.iter().find(|b| &b.id == id))
-                    .map(|d| d.name.to_string())
-                    .unwrap_or_else(|| "???".to_string());
-                (name, String::new(), boon_colors[i.min(2)])
-            })
-            .collect();
-        ("CHOISIS UNE AMÉLIORATION", cards)
-    };
+    let (heading, cards): (&str, Vec<(String, String, egui::Color32)>) =
+        if reward.is_element_choice() {
+            let vfx = elements_cfg
+                .as_deref()
+                .map(|c| c.vfx.clone())
+                .unwrap_or_default();
+            let cards = reward
+                .element_candidates
+                .iter()
+                .map(|e| {
+                    let [r, g, b] = e.rgb(&vfx);
+                    let col = egui::Color32::from_rgb(
+                        (r * 255.0) as u8,
+                        (g * 255.0) as u8,
+                        (b * 255.0) as u8,
+                    );
+                    (e.fr_name().to_string(), e.tag().to_string(), col)
+                })
+                .collect();
+            ("ARME UN ÉLÉMENT", cards)
+        } else {
+            let cat = catalogue.as_deref();
+            let cards = reward
+                .candidates
+                .iter()
+                .enumerate()
+                .map(|(i, id)| {
+                    let name = cat
+                        .and_then(|c| c.entries.iter().find(|b| &b.id == id))
+                        .map(|d| d.name.to_string())
+                        .unwrap_or_else(|| "???".to_string());
+                    (name, String::new(), boon_colors[i.min(2)])
+                })
+                .collect();
+            ("CHOISIS UNE AMÉLIORATION", cards)
+        };
 
     // Prompt dynamique : reflète le nombre réel de cartes (story-589 — au portail
     // final il peut n'y avoir que 2 éléments à armer, pas 3).
@@ -1602,7 +1609,7 @@ pub(crate) fn draw_zone_reward_cards(
                 .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(40, 28))
                 .corner_radius(egui::CornerRadius::same(16))
-                .stroke(egui::Stroke::new(4.0, FORGE_OR))
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         ui.heading(display_text(heading, 34.0, FORGE_CREME).strong());
@@ -1642,11 +1649,7 @@ pub(crate) fn draw_zone_reward_cards(
                             }
                         });
                         ui.add_space(14.0);
-                        ui.label(
-                            egui::RichText::new(&prompt)
-                                .size(18.0)
-                                .color(C_TEXT_MUTED),
-                        );
+                        ui.label(egui::RichText::new(&prompt).size(18.0).color(C_TEXT_MUTED));
                     });
                 });
         });

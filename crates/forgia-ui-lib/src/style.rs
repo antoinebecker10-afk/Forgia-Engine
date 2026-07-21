@@ -339,6 +339,19 @@ pub fn cartoon_btn(ui: &mut egui::Ui, label: &str, fill: Color32) -> egui::Respo
     )
 }
 
+/// Bouton « verre sombre » (secondaire) : fond aubergine + liseré or + texte
+/// crème. Pendant sombre de [`cartoon_btn`] — celui-ci reste pour les CTA or.
+/// DA « Verre & Braise » : remplace les boutons bois clair des menus/overlays.
+pub fn glass_btn(ui: &mut egui::Ui, label: &str) -> egui::Response {
+    ui.add(
+        egui::Button::new(crate::theme::display_text(label, 22.0, FORGE_CREME))
+            .fill(FORGE_PANEL)
+            .stroke(Stroke::new(1.5, HAIR_GOLD_STRONG))
+            .corner_radius(egui::CornerRadius::same(14))
+            .min_size(egui::vec2(280.0, 52.0)),
+    )
+}
+
 /// Frame modal cartoon « bois + or » (pattern Defeat/Coffre, bible v1).
 pub fn forge_panel_frame() -> egui::Frame {
     egui::Frame::new()

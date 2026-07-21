@@ -28,7 +28,7 @@ use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::*;
 use forgia_input::InputBlockers;
 use forgia_rpg_data::loot_tables::Souls as Gold;
-use forgia_ui_lib::style::{C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL};
+use forgia_ui_lib::style::{C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL, HAIR_GOLD_STRONG};
 use forgia_ui_lib::theme::display_text;
 
 use crate::merchant::{
@@ -184,7 +184,7 @@ pub fn draw_forge_shop_window(
                 .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(30, 24))
                 .corner_radius(egui::CornerRadius::same(14))
-                .stroke(egui::Stroke::new(3.0, FORGE_OR))
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.set_max_width(780.0);
                     ui.vertical_centered(|ui| {
@@ -275,7 +275,10 @@ pub fn draw_forge_shop_window(
                                         C_TEXT_MUTED
                                     }),
                                 );
-                                if ui.add_enabled(t_afford && trempe_cfg.enabled, btn).clicked() {
+                                if ui
+                                    .add_enabled(t_afford && trempe_cfg.enabled, btn)
+                                    .clicked()
+                                {
                                     ev_temper.write(TemperRequest);
                                 }
                             }

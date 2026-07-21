@@ -15,6 +15,7 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
+use forgia_ui_lib::style::{HAIR_GOLD_STRONG, VERRE_GLASS};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -56,10 +57,18 @@ impl Default for IdentityConfig {
     fn default() -> Self {
         Self {
             default_name: "Forgeron Écarlate".to_string(),
-            name_presets: ["Forgeron Écarlate", "Petit Marteau", "Braise", "Enclumette", "Cendre"]
-                .iter()
-                .map(|l| NamePreset { label: l.to_string() })
-                .collect(),
+            name_presets: [
+                "Forgeron Écarlate",
+                "Petit Marteau",
+                "Braise",
+                "Enclumette",
+                "Cendre",
+            ]
+            .iter()
+            .map(|l| NamePreset {
+                label: l.to_string(),
+            })
+            .collect(),
             colors: vec![
                 ("default", "Apprenti", [0.80, 0.50, 0.20]),
                 ("azur", "Azur", [0.20, 0.45, 0.90]),
@@ -216,16 +225,24 @@ fn draw_identity_panel(
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 10.0))
         .show(ctx, |ui| {
             egui::Frame::new()
-                .fill(egui::Color32::from_black_alpha(180))
+                .fill(VERRE_GLASS)
                 .inner_margin(egui::Margin::symmetric(22, 18))
                 .corner_radius(egui::CornerRadius::same(10))
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.set_min_width(320.0);
                     // Pastille couleur + nom coloré.
                     ui.horizontal(|ui| {
-                        let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
-                        ui.painter().rect_filled(r, egui::CornerRadius::same(4), name_col);
-                        ui.label(egui::RichText::new(&save.player_name).size(22.0).strong().color(name_col));
+                        let (r, _) =
+                            ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
+                        ui.painter()
+                            .rect_filled(r, egui::CornerRadius::same(4), name_col);
+                        ui.label(
+                            egui::RichText::new(&save.player_name)
+                                .size(22.0)
+                                .strong()
+                                .color(name_col),
+                        );
                         if ui.button("✏").on_hover_text("Changer le nom").clicked() {
                             *editing = !*editing;
                         }
@@ -245,7 +262,14 @@ fn draw_identity_panel(
                             }
                         });
                         let mut typed = save.player_name.clone();
-                        if ui.add(egui::TextEdit::singleline(&mut typed).hint_text("…ou tape le tien").char_limit(20)).changed() {
+                        if ui
+                            .add(
+                                egui::TextEdit::singleline(&mut typed)
+                                    .hint_text("…ou tape le tien")
+                                    .char_limit(20),
+                            )
+                            .changed()
+                        {
                             save.player_name = typed;
                             save.name_edited = true;
                             // Save léger : sur perte de focus serait idéal ; ici save sur changement (rare).
@@ -270,9 +294,10 @@ fn draw_identity_panel(
                             );
                             let selected = c.id == equipped;
                             let size = if selected { 30.0 } else { 24.0 };
-                            let (r, resp) =
-                                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
-                            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
+                            let (r, resp) = ui
+                                .allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+                            ui.painter()
+                                .rect_filled(r, egui::CornerRadius::same(5), col);
                             if selected {
                                 ui.painter().rect_stroke(
                                     r,
@@ -307,9 +332,10 @@ fn draw_identity_panel(
                             );
                             let selected = c.id == cur;
                             let size = if selected { 30.0 } else { 24.0 };
-                            let (r, resp) =
-                                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
-                            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
+                            let (r, resp) = ui
+                                .allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+                            ui.painter()
+                                .rect_filled(r, egui::CornerRadius::same(5), col);
                             if selected {
                                 ui.painter().rect_stroke(
                                     r,
