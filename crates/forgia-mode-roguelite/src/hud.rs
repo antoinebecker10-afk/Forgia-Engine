@@ -116,7 +116,7 @@ pub(crate) fn draw_wave_counter(
         egui::pos2(center_x, top_y + 54.0),
         egui::Align2::CENTER_CENTER,
         &sub_text,
-        egui::FontId::monospace(16.0),
+        egui::FontId::proportional(16.0),
         sub_color,
         1.0,
     );
@@ -186,7 +186,7 @@ pub(crate) fn draw_currency_counters(
             egui::pos2(rect.min.x + 44.0, rect.min.y + 5.0),
             egui::Align2::LEFT_TOP,
             label,
-            egui::FontId::monospace(12.0),
+            egui::FontId::proportional(12.0),
             C_TEXT_MUTED,
             1.0,
         );
@@ -1104,7 +1104,7 @@ pub(crate) fn draw_minimap(
         egui::pos2(center.x, center.y + RADIUS + 16.0),
         egui::Align2::CENTER_CENTER,
         &format!("{}:{:02}", total / 60, total % 60),
-        egui::FontId::monospace(18.0),
+        egui::FontId::proportional(18.0),
         C_TEXT_LIGHT,
         2.0,
     );
@@ -1170,7 +1170,7 @@ pub(crate) fn draw_weapon_slots(
         egui::pos2(start_x, bottom_y - 8.0),
         egui::Align2::LEFT_BOTTOM,
         "⇧ DASH",
-        egui::FontId::monospace(13.0),
+        egui::FontId::proportional(13.0),
         C_TEXT_MUTED,
         1.0,
     );
@@ -1206,7 +1206,7 @@ pub(crate) fn draw_weapon_slots(
             egui::pos2(rect.min.x + 7.0, rect.min.y + 4.0),
             egui::Align2::LEFT_TOP,
             &format!("{}", i + 1),
-            egui::FontId::monospace(14.0),
+            egui::FontId::proportional(14.0),
             txt_color,
             1.0,
         );
@@ -1222,7 +1222,7 @@ pub(crate) fn draw_weapon_slots(
             egui::pos2(rect.center().x, rect.max.y - 13.0),
             egui::Align2::CENTER_CENTER,
             name,
-            egui::FontId::monospace(13.0),
+            egui::FontId::proportional(13.0),
             txt_color,
             1.0,
         );
@@ -1345,7 +1345,7 @@ pub(crate) fn draw_player_identity_badge(
         egui::pos2(text_x, portrait_center.y + 13.0),
         egui::Align2::LEFT_CENTER,
         &lvl_text,
-        egui::FontId::monospace(14.0),
+        egui::FontId::proportional(14.0),
         FORGE_OR,
         1.2,
     );
@@ -1434,7 +1434,7 @@ pub(crate) fn draw_ultimate_banner(
         egui::pos2(cx, by + bh + 16.0),
         egui::Align2::CENTER_CENTER,
         &format!("{:.0}s", ult.active_left.ceil()),
-        egui::FontId::monospace(20.0),
+        egui::FontId::proportional(20.0),
         col,
         1.5,
     );
@@ -1492,7 +1492,7 @@ pub(crate) fn draw_shockwave_indicator(
         center,
         egui::Align2::CENTER_CENTER,
         "F",
-        egui::FontId::monospace(24.0),
+        egui::FontId::proportional(24.0),
         f_color,
         2.0,
     );
@@ -1515,7 +1515,7 @@ pub(crate) fn draw_shockwave_indicator(
             egui::pos2(center.x, center.y + R + 12.0),
             egui::Align2::CENTER_CENTER,
             &format!("{:.0}", cd.ceil()),
-            egui::FontId::monospace(14.0),
+            egui::FontId::proportional(14.0),
             C_TEXT_MUTED,
             1.0,
         );

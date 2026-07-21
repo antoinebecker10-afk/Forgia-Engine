@@ -11,10 +11,10 @@ use forgia_player::Player;
 
 use crate::style::*;
 
-/// Bouclier (bleu) / Armure (jaune) — couleurs UI cosmétiques (story-644 P1 Inc.1),
-/// alignées sur le concept DefenseLayer (Bouclier bleu régénérant, Armure jaune).
-const C_SHIELD: egui::Color32 = egui::Color32::from_rgb(70, 150, 240);
-const C_ARMOR: egui::Color32 = egui::Color32::from_rgb(235, 195, 70);
+/// Bouclier (bleu) / Armure (jaune) — DA Verre & Braise : source unique via les
+/// tokens sémantiques défense (fusion des 2 palettes, cf audit reskin 2026-07-20).
+const C_SHIELD: egui::Color32 = DEFENSE_SHIELD;
+const C_ARMOR: egui::Color32 = DEFENSE_ARMOR;
 
 // Marker `With<Player>` requis : 2026-05-27 bug HP bar disparaît début vague suivante.
 // Les ArenaBots (forgia-ai-arena-bot) portent aussi `forgia_damage::Health` → query
@@ -118,7 +118,7 @@ pub(crate) fn draw_player_hp(
         egui::pos2(left_x - 14.0, bar_rect.center().y),
         egui::Align2::RIGHT_CENTER,
         "HP",
-        egui::FontId::monospace(20.0),
+        egui::FontId::proportional(20.0),
         C_PRIMARY,
         1.5,
     );

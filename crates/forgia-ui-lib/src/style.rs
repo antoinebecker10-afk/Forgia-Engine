@@ -14,10 +14,11 @@ use bevy_egui::egui::{self, Color32, Pos2, Rect, Stroke};
 
 // ─── Palette Forgia HUD ─────────────────────────────────────────────────
 
-/// Orange Forgia (accent primary). Boutons, bordures actives.
-pub const C_PRIMARY: Color32 = Color32::from_rgb(255, 122, 26);
-/// Cyan electric (accent secondary). Highlights, info.
-pub const C_ACCENT: Color32 = Color32::from_rgb(0, 217, 255);
+/// Accent primary (or de forge). DA « Verre & Braise » : l'ancien orange
+/// arcade est fusionné dans l'or Forge — source unique [`FORGE_OR`].
+pub const C_PRIMARY: Color32 = FORGE_OR;
+/// Accent secondary (cyan électrique). Aligné sur l'élément Électrique [`ELEM_ELEC`].
+pub const C_ACCENT: Color32 = ELEM_ELEC;
 
 /// HP high (>50%) — vert vif.
 pub const C_HP_HIGH: Color32 = Color32::from_rgb(80, 220, 100);
@@ -29,14 +30,14 @@ pub const C_HP_LOW: Color32 = Color32::from_rgb(230, 57, 70);
 /// Bot HP bar (toujours rouge cartoon — convention ennemis).
 pub const C_BOT_HP: Color32 = Color32::from_rgb(232, 70, 60);
 
-/// Fond panel HUD (translucide).
-pub const C_BG_DARK: Color32 = Color32::from_rgba_premultiplied(15, 18, 24, 200);
+/// Fond panel HUD (verre sombre translucide). DA Verre & Braise → [`VERRE_GLASS`].
+pub const C_BG_DARK: Color32 = VERRE_GLASS;
 /// Outline systématique (noir chunky).
 pub const C_OUTLINE: Color32 = Color32::from_rgb(8, 8, 12);
-/// Texte clair principal.
-pub const C_TEXT_LIGHT: Color32 = Color32::from_rgb(248, 250, 252);
-/// Texte secondaire (gris doux).
-pub const C_TEXT_MUTED: Color32 = Color32::from_rgb(168, 178, 192);
+/// Texte clair principal (crème chaud, DA Verre & Braise).
+pub const C_TEXT_LIGHT: Color32 = Color32::from_rgb(241, 234, 223);
+/// Texte secondaire (mauve doux chaud).
+pub const C_TEXT_MUTED: Color32 = Color32::from_rgb(169, 159, 180);
 
 /// Damage popup number — jaune saturé cartoon.
 pub const C_DAMAGE_NUMBER: Color32 = Color32::from_rgb(255, 240, 80);
@@ -206,11 +207,44 @@ pub const FORGE_CHARBON: Color32 = Color32::from_rgb(43, 24, 16);
 pub const FORGE_CREME: Color32 = Color32::from_rgb(255, 244, 220);
 /// Healing, mana, qualité commune-plus.
 pub const FORGE_TEAL: Color32 = Color32::from_rgb(60, 174, 163);
-/// Fond panneau « charbon chaud » (modaux sombres : Enclume, reward cards).
-/// Story-596 — remplace les littéraux (28,26,34)/(28,24,20) dispersés.
-pub const FORGE_PANEL: Color32 = Color32::from_rgb(36, 28, 22);
+/// Fond panneau « verre sombre aubergine » (modaux/HUD). DA « Verre & Braise »
+/// (2026-07-20) — remplace le charbon chaud (36,28,22) par l'aubergine glass.
+pub const FORGE_PANEL: Color32 = Color32::from_rgb(27, 21, 38);
 /// Variante éclaircie de [`FORGE_PANEL`] (cartes internes d'un modal).
-pub const FORGE_PANEL_LIGHT: Color32 = Color32::from_rgb(52, 42, 34);
+pub const FORGE_PANEL_LIGHT: Color32 = Color32::from_rgb(42, 34, 58);
+
+// ─── DA « Verre & Braise » (2026-07-20, story reskin UI) ─────────────────
+// Verre sombre translucide + or de forge. Les éléments/statuts sont des tokens
+// SÉMANTIQUES, séparés de l'accent or ([`FORGE_OR`]). Fusionne les 2 familles
+// historiques (C_* arcade + FORGE_* cartoon) en une seule source de vérité.
+
+/// Verre translucide : panneaux qui laissent transparaître la scène (HUD/overlays).
+/// Prémultiplié (from_rgba_unmultiplied non-const) = unmult (24,18,34,214).
+pub const VERRE_GLASS: Color32 = Color32::from_rgba_premultiplied(20, 15, 29, 214);
+/// Liseré chaud discret (bord de panneau verre). = unmult (255,214,140,46).
+pub const HAIR_GOLD: Color32 = Color32::from_rgba_premultiplied(46, 39, 25, 46);
+/// Liseré or marqué (panneaux héros / focus). = unmult (255,205,90,130).
+pub const HAIR_GOLD_STRONG: Color32 = Color32::from_rgba_premultiplied(130, 105, 46, 130);
+/// Braise — chaleur / accents chauds secondaires.
+pub const FORGE_EMBER: Color32 = Color32::from_rgb(232, 83, 28);
+
+/// Élément Feu (orange braise).
+pub const ELEM_FEU: Color32 = Color32::from_rgb(255, 122, 60);
+/// Élément Électrique (cyan).
+pub const ELEM_ELEC: Color32 = Color32::from_rgb(84, 214, 230);
+/// Élément Poison (vert toxique).
+pub const ELEM_POISON: Color32 = Color32::from_rgb(143, 209, 79);
+/// Élément Perforant (violet).
+pub const ELEM_PERFO: Color32 = Color32::from_rgb(178, 116, 255);
+
+/// Statut positif (soin, succès).
+pub const STATUS_OK: Color32 = Color32::from_rgb(95, 209, 106);
+/// Statut danger (alerte, faible PV).
+pub const STATUS_DANGER: Color32 = Color32::from_rgb(224, 82, 74);
+/// Défense — Bouclier (bleu).
+pub const DEFENSE_SHIELD: Color32 = Color32::from_rgb(79, 180, 255);
+/// Défense — Armure (jaune ambré).
+pub const DEFENSE_ARMOR: Color32 = Color32::from_rgb(242, 194, 74);
 
 // Rarity colors — convention Hearthstone/Diablo (universellement lisible
 // enfants). Override des couleurs HUD générique pour le Coffre.
@@ -312,4 +346,36 @@ pub fn forge_panel_frame() -> egui::Frame {
         .inner_margin(egui::Margin::symmetric(80, 48))
         .corner_radius(egui::CornerRadius::same(20))
         .stroke(Stroke::new(5.0, FORGE_OR))
+}
+
+// ─── DA « Verre & Braise » — panneaux verre (2026-07-20) ─────────────────
+
+/// Frame panneau « verre sombre » : fond aubergine translucide + liseré or
+/// discret. Standard des panneaux de la DA Verre & Braise ; remplace les
+/// `egui::Frame` construits inline dans chaque écran (généralisé en Vague 2).
+pub fn glass_frame() -> egui::Frame {
+    egui::Frame::new()
+        .fill(VERRE_GLASS)
+        .inner_margin(egui::Margin::same(16))
+        .corner_radius(egui::CornerRadius::same(16))
+        .stroke(Stroke::new(1.5, HAIR_GOLD))
+}
+
+/// Variante « héros » du panneau verre (liseré or marqué — focus / CTA).
+pub fn glass_frame_hero() -> egui::Frame {
+    glass_frame().stroke(Stroke::new(1.5, HAIR_GOLD_STRONG))
+}
+
+/// Panneau verre en peinture directe (HUD immediate-mode) : ombre douce +
+/// fond translucide + liseré or. Pour les widgets qui dessinent au painter
+/// plutôt qu'en `egui::Frame` (compteurs, minimap, slots…).
+pub fn glass_panel(painter: &egui::Painter, rect: Rect, corner: f32) {
+    cartoon_drop_shadow(painter, rect, corner, egui::vec2(0.0, 5.0));
+    painter.rect_filled(rect, corner, VERRE_GLASS);
+    painter.rect_stroke(
+        rect,
+        corner,
+        Stroke::new(1.5, HAIR_GOLD),
+        egui::StrokeKind::Inside,
+    );
 }

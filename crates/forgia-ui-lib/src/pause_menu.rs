@@ -391,11 +391,10 @@ pub(crate) fn draw_pause_menu(
     egui::Area::new(egui::Id::new("forgia_pause_menu"))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
         .show(ctx, |ui| {
-            egui::Frame::new()
-                .fill(egui::Color32::from_black_alpha(200))
+            crate::style::glass_frame_hero()
+                .fill(FORGE_PANEL)
                 .inner_margin(egui::Margin::symmetric(56, 36))
-                .corner_radius(egui::CornerRadius::same(10))
-                .stroke(egui::Stroke::new(2.5, C_PRIMARY))
+                .corner_radius(egui::CornerRadius::same(18))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| match state.sub {
                         PauseSubMenu::Root => {
@@ -432,12 +431,7 @@ fn draw_root(
     state: &mut PauseMenuState,
 ) {
     ui.add_space(4.0);
-    ui.heading(
-        egui::RichText::new("PAUSE")
-            .size(56.0)
-            .color(C_PRIMARY)
-            .strong(),
-    );
+    ui.label(crate::theme::display_text("PAUSE", 52.0, C_PRIMARY));
     ui.add_space(24.0);
 
     let btn = |ui: &mut egui::Ui, label: &str| -> bool {

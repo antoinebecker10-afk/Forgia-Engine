@@ -167,7 +167,7 @@ pub(crate) fn draw_ammo_counter(
         main_pos,
         egui::Align2::RIGHT_CENTER,
         &cache.main_text,
-        egui::FontId::monospace(tuning.counter_font_main),
+        egui::FontId::proportional(tuning.counter_font_main),
         main_color,
         tuning.counter_outline_px,
     );
@@ -182,7 +182,7 @@ pub(crate) fn draw_ammo_counter(
         reserve_pos,
         egui::Align2::RIGHT_CENTER,
         &cache.reserve_text,
-        egui::FontId::monospace(tuning.counter_font_reserve),
+        egui::FontId::proportional(tuning.counter_font_reserve),
         C_TEXT_MUTED,
         tuning.counter_reserve_outline_px,
     );
@@ -202,7 +202,7 @@ pub(crate) fn draw_ammo_counter(
         label_pos,
         egui::Align2::LEFT_TOP,
         "AMMO",
-        egui::FontId::monospace(tuning.label_font_size),
+        egui::FontId::proportional(tuning.label_font_size),
         C_TEXT_MUTED,
         tuning.label_outline_px,
     );
@@ -218,7 +218,7 @@ pub(crate) fn draw_ammo_counter(
             reload_pos,
             egui::Align2::LEFT_BOTTOM,
             "RELOADING…",
-            egui::FontId::monospace(tuning.reload_indicator_font_size),
+            egui::FontId::proportional(tuning.reload_indicator_font_size),
             C_RELOAD_ARC,
             tuning.reload_indicator_outline_px,
         );
@@ -340,7 +340,7 @@ pub(crate) fn draw_slot_strip(
             box_rect.center(),
             egui::Align2::CENTER_CENTER,
             weapon_initial(weapon),
-            egui::FontId::monospace(tuning.slot_initial_font * scale),
+            egui::FontId::proportional(tuning.slot_initial_font * scale),
             initial_color,
             tuning.slot_initial_outline_px,
         );
@@ -358,7 +358,7 @@ pub(crate) fn draw_slot_strip(
                 hk_pos,
                 egui::Align2::LEFT_TOP,
                 hk_str,
-                egui::FontId::monospace(tuning.slot_hotkey_font),
+                egui::FontId::proportional(tuning.slot_hotkey_font),
                 C_PRIMARY,
                 1.0,
             );
@@ -386,7 +386,7 @@ pub(crate) fn draw_slot_strip(
                 mini_pos,
                 egui::Align2::CENTER_BOTTOM,
                 &cache.slot_mini[buf_idx],
-                egui::FontId::monospace(tuning.slot_mini_counter_font * scale),
+                egui::FontId::proportional(tuning.slot_mini_counter_font * scale),
                 mini_color,
                 tuning.slot_mini_counter_outline_px,
             );

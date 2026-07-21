@@ -273,7 +273,7 @@ pub(crate) fn draw_killfeed(
             egui::pos2(entry_rect.min.x + pad, center_y),
             egui::Align2::LEFT_CENTER,
             &entry.attacker_label,
-            egui::FontId::monospace(tuning.font_attacker),
+            egui::FontId::proportional(tuning.font_attacker),
             attacker_color,
             tuning.text_outline_px,
         );
@@ -286,7 +286,7 @@ pub(crate) fn draw_killfeed(
                 egui::pos2(icon_x, center_y),
                 egui::Align2::CENTER_CENTER,
                 weapon_short(w),
-                egui::FontId::monospace(tuning.font_weapon_icon),
+                egui::FontId::proportional(tuning.font_weapon_icon),
                 with_alpha(C_PRIMARY, alpha_u8),
                 1.5,
             );
@@ -298,7 +298,7 @@ pub(crate) fn draw_killfeed(
             egui::pos2(icon_x + tuning.arrow_offset_x_from_icon, center_y),
             egui::Align2::CENTER_CENTER,
             ">",
-            egui::FontId::monospace(tuning.font_arrow),
+            egui::FontId::proportional(tuning.font_arrow),
             with_alpha(C_TEXT_LIGHT, alpha_u8),
             1.0,
         );
@@ -309,7 +309,7 @@ pub(crate) fn draw_killfeed(
             egui::pos2(icon_x + tuning.victim_offset_x_from_icon, center_y),
             egui::Align2::LEFT_CENTER,
             &entry.victim_label,
-            egui::FontId::monospace(tuning.font_victim),
+            egui::FontId::proportional(tuning.font_victim),
             victim_color,
             tuning.text_outline_px,
         );
@@ -321,7 +321,7 @@ pub(crate) fn draw_killfeed(
                 egui::pos2(entry_rect.max.x - pad, center_y),
                 egui::Align2::RIGHT_CENTER,
                 "*",
-                egui::FontId::monospace(tuning.font_attacker + tuning.headshot_font_bonus),
+                egui::FontId::proportional(tuning.font_attacker + tuning.headshot_font_bonus),
                 with_alpha(C_AMMO_TEXT, alpha_u8),
                 1.5,
             );
@@ -385,7 +385,7 @@ pub(crate) fn draw_multikill_banner(
         center,
         egui::Align2::CENTER_CENTER,
         banner,
-        egui::FontId::monospace(tuning.multikill_font * scale),
+        egui::FontId::proportional(tuning.multikill_font * scale),
         color,
         3.0,
     );

@@ -84,9 +84,10 @@ pub fn forge_style(style: &mut egui::Style) {
     .into();
     style.spacing.button_padding = egui::vec2(18.0, 10.0);
 
-    // Bois sombre → hover éclairci → press or. Liserés métal/or, radius 12.
-    let btn_fill = Color32::from_rgb(56, 42, 30);
-    let btn_hover = Color32::from_rgb(84, 60, 38);
+    // Verre aubergine → hover éclairci → press or. Liserés métal/or, radius 12.
+    // DA « Verre & Braise » (2026-07-20) : boutons natifs alignés sur les panneaux.
+    let btn_fill = Color32::from_rgb(40, 32, 54);
+    let btn_hover = Color32::from_rgb(58, 46, 78);
     let radius = CornerRadius::same(12);
 
     let v = &mut style.visuals;
@@ -98,7 +99,7 @@ pub fn forge_style(style: &mut egui::Style) {
 
     v.widgets.noninteractive.bg_fill = FORGE_PANEL;
     v.widgets.noninteractive.weak_bg_fill = FORGE_PANEL;
-    v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(92, 78, 64));
+    v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(78, 68, 96));
     v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, FORGE_CREME);
     v.widgets.noninteractive.corner_radius = radius;
 

@@ -218,7 +218,11 @@ pub(crate) fn draw_screen_flash(
     q_player_health: Query<&Health, With<Player>>,
     mut sensor: ResMut<ScreenFlashSensor>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    // Fix 2026-07-20 : était gaté `GameMode::Fps` seul → flash dégâts/kill +
+    // vignette low-HP INACTIFS en Roguelite (le mode shippé). Étendu aux deux.
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+    {
         sensor.low_hp_active = false;
         return;
     }

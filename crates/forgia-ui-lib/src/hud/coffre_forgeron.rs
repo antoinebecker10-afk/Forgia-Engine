@@ -317,7 +317,7 @@ fn draw_card(
             egui::pos2(rect.center().x, chip_y),
             egui::Align2::CENTER_CENTER,
             tags_text,
-            egui::FontId::monospace(12.0),
+            egui::FontId::proportional(12.0),
             rarity_color,
         );
     }

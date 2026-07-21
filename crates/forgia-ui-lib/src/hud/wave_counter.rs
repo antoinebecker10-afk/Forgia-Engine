@@ -88,7 +88,7 @@ pub(crate) fn draw_wave_counter(
         egui::pos2(center_x, top_y + 22.0),
         egui::Align2::CENTER_CENTER,
         &main_text,
-        egui::FontId::monospace(26.0),
+        egui::FontId::proportional(26.0),
         main_color,
         2.0,
     );
@@ -115,7 +115,7 @@ pub(crate) fn draw_wave_counter(
         egui::pos2(center_x, top_y + 54.0),
         egui::Align2::CENTER_CENTER,
         &sub_text,
-        egui::FontId::monospace(16.0),
+        egui::FontId::proportional(16.0),
         sub_color,
         1.0,
     );

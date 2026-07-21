@@ -68,7 +68,7 @@ pub(crate) fn draw_energy_label_overlay(
         egui::pos2(left_x - 14.0, bar_center_y),
         egui::Align2::RIGHT_CENTER,
         "ÉNERGIE",
-        egui::FontId::monospace(15.0),
+        egui::FontId::proportional(15.0),
         C_PRIMARY,
         1.5,
     );
