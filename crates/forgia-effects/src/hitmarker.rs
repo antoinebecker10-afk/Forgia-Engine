@@ -77,7 +77,8 @@ fn hitmarker_trigger(
         if hs_count > 0 {
             // Story-528 AC6 — POW! pop + ding placeholder log (audio TBD).
             state.pow_time_left = POW_DURATION;
-            info!("[forgia-effects::hitmarker] DING — POW! headshot ({hs_count})");
+            // Lot A perf tir (audit 2026-07-20) : per-headshot → debug!.
+            debug!("[forgia-effects::hitmarker] DING — POW! headshot ({hs_count})");
         }
     } else {
         let dt = time.delta_secs();

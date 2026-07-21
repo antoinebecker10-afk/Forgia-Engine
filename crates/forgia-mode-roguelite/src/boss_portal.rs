@@ -32,8 +32,9 @@ const PORTAL_Y_OFFSET: f32 = 0.0;
 /// Décalage de yaw du portail (la porte regarde le spawn). Axe avant du GLB =
 /// +Z (la porte tournait le dos) → `PI` (180°). `±FRAC_PI_2` si jamais de profil.
 const PORTAL_YAW_OFFSET: f32 = std::f32::consts::PI;
-const PORTAL_CLOSED_GLB: &str = "models/environment/portal/portal_closed.glb";
-const PORTAL_OPEN_GLB: &str = "models/environment/portal/portal_open.glb";
+// pub(crate) — consommés aussi par le warmup de pipelines (story-664).
+pub(crate) const PORTAL_CLOSED_GLB: &str = "models/environment/portal/portal_closed.glb";
+pub(crate) const PORTAL_OPEN_GLB: &str = "models/environment/portal/portal_open.glb";
 /// Nb de frames d'échec du raycast de surface AVANT le fallback AABB durci. Le cas
 /// normal résout en < 10 frames ; ce seuil (~2 s @ 60 fps) ne déclenche que si le
 /// collider du dais ne s'enregistre jamais (charge authored 11 GLB = ordre variable,

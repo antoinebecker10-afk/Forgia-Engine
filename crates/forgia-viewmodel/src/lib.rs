@@ -35,6 +35,7 @@
 use bevy::prelude::*;
 
 pub mod arms;
+pub mod arms_sensor;
 pub mod attach;
 pub mod calibration;
 pub mod vm_camera;

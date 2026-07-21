@@ -33,18 +33,31 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy::state::state_scoped::DespawnOnExit;
-use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::*;
 use forgia_player::Player;
 use forgia_rpg_data::loot_tables::Souls as Gold;
-use forgia_ui_lib::style::{C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL};
-use forgia_ui_lib::theme::display_text;
 use serde::Deserialize;
 use std::fs;
 
 use crate::run::{MetaSouls, RogueliteRunMarker, RunState};
+
+/// État d'ouverture de la fenêtre du forgeron (dialogue). Toggle par E près du
+/// marchand (`forge_shop.rs`). Ouvert → curseur libre + tir/look bloqués + fenêtre.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct ForgeShopOpen(pub bool);
+
+/// Marqueur du PNJ gobelin (pour l'anim procédurale — il n'a pas de rig).
+#[derive(Component)]
+pub struct MerchantVendor;
+
+/// Demande d'achat d'un item du catalogue (index). Émise par le bouton de la fenêtre
+/// OU la touche 1-N ; consommée par `sys_apply_purchase`.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct PurchaseRequest {
+    pub index: usize,
+}
 
 const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_merchant.toml";
 const SENSOR_PATH: &str = "forgia2_merchant.json";
@@ -94,7 +107,7 @@ impl Currency {
             _ => None,
         }
     }
-    fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Currency::Or => "Or",
             Currency::Ames => "Âmes",
@@ -308,9 +321,11 @@ pub fn sys_spawn_merchant(mut commands: Commands, asset_server: Res<AssetServer>
         },
     ));
     // PNJ Gobli derrière le comptoir — regarde le joueur via le yaw du parent.
+    // `MerchantVendor` → anim procédurale (rotation seule : le GLB n'a pas de rig).
     commands.spawn((
         ChildOf(parent),
         Name::new("MerchantVendorGobli"),
+        MerchantVendor,
         SceneRoot(gobli),
         Transform::from_translation(GOBLI_LOCAL_OFFSET),
         NeedsMerchantCalibrate {
@@ -462,27 +477,15 @@ pub fn sys_merchant_proximity(
     stats.near_player = d_sq <= MERCHANT_RADIUS * MERCHANT_RADIUS;
 }
 
-/// `GameSet::UI` (run_if InRun/Boss) — touches 1..N = achat si proche + monnaie OK.
-#[allow(clippy::too_many_arguments)]
-pub fn sys_merchant_input(
+/// `GameSet::UI` — touches 1..N = achat (bonus clavier), UNIQUEMENT quand la fenêtre
+/// du forgeron est ouverte. Émet `PurchaseRequest` (comme les boutons souris).
+pub fn sys_merchant_keyboard(
     keys: Res<ButtonInput<KeyCode>>,
+    shop: Res<ForgeShopOpen>,
     cat: Res<MerchantCatalogue>,
-    mut stats: ResMut<MerchantStats>,
-    mut gold: Option<ResMut<Gold>>,
-    mut meta: ResMut<MetaSouls>,
-    mut equipped: Option<ResMut<EquippedWeapons>>,
-    mut revive: ResMut<ReviveTokens>,
-    q_player: Query<Entity, With<Player>>,
-    run_state: Option<Res<State<RunState>>>,
-    mut commands: Commands,
+    mut ev: MessageWriter<PurchaseRequest>,
 ) {
-    // Achats actifs UNIQUEMENT pendant la run (InRun/Boss). Au Lobby, les touches
-    // 1-4 appartiennent déjà à L'Enclume (meta_shop) — éviter le double-achat.
-    let active = matches!(
-        run_state.as_deref().map(|s| s.get()),
-        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
-    );
-    if !active || !stats.near_player {
+    if !shop.0 {
         return;
     }
     const DIGITS: [KeyCode; 9] = [
@@ -499,8 +502,27 @@ pub fn sys_merchant_input(
     let Some(i) = DIGITS.iter().position(|k| keys.just_pressed(*k)) else {
         return;
     };
-    let Some(item) = cat.items.get(i) else {
-        return;
+    if i < cat.items.len() {
+        ev.write(PurchaseRequest { index: i });
+    }
+}
+
+/// Applique les `PurchaseRequest` (bouton souris ou clavier) : débit monnaie + effet.
+#[allow(clippy::too_many_arguments)]
+pub fn sys_apply_purchase(
+    mut reqs: MessageReader<PurchaseRequest>,
+    cat: Res<MerchantCatalogue>,
+    mut stats: ResMut<MerchantStats>,
+    mut gold: Option<ResMut<Gold>>,
+    mut meta: ResMut<MetaSouls>,
+    mut equipped: Option<ResMut<EquippedWeapons>>,
+    mut revive: ResMut<ReviveTokens>,
+    q_player: Query<Entity, With<Player>>,
+    mut commands: Commands,
+) {
+    for req in reqs.read() {
+    let Some(item) = cat.items.get(req.index) else {
+        continue;
     };
 
     // Solde dans la bonne monnaie ?
@@ -516,7 +538,7 @@ pub fn sys_merchant_input(
             balance,
             item.cost
         );
-        return;
+        continue;
     }
 
     // Débit.
@@ -579,93 +601,12 @@ pub fn sys_merchant_input(
         item.cost,
         item.currency.label()
     );
+    }
 }
 
 /// Reset des jetons revive en rentrant au Lobby (insurance per-run).
 pub fn sys_reset_revive_tokens(mut revive: ResMut<ReviveTokens>) {
     revive.0 = 0;
-}
-
-/// Panneau egui du commerçant — affiché quand proche + run active.
-#[allow(clippy::too_many_arguments)]
-pub fn draw_merchant_panel(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    game_mode: Res<State<GameMode>>,
-    run_state: Option<Res<State<RunState>>>,
-    cat: Res<MerchantCatalogue>,
-    stats: Res<MerchantStats>,
-    gold: Option<Res<Gold>>,
-    meta: Res<MetaSouls>,
-    revive: Res<ReviveTokens>,
-) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
-        return;
-    }
-    let active = matches!(
-        run_state.as_deref().map(|s| s.get()),
-        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
-    );
-    if !active || !stats.near_player {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
-    let or_balance = gold.as_ref().map(|g| g.current).unwrap_or(0);
-
-    egui::Area::new(egui::Id::new("forgia_merchant"))
-        .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -90.0))
-        .show(ctx, |ui| {
-            egui::Frame::new()
-                .fill(FORGE_PANEL)
-                .inner_margin(egui::Margin::symmetric(32, 22))
-                .corner_radius(egui::CornerRadius::same(12))
-                .stroke(egui::Stroke::new(3.0, FORGE_OR))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.heading(display_text("LE FORGERON ITINÉRANT", 30.0, FORGE_OR).strong());
-                        ui.add_space(4.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "Or : {}      ◇ Âmes : {}      Second souffle : {}",
-                                or_balance, meta.current, revive.0
-                            ))
-                            .size(18.0)
-                            .strong()
-                            .color(FORGE_TEAL),
-                        );
-                        ui.add_space(10.0);
-                        for (i, item) in cat.items.iter().enumerate() {
-                            let balance = match item.currency {
-                                Currency::Or => or_balance,
-                                Currency::Ames => meta.current,
-                            };
-                            let afford = balance >= item.cost;
-                            let text = format!(
-                                "[{}]  {} — {}  ·  {} {}",
-                                i + 1,
-                                item.name,
-                                item.desc,
-                                item.cost,
-                                item.currency.label()
-                            );
-                            let col = if afford { FORGE_OR } else { C_TEXT_MUTED };
-                            ui.label(egui::RichText::new(text).size(17.0).color(col));
-                            ui.add_space(3.0);
-                        }
-                        ui.add_space(8.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "Touches 1-{} = acheter",
-                                cat.items.len()
-                            ))
-                            .size(15.0)
-                            .color(C_TEXT_MUTED),
-                        );
-                    });
-                });
-        });
 }
 
 /// Sensor `forgia2_merchant.json` 1Hz — soldes, proximité, achats, health check.
@@ -720,6 +661,8 @@ impl Plugin for MerchantPlugin {
         app.insert_resource(MerchantCatalogue::load_or_default());
         app.init_resource::<MerchantStats>();
         app.init_resource::<ReviveTokens>();
+        app.init_resource::<ForgeShopOpen>();
+        app.add_message::<PurchaseRequest>();
         app.add_systems(OnEnter(GameMode::Roguelite), sys_spawn_merchant);
         app.add_systems(OnEnter(RunState::Lobby), sys_reset_revive_tokens);
         // Calibration scale (AABB) + pose au sol des visuels GLB (étale + Gobli).
@@ -735,15 +678,15 @@ impl Plugin for MerchantPlugin {
                 .in_set(GameSet::Input)
                 .run_if(in_state(GameMode::Roguelite)),
         );
+        // Achat = event-driven : clavier (bonus, si fenêtre ouverte) + boutons souris
+        // (forge_shop.rs) → PurchaseRequest → sys_apply_purchase. La FENÊTRE elle-même
+        // (dialogue E, curseur, colonnes, anim gobelin) vit dans `forge_shop.rs`.
         app.add_systems(
             Update,
-            sys_merchant_input
+            (sys_merchant_keyboard, sys_apply_purchase)
+                .chain()
                 .in_set(GameSet::UI)
                 .run_if(in_state(GameMode::Roguelite)),
-        );
-        app.add_systems(
-            EguiPrimaryContextPass,
-            draw_merchant_panel.run_if(in_state(GameMode::Roguelite)),
         );
         app.add_systems(
             Update,

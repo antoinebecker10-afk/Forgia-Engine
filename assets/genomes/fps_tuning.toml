@@ -79,13 +79,27 @@ idle_freq = 0.4              # cycles/s respiration (baissé 1.1→0.4 : respira
 # hauteur sous l'arme. 'scale' agrandit la MAIN. Hot-reload Shift+F12.
 [viewmodel_arms]
 enabled = true
+use_glb = true     # story-661 : bras GLB cartoon ; false = poings procéduraux (A/B live)
+glb_scale = 1.35   # échelle mitaines GLB (>1 = grosses pattes cartoon, calibré WYSIWYG)
 scale = 2.0
-grip_x = 0.0       # main crosse : latéral
-grip_drop = -0.08  # sous l'arme
-grip_back = 0.30   # recul (× longueur arme)
-barrel_x = -0.04   # main soutien : latéral
-barrel_drop = -0.06
-barrel_fwd = 0.30  # avancée sous le canon (× longueur arme)
+# Ancres recalibrées pour les bras GLB story-661 (WYSIWYG preview_ingame.py) :
+# la poignée des armes-créatures est SOUS le centre, pas loin derrière.
+# Mains sur la SILHOUETTE de l'arme (les armes-créatures sont larges : une ancre
+# au centre exact est occluse au FOV viewmodel) — coin bas-droit arrière (crosse)
+# et grip avant bas-gauche (soutien).
+# La paume CHEVAUCHE l'arme (la poignée passe dans le C de la main).
+# Main droite = MANCHE VERTICAL (poignée pistolet, le grip vert des armes-
+# créatures, LÉGÈREMENT EN AVANT du centre) — validé user 2026-07-20.
+# Calibrable visuellement : sphères MK_R/MK_L dans calibration_<arme>.blend
+# (tools/blender/preview_ingame.py) → tools/blender/read_grip_markers.py.
+# Ancres = tubes MK_R/MK_L placés par Antoine dans calibration_bourrasque.blend
+# (2026-07-20 19h35, extraits par read_grip_markers).
+grip_x = -0.002    # main crosse : centrée sur la poignée arrière
+grip_drop = -0.131
+grip_back = 0.045
+barrel_x = -0.033  # main soutien : museau, AU-DESSUS du centre (canon)
+barrel_drop = 0.069
+barrel_fwd = 0.400
 elbow_drop = 0.30
 elbow_back = 0.45
 grip_elbow_out = 0.12     # coude main droite (crosse) — modéré

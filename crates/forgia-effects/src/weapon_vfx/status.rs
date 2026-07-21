@@ -2,15 +2,25 @@
 //! Diffèrent des muzzle/impact (burst one-shot, period énorme) : ici burst à
 //! PÉRIODE COURTE = flux continu (la doc 0.18 : burst boucle à l'infini). On
 //! évite `SpawnerSettings::rate` qui ne rendait rien dans ce repo. World-space +
-//! suivi manuel (`status_vfx::sys_follow_status_vfx`). L'on/off = cycle de vie de l'entité
-//! `ParticleEffect` (spawn quand StatusBurn/Poison ajouté, despawn au retrait —
-//! cf `forgia-mode-roguelite/src/status_vfx.rs`).
+//! suivi manuel (`status_vfx::sys_follow_status_vfx`). L'on/off = lease d'un slot
+//! du pool persistant `StatusVfxPool` (attach = retrigger du spawner, detach =
+//! `spawner.active = false` — plus AUCUN spawn/despawn d'entité par statut,
+//! audit fire-path 2026-07-20 — cf `forgia-mode-roguelite/src/status_vfx.rs`).
 
 use bevy::prelude::*;
 use bevy_hanabi::prelude::*;
 use bevy_hanabi::Gradient as HanabiGradient;
 
 use super::VfxTuning;
+
+/// Capacité UNIFIÉE des 3 effets de statut (flamme/poison/shock) — condition du
+/// pool partagé d'auras (`status_vfx::StatusVfxPool`) : le swap de handle sur un
+/// slot vivant ne ré-alloue pas le slice EffectCache si capacité + attributs
+/// sont identiques (précédent validé : pool élément, `element_vfx.rs`).
+/// 128 = l'ancien max des trois (flamme), marge large pour chacun.
+fn status_capacity(t: &VfxTuning) -> u32 {
+    (128.0_f32 * t.count_mult).ceil() as u32
+}
 
 /// Flamme orange soutenue qui colle au corps d'un ennemi en feu.
 /// HDR MODÉRÉ (pic ~2.6, leçon story-450 `muzzle.rs:23-47` : HDR fort + bloom
@@ -64,7 +74,7 @@ pub(super) fn create_status_flame(
     let texture_slot = writer.lit(0u32).expr();
 
     let effect = EffectAsset::new(
-        (128.0_f32 * t.count_mult).ceil() as u32, // ~30/s × lifetime 0.6s ≈ 18 vivants, marge confortable
+        status_capacity(t), // ~30/s × lifetime 0.6s ≈ 18 vivants, marge confortable
         // CONTINU via burst répété (3 particules toutes les 0.1s = 30/s). On
         // utilise `burst` (et PAS `rate`) car c'est l'API prouvée visible du repo
         // (muzzle/impact) ; `rate` ne rendait rien ici. La doc 0.18 confirme que
@@ -149,7 +159,7 @@ pub(super) fn create_status_poison_cloud(
     let texture_slot = writer.lit(0u32).expr();
 
     let effect = EffectAsset::new(
-        (96.0_f32 * t.count_mult).ceil() as u32, // ~16/s × lifetime 1.0s ≈ 16 vivants
+        status_capacity(t), // ~16/s × lifetime 1.0s ≈ 16 vivants (capacité unifiée pool)
         // CONTINU via burst répété (2 particules toutes les 0.12s ≈ 16/s) — cf flamme.
         SpawnerSettings::burst(2.0.into(), 0.12.into()),
         {
@@ -228,7 +238,7 @@ pub(super) fn create_status_shock(
     let texture_slot = writer.lit(0u32).expr();
 
     let effect = EffectAsset::new(
-        (96.0_f32 * t.count_mult).ceil() as u32, // ~(4×count)/0.07s × lifetime ~0.2s ≈ 17×count vivants, marge large
+        status_capacity(t), // ~(4×count)/0.07s × lifetime ~0.2s ≈ 17×count vivants (capacité unifiée pool)
         // CONTINU via burst répété rapide (cf flamme : burst prouvé, PAS rate) :
         // 4 étincelles toutes les 70 ms = grésillement, pas un flux.
         SpawnerSettings::burst((4.0 * t.count_mult).into(), 0.07.into()),

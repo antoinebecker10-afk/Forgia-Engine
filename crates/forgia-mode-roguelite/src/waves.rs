@@ -124,6 +124,11 @@ pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
 /// Story-517 (2026-05-26) : visual KayKit Skeleton SceneRoot + head proxy
 /// sensor pour permettre headshots (zone-based damage multiplier via
 /// `forgia_damage::HitZoneTag`). Capsule physique conservée (collision OK).
+///
+/// Story-652 (2026-07-02) : la sphère tête est dimensionnée sur le crâne MESURÉ du
+/// GLB et DÉPASSE de la capsule (recalibrée aux épaules) — sinon le raycast
+/// premier-hit de forgia-fps ne la touchait jamais (0 headshot possible). Elle est
+/// ensuite recollée sur le joint `head` du rig animé (cf `head_hitbox.rs`).
 pub fn spawn_wave_enemies(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -144,10 +149,14 @@ pub fn spawn_wave_enemies(
             format!("{}#Scene0", enemies::skeleton_asset_path(*archetype)),
         );
         let scene_scale = enemies::skeleton_scale(*archetype);
-        // Head proxy : sphère sensor ~80% en haut de la capsule body.
-        // Y offset relatif au parent (qui est au centre de la capsule).
-        let head_y_offset = stats.capsule_half_height * 0.85;
-        let head_radius = stats.capsule_radius * 0.55;
+        // Story-652 — sphère tête = crâne mesuré du GLB (position bind-pose en
+        // fallback ; recollée sur l'os `head` par sys_track_head_proxies ensuite).
+        let head_y_offset = crate::head_hitbox::head_local_y_bind(
+            stats.capsule_half_height,
+            stats.capsule_radius,
+            scene_scale,
+        );
+        let head_radius = crate::head_hitbox::head_radius(stats.head_radius, scene_scale);
         let yaw0 = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * std::f32::consts::TAU;
         for i in 0..*count {
             let theta = yaw0 + (i as f32 / *count as f32) * std::f32::consts::TAU;
@@ -185,13 +194,11 @@ pub fn spawn_wave_enemies(
                     // Story-636 — échantillon de vitesse pour le driver d'anim
                     // squelettique (marche vs course selon le déplacement réel).
                     crate::enemy_anim::EnemyLocoSample::default(),
-                    // Story-644 fix boss — hauteur du nameplate = sommet de la capsule
-                    // (`half_height + radius`) + marge, pour qu'il colle la tête de CHAQUE
-                    // ennemi (le boss géant, capsule ~7 m, avait son nameplate + barres
-                    // défensives DANS son corps avec l'offset genome fixe de 2.4 m).
-                    forgia_enemy_nameplate::NameplateAnchor(
-                        stats.capsule_half_height + stats.capsule_radius + 0.6,
-                    ),
+                    // Story-644 (intent préservé par story-652) — nameplate au-dessus
+                    // du CRÂNE réel (haut de la sphère tête + marge). L'ancien ancrage
+                    // « haut de capsule + 0.6 » plaçait le nameplate dans le crâne du
+                    // Runner et 2 m au-dessus du Boss (capsule décalibrée du mesh).
+                    forgia_enemy_nameplate::NameplateAnchor(head_y_offset + head_radius + 0.35),
                 ))
                 .id();
             // Body collider (capsule), classified HitZone::Body par défaut.
@@ -229,8 +236,9 @@ pub fn spawn_wave_enemies(
                 // Story-636 — au scene-ready : rend le mesh translucide (clone de
                 // matériau dédupliqué) pour la viz de contrôle du rig.
                 .observe(crate::enemy_rig_debug::on_enemy_scene_ready);
-            // Head proxy sensor (story-517 headshot — sphère détectée AVANT capsule
-            // body si ray traverse les deux. Tagué HitZone::Head → multiplier dégâts.
+            // Head proxy sensor (story-652) : sphère HitZone::Head dépassant de la
+            // capsule → atteignable en premier-hit. Suivie du joint `head` du rig
+            // animé une fois la scène liée (head_hitbox::sys_bind_head_joints).
             commands.spawn((
                 Name::new(format!(
                     "RogueliteEnemy_W{wave}_{}_{i}_head_proxy",
@@ -241,6 +249,10 @@ pub fn spawn_wave_enemies(
                 Collider::ball(head_radius),
                 Sensor,
                 forgia_damage::HitZoneTag(forgia_damage::HitZone::Head),
+                crate::head_hitbox::HeadProxy {
+                    enemy_root: parent,
+                    joint: None,
+                },
             ));
             total += 1;
         }

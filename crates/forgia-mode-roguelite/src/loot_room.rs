@@ -643,6 +643,16 @@ fn sys_spin_portals(time: Res<Time>, mut q: Query<&mut Transform, With<PortalSpi
     }
 }
 
+/// Contexte du tirage de boon du diamant (story-662) — regroupé en `SystemParam`
+/// pour rester ≤ 12 params sur `sys_collect_level_items` (règle scalability).
+#[derive(bevy::ecs::system::SystemParam)]
+struct BoonRollCtx<'w> {
+    active: ResMut<'w, ActiveBoons>,
+    catalogue: Option<Res<'w, BoonsCatalogue>>,
+    tiers: Res<'w, UnlockedBoonTiers>,
+    rng: ResMut<'w, CoffreRng>,
+}
+
 /// Ramassage walk-over des items du niveau (couronne/cœur/diamant/pièce/étoile) → avantages in-game.
 /// Utilise `GlobalTransform` car les items sont des nodes enfants du GLB (Transform local ≠ monde).
 #[allow(clippy::too_many_arguments)]
@@ -655,10 +665,8 @@ fn sys_collect_level_items(
     mut shrink: ResMut<ShrinkBuff>,
     mut meta: ResMut<crate::run::MetaSouls>,
     mut q_health: Query<&mut Health, With<Player>>,
-    mut active: ResMut<ActiveBoons>,
-    catalogue: Option<Res<BoonsCatalogue>>,
+    mut boons: BoonRollCtx,
     mut popups: ResMut<KillPopupState>,
-    mut diamond_idx: Local<usize>,
 ) {
     if !state.in_room {
         return;
@@ -684,11 +692,23 @@ fn sys_collect_level_items(
                 ("+PV MAX", egui::Color32::from_rgb(231, 76, 60))
             }
             LevelItemKind::Diamond => {
-                if let Some(cat) = catalogue.as_deref() {
-                    if !cat.entries.is_empty() {
-                        let def = cat.entries[*diamond_idx % cat.entries.len()].clone();
-                        *diamond_idx += 1;
-                        active.apply(&def, cat);
+                // Fix audit 2026-07-19 — l'ancien tirage était un index CYCLIQUE
+                // non seedé sur TOUT le catalogue : gating des paliers (story-616)
+                // et gate légendaire 3-tags ignorés → un compte neuf pouvait
+                // toucher un légendaire gratuit. Tirage canonique du Coffre :
+                // pondéré par rareté + paliers méta + légendaires, seedé CoffreRng.
+                // (Le diamant reste GRATUIT — lui donner un coût = décision de
+                // balance, cf audit éco §7 reco P0-4, non tranchée.)
+                if let Some(cat) = boons.catalogue.as_deref() {
+                    let mut idx_fn = rng_next_index(&mut boons.rng.0);
+                    let picked =
+                        roll_candidates_weighted(cat, &boons.active, &boons.tiers, 1, &mut idx_fn);
+                    if let Some(def) = picked
+                        .first()
+                        .and_then(|id| cat.entries.iter().find(|b| &b.id == id))
+                        .cloned()
+                    {
+                        boons.active.apply(&def, cat);
                     }
                 }
                 ("BOON !", egui::Color32::from_rgb(120, 200, 255))

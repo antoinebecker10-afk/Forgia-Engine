@@ -1,5 +1,7 @@
 # Forgia — Roadmap post-audit complet (2026-06-10)
 
+> ⚠️ **SUPERSEDED — voir [`docs/ROADMAP.md`](./ROADMAP.md) (source de vérité unique).** Conservé pour l'historique de la priorisation post-audit du 10 juin.
+>
 > **Source** : [audit complet 16 domaines](./audit/audit-2026-06-10-full-codebase.md) (51 agents, vérif. adversariale).
 > **Objectif** : convertir le moat technique (moteur IA-natif observable) en position de marché
 > en shippant le Roguelite, dans la fenêtre de différenciation estimée à 12-24 mois.

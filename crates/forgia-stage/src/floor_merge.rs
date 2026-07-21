@@ -1,0 +1,481 @@
+//! # Static merge — fusion de géométrie statique par cellule × matériau (story-663)
+//!
+//! Perf : le sol tuilé (~1 600 entités + ~3 200 nœuds de scène) et les murs de
+//! ramparts (~130 prefabs) payaient chacun transform-propagation + visibilité +
+//! extraction CPU par frame (audit 2026-07-19 : la scène statique borne le CPU ;
+//! cible ship = 60 fps GTX 1060). Ici : des **sondes cachées** instancient
+//! chaque GLB une fois, on lit meshes/matériaux/transforms **réellement
+//! produits** par le scene-spawner (zéro hypothèse sur la hiérarchie interne du
+//! GLB — même philosophie que `NeedsAssetCalibrate`), puis on fusionne les
+//! instances en 1 mesh par (cellule de [`MERGE_CELL_WORLD_M`] × matériau) via
+//! `Mesh::transformed_by` + `Mesh::merge`. Le frustum culling reste efficace
+//! (AABB par cellule, pas un mesh géant tout-ou-rien).
+//!
+//! Générique par `label` ("floor", "walls", …) : Inc.1 sol, Inc.2 murs — les
+//! colliders ne changent JAMAIS (sol = 1 cuboid global, murs = 6 cuboids
+//! segment, gérés par le caller).
+//!
+//! **Cache par clé** ([`MergedStaticCache`]) : re-entrer dans une salle de même
+//! taille réutilise les `Handle<Mesh>` fusionnés — zéro rebuild, zéro hitch.
+//!
+//! **Fallback** : si les sondes n'ont rien produit sous [`MERGE_TIMEOUT_SECS`]
+//! (GLB manquant/corrompu), spawn instance-par-instance (`SceneRoot` direct) —
+//! la géométrie ne peut JAMAIS manquer.
+
+use bevy::prelude::*;
+use std::collections::HashMap;
+
+use crate::{StageArenaMarker, StageLoadResult};
+
+/// Côté d'une cellule de fusion en mètres (8 tuiles de 4 m). Granularité
+/// interne perf (compromis batch vs frustum culling) — pas un paramètre
+/// créateur (creator-simplicity : seuils perf non exposés).
+const MERGE_CELL_WORLD_M: f32 = 32.0;
+
+/// Au-delà : GLB considérés KO → fallback spawn individuel + warn.
+const MERGE_TIMEOUT_SECS: f32 = 5.0;
+
+/// Cellules fusionnées spawnées PAR FRAME (mesure 2026-07-20 : tout spawner
+/// d'un coup = burst 412 ms au 1er rendu, tout se spécialise/uploade sur une
+/// frame). 8/frame → ~88 meshes étalés sur ~11 frames pendant le fade-in
+/// d'arène. Interne perf — pas un paramètre créateur.
+const SPAWN_CELLS_PER_FRAME: usize = 8;
+
+/// Une tuile de sol planifiée. `kind` : 0=clean, 1=dirt, 2=rocks.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PendingTile {
+    pub kind: u8,
+    pub pos: Vec3,
+    pub yaw: f32,
+}
+
+/// Lot de géométrie statique en attente de fusion — spawné par
+/// `spawn_stage_arena_on_request` À LA PLACE des N instances. Porte
+/// [`StageArenaMarker`] : un switch de stage nettoie aussi un merge en cours.
+#[derive(Component)]
+pub struct PendingStaticMerge {
+    /// "floor" | "walls" — route les compteurs sensor + nomme les entités.
+    pub label: &'static str,
+    /// Instances : (index de scène dans `scenes`, pose monde).
+    pub instances: Vec<(u8, Transform)>,
+    /// Scènes GLB sources (sondes + fallback).
+    pub scenes: Vec<Handle<Scene>>,
+    /// Clé de cache (`label:extent_dm`) : le plan est déterministe par extent.
+    pub cache_key: String,
+    /// Stage propriétaire (fix QA-663 #1) : si le `StageLoadRequest` courant a
+    /// changé, ce plan est périmé → jeté sans spawner (sinon un cache-hit la
+    /// même frame qu'une transition spawnerait de la géométrie orpheline, hors
+    /// du snapshot `q_existing` déjà capturé par le despawn).
+    pub stage_id: String,
+    pub elapsed_secs: f32,
+}
+
+/// Sonde cachée : 1 par (label, scène utilisée), instancie le GLB une fois
+/// pour lire les meshes réels. `Visibility::Hidden` → jamais rendue.
+#[derive(Component)]
+pub struct MergeProbe {
+    pub label: &'static str,
+    pub scene_idx: u8,
+}
+
+/// Cache des fusions par clé. Les `Handle<Mesh>` restent vivants tant que la
+/// Resource existe (quelques Mo pour 1-2 tailles d'arène × 2 labels).
+#[derive(Resource, Default)]
+pub struct MergedStaticCache {
+    pub by_key: HashMap<String, Vec<(Handle<Mesh>, Handle<StandardMaterial>, Name)>>,
+}
+
+/// File de spawn étalé des meshes fusionnés (mesure 2026-07-20 : spawn
+/// one-shot = burst 412 ms de spécialisation/upload au 1er rendu). Drainée
+/// [`SPAWN_CELLS_PER_FRAME`] par frame par `sys_drain_merge_spawn_queue`.
+/// Porte [`StageArenaMarker`] → nettoyée par les transitions de stage.
+#[derive(Component)]
+pub struct MergedSpawnQueue {
+    pub label: &'static str,
+    pub stage_id: String,
+    pub items: Vec<(Handle<Mesh>, Handle<StandardMaterial>, Name)>,
+    pub cursor: usize,
+}
+
+/// Plan de tuiles du sol — extrait pur de l'ex-boucle de spawn (même maths :
+/// culling circulaire, centre « propre » 1/3 du rayon, mix dirt/rocks, yaw
+/// déterministe 0/90/180/270° anti-répétition). Testable headless.
+pub(crate) fn plan_floor_tiles(extent: f32, tile_size: f32) -> Vec<PendingTile> {
+    let tiles_radius = (extent / tile_size).ceil() as i32;
+    let clean_center = (tiles_radius / 3).max(2);
+    let mut tiles = Vec::new();
+    for tx in -tiles_radius..=tiles_radius {
+        for tz in -tiles_radius..=tiles_radius {
+            let pos = Vec3::new(tx as f32 * tile_size, 0.0, tz as f32 * tile_size);
+            if pos.length() > extent {
+                continue; // cull hors arène (cercle inscrivant l'hex)
+            }
+            let dist = tx.abs().max(tz.abs());
+            let kind = if dist >= clean_center {
+                if (tx + tz).rem_euclid(3) == 0 {
+                    2 // rocks
+                } else {
+                    1 // dirt
+                }
+            } else {
+                0 // clean
+            };
+            let yaw_q = (tx.wrapping_mul(7) ^ tz.wrapping_mul(13)).rem_euclid(4);
+            let yaw = yaw_q as f32 * std::f32::consts::FRAC_PI_2;
+            tiles.push(PendingTile { kind, pos, yaw });
+        }
+    }
+    tiles
+}
+
+/// Spawne le plan + les sondes d'un lot statique à fusionner. Appelé par
+/// `spawn_stage_arena_on_request` (sol Inc.1, murs Inc.2).
+pub(crate) fn spawn_static_merge(
+    commands: &mut Commands,
+    label: &'static str,
+    instances: Vec<(u8, Transform)>,
+    scenes: Vec<Handle<Scene>>,
+    extent: f32,
+    stage_id: &str,
+) {
+    for idx in 0..scenes.len() as u8 {
+        if instances.iter().any(|(k, _)| *k == idx) {
+            commands.spawn((
+                Name::new(format!("MergeProbe_{label}_{idx}")),
+                StageArenaMarker,
+                MergeProbe { label, scene_idx: idx },
+                SceneRoot(scenes[idx as usize].clone()),
+                Transform::IDENTITY,
+                Visibility::Hidden,
+            ));
+        }
+    }
+    commands.spawn((
+        Name::new(format!("PendingStaticMerge_{label}_{stage_id}")),
+        StageArenaMarker,
+        PendingStaticMerge {
+            label,
+            instances,
+            scenes,
+            cache_key: format!("{label}:{}", (extent * 10.0).round() as u32),
+            stage_id: stage_id.to_string(),
+            elapsed_secs: 0.0,
+        },
+    ));
+}
+
+/// Fallback : spawn instance-par-instance (`SceneRoot` direct, équivalent
+/// visuel de l'ancien spawn tuile/prefab).
+fn spawn_instances_individually(commands: &mut Commands, pending: &PendingStaticMerge) -> u32 {
+    for (kind, tf) in &pending.instances {
+        commands.spawn((
+            Name::new(format!("StaticFallback_{}", pending.label)),
+            StageArenaMarker,
+            *tf,
+            Visibility::default(),
+            SceneRoot(pending.scenes[*kind as usize].clone()),
+        ));
+    }
+    pending.instances.len() as u32
+}
+
+fn despawn_probes_of(
+    commands: &mut Commands,
+    label: &str,
+    q_probes: &Query<(Entity, &MergeProbe)>,
+) {
+    for (e, p) in q_probes.iter() {
+        if p.label == label {
+            commands.entity(e).despawn();
+        }
+    }
+}
+
+fn note_merged(result: &mut StageLoadResult, label: &str, cells: u32) {
+    match label {
+        "floor" => result.floor_merged_cells = cells,
+        "walls" => result.walls_merged_cells = cells,
+        _ => {}
+    }
+}
+
+/// Construit la géométrie fusionnée dès que les sondes ont instancié leurs
+/// meshes. Retry par frame (pattern `sys_collide_authored_pieces` : GLB async).
+#[allow(clippy::too_many_arguments)]
+pub fn sys_build_merged_static(
+    mut commands: Commands,
+    time: Res<Time>,
+    request: Option<Res<crate::StageLoadRequest>>,
+    mut cache: ResMut<MergedStaticCache>,
+    mut q_pending: Query<(Entity, &mut PendingStaticMerge)>,
+    q_probes: Query<(Entity, &MergeProbe)>,
+    q_children: Query<&Children>,
+    q_mesh_nodes: Query<(&Mesh3d, &MeshMaterial3d<StandardMaterial>, &GlobalTransform)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut result: ResMut<StageLoadResult>,
+) {
+    if q_pending.is_empty() {
+        return;
+    }
+    let current_id = request.as_ref().map(|r| r.stage_id.as_str()).unwrap_or("");
+
+    for (pending_e, mut pending) in &mut q_pending {
+        // Fix QA-663 #1 — plan périmé (transition de stage cette frame) : jeter
+        // sans rien spawner. Le nouveau stage re-spawnera son propre plan.
+        if pending.stage_id != current_id {
+            despawn_probes_of(&mut commands, pending.label, &q_probes);
+            commands.entity(pending_e).despawn();
+            continue;
+        }
+
+        // ── Cache hit : re-spawn (étalé) des meshes déjà fusionnés ───────────
+        if let Some(cached) = cache.by_key.get(&pending.cache_key) {
+            commands.spawn((
+                Name::new(format!("MergedSpawnQueue_{}", pending.label)),
+                StageArenaMarker,
+                MergedSpawnQueue {
+                    label: pending.label,
+                    stage_id: pending.stage_id.clone(),
+                    items: cached.clone(),
+                    cursor: 0,
+                },
+            ));
+            note_merged(&mut result, pending.label, cached.len() as u32);
+            info!(
+                "[stage-arena] Static merge '{}': cache hit key={} → {} meshes (spawn étalé)",
+                pending.label,
+                pending.cache_key,
+                cached.len()
+            );
+            despawn_probes_of(&mut commands, pending.label, &q_probes);
+            commands.entity(pending_e).despawn();
+            continue;
+        }
+
+        pending.elapsed_secs += time.delta_secs();
+
+        // ── Harvest des sondes du label : produit réel du scene-spawner ──────
+        let scene_count = pending.scenes.len();
+        let mut per_scene: Vec<Vec<(Handle<Mesh>, Handle<StandardMaterial>, Transform)>> =
+            vec![Vec::new(); scene_count];
+        for (probe_e, probe) in &q_probes {
+            if probe.label != pending.label {
+                continue;
+            }
+            let mut stack: Vec<Entity> = q_children
+                .get(probe_e)
+                .map(|c| c.iter().collect())
+                .unwrap_or_default();
+            while let Some(e) = stack.pop() {
+                if let Ok((m, mat, gt)) = q_mesh_nodes.get(e) {
+                    // Sonde à l'identité → GlobalTransform = transform relatif au GLB.
+                    per_scene[probe.scene_idx as usize].push((
+                        m.0.clone(),
+                        mat.0.clone(),
+                        gt.compute_transform(),
+                    ));
+                }
+                if let Ok(ch) = q_children.get(e) {
+                    stack.extend(ch.iter());
+                }
+            }
+        }
+
+        let mut used = vec![false; scene_count];
+        for (k, _) in &pending.instances {
+            used[*k as usize] = true;
+        }
+        let probes_ready = (0..scene_count).all(|k| !used[k] || !per_scene[k].is_empty());
+        let assets_ready = probes_ready
+            && per_scene
+                .iter()
+                .flatten()
+                .all(|(h, _, _)| meshes.get(h).is_some());
+
+        if !assets_ready {
+            if pending.elapsed_secs > MERGE_TIMEOUT_SECS {
+                warn!(
+                    "[stage-arena] Static merge '{}' TIMEOUT ({:.1}s, GLB KO ?) — fallback spawn individuel",
+                    pending.label, pending.elapsed_secs
+                );
+                spawn_instances_individually(&mut commands, &pending);
+                note_merged(&mut result, pending.label, 0);
+                despawn_probes_of(&mut commands, pending.label, &q_probes);
+                commands.entity(pending_e).despawn();
+            }
+            continue;
+        }
+
+        // ── Fusion par (cellule, matériau) — vertices bakés en espace monde ──
+        let mut acc: HashMap<(i32, i32, AssetId<StandardMaterial>), (Mesh, Handle<StandardMaterial>)> =
+            HashMap::new();
+        let mut merge_failed = false;
+        'instances: for (kind, inst_tf) in &pending.instances {
+            let cx = (inst_tf.translation.x / MERGE_CELL_WORLD_M).floor() as i32;
+            let cz = (inst_tf.translation.z / MERGE_CELL_WORLD_M).floor() as i32;
+            for (mesh_h, mat_h, rel) in &per_scene[*kind as usize] {
+                let Some(src) = meshes.get(mesh_h) else { continue };
+                let piece = src.clone().transformed_by(inst_tf.mul_transform(*rel));
+                match acc.entry((cx, cz, mat_h.id())) {
+                    std::collections::hash_map::Entry::Occupied(mut e) => {
+                        if e.get_mut().0.merge(&piece).is_err() {
+                            merge_failed = true;
+                            break 'instances;
+                        }
+                    }
+                    std::collections::hash_map::Entry::Vacant(v) => {
+                        v.insert((piece, mat_h.clone()));
+                    }
+                }
+            }
+        }
+        if merge_failed {
+            // Attributs incompatibles (ne devrait pas arriver : même mesh
+            // source) — on ne livre jamais une géométrie partielle.
+            warn!(
+                "[stage-arena] Static merge '{}': Mesh::merge a échoué — fallback individuel",
+                pending.label
+            );
+            spawn_instances_individually(&mut commands, &pending);
+            note_merged(&mut result, pending.label, 0);
+            despawn_probes_of(&mut commands, pending.label, &q_probes);
+            commands.entity(pending_e).despawn();
+            continue;
+        }
+
+        let instance_count = pending.instances.len();
+        let mut cached: Vec<(Handle<Mesh>, Handle<StandardMaterial>, Name)> =
+            Vec::with_capacity(acc.len());
+        for ((cx, cz, _), (mesh, mat)) in acc {
+            let name = Name::new(format!("StaticMerged_{}_{cx}_{cz}", pending.label));
+            let handle = meshes.add(mesh);
+            cached.push((handle, mat, name));
+        }
+        info!(
+            "[stage-arena] Static merge '{}': {} instances → {} meshes fusionnés (cellules {:.0}m, key={}, spawn étalé {}/frame)",
+            pending.label,
+            instance_count,
+            cached.len(),
+            MERGE_CELL_WORLD_M,
+            pending.cache_key,
+            SPAWN_CELLS_PER_FRAME
+        );
+        note_merged(&mut result, pending.label, cached.len() as u32);
+        commands.spawn((
+            Name::new(format!("MergedSpawnQueue_{}", pending.label)),
+            StageArenaMarker,
+            MergedSpawnQueue {
+                label: pending.label,
+                stage_id: pending.stage_id.clone(),
+                items: cached.clone(),
+                cursor: 0,
+            },
+        ));
+        cache.by_key.insert(pending.cache_key.clone(), cached);
+        despawn_probes_of(&mut commands, pending.label, &q_probes);
+        commands.entity(pending_e).despawn();
+    }
+
+    // Compte de pendings restants (les despawns ci-dessus sont différés → la
+    // valeur se stabilise à la frame suivante ; suffisant pour le sensor 1Hz).
+    result.static_merge_pending = q_pending.iter().count() as u32;
+}
+
+/// Draine les files de spawn étalé : [`SPAWN_CELLS_PER_FRAME`] meshes par
+/// frame et par file. Étale la spécialisation pipeline + l'upload GPU sur
+/// ~11 frames (fix du burst 412 ms mesuré au 1er rendu, 2026-07-20).
+pub fn sys_drain_merge_spawn_queue(
+    mut commands: Commands,
+    request: Option<Res<crate::StageLoadRequest>>,
+    mut q_queues: Query<(Entity, &mut MergedSpawnQueue)>,
+) {
+    if q_queues.is_empty() {
+        return;
+    }
+    let current_id = request.as_ref().map(|r| r.stage_id.as_str()).unwrap_or("");
+    for (queue_e, mut queue) in &mut q_queues {
+        // Même garde anti-péremption que le build (QA-663 #1).
+        if queue.stage_id != current_id {
+            commands.entity(queue_e).despawn();
+            continue;
+        }
+        let end = (queue.cursor + SPAWN_CELLS_PER_FRAME).min(queue.items.len());
+        for i in queue.cursor..end {
+            let (mesh_h, mat_h, name) = &queue.items[i];
+            commands.spawn((
+                name.clone(),
+                StageArenaMarker,
+                Mesh3d(mesh_h.clone()),
+                MeshMaterial3d(mat_h.clone()),
+            ));
+        }
+        queue.cursor = end;
+        if queue.cursor >= queue.items.len() {
+            commands.entity(queue_e).despawn();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TILE: f32 = 4.0;
+
+    #[test]
+    fn plan_matches_legacy_counts_and_bounds() {
+        // Extent 90 m (crypts_of_anvil) : ~1 600 tuiles, toutes dans le cercle.
+        let tiles = plan_floor_tiles(90.0, TILE);
+        assert!(
+            (1400..=1800).contains(&tiles.len()),
+            "compte plausible pour r=23, got {}",
+            tiles.len()
+        );
+        for t in &tiles {
+            assert!(t.pos.length() <= 90.0 + f32::EPSILON, "tuile hors arène");
+            assert!(t.kind < 3);
+        }
+    }
+
+    #[test]
+    fn plan_is_deterministic() {
+        assert_eq!(plan_floor_tiles(60.0, TILE), plan_floor_tiles(60.0, TILE));
+    }
+
+    #[test]
+    fn plan_center_is_clean_kind() {
+        let tiles = plan_floor_tiles(90.0, TILE);
+        let center = tiles
+            .iter()
+            .find(|t| t.pos == Vec3::ZERO)
+            .expect("tuile centrale");
+        assert_eq!(center.kind, 0, "centre = floor.glb propre");
+    }
+
+    #[test]
+    fn cell_grouping_upper_bound() {
+        // Cellules de 32 m → pour r=23 tuiles (~46×46 = 92 m), ≤ 7×7 cellules ;
+        // × ≤3 matériaux = borne large mais significative vs 1 600 entités.
+        let tiles = plan_floor_tiles(90.0, TILE);
+        let mut cells = std::collections::HashSet::new();
+        for t in &tiles {
+            cells.insert((
+                (t.pos.x / MERGE_CELL_WORLD_M).floor() as i32,
+                (t.pos.z / MERGE_CELL_WORLD_M).floor() as i32,
+            ));
+        }
+        assert!(
+            cells.len() <= 49,
+            "{} cellules pour r=23 — grouping cassé ?",
+            cells.len()
+        );
+    }
+
+    #[test]
+    fn yaw_is_quarter_turns() {
+        for t in plan_floor_tiles(40.0, TILE) {
+            let q = t.yaw / std::f32::consts::FRAC_PI_2;
+            assert!((q - q.round()).abs() < 1e-5, "yaw non quantifié: {}", t.yaw);
+        }
+    }
+}

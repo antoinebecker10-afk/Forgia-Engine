@@ -15,7 +15,8 @@
 use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_combat::combat_mods::PlayerCombatMods;
-use forgia_damage::{DamageEvent, DamageKind, DeathEvent, Health, HealthGuard};
+use forgia_combat::Health as EnemyHealth;
+use forgia_damage::{DamageChannel, DeathEvent, DefenseLayer, Health, HealthGuard};
 use forgia_player::Player;
 use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonsCatalogue};
 
@@ -34,6 +35,8 @@ pub fn sys_recompute_boon_mods(
     perm: Res<crate::meta_shop::PermanentPlayerMods>,
     // P3 — bonus de maîtrise d'arme (niveau), composé comme les mods méta.
     mastery: Res<crate::meta_shop::WeaponMasteryMods>,
+    // Story-653 — La Trempe (progression in-run de l'arme), composée comme perm/mastery.
+    trempe: Res<crate::trempe::WeaponTrempeState>,
     mut mods: ResMut<PlayerCombatMods>,
     mut heal: ResMut<HealOnKillCumul>,
 ) {
@@ -86,6 +89,8 @@ pub fn sys_recompute_boon_mods(
     new_mods.damage_mul *= perm.damage_mul;
     // P3 — maîtrise d'arme (niveau) : multiplicatif comme les autres bonus de dégâts.
     new_mods.damage_mul *= mastery.damage_mul;
+    // Story-653 — La Trempe (in-run) : multiplicatif, même couche que perm/mastery.
+    new_mods.damage_mul *= trempe.damage_mul;
     new_mods.damage_reduction = (new_mods.damage_reduction + perm.damage_reduction).min(0.85);
     // Log seulement au changement (recompute tourne chaque frame désormais).
     let changed =
@@ -174,9 +179,17 @@ pub fn sys_apply_knockback_on_hit(
 }
 
 /// Story-558 Phase 4b — chain hitscan. Sur CombatHitEvent (1er hit), si
-/// `chain_extra_targets > 0`, raycast depuis le hit point vers les N enemies
-/// les plus proches dans rayon CHAIN_RANGE et émet DamageEvent à damage réduit
-/// (CHAIN_DAMAGE_FACTOR du damage original).
+/// `chain_extra_targets > 0`, saute aux N enemies les plus proches dans rayon
+/// CHAIN_RANGE et applique un dégât réduit (CHAIN_DAMAGE_FACTOR du damage
+/// original) par mutation directe de `forgia_combat::Health`, routé Bouclier→
+/// Armure→Vie via `DefenseLayer::absorb` (canal Physical) — même pattern que
+/// l'arc Shock d'`elements.rs`.
+///
+/// Fix audit 2026-07-19 : l'ancienne version émettait `DamageEvent`, pipeline
+/// joueur-only (`apply_damage` ne query que `forgia_damage::Health`, absente
+/// des ennemis) → 0 dégât silencieux. Pas de `CombatHitEvent` ré-émis non plus :
+/// un chain hit qui en émettrait re-déclencherait ce système (cascade).
+/// La mort (HP≤0) reste gérée par `despawn_dead_cubes` → DeathEvent → loot/heal.
 ///
 /// Pas de raycast Rapier ici (CombatHitEvent ne porte pas le ctx) — proxy via
 /// distance Transform (cheap, no LOS check). Bible kid-friendly : « Ça saute
@@ -186,7 +199,10 @@ pub fn sys_apply_chain_targets(
     mut events: MessageReader<CombatHitEvent>,
     mods: Res<PlayerCombatMods>,
     q_targets: Query<(Entity, &GlobalTransform), With<crate::enemies::EnemyArchetype>>,
-    mut dmg_w: MessageWriter<DamageEvent>,
+    mut q_enemy_hp: Query<&mut EnemyHealth, With<crate::enemies::EnemyArchetype>>,
+    mut q_enemy_def: Query<&mut DefenseLayer, With<crate::enemies::EnemyArchetype>>,
+    // Lot C perf tir (audit 2026-07-20) : scratch réutilisé, zéro alloc par hit.
+    mut candidates: Local<Vec<(f32, Entity)>>,
 ) {
     let n = mods.chain_extra_targets;
     if n == 0 {
@@ -197,36 +213,37 @@ pub fn sys_apply_chain_targets(
     for ev in events.read() {
         let origin = ev.hit_world_pos;
         // Collect candidates (distance, entity) sauf target original
-        let mut candidates: Vec<(f32, Entity)> = q_targets
-            .iter()
-            .filter_map(|(e, gt)| {
-                if e == ev.target {
-                    return None;
-                }
-                let d = (gt.translation() - origin).length();
-                if d <= CHAIN_RANGE {
-                    Some((d, e))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        candidates.clear();
+        candidates.extend(q_targets.iter().filter_map(|(e, gt)| {
+            if e == ev.target {
+                return None;
+            }
+            let d = (gt.translation() - origin).length();
+            if d <= CHAIN_RANGE {
+                Some((d, e))
+            } else {
+                None
+            }
+        }));
         candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         let chain_dmg = ev.damage * CHAIN_DAMAGE_FACTOR;
+        let mut applied = 0u32;
         for (_, target) in candidates.iter().take(n as usize) {
-            dmg_w.write(DamageEvent {
-                target: *target,
-                source: ev.attacker,
-                amount: chain_dmg,
-                kind: DamageKind::Physical,
-            });
-        }
-        if !candidates.is_empty() {
-            info!(
-                "[boons] chain hit ×{} targets (~{:.1} dmg each)",
-                candidates.len().min(n as usize),
+            // Bouclier→Armure→Vie, comme le hit de base (forgia-fps) et l'arc Shock.
+            let leak = if let Ok(mut dl) = q_enemy_def.get_mut(*target) {
+                dl.note_hit();
+                dl.absorb(chain_dmg, DamageChannel::Physical)
+            } else {
                 chain_dmg
-            );
+            };
+            if let Ok(mut hp) = q_enemy_hp.get_mut(*target) {
+                hp.current = (hp.current - leak).max(0.0);
+                applied += 1;
+            }
+        }
+        if applied > 0 {
+            // Lot A perf tir : per-hit → debug! (stdout synchrone par tir).
+            debug!("[boons] chain hit ×{applied} targets (~{chain_dmg:.1} dmg each)");
         }
     }
 }
@@ -262,7 +279,8 @@ pub fn obs_heal_on_kill(
     hp.current = (hp.current + heal.hp_per_kill).min(hp.max);
     let healed = hp.current - before;
     if healed > 0.0 {
-        info!(
+        // Lot A perf tir : per-kill → debug!.
+        debug!(
             "[boons] heal_on_kill +{:.1} HP ({:.1} → {:.1})",
             healed, before, hp.current
         );

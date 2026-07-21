@@ -158,47 +158,24 @@ impl CameraTrauma {
     }
 }
 
+/// Emissive du flash de hit — blanc HDR. Invariant juice interne (valeur héritée
+/// de l'ex-`HitFlashCache.flash_material`, story-432 V4) ; pas exposé créateur.
+pub const HIT_FLASH_EMISSIVE: LinearRgba = LinearRgba::new(8.0, 8.0, 8.0, 1.0);
+
 #[derive(Component)]
 pub struct HitFlashTimer {
     pub timer: Timer,
+    /// Emissive d'ORIGINE du matériau, capturée au 1er hit — restaurée à expiry.
     pub original_emissive: LinearRgba,
-    /// 2026-04-27 â€” handle of the *original* (shared) StandardMaterial. On
-    /// expiry we restore this handle so the entity rejoins the GPU-instancing
-    /// batch of its peers. `None` if the entity has no `MeshMaterial3d`.
-    ///
-    /// story-432 V4 (2026-05-13) : la stratÃ©gie de clone-per-hit a Ã©tÃ©
-    /// remplacÃ©e par un swap vers `HitFlashCache.flash_material` partagÃ©.
-    /// Plusieurs entitÃ©s en flash simultanÃ©ment pointent vers le MÃŠME handle
-    /// (pas de mutation du shared = pas de peer-flash bug du 2026-04-27).
-    /// Cost hot path : `Handle::clone` (Arc atomic inc, ~ns) vs ~6 KB
-    /// per-hit material clone prÃ©cÃ©demment (suspect freeze sensors).
-    pub original_handle: Option<Handle<StandardMaterial>>,
-}
-
-/// Pre-built shared flash material â€” white emissive HDR (8.0, 8.0, 8.0).
-/// InsÃ©rÃ© au Startup, swappÃ© sur l'entity touchÃ©e pour la durÃ©e du flash.
-///
-/// story-432 V4 : remplace le pattern clone-per-hit pour Ã©liminer un suspect
-/// majeur des freezes 100-200ms corrÃ©lÃ©s `damage_player â†’ 3 hits` observÃ©s
-/// dans `forgia_lag_events.json`.
-#[derive(Resource)]
-pub struct HitFlashCache {
-    pub flash_material: Handle<StandardMaterial>,
-}
-
-/// Startup : prÃ©-construit le material flash blanc partagÃ©.
-pub fn setup_hit_flash_cache(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    commands.insert_resource(HitFlashCache {
-        flash_material: materials.add(StandardMaterial {
-            base_color: Color::WHITE,
-            emissive: LinearRgba::new(8.0, 8.0, 8.0, 1.0),
-            unlit: false,
-            ..default()
-        }),
-    });
+    /// Audit fire-path 2026-07-20 (suspect « hit-flash swap ») : le flash mute
+    /// désormais `emissive` EN PLACE sur le matériau de l'entité (handle
+    /// inchangé → l'entité ne quitte jamais son batch GPU ; zéro swap de
+    /// `MeshMaterial3d` per-hit, zéro `HitFlashCache`). Remplace le swap vers
+    /// un flash-material partagé (story-432 V4). Prérequis : le handle est
+    /// propre à l'entité (muter un matériau partagé flasherait tous les pairs
+    /// — bug 2026-04-27) ; seul chemin poseur = racine ennemie portant son
+    /// propre `MeshMaterial3d` (forgia-fps fire path).
+    pub material: Handle<StandardMaterial>,
 }
 
 // â”€â”€ Systems â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -239,16 +216,17 @@ pub fn compute_trauma_offset(trauma: &CameraTrauma) -> Vec3 {
 pub fn hit_flash_tick_system(
     time: Res<Time>,
     mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut query: Query<(Entity, &mut HitFlashTimer)>,
 ) {
-    // story-432 V4 : plus de mutation per-frame du material (le shared
-    // `HitFlashCache.flash_material` a dÃ©jÃ  emissive=8.0 figÃ©). Tick juste le
-    // timer + restore le handle original Ã  expiry.
+    // Audit fire-path 2026-07-20 : tick le timer ; à expiry, restaure
+    // l'emissive d'origine EN PLACE (même handle → l'entité ne quitte
+    // jamais son batch GPU ; remplace le swap MeshMaterial3d story-432 V4).
     for (entity, mut flash) in &mut query {
         flash.timer.tick(time.delta());
         if flash.timer.is_finished() {
-            if let Some(orig) = flash.original_handle.take() {
-                commands.entity(entity).insert(MeshMaterial3d(orig));
+            if let Some(mat) = materials.get_mut(&flash.material) {
+                mat.emissive = flash.original_emissive;
             }
             commands.entity(entity).remove::<HitFlashTimer>();
         }

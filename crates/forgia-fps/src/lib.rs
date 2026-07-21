@@ -165,6 +165,9 @@ impl Default for FtViewmodelFov {
 #[derive(Deserialize, Clone)]
 pub struct FtViewmodelArms {
     pub enabled: bool,
+    // Story-661 — bras GLB cartoon vs poings procéduraux (toggle A/B hot-reload).
+    pub use_glb: bool,
+    pub glb_scale: f32,
     pub scale: f32,
     pub grip_x: f32,
     pub grip_drop: f32,
@@ -183,6 +186,8 @@ impl Default for FtViewmodelArms {
         // Miroir de ViewmodelArmsTuning::default (forgia-viewmodel).
         Self {
             enabled: true,
+            use_glb: true,
+            glb_scale: 1.0,
             scale: 2.0,
             grip_x: 0.0,
             grip_drop: -0.08,
@@ -381,6 +386,10 @@ pub struct HitApplyCtx<'w, 's> {
         (
             &'static mut Health,
             Option<&'static MeshMaterial3d<StandardMaterial>>,
+            // Audit fire-path 2026-07-20 — flash déjà actif : reset du timer
+            // SANS re-capturer l'emissive (sinon le blanc du flash deviendrait
+            // « l'origine » et l'ennemi resterait blanc à jamais).
+            Option<&'static mut HitFlashTimer>,
         ),
         With<TargetCube>,
     >,
@@ -580,7 +589,11 @@ fn find_health_ancestor(
     hit_entity: Entity,
     q_child_of: &Query<&ChildOf>,
     health_query: &Query<
-        (&mut Health, Option<&MeshMaterial3d<StandardMaterial>>),
+        (
+            &mut Health,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+            Option<&mut HitFlashTimer>,
+        ),
         With<TargetCube>,
     >,
     max_depth: u32,
@@ -616,7 +629,9 @@ fn despawn_dead_cubes(mut commands: Commands, q: Query<(Entity, &Health), With<T
             if let Ok(mut ec) = commands.get_entity(entity) {
                 ec.try_despawn();
             }
-            info!(
+            // Lot A perf tir (audit 2026-07-20) : per-kill → debug! (le stdout
+            // synchrone par événement coûtait des freezes ; data via sensors 1Hz).
+            debug!(
                 "[death] cube {:?} despawned (HP=0) + DeathEvent fired",
                 entity
             );
@@ -715,7 +730,9 @@ fn fire_weapon_minimal(
     q_player: Query<Entity, With<Player>>,
     mut hit_ctx: HitApplyCtx,
     mut commands: Commands,
-    flash_cache: Res<HitFlashCache>,
+    // Audit fire-path 2026-07-20 — hit flash par mutation d'emissive EN PLACE
+    // (remplace Res<HitFlashCache> + swap de MeshMaterial3d ; budget 16 params neutre).
+    mut std_materials: ResMut<Assets<StandardMaterial>>,
     tracer_res: Option<Res<TracerResources>>,
     weapon_vfx: Option<Res<WeaponVfxEffects>>,
     mut timing: FireTimingCtx,
@@ -1043,7 +1060,7 @@ fn fire_weapon_minimal(
                     .unwrap_or(forgia_damage::HitZone::Body);
                 let zone_mul = hitscan_ctx.feedback.0.damage_mul(zone);
 
-                if let Ok((mut hp, mat_opt)) = hit_ctx.health.get_mut(entity) {
+                if let Ok((mut hp, mat_opt, flash_opt)) = hit_ctx.health.get_mut(entity) {
                     let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
                     // Story-558 Phase 4 — damage_mul appliqué au damage final.
                     // Phase 4b — headshot_bonus_mul ajouté à zone_mul si Head zone,
@@ -1075,7 +1092,7 @@ fn fire_weapon_minimal(
                         * crit_mul
                         * pepin_mul;
                     if crit_mul > 1.0 {
-                        info!("[fire] CRIT! dmg ×2");
+                        debug!("[fire] CRIT! dmg ×2");
                     }
                     // Story-642 P0-4 Inc.3 — vulnérabilité électrique : le hit de base est
                     // ×mult si la cible porte une `Vulnerability` (posée par les hits Shock).
@@ -1115,14 +1132,27 @@ fn fire_weapon_minimal(
 
                     if let Some(mat_comp) = mat_opt {
                         let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
-                        commands
-                            .entity(entity)
-                            .insert(MeshMaterial3d(flash_cache.flash_material.clone()))
-                            .insert(HitFlashTimer {
-                                timer: Timer::from_seconds(flash_dur, TimerMode::Once),
-                                original_emissive: LinearRgba::new(0.0, 0.0, 0.0, 1.0),
-                                original_handle: Some(mat_comp.0.clone()),
-                            });
+                        // Audit fire-path 2026-07-20 — flash par mutation
+                        // d'emissive EN PLACE (handle inchangé → pas de re-batch
+                        // GPU, zéro swap de MeshMaterial3d per-hit).
+                        if let Some(mut flash) = flash_opt {
+                            // Hit pendant un flash actif : prolonge SANS re-capturer
+                            // l'emissive (elle vaut déjà le blanc du flash).
+                            flash.timer.reset();
+                        } else if let Some(mat) = std_materials.get_mut(&mat_comp.0) {
+                            // Garde même-frame (pellets shotgun) : le HitFlashTimer
+                            // du 1er pellet est différé (Commands) → invisible ici ;
+                            // l'égalité d'emissive évite la double capture.
+                            if mat.emissive != forgia_combat::prelude::HIT_FLASH_EMISSIVE {
+                                let original_emissive = mat.emissive;
+                                mat.emissive = forgia_combat::prelude::HIT_FLASH_EMISSIVE;
+                                commands.entity(entity).insert(HitFlashTimer {
+                                    timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                                    original_emissive,
+                                    material: mat_comp.0.clone(),
+                                });
+                            }
+                        }
                     }
 
                     let attacker_entity = q_player.single().ok();
@@ -1158,7 +1188,9 @@ fn fire_weapon_minimal(
                     if hit_record.is_none() {
                         hit_record = Some((entity, toi));
                     }
-                    info!(
+                    // Lot A perf tir : per-pellet → debug! (1+ ligne/tir garantie
+                    // = coût stdout synchrone à chaque tir, cf audit 2026-07-20).
+                    debug!(
                         "[fire] pellet {}/{} HIT {entity:?} toi={toi:.2}m dmg={effective_dmg:.1} hp={new_hp:.1} dead={dead}",
                         pellet_idx + 1, pellets
                     );
@@ -1194,7 +1226,7 @@ fn fire_weapon_minimal(
             stats.record(tier, hs_dur);
         }
     } else {
-        info!(
+        debug!(
             "[fire] miss ({} pellets, {:?})",
             pellets, ammo.equipped.current
         );
@@ -1251,6 +1283,8 @@ fn sync_fps_tuning(
     // Story-617/618 — placement bras par-main (hot-reload : ajuste sans rebuild).
     let arms = &t.viewmodel_arms;
     arms_tuning.enabled = arms.enabled;
+    arms_tuning.use_glb = arms.use_glb;
+    arms_tuning.glb_scale = arms.glb_scale;
     arms_tuning.scale = arms.scale;
     arms_tuning.grip_x = arms.grip_x;
     arms_tuning.grip_drop = arms.grip_drop;

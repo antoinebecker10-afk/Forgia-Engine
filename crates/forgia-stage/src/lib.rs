@@ -31,9 +31,20 @@
 //! - Forgia memory `[[reference-pattern-genome-driven-plugin-with-sensor]]`.
 
 pub mod authored;
+pub mod floor_merge;
 pub mod graph;
 pub mod layout;
 pub mod layout_sensor;
+
+/// Paths des 3 GLB du sol fusionné de l'arène — **source unique** (consommée par
+/// le chargement du sol ET par le warmup de pipelines au Lobby, story-664 : le
+/// matériau du sol doit compiler avant le combat, pas au 1er affichage en jeu).
+/// Sans `#SceneN` : chaque consommateur ajoute le label de scène voulu.
+pub const MERGED_FLOOR_GLB: [&str; 3] = [
+    "models/kaykit/dungeon/floor.glb",
+    "models/kaykit/dungeon/floor_dirt.glb",
+    "models/kaykit/dungeon/floor_rocks.glb",
+];
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -232,6 +243,14 @@ pub struct StageLoadResult {
     /// Nombre de murs tilés par segment hex (1 segment = 1/6 du périmètre).
     /// Diagnostic gaps/overlaps avant rebuild.
     pub walls_per_segment: u32,
+    /// Story-663 — meshes fusionnés du sol (cellule × matériau). 0 après
+    /// stabilisation = fallback tuile-par-tuile actif (voir log warn).
+    pub floor_merged_cells: u32,
+    /// Story-663 Inc.2 — meshes fusionnés des murs de ramparts.
+    pub walls_merged_cells: u32,
+    /// Story-663 — nombre de lots de fusion en attente (sol/murs). Soutenu
+    /// > MERGE_TIMEOUT_SECS = sondes bloquées (GLB KO ?) → voir log warn.
+    pub static_merge_pending: u32,
     /// `music_state` du stage def actuel (toggle TOML). Vide si stage def n'en
     /// définit pas. Consommé par caller (forgia-mode-roguelite::sys_apply_stage_toggles).
     pub music_state_id: String,
@@ -334,6 +353,8 @@ impl Plugin for ForgiaStageArenaPlugin {
             .init_resource::<StageGenomeHandles>()
             .init_resource::<StageArenaTuning>()
             .init_resource::<LayoutResult>()
+            // Story-663 — cache des fusions statiques (re-entrée = zéro rebuild).
+            .init_resource::<floor_merge::MergedStaticCache>()
             .add_systems(Startup, load_stage_genomes)
             // L7 SystemSets — stage-arena is **mode-agnostic by design** : il sera
             // consommé par forgia-mode-roguelite (V1), forgia-mode-fps-arena (M4),
@@ -351,6 +372,18 @@ impl Plugin for ForgiaStageArenaPlugin {
             .add_systems(
                 Update,
                 authored::sys_collide_authored_pieces
+                    .in_set(forgia_core::prelude::GameSet::Movement)
+                    .after(spawn_stage_arena_on_request),
+            )
+            // Story-663 - fusion statique par cellule (retry jusqu'a sondes pretes)
+            // + drain etale du spawn (fix burst 412 ms au 1er rendu).
+            .add_systems(
+                Update,
+                (
+                    floor_merge::sys_build_merged_static,
+                    floor_merge::sys_drain_merge_spawn_queue,
+                )
+                    .chain()
                     .in_set(forgia_core::prelude::GameSet::Movement)
                     .after(spawn_stage_arena_on_request),
             )
@@ -403,6 +436,9 @@ struct StageSensorJson<'a> {
     ambiance_lights: u32,
     wall_natural_len_used: f32,
     walls_per_segment: u32,
+    floor_merged_cells: u32,
+    walls_merged_cells: u32,
+    static_merge_pending: u32,
     music_state_id: &'a str,
     weather_override: &'a str,
     next_step: &'a str,
@@ -451,6 +487,9 @@ fn write_stage_sensor(
         ambiance_lights: result.ambiance_lights,
         wall_natural_len_used: result.wall_natural_len_used,
         walls_per_segment: result.walls_per_segment,
+        floor_merged_cells: result.floor_merged_cells,
+        walls_merged_cells: result.walls_merged_cells,
+        static_merge_pending: result.static_merge_pending,
         music_state_id: &result.music_state_id,
         weather_override: &result.weather_override,
         next_step,
@@ -862,52 +901,41 @@ fn spawn_stage_arena_on_request(
     let (glow_color, glow_intensity, glow_range) = biome_ambiance_glow(&stage_def.biome);
     let mut ambiance_lights: u32 = 0;
 
-    // 1. Floor — tuiles GLB KayKit dungeon tilées : MÊME sol que le mode FPS
-    //    (cf forgia-mode-fps-arena::spawn_arena). floor.glb au centre, floor_dirt
-    //    + floor_rocks en périphérie. Tuiles culled hors du cercle de rayon `extent`
-    //    (forme arène, limite le compte). 1 collider sol global — les SceneRoot
-    //    n'ont pas de collider individuel (LOCK identique au FPS).
-    let floor: Handle<Scene> = asset_server.load("models/kaykit/dungeon/floor.glb#Scene0");
-    let floor_dirt: Handle<Scene> =
-        asset_server.load("models/kaykit/dungeon/floor_dirt.glb#Scene0");
-    let floor_rocks: Handle<Scene> =
-        asset_server.load("models/kaykit/dungeon/floor_rocks.glb#Scene0");
-    let tiles_radius = (extent / FLOOR_TILE_SIZE).ceil() as i32;
-    // Centre "propre" (floor.glb) ~1/3 du rayon, comme la proportion FPS (dist>=4 sur 9).
-    let clean_center = (tiles_radius / 3).max(2);
-    let mut floor_tiles_spawned = 0u32;
-    for tx in -tiles_radius..=tiles_radius {
-        for tz in -tiles_radius..=tiles_radius {
-            let pos = Vec3::new(tx as f32 * FLOOR_TILE_SIZE, 0.0, tz as f32 * FLOOR_TILE_SIZE);
-            if pos.length() > extent {
-                continue; // cull hors arène (cercle inscrivant l'hex)
-            }
-            let dist = tx.abs().max(tz.abs());
-            let tile = if dist >= clean_center {
-                if (tx + tz).rem_euclid(3) == 0 {
-                    floor_rocks.clone()
-                } else {
-                    floor_dirt.clone()
-                }
-            } else {
-                floor.clone()
-            };
-            // Rotation par tuile (0/90/180/270°) déterministe → casse la
-            // répétition visible de la grille (le pattern fissuré tourne par
-            // cellule). Tuile carrée 4m centrée → footprint invariant, zéro gap.
-            let yaw_q = (tx.wrapping_mul(7) ^ tz.wrapping_mul(13)).rem_euclid(4);
-            let yaw = yaw_q as f32 * std::f32::consts::FRAC_PI_2;
-            commands.spawn((
-                Name::new(format!("StageFloorTile_{tx}_{tz}")),
-                StageArenaMarker,
-                Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
-                Visibility::default(),
-                children![(SceneRoot(tile), Transform::default())],
-            ));
-            floor_tiles_spawned += 1;
-        }
-    }
-    // Collider sol global (les tuiles SceneRoot pures n'ont pas de collider).
+    // 1. Floor — story-663 : le sol tuilé (~1 600 entités + ~3 200 nœuds de
+    //    scène) est FUSIONNÉ par cellule × matériau (perf : la scène statique
+    //    borne le CPU, cible 60 fps GTX 1060 — cf `floor_merge`). Ici on ne
+    //    spawne que le PLAN (`PendingFloorMerge`, mêmes maths que l'ex-boucle :
+    //    culling circulaire, mix dirt/rocks, yaw déterministe) + 3 sondes
+    //    cachées ; `sys_build_merged_floor` construit les meshes dès que les
+    //    GLB sont instanciés (cache par extent, fallback tuile-par-tuile si
+    //    GLB KO). Mêmes assets KayKit que le mode FPS (le layout diffère :
+    //    culling circulaire + yaw ici, grille carrée fixe là-bas — QA-663 #2).
+    //    1 collider global inchangé.
+    // Source unique des paths (consommée aussi par le warmup de pipelines au
+    // Lobby, story-664 — les matériaux du sol doivent compiler avant le combat).
+    let scenes: [Handle<Scene>; 3] =
+        MERGED_FLOOR_GLB.map(|p| asset_server.load(format!("{p}#Scene0")));
+    let tiles = floor_merge::plan_floor_tiles(extent, FLOOR_TILE_SIZE);
+    let floor_tiles_planned = tiles.len();
+    let floor_instances: Vec<(u8, Transform)> = tiles
+        .into_iter()
+        .map(|t| {
+            (
+                t.kind,
+                Transform::from_translation(t.pos).with_rotation(Quat::from_rotation_y(t.yaw)),
+            )
+        })
+        .collect();
+    floor_merge::spawn_static_merge(
+        &mut commands,
+        "floor",
+        floor_instances,
+        scenes.to_vec(),
+        extent,
+        &req.stage_id,
+    );
+    result.floor_merged_cells = 0;
+    // Collider sol global (le sol rendu — fusionné ou tuiles — n'en a pas).
     commands.spawn((
         Name::new(format!("StageFloorCollider_{}", req.stage_id)),
         StageArenaMarker,
@@ -917,7 +945,7 @@ fn spawn_stage_arena_on_request(
     ));
     props_spawned += 1;
     info!(
-        "[stage-arena] Floor: {floor_tiles_spawned} KayKit tiles (radius {tiles_radius}, ~{}m)",
+        "[stage-arena] Floor: {floor_tiles_planned} tuiles planifiées → merge par cellule (~{}m)",
         extent
     );
 
@@ -956,23 +984,26 @@ fn spawn_stage_arena_on_request(
     }
     // N walls tilés par segment (visual seulement, pas de collider — physics
     // déjà couverte par les 6 colliders ci-dessus).
+    // Story-663 Inc.2 : ~130 prefabs mur → FUSIONNÉS par cellule × matériau
+    // (cf `floor_merge::spawn_static_merge`). Même GLB, mêmes poses — le count
+    // reste porté par `props_spawned` ; `forgia_prefab.json::total_spawned` ne
+    // compte plus les murs (fusionnés hors prefab pipeline, assumé).
     let tiled = ramparts_hex_tiled_positions(extent, wall_len);
-    // Walls = geometry visuelle pure (pas des anchors). Le count est porté par
-    // `props_spawned` + `forgia_prefab.json::total_spawned`. Évite la
-    // sur-fonction sémantique de `AnchorKind::Landmark` (cf qa-lead BUG-483-02).
-    for (idx, (pos, rot)) in tiled.iter().enumerate() {
-        let spawn = PrefabSpawn::new(wall_glb, *pos)
-            .with_rotation(*rot)
-            .with_name(format!("RampartTile_{idx}"));
-        let _e = spawn_gltf_prefab(
-            &mut commands,
-            &asset_server,
-            &prefab_stats,
-            spawn,
-            (StageArenaMarker,),
-        );
-        props_spawned += 1;
-    }
+    let wall_scene: Handle<Scene> = asset_server.load(format!("{wall_glb}#Scene0"));
+    let wall_instances: Vec<(u8, Transform)> = tiled
+        .iter()
+        .map(|(pos, rot)| (0u8, Transform::from_translation(*pos).with_rotation(*rot)))
+        .collect();
+    props_spawned += wall_instances.len() as u32;
+    floor_merge::spawn_static_merge(
+        &mut commands,
+        "walls",
+        wall_instances,
+        vec![wall_scene],
+        extent,
+        &req.stage_id,
+    );
+    result.walls_merged_cells = 0;
 
     // 2.5 Coquille AUTHORED (story-625) - composition data-driven depuis
     //     arena_layouts.toml. Si presente, c'est la STRUCTURE de l'arene ; le

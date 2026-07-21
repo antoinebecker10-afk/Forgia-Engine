@@ -12,7 +12,7 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const SAVE_FILE: &str = "ftue_save.toml";
 const SAVE_VERSION: u32 = 1;
@@ -42,31 +42,13 @@ impl Default for FtueSave {
     }
 }
 
-/// Walk-up depuis l'exe pour trouver `config/` (marqueur `config/biomes/`),
-/// fallback `config/`. Réplique locale (cf `meta_shop::config_dir`, évite une dép).
-fn config_dir() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        let mut cursor: Option<&Path> = exe.parent();
-        while let Some(d) = cursor {
-            if d.join("config").join("biomes").exists() {
-                return d.join("config");
-            }
-            cursor = d.parent();
-        }
-    }
-    PathBuf::from("config")
-}
-
 impl FtueSave {
     fn save_path() -> PathBuf {
-        config_dir().join(SAVE_FILE)
+        crate::persist::save_dir().join(SAVE_FILE)
     }
 
     pub fn load_or_default() -> Self {
-        match std::fs::read_to_string(Self::save_path()) {
-            Ok(c) => toml::from_str(&c).unwrap_or_default(),
-            Err(_) => Self::default(),
-        }
+        crate::persist::load_toml_migrating(SAVE_FILE)
     }
 
     pub fn save(&self) {

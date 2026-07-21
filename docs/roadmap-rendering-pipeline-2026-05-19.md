@@ -1,5 +1,7 @@
 # Roadmap — Rendering Pipeline V2 (mid-distance & horizon)
 
+> ⚠️ **SUPERSEDED — voir [`docs/ROADMAP.md`](./ROADMAP.md) (source de vérité unique).** Conservé pour le détail technique du pipeline de rendu.
+
 **Créé** : 2026-05-19
 **Auteur** : session Claude après audit V1+V2 + recherche industrie
 **Contexte session** : après fix `sample_offset` (terrain spawn flat à sea_level → relief réel) Antoine demande pourquoi le mid-distance / horizon V2 n'a pas le rendu AAA d'un Witcher 3 / Skyrim / RDR2. Audit révèle 6 trous concrets sur le pipeline de profondeur.

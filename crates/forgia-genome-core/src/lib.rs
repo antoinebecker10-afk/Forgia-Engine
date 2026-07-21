@@ -78,6 +78,34 @@ pub fn parse_genome<T: DeserializeOwned>(toml_src: &str) -> Result<T, toml::de::
     toml::from_str(toml_src)
 }
 
+/// Helper trait that consumer crates implement to register a typed genome.
+pub trait RegisterGenome {
+    fn register_genome<T>(&mut self) -> &mut Self
+    where
+        T: Send + Sync + 'static + TypePath + DeserializeOwned + bevy::reflect::FromReflect;
+}
+
+impl RegisterGenome for App {
+    fn register_genome<T>(&mut self) -> &mut Self
+    where
+        T: Send + Sync + 'static + TypePath + DeserializeOwned + bevy::reflect::FromReflect,
+    {
+        self.init_asset::<Genome<T>>()
+            .register_asset_loader(GenomeLoader::<T>::default());
+        self
+    }
+}
+
+pub struct ForgiaGenomeCorePlugin;
+
+impl Plugin for ForgiaGenomeCorePlugin {
+    fn build(&self, _app: &mut App) {
+        // No-op : per-type registration is done by consumer crates via
+        // `app.register_genome::<MyGenome>()`. This plugin is a marker for
+        // documentation purposes.
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,33 +173,5 @@ mod tests {
     fn loader_accepts_toml_extension_only() {
         let loader = GenomeLoader::<TestTuning>::default();
         assert_eq!(loader.extensions(), &["toml"]);
-    }
-}
-
-/// Helper trait that consumer crates implement to register a typed genome.
-pub trait RegisterGenome {
-    fn register_genome<T>(&mut self) -> &mut Self
-    where
-        T: Send + Sync + 'static + TypePath + DeserializeOwned + bevy::reflect::FromReflect;
-}
-
-impl RegisterGenome for App {
-    fn register_genome<T>(&mut self) -> &mut Self
-    where
-        T: Send + Sync + 'static + TypePath + DeserializeOwned + bevy::reflect::FromReflect,
-    {
-        self.init_asset::<Genome<T>>()
-            .register_asset_loader(GenomeLoader::<T>::default());
-        self
-    }
-}
-
-pub struct ForgiaGenomeCorePlugin;
-
-impl Plugin for ForgiaGenomeCorePlugin {
-    fn build(&self, _app: &mut App) {
-        // No-op : per-type registration is done by consumer crates via
-        // `app.register_genome::<MyGenome>()`. This plugin is a marker for
-        // documentation purposes.
     }
 }

@@ -2,7 +2,7 @@
 name = "forgia-effects"
 version = "0.1.0"
 edition = "2021"
-description = "Forgia V2 — Hanabi VFX (pre-spawn dummy au Startup, anti-freeze 25s) + audio combat + HitFlashCache."
+description = "Forgia V2 — Hanabi VFX (pre-spawn dummy au Startup, anti-freeze 25s) + audio combat."
 
 [lints]
 workspace = true

@@ -542,10 +542,10 @@ pub fn sync_boons_catalogue(
         match ev {
             AssetEvent::Added { id }
             | AssetEvent::Modified { id }
-            | AssetEvent::LoadedWithDependencies { id } => {
-                if *id == handle.0.id() {
-                    should = true;
-                }
+            | AssetEvent::LoadedWithDependencies { id }
+                if *id == handle.0.id() =>
+            {
+                should = true;
             }
             _ => {}
         }
@@ -684,7 +684,7 @@ mod tests {
         let legendary = def("legend_chaos", BoonRarity::Legendary, &[BoonTag::Chaos]);
         let cat = BoonsCatalogue {
             rarity_weights: RarityWeights::default(),
-            entries: vec![legendary.clone()],
+            entries: vec![legendary],
         };
         let mut active = ActiveBoons::default();
         let chaos = def("c", BoonRarity::Common, &[BoonTag::Chaos]);
@@ -704,7 +704,7 @@ mod tests {
         let legendary_chaos = def("lc", BoonRarity::Legendary, &[BoonTag::Chaos]);
         let cat = BoonsCatalogue {
             rarity_weights: RarityWeights::default(),
-            entries: vec![legendary_fire.clone(), legendary_chaos],
+            entries: vec![legendary_fire, legendary_chaos],
         };
         let mut active = ActiveBoons::default();
         let knock = def("k", BoonRarity::Common, &[BoonTag::Knockback]);
@@ -852,7 +852,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
             ],
         };
         let active = ActiveBoons {
-            unlocked_legendary: vec![leg.id.clone()],
+            unlocked_legendary: vec![leg.id],
             ..Default::default()
         };
         let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, fake_seq(vec![2, 0, 0]));

@@ -683,7 +683,23 @@ pub fn save_user_settings(settings: &UserSettings) -> bool {
         let _ = fs::create_dir_all(parent);
     }
     match toml::to_string_pretty(settings) {
-        Ok(content) => fs::write(&path, content).is_ok(),
+        // Écriture atomique tmp+rename (fix audit 2026-07-19) : un crash
+        // mi-écriture ne doit jamais corrompre le seul save utilisateur non
+        // versionné par run. Même pattern que `persist.rs` (roguelite).
+        Ok(content) => {
+            let tmp = path.with_extension("toml.tmp");
+            if fs::write(&tmp, content).is_err() {
+                return false;
+            }
+            match fs::rename(&tmp, &path) {
+                Ok(()) => true,
+                Err(e) => {
+                    warn!("[pause-menu] save rename error: {e}");
+                    let _ = fs::remove_file(&tmp);
+                    false
+                }
+            }
+        }
         Err(e) => {
             warn!("[pause-menu] save serialize error: {e}");
             false
@@ -811,9 +827,11 @@ mod tests {
 
     #[test]
     fn settings_roundtrip_toml() {
-        let mut s = UserSettings::default();
-        s.master_volume = 0.35;
-        s.window_mode = "borderless".to_string();
+        let s = UserSettings {
+            master_volume: 0.35,
+            window_mode: "borderless".to_string(),
+            ..Default::default()
+        };
         let toml_str = toml::to_string_pretty(&s).expect("serialize");
         let back: UserSettings = toml::from_str(&toml_str).expect("deserialize");
         assert_eq!(back.master_volume, 0.35);

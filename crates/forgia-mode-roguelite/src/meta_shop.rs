@@ -26,7 +26,7 @@ use forgia_core::prelude::*;
 use forgia_ui_lib::style::{C_HP_HIGH, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::run::{MetaSouls, RunState, StartRunEvent};
 
@@ -336,22 +336,6 @@ pub fn sys_record_run_stats(
     );
 }
 
-/// Walk-up depuis l'exe pour trouver `config/` (marqueur `config/biomes/`),
-/// fallback `config/`. Réplique locale de `forgia_terrain::config_dir` (évite
-/// une dépendance crate pour un simple chemin de save).
-fn config_dir() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        let mut cursor: Option<&Path> = exe.parent();
-        while let Some(d) = cursor {
-            if d.join("config").join("biomes").exists() {
-                return d.join("config");
-            }
-            cursor = d.parent();
-        }
-    }
-    PathBuf::from("config")
-}
-
 impl MetaShopSave {
     pub fn rank(&self, id: &str) -> u32 {
         self.ranks.get(id).copied().unwrap_or(0)
@@ -393,14 +377,11 @@ impl MetaShopSave {
     }
 
     fn save_path() -> PathBuf {
-        config_dir().join(SAVE_FILE)
+        crate::persist::save_dir().join(SAVE_FILE)
     }
 
     pub fn load_or_default() -> Self {
-        match std::fs::read_to_string(Self::save_path()) {
-            Ok(c) => toml::from_str(&c).unwrap_or_default(),
-            Err(_) => Self::default(),
-        }
+        crate::persist::load_toml_migrating(SAVE_FILE)
     }
 
     pub fn save(&self) {

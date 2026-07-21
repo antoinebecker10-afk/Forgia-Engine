@@ -35,7 +35,10 @@ pub mod elements;
 pub mod enemies;
 pub mod enemy_anim;
 pub mod enemy_rig_debug;
+pub mod enemy_scaling;
+pub mod forge_shop;
 pub mod ftue;
+pub mod head_hitbox;
 pub mod hub;
 pub mod hud;
 pub mod identity;
@@ -57,9 +60,11 @@ pub mod shockwave;
 pub mod stations;
 pub mod status_vfx;
 pub mod toon_config;
+pub mod trempe;
 pub mod ultimate_apply;
 pub mod ultimate_config;
 pub mod ultimate_tech;
+pub mod pipeline_warmup;
 pub mod ultimate_vfx;
 pub mod waves;
 pub mod weapon_select;
@@ -410,6 +415,23 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             Startup,
             element_vfx::sys_init_vfx_assets.after(elements::sys_init_element_genome),
         );
+        // Story-655 — bursts hanabi par élément (remplacent les sphères) :
+        // PostStartup pour disposer du genome éléments ET des textures weapon_vfx
+        // (warmup shader avec le bon EffectMaterial).
+        app.add_systems(PostStartup, element_vfx::sys_init_element_bursts);
+        // LOT B bis (audit fire-path 2026-07-20) — pool partagé d'auras de statut
+        // (12 slots persistants, remplace le spawn/despawn hanabi par statut,
+        // suspect n°1 des freezes per-hit `spikes_15`). PostStartup : après
+        // `setup_weapon_vfx` (Startup) pour les handles + warmup shader des 3
+        // effets via la 1re émission cachée des slots.
+        app.add_systems(PostStartup, status_vfx::sys_init_status_vfx_pool);
+        // Hors Roguelite les detach ne tournent plus (run_if) et les
+        // RemovedComponents des ennemis DespawnOnExit seraient perdus → reset
+        // des leases à la sortie (sinon auras orphelines dans le Bourg).
+        app.add_systems(
+            OnExit(GameMode::Roguelite),
+            status_vfx::sys_reset_status_vfx_pool,
+        );
         app.add_systems(
             OnEnter(GameMode::Roguelite),
             element_vfx::sys_reset_vfx_stats,
@@ -427,6 +449,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 status_vfx::sys_detach_burn_vfx,
                 status_vfx::sys_attach_poison_vfx,
                 status_vfx::sys_detach_poison_vfx,
+                // Story-653 — arcs électriques sur StatusShock (identité Pépin).
+                status_vfx::sys_attach_shock_vfx,
+                status_vfx::sys_detach_shock_vfx,
                 status_vfx::sys_follow_status_vfx,
             )
                 .in_set(GameSet::Effects)
@@ -628,6 +653,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // (mesh translucide + gizmos de bones, toggle hot-reload). Capteur
             // forgia2_enemy_anim.json.
             .add_plugins(enemy_anim::ForgiaRogueliteEnemyAnimPlugin)
+            // Story-652 — hitbox tête suivie de l'os `head` du rig (headshots réels :
+            // l'ancien proxy était enfermé dans la capsule body, inatteignable en
+            // raycast premier-hit). Capteur forgia2_head_hitbox.json.
+            .add_plugins(head_hitbox::RogueliteHeadHitboxPlugin)
             // Portail → salle de loot verticale (2026-06-06).
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).
@@ -637,6 +666,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // Story-612 — Wizard de choix d'arme de départ (carte de stats réelles
             // + élément + matchup au Lobby, à côté de L'Enclume). Phase 0.
             .add_plugins(weapon_select::WeaponSelectPlugin)
+            // Audit fire-path 2026-07-20 — warmup des pipelines PBR au Lobby
+            // (anti-freeze « tourner la caméra » : compile le décor+squelettes une
+            // fois au Lobby, plus en combat). Détecteur PipelinesReady = ForgiaEffectsPlugin.
+            .add_plugins(pipeline_warmup::PipelineWarmupPlugin)
             // Hub d'accueil à onglets (design home-hub 2026-06-26, P2) : regroupe
             // Forgeron/Armes/Enclume en onglets + bandeau Âmes/niveau + bouton LANCER.
             .add_plugins(hub::HubPlugin)
@@ -646,6 +679,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // Story-610 — Commerçant d'arène : sink in-run (Or = munitions/soin,
             // Âmes = Second souffle revive) + sensor forgia2_merchant.json.
             .add_plugins(merchant::MerchantPlugin)
+            // Story-653 — La Trempe : progression de l'arme in-run (Or → +dégâts par
+            // palier) chez le forgeron itinérant. Sensor forgia2_trempe.json.
+            .add_plugins(trempe::RogueliteTrempePlugin)
+            // Story-659 — Fenêtre unique du forgeron (dialogue E) : achat souris +
+            // Trempe côte à côte + anim procédurale du gobelin.
+            .add_plugins(forge_shop::RogueliteForgeShopPlugin)
+            // Story-658 — Scaling ennemi par profondeur de salle (la pression qui
+            // donne son sens à la Trempe). Post-spawn, sensor forgia2_enemy_scaling.json.
+            .add_plugins(enemy_scaling::RogueliteEnemyScalingPlugin)
             // Story-597 Phase B — FTUE « mort = centre de gravité » : récap pédago 1re mort
             // (FtueSave persistée) + sensor forgia2_ftue.json.
             .add_plugins(ftue::FtuePlugin)

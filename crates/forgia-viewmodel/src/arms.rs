@@ -16,14 +16,18 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::scene::SceneInstanceReady;
 use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::{ArmCosmetics, ArmStyle, GameMode};
 use forgia_genome_core::Genome;
 use forgia_player::prelude::FpsCamera;
 
+use crate::attach::{NeedsAutoScale, ViewmodelBaseScale, WeaponViewmodel};
 use crate::calibration::{viewmodel_target_size, viewmodel_transform};
 use crate::genome::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle};
-use crate::pose::{apply_viewmodel_sway_bob, AdsState, ViewmodelMotionOffset};
+use crate::pose::{
+    apply_ads_viewmodel, apply_viewmodel_sway_bob, AdsState, ViewmodelMotionOffset,
+};
 
 /// Marker sur le root des bras (enfant de la FpsCamera).
 #[derive(Component)]
@@ -78,12 +82,80 @@ fn apply_arm_style(mat: &mut StandardMaterial, color: [f32; 3], style: ArmStyle,
     }
 }
 
+/// Variante GLB de `apply_arm_style` : la couleur devient une TEINTE qui
+/// préserve la luminosité (normalisée par son canal max), multipliée par la
+/// texture aplats du GLB — un multiply par la couleur brute assombrirait tout.
+/// Mêmes familles de réglages matériau que `apply_arm_style` (cosmétique).
+fn apply_arm_style_glb(mat: &mut StandardMaterial, color: [f32; 3], style: ArmStyle) {
+    let [r, g, b] = color;
+    let max = r.max(g).max(b).max(1e-3);
+    let (tr, tg, tb) = (r / max, g / max, b / max);
+    match style {
+        ArmStyle::Peau => {
+            mat.base_color = Color::srgb(tr, tg, tb);
+            mat.metallic = 0.0;
+            mat.perceptual_roughness = 0.9;
+            mat.reflectance = 0.35;
+            mat.emissive = LinearRgba::BLACK;
+        }
+        ArmStyle::Gantelet => {
+            mat.base_color = Color::srgb(tr * 0.85, tg * 0.85, tb * 0.9);
+            mat.metallic = 0.85;
+            mat.perceptual_roughness = 0.38;
+            mat.reflectance = 0.6;
+            mat.emissive = LinearRgba::BLACK;
+        }
+        ArmStyle::Cyber => {
+            mat.base_color = Color::srgb(tr * 0.35, tg * 0.35, tb * 0.4);
+            mat.metallic = 0.4;
+            mat.perceptual_roughness = 0.3;
+            mat.reflectance = 0.5;
+            // Glow de la teinte choisie (gant cyber lumineux).
+            mat.emissive = LinearRgba::rgb(r * 1.4, g * 1.4, b * 1.4);
+        }
+    }
+}
+
+/// Handle du matériau CLONÉ d'une main GLB → teinte/style live via
+/// `sync_arm_cosmetics` (onglet Forge, comme les bras procéduraux).
+#[derive(Component)]
+pub struct ArmGlbMaterial(pub Handle<StandardMaterial>);
+
+/// Observer posé sur chaque main GLB au spawn : au scene-ready, clone le
+/// matériau du GLB (l'asset est PARTAGÉ entre les 2 mains — muter l'original
+/// teinterait tout usage du GLB) puis applique la cosmétique courante.
+/// Event-driven : zéro coût par-frame (pas de scan global des matériaux).
+pub fn on_arm_scene_ready(
+    event: On<SceneInstanceReady>,
+    children: Query<&Children>,
+    mat_q: Query<&MeshMaterial3d<StandardMaterial>>,
+    cosmetics: Res<ArmCosmetics>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut commands: Commands,
+) {
+    let root = event.entity;
+    for desc in children.iter_descendants(root) {
+        let Ok(mat_handle) = mat_q.get(desc) else {
+            continue;
+        };
+        let Some(mut m) = materials.get(&mat_handle.0).cloned() else {
+            continue; // matériau pas encore chargé — laisser l'original
+        };
+        apply_arm_style_glb(&mut m, cosmetics.color, cosmetics.style);
+        let h = materials.add(m);
+        commands.entity(desc).insert(MeshMaterial3d(h.clone()));
+        // GLB bras mono-matériau → 1 handle par main suffit.
+        commands.entity(root).insert(ArmGlbMaterial(h));
+    }
+}
+
 /// Ré-applique la cosmétique aux matériaux des bras quand `ArmCosmetics` change
-/// (choix dans l'onglet Forge). Mute les assets partagés → paume/doigts/manche
-/// suivent. Event-driven (`is_changed`).
+/// (choix dans l'onglet Forge). Mute les assets (procéduraux partagés / clones
+/// GLB par-main) → paume/doigts/manche suivent. Event-driven (`is_changed`).
 pub fn sync_arm_cosmetics(
     cosmetics: Res<ArmCosmetics>,
     q_handles: Query<&ArmMaterialHandles>,
+    q_glb: Query<&ArmGlbMaterial>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if !cosmetics.is_changed() {
@@ -95,6 +167,11 @@ pub fn sync_arm_cosmetics(
         }
         if let Some(m) = materials.get_mut(&h.cuff) {
             apply_arm_style(m, cosmetics.color, cosmetics.style, true);
+        }
+    }
+    for h in &q_glb {
+        if let Some(m) = materials.get_mut(&h.0) {
+            apply_arm_style_glb(m, cosmetics.color, cosmetics.style);
         }
     }
 }
@@ -110,6 +187,11 @@ pub struct ViewmodelHand {
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct ViewmodelArmsTuning {
     pub enabled: bool,
+    /// Bras GLB cartoon (story-661) au lieu des poings procéduraux.
+    /// Hot-reload : le toggle despawn/respawn les bras dans le bon mode.
+    pub use_glb: bool,
+    /// Échelle des bras GLB (mesh baked en mètres réels ; 1.0 = taille physique).
+    pub glb_scale: f32,
     pub scale: f32,
     /// Main crosse (droite) : décalage latéral, vertical, et recul (fraction de la
     /// longueur de l'arme, vers l'arrière/caméra).
@@ -133,6 +215,8 @@ impl Default for ViewmodelArmsTuning {
     fn default() -> Self {
         Self {
             enabled: true,
+            use_glb: true,
+            glb_scale: 1.0,
             scale: 2.0,
             grip_x: 0.0,
             grip_drop: -0.08,
@@ -151,6 +235,19 @@ impl Default for ViewmodelArmsTuning {
 // Couleurs/matériaux des bras = `apply_arm_style` (couleur + style cosmétiques choisis
 // dans l'onglet Forge). Le viewmodel n'est PAS toon-shadé (caméra séparée) et n'est
 // éclairé que par la scène → emissive léger gardé pour rester lisible au crépuscule.
+
+// ── Bras GLB cartoon (story-661, pipeline `tools/blender/cartoonize_arms.py`) ──
+// Convention baked identique aux poings procéduraux : poignet à l'origine,
+// avant-bras vers -Y, doigts +Y, paume +Z, pouce ±X → `position_hands` inchangé.
+// Chemins littéraux : même précédent que les armes (attach.rs). `pub(crate)` :
+// lus aussi par le capteur `arms_sensor` (état de chargement).
+pub(crate) const ARM_GLB_RIGHT: &str = "models/arms/fps_arm_R.glb#Scene0";
+pub(crate) const ARM_GLB_LEFT: &str = "models/arms/fps_arm_L.glb#Scene0";
+
+/// Mode des bras actuellement spawnés (true = GLB) — permet le respawn quand
+/// `use_glb` change à chaud (fps_tuning hot-reload).
+#[derive(Component)]
+pub struct ArmsGlbMode(pub bool);
 
 // ── Proportions du poing (mètres, main-local : +Y = vers les doigts) ──
 const FOREARM_RADIUS: f32 = 0.036;
@@ -195,9 +292,13 @@ fn skin_detail_texture() -> Image {
     for y in 0..N {
         for x in 0..N {
             let blotch = smooth_noise(x, y, N as f32, 5.0); // grandes taches
+            // 2e octave (fréquence ~2.5×, coordonnées décalées pour décorréler) :
+            // marbrures moyennes entre les grandes taches et le grain.
+            let blotch2 = smooth_noise(x.wrapping_add(53), y.wrapping_add(97), N as f32, 13.0);
             let grain = hash01(x.wrapping_mul(73).wrapping_add(y.wrapping_mul(151)));
-            // Variation multiplicative douce, légèrement chaude.
-            let v = ((0.86 + 0.14 * blotch) * (0.97 + 0.03 * grain)).clamp(0.0, 1.0);
+            // Variation multiplicative douce, légèrement chaude (même moyenne qu'avant).
+            let v = ((0.85 + 0.10 * blotch + 0.05 * blotch2) * (0.97 + 0.03 * grain))
+                .clamp(0.0, 1.0);
             let idx = ((y * N + x) * 4) as usize;
             data[idx] = (v * 255.0) as u8;
             data[idx + 1] = (v * 0.985 * 255.0) as u8;
@@ -242,9 +343,12 @@ fn spawn_finger(
             Name::new("Finger"),
         ))
         .id();
+    // Phalanges en capsules (bouts arrondis, section circulaire) — casse l'aspect
+    // « briques » des cuboids. Longueur totale capsule = cylindre + 2×rayon = l.
+    let prox_r = width * 0.5;
     let prox = commands
         .spawn((
-            Mesh3d(meshes.add(Cuboid::new(width, l1, width * 0.95))),
+            Mesh3d(meshes.add(Capsule3d::new(prox_r, (l1 - 2.0 * prox_r).max(l1 * 0.3)))),
             MeshMaterial3d(skin.clone()),
             Transform::from_xyz(0.0, l1 * 0.5, 0.0),
         ))
@@ -256,9 +360,10 @@ fn spawn_finger(
             Visibility::Inherited,
         ))
         .id();
+    let dist_r = width * 0.45;
     let dist = commands
         .spawn((
-            Mesh3d(meshes.add(Cuboid::new(width * 0.9, l2, width * 0.85))),
+            Mesh3d(meshes.add(Capsule3d::new(dist_r, (l2 - 2.0 * dist_r).max(l2 * 0.3)))),
             MeshMaterial3d(skin.clone()),
             Transform::from_xyz(0.0, l2 * 0.5, 0.0),
         ))
@@ -288,12 +393,28 @@ fn spawn_hand(
 
     // Pièces simples (avant-bras, manche, poignet, paume, dos de main).
     let kids = [
+        // Section elliptique (x>z) : un avant-bras réel n'est pas un tube rond.
         commands
             .spawn((
                 Mesh3d(meshes.add(Capsule3d::new(FOREARM_RADIUS, FOREARM_LEN))),
                 MeshMaterial3d(skin.clone()),
-                Transform::from_xyz(0.0, -FOREARM_LEN * 0.55, 0.0),
+                Transform::from_xyz(0.0, -FOREARM_LEN * 0.55, 0.0)
+                    .with_scale(Vec3::new(1.10, 1.0, 0.92)),
                 Name::new("Forearm"),
+            ))
+            .id(),
+        // Galbe du muscle (côté coude) : léger renflement, reste sous le rayon de
+        // la manche (1.25×) pour ne pas la percer.
+        commands
+            .spawn((
+                Mesh3d(meshes.add(Capsule3d::new(
+                    FOREARM_RADIUS * 1.12,
+                    FOREARM_LEN * 0.20,
+                ))),
+                MeshMaterial3d(skin.clone()),
+                Transform::from_xyz(0.0, -FOREARM_LEN * 0.60, 0.0)
+                    .with_scale(Vec3::new(1.10, 1.0, 0.92)),
+                Name::new("ForearmBulge"),
             ))
             .id(),
         commands
@@ -338,13 +459,16 @@ fn spawn_hand(
     let knuckle_y = 0.056;
     for (i, &p) in FINGER_PROFILE.iter().enumerate() {
         let x = (i as f32 - 1.5) * 0.0175;
+        // Éventail léger (~±4.5°) : les doigts extérieurs s'écartent du majeur →
+        // main organique au lieu de 4 doigts parallèles.
+        let splay = Quat::from_rotation_z((1.5 - i as f32) * 0.052);
         spawn_finger(
             commands,
             hand,
             meshes,
             skin,
             Vec3::new(x, knuckle_y, 0.010),
-            Quat::IDENTITY,
+            splay,
             0.013,
             0.026 * p,
             0.022 * p,
@@ -377,25 +501,79 @@ fn spawn_hand(
         -0.35,
         -0.70,
     );
+
+    // Éminence thénar : galbe charnu à la base du pouce (raccord paume→pouce).
+    let thenar = commands
+        .spawn((
+            Mesh3d(meshes.add(Sphere::new(0.016))),
+            MeshMaterial3d(skin.clone()),
+            Transform::from_xyz(mirror * 0.030, 0.012, 0.010)
+                .with_scale(Vec3::new(1.0, 1.25, 0.85)),
+            Name::new("Thenar"),
+        ))
+        .id();
+    commands.entity(hand).add_child(thenar);
 }
 
 /// Spawn root + 2 mains une fois la FpsCamera présente. Idempotent.
+/// `use_glb` (hot-reload) choisit bras GLB cartoon (story-661) vs poings
+/// procéduraux ; un toggle à chaud despawn puis respawn dans le bon mode.
 pub fn spawn_arms(
     mut commands: Commands,
     tuning: Res<ViewmodelArmsTuning>,
     cosmetics: Res<ArmCosmetics>,
+    asset_server: Res<AssetServer>,
     q_cam: Query<Entity, With<FpsCamera>>,
-    q_arms: Query<(), With<ViewmodelArms>>,
+    q_arms: Query<(Entity, &ArmsGlbMode), With<ViewmodelArms>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    if !tuning.enabled || !q_arms.is_empty() {
+    if !tuning.enabled {
+        return;
+    }
+    if let Ok((root, mode)) = q_arms.single() {
+        if mode.0 != tuning.use_glb {
+            commands.entity(root).despawn();
+        }
         return;
     }
     let Ok(cam) = q_cam.single() else {
         return;
     };
+
+    // ── Mode GLB (story-661) : 1 scène par main, placée par `position_hands`
+    // exactement comme les poings procéduraux (convention baked identique). ──
+    if tuning.use_glb {
+        let root = commands
+            .spawn((
+                ViewmodelArms,
+                ArmsGlbMode(true),
+                Transform::IDENTITY,
+                Visibility::Inherited,
+                Name::new("ViewmodelArms"),
+            ))
+            .id();
+        commands.entity(cam).add_child(root);
+        for (mirror, path) in [(1.0, ARM_GLB_RIGHT), (-1.0, ARM_GLB_LEFT)] {
+            let hand = commands
+                .spawn((
+                    ViewmodelHand { mirror },
+                    SceneRoot(asset_server.load(path)),
+                    Transform::IDENTITY,
+                    Visibility::Inherited,
+                    Name::new("ViewmodelHandGlb"),
+                ))
+                // Cosmétiques Forge : clone du matériau + teinte au scene-ready.
+                .observe(on_arm_scene_ready)
+                .id();
+            commands.entity(root).add_child(hand);
+        }
+        info!("[forgia-viewmodel] bras GLB cartoon spawnés (story-661)");
+        return;
+    }
+
+    // ── Mode procédural (fallback A/B, `use_glb = false`) ──
     // Texture de détail procédurale (variation organique) — partagée skin + cuff.
     let detail = images.add(skin_detail_texture());
     // Couleur + style initiaux = cosmétique courante (choix Forge, persistée).
@@ -415,6 +593,7 @@ pub fn spawn_arms(
     let root = commands
         .spawn((
             ViewmodelArms,
+            ArmsGlbMode(false),
             ArmMaterialHandles {
                 skin: skin.clone(),
                 cuff: cuff.clone(),
@@ -430,30 +609,55 @@ pub fn spawn_arms(
     info!("[forgia-viewmodel] mains procédurales spawnées (placement auto par-arme)");
 }
 
-/// Positionne chaque main depuis la position + taille RÉELLES de l'arme équipée
-/// (genome) → s'adapte à chaque arme. Live (chaque frame) : hot-reload instantané.
+/// Positionne chaque main depuis la pose RÉELLE de l'arme équipée → suit le lerp
+/// hipfire→ADS (translation, dé-tilt, shrink `ads_scale_factor`) écrit par
+/// `apply_ads_viewmodel`. Ordonné APRÈS la pose ADS et AVANT le sway (le sway est
+/// répliqué sur le root des bras par `apply_arms_motion`, sinon il compterait double).
+/// Fallback genome hipfire tant que l'arme n'existe pas / est en auto-scale (boot).
 pub fn position_hands(
     tuning: Res<ViewmodelArmsTuning>,
     equipped: Res<EquippedWeapons>,
     genome_handle: Option<Res<ViewmodelGenomeHandle>>,
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
-    mut q: Query<(&mut Transform, &ViewmodelHand)>,
+    q_weapon: Query<
+        (&Transform, Option<&ViewmodelBaseScale>),
+        (With<WeaponViewmodel>, Without<NeedsAutoScale>, Without<ViewmodelHand>),
+    >,
+    mut q: Query<(&mut Transform, &ViewmodelHand), Without<WeaponViewmodel>>,
 ) {
     let entry = genome_handle
         .as_deref()
         .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
-    // Centre + longueur de l'arme en camera-local (mêmes helpers que l'attach).
-    let gun = viewmodel_transform(equipped.current, entry).translation;
-    let len = viewmodel_target_size(equipped.current, entry);
+    let hipfire = viewmodel_transform(equipped.current, entry);
+    let base_len = viewmodel_target_size(equipped.current, entry);
+
+    // Ancre = Transform courant de l'arme. `delta_rot` = rotation hipfire→pose courante
+    // (≈ retrait du tilt en ADS) appliquée aux offsets camera-local → mains collées.
+    // `len` suit le shrink ADS (scale courant / scale de base calibré).
+    let (gun, delta_rot, len) = match q_weapon.single() {
+        Ok((wtf, base_scale)) => {
+            let scale_mul = base_scale
+                .filter(|b| b.0 > 1e-6)
+                .map(|b| wtf.scale.x / b.0)
+                .unwrap_or(1.0);
+            (
+                wtf.translation,
+                wtf.rotation * hipfire.rotation.inverse(),
+                base_len * scale_mul,
+            )
+        }
+        Err(_) => (hipfire.translation, Quat::IDENTITY, base_len),
+    };
 
     for (mut tf, hand) in &mut q {
-        let wrist = if hand.mirror > 0.0 {
+        let offset = if hand.mirror > 0.0 {
             // Main crosse : arrière (+Z vers caméra), sous l'arme.
-            gun + Vec3::new(tuning.grip_x, tuning.grip_drop, tuning.grip_back * len)
+            Vec3::new(tuning.grip_x, tuning.grip_drop, tuning.grip_back * len)
         } else {
             // Main soutien : avant (-Z vers le canon), sous l'arme.
-            gun + Vec3::new(tuning.barrel_x, tuning.barrel_drop, -tuning.barrel_fwd * len)
+            Vec3::new(tuning.barrel_x, tuning.barrel_drop, -tuning.barrel_fwd * len)
         };
+        let wrist = gun + delta_rot * offset;
         let elbow_out = if hand.mirror > 0.0 {
             tuning.grip_elbow_out
         } else {
@@ -467,9 +671,15 @@ pub fn position_hands(
             );
         let fwd = (wrist - elbow).normalize_or_zero();
         let rot = Quat::from_rotation_arc(Vec3::Y, fwd);
+        // GLB = mètres réels (glb_scale ~1) ; procédural = proportions internes ×scale.
+        let scale = if tuning.use_glb {
+            tuning.glb_scale
+        } else {
+            tuning.scale
+        };
         *tf = Transform::from_translation(wrist)
             .with_rotation(rot)
-            .with_scale(Vec3::splat(tuning.scale.max(0.01)));
+            .with_scale(Vec3::splat(scale.max(0.01)));
     }
 }
 
@@ -521,10 +731,16 @@ impl Plugin for ForgiaViewmodelArmsPlugin {
             Update,
             (
                 spawn_arms,
-                position_hands,
+                // Après la pose ADS (ancre = arme réelle), avant le sway (répliqué
+                // séparément sur le root par apply_arms_motion — sinon double).
+                position_hands
+                    .after(apply_ads_viewmodel)
+                    .before(apply_viewmodel_sway_bob),
                 apply_arms_motion.after(apply_viewmodel_sway_bob),
                 update_arms_visibility,
                 sync_arm_cosmetics,
+                // Story-661 — capteur forgia2_viewmodel_arms.json (1 Hz).
+                crate::arms_sensor::write_arms_sensor,
             )
                 .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
         );

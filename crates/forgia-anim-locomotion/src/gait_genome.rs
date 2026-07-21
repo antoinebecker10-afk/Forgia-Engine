@@ -120,19 +120,24 @@ static GAIT: RwLock<Option<GaitGenome>> = RwLock::new(None);
 
 /// Le gait courant (chargé du disque au 1er accès, puis mémorisé). `Copy` → retour
 /// par valeur, pas d'alloc. Appelé par `for_speed` (fn pure hot-path).
+///
+/// Poison recovery (fix audit 2026-07-19) : un panic isolé pendant la section
+/// critique empoisonnerait le lock POUR TOUJOURS → `.expect` = crash permanent
+/// de l'anim sur toutes les frames suivantes. La donnée est `Copy` et toujours
+/// cohérente (écriture atomique d'un `Option`) → récupérer via `into_inner`.
 pub fn gait() -> GaitGenome {
-    if let Some(g) = *GAIT.read().expect("gait lock poisoned") {
+    if let Some(g) = *GAIT.read().unwrap_or_else(|e| e.into_inner()) {
         return g;
     }
     let loaded = GaitGenome::load_or_default(GAIT_BIPED_LIZARD_PATH);
-    *GAIT.write().expect("gait lock poisoned") = Some(loaded);
+    *GAIT.write().unwrap_or_else(|e| e.into_inner()) = Some(loaded);
     loaded
 }
 
 /// Relit le TOML depuis le disque (hot-reload Shift+F12 / re-enter — câblé en incr.2).
 pub fn reload_gait() {
     let g = GaitGenome::load_or_default(GAIT_BIPED_LIZARD_PATH);
-    *GAIT.write().expect("gait lock poisoned") = Some(g);
+    *GAIT.write().unwrap_or_else(|e| e.into_inner()) = Some(g);
 }
 
 #[cfg(test)]

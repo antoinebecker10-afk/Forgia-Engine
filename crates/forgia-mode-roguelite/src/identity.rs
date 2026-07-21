@@ -137,29 +137,13 @@ impl Default for IdentitySave {
     }
 }
 
-fn config_dir() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        let mut cursor = exe.parent();
-        while let Some(d) = cursor {
-            if d.join("config").join("biomes").exists() {
-                return d.join("config");
-            }
-            cursor = d.parent();
-        }
-    }
-    PathBuf::from("config")
-}
-
 impl IdentitySave {
     fn save_path() -> PathBuf {
-        config_dir().join(SAVE_FILE)
+        crate::persist::save_dir().join(SAVE_FILE)
     }
 
     fn load_or_default() -> Self {
-        match std::fs::read_to_string(Self::save_path()) {
-            Ok(c) => toml::from_str(&c).unwrap_or_default(),
-            Err(_) => Self::default(),
-        }
+        crate::persist::load_toml_migrating(SAVE_FILE)
     }
 
     fn save(&self) {

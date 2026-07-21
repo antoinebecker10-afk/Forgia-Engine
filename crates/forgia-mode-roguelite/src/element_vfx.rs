@@ -16,30 +16,27 @@
 //! en place (`materials.get_mut`, mêmes handles) donc les sparks vivants
 //! changent aussi.
 //!
-//! La lumière n'est attachée qu'aux **impacts** (les pulses DoT n'en ont pas) →
-//! le nombre de `PointLight` simultanés reste borné. Cap global d'instances
-//! ([`MAX_ACTIVE_SPARKS`]) en garde-fou anti-spam.
+//! La lumière n'est attachée qu'aux **impacts** (les pulses DoT n'en ont pas).
+//! LOT B (audit fire-path 2026-07-20) : les bursts + lumières d'impact sont
+//! des **pools persistants** ([`ElementBurstPool`], `ELEMENT_BURST_POOL_SIZE`
+//! slots) — le round-robin borne nativement la concurrence, plus de
+//! spawn/despawn par hit (anti-pattern hanabi #255).
 
 use bevy::prelude::*;
-use bevy::state::state_scoped::DespawnOnExit;
 use bevy_hanabi::Gradient as HanabiGradient;
 use bevy_hanabi::{
-    AccelModifier, Attribute, ColorOverLifetimeModifier, EffectAsset, ExprWriter,
+    AccelModifier, Attribute, ColorOverLifetimeModifier, EffectAsset, EffectSpawner, ExprWriter,
     ImageSampleMapping, LinearDragModifier, ParticleTextureModifier, SetAttributeModifier,
     SetPositionSphereModifier, SetVelocitySphereModifier, ShapeDimension, SpawnerSettings,
 };
 use forgia_combat::combat_juice::CombatHitEvent;
-use forgia_core::prelude::*;
-use forgia_effects::prelude::{
-    EffectMaterial, Lifetime as VfxLifetime, ParticleEffect, VfxTuning, WeaponVfxEffects,
-};
+use forgia_effects::prelude::{EffectMaterial, ParticleEffect, VfxTuning, WeaponVfxEffects};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::elements::{Element, ElementConfig, ElementUnlocks, ReactionEvent};
 
 const SENSOR_PATH: &str = "forgia2_element_vfx.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
-/// Garde-fou : au-delà, on ne spawn plus de flash (anti-spam cadence SMG).
-const MAX_ACTIVE_SPARKS: usize = 64;
 /// Boost émissif (bloom-friendly) appliqué à la couleur de base de l'élément.
 const EMISSIVE_BOOST: f32 = 3.0;
 
@@ -144,9 +141,6 @@ pub fn sys_reset_vfx_stats(mut stats: ResMut<ElementVfxStats>) {
 pub struct ElementBurstAssets {
     /// Indexé par [`Element::idx`].
     pub effects: [Handle<EffectAsset>; 4],
-    /// TTL de l'entité burst — DOIT dépasser le lifetime max des particules
-    /// (despawn de l'entité hanabi = particules coupées net).
-    pub entity_ttl: f32,
 }
 
 /// Texture du burst par élément (partage les textures Kenney de weapon_vfx).
@@ -155,6 +149,90 @@ fn element_burst_texture(w: &WeaponVfxEffects, e: Element) -> Handle<Image> {
         Element::Fire => w.tex_flame.clone(),
         Element::Poison => w.tex_poison.clone(),
         Element::Shock | Element::ArmorPierce => w.tex_spark.clone(),
+    }
+}
+
+// ─── LOT B (audit fire-path 2026-07-20) — pool persistant des bursts ────────
+// Best practice bevy_hanabi (issue #255) : réutiliser un spawner existant
+// (repositionner + retrigger) plutôt que spawn/despawn une entité par hit.
+
+/// Nombre de slots round-robin PARTAGÉS entre tous les éléments (perf interne,
+/// pas exposé créateur). Le hot-swap `ParticleEffect.handle`/`EffectMaterial`
+/// est acceptable ici : les 4 bursts élément partagent la MÊME particle-layout
+/// (mêmes attributs/capacité, seule couleur/texture diffère) → pas de
+/// réallocation EffectCache, juste une reconfiguration légère du
+/// `CompiledParticleEffect` (cf `compile_effects` dans bevy_hanabi). Un pool
+/// dédié par élément (4×2) aurait évité ce swap mais sature sous Bourrasque
+/// (11 tirs/s, élément Feu unique) — 8 slots PARTAGÉS absorbent la cadence
+/// réelle sans troncature visuelle prématurée.
+const ELEMENT_BURST_POOL_SIZE: usize = 8;
+
+/// Pool persistant des bursts élément : `particles[i]` et `lights[i]` forment
+/// TOUJOURS une paire (même position). Jamais despawné.
+#[derive(Resource)]
+pub struct ElementBurstPool {
+    particles: [Entity; ELEMENT_BURST_POOL_SIZE],
+    lights: [Entity; ELEMENT_BURST_POOL_SIZE],
+    cursor: AtomicUsize,
+}
+
+impl ElementBurstPool {
+    /// Pioche le prochain index round-robin (thread-safe : `Res<>` immuable).
+    fn next_index(&self) -> usize {
+        self.cursor.fetch_add(1, Ordering::Relaxed) % ELEMENT_BURST_POOL_SIZE
+    }
+}
+
+/// Reconfigure une entité de pool (déjà vivante) pour émettre un NOUVEAU burst
+/// élémentaire : swap handle+texture, repositionne, puis force une réémission
+/// via `Commands` (retire `EffectSpawner` — hanabi le ré-ajoute frais au
+/// prochain tick, cf `tick_spawners()`, comportement identique à un spawn
+/// neuf sans jamais recréer l'entité ni son slot GPU). LOT B, 2026-07-20.
+#[allow(clippy::type_complexity)]
+fn retrigger_element_particle(
+    commands: &mut Commands,
+    q_particle: &mut Query<
+        (&mut ParticleEffect, &mut EffectMaterial, &mut Transform, &mut Visibility),
+        Without<PointLight>,
+    >,
+    entity: Entity,
+    handle: Handle<EffectAsset>,
+    tex: Handle<Image>,
+    pos: Vec3,
+    scale: f32,
+) {
+    if let Ok((mut effect, mut material, mut tf, mut vis)) = q_particle.get_mut(entity) {
+        effect.handle = handle;
+        material.images = vec![tex];
+        *tf = Transform::from_translation(pos).with_scale(Vec3::splat(scale));
+        *vis = Visibility::Visible;
+    }
+    commands.entity(entity).remove::<EffectSpawner>();
+}
+
+/// Repositionne + relance le decay (`ElementSpark`) d'une lumière de pool —
+/// jamais despawnée (LOT B).
+#[allow(clippy::too_many_arguments)]
+fn retrigger_element_light(
+    q_light: &mut Query<(&mut Transform, &mut PointLight, &mut Visibility, &mut ElementSpark)>,
+    entity: Entity,
+    pos: Vec3,
+    rgb: [f32; 3],
+    intensity: f32,
+    range: f32,
+    ttl: f32,
+    start_scale: f32,
+) {
+    if let Ok((mut tf, mut light, mut vis, mut spark)) = q_light.get_mut(entity) {
+        *tf = Transform::from_translation(pos);
+        light.color = Color::srgb(rgb[0], rgb[1], rgb[2]);
+        light.intensity = intensity;
+        light.range = range;
+        *vis = Visibility::Visible;
+        spark.age = 0.0;
+        spark.ttl = ttl;
+        spark.start_scale = start_scale;
+        spark.light0 = intensity;
     }
 }
 
@@ -227,8 +305,10 @@ fn create_element_burst(
 }
 
 /// PostStartup — après le genome éléments et les textures weapon_vfx : construit
-/// les 4 bursts + warmup shader (1 dummy caché par asset, leçon anti-freeze
-/// story-594 : la 1re compile hanabi coûte des secondes).
+/// les 4 bursts ET le pool persistant de `ELEMENT_BURST_POOL_SIZE` slots
+/// (LOT B, 2026-07-20). Les slots naissent cachés à Y=-10000 : leur toute
+/// première émission (invisible) paie AUSSI le warmup shader (leçon
+/// anti-freeze story-594 — remplace l'ancien dummy jetable).
 pub fn sys_init_element_bursts(
     mut commands: Commands,
     mut effect_assets: ResMut<Assets<EffectAsset>>,
@@ -242,23 +322,49 @@ pub fn sys_init_element_bursts(
     let handles =
         ALL_ELEMENTS.map(|e| create_element_burst(&mut effect_assets, &t, e.rgb(&vfx), names[e.idx()]));
     if let Some(w) = weapon_vfx.as_deref() {
-        for e in ALL_ELEMENTS {
-            commands.spawn((
-                ParticleEffect::new(handles[e.idx()].clone()),
-                EffectMaterial {
-                    images: vec![element_burst_texture(w, e)],
-                },
-                Transform::from_xyz(0.0, -10_000.0, 0.0),
-                Visibility::Hidden,
-                VfxLifetime(Timer::from_seconds(5.0, TimerMode::Once)),
-            ));
-        }
+        let hidden = Transform::from_xyz(0.0, -10_000.0, 0.0);
+        let particles: [Entity; ELEMENT_BURST_POOL_SIZE] = std::array::from_fn(|i| {
+            let e = ALL_ELEMENTS[i % ALL_ELEMENTS.len()];
+            commands
+                .spawn((
+                    ParticleEffect::new(handles[e.idx()].clone()),
+                    EffectMaterial {
+                        images: vec![element_burst_texture(w, e)],
+                    },
+                    hidden,
+                    Visibility::Hidden,
+                ))
+                .id()
+        });
+        let lights: [Entity; ELEMENT_BURST_POOL_SIZE] = std::array::from_fn(|_| {
+            commands
+                .spawn((
+                    hidden,
+                    PointLight {
+                        intensity: 0.0,
+                        shadows_enabled: false,
+                        ..default()
+                    },
+                    Visibility::Hidden,
+                    ElementSpark {
+                        age: 1.0,
+                        ttl: 1.0,
+                        start_scale: 0.0,
+                        light0: 0.0,
+                    },
+                ))
+                .id()
+        });
+        commands.insert_resource(ElementBurstPool {
+            particles,
+            lights,
+            cursor: AtomicUsize::new(0),
+        });
     }
-    commands.insert_resource(ElementBurstAssets {
-        effects: handles,
-        entity_ttl: 0.4 * t.lifetime_mult + 0.3,
-    });
-    info!("[element-vfx] 4 bursts hanabi construits (story-655 — fin des sphères)");
+    commands.insert_resource(ElementBurstAssets { effects: handles });
+    info!(
+        "[element-vfx] pool persistant de {ELEMENT_BURST_POOL_SIZE} bursts hanabi construit (LOT B, audit fire-path 2026-07-20 — remplace spawn/despawn par hit)"
+    );
 }
 
 // ─── Spawn : flash à l'impact ───────────────────────────────────────────────
@@ -267,28 +373,34 @@ pub fn sys_init_element_bursts(
 /// spawn un flash coloré à `hit_world_pos`. L'explosif est plus gros (splash) et
 /// 2× plus lumineux. Gaté par le MÊME check que l'application réelle
 /// (`unlocks.is_unlocked`, story-589) + `vfx.enabled` — sinon flash sans dégâts.
+#[allow(clippy::type_complexity)]
 pub fn sys_spawn_element_impact(
     mut events: MessageReader<CombatHitEvent>,
     config: Res<ElementConfig>,
     unlocks: Res<ElementUnlocks>,
     vfx_tuning: Option<Res<VfxTuning>>,
-    q_sparks: Query<(), With<ElementSpark>>,
     q_pos: Query<&GlobalTransform>,
     mut stats: ResMut<ElementVfxStats>,
     mut commands: Commands,
     // Story-655 — vrais bursts texturés (remplacent les sphères procédurales).
     bursts: Option<Res<ElementBurstAssets>>,
+    // LOT B (2026-07-20) — pool persistant, plus de spawn/despawn par hit.
+    pool: Option<Res<ElementBurstPool>>,
     weapon_vfx: Option<Res<WeaponVfxEffects>>,
+    mut q_particle: Query<
+        (&mut ParticleEffect, &mut EffectMaterial, &mut Transform, &mut Visibility),
+        Without<PointLight>,
+    >,
+    mut q_light: Query<(&mut Transform, &mut PointLight, &mut Visibility, &mut ElementSpark)>,
 ) {
-    let (Some(bursts), Some(weapon_vfx)) = (bursts, weapon_vfx) else {
+    let (Some(bursts), Some(pool), Some(weapon_vfx)) = (bursts, pool, weapon_vfx) else {
         return;
     };
     // Story-652 Inc.2 — échelle + offset unifiés avec les VFX d'armes
     // (roguelite_vfx.toml : un seul curseur pour tout le feedback de combat).
     let tuning = vfx_tuning.as_deref().copied().unwrap_or_default();
-    let mut live = q_sparks.iter().count();
     for ev in events.read() {
-        if !config.vfx.enabled || live >= MAX_ACTIVE_SPARKS {
+        if !config.vfx.enabled {
             continue;
         }
         let Some(weapon) = ev.weapon else {
@@ -307,7 +419,7 @@ pub fn sys_spawn_element_impact(
             * if arc { config.vfx.arc_scale } else { 1.0 }
             * tuning.size_mult;
         let light0 = config.vfx.light_intensity * if arc { 2.0 } else { 1.0 };
-        let [r, g, b] = element.rgb(&config.vfx);
+        let rgb = element.rgb(&config.vfx);
         // Offset HORS de la surface, vers le tireur (architecture standard —
         // sinon la sphère naît à moitié DANS le mesh du mob, occluse).
         let spawn_pos = match ev.attacker.and_then(|a| q_pos.get(a).ok()) {
@@ -318,33 +430,29 @@ pub fn sys_spawn_element_impact(
             }
             None => ev.hit_world_pos,
         };
-        // Story-655 — VRAI burst texturé (flamme/volutes/étincelles selon
-        // l'élément) au lieu de la sphère émissive.
-        commands.spawn((
-            ParticleEffect::new(bursts.effects[element.idx()].clone()),
-            EffectMaterial {
-                images: vec![element_burst_texture(&weapon_vfx, element)],
-            },
-            Transform::from_translation(spawn_pos).with_scale(Vec3::splat(scale)),
-            VfxLifetime(Timer::from_seconds(bursts.entity_ttl, TimerMode::Once)),
-            DespawnOnExit(GameMode::Roguelite),
-        ));
-        // La lumière colorée est CONSERVÉE (entité dédiée — `ElementSpark` gère
-        // son fade/despawn ; le scale tick est sans effet, plus de mesh).
-        commands.spawn((
-            Transform::from_translation(spawn_pos),
-            PointLight {
-                color: Color::srgb(r, g, b),
-                intensity: light0,
-                range: config.vfx.light_range,
-                shadows_enabled: false,
-                ..default()
-            },
-            ElementSpark { age: 0.0, ttl: config.vfx.impact_ttl, start_scale: scale, light0 },
-            DespawnOnExit(GameMode::Roguelite),
-        ));
+        // LOT B — pioche le prochain slot round-robin (particule + lumière
+        // PAIRÉE) et le retrigger, au lieu de spawn un burst texturé neuf.
+        let idx = pool.next_index();
+        retrigger_element_particle(
+            &mut commands,
+            &mut q_particle,
+            pool.particles[idx],
+            bursts.effects[element.idx()].clone(),
+            element_burst_texture(&weapon_vfx, element),
+            spawn_pos,
+            scale,
+        );
+        retrigger_element_light(
+            &mut q_light,
+            pool.lights[idx],
+            spawn_pos,
+            rgb,
+            light0,
+            config.vfx.light_range,
+            config.vfx.impact_ttl,
+            scale,
+        );
         stats.sparks_spawned = stats.sparks_spawned.saturating_add(1);
-        live += 1;
     }
 }
 
@@ -362,6 +470,7 @@ pub fn sys_spawn_element_impact(
 /// lumineuse pour le 1er élément, halo plus petit pour le 2e → la fusion est
 /// lisible. Throttlé en amont (cooldown/cible) donc pas de cap anti-spam ici.
 /// Miasma (DoT stackant) ne passe pas ici — son visuel viendra de `status_vfx` (P1).
+#[allow(clippy::type_complexity)]
 pub fn sys_spawn_reaction_vfx(
     mut events: MessageReader<ReactionEvent>,
     config: Res<ElementConfig>,
@@ -369,9 +478,16 @@ pub fn sys_spawn_reaction_vfx(
     mut commands: Commands,
     // Story-655 — vrais bursts texturés (remplacent les 2 sphères de fusion).
     bursts: Option<Res<ElementBurstAssets>>,
+    // LOT B (2026-07-20) — pool persistant, plus de spawn/despawn par événement.
+    pool: Option<Res<ElementBurstPool>>,
     weapon_vfx: Option<Res<WeaponVfxEffects>>,
+    mut q_particle: Query<
+        (&mut ParticleEffect, &mut EffectMaterial, &mut Transform, &mut Visibility),
+        Without<PointLight>,
+    >,
+    mut q_light: Query<(&mut Transform, &mut PointLight, &mut Visibility, &mut ElementSpark)>,
 ) {
-    let (Some(bursts), Some(weapon_vfx)) = (bursts, weapon_vfx) else {
+    let (Some(bursts), Some(pool), Some(weapon_vfx)) = (bursts, pool, weapon_vfx) else {
         return;
     };
     if !config.vfx.enabled {
@@ -380,42 +496,45 @@ pub fn sys_spawn_reaction_vfx(
     let ttl = config.vfx.impact_ttl * 2.0;
     for ev in events.read() {
         let (primary, secondary) = ev.kind.pair();
-        let [r, g, b] = primary.rgb(&config.vfx);
+        let rgb = primary.rgb(&config.vfx);
         let light0 = config.vfx.light_intensity * 3.0;
-        // Story-655 — burst texturé du 1er élément (grand) + halo du 2e (plus
-        // petit) : la fusion se lit par la superposition des deux couleurs.
-        commands.spawn((
-            ParticleEffect::new(bursts.effects[primary.idx()].clone()),
-            EffectMaterial {
-                images: vec![element_burst_texture(&weapon_vfx, primary)],
-            },
-            Transform::from_translation(ev.pos).with_scale(Vec3::splat(ev.radius)),
-            VfxLifetime(Timer::from_seconds(bursts.entity_ttl, TimerMode::Once)),
-            DespawnOnExit(GameMode::Roguelite),
-        ));
+        // Burst texturé du 1er élément (grand) + halo du 2e (plus petit) : la
+        // fusion se lit par la superposition des deux couleurs. LOT B : 2
+        // slots du pool partagé sont retrigger (pas de spawn).
+        let idx_primary = pool.next_index();
+        retrigger_element_particle(
+            &mut commands,
+            &mut q_particle,
+            pool.particles[idx_primary],
+            bursts.effects[primary.idx()].clone(),
+            element_burst_texture(&weapon_vfx, primary),
+            ev.pos,
+            ev.radius,
+        );
         let halo = ev.radius * 0.6;
-        commands.spawn((
-            ParticleEffect::new(bursts.effects[secondary.idx()].clone()),
-            EffectMaterial {
-                images: vec![element_burst_texture(&weapon_vfx, secondary)],
-            },
-            Transform::from_translation(ev.pos).with_scale(Vec3::splat(halo)),
-            VfxLifetime(Timer::from_seconds(bursts.entity_ttl, TimerMode::Once)),
-            DespawnOnExit(GameMode::Roguelite),
-        ));
-        // Lumière de fusion conservée (entité dédiée, fade par ElementSpark).
-        commands.spawn((
-            Transform::from_translation(ev.pos),
-            PointLight {
-                color: Color::srgb(r, g, b),
-                intensity: light0,
-                range: ev.radius * 2.0,
-                shadows_enabled: false,
-                ..default()
-            },
-            ElementSpark { age: 0.0, ttl, start_scale: ev.radius, light0 },
-            DespawnOnExit(GameMode::Roguelite),
-        ));
+        let idx_secondary = pool.next_index();
+        retrigger_element_particle(
+            &mut commands,
+            &mut q_particle,
+            pool.particles[idx_secondary],
+            bursts.effects[secondary.idx()].clone(),
+            element_burst_texture(&weapon_vfx, secondary),
+            ev.pos,
+            halo,
+        );
+        // Lumière de fusion : réutilise le slot PAIRÉ de la particule primaire
+        // (pas de pool lumière dédié pour les réactions — throttlées en amont
+        // par le cooldown/ciblage de `sys_apply_elements_on_hit`).
+        retrigger_element_light(
+            &mut q_light,
+            pool.lights[idx_primary],
+            ev.pos,
+            rgb,
+            light0,
+            ev.radius * 2.0,
+            ttl,
+            ev.radius,
+        );
         stats.reaction_bursts = stats.reaction_bursts.saturating_add(1);
     }
 }
@@ -424,13 +543,19 @@ pub fn sys_spawn_reaction_vfx(
 
 // ─── Tick : fade + despawn ──────────────────────────────────────────────────
 
+/// LOT B (audit fire-path 2026-07-20) : ces lumières appartiennent TOUJOURS à
+/// un pool persistant (`ElementBurstPool`) — plus de despawn ici, seulement un
+/// decay vers 0. L'entité attend la prochaine réutilisation par le round-robin
+/// (`retrigger_element_light` remet `age=0` à ce moment-là).
 pub fn sys_tick_element_sparks(
     time: Res<Time>,
-    mut commands: Commands,
-    mut q: Query<(Entity, &mut Transform, &mut ElementSpark, Option<&mut PointLight>)>,
+    mut q: Query<(&mut Transform, &mut ElementSpark, Option<&mut PointLight>)>,
 ) {
     let dt = time.delta_secs();
-    for (e, mut tf, mut spark, light) in &mut q {
+    for (mut tf, mut spark, light) in &mut q {
+        if spark.age >= spark.ttl {
+            continue; // déjà retombé à 0 — pas de despawn, pool persistant
+        }
         spark.age += dt;
         let t = if spark.ttl > 0.0 {
             (spark.age / spark.ttl).clamp(0.0, 1.0)
@@ -442,9 +567,6 @@ pub fn sys_tick_element_sparks(
         if let Some(mut l) = light {
             l.intensity = spark.light0 * k;
         }
-        if spark.age >= spark.ttl {
-            commands.entity(e).despawn();
-        }
     }
 }
 
@@ -455,7 +577,7 @@ pub fn sys_write_element_vfx_sensor(
     mut accum: Local<f32>,
     config: Res<ElementConfig>,
     stats: Res<ElementVfxStats>,
-    q_sparks: Query<(), With<ElementSpark>>,
+    q_sparks: Query<&ElementSpark>,
 ) {
     *accum += time.delta_secs();
     if *accum < POLL_PERIOD_SEC {
@@ -463,7 +585,10 @@ pub fn sys_write_element_vfx_sensor(
     }
     *accum = 0.0;
 
-    let active = q_sparks.iter().count();
+    // LOT B — le pool est persistant (toujours ELEMENT_BURST_POOL_SIZE
+    // entités) : "active" = celles encore dans leur fenêtre de decay, pas le
+    // total du pool.
+    let active = q_sparks.iter().filter(|s| s.age < s.ttl).count();
     let (severity, next_step) = if config.vfx.enabled {
         ("ok", "")
     } else {

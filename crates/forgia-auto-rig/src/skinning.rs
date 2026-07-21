@@ -953,10 +953,10 @@ mod tests {
             BoneSkinKind { is_arm: true, is_head: false, is_body: false },
             BoneSkinKind { is_arm: false, is_head: false, is_body: false },
         ];
-        let (indices, weights) =
+        let (indices, _) =
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
         assert!(
-            !indices[0].iter().any(|&j| j == 1),
+            !indices[0].contains(&1),
             "clavicle (arm, index 1) ne doit apparaître dans AUCUN slot d'un vertex tête, got {:?}",
             indices[0]
         );
@@ -970,7 +970,7 @@ mod tests {
             &cfg(),
         );
         assert!(
-            indices_no_excl[0].iter().any(|&j| j == 1),
+            indices_no_excl[0].contains(&1),
             "sans exclusion, la clavicle proche DOIT capter le vertex (sinon le test ne prouve rien)"
         );
     }
@@ -997,7 +997,7 @@ mod tests {
         let (indices, _) =
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
         assert!(
-            !indices[0].iter().any(|&j| j == 1),
+            !indices[0].contains(&1),
             "arm (index 1) ne doit apparaître dans AUCUN slot d'un vertex torse, got {:?}",
             indices[0]
         );
@@ -1011,7 +1011,7 @@ mod tests {
             &cfg(),
         );
         assert!(
-            indices_no_excl[0].iter().any(|&j| j == 1),
+            indices_no_excl[0].contains(&1),
             "sans exclusion, le bras proche DOIT capter le vertex torse (sinon le test ne prouve rien)"
         );
     }
@@ -1037,7 +1037,7 @@ mod tests {
         let (indices, _) =
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
         assert!(
-            !indices[0].iter().any(|&j| j == 1),
+            !indices[0].contains(&1),
             "neck (is_head, index 1) ne doit PAS capter un vertex torse, got {:?}",
             indices[0]
         );
@@ -1051,7 +1051,7 @@ mod tests {
             &cfg(),
         );
         assert!(
-            no_excl[0].iter().any(|&j| j == 1),
+            no_excl[0].contains(&1),
             "sans exclusion, la nuque proche DOIT capter le vertex (sinon le test ne prouve rien)"
         );
     }

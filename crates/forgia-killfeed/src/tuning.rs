@@ -121,10 +121,10 @@ pub fn sync_killfeed_tuning(
         match ev {
             AssetEvent::Added { id }
             | AssetEvent::Modified { id }
-            | AssetEvent::LoadedWithDependencies { id } => {
-                if *id == handle.0.id() {
-                    should = true;
-                }
+            | AssetEvent::LoadedWithDependencies { id }
+                if *id == handle.0.id() =>
+            {
+                should = true;
             }
             _ => {}
         }

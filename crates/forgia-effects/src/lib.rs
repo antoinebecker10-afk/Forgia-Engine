@@ -1,6 +1,6 @@
 //! # forgia-effects
 //!
-//! Hanabi VFX + audio combat + HitFlashCache.
+//! Hanabi VFX + audio combat.
 //!
 //! **Pattern obligatoire Phase 0** : pre-spawn dummy `ParticleEffect` `Visibility::Hidden`
 //! au Startup pour payer le shader compile lazy AVANT le 1er tir.
@@ -15,6 +15,7 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod arena_feedback;
+pub mod pipeline_ready;
 pub mod weapon_vfx;
 // Story-523 fusion : 4 VFX-adjacent crates intégrées comme modules.
 pub mod damage_numbers;
@@ -49,6 +50,9 @@ pub mod prelude {
     // depuis que les EffectAsset déclarent un slot texture.
     pub use bevy_hanabi::{EffectMaterial, ParticleEffect};
     pub use crate::ForgiaEffectsPlugin;
+    // Audit fire-path 2026-07-20 — détecteur générique de compilation de pipelines
+    // (anti-freeze de specialization au 1er affichage, consommé par le warmup décor).
+    pub use crate::pipeline_ready::{PipelinesReady, PipelinesReadyPlugin};
     // Story-523 re-exports des modules fusionnés.
     pub use crate::damage_numbers::ForgiaDamageNumbersPlugin;
     pub use crate::hitmarker::{ForgiaHitmarkerPlugin, HitmarkerState};
@@ -63,6 +67,9 @@ impl Plugin for ForgiaEffectsPlugin {
         // Pre-spawn hanabi dummies pour payer le shader compile AVANT le 1er tir
         // (pattern story-436 / reference_hanabi_shader_compile_lazy_pattern.md).
         // PostStartup : setup_weapon_vfx (Startup) doit avoir inséré WeaponVfxEffects.
+        // Audit fire-path 2026-07-20 — détecteur « pipelines compilés » (RenderApp),
+        // consommé par le warmup PBR du Lobby roguelite. Idempotent (skip si RenderApp absent).
+        app.add_plugins(pipeline_ready::PipelinesReadyPlugin);
         app.add_systems(PostStartup, prespawn_hanabi_dummies)
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
             .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
@@ -73,6 +80,9 @@ impl Plugin for ForgiaEffectsPlugin {
                     effects_tick,
                     emissive_fade_tick,
                     lifetime_tick,
+                    // LOT B (audit fire-path 2026-07-20) — decay des lumières des
+                    // pools persistants (muzzle/impact/kill), sans despawn.
+                    tick_pooled_light_fade,
                     weapon_vfx::tracer::tick_bullets_in_flight,
                     // Story-652 — tuning VFX hot-reload (rebuild assets) + capteur.
                     weapon_vfx::sys_hot_reload_vfx_genome,
@@ -80,6 +90,29 @@ impl Plugin for ForgiaEffectsPlugin {
                 )
                     .in_set(GameSet::Effects),
             );
+    }
+}
+
+/// LOT B (audit fire-path 2026-07-20) — decay d'intensité SANS despawn, pour
+/// les `PointLight` des pools persistants muzzle/impact/kill (weapon_vfx). À
+/// la différence de `Lifetime`/`lifetime_tick` (qui despawn), l'entité reste
+/// vivante et attend la prochaine réutilisation par le round-robin. Réinsérer
+/// ce composant (via `Commands::insert`) au prochain événement relance le decay.
+#[derive(Component)]
+pub(crate) struct PooledLightFade {
+    pub timer: Timer,
+    pub base_intensity: f32,
+}
+
+/// Tick `PooledLightFade` — decay l'intensité vers 0 sans jamais despawn.
+fn tick_pooled_light_fade(time: Res<Time>, mut q: Query<(&mut PointLight, &mut PooledLightFade)>) {
+    for (mut light, mut fade) in &mut q {
+        if fade.timer.is_finished() {
+            continue; // déjà éteinte — attend la prochaine réutilisation du slot
+        }
+        fade.timer.tick(time.delta());
+        let k = (1.0 - fade.timer.fraction()).max(0.0);
+        light.intensity = fade.base_intensity * k;
     }
 }
 
@@ -129,28 +162,27 @@ fn emissive_fade_tick(
     }
 }
 
-/// Pré-spawn 1 dummy `ParticleEffect` caché par EffectAsset (8) à Y=-10000 :
+/// Pré-spawn 1 dummy `ParticleEffect` caché par EffectAsset restant à Y=-10000 :
 /// hanabi compile ses shaders à la première préparation d'un effet — sans ce
 /// warmup, le PREMIER tir de la session paie la compile (freeze 25 s confirmé
 /// V1, story-436). Les dummies vivent 5 s puis `lifetime_tick` les despawn.
 /// Était un placeholder « TODO Phase 2 » depuis Phase 0 — implémenté story-594
 /// (audit 2026-06-10 P1, M2-B5).
+///
+/// LOT B (audit fire-path 2026-07-20) : les 8 handles muzzle (×5) + impact
+/// sparks/dust + kill_burst n'ont PLUS besoin de dummy ici — leurs pools
+/// persistants (`weapon_vfx::spawn_muzzle_pool/spawn_impact_pool/spawn_kill_pool`,
+/// spawnés dans `setup_weapon_vfx`) émettent déjà UNE fois, cachés à
+/// Y=-10000, ce qui paie le même warmup shader. Seuls les 4 handles SANS pool
+/// dédié (impact_flash désactivé + les 3 status DoT continus) restent ici.
 fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::WeaponVfxEffects>) {
     // Story-647 : chaque dummy binde aussi sa texture (EffectMaterial) — un effet
     // à slot texture sans material ne prépare pas son bind group, le warmup
     // shader serait incomplet.
     let handles = [
-        (&effects.muzzle_core_flash, &effects.tex_muzzle_flash),
-        (&effects.muzzle_sparks, &effects.tex_spark),
-        (&effects.muzzle_smoke, &effects.tex_smoke),
-        (&effects.muzzle_heat_glow, &effects.tex_glow),
-        (&effects.muzzle_forward_flash, &effects.tex_muzzle_tongue),
-        (&effects.impact_sparks, &effects.tex_spark),
-        (&effects.impact_dust, &effects.tex_dust),
         (&effects.impact_flash, &effects.tex_flare),
         (&effects.status_flame, &effects.tex_flame),
         (&effects.status_poison_cloud, &effects.tex_poison),
-        (&effects.kill_burst, &effects.tex_burst),
         (&effects.status_shock, &effects.tex_spark),
     ];
     for (handle, tex) in handles {
@@ -164,7 +196,9 @@ fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::Weap
             weapon_vfx::Lifetime(Timer::from_seconds(5.0, TimerMode::Once)),
         ));
     }
-    info!("[forgia-effects] prespawn 12 hanabi dummies (shader warmup, story-594/652/653)");
+    info!(
+        "[forgia-effects] prespawn 4 hanabi dummies (shader warmup status/impact_flash, story-594/652/653) + 38 entités de pool persistant LOT B (muzzle/impact/kill, déjà warmées à leur spawn)"
+    );
 }
 
 fn effects_tick() {

@@ -6,7 +6,7 @@
 //! - Hit-stop genome (Time<Virtual> pause/resume)
 //! - Camera recoil event Apex
 //! - Hitmarker visuel
-//! - HitFlashCache (shared, anti clone-per-hit)
+//! - Hit flash emissive en place (zéro swap de matériau per-hit)
 //! - Damage numbers + falloff
 //! - Tracer cache (-55% freeze 1er tir)
 //!
@@ -40,8 +40,8 @@ pub mod prelude {
         ReloadState,
     };
     pub use crate::combat_juice::{
-        CameraTrauma, CombatHitEvent, HitFlashCache, HitFlashTimer, WeaponRecoilDebt,
-        WeaponRecoilImpulse,
+        CameraTrauma, CombatHitEvent, HitFlashTimer, WeaponRecoilDebt, WeaponRecoilImpulse,
+        HIT_FLASH_EMISSIVE,
     };
     pub use crate::combat_rng::{CombatRng, CRIT_SALT};
     pub use crate::confidence::{PepinConfidence, ShotResolved};
@@ -168,13 +168,9 @@ impl Plugin for ForgiaCombatPlugin {
             .add_message::<combat_juice::CombatHitEvent>()
             .add_message::<combat_juice::WeaponFiredEvent>()
             .add_message::<ammo::AmmoChanged>()
-            .add_systems(
-                Startup,
-                (
-                    weapons::setup_casing_resources,
-                    combat_juice::setup_hit_flash_cache,
-                ),
-            )
+            // setup_hit_flash_cache retiré (audit fire-path 2026-07-20) : le
+            // flash mute l'emissive en place, plus de flash-material partagé.
+            .add_systems(Startup, weapons::setup_casing_resources)
             // Keystone 0.1a-2 slice 2 (story-634) — cooldowns d'arme/melee = timers
             // PURS (Res<Time> seul, 0 input) → migrés en FixedUpdate (sim déterministe).
             // En FixedUpdate, Res<Time> == Time<Fixed> ; le hit-stop (Time<Virtual>

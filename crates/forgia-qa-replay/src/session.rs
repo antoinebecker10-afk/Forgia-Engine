@@ -302,8 +302,7 @@ mod tests {
         s.record_input(InputEvent::KeyPressed { code: 3, frame: 5 });
         s.record_input(InputEvent::KeyPressed { code: 4, frame: 10 });
 
-        let at_5: Vec<_> = s.inputs_at_frame(5).collect();
-        assert_eq!(at_5.len(), 2);
+        assert_eq!(s.inputs_at_frame(5).count(), 2);
     }
 
     #[test]

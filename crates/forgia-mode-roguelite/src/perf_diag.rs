@@ -41,6 +41,10 @@ const SPIKE_30: f32 = 30.0;
 const SPIKE_45: f32 = 45.0;
 const SPIKE_60: f32 = 60.0;
 
+/// Micro-freeze : 1 frame > 15 ms = hitch perceptible à haute cadence
+/// (demande user 2026-07-20 : les micro-freezes < 30 ms passaient sous le radar).
+const SPIKE_15: f32 = 15.0;
+
 /// Nombre de secondes-freeze retenues dans l'anneau (post-hoc).
 const FREEZE_RING: usize = 8;
 
@@ -52,6 +56,7 @@ struct FreezeSecond {
     t: f32,
     max_ms: f32,
     avg_ms: f32,
+    spikes_15: u32,
     spikes_30: u32,
     spikes_45: u32,
     spikes_60: u32,
@@ -70,6 +75,7 @@ pub struct PerfDiagState {
     frames: u32,
     sum_ms: f32,
     max_ms: f32,
+    spikes_15: u32,
     spikes_30: u32,
     spikes_45: u32,
     spikes_60: u32,
@@ -101,6 +107,9 @@ pub fn sys_perf_diag(
     st.frames += 1;
     st.sum_ms += dt_ms;
     st.max_ms = st.max_ms.max(dt_ms);
+    if dt_ms > SPIKE_15 {
+        st.spikes_15 += 1;
+    }
     if dt_ms > SPIKE_30 {
         st.spikes_30 += 1;
     }
@@ -139,6 +148,8 @@ pub fn sys_perf_diag(
         )
     } else if st.spikes_30 > 2 {
         ("warn", "stutter soutenu (>2 spikes 30ms/s) — charge par-frame trop haute")
+    } else if st.spikes_15 > 4 {
+        ("warn", "micro-stutter (>4 frames 15ms+/s) — hitchs perceptibles sous le seuil 30ms")
     } else {
         ("ok", "")
     };
@@ -148,8 +159,14 @@ pub fn sys_perf_diag(
     // même si des secondes calmes réécrivent ensuite le fichier.
     if severity == "warn" {
         // Capture les champs `st.*` AVANT le push (sinon double-borrow de `st`).
-        let (t, max_ms, sp30, sp45, sp60) =
-            (time.elapsed_secs(), st.max_ms, st.spikes_30, st.spikes_45, st.spikes_60);
+        let (t, max_ms, sp15, sp30, sp45, sp60) = (
+            time.elapsed_secs(),
+            st.max_ms,
+            st.spikes_15,
+            st.spikes_30,
+            st.spikes_45,
+            st.spikes_60,
+        );
         if st.freezes.len() >= FREEZE_RING {
             st.freezes.remove(0);
         }
@@ -157,6 +174,7 @@ pub fn sys_perf_diag(
             t,
             max_ms,
             avg_ms: avg,
+            spikes_15: sp15,
             spikes_30: sp30,
             spikes_45: sp45,
             spikes_60: sp60,
@@ -176,10 +194,11 @@ pub fn sys_perf_diag(
             freezes_json.push(',');
         }
         freezes_json.push_str(&format!(
-            r#"{{"t":{:.1},"max_ms":{:.1},"avg_ms":{:.2},"spikes_30":{},"spikes_45":{},"spikes_60":{},"enemies":{},"status_auras":{},"element_sparks":{},"particle_effects":{},"point_lights":{},"total_entities":{}}}"#,
+            r#"{{"t":{:.1},"max_ms":{:.1},"avg_ms":{:.2},"spikes_15":{},"spikes_30":{},"spikes_45":{},"spikes_60":{},"enemies":{},"status_auras":{},"element_sparks":{},"particle_effects":{},"point_lights":{},"total_entities":{}}}"#,
             f.t,
             f.max_ms,
             f.avg_ms,
+            f.spikes_15,
             f.spikes_30,
             f.spikes_45,
             f.spikes_60,
@@ -194,10 +213,11 @@ pub fn sys_perf_diag(
     freezes_json.push(']');
 
     let json = format!(
-        r#"{{"id":"perf_diag","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"frame_avg_ms":{:.2},"frame_max_ms":{:.1},"spikes_30":{},"spikes_45":{},"spikes_60":{},"frames_this_sec":{},"load":{{"total_entities":{total},"enemies":{enemies},"status_auras":{auras},"element_sparks":{sparks},"particle_effects":{particles},"point_lights":{lights},"pickups":{pickups},"meshes":{meshes},"colliders":{colliders}}},"freeze_count":{},"freezes":{freezes_json}}}"#,
+        r#"{{"id":"perf_diag","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"frame_avg_ms":{:.2},"frame_max_ms":{:.1},"spikes_15":{},"spikes_30":{},"spikes_45":{},"spikes_60":{},"frames_this_sec":{},"load":{{"total_entities":{total},"enemies":{enemies},"status_auras":{auras},"element_sparks":{sparks},"particle_effects":{particles},"point_lights":{lights},"pickups":{pickups},"meshes":{meshes},"colliders":{colliders}}},"freeze_count":{},"freezes":{freezes_json}}}"#,
         time.elapsed_secs(),
         avg,
         st.max_ms,
+        st.spikes_15,
         st.spikes_30,
         st.spikes_45,
         st.spikes_60,
@@ -213,6 +233,7 @@ pub fn sys_perf_diag(
     st.frames = 0;
     st.sum_ms = 0.0;
     st.max_ms = 0.0;
+    st.spikes_15 = 0;
     st.spikes_30 = 0;
     st.spikes_45 = 0;
     st.spikes_60 = 0;
@@ -237,6 +258,7 @@ mod tests {
             t,
             max_ms: 70.0,
             avg_ms: 8.0,
+            spikes_15: 2,
             spikes_30: 1,
             spikes_45: 1,
             spikes_60: 0,

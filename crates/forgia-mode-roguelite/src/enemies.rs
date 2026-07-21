@@ -58,6 +58,11 @@ pub struct EnemyStats {
     pub warmup_secs: f32,
     pub capsule_radius: f32,
     pub capsule_half_height: f32,
+    /// Rayon override de la hitbox tête (m monde). None = auto : crâne mesuré du
+    /// GLB × skeleton_scale (story-652, cf `head_hitbox.rs`). Champ optionnel dans
+    /// le TOML (absent → None → auto).
+    #[serde(default)]
+    pub head_radius: Option<f32>,
     /// Couleur base RGB linéaire (StandardMaterial.base_color).
     pub color_rgb: [f32; 3],
     /// Couleur émissive RGB linéaire (faible — silhouette pop sans flash).
@@ -83,34 +88,40 @@ pub struct EnemyStatsConfig {
 
 impl Default for EnemyStatsConfig {
     fn default() -> Self {
+        // Story-652 — capsules recalibrées sur les meshs KayKit mesurés : la capsule
+        // body s'arrête aux ÉPAULES (H = 1.40 × skeleton_scale, bas du crâne à
+        // 1.31 × scale + chevauchement anti-trou-du-cou) ; le crâne est couvert par la
+        // sphère tête qui DÉPASSE (sinon headshot impossible, cf head_hitbox.rs).
+        // hh = H/2 − radius. Avant : tank 0.75 / runner 0.60 / sniper 0.85 / boss 2.2
+        // (le Runner avait 33 cm de crâne sans collider, le Boss 2 m de vide touchable).
         Self {
             tank: EnemyStats {
                 hp: 120.0, speed: 2.8, stop_distance: 3.0, attack_range: 4.0,
                 detect_range: 22.0, attack_cooldown: 1.8, warmup_secs: 2.0,
-                capsule_radius: 0.55, capsule_half_height: 0.75,
+                capsule_radius: 0.55, capsule_half_height: 0.43, head_radius: None,
                 color_rgb: [0.55, 0.10, 0.10], emissive_rgb: [0.25, 0.03, 0.03],
                 shoot_damage: 25.0, shoot_range: 5.0, shoot_jitter_deg: 6.0,
             },
             runner: EnemyStats {
                 hp: 35.0, speed: 7.0, stop_distance: 6.0, attack_range: 7.0,
                 detect_range: 40.0, attack_cooldown: 0.7, warmup_secs: 1.2,
-                capsule_radius: 0.32, capsule_half_height: 0.60,
+                capsule_radius: 0.32, capsule_half_height: 0.38, head_radius: None,
                 color_rgb: [0.95, 0.45, 0.10], emissive_rgb: [0.40, 0.18, 0.04],
                 shoot_damage: 8.0, shoot_range: 8.0, shoot_jitter_deg: 5.0,
             },
             sniper: EnemyStats {
                 hp: 45.0, speed: 3.2, stop_distance: 22.0, attack_range: 24.0,
                 detect_range: 55.0, attack_cooldown: 1.6, warmup_secs: 1.8,
-                capsule_radius: 0.30, capsule_half_height: 0.85,
+                capsule_radius: 0.30, capsule_half_height: 0.47, head_radius: None,
                 color_rgb: [0.55, 0.20, 0.80], emissive_rgb: [0.22, 0.08, 0.35],
                 shoot_damage: 18.0, shoot_range: 28.0, shoot_jitter_deg: 1.5,
             },
-            // Boss : tanky, mi-range, intimidant. Capsule géante 3×Tank. Phase 2
-            // enrage à 50% HP : speed×1.8, cooldown×0.55 (cf sys_boss_enrage).
+            // Boss : tanky, mi-range, intimidant. Phase 2 enrage à 50% HP :
+            // speed×1.8, cooldown×0.55 (cf sys_boss_enrage).
             boss: EnemyStats {
                 hp: 800.0, speed: 3.5, stop_distance: 10.0, attack_range: 30.0,
                 detect_range: 80.0, attack_cooldown: 1.3, warmup_secs: 2.5,
-                capsule_radius: 1.4, capsule_half_height: 2.2,
+                capsule_radius: 1.4, capsule_half_height: 0.35, head_radius: None,
                 color_rgb: [0.90, 0.10, 0.50], emissive_rgb: [0.50, 0.05, 0.25],
                 shoot_damage: 22.0, shoot_range: 32.0, shoot_jitter_deg: 3.0,
             },

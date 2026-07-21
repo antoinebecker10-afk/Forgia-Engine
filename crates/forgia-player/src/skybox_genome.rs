@@ -137,10 +137,10 @@ fn sync_palette_from_genome(
         match ev {
             AssetEvent::Added { id }
             | AssetEvent::Modified { id }
-            | AssetEvent::LoadedWithDependencies { id } => {
-                if *id == handle.0.id() {
-                    should = true;
-                }
+            | AssetEvent::LoadedWithDependencies { id }
+                if *id == handle.0.id() =>
+            {
+                should = true;
             }
             _ => {}
         }

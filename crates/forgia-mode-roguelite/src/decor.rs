@@ -1120,11 +1120,10 @@ fn plan_decor_set(cfg: &RogueliteDecorConfig, assets: &DecorAssets, seed: u64) -
     let step = TAU / n as f32;
     // Slots des landmarks : répartis ~également autour de l'anneau.
     let landmark_n = cfg.landmark_count.min(cfg.perimeter_count);
-    let landmark_step = if landmark_n > 0 {
-        (cfg.perimeter_count / landmark_n).max(1)
-    } else {
-        u32::MAX
-    };
+    let landmark_step = cfg
+        .perimeter_count
+        .checked_div(landmark_n)
+        .map_or(u32::MAX, |s| s.max(1));
     let mut landmarks_placed = 0u32;
 
     for i in 0..cfg.perimeter_count {

@@ -221,7 +221,7 @@ chromosome = "GunfeelImpact"
 target = "Value"
 min = 0.0
 max = 200.0
-default = 50.0
+default = 0.0
 layer = "hit_stop"
 
 [[genes]]

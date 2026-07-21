@@ -59,13 +59,15 @@ pub fn chk_stuck_wave(
     run_state: &str,
     bots_alive: u64,
     in_break: bool,
-    victory: bool,
+    // Fix audit 2026-07-19 — ex-`victory` : latch de fin de run (posé aussi sur
+    // Defeat), renommé `run_ended` côté producteur (sensor.rs) et ici.
+    run_ended: bool,
     boss_defeated: bool,
     time_in_state_secs: f32,
     stuck_wave_secs: f32,
 ) -> CheckResult {
     let active = run_state == "in_run" || run_state == "boss";
-    if !active || in_break || victory || boss_defeated {
+    if !active || in_break || run_ended || boss_defeated {
         return CheckResult::ok(format!("RGL-2: pas de combat actif à surveiller ({run_state})"));
     }
     if bots_alive == 0 && time_in_state_secs > stuck_wave_secs {
@@ -111,8 +113,8 @@ fn read_stuck_wave(elapsed_secs: f32, stuck_wave_secs: f32, state_stale_secs: f3
         .get("in_break")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
-    let victory = v
-        .get("victory")
+    let run_ended = v
+        .get("run_ended")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
     let boss_defeated = v
@@ -127,7 +129,7 @@ fn read_stuck_wave(elapsed_secs: f32, stuck_wave_secs: f32, state_stale_secs: f3
         run_state,
         bots_alive,
         in_break,
-        victory,
+        run_ended,
         boss_defeated,
         time_in_state,
         stuck_wave_secs,

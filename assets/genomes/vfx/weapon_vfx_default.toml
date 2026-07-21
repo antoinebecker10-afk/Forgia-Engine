@@ -221,7 +221,10 @@ chromosome = "GunfeelImpact"
 target = "Value"
 min = 0.0
 max = 200.0
-default = 50.0
+# 2026-07-20 — hitstop DESACTIVE (demande user : micro-freezes ressentis en tir
+# soutenu = le hitstop par-hit, invisible aux capteurs frame-time). Was 50.0.
+# Pour re-tuner : paliers crit/kill dans roguelite_gamefeel.toml.
+default = 0.0
 layer = "hit_stop"
 
 [[genes]]

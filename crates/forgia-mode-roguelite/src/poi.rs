@@ -850,7 +850,7 @@ default = 0.0
         cfg.vault_weight = 0.0;
         cfg.lava_weight = 10.0;
         for slot in 1..12u32 {
-            assert_eq!(assign_poi_kind(slot, slot as u64, &cfg), PoiKind::LavaHazard);
+            assert_eq!(assign_poi_kind(slot, u64::from(slot), &cfg), PoiKind::LavaHazard);
         }
     }
 

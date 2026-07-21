@@ -13,6 +13,7 @@ pub mod tracer;
 use bevy::prelude::*;
 use bevy_hanabi::prelude::*;
 use forgia_combat::weapons::WeaponType;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 // TODO: port from V1 — components::Lifetime
 // use forgia_core::components::Lifetime;
@@ -270,6 +271,23 @@ pub struct WeaponVfxEffects {
     /// durée : sinon monter `vfx_lifetime_mult` coupe les particules en vol
     /// (despawn entité hanabi = buffer particules détruit).
     pub lifetime_mult: f32,
+    // ── LOT B (audit fire-path 2026-07-20) — pools persistants ──────────────
+    // Plus AUCUN spawn/despawn par tir : chaque slot est repositionné et son
+    // spawner est retrigger (anti-pattern hanabi #255 : churn EffectCache/
+    // bind-group/dispatch-init GPU, ~90 instances/s en auto-fire Bourrasque).
+    /// Pool des 5 couches muzzle + 1 lumière (1 set, repositionné à chaque tir).
+    pub muzzle_pool: MuzzlePool,
+    /// Pool round-robin d'impact (sparks+dust+light par slot) — 8 slots
+    /// couvrent le cas extrême shotgun (jusqu'à 8 pellets/frame).
+    pub impact_pool: [ImpactPoolSlot; IMPACT_POOL_SIZE],
+    /// Curseur round-robin — `AtomicUsize` car `effects` est passé `&WeaponVfxEffects`
+    /// (immuable) au fire path (forgia-fps), jamais `&mut`.
+    pub impact_cursor: AtomicUsize,
+    /// Pool round-robin de kill-burst (particule+light par slot) — 4 slots
+    /// couvrent des kills simultanés (AoE/chaîne) qui se chevauchent dans la
+    /// fenêtre de vie du burst (~0.35-0.6 s × lifetime_mult).
+    pub kill_pool: [KillBurstPoolSlot; KILL_BURST_POOL_SIZE],
+    pub kill_cursor: AtomicUsize,
 }
 
 /// Marker: muzzle VFX entity (for cleanup)
@@ -280,37 +298,346 @@ pub struct MuzzleVfxMarker;
 #[derive(Component)]
 pub struct ImpactVfxMarker;
 
-/// Construit tous les EffectAssets selon le tuning (Startup + rebuild hot-reload).
+// ─── LOT B (audit fire-path 2026-07-20) — pools persistants Hanabi ──────────
+// Best practice bevy_hanabi documentée (issue #255) : réutiliser un spawner
+// existant (repositionner + retrigger) plutôt que spawn/despawn une entité par
+// événement. Tailles de pool = perf interne, PAS exposées créateur (no-hardcode
+// : ce sont des bornes de dimensionnement mémoire/GPU, pas des valeurs gameplay).
+
+/// Nombre de slots round-robin du pool d'impact : couvre le cas extrême shotgun
+/// (jusqu'à 8 pellets touchant dans la même frame) sans réutiliser un slot
+/// encore visuellement actif.
+const IMPACT_POOL_SIZE: usize = 8;
+/// Nombre de slots du pool de kill-burst : kills simultanés (AoE / chaîne) qui
+/// peuvent se chevaucher dans la fenêtre de vie du burst.
+const KILL_BURST_POOL_SIZE: usize = 4;
+
+/// Pool persistant des 5 couches muzzle + 1 lumière (LOT B) : repositionné à
+/// chaque tir, jamais respawné.
+pub struct MuzzlePool {
+    pub core_flash: Entity,
+    pub sparks: Entity,
+    pub smoke: Entity,
+    pub heat_glow: Entity,
+    pub forward_flash: Entity,
+    pub light: Entity,
+}
+
+/// 1 slot du pool d'impact : sparks + dust + light partageant toujours la
+/// même position à chaque réutilisation.
+pub struct ImpactPoolSlot {
+    pub sparks: Entity,
+    pub dust: Entity,
+    pub light: Entity,
+}
+
+/// 1 slot du pool de kill-burst : particule + light.
+pub struct KillBurstPoolSlot {
+    pub particle: Entity,
+    pub light: Entity,
+}
+
+/// Position initiale des entités de pool : cachée, loin de la scène — même
+/// pattern que l'ancien warmup dummy (leur toute première émission hanabi,
+/// invisible, paie AUSSI la compile shader avant le 1er tir réel, cf story-594).
+fn pool_hidden_transform() -> Transform {
+    Transform::from_xyz(0.0, -10_000.0, 0.0)
+}
+
+/// Spawn les 6 entités persistantes du pool muzzle (LOT B).
+#[allow(clippy::too_many_arguments)]
+fn spawn_muzzle_pool(
+    commands: &mut Commands,
+    core_flash: &Handle<EffectAsset>,
+    sparks: &Handle<EffectAsset>,
+    smoke: &Handle<EffectAsset>,
+    heat_glow: &Handle<EffectAsset>,
+    forward_flash: &Handle<EffectAsset>,
+    tex_muzzle_flash: &Handle<Image>,
+    tex_spark: &Handle<Image>,
+    tex_smoke: &Handle<Image>,
+    tex_glow: &Handle<Image>,
+    tex_muzzle_tongue: &Handle<Image>,
+) -> MuzzlePool {
+    let hidden = pool_hidden_transform();
+    let core_flash = commands
+        .spawn((
+            ParticleEffect::new(core_flash.clone()),
+            EffectMaterial {
+                images: vec![tex_muzzle_flash.clone()],
+            },
+            hidden,
+            Visibility::Hidden,
+            MuzzleVfxMarker,
+        ))
+        .id();
+    let sparks = commands
+        .spawn((
+            ParticleEffect::new(sparks.clone()),
+            EffectMaterial {
+                images: vec![tex_spark.clone()],
+            },
+            hidden,
+            Visibility::Hidden,
+            MuzzleVfxMarker,
+        ))
+        .id();
+    let smoke = commands
+        .spawn((
+            ParticleEffect::new(smoke.clone()),
+            EffectMaterial {
+                images: vec![tex_smoke.clone()],
+            },
+            hidden,
+            Visibility::Hidden,
+            MuzzleVfxMarker,
+        ))
+        .id();
+    let heat_glow = commands
+        .spawn((
+            ParticleEffect::new(heat_glow.clone()),
+            EffectMaterial {
+                images: vec![tex_glow.clone()],
+            },
+            hidden,
+            Visibility::Hidden,
+            MuzzleVfxMarker,
+        ))
+        .id();
+    let forward_flash = commands
+        .spawn((
+            ParticleEffect::new(forward_flash.clone()),
+            EffectMaterial {
+                images: vec![tex_muzzle_tongue.clone()],
+            },
+            hidden,
+            Visibility::Hidden,
+            MuzzleVfxMarker,
+        ))
+        .id();
+    let light = commands
+        .spawn((
+            PointLight {
+                intensity: 0.0,
+                shadows_enabled: false,
+                ..default()
+            },
+            hidden,
+            Visibility::Hidden,
+            MuzzleVfxMarker,
+        ))
+        .id();
+    MuzzlePool {
+        core_flash,
+        sparks,
+        smoke,
+        heat_glow,
+        forward_flash,
+        light,
+    }
+}
+
+/// Spawn les `IMPACT_POOL_SIZE` slots persistants du pool d'impact (LOT B).
+fn spawn_impact_pool(
+    commands: &mut Commands,
+    impact_sparks: &Handle<EffectAsset>,
+    impact_dust: &Handle<EffectAsset>,
+    tex_spark: &Handle<Image>,
+    tex_dust: &Handle<Image>,
+) -> [ImpactPoolSlot; IMPACT_POOL_SIZE] {
+    std::array::from_fn(|_| {
+        let hidden = pool_hidden_transform();
+        let sparks = commands
+            .spawn((
+                ParticleEffect::new(impact_sparks.clone()),
+                EffectMaterial {
+                    images: vec![tex_spark.clone()],
+                },
+                hidden,
+                Visibility::Hidden,
+                ImpactVfxMarker,
+            ))
+            .id();
+        let dust = commands
+            .spawn((
+                ParticleEffect::new(impact_dust.clone()),
+                EffectMaterial {
+                    images: vec![tex_dust.clone()],
+                },
+                hidden,
+                Visibility::Hidden,
+                ImpactVfxMarker,
+            ))
+            .id();
+        let light = commands
+            .spawn((
+                PointLight {
+                    intensity: 0.0,
+                    shadows_enabled: false,
+                    ..default()
+                },
+                hidden,
+                Visibility::Hidden,
+                ImpactVfxMarker,
+            ))
+            .id();
+        ImpactPoolSlot { sparks, dust, light }
+    })
+}
+
+/// Spawn les `KILL_BURST_POOL_SIZE` slots persistants du pool de kill-burst (LOT B).
+fn spawn_kill_pool(
+    commands: &mut Commands,
+    kill_burst: &Handle<EffectAsset>,
+    tex_burst: &Handle<Image>,
+) -> [KillBurstPoolSlot; KILL_BURST_POOL_SIZE] {
+    std::array::from_fn(|_| {
+        let hidden = pool_hidden_transform();
+        let particle = commands
+            .spawn((
+                ParticleEffect::new(kill_burst.clone()),
+                EffectMaterial {
+                    images: vec![tex_burst.clone()],
+                },
+                hidden,
+                Visibility::Hidden,
+                ImpactVfxMarker,
+            ))
+            .id();
+        let light = commands
+            .spawn((
+                PointLight {
+                    intensity: 0.0,
+                    shadows_enabled: false,
+                    ..default()
+                },
+                hidden,
+                Visibility::Hidden,
+                ImpactVfxMarker,
+            ))
+            .id();
+        KillBurstPoolSlot { particle, light }
+    })
+}
+
+/// Despawn l'ANCIEN pool avant reconstruction — hot-reload uniquement (rare,
+/// outil de tuning en session). Le chemin de tir normal ne despawn JAMAIS ces
+/// entités (c'est tout l'objet du LOT B).
+fn despawn_weapon_vfx_pools(commands: &mut Commands, vfx: &WeaponVfxEffects) {
+    let mp = &vfx.muzzle_pool;
+    for e in [
+        mp.core_flash,
+        mp.sparks,
+        mp.smoke,
+        mp.heat_glow,
+        mp.forward_flash,
+        mp.light,
+    ] {
+        commands.entity(e).try_despawn();
+    }
+    for slot in &vfx.impact_pool {
+        for e in [slot.sparks, slot.dust, slot.light] {
+            commands.entity(e).try_despawn();
+        }
+    }
+    for slot in &vfx.kill_pool {
+        for e in [slot.particle, slot.light] {
+            commands.entity(e).try_despawn();
+        }
+    }
+}
+
+/// Repositionne une entité de pool persistante et force une NOUVELLE émission :
+/// retire `EffectSpawner`, que `tick_spawners()` de hanabi ré-ajoute frais dès
+/// la frame suivante (clonage de `SpawnerSettings` depuis l'asset, comme pour
+/// une entité neuve) — comportement identique à un spawn frais, sans jamais
+/// recréer l'entité ni son slot GPU (EffectCache/bind-group). LOT B, audit
+/// fire-path 2026-07-20.
+fn retrigger_pool_particle(commands: &mut Commands, entity: Entity, transform: Transform) {
+    commands
+        .entity(entity)
+        .insert((transform, Visibility::Visible))
+        .remove::<EffectSpawner>();
+}
+
+/// Construit tous les EffectAssets selon le tuning (Startup + rebuild hot-reload)
+/// ET spawn les pools persistants LOT B (muzzle/impact/kill — cf plus haut).
 fn build_weapon_vfx(
+    commands: &mut Commands,
     effects: &mut ResMut<Assets<EffectAsset>>,
     asset_server: &AssetServer,
     t: &VfxTuning,
 ) -> WeaponVfxEffects {
+    let muzzle_core_flash = muzzle::create_muzzle_core_flash(effects, t);
+    let muzzle_sparks = muzzle::create_muzzle_sparks(effects, t);
+    let muzzle_smoke = muzzle::create_muzzle_smoke(effects, t);
+    let muzzle_heat_glow = muzzle::create_muzzle_heat_glow(effects, t);
+    let muzzle_forward_flash = muzzle::create_muzzle_forward_flash(effects, t);
+    let impact_sparks = impact::create_impact_sparks(effects, t);
+    let impact_dust = impact::create_impact_dust(effects, t);
+    let impact_flash = impact::create_impact_flash(effects, t);
+    let status_flame = status::create_status_flame(effects, t);
+    let status_poison_cloud = status::create_status_poison_cloud(effects, t);
+    let status_shock = status::create_status_shock(effects, t);
+    let kill_burst = impact::create_kill_burst(effects, t);
+
+    let tex_muzzle_flash: Handle<Image> = asset_server.load(tex_paths::MUZZLE_FLASH);
+    let tex_muzzle_tongue: Handle<Image> = asset_server.load(tex_paths::MUZZLE_TONGUE);
+    let tex_spark: Handle<Image> = asset_server.load(tex_paths::SPARK);
+    let tex_smoke: Handle<Image> = asset_server.load(tex_paths::SMOKE);
+    let tex_dust: Handle<Image> = asset_server.load(tex_paths::DUST);
+    let tex_glow: Handle<Image> = asset_server.load(tex_paths::GLOW);
+    let tex_flare: Handle<Image> = asset_server.load(tex_paths::FLARE);
+    let tex_flame: Handle<Image> = asset_server.load(tex_paths::FLAME);
+    let tex_poison: Handle<Image> = asset_server.load(tex_paths::POISON);
+    let tex_burst: Handle<Image> = asset_server.load(tex_paths::BURST);
+
+    let muzzle_pool = spawn_muzzle_pool(
+        commands,
+        &muzzle_core_flash,
+        &muzzle_sparks,
+        &muzzle_smoke,
+        &muzzle_heat_glow,
+        &muzzle_forward_flash,
+        &tex_muzzle_flash,
+        &tex_spark,
+        &tex_smoke,
+        &tex_glow,
+        &tex_muzzle_tongue,
+    );
+    let impact_pool = spawn_impact_pool(commands, &impact_sparks, &impact_dust, &tex_spark, &tex_dust);
+    let kill_pool = spawn_kill_pool(commands, &kill_burst, &tex_burst);
+
     WeaponVfxEffects {
-        muzzle_core_flash: muzzle::create_muzzle_core_flash(effects, t),
-        muzzle_sparks: muzzle::create_muzzle_sparks(effects, t),
-        muzzle_smoke: muzzle::create_muzzle_smoke(effects, t),
-        muzzle_heat_glow: muzzle::create_muzzle_heat_glow(effects, t),
-        muzzle_forward_flash: muzzle::create_muzzle_forward_flash(effects, t),
-        impact_sparks: impact::create_impact_sparks(effects, t),
-        impact_dust: impact::create_impact_dust(effects, t),
-        impact_flash: impact::create_impact_flash(effects, t),
-        status_flame: status::create_status_flame(effects, t),
-        status_poison_cloud: status::create_status_poison_cloud(effects, t),
-        status_shock: status::create_status_shock(effects, t),
+        muzzle_core_flash,
+        muzzle_sparks,
+        muzzle_smoke,
+        muzzle_heat_glow,
+        muzzle_forward_flash,
+        impact_sparks,
+        impact_dust,
+        impact_flash,
+        status_flame,
+        status_poison_cloud,
+        status_shock,
         impact_offset_m: t.impact_offset_m,
         lifetime_mult: t.lifetime_mult,
-        kill_burst: impact::create_kill_burst(effects, t),
-        tex_muzzle_flash: asset_server.load(tex_paths::MUZZLE_FLASH),
-        tex_muzzle_tongue: asset_server.load(tex_paths::MUZZLE_TONGUE),
-        tex_spark: asset_server.load(tex_paths::SPARK),
-        tex_smoke: asset_server.load(tex_paths::SMOKE),
-        tex_dust: asset_server.load(tex_paths::DUST),
-        tex_glow: asset_server.load(tex_paths::GLOW),
-        tex_flare: asset_server.load(tex_paths::FLARE),
-        tex_flame: asset_server.load(tex_paths::FLAME),
-        tex_poison: asset_server.load(tex_paths::POISON),
-        tex_burst: asset_server.load(tex_paths::BURST),
+        kill_burst,
+        tex_muzzle_flash,
+        tex_muzzle_tongue,
+        tex_spark,
+        tex_smoke,
+        tex_dust,
+        tex_glow,
+        tex_flare,
+        tex_flame,
+        tex_poison,
+        tex_burst,
+        muzzle_pool,
+        impact_pool,
+        impact_cursor: AtomicUsize::new(0),
+        kill_pool,
+        kill_cursor: AtomicUsize::new(0),
     }
 }
 
@@ -323,7 +650,7 @@ pub fn setup_weapon_vfx(
     let mtime = std::fs::metadata(VFX_GENOME_PATH)
         .and_then(|m| m.modified())
         .ok();
-    let vfx = build_weapon_vfx(&mut effects, &asset_server, &t);
+    let vfx = build_weapon_vfx(&mut commands, &mut effects, &asset_server, &t);
     commands.insert_resource(vfx);
     commands.insert_resource(t);
     commands.insert_resource(VfxGenomeWatch {
@@ -331,16 +658,17 @@ pub fn setup_weapon_vfx(
         ..Default::default()
     });
     info!(
-        "Weapon VFX initialises (5-layer muzzle + 3-layer impact + kill burst, tuning ×{:.1} taille ×{:.1} qté — story-652)",
+        "Weapon VFX initialises (5-layer muzzle + 3-layer impact + kill burst, pools persistants LOT B, tuning ×{:.1} taille ×{:.1} qté — story-652)",
         t.size_mult, t.count_mult
     );
 }
 
 /// Story-652 — hot-reload du tuning VFX : RECONSTRUIT les EffectAssets au
-/// changement du TOML (1Hz). Les instances déjà spawnées gardent l'ancien
-/// asset jusqu'à leur despawn (<1 s) ; petit hitch de compile shader possible —
-/// outil de tuning en session, pas un toggle de combat.
+/// changement du TOML (1Hz). LOT B — l'ancien pool persistant est despawné
+/// AVANT reconstruction (un seul hitch au hot-reload, rare et dev-only ; le
+/// chemin de tir normal ne despawn jamais rien).
 pub fn sys_hot_reload_vfx_genome(
+    mut commands: Commands,
     time: Res<Time>,
     mut accum: Local<f32>,
     mut effects: ResMut<Assets<EffectAsset>>,
@@ -373,10 +701,11 @@ pub fn sys_hot_reload_vfx_genome(
     let new_tuning = VfxTuning::parse_toml(&content);
     if new_tuning != *tuning {
         *tuning = new_tuning;
-        *vfx = build_weapon_vfx(&mut effects, &asset_server, &new_tuning);
+        despawn_weapon_vfx_pools(&mut commands, &vfx);
+        *vfx = build_weapon_vfx(&mut commands, &mut effects, &asset_server, &new_tuning);
         watch.reload_count = watch.reload_count.saturating_add(1);
         info!(
-            "[weapon-vfx] HOT-RELOADED — taille ×{:.1} qté ×{:.1} durée ×{:.1} (assets reconstruits)",
+            "[weapon-vfx] HOT-RELOADED — taille ×{:.1} qté ×{:.1} durée ×{:.1} (assets + pools reconstruits)",
             new_tuning.size_mult, new_tuning.count_mult, new_tuning.lifetime_mult
         );
     }
@@ -413,6 +742,8 @@ pub fn sys_write_weapon_vfx_sensor(
 
 /// Story-652 — burst de kill au point d'impact : volutes chaudes + PointLight
 /// bref tinté par l'arme. Appelé par le fire path à l'edge vivant→mort.
+/// LOT B (2026-07-20) : round-robin sur `KILL_BURST_POOL_SIZE` slots persistants
+/// — repositionne + retrigger, ne spawn/despawn plus jamais d'entité.
 pub fn spawn_kill_burst(
     commands: &mut Commands,
     effects: &WeaponVfxEffects,
@@ -424,19 +755,20 @@ pub fn spawn_kill_burst(
     // kill doit s'ouvrir DEVANT le corps, pas dedans.
     let pos = pos - shot_dir.normalize_or_zero() * effects.impact_offset_m;
     let scale_v = Vec3::splat(weapon_impact_scale(weapon).max(1.0));
-    commands.spawn((
-        ParticleEffect::new(effects.kill_burst.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_burst.clone()],
-        },
+
+    let idx = effects.kill_cursor.fetch_add(1, Ordering::Relaxed) % KILL_BURST_POOL_SIZE;
+    let slot = &effects.kill_pool[idx];
+    retrigger_pool_particle(
+        commands,
+        slot.particle,
         Transform::from_translation(pos).with_scale(scale_v),
-        ImpactVfxMarker,
-        Lifetime(Timer::from_seconds(1.2 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    );
+
     // Lumière du kill : plus forte que l'impact standard (l'événement), toujours
     // bornée (leçon anti-casse-Atmosphère, cf weapon_muzzle_light_intensity).
+    // Decay géré par `PooledLightFade` (pas de despawn — pool persistant LOT B).
     let tint = weapon_impact_tint(weapon);
-    commands.spawn((
+    commands.entity(slot.light).insert((
         PointLight {
             color: Color::LinearRgba(tint),
             intensity: 6_000.0,
@@ -446,14 +778,19 @@ pub fn spawn_kill_burst(
             ..default()
         },
         Transform::from_translation(pos),
-        ImpactVfxMarker,
-        Lifetime(Timer::from_seconds(0.08, TimerMode::Once)),
+        Visibility::Visible,
+        crate::PooledLightFade {
+            timer: Timer::from_seconds(0.08, TimerMode::Once),
+            base_intensity: 6_000.0,
+        },
     ));
 }
 
 /// Spawn all 5 muzzle flash layers at the given barrel tip position.
 /// `shot_dir` orients the forward flash tongue.
 /// `weapon` détermine le scale (Shotgun/Rocket = plus gros, mêlée = skip).
+/// LOT B (2026-07-20) : pool persistant `effects.muzzle_pool` — repositionne
+/// les 5 couches + retrigger leur spawner, ne spawn/despawn plus jamais.
 pub fn spawn_muzzle_flash(
     commands: &mut Commands,
     effects: &WeaponVfxEffects,
@@ -466,6 +803,7 @@ pub fn spawn_muzzle_flash(
         return; // mêlée — pas de muzzle
     }
     let scale_v = Vec3::splat(scale);
+    let pool = &effects.muzzle_pool;
 
     // Transform oriented along shot direction
     let flash_tf = Transform::from_translation(barrel_tip)
@@ -473,74 +811,47 @@ pub fn spawn_muzzle_flash(
         .with_scale(scale_v);
 
     // Layer 1: Core flash (world-space, at barrel tip)
-    commands.spawn((
-        ParticleEffect::new(effects.muzzle_core_flash.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_muzzle_flash.clone()],
-        },
+    retrigger_pool_particle(
+        commands,
+        pool.core_flash,
         Transform::from_translation(barrel_tip).with_scale(scale_v),
-        MuzzleVfxMarker,
-        Lifetime(Timer::from_seconds(0.15 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    );
 
     // Layer 2: Spark spray (world-space)
-    commands.spawn((
-        ParticleEffect::new(effects.muzzle_sparks.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_spark.clone()],
-        },
+    retrigger_pool_particle(
+        commands,
+        pool.sparks,
         Transform::from_translation(barrel_tip).with_scale(scale_v),
-        MuzzleVfxMarker,
-        Lifetime(Timer::from_seconds(0.5 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    );
 
     // Layer 3: Smoke puff (world-space, lingers — per-arme : sniper = trail long)
-    commands.spawn((
-        ParticleEffect::new(effects.muzzle_smoke.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_smoke.clone()],
-        },
+    retrigger_pool_particle(
+        commands,
+        pool.smoke,
         Transform::from_translation(barrel_tip + shot_dir * 0.05).with_scale(scale_v),
-        MuzzleVfxMarker,
-        Lifetime(Timer::from_seconds(
-            weapon_muzzle_smoke_lifetime(weapon) * effects.lifetime_mult,
-            TimerMode::Once,
-        )),
-    ));
+    );
 
     // Layer 4: Heat glow — story-450 (2026-05-18) : RE-ENABLED après shrink x3
     // (0.10-0.20 vs 0.30-0.60) + alpha /2. Halo bloom subtil qui ajoute la
-    // qualité AAA "weight feel" sans bloquer la cible. Coût hanabi acceptable
-    // (12 particles × 0.07s = ~0.84 particles/s steady-state en auto-fire).
-    commands.spawn((
-        ParticleEffect::new(effects.muzzle_heat_glow.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_glow.clone()],
-        },
+    // qualité AAA "weight feel" sans bloquer la cible.
+    retrigger_pool_particle(
+        commands,
+        pool.heat_glow,
         Transform::from_translation(barrel_tip).with_scale(scale_v),
-        MuzzleVfxMarker,
-        Lifetime(Timer::from_seconds(0.12 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    );
 
     // Layer 5: Forward flash tongue (oriented along barrel)
-    commands.spawn((
-        ParticleEffect::new(effects.muzzle_forward_flash.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_muzzle_tongue.clone()],
-        },
-        flash_tf,
-        MuzzleVfxMarker,
-        Lifetime(Timer::from_seconds(0.15 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    retrigger_pool_particle(commands, pool.forward_flash, flash_tf);
 
     // Layer 6: PointLight bref tinté per-arme (Phase 5 dette tech 2026-05-18).
     // Historique : un PointLight plein-intensité cassait l'Atmosphere. Solution :
-    // intensity faible (2k-8k lumens, vs 100k+ "réaliste"), lifetime ultra-court
-    // (50-80ms), range borné. Donne signature couleur sans bloom run-away.
+    // intensity faible (2k-8k lumens, vs 100k+ "réaliste"), decay ultra-court
+    // (70ms), range borné. Donne signature couleur sans bloom run-away.
+    // Decay géré par `PooledLightFade` (pas de despawn — pool persistant LOT B).
     let light_intensity = weapon_muzzle_light_intensity(weapon);
     if light_intensity > 0.0 {
         let tint = weapon_muzzle_tint(weapon);
-        commands.spawn((
+        commands.entity(pool.light).insert((
             PointLight {
                 color: Color::LinearRgba(tint),
                 intensity: light_intensity,
@@ -550,14 +861,19 @@ pub fn spawn_muzzle_flash(
                 ..default()
             },
             Transform::from_translation(barrel_tip),
-            MuzzleVfxMarker,
-            Lifetime(Timer::from_seconds(0.07, TimerMode::Once)),
+            Visibility::Visible,
+            crate::PooledLightFade {
+                timer: Timer::from_seconds(0.07, TimerMode::Once),
+                base_intensity: light_intensity,
+            },
         ));
     }
 }
 
-/// Spawn impact VFX at hit point: 3 particle layers + point light.
+/// Spawn impact VFX at hit point: 2 particle layers + point light.
 /// `weapon` détermine le scale (Rocket = gros plume, sniper = précis, SMG = standard).
+/// LOT B (2026-07-20) : round-robin sur `IMPACT_POOL_SIZE` slots persistants —
+/// repositionne + retrigger, ne spawn/despawn plus jamais d'entité.
 /// Bullet hole decal will be added when textures are available (Phase 3b).
 pub fn spawn_impact_vfx(
     commands: &mut Commands,
@@ -570,49 +886,31 @@ pub fn spawn_impact_vfx(
     // standard : sans lui, la moitié des particules naît dans le mesh, occluse).
     let impact_pos = impact_pos - shot_dir.normalize_or_zero() * effects.impact_offset_m;
     let scale_v = Vec3::splat(weapon_impact_scale(weapon));
+    let tf = Transform::from_translation(impact_pos).with_scale(scale_v);
+
+    let idx = effects.impact_cursor.fetch_add(1, Ordering::Relaxed) % IMPACT_POOL_SIZE;
+    let slot = &effects.impact_pool[idx];
 
     // Layer 1: Sparks (hemisphere burst)
-    commands.spawn((
-        ParticleEffect::new(effects.impact_sparks.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_spark.clone()],
-        },
-        Transform::from_translation(impact_pos).with_scale(scale_v),
-        ImpactVfxMarker,
-        Lifetime(Timer::from_seconds(0.6 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    retrigger_pool_particle(commands, slot.sparks, tf);
 
     // Layer 2: Dust cloud
-    commands.spawn((
-        ParticleEffect::new(effects.impact_dust.clone()),
-        EffectMaterial {
-            images: vec![effects.tex_dust.clone()],
-        },
-        Transform::from_translation(impact_pos).with_scale(scale_v),
-        ImpactVfxMarker,
-        Lifetime(Timer::from_seconds(1.0 * effects.lifetime_mult, TimerMode::Once)),
-    ));
+    retrigger_pool_particle(commands, slot.dust, tf);
 
-    // Layer 3: Flash burst — story-432 V5-A (2026-05-13) : DISABLED pour
-    // réduire le coût spawn hanabi sur burst hits (combat_hit×3 dans 1 frame
-    // → 9 spawn). Lifetime 0.1s ultra court = marginal visuel, drop = -33%
-    // cost impact. Sparks + dust suffisent au feedback.
-    // commands.spawn((
-    //     ParticleEffect::new(effects.impact_flash.clone()),
-    //     Transform::from_translation(impact_pos),
-    //     ImpactVfxMarker,
-    //     Lifetime(Timer::from_seconds(0.1, TimerMode::Once)),
-    // ));
+    // Layer 3: Flash burst — story-432 V5-A (2026-05-13) : reste DISABLED
+    // (marginal visuel, cf historique) — `effects.impact_flash` toujours
+    // construit/warmé mais aucun slot de pool ne l'utilise.
 
     // Layer 4: PointLight bref tinté per-arme (Phase 5 dette tech 2026-05-18).
-    // Intensity ~50% du muzzle (impact = secondaire feedback), lifetime 40ms.
+    // Intensity ~50% du muzzle (impact = secondaire feedback), decay 40ms.
+    // Decay géré par `PooledLightFade` (pas de despawn — pool persistant LOT B).
     let tint = weapon_impact_tint(weapon);
     let intensity = match weapon {
         WeaponType::RocketLauncher => 5_000.0,
         WeaponType::Shotgun => 3_000.0,
         _ => 1_500.0,
     };
-    commands.spawn((
+    commands.entity(slot.light).insert((
         PointLight {
             color: Color::LinearRgba(tint),
             intensity,
@@ -622,8 +920,11 @@ pub fn spawn_impact_vfx(
             ..default()
         },
         Transform::from_translation(impact_pos),
-        ImpactVfxMarker,
-        Lifetime(Timer::from_seconds(0.04, TimerMode::Once)),
+        Visibility::Visible,
+        crate::PooledLightFade {
+            timer: Timer::from_seconds(0.04, TimerMode::Once),
+            base_intensity: intensity,
+        },
     ));
 }
 

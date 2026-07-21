@@ -1,0 +1,3 @@
+crates\forgia-qa-harness\src\test_app.rs:247: panic!(
+crates\forgia-qa-harness\src\test_app.rs:268: panic!(
+crates\forgia-qa-harness\src\test_app.rs:292: panic!("expect_category requires with_qa_core() — collector absent");

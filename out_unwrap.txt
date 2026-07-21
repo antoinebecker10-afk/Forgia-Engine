@@ -1,0 +1,23 @@
+UNWRAP crates\forgia-anim-locomotion\src\foot_ik.rs:184: chain.0.unwrap(),
+UNWRAP crates\forgia-anim-locomotion\src\foot_ik.rs:185: chain.1.unwrap(),
+UNWRAP crates\forgia-anim-locomotion\src\foot_ik.rs:186: chain.2.unwrap(),
+UNWRAP crates\forgia-anim-locomotion\src\foot_ik.rs:187: chain.3.unwrap(),
+UNWRAP crates\forgia-anim-locomotion\src\locomotion.rs:1216: let cache = cache_opt.unwrap();
+UNWRAP crates\forgia-assets-bundle\src\lib.rs:29: //! let manifest = PackManifest::load_from_path("assets/packs.toml").unwrap();
+UNWRAP crates\forgia-assets-bundle\src\lib.rs:30: //! let lockfile = PackLockfile::load_from_path("assets/packs.lock").unwrap();
+UNWRAP crates\forgia-foliage\src\material_override.rs:267: let (fallback_entity, picked_tri) = *mesh_children.first().unwrap();
+UNWRAP crates\forgia-mode-fps-arena\src\lib.rs:784: let cloud_blob_mesh = meshes.add(Sphere::new(1.0).mesh().ico(3).unwrap());
+UNWRAP crates\forgia-qa-replay\src\plugin.rs:24: //! let session = recorder.take_session().unwrap();
+UNWRAP crates\forgia-qa-replay\src\plugin.rs:25: //! session.save_to_path("target/forgia_qa/replays/my.replay.ron").unwrap();
+UNWRAP crates\forgia-qa-replay\src\plugin.rs:34: //! let session = RecordedSession::load_from_path("...").unwrap();
+UNWRAP crates\forgia-rpg\src\lib.rs:1998: let cloud_blob_mesh = meshes.add(Sphere::new(1.0).mesh().ico(3).unwrap());
+UNWRAP crates\forgia-rpg\src\lib.rs:2186: if d <= ip.radius && (best.is_none() || d < best.unwrap().1) {
+UNWRAP crates\forgia-skeleton-embedder\src\lib.rs:372: center_xz + template.bones[*chain.bones.last().unwrap()].pos_vec3() * mesh_height;
+UNWRAP crates\forgia-skeleton-embedder\src\lib.rs:699: let (parent_pos, expected_dir) = direction_hint.unwrap();
+UNWRAP crates\forgia-stage\src\layout.rs:162: let mp = midpoint_player_boss(player_xz, boss_xz_opt.unwrap());
+---
+EXPECT crates\forgia-anim-locomotion\src\gait_genome.rs:124: if let Some(g) = *GAIT.read().expect("gait lock poisoned") {
+EXPECT crates\forgia-anim-locomotion\src\gait_genome.rs:128: *GAIT.write().expect("gait lock poisoned") = Some(loaded);
+EXPECT crates\forgia-anim-locomotion\src\gait_genome.rs:135: *GAIT.write().expect("gait lock poisoned") = Some(g);
+EXPECT crates\forgia-qa-autopilot\src\soak.rs:132: let first = samples.first().expect("≥2 samples");
+EXPECT crates\forgia-qa-autopilot\src\soak.rs:133: let last = samples.last().expect("≥2 samples");

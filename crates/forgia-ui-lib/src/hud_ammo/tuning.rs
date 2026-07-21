@@ -176,10 +176,10 @@ pub fn sync_ammo_hud_tuning(
         match ev {
             AssetEvent::Added { id }
             | AssetEvent::Modified { id }
-            | AssetEvent::LoadedWithDependencies { id } => {
-                if *id == handle.0.id() {
-                    should_sync = true;
-                }
+            | AssetEvent::LoadedWithDependencies { id }
+                if *id == handle.0.id() =>
+            {
+                should_sync = true;
             }
             _ => {}
         }

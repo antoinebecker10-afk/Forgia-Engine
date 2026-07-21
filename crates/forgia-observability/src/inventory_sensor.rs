@@ -88,7 +88,7 @@ pub fn sys_write_inventory_sensor(
         .into_iter()
         .map(|(id, (c, m))| (id, c, m))
         .collect();
-    top.sort_by(|a, b| b.1.cmp(&a.1));
+    top.sort_by_key(|t| std::cmp::Reverse(t.1));
     let top_json: String = top
         .iter()
         .take(TOP_ITEMS_DUMP)

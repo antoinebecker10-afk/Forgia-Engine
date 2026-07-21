@@ -157,6 +157,18 @@ fn reset_menu_page(mut page: ResMut<MenuPage>) {
     *page = MenuPage::Root;
 }
 
+/// Le menu titre expose une ligne « Démos moteur (dev) » (RPG / Cyber City) hors
+/// parcours joueur Roguelite. On la masque dans le build distribué aux joueurs
+/// tout en la gardant en dev.
+///
+/// Visible si build debug (`cargo run`, `cfg!(debug_assertions)`) OU si
+/// `FORGIA_DEV_MENU=1` (échappatoire pour la voir dans un build release, p. ex.
+/// tester la démo Cyber City en perf). Un build `--release` — le build joueur, cf
+/// `xtask dist-roguelite` — la cache donc par défaut.
+fn dev_menu_visible() -> bool {
+    cfg!(debug_assertions) || std::env::var_os("FORGIA_DEV_MENU").is_some()
+}
+
 fn main_menu_ui(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
@@ -272,41 +284,44 @@ fn main_menu_ui(
                             exit.write(AppExit::Success);
                         }
 
-                        // Démos moteur (dev) — secondaires/discrètes. Conservées pour
-                        // l'accès dev (RPG openworld / stress-test GLB cyber city),
-                        // hors parcours joueur Roguelite.
-                        ui.add_space(32.0);
-                        ui.label(
-                            egui::RichText::new("— Démos moteur (dev) —")
-                                .size(12.0)
-                                .color(egui::Color32::from_gray(150)),
-                        );
-                        ui.add_space(8.0);
-                        ui.horizontal(|ui| {
-                            if ui
-                                .add(
-                                    egui::Button::new(egui::RichText::new("🗺 RPG").size(15.0))
-                                        .min_size(egui::vec2(120.0, 32.0)),
-                                )
-                                .clicked()
-                            {
-                                next_game.set(GameMode::Rpg);
-                                next_app.set(AppMode::InGame);
-                            }
-                            ui.add_space(10.0);
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        egui::RichText::new("🏙 Cyber City").size(15.0),
+                        // Démos moteur (dev) — RPG / Cyber City. Hors parcours joueur
+                        // Roguelite : masquées dans le build distribué aux joueurs
+                        // (release) via `dev_menu_visible()`, visibles en dev
+                        // (`cargo run`) ou avec `FORGIA_DEV_MENU=1`.
+                        if dev_menu_visible() {
+                            ui.add_space(32.0);
+                            ui.label(
+                                egui::RichText::new("— Démos moteur (dev) —")
+                                    .size(12.0)
+                                    .color(egui::Color32::from_gray(150)),
+                            );
+                            ui.add_space(8.0);
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .add(
+                                        egui::Button::new(egui::RichText::new("🗺 RPG").size(15.0))
+                                            .min_size(egui::vec2(120.0, 32.0)),
                                     )
-                                    .min_size(egui::vec2(140.0, 32.0)),
-                                )
-                                .clicked()
-                            {
-                                next_game.set(GameMode::CyberCity);
-                                next_app.set(AppMode::InGame);
-                            }
-                        });
+                                    .clicked()
+                                {
+                                    next_game.set(GameMode::Rpg);
+                                    next_app.set(AppMode::InGame);
+                                }
+                                ui.add_space(10.0);
+                                if ui
+                                    .add(
+                                        egui::Button::new(
+                                            egui::RichText::new("🏙 Cyber City").size(15.0),
+                                        )
+                                        .min_size(egui::vec2(140.0, 32.0)),
+                                    )
+                                    .clicked()
+                                {
+                                    next_game.set(GameMode::CyberCity);
+                                    next_app.set(AppMode::InGame);
+                                }
+                            });
+                        }
                     });
                 }
                 // ── Page Options : réutilise les contrôles du pause menu (DRY) ──

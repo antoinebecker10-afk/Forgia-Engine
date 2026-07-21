@@ -1,7 +1,60 @@
 # Forgia Roguelite — Roadmap V1 (2026-05-26)
 
+> ⚠️ **SUPERSEDED — le pilotage vivant est dans [`docs/ROADMAP.md`](./ROADMAP.md) (Now/Next/Later).** Conservé comme **référence de fond** (bible, benchmarks all-time, 3 gaps, backlog vendeur, § ship-gap).
+>
 > Roadmap dédiée Roguelite mode après session audit + bible + industry research 3 agents.
 > Cible : Steam Next Fest démo + V1 shippable. Cartoon fantasy familial.
+
+---
+
+## 🗓️ Backlog ajouté 2026-07-03 — Gap ship réel vers build itch.io (audit 2 passes)
+
+> Session « ce qui reste avant un build téléchargeable ». Deux passes (game-maker + explore).
+> **Ship-readiness réel ≈ 70%** — les audits `roguelite-ship-readiness-2026-06-04.md` (40%) et
+> `audit-2026-06-10-full-codebase.md` (55-60%) sont **périmés** (boons perçus, méta-progression,
+> persistance disque, sink Âmes, FixedUpdate, pipeline dist livrés depuis).
+
+**Recadrage vérifié dans le code (pas de spéculation) :**
+
+- ✅ **Victoire DÉJÀ câblée** depuis story-571 (`f799876`, 2026-06-02) : `waves.rs:233-245` émet
+  `EndRunEvent(Victory)` → `run.rs:796` transitionne `RunState::Victory` → overlay `hud.rs:484`
+  et save flush `meta_shop.rs:509`. ⚠️ L'audit game-maker (2026-06-30, run 3,4 h) a rapporté à
+  tort « victoire cassée » — **état lu périmé, ne pas s'y fier sur ce point**. `loot_room.rs` =
+  side-space optionnel par portails, ne gate pas la fin de run.
+- ⚠️ Victoire **jamais vérifiée au runtime** (la seule preuve était l'audit périmé) → à confirmer
+  en jouant une run complète.
+
+| Prio | Item | Effort | Bloquant ship ? | Détail |
+|---|---|---|---|---|
+| **P0** | **Produire + tester le binaire dist** : lancer `scripts/build-dist.ps1`, décompresser le zip sur dossier/machine propre, vérifier lancement standalone (assets, cwd relatif, capteurs). Sert AUSSI à vérifier la victoire au runtime. | ~1 j | **OUI** | `target/release/forgia.exe` absent, `dist/` vide. Script codé, **jamais exécuté**. Build release lent + risque OOM → `-j 4`. **Depuis un HEAD propre uniquement.** |
+| **P0** | **Recréer `docs/FRICTION_LOG.md`** (absent du repo) avec findings corrigés | XS | prérequis process | Seed : FL victoire OK / binaire à produire / onboarding in-game absent |
+| **P1** | Onboarding in-game (contrôles + verbes dash/F/éléments) + FTUE Phase A hints (`ftue.rs`, Phase B seule aujourd'hui, story-597 TODO) | M ~1-2 j | non (v0.2) | « ça tourne » ≠ « ça convainc » : requis pour valider la thèse devant joueurs |
+| **P1** | Variété d'ennemis lisible (3/4 archétypes partagent ~mêmes stats) | M | non (v0.2) | — |
+| **P2** | Mid-boss (story-536 partiel) + 2e arène vraiment ressentie (`run.rs:109` alterne mais 1 visitée/run) + page itch + icône exe | M+ | non (v0.2) | — |
+
+**⛔ Blocage coordination (raison du STOP) :** au moment de l'audit, un autre terminal était en
+plein **story-596 (Ultime par arme)** — `ultimate_apply.rs`/`ultimate_config.rs`/`roguelite_ultimate.toml`
+non committés dans `forgia-mode-roguelite`. **Ni édition ni build** tant que cet arbre n'est pas
+propre/committé (piège « artefact stale » de la règle multi-terminal : un build release embarquerait
+du story-596 à moitié fait, ou échouerait). **Reprendre le P0 build+vérif dès HEAD propre.**
+
+---
+
+## 🗓️ Backlog ajouté 2026-07-03 — Animation du vendeur (gobelin)
+
+> Suite à l'audit anim procédurale : [`audit/audit-2026-07-03-animation-procedurale.md`](./audit/audit-2026-07-03-animation-procedurale.md).
+> Le gobelin marchand (`forge_shop.rs`, story-659) est animé au tier le plus pauvre (sin brut,
+> symétrique, ne regarde pas le joueur). Best practices : ressort amorti + look-at + asymétrie.
+
+| Prio | Item | Effort | Rig ? | Détail |
+|---|---|---|---|---|
+| **P0** | Vendeur « prend vie » : spring-damper réutilisable (Juckett) + **look-at joueur** + asymétrie/weight-shift | ~2 h | non | `vendor_anim.rs` ; l'écart le plus visible, sans asset |
+| **P1** | Réactions contextuelles (bounce à l'achat, salut à l'approche, shrug « pas assez d'Or ») + genome + sensor `forgia2_vendor_anim.json` | ~2 h | non | réutilise les events story-659 |
+| **P2-A** | Import gobelin **riggé** + clips (idle/talk/wave/count), joué via pipeline `AnimationPlayer` (tier ennemis) | ~1 j | **asset** | route SHIP, qualité max |
+| **P2-B** | Dogfood FORGE : auto-rig gobelin + spring bones (`forgia-secondary-motion`, déjà branché) + look-at IK (`forgia-ik`) | épique | **auto-rig** | débloque story-601, pari « moteur IA-natif » |
+
+Reco : **P0 dès que possible** (2 h), P1 dans la foulée, P2 quand un asset riggé arrive ou que
+l'auto-rig est débloqué. Cf audit §6-8 pour le détail + sources.
 
 ---
 

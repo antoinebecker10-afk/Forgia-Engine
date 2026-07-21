@@ -62,7 +62,7 @@ pub fn sys_write_boons_sensor(
                 .iter()
                 .map(|(k, v)| (k.clone(), *v))
                 .collect();
-            tags.sort_by(|a, b| b.1.cmp(&a.1));
+            tags.sort_by_key(|t| std::cmp::Reverse(t.1));
             let tags_json = tags
                 .iter()
                 .map(|(k, v)| format!("\"{}\":{}", sanitize_json_str(k), v))

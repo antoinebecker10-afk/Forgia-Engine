@@ -50,7 +50,17 @@
       "Bash(python \"/c/Users/Antoi/AppData/Local/Temp/claude/c--Users-Antoi-Desktop-Forgia-Rewrite/75cab485-af5b-4557-8540-c3a9d8f2c570/scratchpad/patch_tier4_ssao.py\")",
       "Bash(python -c ' *)",
       "Bash(git check-ignore *)",
-      "Bash(python \"/c/Users/Antoi/AppData/Local/Temp/claude/c--Users-Antoi-Desktop-Forgia-Rewrite/75cab485-af5b-4557-8540-c3a9d8f2c570/scratchpad/patch_registry.py\")"
+      "Bash(python \"/c/Users/Antoi/AppData/Local/Temp/claude/c--Users-Antoi-Desktop-Forgia-Rewrite/75cab485-af5b-4557-8540-c3a9d8f2c570/scratchpad/patch_registry.py\")",
+      "PowerShell(git -C \"C:\\\\Users\\\\Antoi\\\\Desktop\\\\Forgia Rewrite\" log --oneline -6)",
+      "PowerShell(git -C \"C:\\\\Users\\\\Antoi\\\\Desktop\\\\Forgia Rewrite\" status -s)",
+      "PowerShell(cd \"C:\\\\Users\\\\Antoi\\\\Desktop\\\\Forgia Rewrite\"; foreach \\($c in @\\(\"3c0f9e0\",\"45c4413\",\"a5d1be0\"\\)\\) { $r = git merge-base --is-ancestor $c HEAD; if \\($LASTEXITCODE -eq 0\\) { Write-Output \"$c : ANCESTRE de HEAD \\(pousse\\)\" } else { Write-Output \"$c : PAS ancetre \\(!!\\)\" } }; Write-Output \"----- HEAD -----\"; git log --oneline -1)",
+      "WebFetch(domain:crates.io)",
+      "Bash(cd \"c:/Users/Antoi/Desktop/Forgia Rewrite\" && stat -c '%y  %n' \\\\ *)",
+      "Read(//c/Users/Antoi/Desktop/Forgia Rewrite/**)",
+      "Bash(python \"/c/Users/Antoi/AppData/Local/Temp/claude/c--Users-Antoi-Desktop-Forgia-Rewrite/75cab485-af5b-4557-8540-c3a9d8f2c570/scratchpad/validate_cover_spacing.py\")",
+      "WebFetch(domain:www.enkisoftware.com)",
+      "WebFetch(domain:www.riotgames.com)",
+      "WebFetch(domain:www.alanzucconi.com)"
     ],
     "additionalDirectories": [
       "D:\\Forgia\\website"

@@ -1,6 +1,8 @@
 ﻿# Forgia V2 Rewrite — ROADMAP_CURRENT
 
-> **Source de vérité unique** pour l'état des vagues V2 et la priorisation BMAD.
+> ⚠️ **SUPERSEDED — le pilotage vivant est passé dans [`docs/ROADMAP.md`](./ROADMAP.md) (Now/Next/Later).** Ce fichier reste comme **historique** des vagues V1→V7, plus comme source d'autorité.
+>
+> Historique de l'état des vagues V2 et de la priorisation BMAD.
 > Mise à jour à chaque livraison story ou à la commande "Memorise" (CLAUDE.md §11).
 >
 > **Dernière révision** : 2026-06-04 — 🎯 **PIVOT VISION** : Forgia = moteur IA-natif (créateur importe assets, l'IA construit), priorité = **SHIP le Roguelite** (FPS roguelite type Gunfire Reborn). RPG = track FORGE. Vision : [`vision/FORGIA_VISION_2026-06-04.md`](./vision/FORGIA_VISION_2026-06-04.md). Ship-audit : [`audit/roguelite-ship-readiness-2026-06-04.md`](./audit/roguelite-ship-readiness-2026-06-04.md) → **~40% MVG**. Chemin critique : 559(B)→566→564→565→569 + onboarding + honnêteté UI (~25-30j). story-566 bloquée sur décision archi read-path éco (cf SESSION_STATE).
