@@ -60,11 +60,13 @@ pub(crate) fn draw_wave_counter(
     // Flash color cycle au moment du wave change.
     let flash_t = (anim.flash_secs_left / 1.2).clamp(0.0, 1.0);
     let panel_fill = if flash_t > 0.0 {
-        // Lerp orange→bg
+        // Lerp fond sombre → accent (C_PRIMARY = or, DA Verre & Braise). Cible
+        // repointée depuis le littéral orange (255,122,26) pour rester synchro
+        // avec le texte qui flashe déjà en C_PRIMARY (fix desync reskin 2026-07-20).
         egui::Color32::from_rgba_unmultiplied(
-            (15.0 + (255.0 - 15.0) * flash_t * 0.55) as u8,
-            (18.0 + (122.0 - 18.0) * flash_t * 0.55) as u8,
-            (24.0 + (26.0 - 24.0) * flash_t * 0.55) as u8,
+            (15.0 + (f32::from(C_PRIMARY.r()) - 15.0) * flash_t * 0.55) as u8,
+            (18.0 + (f32::from(C_PRIMARY.g()) - 18.0) * flash_t * 0.55) as u8,
+            (24.0 + (f32::from(C_PRIMARY.b()) - 24.0) * flash_t * 0.55) as u8,
             (200.0 + 30.0 * flash_t) as u8,
         )
     } else {

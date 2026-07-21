@@ -17,6 +17,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
+use forgia_damage::DamageEvent;
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::Player;
 use serde::Deserialize;
@@ -150,7 +151,8 @@ pub struct ScreenFlashSensor {
 // ─── Systems ──────────────────────────────────────────────────────────
 
 pub(crate) fn ingest_flash_events(
-    mut events: MessageReader<CombatHitEvent>,
+    mut hits: MessageReader<CombatHitEvent>,
+    mut damage_events: MessageReader<DamageEvent>,
     mut state: ResMut<ScreenFlashState>,
     mut sensor: ResMut<ScreenFlashSensor>,
     tuning: Res<ScreenFlashTuning>,
@@ -161,9 +163,14 @@ pub(crate) fn ingest_flash_events(
     };
     // BUG-455-06 fix : helper push_capped — drop front si cap atteint (anti-spam).
     let cap = tuning.max_flash_layers.max(1);
-    for hit in events.read() {
-        // Player reçu un coup → red pulse.
-        if hit.target == player_entity {
+
+    // Player reçu un coup → red pulse. SOURCE = `DamageEvent` (forgia_damage) :
+    // les dégâts ennemi→joueur passent par `apply_damage`, JAMAIS par
+    // `CombatHitEvent` (dual-health, cf reference_two_health_types). Fix 2026-07-20
+    // — avant, ce pulse lisait `CombatHitEvent.target == player` (branche morte
+    // en Roguelite ET FPS → aucun flash à la prise de dégâts).
+    for dmg in damage_events.read() {
+        if dmg.target == player_entity && dmg.amount > 0.0 {
             if state.layers.len() >= cap {
                 state.layers.remove(0);
             }
@@ -180,7 +187,11 @@ pub(crate) fn ingest_flash_events(
             });
             sensor.damage_flashes_session = sensor.damage_flashes_session.saturating_add(1);
         }
-        // Player a tué un ennemi → white pulse bref.
+    }
+
+    // Player a tué un ennemi → white pulse bref (source = CombatHitEvent,
+    // kill côté joueur→ennemi).
+    for hit in hits.read() {
         if hit.is_kill && hit.attacker == Some(player_entity) {
             if state.layers.len() >= cap {
                 state.layers.remove(0);

@@ -3440,6 +3440,7 @@ dependencies = [
  "bevy_egui",
  "forgia-combat",
  "forgia-core",
+ "forgia-damage",
  "forgia-genome-core",
  "forgia-player",
  "forgia-ui-lib",
