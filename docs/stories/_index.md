@@ -65,7 +65,7 @@
 | 656 | Hitbox tête ennemis : suivie de l'os + capsules recalibrées sur les meshs | [story-656-enemy-head-hitbox-bone-tracked.md](./story-656-enemy-head-hitbox-bone-tracked.md) |
 | 657 | La Trempe : progression de l'arme en cours de run (Inc.1) | [story-657-trempe-weapon-in-run-progression.md](./story-657-trempe-weapon-in-run-progression.md) |
 | 658 | Scaling ennemi par profondeur de salle (la pression) | [story-658-enemy-scaling-by-depth.md](./story-658-enemy-scaling-by-depth.md) |
-| 659 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-659-forge-shop-unified-window.md](./story-659-forge-shop-unified-window.md) |
+| 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 | 661 | Story 661 — Bras viewmodel GLB cartoon (remplace les poings procéduraux) | [story-661-bras-viewmodel-glb-cartoon.md](./story-661-bras-viewmodel-glb-cartoon.md) |
 
 ## REVIEW (51)

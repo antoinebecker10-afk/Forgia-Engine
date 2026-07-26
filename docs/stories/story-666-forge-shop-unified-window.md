@@ -1,4 +1,7 @@
-# Story-659 — Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E
+# Story-666 — Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E
+
+> Renumérotée story-659 → 666 le 2026-07-26 : collision d'ID avec
+> story-659-projectiles-elementaires-pow-retire (antérieure, conservée).
 
 **Statut** : IN_PROGRESS
 **Niveau BMAD** : Enterprise (nouveau module UI + refonte merchant/trempe + input/curseur + anim, 1 crate)
