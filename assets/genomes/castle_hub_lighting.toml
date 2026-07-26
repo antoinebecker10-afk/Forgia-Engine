@@ -60,6 +60,21 @@ flicker_speed_hz = 6.5
 # GÉOMÉTRIE, parce que beaucoup de bougeoirs ont leurs bougies modelées dans le
 # mesh — il n'existe alors aucun objet séparé où accrocher une flamme.
 
+[environment]
+# Éclairage par image. Forgia n'en avait AUCUN : `EnvironmentMapLight` n'était
+# employé nulle part. Une surface PBR avec une carte de rugosité et rien à
+# réfléchir tombe sur un reflet plat et uniforme — c'est l'aspect « pierre
+# mouillée » du sol face à la capture du créateur.
+#
+# La cubemap `assets/hdri/castle_hub_env.hdr` est moyennée depuis ses 27 sondes
+# de réflexion cuites d'intérieur (sur 32 ; les 5 autres regardent le ciel), par
+# `tools/unity/build_castle_envmap.py`.
+enabled = true
+# En cd/m². Ses sondes sont très sombres (luminance moyenne 0,008) : ce facteur
+# les remonte au niveau du reste de l'éclairage. Monte-le si la pierre reste
+# mate, baisse-le si tout se met à briller comme du métal.
+intensity = 900.0
+
 [creator_lights]
 # Les 56 lumières placées à la main par le créateur du pack (43 ponctuelles +
 # 13 spots), portées 1:1 depuis sa scène Unity vers

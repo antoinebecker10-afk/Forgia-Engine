@@ -35,6 +35,10 @@ mod castle_flames;
 /// composites (`_static`, `_lit`, `_comp`) n'avaient pas de FBX 1:1 et sont tombés
 /// en silence : 50 bannières murales manquaient alors que leur mesh était chargé.
 mod castle_props;
+/// Éclairage par image du Hall (2026-07-26) — Forgia n'en avait aucun, d'où l'aspect
+/// « pierre mouillée » : une surface PBR sans environnement à réfléchir tombe sur un
+/// reflet plat. La cubemap vient des 27 sondes d'intérieur cuites par le créateur.
+mod castle_envmap;
 /// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
 /// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
 mod color_grading;
@@ -193,6 +197,10 @@ pub fn run_game() -> AppExit {
     // 50 bannières murales manquaient. Leur mesh est déjà chargé — on clone ses
     // handles. Détail : docs/audits/audit-2026-07-26-diff-complet-map-createur.md
     app.add_plugins(castle_props::CastlePropsPlugin);
+    // 7e-septies. Éclairage par image du Hall : le projet n'en avait aucun, ce qui
+    // laissait toute surface PBR sans rien à réfléchir. La cubemap est moyennée
+    // depuis les 27 sondes d'intérieur cuites par le créateur du pack.
+    app.add_plugins(castle_envmap::CastleEnvMapPlugin);
     // 7e-quater. Éditeur de scène in-game (story-665) — `.` du pavé numérique dans
     // le Hall : sélection, déplacement/rotation/échelle façon Blender, bibliothèque
     // d'assets, aimant au sol. Persistance non destructive dans

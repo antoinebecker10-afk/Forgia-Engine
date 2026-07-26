@@ -363,3 +363,64 @@ Les 78 `_lit` sont extractibles par le même outil, mais les poser rouvre une
 décision : nous allumons aujourd'hui les 767 mèches détectées, lui n'en allume que
 78. Ajouter ses bougies allumées sans restreindre l'allumage donnerait 845 flammes.
 C'est un choix d'ambiance, pas un défaut technique — à trancher avant de l'appliquer.
+
+
+---
+
+## 10. Correctif K — éclairage par image (2026-07-26)
+
+### Le diagnostic était trop étroit
+
+L'audit attribuait l'aspect « pierre mouillée » aux 31 sondes de réflexion
+absentes. La mesure est plus large : **`EnvironmentMapLight` n'est employé nulle
+part dans Forgia**. Le projet n'a aucun éclairage par image, alors qu'il livre
+déjà des cubemaps préfiltrées inutilisées (`assets/hdri/env-maps-v1/pisa_*.ktx2`).
+
+Ce n'étaient donc pas 31 sondes qui manquaient au Hall, mais la brique entière.
+
+### Ses sondes cuites sont dans le pack
+
+| | |
+|---|---|
+| Fichiers | **32** `ReflectionProbe-N.exr` |
+| Format | 768 × 128 = **6 faces de 128** en bande horizontale, compression PIZ |
+| Contenu | sombre et franchement chaud — rapport rouge/bleu jusqu'à **25** |
+
+Ce sont des mesures de ce que sa pierre réfléchit, pas une supposition.
+
+**L'ordre des faces est vérifié, pas supposé.** En ordre Unity standard
+(`+X, −X, +Y, −Y, +Z, −Z`), la face 2 est le plafond et la face 3 le sol. Dans un
+intérieur éclairé aux bougies, le sol doit être plus clair que le plafond : c'est
+le cas sur **25 des 32 sondes**. Les 7 exceptions sont précisément les sondes
+extérieures, où le ciel est la source.
+
+### Le miroir, encore
+
+Le château porte un miroir sur X. Une direction `d` de notre monde vaut
+`(−d.x, d.y, d.z)` chez lui, ce qui donne sur la cubemap :
+
+- **toutes** les faces retournées horizontalement ;
+- les faces `+X` et `−X` échangées.
+
+Même piège que sur les rotations des bannières, même traitement.
+
+### Ce qui est livré, et ce qui ne l'est pas
+
+`tools/unity/build_castle_envmap.py` reconnaît les **27 sondes d'intérieur** (les
+5 autres regardent le ciel : claires et bleues, séparation nette) et les moyenne
+en une cubemap unique, `assets/hdri/castle_hub_env.hdr` — luminance moyenne
+0,0077. Elle est posée sur les caméras du Hall via
+`GeneratedEnvironmentMapLight`, qui filtre sur GPU : aucun bake de notre côté.
+
+**Les 31 sondes localisées ne sont pas posées.** Sa scène ne dit pas quel EXR va
+avec quelle sonde — l'association vit dans `LightingData.asset`, un binaire Unity.
+Poser des sondes sur une association devinée serait pire que pas de sonde : un
+reflet de cour extérieure dans une cave se voit immédiatement. L'ambiance unique
+est juste par construction ; les sondes localisées attendront cette association.
+
+### Reste
+
+Les **11 lightmaps** (correctif F) sont elles aussi dans le pack, en EXR 4096²
+(22 Mo pièce, 250 Mo au total). C'est l'écart structurel qui subsiste : sans
+rebond cuit, tout ce qui n'est pas frappé directement tombe au plancher de
+l'ambiante. L'UV2 est déjà présent sur nos meshes.

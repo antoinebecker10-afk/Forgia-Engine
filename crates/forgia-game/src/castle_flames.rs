@@ -92,6 +92,14 @@ pub struct CastleLighting {
     /// il doit rester discret. À 7 000 (valeur d'origine) il éclairait l'intérieur
     /// comme s'il n'y avait pas de château.
     pub fill_lux: f32,
+
+    /// Éclairage par image du Hall — cf `castle_envmap`. Sans lui, une surface PBR
+    /// n'a rien à réfléchir et tombe sur un reflet plat (« pierre mouillée »).
+    pub env_enabled: bool,
+    /// Intensité de la cubemap d'ambiance, en cd/m². Les sondes du pack sont très
+    /// sombres (luminance moyenne 0,008) : ce facteur les remonte au niveau du
+    /// reste de l'éclairage.
+    pub env_intensity: f32,
 }
 
 impl Default for CastleLighting {
@@ -113,6 +121,8 @@ impl Default for CastleLighting {
             creator_lights_enabled: true,
             key_lux: 12_000.0,
             fill_lux: 600.0,
+            env_enabled: true,
+            env_intensity: 900.0,
         }
     }
 }
@@ -142,6 +152,7 @@ impl CastleLighting {
         let ambient = parsed.ambient.unwrap_or_default();
         let flames = parsed.flames.unwrap_or_default();
         let creator = parsed.creator_lights.unwrap_or_default();
+        let environment = parsed.environment.unwrap_or_default();
         Self {
             ambient_brightness: ambient.brightness.unwrap_or(base.ambient_brightness),
             ambient_color: ambient.color.unwrap_or(base.ambient_color),
@@ -159,6 +170,8 @@ impl CastleLighting {
             creator_lights_enabled: creator.enabled.unwrap_or(base.creator_lights_enabled),
             key_lux: ambient.key_lux.unwrap_or(base.key_lux),
             fill_lux: ambient.fill_lux.unwrap_or(base.fill_lux),
+            env_enabled: environment.enabled.unwrap_or(base.env_enabled),
+            env_intensity: environment.intensity.unwrap_or(base.env_intensity),
         }
     }
 
@@ -178,6 +191,13 @@ struct LightingToml {
     ambient: Option<AmbientToml>,
     flames: Option<FlamesToml>,
     creator_lights: Option<CreatorLightsToml>,
+    environment: Option<EnvironmentToml>,
+}
+
+#[derive(Deserialize, Default)]
+struct EnvironmentToml {
+    enabled: Option<bool>,
+    intensity: Option<f32>,
 }
 
 #[derive(Deserialize, Default)]
