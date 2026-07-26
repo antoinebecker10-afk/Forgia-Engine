@@ -65,22 +65,25 @@
     "glb": "body.glb",
     "parts": {
       "head": {
-        "tris": 2344
+        "tris": 4400
       },
       "hair": {
-        "tris": 336
+        "tris": 576
+      },
+      "goggles": {
+        "tris": 320
       },
       "beard": {
-        "tris": 608
+        "tris": 3322
       },
       "torso": {
-        "tris": 896
+        "tris": 4904
       },
       "hands": {
-        "tris": 1096
+        "tris": 5320
       },
       "pelvis": {
-        "tris": 352
+        "tris": 1056
       },
       "feet": {
         "tris": 856
@@ -90,13 +93,17 @@
   "clips": {
     "glb": "body.glb",
     "fps": 24,
-    "names": []
+    "names": [
+      "idle",
+      "walk"
+    ]
   },
   "slots": {
     "helmet": {
       "glb": "helmet.glb",
       "hides": [
-        "hair"
+        "hair",
+        "goggles"
       ],
       "bones": [
         "Head"
@@ -119,7 +126,7 @@
         "LeftArm",
         "RightArm"
       ],
-      "tris": 6212
+      "tris": 6660
     },
     "gloves": {
       "glb": "gloves.glb",
@@ -169,7 +176,7 @@
         "LeftLeg",
         "RightLeg"
       ],
-      "tris": 3160
+      "tris": 3736
     },
     "boots": {
       "glb": "boots.glb",
