@@ -87,3 +87,9 @@ worldgen_baked_city.ron
 assets/user_settings.toml
 config/*_save.toml
 assets/audio/roguelite/weapons/_preroll_backup/
+
+# Éditeur in-game : les retouches de scène du joueur, pas du code source.
+castle_hub_edits.json
+
+# Caches Python des scripts outils
+__pycache__/
