@@ -66,9 +66,21 @@ impl Plugin for CastleGroundPlugin {
             .init_resource::<FlyMode>()
             .add_systems(OnEnter(GameMode::CastleHub), spawn_castle_ground)
             .add_systems(OnExit(GameMode::CastleHub), cleanup_castle_ground)
+            // `sys_nudge_ground` est désarmé quand l'éditeur de scène est ouvert :
+            // il occupe tout le pavé numérique (4/6/8/2/9/3/7/1, +/-, Numpad0) et
+            // continuerait à déplacer le terrain sous les pieds du créateur pendant
+            // qu'il édite. Le vol libre, lui, reste actif — c'est le moyen de
+            // naviguer pour aller placer un objet.
             .add_systems(
                 Update,
-                (sys_nudge_ground, sys_toggle_fly)
+                sys_nudge_ground
+                    .run_if(in_state(GameMode::CastleHub))
+                    .run_if(in_state(AppMode::InGame))
+                    .run_if(not(forgia_editor::editor_holds_keyboard)),
+            )
+            .add_systems(
+                Update,
+                sys_toggle_fly
                     .run_if(in_state(GameMode::CastleHub))
                     .run_if(in_state(AppMode::InGame)),
             )

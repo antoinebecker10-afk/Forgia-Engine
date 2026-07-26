@@ -175,6 +175,13 @@ pub fn run_game() -> AppExit {
     // fin position/relief (align, vscale) passe par le même fichier. Findings :
     // memory/reference_castle_terrain_unity_reconstruction.md.
     app.add_plugins(castle_ground::CastleGroundPlugin);
+    // 7e-quater. Éditeur de scène in-game (story-665) — `.` du pavé numérique dans
+    // le Hall : sélection, déplacement/rotation/échelle façon Blender, bibliothèque
+    // d'assets, aimant au sol. Persistance non destructive dans
+    // `castle_hub_edits.json`. Gaté `GameMode::CastleHub` en interne : les autres
+    // modes ne paient que le boot du plugin. Les pinceaux de sol et la peinture
+    // sont les lots suivants.
+    app.add_plugins(forgia_editor::prelude::ForgiaEditorPlugin);
 
     // 7f. Color grading filmique par mode (story-602) — ColorGrading par GameMode,
     // hot-reload assets/genomes/color_grading.toml. Sensor forgia2_color_grading.json.
