@@ -136,6 +136,7 @@
 | `forgia2_transform_hierarchy.json` | T0 | forgia-mode-roguelite | `src/transform_hierarchy_sensor.rs` | 1Hz | plus grandes hiérarchies de scène, squelettes et VFX ; diagnostic propagation transforms | active |
 | `forgia2_merchant.json` | T0 | forgia-mode-roguelite | `src/merchant.rs:50` | 1Hz | marchand : offres, proximité, achats Or/Âmes, revives — story-591 | active |
 | `forgia2_render.json` | T0 | forgia-observability | `src/render_sensor.rs:137` | 1Hz | mesh3d_visible vs total (écran vide/brun), caméras 3D actives, clear_color | active |
+| `forgia2_editor.json` | T0 | forgia-editor | `src/sensor.rs:19` | 1Hz | éditeur de scène in-game du Hall : ouvert/snap, props/overrides, sélection, opération active, bibliothèque, sauvegardes ; alert critical si écriture castle_hub_edits.json en échec — story-665 | active |
 
 ## Producteurs retirés — historique (story-593, audit 2026-06-10)
 
