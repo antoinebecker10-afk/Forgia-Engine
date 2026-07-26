@@ -1,0 +1,190 @@
+{
+  "_comment": "Généré par tools/blender/build_dwarf.py — ne pas éditer à la main.",
+  "height_m": 1.45,
+  "forward": "-Z (glTF) — le nain regarde +Y en repère Blender",
+  "skeleton": {
+    "root": "Hips",
+    "bone_count": 53,
+    "bones": [
+      "Hips",
+      "Spine",
+      "Spine1",
+      "Spine2",
+      "Neck",
+      "Head",
+      "HeadTop_End",
+      "LeftShoulder",
+      "LeftArm",
+      "LeftForeArm",
+      "LeftHand",
+      "LeftHand_End",
+      "LeftForeArmTwist",
+      "LeftHandIndex1",
+      "LeftHandIndex2",
+      "LeftHandMiddle1",
+      "LeftHandMiddle2",
+      "LeftHandRing1",
+      "LeftHandRing2",
+      "LeftHandPinky1",
+      "LeftHandPinky2",
+      "LeftHandThumb1",
+      "LeftHandThumb2",
+      "LeftUpLeg",
+      "LeftLeg",
+      "LeftFoot",
+      "LeftToeBase",
+      "LeftToe_End",
+      "RightShoulder",
+      "RightArm",
+      "RightForeArm",
+      "RightHand",
+      "RightHand_End",
+      "RightForeArmTwist",
+      "RightHandIndex1",
+      "RightHandIndex2",
+      "RightHandMiddle1",
+      "RightHandMiddle2",
+      "RightHandRing1",
+      "RightHandRing2",
+      "RightHandPinky1",
+      "RightHandPinky2",
+      "RightHandThumb1",
+      "RightHandThumb2",
+      "RightUpLeg",
+      "RightLeg",
+      "RightFoot",
+      "RightToeBase",
+      "RightToe_End",
+      "Jaw",
+      "Beard1",
+      "Beard2",
+      "Beard3"
+    ]
+  },
+  "body": {
+    "glb": "body.glb",
+    "parts": {
+      "head": {
+        "tris": 2344
+      },
+      "hair": {
+        "tris": 336
+      },
+      "beard": {
+        "tris": 608
+      },
+      "torso": {
+        "tris": 896
+      },
+      "hands": {
+        "tris": 1096
+      },
+      "pelvis": {
+        "tris": 352
+      },
+      "feet": {
+        "tris": 856
+      }
+    }
+  },
+  "clips": {
+    "glb": "body.glb",
+    "fps": 24,
+    "names": []
+  },
+  "slots": {
+    "helmet": {
+      "glb": "helmet.glb",
+      "hides": [
+        "hair"
+      ],
+      "bones": [
+        "Head"
+      ],
+      "tris": 1180
+    },
+    "chest": {
+      "glb": "chest.glb",
+      "hides": [
+        "torso"
+      ],
+      "bones": [
+        "Hips",
+        "Spine",
+        "Spine1",
+        "Spine2",
+        "Neck",
+        "LeftShoulder",
+        "RightShoulder",
+        "LeftArm",
+        "RightArm"
+      ],
+      "tris": 6212
+    },
+    "gloves": {
+      "glb": "gloves.glb",
+      "hides": [
+        "hands"
+      ],
+      "bones": [
+        "LeftForeArm",
+        "RightForeArm",
+        "LeftForeArmTwist",
+        "RightForeArmTwist",
+        "LeftHand",
+        "RightHand",
+        "LeftHandThumb1",
+        "LeftHandThumb2",
+        "LeftHandIndex1",
+        "LeftHandIndex2",
+        "LeftHandMiddle1",
+        "LeftHandMiddle2",
+        "LeftHandRing1",
+        "LeftHandRing2",
+        "LeftHandPinky1",
+        "LeftHandPinky2",
+        "RightHandThumb1",
+        "RightHandThumb2",
+        "RightHandIndex1",
+        "RightHandIndex2",
+        "RightHandMiddle1",
+        "RightHandMiddle2",
+        "RightHandRing1",
+        "RightHandRing2",
+        "RightHandPinky1",
+        "RightHandPinky2"
+      ],
+      "tris": 1584
+    },
+    "legs": {
+      "glb": "legs.glb",
+      "hides": [
+        "pelvis"
+      ],
+      "bones": [
+        "Hips",
+        "Spine",
+        "LeftUpLeg",
+        "RightUpLeg",
+        "LeftLeg",
+        "RightLeg"
+      ],
+      "tris": 3160
+    },
+    "boots": {
+      "glb": "boots.glb",
+      "hides": [
+        "feet"
+      ],
+      "bones": [
+        "LeftLeg",
+        "RightLeg",
+        "LeftFoot",
+        "RightFoot",
+        "LeftToeBase",
+        "RightToeBase"
+      ],
+      "tris": 4104
+    }
+  }
+}
