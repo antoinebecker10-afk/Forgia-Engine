@@ -50,6 +50,9 @@ const MENU_VIDEO_PREROLL_MIN_LOADED: usize = 4;
 
 /// Cadence d'export du sensor JSON (secondes, `Time<Real>`).
 const MENU_VIDEO_SENSOR_INTERVAL_S: f32 = 2.0;
+/// Hors menu, la vidéo est inactive : garder un heartbeat peu fréquent évite des
+/// écritures disque synchrones inutiles dans le hot path du jeu.
+const MENU_VIDEO_INACTIVE_SENSOR_INTERVAL_S: f32 = 30.0;
 
 /// Sensor : état du player vidéo menu.
 const SENSOR_MENU_VIDEO_PATH: &str = "forgia2_menu_video.json";
@@ -81,6 +84,9 @@ pub struct MenuVideoState {
     pub frames_loaded: usize,
     /// Throttle de l'export sensor (secondes, `Time<Real>`).
     pub sensor_timer: f32,
+    /// Dernier état exporté. Une transition Menu ↔ jeu doit être visible sans
+    /// attendre le heartbeat inactif.
+    pub last_sensor_menu_active: Option<bool>,
 }
 
 /// Setup (Startup) : compte les frames disponibles, init le state, pré-warm.
@@ -205,7 +211,20 @@ pub fn ensure_menu_video_frame(
         });
     }
 
-    // LRU : drop les frames hors fenêtre (Bevy reclaim auto la VRAM via Handle drop).
+    // LRU : désenregistrer D'ABORD les textures egui évincées. Retirer seulement
+    // le Handle du HashMap ne suffit pas : `EguiContexts::add_image` conserve un
+    // handle fort dans son registre, ce qui gardait les 361 frames WebP décodées
+    // en RAM/VRAM après un cycle complet (~15 Go observés au menu).
+    let evicted: Vec<AssetId<Image>> = video
+        .cache
+        .iter()
+        .filter(|(idx, _)| !desired.contains(idx))
+        .map(|(_, (handle, _))| handle.id())
+        .collect();
+    for image_id in evicted {
+        contexts.remove_image(image_id);
+    }
+    // Les handles hors fenêtre peuvent alors réellement être libérés par Bevy.
     video.cache.retain(|k, _| desired.contains(k));
 
     // Preroll gate : compte les frames `Loaded`. Flip `prerolled` une seule fois.
@@ -235,11 +254,15 @@ pub fn menu_video_sensor(
     video: Option<ResMut<MenuVideoState>>,
 ) {
     let Some(mut video) = video else { return };
+    let menu_active = *app_state.get() == AppMode::Menu;
     video.sensor_timer += time.delta_secs();
-    if video.sensor_timer < MENU_VIDEO_SENSOR_INTERVAL_S {
+    let state_changed = video.last_sensor_menu_active != Some(menu_active);
+    let interval = menu_video_sensor_interval(menu_active);
+    if !state_changed && video.sensor_timer < interval {
         return;
     }
     video.sensor_timer = 0.0;
+    video.last_sensor_menu_active = Some(menu_active);
     let json = build_menu_video_sensor_json(MenuVideoSensorView {
         ts: time.elapsed_secs(),
         frame_count: video.frame_count,
@@ -247,7 +270,7 @@ pub fn menu_video_sensor(
         cache_size: video.cache.len(),
         frames_loaded: video.frames_loaded,
         prerolled: video.prerolled,
-        menu_active: *app_state.get() == AppMode::Menu,
+        menu_active,
         time_accumulator: video.time_accumulator,
     });
     let _ = std::fs::write(SENSOR_MENU_VIDEO_PATH, json);
@@ -280,6 +303,14 @@ pub(crate) fn build_menu_video_sensor_json(v: MenuVideoSensorView) -> String {
     )
 }
 
+fn menu_video_sensor_interval(menu_active: bool) -> f32 {
+    if menu_active {
+        MENU_VIDEO_SENSOR_INTERVAL_S
+    } else {
+        MENU_VIDEO_INACTIVE_SENSOR_INTERVAL_S
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,5 +336,11 @@ mod tests {
         assert!(json.contains("\"frame_count\":361"));
         assert!(json.contains("\"current_frame\":42"));
         assert!(json.contains("\"prerolled\":true"));
+    }
+
+    #[test]
+    fn inactive_sensor_is_strongly_throttled() {
+        assert_eq!(menu_video_sensor_interval(true), 2.0);
+        assert_eq!(menu_video_sensor_interval(false), 30.0);
     }
 }

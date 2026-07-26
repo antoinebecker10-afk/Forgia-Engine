@@ -180,6 +180,30 @@ fn polar(center: Pos2, r: f32, theta: f32) -> Pos2 {
     Pos2::new(center.x + r * theta.cos(), center.y + r * theta.sin())
 }
 
+/// Cœur cartoon stylisé : 2 demi-disques (haut) + triangle pointe bas. Les glyphes
+/// ♥/♡ ne sont pas couverts par les polices egui → on dessine la forme. Primitive
+/// HUD partagée : rangée énergie + jauge de confiance Pépin de la carte vitals.
+pub fn draw_cartoon_heart(painter: &egui::Painter, cx: f32, cy: f32, size: f32, color: Color32) {
+    let r = size * 0.5;
+    let outline = Color32::BLACK;
+    // 2 demi-cercles côte à côte (en haut).
+    let left = Pos2::new(cx - r * 0.55, cy - r * 0.20);
+    let right = Pos2::new(cx + r * 0.55, cy - r * 0.20);
+    painter.circle_filled(left, r * 0.65, color);
+    painter.circle_filled(right, r * 0.65, color);
+    // Triangle pointe bas (3 sommets).
+    let tri = [
+        Pos2::new(cx - r, cy - r * 0.05),
+        Pos2::new(cx + r, cy - r * 0.05),
+        Pos2::new(cx, cy + r * 0.95),
+    ];
+    painter.add(egui::Shape::convex_polygon(
+        tri.to_vec(),
+        color,
+        Stroke::new(1.0, outline),
+    ));
+}
+
 // ─── Story-558 Phase 7 (2026-05-29) — Palette "Forge" cartoon kid-friendly ──
 //
 // Bible v1 cartoon family-friendly (Overwatch×Hadès×Borderlands, cible

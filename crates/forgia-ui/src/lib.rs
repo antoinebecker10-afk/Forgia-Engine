@@ -18,8 +18,28 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_input::prelude::InputBlockers;
 use forgia_ui_lib::pause_menu::{draw_settings_controls, save_user_settings, UserSettings};
-use forgia_ui_lib::style::{cartoon_btn, glass_btn, C_PRIMARY, FORGE_CREME, FORGE_OR};
+use forgia_ui_lib::style::{
+    cartoon_btn, glass_btn, glass_frame_hero, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR,
+    FORGE_PANEL, HAIR_GOLD_STRONG,
+};
 use forgia_ui_lib::theme::display_text;
+// Hub-menu (story-menu-hub) : le menu-titre devient le hub roguelite complet.
+// `forgia-ui` → `forgia-mode-roguelite` dep existe (pas de cycle) → on lit les Res
+// persistées au Startup (présentes dès le menu) et on réutilise les helpers de
+// sections déjà écrits dans `hub.rs` (zéro duplication).
+use forgia_mode_roguelite::hub::{draw_codex_section, section_intro};
+use forgia_mode_roguelite::identity::{draw_identity_content, IdentityConfig, IdentitySave};
+use forgia_mode_roguelite::meta_shop::{
+    apply_meta_purchase, draw_enclume_panel, MetaShopCatalogue, MetaShopSave,
+};
+use forgia_mode_roguelite::elements::ElementConfig;
+use forgia_mode_roguelite::pipeline_warmup::WarmupState;
+use forgia_mode_roguelite::progress::PlayerProgress;
+use forgia_mode_roguelite::run::MetaSouls;
+use forgia_mode_roguelite::StartRunEvent;
+use forgia_mode_roguelite::weapon_select::{
+    draw_weapon_menu_panel, StartingWeaponChoice, WeaponCards,
+};
 // Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
 pub use forgia_crosshair::CrosshairMode;
 pub use forgia_effects::hitmarker::HitmarkerState;
@@ -36,6 +56,10 @@ pub mod prelude {
 mod menu_video;
 use menu_video::MenuVideoState;
 
+/// Aperçus 3D (arme + bras) au hub-menu (render-to-texture). Story-menu-hub étape 5b.
+mod weapon_preview;
+use weapon_preview::{ArmPreviewRtt, WeaponPreviewPlugin, WeaponPreviewRtt};
+
 pub struct ForgiaUiPlugin;
 
 impl Plugin for ForgiaUiPlugin {
@@ -49,6 +73,10 @@ impl Plugin for ForgiaUiPlugin {
         }
         if !app.is_plugin_added::<forgia_effects::hitmarker::ForgiaHitmarkerPlugin>() {
             app.add_plugins(forgia_effects::hitmarker::ForgiaHitmarkerPlugin);
+        }
+        // Aperçu 3D d'arme au hub-menu (RTT) — cycle de vie sur AppMode::Menu.
+        if !app.is_plugin_added::<WeaponPreviewPlugin>() {
+            app.add_plugins(WeaponPreviewPlugin);
         }
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
@@ -115,9 +143,91 @@ impl Plugin for ForgiaUiPlugin {
             )
             // Story-455 Phase G — paused_overlay_ui retiré (remplacé par forgia-ui-pause-menu
             // cliquable Resume / Settings / Quit). Le handler ESC/Q reste ici (escape_handler).
-            .add_systems(EguiPrimaryContextPass, main_menu_ui)
-            .add_systems(Update, escape_handler.in_set(GameSet::UI));
+            // Hub-menu : menu principal + sections interactives (Enclume cliquable,
+            // Forgeron/identité). Areas indépendantes, chaînées pour un ordre de
+            // dessin déterministe.
+            .add_systems(
+                EguiPrimaryContextPass,
+                (
+                    main_menu_ui,
+                    sys_menu_enclume,
+                    sys_menu_forgeron,
+                    sys_menu_armes,
+                )
+                    .chain(),
+            )
+            .add_systems(Update, escape_handler.in_set(GameSet::UI))
+            // Étape 6 hub-menu — lancement direct : le Lobby est un GATE DE
+            // CHARGEMENT (le hub est au menu). Auto-start dès warmup PBR prêt +
+            // overlay de chargement qui couvre l'ancien hub le temps du warmup.
+            .add_systems(
+                Update,
+                sys_auto_start_when_warm
+                    // Ordonné AVANT le reader `sys_start_run` (autre crate) : le
+                    // `StartRunEvent` écrit est lu la même frame → transition Lobby→
+                    // InRun immédiate (lève l'ambiguïté d'ordre intra-frame, qa-lead M1).
+                    .before(forgia_mode_roguelite::run::sys_start_run)
+                    .run_if(in_state(AppMode::InGame))
+                    .run_if(in_state(GameMode::Roguelite))
+                    .run_if(in_state(forgia_mode_roguelite::RunState::Lobby)),
+            )
+            .add_systems(
+                EguiPrimaryContextPass,
+                sys_lobby_loading_overlay
+                    .run_if(in_state(AppMode::InGame))
+                    .run_if(in_state(GameMode::Roguelite))
+                    .run_if(in_state(forgia_mode_roguelite::RunState::Lobby)),
+            );
     }
+}
+
+/// Étape 6 hub-menu — lancement direct : le Lobby n'est plus un hub interactif mais
+/// un **gate de chargement**. Dès que le warmup PBR est prêt (`WarmupState.done`),
+/// auto-fire `StartRunEvent` → combat, sans action utilisateur (tout est configuré
+/// au menu). L'anti-double-spawn de `sys_start_run` + `run_if(Lobby)` (qui coupe
+/// après la transition InRun) bornent le tir. Replay (Defeat/Victory → Lobby) :
+/// `done` reste vrai → lancement instantané.
+fn sys_auto_start_when_warm(
+    warmup: Option<Res<WarmupState>>,
+    mut start_run: MessageWriter<StartRunEvent>,
+) {
+    if warmup.as_ref().is_some_and(|w| w.done) {
+        start_run.write(StartRunEvent { seed: None });
+    }
+}
+
+/// Overlay de chargement plein écran pendant le gate Lobby — couvre l'ancien hub
+/// interactif le temps du warmup, avant l'auto-lancement. Layer Foreground (au-
+/// dessus des panneaux du hub, ordre Middle).
+fn sys_lobby_loading_overlay(mut contexts: EguiContexts, warmup: Option<Res<WarmupState>>) {
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let ready = warmup.as_ref().is_some_and(|w| w.done);
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("lobby_loading_overlay"),
+    ));
+    painter.rect_filled(screen, 0.0, egui::Color32::from_rgb(12, 9, 16));
+    painter.text(
+        screen.center(),
+        egui::Align2::CENTER_CENTER,
+        if ready {
+            "La Forge est prête…"
+        } else {
+            "Préparation de la Forge…"
+        },
+        egui::FontId::proportional(34.0),
+        FORGE_CREME,
+    );
+    painter.text(
+        screen.center() + egui::vec2(0.0, 44.0),
+        egui::Align2::CENTER_CENTER,
+        "◆ ◆ ◆",
+        egui::FontId::proportional(18.0),
+        FORGE_OR,
+    );
 }
 
 #[derive(Component)]
@@ -140,31 +250,78 @@ fn spawn_menu_camera_permanent(mut commands: Commands, q: Query<Entity, With<Men
     }
 }
 
-/// Sous-page du menu titre (design: roguelite-home-hub-proposal 2026-06-26, P1).
+/// Sous-page du menu titre — devenu **hub roguelite complet** (story-menu-hub).
 /// Navigation purement UI-locale : PAS un variant d'`AppMode` (qui vit dans
 /// forgia-core et est partagé). Reset à `Root` sur OnEnter(AppMode::Menu).
+///
+/// `Root` = accueil (titre FORGIA + CONTINUER/NOUVELLE PARTIE). Les autres = les
+/// sections du hub, navigables depuis la sidebar verre sans lancer de run.
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 enum MenuPage {
     #[default]
     Root,
+    Forgeron,
+    Armes,
+    Talents,
+    Enclume,
+    Codex,
+    Missions,
+    Succes,
+    Stats,
     Options,
+}
+
+impl MenuPage {
+    /// Ordre de la sidebar de navigation (Accueil en tête, Options en pied).
+    const NAV: [MenuPage; 10] = [
+        MenuPage::Root,
+        MenuPage::Forgeron,
+        MenuPage::Armes,
+        MenuPage::Talents,
+        MenuPage::Enclume,
+        MenuPage::Codex,
+        MenuPage::Missions,
+        MenuPage::Succes,
+        MenuPage::Stats,
+        MenuPage::Options,
+    ];
+
+    /// Libellé de l'onglet dans la sidebar (icône + nom court).
+    fn nav_label(self) -> &'static str {
+        match self {
+            MenuPage::Root => "⌂  Accueil",
+            MenuPage::Forgeron => "⚒  Forgeron",
+            MenuPage::Armes => "🗡  Armes",
+            MenuPage::Talents => "✦  Talents",
+            MenuPage::Enclume => "🔨  Enclume",
+            MenuPage::Codex => "📖  Codex",
+            MenuPage::Missions => "🎯  Missions",
+            MenuPage::Succes => "🏆  Succès",
+            MenuPage::Stats => "📊  Stats",
+            MenuPage::Options => "⚙  Options",
+        }
+    }
+
+    /// Titre display (Lilita) affiché en tête du panneau de section.
+    fn section_title(self) -> &'static str {
+        match self {
+            MenuPage::Root => "FORGIA",
+            MenuPage::Forgeron => "TON FORGERON",
+            MenuPage::Armes => "TES ARMES",
+            MenuPage::Talents => "TALENTS",
+            MenuPage::Enclume => "L'ENCLUME DES ÂMES",
+            MenuPage::Codex => "CODEX · BESTIAIRE",
+            MenuPage::Missions => "MISSIONS",
+            MenuPage::Succes => "HAUTS FAITS",
+            MenuPage::Stats => "STATISTIQUES",
+            MenuPage::Options => "OPTIONS",
+        }
+    }
 }
 
 /// Revient à la page racine du menu à chaque entrée dans le menu (retour jeu→menu).
 fn reset_menu_page(mut page: ResMut<MenuPage>) {
     *page = MenuPage::Root;
-}
-
-/// Le menu titre expose une ligne « Démos moteur (dev) » (RPG / Cyber City) hors
-/// parcours joueur Roguelite. On la masque dans le build distribué aux joueurs
-/// tout en la gardant en dev.
-///
-/// Visible si build debug (`cargo run`, `cfg!(debug_assertions)`) OU si
-/// `FORGIA_DEV_MENU=1` (échappatoire pour la voir dans un build release, p. ex.
-/// tester la démo Cyber City en perf). Un build `--release` — le build joueur, cf
-/// `xtask dist-roguelite` — la cache donc par défaut.
-fn dev_menu_visible() -> bool {
-    cfg!(debug_assertions) || std::env::var_os("FORGIA_DEV_MENU").is_some()
 }
 
 fn main_menu_ui(
@@ -177,7 +334,10 @@ fn main_menu_ui(
     asset_server: Res<AssetServer>,
     mut page: ResMut<MenuPage>,
     mut settings: ResMut<UserSettings>,
-    meta_save: Option<Res<forgia_mode_roguelite::meta_shop::MetaShopSave>>,
+    // Données persistées au Startup → présentes dès le menu (hub roguelite).
+    meta_save: Option<Res<MetaShopSave>>,
+    progress: Option<Res<PlayerProgress>>,
+    identity: Option<Res<IdentitySave>>,
     mut last_state: Local<Option<AppMode>>,
 ) {
     let current = app_state.get().clone();
@@ -200,12 +360,12 @@ fn main_menu_ui(
         warn!("[forgia-ui] main_menu_ui: egui ctx not found (no Camera2d?)");
         return;
     };
+
+    // ── Couche background : fond vidéo plein écran + scrim dégradé vertical ──
+    // (story-596 — haut léger, bas dense pour asseoir l'UI sans éteindre la vidéo).
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(8, 8, 12)))
         .show(ctx, |ui| {
-            // Fond vidéo plein écran + scrim dégradé vertical (story-596 —
-            // remplace le voile plat alpha 90 : haut léger, bas dense pour
-            // asseoir les boutons sans éteindre la vidéo).
             if let Some(id) = bg_id {
                 let rect = ui.max_rect();
                 ui.painter().image(
@@ -225,148 +385,588 @@ fn main_menu_ui(
                 scrim.add_triangle(0, 2, 3);
                 ui.painter().add(egui::Shape::mesh(scrim));
             }
-            match *page {
-                // ── Page racine : menu joueur Roguelite (design home-hub P1) ──
-                MenuPage::Root => {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(96.0);
-                        // titre display (Lilita One) + orange Forgia canon.
-                        ui.heading(display_text("FORGIA", 84.0, C_PRIMARY).strong());
-                        ui.add_space(8.0);
-                        ui.label(
-                            egui::RichText::new("ROGUELITE")
-                                .size(22.0)
-                                .color(FORGE_CREME)
-                                .strong(),
+        });
+
+    // ── Données persistées (chargées au Startup → lisibles dès le menu) ──
+    let souls_n = meta_save.as_ref().map(|s| s.souls_total).unwrap_or(0);
+    // « A déjà joué » = méta persistée (Âmes / upgrades / armes au-delà de Pépin).
+    let has_save = meta_save
+        .as_ref()
+        .is_some_and(|s| s.souls_total > 0 || !s.ranks.is_empty() || s.unlocked_weapons.len() > 1);
+    let name = identity
+        .as_ref()
+        .map(|i| {
+            if i.player_name.is_empty() {
+                "Forgeron"
+            } else {
+                i.player_name.as_str()
+            }
+        })
+        .unwrap_or("Forgeron");
+    let (level, xp, xp_next, frac) = progress
+        .as_ref()
+        .map(|p| {
+            (
+                p.level,
+                p.xp,
+                PlayerProgress::xp_to_next(p.level),
+                p.xp_fraction(),
+            )
+        })
+        .unwrap_or((1, 0, 80, 0.0));
+
+    // ── Chrome persistant : bandeau Âmes (droite) + sidebar de navigation (gauche) ──
+    draw_hub_souls_chip(ctx, souls_n);
+    draw_hub_nav(ctx, &mut page, name, level, xp, xp_next, frac);
+
+    // ── Panneau de la section active ──
+    // Les sections rendent leur contenu et renvoient une action de navigation
+    // d'état (lancer une run / quitter) que l'on applique ici — évite de passer
+    // NextState/MessageWriter dans chaque helper.
+    let action = match *page {
+        MenuPage::Root => draw_root_landing(ctx, has_save),
+        MenuPage::Codex => {
+            hub_section_panel(ctx, "hub_sec_codex", MenuPage::Codex.section_title(), 720.0, |ui| {
+                draw_codex_section(ui);
+            });
+            MenuAction::None
+        }
+        MenuPage::Talents => {
+            let pts = progress.as_ref().map(|p| p.talent_points).unwrap_or(0);
+            hub_section_panel(
+                ctx,
+                "hub_sec_talents",
+                MenuPage::Talents.section_title(),
+                640.0,
+                |ui| {
+                    section_intro(
+                        ui,
+                        "Arbres de talents",
+                        "Choisis ton style — Feu · Givre · Éclair · Poison — et débloque des \
+                         combos signature en jouant.",
+                    );
+                    ui.add_space(8.0);
+                    ui.label(display_text(
+                        format!("{pts} point(s) de talent en attente"),
+                        18.0,
+                        FORGE_OR,
+                    ));
+                },
+            );
+            MenuAction::None
+        }
+        MenuPage::Missions => {
+            hub_section_panel(
+                ctx,
+                "hub_sec_missions",
+                MenuPage::Missions.section_title(),
+                640.0,
+                |ui| {
+                    section_intro(
+                        ui,
+                        "Missions",
+                        "Des défis quotidiens & hebdomadaires. Accomplis-les pour gagner des Âmes \
+                         et débloquer des titres.",
+                    );
+                },
+            );
+            MenuAction::None
+        }
+        MenuPage::Succes => {
+            hub_section_panel(
+                ctx,
+                "hub_sec_succes",
+                MenuPage::Succes.section_title(),
+                640.0,
+                |ui| {
+                    section_intro(
+                        ui,
+                        "Hauts faits",
+                        "Repousse tes limites — chaque haut fait débloqué rapporte des Âmes et un \
+                         titre à porter.",
+                    );
+                },
+            );
+            MenuAction::None
+        }
+        MenuPage::Stats => {
+            hub_section_panel(
+                ctx,
+                "hub_sec_stats",
+                MenuPage::Stats.section_title(),
+                560.0,
+                |ui| draw_stats_section(ui, meta_save.as_deref(), level),
+            );
+            MenuAction::None
+        }
+        // Forgeron / Armes / Enclume : panneaux interactifs dessinés par leurs
+        // systèmes dédiés (`sys_menu_forgeron` / `sys_menu_armes` / `sys_menu_enclume`).
+        MenuPage::Forgeron | MenuPage::Armes | MenuPage::Enclume => MenuAction::None,
+        MenuPage::Options => {
+            draw_options_page(ctx, &mut page, &mut settings);
+            MenuAction::None
+        }
+    };
+
+    match action {
+        MenuAction::Launch(mode) => {
+            next_game.set(mode);
+            next_app.set(AppMode::InGame);
+        }
+        MenuAction::Quit => {
+            exit.write(AppExit::Success);
+        }
+        MenuAction::None => {}
+    }
+}
+
+/// Action de navigation d'état demandée par une section du hub-menu (appliquée par
+/// `main_menu_ui`). Découple le rendu des sections des `NextState`/`MessageWriter`.
+enum MenuAction {
+    None,
+    /// Entrer InGame dans le mode donné (Roguelite = run, Rpg/CyberCity = démos dev).
+    Launch(GameMode),
+    Quit,
+}
+
+/// Cadre « chip » cohérent avec le hub (verre aubergine + liseré or).
+fn hub_chip_frame() -> egui::Frame {
+    egui::Frame::new()
+        .fill(FORGE_PANEL)
+        .inner_margin(egui::Margin::symmetric(14, 8))
+        .corner_radius(egui::CornerRadius::same(8))
+        .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
+}
+
+/// Bandeau Âmes (méta persistante) — haut-droite du hub-menu.
+fn draw_hub_souls_chip(ctx: &egui::Context, souls_n: u32) {
+    egui::Area::new(egui::Id::new("menu_hub_souls"))
+        .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-24.0, 18.0))
+        .show(ctx, |ui| {
+            hub_chip_frame().show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new(format!("◇ {souls_n}  Âmes"))
+                        .size(20.0)
+                        .color(FORGE_OR)
+                        .strong(),
+                );
+            });
+        });
+}
+
+/// Sidebar de navigation (gauche) : en-tête forgeron (nom + niveau + XP) puis les
+/// onglets des sections. `page` est muté au clic.
+fn draw_hub_nav(
+    ctx: &egui::Context,
+    page: &mut MenuPage,
+    name: &str,
+    level: u32,
+    xp: u32,
+    xp_next: u32,
+    frac: f32,
+) {
+    egui::Area::new(egui::Id::new("menu_hub_nav"))
+        .anchor(egui::Align2::LEFT_CENTER, egui::vec2(24.0, 0.0))
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(FORGE_PANEL)
+                .inner_margin(egui::Margin::symmetric(12, 14))
+                .corner_radius(egui::CornerRadius::same(14))
+                .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
+                .show(ui, |ui| {
+                    ui.set_min_width(204.0);
+                    // En-tête forgeron.
+                    ui.label(
+                        egui::RichText::new(name)
+                            .size(18.0)
+                            .color(FORGE_CREME)
+                            .strong(),
+                    );
+                    ui.label(
+                        egui::RichText::new(format!("Niveau {level}"))
+                            .size(13.0)
+                            .color(C_TEXT_MUTED),
+                    );
+                    ui.add_space(4.0);
+                    ui.add_sized(
+                        egui::vec2(200.0, 9.0),
+                        egui::ProgressBar::new(frac).fill(FORGE_OR).text(
+                            egui::RichText::new(format!("{xp} / {xp_next} XP"))
+                                .size(9.0)
+                                .color(FORGE_CREME),
+                        ),
+                    );
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.add_space(6.0);
+                    // Onglets.
+                    for tab in MenuPage::NAV {
+                        let selected = *page == tab;
+                        let resp = ui.add_sized(
+                            egui::vec2(200.0, 30.0),
+                            egui::Button::selectable(
+                                selected,
+                                egui::RichText::new(tab.nav_label())
+                                    .size(16.0)
+                                    .color(if selected { C_PRIMARY } else { FORGE_CREME })
+                                    .strong(),
+                            ),
                         );
-                        ui.add_space(44.0);
-
-                        // « A déjà joué » = méta persistée (Âmes / upgrades achetés /
-                        // armes débloquées au-delà de Pépin). Pilote Continuer actif +
-                        // quel bouton porte le CTA principal (or).
-                        let has_save = meta_save.as_ref().is_some_and(|s| {
-                            s.souls_total > 0
-                                || !s.ranks.is_empty()
-                                || s.unlocked_weapons.len() > 1
-                        });
-
-                        // CONTINUER — relance avec la progression méta (L'Enclume).
-                        // Grisé tant qu'aucune partie n'a laissé de méta.
-                        let mut continue_clicked = false;
-                        ui.add_enabled_ui(has_save, |ui| {
-                            continue_clicked =
-                                cartoon_btn(ui, "▶  CONTINUER", FORGE_OR).clicked();
-                        });
-                        if continue_clicked {
-                            next_game.set(GameMode::Roguelite);
-                            next_app.set(AppMode::InGame);
+                        if resp.clicked() {
+                            *page = tab;
                         }
-                        ui.add_space(16.0);
+                        ui.add_space(3.0);
+                    }
+                });
+        });
+}
 
-                        // NOUVELLE PARTIE — entre au Lobby (le wizard nom+style est la
-                        // phase suivante du design). CTA or quand pas de save, sinon
-                        // bois pour laisser Continuer primer.
-                        let nouvelle = if has_save {
-                            glass_btn(ui, "✦  NOUVELLE PARTIE")
-                        } else {
-                            cartoon_btn(ui, "✦  NOUVELLE PARTIE", FORGE_OR)
-                        };
-                        if nouvelle.clicked() {
-                            next_game.set(GameMode::Roguelite);
-                            next_app.set(AppMode::InGame);
-                        }
-                        ui.add_space(16.0);
-
-                        if glass_btn(ui, "⚙  OPTIONS").clicked() {
-                            *page = MenuPage::Options;
-                        }
-                        ui.add_space(16.0);
-
-                        if glass_btn(ui, "✕  QUITTER").clicked() {
-                            exit.write(AppExit::Success);
-                        }
-
-                        // Démos moteur (dev) — RPG / Cyber City. Hors parcours joueur
-                        // Roguelite : masquées dans le build distribué aux joueurs
-                        // (release) via `dev_menu_visible()`, visibles en dev
-                        // (`cargo run`) ou avec `FORGIA_DEV_MENU=1`.
-                        if dev_menu_visible() {
-                            ui.add_space(32.0);
-                            ui.label(
-                                egui::RichText::new("— Démos moteur (dev) —")
-                                    .size(12.0)
-                                    .color(egui::Color32::from_gray(150)),
-                            );
-                            ui.add_space(8.0);
-                            ui.horizontal(|ui| {
-                                if ui
-                                    .add(
-                                        egui::Button::new(egui::RichText::new("🗺 RPG").size(15.0))
-                                            .min_size(egui::vec2(120.0, 32.0)),
-                                    )
-                                    .clicked()
-                                {
-                                    next_game.set(GameMode::Rpg);
-                                    next_app.set(AppMode::InGame);
-                                }
-                                ui.add_space(10.0);
-                                if ui
-                                    .add(
-                                        egui::Button::new(
-                                            egui::RichText::new("🏙 Cyber City").size(15.0),
-                                        )
-                                        .min_size(egui::vec2(140.0, 32.0)),
-                                    )
-                                    .clicked()
-                                {
-                                    next_game.set(GameMode::CyberCity);
-                                    next_app.set(AppMode::InGame);
-                                }
-                            });
-                        }
-                    });
-                }
-                // ── Page Options : réutilise les contrôles du pause menu (DRY) ──
-                MenuPage::Options => {
+/// Panneau de section centré (verre + liseré or) — chrome commun aux sections
+/// data du hub. Décalé à droite pour ne pas passer sous la sidebar.
+fn hub_section_panel(
+    ctx: &egui::Context,
+    id: &'static str,
+    title: &str,
+    max_width: f32,
+    add_contents: impl FnOnce(&mut egui::Ui),
+) {
+    egui::Area::new(egui::Id::new(id))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .show(ctx, |ui| {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(40, 30))
+                .show(ui, |ui| {
+                    ui.set_max_width(max_width);
                     ui.vertical_centered(|ui| {
-                        ui.add_space(52.0);
-                        ui.heading(display_text("OPTIONS", 56.0, C_PRIMARY).strong());
+                        ui.label(display_text(title, 40.0, FORGE_OR).strong());
+                        ui.add_space(16.0);
+                        add_contents(ui);
+                    });
+                });
+        });
+}
+
+/// Accueil (page racine) : titre FORGIA + CONTINUER / NOUVELLE PARTIE / QUITTER
+/// (+ démos moteur en dev). Renvoie l'action de lancement/quit à appliquer.
+fn draw_root_landing(ctx: &egui::Context, has_save: bool) -> MenuAction {
+    let mut action = MenuAction::None;
+    egui::Area::new(egui::Id::new("menu_hub_root"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.heading(display_text("FORGIA", 84.0, C_PRIMARY).strong());
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new("ROGUELITE")
+                        .size(22.0)
+                        .color(FORGE_CREME)
+                        .strong(),
+                );
+                ui.add_space(40.0);
+
+                // CONTINUER — grisé tant qu'aucune partie n'a laissé de méta.
+                let mut continue_clicked = false;
+                ui.add_enabled_ui(has_save, |ui| {
+                    continue_clicked = cartoon_btn(ui, "▶  CONTINUER", FORGE_OR).clicked();
+                });
+                if continue_clicked {
+                    action = MenuAction::Launch(GameMode::Roguelite);
+                }
+                ui.add_space(16.0);
+
+                // NOUVELLE PARTIE — CTA or quand pas de save, sinon verre (Continuer prime).
+                let nouvelle = if has_save {
+                    glass_btn(ui, "✦  NOUVELLE PARTIE")
+                } else {
+                    cartoon_btn(ui, "✦  NOUVELLE PARTIE", FORGE_OR)
+                };
+                if nouvelle.clicked() {
+                    action = MenuAction::Launch(GameMode::Roguelite);
+                }
+                ui.add_space(16.0);
+
+                // Hall de Forgia — hub social 3D walkable (château importé). Zone
+                // neutre, point de rassemblement (multijoueur à terme). C'est une
+                // feature du jeu, pas une démo dev → toujours visible.
+                if glass_btn(ui, "🏰  Hall de Forgia").clicked() {
+                    action = MenuAction::Launch(GameMode::CastleHub);
+                }
+                ui.add_space(8.0);
+
+                if glass_btn(ui, "✕  QUITTER").clicked() {
+                    action = MenuAction::Quit;
+                }
+                // Démos moteur RPG / Cyber City retirées du menu roguelite (2026-07-22,
+                // demande user « roguelite pur »). Modes conservés dans le code
+                // (GameMode::Rpg/CyberCity + plugins) → récupérables en re-câblant un
+                // bouton ici. Hall de Forgia (CastleHub) gardé (feature du jeu).
+            });
+        });
+    action
+}
+
+/// Section Stats — synthèse de la méta-progression (records + compteurs de runs).
+fn draw_stats_section(ui: &mut egui::Ui, save: Option<&MetaShopSave>, level: u32) {
+    let (runs, wins, best, souls, weapons) = save
+        .map(|s| {
+            (
+                s.runs_played,
+                s.victories,
+                s.best_victory_secs,
+                s.souls_total,
+                s.unlocked_weapons.len(),
+            )
+        })
+        .unwrap_or((0, 0, 0.0, 0, 1));
+    let win_rate = if runs > 0 {
+        (wins as f32 / runs as f32 * 100.0).round() as u32
+    } else {
+        0
+    };
+    let best_str = if best > 0.0 {
+        let m = (best / 60.0).floor() as u32;
+        let s = (best % 60.0).floor() as u32;
+        format!("{m} min {s:02} s")
+    } else {
+        "—".to_string()
+    };
+    stat_row(ui, "Runs jouées", runs.to_string());
+    stat_row(ui, "Victoires", format!("{wins}  ({win_rate} %)"));
+    stat_row(ui, "Meilleure victoire", best_str);
+    stat_row(ui, "Âmes accumulées", souls.to_string());
+    stat_row(ui, "Armes débloquées", weapons.to_string());
+    stat_row(ui, "Niveau", level.to_string());
+}
+
+/// Une ligne « libellé … valeur » de la section Stats (verre + liseré or).
+fn stat_row(ui: &mut egui::Ui, label: &str, value: String) {
+    egui::Frame::new()
+        .fill(FORGE_PANEL)
+        .inner_margin(egui::Margin::symmetric(16, 9))
+        .corner_radius(egui::CornerRadius::same(8))
+        .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
+        .show(ui, |ui| {
+            ui.set_min_width(460.0);
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(label).size(16.0).color(FORGE_CREME));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        egui::RichText::new(value)
+                            .size(18.0)
+                            .color(FORGE_OR)
+                            .strong(),
+                    );
+                });
+            });
+        });
+    ui.add_space(8.0);
+}
+
+/// Page Options — réutilise les contrôles du pause menu (DRY), dans un panneau
+/// verre centré. « Retour » ramène à l'accueil.
+fn draw_options_page(
+    ctx: &egui::Context,
+    page: &mut ResMut<MenuPage>,
+    settings: &mut ResMut<UserSettings>,
+) {
+    egui::Area::new(egui::Id::new("menu_hub_options"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .show(ctx, |ui| {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(40, 26))
+                .show(ui, |ui| {
+                    ui.set_max_width(520.0);
+                    ui.vertical_centered(|ui| {
+                        ui.label(display_text("OPTIONS", 44.0, FORGE_OR).strong());
                     });
                     ui.add_space(14.0);
-                    // Conteneur centré largeur bornée (lisibilité des sliders).
-                    let avail = ui.available_width();
-                    let panel_w = 520.0_f32.min((avail - 40.0).max(280.0));
-                    let margin = ((avail - panel_w) * 0.5).max(0.0);
+                    // Anti-crash : bypass + set_changed() SEULEMENT si un contrôle
+                    // change (sinon apply_window_settings boucle → resize → race wgpu).
+                    let dirty = draw_settings_controls(ui, settings.bypass_change_detection());
+                    if dirty {
+                        settings.set_changed();
+                    }
+                    ui.add_space(16.0);
                     ui.horizontal(|ui| {
-                        ui.add_space(margin);
-                        ui.vertical(|ui| {
-                            ui.set_max_width(panel_w);
-                            // Anti-crash : bypass + set_changed() SEULEMENT si un
-                            // contrôle change (sinon apply_window_settings boucle →
-                            // resize → race wgpu, cf draw_pause_menu).
-                            let dirty =
-                                draw_settings_controls(ui, settings.bypass_change_detection());
-                            if dirty {
-                                settings.set_changed();
-                            }
-                            ui.add_space(16.0);
-                            let mut save_clicked = false;
-                            let mut back_clicked = false;
-                            ui.horizontal(|ui| {
-                                save_clicked = glass_btn(ui, "💾 Sauvegarder").clicked();
-                                ui.add_space(12.0);
-                                back_clicked = glass_btn(ui, "← Retour").clicked();
-                            });
-                            if save_clicked {
-                                save_user_settings(settings.bypass_change_detection());
-                            }
-                            if back_clicked {
-                                *page = MenuPage::Root;
-                            }
-                        });
+                        if glass_btn(ui, "💾 Sauvegarder").clicked() {
+                            save_user_settings(settings.bypass_change_detection());
+                        }
+                        ui.add_space(12.0);
+                        if glass_btn(ui, "← Retour").clicked() {
+                            **page = MenuPage::Root;
+                        }
                     });
-                }
-            }
+                });
+        });
+}
+
+/// Section Enclume au menu-titre — méta-shop en **cartes cliquables** (souris).
+/// Système séparé (garde `main_menu_ui` sous la limite de params) gaté
+/// `AppMode::Menu` + onglet `Enclume`. Réutilise le rendu (`draw_enclume_panel`) et
+/// la logique d'achat (`apply_meta_purchase`) de forgia-mode-roguelite — zéro
+/// duplication. Solde = `MetaSouls.current` (chargé au Startup, comme au Lobby).
+fn sys_menu_enclume(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    page: Res<MenuPage>,
+    cat: Res<MetaShopCatalogue>,
+    mut save: ResMut<MetaShopSave>,
+    mut meta: ResMut<MetaSouls>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Enclume {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let souls = meta.current;
+    let mut intent = None;
+    egui::Area::new(egui::Id::new("menu_hub_enclume"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .show(ctx, |ui| {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(40, 28))
+                .show(ui, |ui| {
+                    ui.set_max_width(560.0);
+                    ui.vertical_centered(|ui| {
+                        ui.label(display_text("L'ENCLUME DES ÂMES", 38.0, FORGE_OR).strong());
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new("Dépense tes Âmes en améliorations permanentes.")
+                                .size(13.0)
+                                .color(C_TEXT_MUTED),
+                        );
+                        ui.add_space(14.0);
+                        intent = draw_enclume_panel(ui, &cat, &save, souls);
+                    });
+                });
+        });
+    // Applique l'achat cliqué (mute save/souls + sauve). Le `&save` du rendu est
+    // relâché à la fermeture de l'Area, donc l'emprunt `&mut save` est libre ici.
+    if let Some(purchase) = intent {
+        apply_meta_purchase(&cat, &mut save, &mut meta, purchase);
+    }
+}
+
+/// Section Forgeron au menu-titre — identité (nom + couleurs + bras) avec un
+/// **avatar statique** (disque de la couleur équipée) à la place de l'aperçu 3D
+/// du Lobby (pas de scène 3D au menu). Réutilise `draw_identity_content` de
+/// forgia-mode-roguelite (zéro duplication). Système séparé (params + Local).
+fn sys_menu_forgeron(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    page: Res<MenuPage>,
+    cfg: Res<IdentityConfig>,
+    mut save: ResMut<IdentitySave>,
+    mut arm_cosmetics: ResMut<ArmCosmetics>,
+    mut editing: Local<bool>,
+    rtt: Option<Res<ArmPreviewRtt>>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    // Aperçu 3D des bras (image RTT, l'arme tourne). Fallback = disque de la couleur
+    // équipée si le RTT n'a pas encore spawné (lu dans les presets, données pub).
+    let arm_image = rtt.as_ref().map(|r| r.tex_id);
+    let rgb = cfg
+        .colors
+        .iter()
+        .find(|c| c.id == save.equipped_color)
+        .map(|c| c.rgb)
+        .unwrap_or([0.6, 0.6, 0.6]);
+    let disc_col = egui::Color32::from_rgb(
+        (rgb[0] * 255.0) as u8,
+        (rgb[1] * 255.0) as u8,
+        (rgb[2] * 255.0) as u8,
+    );
+    egui::Area::new(egui::Id::new("menu_hub_forgeron"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .show(ctx, |ui| {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(40, 28))
+                .show(ui, |ui| {
+                    ui.set_max_width(460.0);
+                    ui.vertical_centered(|ui| {
+                        ui.label(display_text("TON FORGERON", 38.0, FORGE_OR).strong());
+                        ui.add_space(12.0);
+                        // Aperçu 3D des bras (RTT) OU disque couleur en fallback.
+                        match arm_image {
+                            Some(tex) => {
+                                ui.add(egui::Image::new(egui::load::SizedTexture::new(
+                                    tex,
+                                    egui::vec2(210.0, 210.0),
+                                )));
+                            }
+                            None => {
+                                let (r, _) = ui.allocate_exact_size(
+                                    egui::vec2(96.0, 96.0),
+                                    egui::Sense::hover(),
+                                );
+                                ui.painter().circle_filled(r.center(), 46.0, disc_col);
+                                ui.painter().circle_stroke(
+                                    r.center(),
+                                    46.0,
+                                    egui::Stroke::new(2.5, HAIR_GOLD_STRONG),
+                                );
+                            }
+                        }
+                        ui.add_space(12.0);
+                        draw_identity_content(ui, &cfg, &mut save, &mut arm_cosmetics, &mut editing);
+                    });
+                });
+        });
+}
+
+/// Section Armes au menu-titre — carte d'arme (stats / élément / matchup +
+/// sélecteur ‹ › + déblocage) avec **aperçu 3D live** : l'image RTT de
+/// `weapon_preview` (l'arme tourne). Réutilise `draw_weapon_menu_panel` de
+/// forgia-mode-roguelite. Système séparé (params + `WeaponPreviewRtt`).
+fn sys_menu_armes(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    page: Res<MenuPage>,
+    mut choice: ResMut<StartingWeaponChoice>,
+    cards: Res<WeaponCards>,
+    elem_cfg: Res<ElementConfig>,
+    mut save: ResMut<MetaShopSave>,
+    cat: Res<MetaShopCatalogue>,
+    mut meta: ResMut<MetaSouls>,
+    rtt: Option<Res<WeaponPreviewRtt>>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Armes {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    // Image RTT de l'aperçu 3D (None si le plugin n'a pas encore spawné la caméra).
+    let weapon_image = rtt.as_ref().map(|r| r.tex_id);
+    egui::Area::new(egui::Id::new("menu_hub_armes"))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .show(ctx, |ui| {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(36, 24))
+                .show(ui, |ui| {
+                    ui.set_max_width(500.0);
+                    ui.vertical_centered(|ui| {
+                        ui.label(display_text("TES ARMES", 36.0, FORGE_OR).strong());
+                        ui.add_space(10.0);
+                        draw_weapon_menu_panel(
+                            ui,
+                            &mut choice,
+                            &cards,
+                            &elem_cfg,
+                            &mut save,
+                            &cat,
+                            &mut meta,
+                            weapon_image,
+                            220.0,
+                        );
+                    });
+                });
         });
 }
 

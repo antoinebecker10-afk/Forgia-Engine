@@ -84,11 +84,11 @@ fn draw_coffre(
             // +56 pour la barre de boutons Skip / Reroll en bas.
             let panel_h = card_h + 110.0 + 56.0;
 
-            // Story-558 Phase 7 — cartoon kid-friendly : panel bois clair +
-            // border or 5px + shadow stack 4 rects (Hadès dialogue pattern).
+            // DA « Verre & Braise » (2026-07-22) : panneau verre aubergine + liseré
+            // or (dark frame + cartes de boons claires = pattern Hadès conservé).
             let frame = egui::Frame::new()
-                .fill(FORGE_BOIS_CLAIR)
-                .stroke(egui::Stroke::new(5.0, FORGE_OR))
+                .fill(VERRE_GLASS)
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .corner_radius(egui::CornerRadius::same(18))
                 .inner_margin(22);
 
@@ -97,7 +97,7 @@ fn draw_coffre(
                 ui.vertical_centered(|ui| {
                     // Story-558 Phase 7 — header cartoon : titre charbon gros sur bois.
                     // Story-596 — display font (Lilita One).
-                    ui.label(display_text("⚒  LE MAÎTRE FORGERON", 28.0, FORGE_CHARBON).strong());
+                    ui.label(display_text("⚒  LE MAÎTRE FORGERON", 28.0, FORGE_OR).strong());
                     let voiceline = if session_res.maitre_voiceline.is_empty() {
                         "Choisis ta bénédiction, petit forgeron !"
                     } else {
@@ -107,7 +107,7 @@ fn draw_coffre(
                         egui::RichText::new(format!("« {voiceline} »"))
                             .size(17.0)
                             .italics()
-                            .color(FORGE_CHARBON),
+                            .color(FORGE_CREME),
                     );
                     ui.add_space(8.0);
                     // Story-571 — le Coffre dépense l'OR (in-run), pas les Souls méta.

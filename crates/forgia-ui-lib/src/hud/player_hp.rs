@@ -26,9 +26,10 @@ pub(crate) fn draw_player_hp(
     game_mode: Res<State<GameMode>>,
     q_player: Query<(&DamageHealth, Option<&DefenseLayer>), With<Player>>,
 ) {
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
-    {
+    // Roguelite dessine sa propre carte vitals unifiée (portrait + énergie +
+    // défense + confiance, sans chevauchement) → cette barre générique ne sert
+    // qu'à l'arène Fps (2026-07-22). Voir forgia-mode-roguelite::draw_vitals_card.
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
         return;
     }
     let Ok((health, defense)) = q_player.single() else {

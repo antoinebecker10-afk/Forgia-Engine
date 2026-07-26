@@ -6,7 +6,6 @@
 
 use bevy::prelude::*;
 use forgia_combat::weapons::EquippedWeapons;
-use std::fs;
 
 use super::tuning::AmmoHudTuning;
 
@@ -62,5 +61,5 @@ pub fn write_ammo_hud_sensor(
         now, active, low_active, sensor.events_total, sensor.last_render_ms, slots_json
     );
 
-    let _ = fs::write("forgia_hud_ammo.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_hud_ammo.json", json);
 }

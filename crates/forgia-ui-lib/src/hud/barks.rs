@@ -11,7 +11,6 @@
 //! liseré couleur persona, fade-out. Texte uniquement (armes parlantes MVP).
 
 use std::collections::{HashMap, VecDeque};
-use std::fs;
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
@@ -517,7 +516,7 @@ fn sys_write_barks_sensor(
         engine.last_line_id,
         json_escape(active),
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[barks] sensor write failed: {e}");
     }
 }

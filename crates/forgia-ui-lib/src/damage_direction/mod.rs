@@ -21,7 +21,6 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::{FpsCamera, Player};
 use crate::style::*;
 use std::collections::VecDeque;
-use std::fs;
 
 mod tuning;
 
@@ -283,7 +282,7 @@ pub(crate) fn write_damage_dir_sensor(
         sensor.last_angle_deg,
         arcs_json,
     );
-    let _ = fs::write("forgia_damage_dir.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_damage_dir.json", json);
 }
 
 // ─── Plugin ────────────────────────────────────────────────────────────

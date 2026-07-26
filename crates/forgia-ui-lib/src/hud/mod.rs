@@ -14,8 +14,8 @@ use bevy::prelude::*;
 // les distances en world units.
 mod barks;
 mod coffre_forgeron;
-mod confidence;
 mod energy;
+mod perf_overlay;
 mod player_hp;
 mod wave_counter;
 
@@ -32,9 +32,9 @@ impl Plugin for ForgiaUiHudPlugin {
         if !app.is_plugin_added::<crate::theme::ForgeThemePlugin>() {
             app.add_plugins(crate::theme::ForgeThemePlugin);
         }
-        // Story-528 AC4 — energy overlay Roguelite (rename HP→Énergie + cœurs cartoon
-        // + warm fade < 30% + voiceline épuisement). Overlay non-destructif au-dessus
-        // de player_hp (gated GameMode::Roguelite).
+        // Story-528 AC4 — energy overlay Roguelite : fade warm < 30% + voiceline
+        // épuisement. Le label « ÉNERGIE » + cœurs sont désormais dans la carte
+        // vitals (forgia-mode-roguelite), plus dans un overlay séparé (2026-07-22).
         app.add_plugins((
             player_hp::PlayerHpPlugin,
             wave_counter::WaveCounterPlugin,
@@ -44,11 +44,11 @@ impl Plugin for ForgiaUiHudPlugin {
             // Resource (ForgiaBoonsPlugin pas wiré), system early-return silencieux
             // après refactor — voir Phase 3.
             coffre_forgeron::CoffreForgeronPlugin,
-            // Story-531 AC9 — cœurs de confiance Pépin (visible arme en main).
-            confidence::ConfidenceHudPlugin,
             // Story-531 AC5-7 incrément kill — barks armes parlantes (bulle
             // persona sur kill, consomme roguelite_dialogue.toml).
             barks::WeaponBarksPlugin,
+            // Overlay perf live (FPS + frame time ms) — visible en continu en jeu.
+            perf_overlay::PerfOverlayPlugin,
         ));
     }
 }

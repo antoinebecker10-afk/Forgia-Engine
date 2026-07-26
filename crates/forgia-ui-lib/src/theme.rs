@@ -159,7 +159,7 @@ fn sys_apply_forge_theme(mut contexts: EguiContexts, mut applied: Local<bool>) {
     let json = format!(
         r#"{{"applied":true,"fonts":["lilita-one","poppins"],"display_family":"{FAMILY_DISPLAY}","timestamp_secs":{ts}}}"#
     );
-    if let Err(e) = std::fs::write("forgia2_ui_theme.json", json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_ui_theme.json", json) {
         warn!("[forge-theme] sensor write failed: {e}");
     }
     info!("[forge-theme] fonts + style Forge appliqués (Lilita One / Poppins)");

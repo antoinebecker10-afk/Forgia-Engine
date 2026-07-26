@@ -744,7 +744,7 @@ pub fn write_pause_menu_sensor(
         settings.vsync,
         present_mode,
     );
-    let _ = fs::write("forgia_pause_menu.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_pause_menu.json", json);
 }
 
 // ─── Plugin ───────────────────────────────────────────────────────────
