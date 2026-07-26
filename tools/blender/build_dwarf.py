@@ -73,6 +73,9 @@ ARM_DROP_DEG = 62.0  # A-pose : bras construits en T puis rabattus
 R_THIGH = 0.098
 R_CALF = 0.086
 R_ANKLE = 0.062
+EYE_Z = 1.258  # mi-hauteur du crâne (1.070 → 1.446) — règle de proportion
+EYE_X = 0.072  # règle des cinq yeux : l'écart entre les yeux = une largeur d'œil
+EYE_R = 0.036
 R_HEAD_U = 0.170  # demi-largeur crâne (X)
 R_HEAD_V = 0.160  # demi-profondeur crâne (Y)
 R_HEAD_W = 0.185  # demi-hauteur crâne (Z)
@@ -101,6 +104,7 @@ PALETTE = {
     "brass": ((0.48, 0.26, 0.08, 1.0), 0.85, 0.38),
     "glass": ((0.06, 0.09, 0.11, 1.0), 0.10, 0.18),
     "eye": ((0.05, 0.04, 0.06, 1.0), 0.00, 0.30),
+    "mouth": ((0.09, 0.03, 0.035, 1.0), 0.00, 0.58),
     "eye_white": ((0.86, 0.83, 0.79, 1.0), 0.00, 0.50),
     "tunic": ((0.29, 0.09, 0.09, 1.0), 0.00, 0.78),
     "trouser": ((0.16, 0.14, 0.18, 1.0), 0.00, 0.80),
@@ -281,6 +285,89 @@ def g_tube(axis, sections, n=RING_SEGMENTS, cap_start=True, cap_end=True):
     return verts, faces
 
 
+def g_planar_tube(axis, sections, n=28, sides=8, planar=0.5, cap_start=True, cap_end=True):
+    """Tube à section POLYGONALE adoucie — donne des PLANS, pas une révolution.
+
+    Principe Asaro : un visage est fait de plans qui accrochent la lumière
+    différemment, et c'est la cassure entre eux qui crée la valeur. Une section
+    circulaire ne produit aucune cassure, d'où l'aspect « plat » quel que soit
+    le sculpt appliqué ensuite.
+
+    Le rayon est ramené vers celui d'un polygone régulier à `sides` côtés :
+    `planar=0` garde l'ellipse, `1` donne le polygone franc. La phase est calée
+    pour qu'un plan soit CENTRÉ sur l'avant (+Y) — le plan du visage.
+    """
+    ti, ui, vi = AXES[axis]
+    step = 2.0 * pi / sides
+    phase = pi / 2.0 - step / 2.0
+    apothem = cos(step / 2.0)
+    verts, faces = [], []
+    for t, cu, cv, ru, rv in sections:
+        for k in range(n):
+            a = 2.0 * pi * k / n
+            local = ((a - phase) % step) - step / 2.0
+            mod = 1.0 + planar * (apothem / cos(local) - 1.0)
+            p = [0.0, 0.0, 0.0]
+            p[ti], p[ui], p[vi] = t, cu + ru * mod * cos(a), cv + rv * mod * sin(a)
+            verts.append(tuple(p))
+    for s in range(len(sections) - 1):
+        b0, b1 = s * n, (s + 1) * n
+        for k in range(n):
+            k2 = (k + 1) % n
+            faces.append((b0 + k, b0 + k2, b1 + k2, b1 + k))
+    for cap, sec, base in ((cap_start, sections[0], 0), (cap_end, sections[-1], (len(sections) - 1) * n)):
+        if not cap:
+            continue
+        t, cu, cv, _, _ = sec
+        centre = len(verts)
+        p = [0.0, 0.0, 0.0]
+        p[ti], p[ui], p[vi] = t, cu, cv
+        verts.append(tuple(p))
+        for k in range(n):
+            faces.append((centre, base + k, base + (k + 1) % n))
+    return verts, faces
+
+
+def g_cloth(axis, sections, n=24, folds=8, depth=0.045, twist=0.55, cap_start=True, cap_end=True):
+    """Tube d'ÉTOFFE : rayon modulé angulairement pour créer de vrais plis.
+
+    Un cylindre lisse lit « plastique » quelle que soit sa texture — c'est le
+    pli qui fait le tissu. La phase dérive avec la hauteur (`twist`) pour que
+    les plis serpentent au lieu d'être des cannelures verticales rigides.
+
+    Demande plus de segments qu'un tube ordinaire : sous ~20, le pli devient un
+    polygone et non une ondulation.
+    """
+    ti, ui, vi = AXES[axis]
+    t_first, t_last = sections[0][0], sections[-1][0]
+    span = (t_last - t_first) or 1.0
+    verts, faces = [], []
+    for t, cu, cv, ru, rv in sections:
+        f = (t - t_first) / span
+        for k in range(n):
+            a = 2.0 * pi * k / n
+            mod = 1.0 + depth * sin(folds * a + twist * 2.0 * pi * f)
+            p = [0.0, 0.0, 0.0]
+            p[ti], p[ui], p[vi] = t, cu + ru * mod * cos(a), cv + rv * mod * sin(a)
+            verts.append(tuple(p))
+    for s in range(len(sections) - 1):
+        b0, b1 = s * n, (s + 1) * n
+        for k in range(n):
+            k2 = (k + 1) % n
+            faces.append((b0 + k, b0 + k2, b1 + k2, b1 + k))
+    for cap, sec, base in ((cap_start, sections[0], 0), (cap_end, sections[-1], (len(sections) - 1) * n)):
+        if not cap:
+            continue
+        t, cu, cv, _, _ = sec
+        centre = len(verts)
+        p = [0.0, 0.0, 0.0]
+        p[ti], p[ui], p[vi] = t, cu, cv
+        verts.append(tuple(p))
+        for k in range(n):
+            faces.append((centre, base + k, base + (k + 1) % n))
+    return verts, faces
+
+
 def g_ellipsoid(center, radii, n=RING_SEGMENTS, rings=9, zmin=None, zmax=None):
     """Ellipsoïde à pôles. `zmin`/`zmax` coupent (dôme de casque, paupière)."""
     cx, cy, cz = center
@@ -406,6 +493,167 @@ def _temp_object(name, geom):
     return obj
 
 
+# ============================================================================
+# SCULPT PROGRAMMATIQUE
+# Le mode sculpt de Blender exige un viewport (inaccessible en headless), mais
+# une brosse n'est que de l'arithmétique sur des vertices : déplacer ceux d'une
+# zone avec une atténuation. Écrites ici, elles donnent le seul outil capable de
+# produire de l'ANATOMIE — pommette, sillon, arcade — là où l'empilement de
+# primitives ne donne que des volumes.
+# ============================================================================
+
+
+def _falloff(distance, radius):
+    if distance >= radius:
+        return 0.0
+    t = 1.0 - distance / radius
+    return t * t * (3.0 - 2.0 * t)  # smoothstep : pas de cassure au bord
+
+
+def _vertex_normals(geom):
+    verts, faces = geom
+    acc = [Vector((0.0, 0.0, 0.0)) for _ in verts]
+    for face in faces:
+        a, b, c = (Vector(verts[face[0]]), Vector(verts[face[1]]), Vector(verts[face[2]]))
+        normal = (b - a).cross(c - a)
+        for idx in face:
+            acc[idx] += normal
+    return [n.normalized() if n.length > 1e-9 else Vector((0.0, 0.0, 1.0)) for n in acc]
+
+
+def g_subdivide(geom, levels=1):
+    """Densifie avant sculpt : une brosse ne peut pas créer de détail plus fin
+    que la maille sur laquelle elle s'applique."""
+    obj = _temp_object("subdiv_src", geom)
+    mod = obj.modifiers.new("subsurf", "SUBSURF")
+    mod.levels = mod.render_levels = levels
+    bpy.context.view_layer.update()
+    deps = bpy.context.evaluated_depsgraph_get()
+    baked = bpy.data.meshes.new_from_object(obj.evaluated_get(deps))
+    out = (
+        [tuple(v.co) for v in baked.vertices],
+        [tuple(p.vertices) for p in baked.polygons],
+    )
+    bpy.data.meshes.remove(baked)
+    mesh = obj.data
+    bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.meshes.remove(mesh)
+    return out
+
+
+def s_grab(geom, center, radius, offset):
+    """Brosse GRAB : tire une zone dans une direction (menton, masse d'une joue)."""
+    origin, delta = Vector(center), Vector(offset)
+    return [
+        tuple(Vector(v) + delta * _falloff((Vector(v) - origin).length, radius))
+        for v in geom[0]
+    ], geom[1]
+
+
+def s_inflate(geom, center, radius, amount):
+    """Brosse INFLATE : gonfle (+) ou creuse (−) le long de la normale.
+
+    C'est la brosse de la pommette, du renflement de biceps, du creux de tempe.
+    """
+    origin = Vector(center)
+    out = []
+    for vert, normal in zip(geom[0], _vertex_normals(geom)):
+        pos = Vector(vert)
+        out.append(tuple(pos + normal * amount * _falloff((pos - origin).length, radius)))
+    return out, geom[1]
+
+
+def s_crease(geom, start, end, radius, depth):
+    """Brosse CREASE : creuse un sillon le long d'un segment.
+
+    Ride du front, sillon nasogénien, pli de tissu — c'est ce qui fait lire
+    « peau » et « étoffe » plutôt que « surface ».
+    """
+    pa, pb = Vector(start), Vector(end)
+    out = []
+    for vert, normal in zip(geom[0], _vertex_normals(geom)):
+        pos = Vector(vert)
+        out.append(tuple(pos - normal * depth * _falloff(_dist_to_segment(pos, pa, pb), radius)))
+    return out, geom[1]
+
+
+def g_union(*geoms):
+    """Fond des coques qui s'interpénètrent en UN volume, par unions successives.
+
+    Contrairement au remaillage voxel — essayé et abandonné, il rabote le nez et
+    facette le crâne — l'union préserve exactement les formes : elle ne fait que
+    supprimer les surfaces internes. C'est le passage de « coques qui se
+    croisent » à « une surface ».
+    """
+    result = geoms[0]
+    for geom in geoms[1:]:
+        try:
+            result = g_boolean(result, geom, operation="UNION")
+        except Exception as exc:  # une union ratée ne doit pas casser le build
+            print(f"[union] repli sur fusion simple : {exc}")
+            result = g_merge(result, geom)
+    return result
+
+
+def g_relax(geom, factor=0.35, iterations=4):
+    """Détend les vertices : adoucit les arêtes vives nées de l'union.
+
+    C'est le congé qu'un sculpteur poserait à la jonction nez/joue. Sans lui,
+    l'union laisse un pli net qui lit « collé » autant que l'interpénétration.
+    """
+    obj = _temp_object("relax_src", geom)
+    mod = obj.modifiers.new("relax", "SMOOTH")
+    mod.factor = factor
+    mod.iterations = iterations
+    bpy.context.view_layer.update()
+    deps = bpy.context.evaluated_depsgraph_get()
+    baked = bpy.data.meshes.new_from_object(obj.evaluated_get(deps))
+    out = (
+        [tuple(v.co) for v in baked.vertices],
+        [tuple(p.vertices) for p in baked.polygons],
+    )
+    bpy.data.meshes.remove(baked)
+    mesh = obj.data
+    bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.meshes.remove(mesh)
+    return out
+
+
+def g_remesh(geom, voxel=0.005, ratio=0.18):
+    """Fusionne un empilement de primitives en UNE surface continue.
+
+    C'est le plafond de réalisme du procédural par primitives : tant que le nez,
+    l'arcade et les oreilles sont des coques distinctes qui s'interpénètrent, il
+    n'existe aucune surface continue et l'œil lit « pièces assemblées ». Le
+    remaillage voxel les fond en un seul volume avec des raccords doux, façon
+    sculpt ; la décimation ramène le polycount à un budget de jeu.
+
+    À réserver aux formes ORGANIQUES : sur l'armure, le voxel arrondirait les
+    arêtes vives et mangerait les rivets.
+    """
+    obj = _temp_object("remesh_src", geom)
+    rem = obj.modifiers.new("remesh", "REMESH")
+    rem.mode = "VOXEL"
+    rem.voxel_size = voxel
+    rem.use_smooth_shade = True
+    dec = obj.modifiers.new("decimate", "DECIMATE")
+    dec.decimate_type = "COLLAPSE"
+    dec.ratio = ratio
+
+    bpy.context.view_layer.update()
+    deps = bpy.context.evaluated_depsgraph_get()
+    baked = bpy.data.meshes.new_from_object(obj.evaluated_get(deps))
+    out = (
+        [tuple(v.co) for v in baked.vertices],
+        [tuple(p.vertices) for p in baked.polygons],
+    )
+    bpy.data.meshes.remove(baked)
+    mesh = obj.data
+    bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.meshes.remove(mesh)
+    return out
+
+
 def g_boolean(base, tool, operation="DIFFERENCE"):
     """Booléen réel via le modificateur + depsgraph.
 
@@ -488,7 +736,36 @@ def g_ring_blocks(z_lo, z_hi, ru, rv, count, half_w, out, sink=0.030, phase=0.0,
     return g_merge(*parts)
 
 
-def g_cog(center, radius, half_thick, teeth, tooth_w=0.011):
+def g_braid(z_top, z_bot, cx, cy_top, cy_bot, wind_r, strand_r, turns=2.4, steps=16, n=7):
+    """Tresse RÉELLE : trois brins hélicoïdaux enroulés autour d'un axe.
+
+    Des tubes droits côte à côte ne produisent jamais un tressage — une tresse
+    est de la géométrie EN BRINS, même famille que la fourrure. Ici les brins
+    s'enroulent pour de bon, et c'est le croisement qui fait la lecture.
+
+    L'enroulement est aplati en Y (×0.55) : à section circulaire, la tresse
+    s'enfonce dans la masse de la barbe et le tressage disparaît de face.
+    """
+    strands = []
+    for k in range(3):
+        phase = 2.0 * pi * k / 3.0
+        sections = []
+        for i in range(steps + 1):
+            f = i / steps
+            angle = phase + turns * 2.0 * pi * f
+            taper = 1.0 - 0.45 * f
+            sections.append((
+                z_top + (z_bot - z_top) * f,
+                cx + wind_r * taper * cos(angle),
+                cy_top + (cy_bot - cy_top) * f + wind_r * taper * sin(angle) * 0.55,
+                strand_r * taper,
+                strand_r * taper,
+            ))
+        strands.append(g_tube("Z", sections, n=n))
+    return g_merge(*strands)
+
+
+def g_cog(center, radius, half_thick, teeth, tooth_w=0.0055):
     """Roue dentée face à +Y — motif signature de Torin, tressé dans la barbe."""
     cx, cy, cz = center
     parts = [g_tube("Y", [
@@ -498,7 +775,7 @@ def g_cog(center, radius, half_thick, teeth, tooth_w=0.011):
     for i in range(teeth):
         a = 2.0 * pi * i / teeth
         tooth = g_box(
-            (radius - 0.008, -half_thick, -tooth_w), (radius + 0.016, half_thick, tooth_w)
+            (radius - 0.006, -half_thick, -tooth_w), (radius + 0.010, half_thick, tooth_w)
         )
         parts.append(g_xform(
             tooth, Matrix.Translation(Vector((cx, cy, cz))) @ Matrix.Rotation(-a, 4, "Y")
@@ -507,8 +784,15 @@ def g_cog(center, radius, half_thick, teeth, tooth_w=0.011):
 
 
 def g_hand(x_wrist, pad=0.0):
+    return g_merge(*g_hand_parts(x_wrist, pad))
+
+
+def g_hand_parts(x_wrist, pad=0.0):
     """Main trapue : paume, rouleau de phalanges, 4 doigts de longueurs
     différentes, pouce opposé. Construite en T-pose (axe X).
+
+    Renvoie les coques SÉPARÉMENT pour permettre une union booléenne — fusionnées
+    d'office, elles ne peuvent plus être fondues en une surface continue.
 
     Partagée par le corps (`pad=0`) et par le gant (`pad>0`, coque gonflée) :
     une seule source de vérité garantit que le gant COUVRE la main qu'il masque.
@@ -536,7 +820,7 @@ def g_hand(x_wrist, pad=0.0):
             (x0 + length * 0.55, dy, Z_SHOULDER - 0.008, 0.018 + pad, 0.019 + pad),
             (x0 + length, dy, Z_SHOULDER - 0.024, 0.015 + pad, 0.016 + pad),
         ], n=8))
-    return g_merge(*parts)
+    return parts
 
 
 def g_stud_line(start, end, count, radius):
@@ -699,6 +983,90 @@ def skin(obj, arm_obj, bone_names, max_influences=4):
 # ============================================================================
 
 
+def sculpt_folds(geom, z_top, z_bot, ru, rv, count, radius, depth, phase=0.0, drift=0.35):
+    """Plis d'étoffe : des SILLONS creusés, qui dérivent en descendant.
+
+    Meilleur que la modulation de rayon de `g_cloth` : celle-ci produit des
+    cannelures régulières, alors qu'un pli réel serpente et se referme. Les deux
+    se cumulent — ondulation de fond + plis marqués par-dessus.
+    """
+    for i in range(count):
+        a0 = phase + 2.0 * pi * i / count
+        a1 = a0 + drift * (1.0 if i % 2 else -1.0)
+        geom = s_crease(
+            geom,
+            (ru * cos(a0), rv * sin(a0), z_top),
+            (ru * cos(a1), rv * sin(a1), z_bot),
+            radius, depth,
+        )
+    return geom
+
+
+def sculpt_wear(geom, ru, rv, z_lo, z_hi, count, radius, depth, seed=0.0):
+    """Bosses et éraflures : une armure de forgeron ne sort pas neuve de la malle.
+
+    Dispersion par suite du nombre d'or plutôt que par RNG — le build doit
+    rester reproductible bit à bit.
+    """
+    for i in range(count):
+        angle = 2.0 * pi * ((i * 0.61803 + seed) % 1.0)
+        f = (i * 0.4370 + seed * 0.31) % 1.0
+        geom = s_inflate(
+            geom,
+            (ru * cos(angle), rv * sin(angle), z_lo + (z_hi - z_lo) * f),
+            radius, -depth,
+        )
+    return geom
+
+
+def sculpt_face(face):
+    """Passe de sculpt du visage, d'après la référence Torin.
+
+    L'union donne une surface continue mais LISSE ; ce sont ces coups de brosse
+    qui donnent l'anatomie — pommette saillante, orbite creusée, sillon
+    nasogénien, tempe rentrée. C'est la différence entre un volume et un visage.
+
+    Densifié d'abord : une brosse ne crée pas de détail plus fin que la maille.
+    """
+    face = g_subdivide(face, 1)
+
+    # ORBITES creusées à la brosse : un bassin doux que le globe vient remplir.
+    # Remplace le booléen, qui laissait un bord franc plus large que l'œil.
+    for sx in (1.0, -1.0):
+        face = s_inflate(face, (sx * EYE_X, 0.150, EYE_Z), 0.062, -0.0165)
+    # ombre portée de l'arcade juste au-dessus des orbites
+    face = s_crease(face, (-0.112, 0.118, EYE_Z + 0.040), (0.112, 0.118, EYE_Z + 0.040), 0.024, 0.0050)
+    # le nez fondait au relax : on le repousse en avant
+    face = s_grab(face, (0.0, 0.190, 1.226), 0.052, (0.0, 0.014, 0.0))
+    # CASSURES DE PLANS (Asaro) : ce sont elles qui créent la valeur
+    for sx in (1.0, -1.0):
+        # arête front → tempe : sépare le plan frontal du plan latéral
+        face = s_crease(face, (sx * 0.132, 0.086, 1.360), (sx * 0.156, 0.028, 1.286), 0.024, 0.0045)
+        # arête pommette → mâchoire : sépare la joue avant de la joue latérale
+        face = s_crease(face, (sx * 0.138, 0.078, 1.212), (sx * 0.112, 0.048, 1.116), 0.026, 0.0050)
+        # bord de la boîte du museau (nez/lèvre supérieure)
+        face = s_crease(face, (sx * 0.052, 0.150, 1.196), (sx * 0.058, 0.132, 1.152), 0.020, 0.0038)
+    # glabelle : la ride verticale entre les sourcils, qui donne l'air buté
+    face = s_crease(face, (0.0, 0.152, 1.298), (0.0, 0.146, 1.342), 0.014, 0.0040)
+    # rides du front
+    face = s_crease(face, (-0.100, 0.132, 1.362), (0.100, 0.132, 1.362), 0.015, 0.0032)
+    face = s_crease(face, (-0.086, 0.124, 1.390), (0.086, 0.124, 1.390), 0.013, 0.0026)
+
+    for sx in (1.0, -1.0):
+        # pommette saillante, puis creux juste dessous : c'est le contraste des
+        # deux qui fait lire l'os, pas la bosse seule
+        face = s_inflate(face, (sx * 0.112, 0.108, 1.216), 0.055, 0.0090)
+        face = s_inflate(face, (sx * 0.100, 0.116, 1.158), 0.046, -0.0060)
+        # tempe rentrée
+        face = s_inflate(face, (sx * 0.150, 0.020, 1.312), 0.050, -0.0070)
+        # sillon nasogénien
+        face = s_crease(
+            face, (sx * 0.048, 0.180, 1.202), (sx * 0.084, 0.140, 1.142), 0.026, 0.0050
+        )
+    # menton poussé vers l'avant
+    return s_grab(face, (0.0, 0.128, 1.092), 0.055, (0.0, 0.010, -0.004))
+
+
 def build_body(m):
     parts = {}
 
@@ -710,22 +1078,32 @@ def build_body(m):
     # La mâchoire et les pommettes sont SCULPTÉES DANS le profil du tube, pas
     # ajoutées en boules par-dessus : des masses rapportées sur un crâne lisse
     # ressortent en verrues au lieu de structurer le visage (rendu v8).
+    # Section circulaire, volontairement : une section polygonale uniforme
+    # (essayée, planar=0.55) facette TOUT le crâne et donne un sac froissé. Les
+    # cassures de plan d'Asaro sont des lignes anatomiques PRÉCISES — elles sont
+    # portées par les `s_crease` de `sculpt_face`, pas par la section du tube.
+    # CRÂNE RESSERRÉ au-dessus de la ligne des yeux. La calotte précédente
+    # restait large jusqu'au front puis fermait d'un coup : un dôme ballon qui
+    # écrasait le visage dans le tiers inférieur. Ici elle se referme
+    # progressivement, et le point le plus large redevient les POMMETTES —
+    # c'est ce qui fait qu'on lit un visage plutôt qu'une tête d'œuf.
     skull = g_tube("Z", [
         (1.070, 0, 0.020, 0.104, 0.100),  # menton
-        (1.108, 0, 0.014, 0.152, 0.146),  # mâchoire
-        (1.152, 0, 0.008, 0.172, 0.160),  # bajoues
-        (1.196, 0, 0.004, 0.178, 0.164),  # pommettes — le point le plus large
-        (1.252, 0, -0.002, 0.174, 0.160),  # tempes
+        (1.104, 0, 0.014, 0.150, 0.144),  # mâchoire
+        (1.150, 0, 0.008, 0.174, 0.162),  # bajoues
+        (1.198, 0, 0.004, 0.180, 0.166),  # pommettes — le point le plus large
+        (1.258, 0, -0.002, 0.174, 0.160),  # ligne des yeux
         (1.320, 0, -0.008, 0.168, 0.154),  # front
-        (1.398, 0, -0.012, 0.134, 0.124),
-        (1.446, 0, -0.016, 0.060, 0.056),
+        (1.398, 0, -0.012, 0.134, 0.124),  # calotte — volontairement RONDE :
+        (1.446, 0, -0.016, 0.060, 0.056),  # resserrée, elle rendait le crâne conique
     ])
     # ORBITES CREUSÉES : booléen sur le crâne SEUL, qui est un manifold propre.
     # Les masses rapportées sont fusionnées après, sinon le solveur patine sur
     # des coquilles qui s'interpénètrent.
-    sockets = g_sided(lambda: g_ellipsoid((0.072, 0.156, 1.272), (0.046, 0.046, 0.046), rings=8))
-    skull = g_boolean(skull, sockets)
-
+    # PLUS DE BOOLÉEN D'ORBITE. Le creux booléen laissait un bord franc plus
+    # large que le globe : trous visibles tout autour, invisibles en plan pied
+    # mais criants en gros plan. L'orbite est désormais CREUSÉE À LA BROSSE dans
+    # `sculpt_face` — un creux doux, sans arête, que le globe vient remplir.
     brow = g_tube("X", [
         (-0.152, 0.050, 1.312, 0.036, 0.024),
         (-0.074, 0.104, 1.328, 0.046, 0.030),
@@ -733,11 +1111,13 @@ def build_body(m):
         (0.074, 0.104, 1.328, 0.046, 0.030),
         (0.152, 0.050, 1.312, 0.036, 0.024),
     ])
+    # Nez SURDIMENSIONNÉ à la construction : l'union puis le relax le rabotent
+    # d'environ un tiers. Le dessiner à sa taille finale le fait disparaître.
     nose = g_tube("Z", [
-        (1.180, 0, 0.150, 0.046, 0.058),
-        (1.222, 0, 0.164, 0.048, 0.062),
-        (1.268, 0, 0.128, 0.036, 0.048),
-        (1.300, 0, 0.088, 0.026, 0.036),
+        (1.166, 0, 0.158, 0.058, 0.072),
+        (1.216, 0, 0.178, 0.062, 0.080),
+        (1.264, 0, 0.138, 0.046, 0.060),
+        (1.300, 0, 0.092, 0.030, 0.042),
     ])
     # oreilles POINTUES et écartées, orientées vers le haut-dehors (réf. Torin)
     ears = g_sided(lambda: g_tube("X", [
@@ -745,31 +1125,44 @@ def build_body(m):
         (0.196, 0.000, 1.270, 0.040, 0.046),
         (0.234, 0.010, 1.312, 0.015, 0.019),
     ]))
-    # paupières : de fins BOURRELETS qui épousent l'orbite. En dôme, elles
-    # lisaient comme deux bosses posées sur le front (rendu v8).
-    lids_up = g_sided(lambda: g_tube("X", [
-        (0.036, 0.104, 1.294, 0.026, 0.014),
-        (0.072, 0.116, 1.298, 0.030, 0.016),
-        (0.108, 0.100, 1.292, 0.024, 0.013),
-    ]))
-    lids_low = g_sided(lambda: g_tube("X", [
-        (0.038, 0.100, 1.244, 0.028, 0.014),
-        (0.072, 0.110, 1.242, 0.032, 0.016),
-        (0.106, 0.098, 1.246, 0.026, 0.013),
-    ]))
+    # PAUPIÈRES EN CALOTTES qui ENVELOPPENT le globe : même centre, rayon
+    # légèrement supérieur, découpées en haut et en bas. La supérieure mord le
+    # haut de l'iris — un œil entièrement dégagé donne le regard fixe et mort.
+    # à peine plus grandes que le globe (+5 mm) : à +9 mm elles lisaient comme
+    # des casquettes rigides posées sur l'œil
+    lids_up = g_sided(lambda: g_ellipsoid(
+        (EYE_X, 0.118, EYE_Z), (EYE_R + 0.005, 0.032, EYE_R + 0.005),
+        n=18, rings=10, zmin=EYE_Z + 0.015,
+    ))
+    lids_low = g_sided(lambda: g_ellipsoid(
+        (EYE_X, 0.118, EYE_Z), (EYE_R + 0.005, 0.032, EYE_R + 0.005),
+        n=18, rings=10, zmax=EYE_Z - 0.023,
+    ))
     # SOURCILS broussailleux : c'est ce qui donne un regard. Sans eux le visage
     # n'est qu'une arcade pâle et deux points sombres perdus dedans (rendu v9).
+    # sourcils POSÉS SUR l'arcade et non devant : en avant du front ils lisaient
+    # comme deux tranches orange flottantes
     eyebrows = g_sided(lambda: g_tube("X", [
-        (0.026, 0.114, 1.316, 0.026, 0.017),
-        (0.078, 0.128, 1.324, 0.033, 0.022),
-        (0.128, 0.102, 1.310, 0.024, 0.015),
+        (0.030, 0.116, EYE_Z + 0.044, 0.019, 0.012),
+        (EYE_X + 0.004, 0.130, EYE_Z + 0.050, 0.024, 0.015),
+        (0.118, 0.108, EYE_Z + 0.040, 0.017, 0.010),
     ]))
-    whites = g_sided(lambda: g_ellipsoid((0.072, 0.112, 1.272), (0.038, 0.038, 0.038), n=14, rings=7))
-    pupils = g_sided(lambda: g_ellipsoid((0.074, 0.132, 1.271), (0.024, 0.024, 0.025), n=12, rings=6))
+    # globe APLATI en profondeur : une sphère pleine bombe hors du visage et
+    # accroche mal dès qu'on le regarde de trois quarts
+    whites = g_sided(lambda: g_ellipsoid((EYE_X, 0.118, EYE_Z), (EYE_R, 0.028, EYE_R), n=16, rings=9))
+    pupils = g_sided(lambda: g_ellipsoid(
+        (EYE_X + 0.002, 0.134, EYE_Z - 0.002), (0.021, 0.018, 0.021), n=14, rings=8
+    ))
+    # AUCUN relax ici — et c'est délibéré. Le modificateur Smooth est un outil
+    # GLOBAL : il adoucit bien les coutures de l'union, mais il aplatit du même
+    # coup le nez, l'arcade et les pommettes, puis regomme les coups de brosse.
+    # La subdivision Catmull-Clark adoucit les mêmes coutures SANS toucher aux
+    # grandes formes — c'est elle qui doit faire ce travail.
+    face = sculpt_face(g_union(skull, brow, nose, ears))
     parts["head"] = make_object(
         "head",
         [
-            (g_merge(skull, brow, nose, ears, lids_up, lids_low), m["skin"]),
+            (g_merge(face, lids_up, lids_low), m["skin"]),
             (eyebrows, m["hair"]),
             (whites, m["eye_white"]),
             (pupils, m["eye"]),
@@ -789,14 +1182,16 @@ def build_body(m):
         (1.334, 0, -0.004, R_HEAD_U + 0.016, R_HEAD_V + 0.016),
         (1.372, 0, -0.004, R_HEAD_U + 0.014, R_HEAD_V + 0.014),
     ])
+    # plus petites et bien moins profondes : à 10 cm de diamètre sur 5 cm de
+    # profondeur, elles lisaient comme deux boules de laiton posées sur le front
     rims = g_sided(lambda: g_tube("Y", [
-        (0.116, 1.353, 0.072, 0.052, 0.052),
-        (0.168, 1.353, 0.072, 0.048, 0.048),
-    ], n=14))
+        (0.128, 1.353, 0.072, 0.040, 0.040),
+        (0.164, 1.353, 0.072, 0.037, 0.037),
+    ], n=16))
     lenses = g_sided(lambda: g_tube("Y", [
-        (0.150, 1.353, 0.072, 0.041, 0.041),
-        (0.162, 1.353, 0.072, 0.041, 0.041),
-    ], n=14))
+        (0.148, 1.353, 0.072, 0.031, 0.031),
+        (0.158, 1.353, 0.072, 0.031, 0.031),
+    ], n=16))
     parts["goggles"] = make_object(
         "goggles", [(g_merge(strap, rims), m["brass"]), (lenses, m["glass"])]
     )
@@ -812,61 +1207,106 @@ def build_body(m):
     ])
     # masse : moins avancée (front à y≈0.155 au lieu de 0.208) et taillée en V,
     # sinon elle mange le plastron et lit « bavoir »
+    # rallongée jusqu'à mi-poitrine (réf. Torin) : elle s'arrêtait au-dessus du
+    # plastron et lisait « bavette » au lieu de « barbe de forgeron »
+    # la masse s'arrête à mi-parcours et CÈDE LA PLACE aux tresses : en
+    # descendant aussi bas qu'elles, elle les recouvrait entièrement et seules
+    # les pointes dépassaient
     mane = g_tube("Z", [
-        (1.155, 0, 0.014, 0.146, 0.132),
-        (1.098, 0, 0.026, 0.164, 0.140),
-        (1.020, 0, 0.030, 0.148, 0.128),
-        (0.962, 0, 0.028, 0.108, 0.096),
-        (0.918, 0, 0.024, 0.058, 0.052),
+        (1.160, 0, 0.014, 0.150, 0.136),
+        (1.100, 0, 0.028, 0.172, 0.150),
+        (1.040, 0, 0.036, 0.168, 0.144),
+        (0.995, 0, 0.038, 0.140, 0.120),
+        (0.968, 0, 0.036, 0.096, 0.084),
     ])
     # TROIS grosses tresses — une centrale, deux latérales — chacune sertie
     # d'un engrenage de laiton (réf. Torin). Les deux tresses fines à anneaux
     # d'or lisaient « breloque » ; ici c'est un attribut de forgeron.
-    side_braids = g_sided(lambda: g_tube("Z", [
-        (1.040, 0.104, 0.062, 0.044, 0.044),
-        (0.948, 0.112, 0.078, 0.041, 0.041),
-        (0.860, 0.110, 0.084, 0.030, 0.030),
-    ]))
-    mid_braid = g_tube("Z", [
-        (1.030, 0.0, 0.086, 0.050, 0.048),
-        (0.930, 0.0, 0.100, 0.046, 0.044),
-        (0.836, 0.0, 0.104, 0.032, 0.031),
-    ])
+    # BOUCHE : creusée au booléen DANS la masse de barbe, sous la moustache.
+    # Sans découpe elle serait noyée dedans — le bas du visage est entièrement
+    # couvert par la barbe à partir de z=1.160.
+    # placée SOUS la moustache, dont le bas descend à z=1.124 : au-dessus, elle
+    # était entièrement recouverte et le booléen ne servait à rien
+    mane = g_boolean(mane, g_ellipsoid((0, 0.186, 1.094), (0.056, 0.044, 0.024), rings=8))
+    mouth = g_ellipsoid((0, 0.136, 1.094), (0.050, 0.028, 0.019), n=16, rings=8)
+
+    side_braids = g_sided(
+        lambda: g_braid(1.040, 0.858, 0.100, 0.106, 0.130, 0.025, 0.021, turns=2.2)
+    )
+    mid_braid = g_braid(1.030, 0.820, 0.0, 0.130, 0.152, 0.030, 0.026, turns=2.6)
+    # engrenages POSÉS SUR les tresses et nettement plus petits : centrés devant
+    # la masse et surdimensionnés, ils masquaient toute la barbe
+    # replacés sur le relief réel des nouvelles tresses, qui saillent davantage
+    # posés PILE à la jonction masse/tresse : ils tiennent la tresse et masquent
+    # la couture, exactement le rôle qu'ils ont sur la référence
     cogs = g_merge(
-        g_cog((0.0, 0.148, 0.968), 0.046, 0.011, 10),
-        g_cog((0.104, 0.124, 1.006), 0.032, 0.009, 8),
-        g_cog((-0.104, 0.124, 1.006), 0.032, 0.009, 8),
+        g_cog((0.0, 0.190, 0.978), 0.040, 0.010, 10),
+        g_cog((0.100, 0.158, 0.995), 0.027, 0.008, 8),
+        g_cog((-0.100, 0.158, 0.995), 0.027, 0.008, 8),
+    )
+    # moyeu sombre au centre : c'est LE signe qui distingue un engrenage d'une
+    # fleur. Sans lui, un disque à dents lit comme une corolle.
+    hubs = g_merge(
+        g_tube("Y", [(0.188, 0.978, 0.0, 0.015, 0.015), (0.206, 0.978, 0.0, 0.015, 0.015)], n=10),
+        g_tube("Y", [(0.156, 0.995, 0.100, 0.010, 0.010), (0.172, 0.995, 0.100, 0.010, 0.010)], n=8),
+        g_tube("Y", [(0.156, 0.995, -0.100, 0.010, 0.010), (0.172, 0.995, -0.100, 0.010, 0.010)], n=8),
     )
     parts["beard"] = make_object(
         "beard",
-        [(g_merge(mane, mustache, side_braids, mid_braid), m["hair"]), (cogs, m["brass"])],
+        [
+            (g_merge(mane, mustache, side_braids, mid_braid), m["hair"]),
+            (mouth, m["mouth"]),
+            (cogs, m["brass"]),
+            (hubs, m["steel_dark"]),
+        ],
         subsurf=SUBSURF_BODY,
     )
 
     # -- torse : tonneau + cou + bras supérieurs (masqués par le plastron) ---
-    barrel = g_tube("Z", [
+    barrel = g_cloth("Z", [
         (0.600, 0, 0, 0.180, 0.135),
         (Z_WAIST, 0, 0, 0.185, 0.135),
+        (0.790, 0, 0, 0.205, 0.142),
         (0.860, 0, 0, 0.230, 0.150),
         (Z_CHEST, 0, 0, 0.255, 0.165),
         (Z_SHOULDER, 0, 0, 0.240, 0.150),
         (1.052, 0, 0, 0.150, 0.115),
-    ])
+    ], folds=9, depth=0.042)
+    # ondulation de fond (g_cloth) + plis marqués creusés par-dessus
+    barrel = sculpt_folds(g_subdivide(barrel, 1), 1.000, 0.620, 0.226, 0.152, 6, 0.030, 0.0055)
     neck = g_tube("Z", [(1.030, 0, 0, 0.082, 0.078), (1.135, 0, 0, 0.075, 0.072)])
-    deltoids = g_sided(lambda: g_arm(g_ellipsoid((SHOULDER_X, 0, Z_SHOULDER), (0.092, 0.090, 0.088), rings=7)))
+    deltoid_one = g_ellipsoid((SHOULDER_X, 0, Z_SHOULDER), (0.092, 0.090, 0.088), rings=7)
     # Le bras supérieur se TERMINE EN FUSEAU au-delà du coude, pour finir enfoui
     # dans l'avant-bras qui l'englobe. Pas de boule de coude : une sphère de
     # rayon voisin d'un cylindre lui est tangente sur toute une zone → dents de
     # scie (rendu v3). Ici les deux surfaces se croisent en biais, net.
-    upperarms = g_sided(lambda: g_arm(g_tube("X", [
+    upperarm_one = g_tube("X", [
         (SHOULDER_X - 0.030, 0, Z_SHOULDER, R_UPPERARM, R_UPPERARM),
         (SHOULDER_X + ARM_UPPER * 0.30, 0, Z_SHOULDER, 0.084, 0.080),  # biceps
         (SHOULDER_X + ARM_UPPER * 0.72, 0, Z_SHOULDER, 0.070, 0.068),
         (SHOULDER_X + ARM_UPPER + 0.045, 0, Z_SHOULDER, 0.056, 0.056),
-    ])))
+    ])
+    # épaule + bras fondus d'un côté, puis miroités : la couture deltoïde/biceps
+    # était l'une des plus visibles du corps
+    # sculpté en T-POSE (avant `g_arm`) : les coordonnées de brosse sont alors
+    # celles du profil construit, pas celles du bras déjà rabattu
+    arm_shape = g_subdivide(g_relax(g_union(deltoid_one, upperarm_one), 0.22, 2), 1)
+    arm_shape = s_inflate(arm_shape, (SHOULDER_X + ARM_UPPER * 0.34, 0, Z_SHOULDER + 0.034), 0.068, 0.0105)
+    arm_shape = s_inflate(arm_shape, (SHOULDER_X + ARM_UPPER * 0.36, 0, Z_SHOULDER - 0.036), 0.060, 0.0070)
+    arm_shape = s_crease(
+        arm_shape,
+        (SHOULDER_X + 0.055, 0.052, Z_SHOULDER + 0.042),
+        (SHOULDER_X + 0.115, 0.020, Z_SHOULDER + 0.014),
+        0.026, 0.0042,  # insertion du deltoïde sur le biceps
+    )
+    arm_one = g_arm(arm_shape)
+    arms = g_merge(arm_one, g_mirror_x(arm_one))
     parts["torso"] = make_object(
         "torso",
-        [(barrel, m["tunic"]), (g_merge(neck, deltoids, upperarms), m["skin"])],
+        [
+            (barrel, m["tunic"]),
+            (g_merge(neck, arms), m["skin"]),
+        ],
         subsurf=SUBSURF_BODY,
     )
 
@@ -884,22 +1324,30 @@ def build_body(m):
             (x0 + ARM_FORE * 0.62, 0, Z_SHOULDER, 0.066, 0.064),
             (x0 + ARM_FORE, 0, Z_SHOULDER, 0.052, 0.050),
         ])
-        return g_arm(g_merge(fore, g_hand(x0 + ARM_FORE)))
+        # avant-bras, paume et doigts FONDUS : les jointures se voyaient
+        # (relax faible — les doigts sont fins et se rétracteraient)
+        shape = g_subdivide(g_relax(g_union(fore, *g_hand_parts(x0 + ARM_FORE)), 0.16, 2), 1)
+        shape = s_inflate(shape, (x0 + ARM_FORE * 0.26, 0, Z_SHOULDER + 0.024), 0.052, 0.0080)
+        wrist = x0 + ARM_FORE
+        for _name, dy, _length in FINGERS:  # bosses de phalanges sur le dos de la main
+            shape = s_inflate(shape, (wrist + HAND_KNUCKLE - 0.004, dy, Z_SHOULDER + 0.032), 0.019, 0.0050)
+        return g_arm(shape)
 
     parts["hands"] = make_object("hands", [(g_sided(forearm_side), m["skin"])], subsurf=SUBSURF_BODY)
 
     # -- bassin + cuisses (masqués par les jambières) ------------------------
-    hips = g_tube("Z", [
+    hips = g_cloth("Z", [
         (0.665, 0, 0, 0.184, 0.138),
         (0.580, 0, 0, 0.178, 0.134),
         (0.500, 0, 0, 0.166, 0.128),
-    ])
-    thighs = g_sided(lambda: g_tube("Z", [
+    ], folds=7, depth=0.032)
+    hips = sculpt_folds(g_subdivide(hips, 1), 0.650, 0.512, 0.176, 0.132, 5, 0.026, 0.0045, phase=0.4)
+    thighs = g_sided(lambda: g_cloth("Z", [
         (0.606, LEG_X, 0.002, 0.104, 0.102),
         (0.520, LEG_X, 0.006, 0.106, 0.104),  # quadriceps
         (0.440, LEG_X, 0.004, 0.094, 0.094),
         (0.375, LEG_X, 0.000, 0.086, 0.086),
-    ]))
+    ], folds=6, depth=0.030))
     parts["pelvis"] = make_object("pelvis", [(g_merge(hips, thighs), m["trouser"])], subsurf=SUBSURF_BODY)
 
     # -- genoux + tibias + pieds nus (masqués par les bottes) ----------------
@@ -985,6 +1433,8 @@ def build_chest(m):
         (1.000, 0, 0, 0.262, 0.172),
         (Z_SHOULDER + 0.038, 0, 0, 0.162, 0.126),
     ])
+    # bosses de martelage : un plastron de forgeron a servi
+    pectoral = sculpt_wear(g_subdivide(pectoral, 1), 0.266, 0.176, 0.912, 1.012, 7, 0.038, 0.0045)
     pect_rim = g_tube("Z", [
         (0.891, 0, 0, 0.266, 0.181), (0.902, 0, 0, 0.266, 0.181),
     ])
@@ -1126,11 +1576,12 @@ def build_gloves(m):
 
 
 def build_legs(m):
-    tassets = g_tube("Z", [
+    tassets = g_cloth("Z", [
         (Z_HIP + 0.030, 0, 0, 0.200, 0.152),
         (0.560, 0, 0, 0.228, 0.174),
         (0.478, 0, 0, 0.238, 0.182),
-    ])
+    ], folds=10, depth=0.038)
+    tassets = sculpt_folds(g_subdivide(tassets, 1), 0.642, 0.488, 0.220, 0.168, 7, 0.028, 0.0060)
     # nettement plus large que le bas des tassets (0.238) : à 4 mm d'écart les
     # deux surfaces étaient tangentes et z-fightaient (rendu v2)
     hem = g_tube("Z", [(0.480, 0, 0, 0.254, 0.198), (0.456, 0, 0, 0.250, 0.194)])

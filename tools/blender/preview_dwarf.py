@@ -94,6 +94,8 @@ def cli_args():
     parser.add_argument("--toon", action="store_true", help="appliquer le post-process du jeu")
     parser.add_argument("--silhouette", action="store_true", help="test de lisibilité à 3 distances")
     parser.add_argument("--clip", choices=sorted(dwarf_anim.CLIPS), help="planche des poses clés d'un cycle")
+    parser.add_argument("--hero", action="store_true", help="plan héros : perspective + profondeur de champ")
+    parser.add_argument("--face", action="store_true", help="gros plan du visage, corps nu, trois quarts")
     return parser.parse_args(sys.argv[sys.argv.index("--") + 1 :])
 
 
@@ -416,6 +418,144 @@ def build_clipsheet(args, body, slots, hidden):
         setup_toon_compositor(toon_params())
 
 
+def _look_at(location, target):
+    forward = (Vector(target) - Vector(location)).normalized()
+    back = -forward
+    up = Vector((0, 0, 1))
+    if abs(back.dot(up)) > 0.99:
+        up = Vector((0, 1, 0))
+    right = up.cross(back).normalized()
+    true_up = back.cross(right)
+    return Matrix((
+        (right.x, true_up.x, back.x, location[0]),
+        (right.y, true_up.y, back.y, location[1]),
+        (right.z, true_up.z, back.z, location[2]),
+        (0, 0, 0, 1),
+    ))
+
+
+def build_hero(args, body, slots, hidden):
+    """Plan « héros » : perspective, profondeur de champ, sol, 3 points.
+
+    Une partie de l'écart avec un rendu de production ne tient pas au modèle
+    mais à la MISE EN SCÈNE : un personnage posé sur un aplat, éclairé à plat,
+    ne peut pas soutenir la comparaison avec le même personnage dans un décor.
+    """
+    # rotation NÉGATIVE : le nain regarde +Y, la caméra est en +X/+Y — il faut
+    # le tourner vers +X pour qu'il présente sa face, pas son dos
+    fresh = spawn([body] + slots, (0, 0, 0), -20.0, set(hidden))
+    if not args.no_pose:
+        apply_pose(fresh)
+
+    scene = base_render_settings(args)
+    scene.render.resolution_x, scene.render.resolution_y = 1200, 1500
+    scene.cycles.samples = max(args.samples, 128)
+
+    ground = bpy.data.meshes.new("ground")
+    ground.from_pydata([(-14, -14, 0), (14, -14, 0), (14, 14, 0), (-14, 14, 0)], [], [(0, 1, 2, 3)])
+    ground.update()
+    mat = bpy.data.materials.new("ground")
+    mat.use_nodes = True
+    bsdf = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    bsdf.inputs["Base Color"].default_value = (0.055, 0.052, 0.048, 1.0)
+    bsdf.inputs["Roughness"].default_value = 0.92
+    ground.materials.append(mat)
+    scene.collection.objects.link(bpy.data.objects.new("ground", ground))
+
+    world = bpy.data.worlds.new("hero")
+    scene.world = world
+    world.use_nodes = True
+    for node in world.node_tree.nodes:
+        if node.type == "BACKGROUND":
+            node.inputs[0].default_value = (0.10, 0.11, 0.14, 1.0)
+            node.inputs[1].default_value = 0.55
+
+    key = bpy.data.objects.new("key", bpy.data.lights.new("key", "AREA"))
+    # Watts, pas facteurs : une aire de 2 m à 4 m tient dans 150-250 W. À 900 W
+    # tout partait au blanc et le travail de palette disparaissait.
+    key.data.energy = 200.0
+    key.data.size = 2.0
+    key.data.color = (1.0, 0.93, 0.84)
+    key.matrix_world = _look_at((2.6, 2.9, 2.6), (0.0, 0.0, 0.95))
+    scene.collection.objects.link(key)
+
+    rim = bpy.data.objects.new("rim", bpy.data.lights.new("rim", "AREA"))
+    rim.data.energy = 260.0
+    rim.data.size = 1.4
+    rim.data.color = (1.0, 0.52, 0.22)  # braise, détoure la silhouette
+    rim.matrix_world = _look_at((-1.9, -2.7, 1.9), (0.0, 0.0, 1.0))
+    scene.collection.objects.link(rim)
+
+    fill = bpy.data.objects.new("fill", bpy.data.lights.new("fill", "AREA"))
+    fill.data.energy = 70.0
+    fill.data.size = 3.4
+    fill.data.color = (0.55, 0.68, 1.0)  # froid : creuse le volume côté ombre
+    fill.matrix_world = _look_at((-3.0, 2.4, 1.3), (0.0, 0.0, 0.8))
+    scene.collection.objects.link(fill)
+
+    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
+    cam.data.lens = 85.0
+    cam.data.dof.use_dof = True
+    cam.data.dof.focus_distance = 4.35
+    cam.data.dof.aperture_fstop = 2.4
+    cam.matrix_world = _look_at((1.45, 4.05, 1.06), (0.0, 0.0, 0.78))
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+
+    if args.toon:
+        setup_toon_compositor(toon_params())
+
+
+def build_face(args, body, _slots, _hidden):
+    """Gros plan du visage, corps NU, en trois quarts.
+
+    Juger un visage sur un plan pied à 100 pixels de haut — et en version
+    équipée, où le nasal du casque le recouvre — c'est sculpter à l'aveugle.
+    Le trois quarts est l'angle canonique : il montre à la fois le profil et la
+    face, donc les cassures de plan.
+    """
+    spawn([body], (0, 0, 0), 0.0, set())
+
+    scene = base_render_settings(args)
+    scene.render.resolution_x, scene.render.resolution_y = 1100, 1300
+    scene.cycles.samples = max(args.samples, 128)
+
+    world = bpy.data.worlds.new("face")
+    scene.world = world
+    world.use_nodes = True
+    for node in world.node_tree.nodes:
+        if node.type == "BACKGROUND":
+            node.inputs[0].default_value = (0.10, 0.11, 0.14, 1.0)
+            node.inputs[1].default_value = 0.5
+
+    key = bpy.data.objects.new("key", bpy.data.lights.new("key", "AREA"))
+    key.data.energy = 22.0  # à 1 m, 60 W brûlait la peau au blanc
+    key.data.size = 0.9
+    key.data.color = (1.0, 0.94, 0.86)
+    key.matrix_world = _look_at((0.85, 1.05, 1.72), (0.0, 0.06, 1.26))
+    scene.collection.objects.link(key)
+
+    rim = bpy.data.objects.new("rim", bpy.data.lights.new("rim", "AREA"))
+    rim.data.energy = 42.0
+    rim.data.size = 0.6
+    rim.data.color = (1.0, 0.55, 0.26)
+    rim.matrix_world = _look_at((-0.85, -0.75, 1.50), (0.0, 0.0, 1.24))
+    scene.collection.objects.link(rim)
+
+    fill = bpy.data.objects.new("fill", bpy.data.lights.new("fill", "AREA"))
+    fill.data.energy = 16.0
+    fill.data.size = 1.4
+    fill.data.color = (0.58, 0.70, 1.0)
+    fill.matrix_world = _look_at((-1.10, 0.95, 1.15), (0.0, 0.0, 1.20))
+    scene.collection.objects.link(fill)
+
+    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
+    cam.data.lens = 90.0
+    cam.matrix_world = _look_at((0.46, 1.02, 1.34), (0.0, 0.04, 1.235))
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+
+
 def main():
     args = cli_args()
     for obj in list(bpy.data.objects):
@@ -424,7 +564,11 @@ def main():
     root = args.dir.resolve()
     body, slots, hidden = load_manifest(root)
 
-    if args.silhouette:
+    if args.face:
+        build_face(args, body, slots, hidden)
+    elif args.hero:
+        build_hero(args, body, slots, hidden)
+    elif args.silhouette:
         build_silhouette(args, body, slots, hidden)
     elif args.clip:
         build_clipsheet(args, body, slots, hidden)
