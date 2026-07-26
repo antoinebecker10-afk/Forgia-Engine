@@ -108,6 +108,13 @@ pub struct CastleLighting {
     /// bas à gauche, glTF en haut à gauche : impossible de trancher sans lancer
     /// le jeu. Si les lightmaps sortent retournées, c'est **cette** valeur.
     pub lightmaps_flip_v: bool,
+    /// Gain appliqué à la lumière cuite (`StandardMaterial::lightmap_exposure`).
+    ///
+    /// 🚨 Ses valeurs cuites ont une **médiane de 0,05** ; l'ambiante Bevy qu'elles
+    /// remplacent valait **400**. Les deux moteurs ne comptent pas dans la même
+    /// unité, et à gain 1 (le défaut de Bevy) la lumière cuite ne pèse rien : le
+    /// Hall devient noir. Ce facteur fait le pont.
+    pub lightmaps_exposure: f32,
 }
 
 impl Default for CastleLighting {
@@ -133,6 +140,8 @@ impl Default for CastleLighting {
             env_intensity: 900.0,
             lightmaps_enabled: true,
             lightmaps_flip_v: false,
+            // 400 (l'ambiante remplacée) / 0,05 (la médiane cuite) = 8000.
+            lightmaps_exposure: 8000.0,
         }
     }
 }
@@ -188,6 +197,7 @@ impl CastleLighting {
             env_intensity: environment.intensity.unwrap_or(base.env_intensity),
             lightmaps_enabled: lightmaps.enabled.unwrap_or(base.lightmaps_enabled),
             lightmaps_flip_v: lightmaps.flip_v.unwrap_or(base.lightmaps_flip_v),
+            lightmaps_exposure: lightmaps.exposure.unwrap_or(base.lightmaps_exposure),
         }
     }
 
@@ -215,6 +225,7 @@ struct LightingToml {
 struct LightmapsToml {
     enabled: Option<bool>,
     flip_v: Option<bool>,
+    exposure: Option<f32>,
 }
 
 #[derive(Deserialize, Default)]

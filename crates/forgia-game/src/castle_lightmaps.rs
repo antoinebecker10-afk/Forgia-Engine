@@ -95,6 +95,16 @@ struct LightmapStats {
     elapsed_secs: f32,
     /// Valeur de `flip_v` réellement posée, pour détecter un changement à chaud.
     applied_flip_v: bool,
+    /// Gain réellement posé sur les matériaux, même usage.
+    applied_exposure: f32,
+    /// Matériaux du château auxquels le gain a été appliqué. Les pièces partagent
+    /// une poignée de matériaux : on les tient pour ne pas re-parcourir la scène.
+    materials: Vec<AssetId<StandardMaterial>>,
+    /// Dernier état **dans le Hall**, conservé après en être sorti.
+    ///
+    /// 🚨 Sans ça, un capteur écrasé chaque seconde ne montre plus rien dès qu'on
+    /// quitte le Hall — et « regarde » arrive presque toujours après en être sorti.
+    last_active: Option<(f32, u32, usize)>,
 }
 
 // ─── Plugin ──────────────────────────────────────────────────────────────────
@@ -109,7 +119,12 @@ impl Plugin for CastleLightmapsPlugin {
             .add_systems(OnExit(GameMode::CastleHub), sys_cleanup)
             .add_systems(
                 Update,
-                (sys_mark_pieces, sys_apply_lightmaps, sys_follow_flip)
+                (
+                    sys_mark_pieces,
+                    sys_apply_lightmaps,
+                    sys_follow_flip,
+                    sys_follow_exposure,
+                )
                     .chain()
                     .run_if(in_state(GameMode::CastleHub)),
             )
@@ -176,7 +191,7 @@ fn sys_apply_lightmaps(
     time: Res<Time<Real>>,
     q_pending: Query<(Entity, &NeedsLightmap)>,
     q_children: Query<&Children>,
-    q_mesh: Query<(), With<Mesh3d>>,
+    q_mesh: Query<&MeshMaterial3d<StandardMaterial>, With<Mesh3d>>,
     mut scratch: Local<Vec<Entity>>,
 ) {
     stats.elapsed_secs += time.delta_secs();
@@ -192,11 +207,17 @@ fn sys_apply_lightmaps(
         while cursor < scratch.len() && scratch.len() < MAX_SUBTREE_NODES {
             let current = scratch[cursor];
             cursor += 1;
-            if q_mesh.contains(current) {
+            if let Ok(material) = q_mesh.get(current) {
                 commands.entity(current).insert((
                     lightmap_for(image.clone(), needs.0.uv, tuning.lightmaps_flip_v),
                     CastleLightmapped,
                 ));
+                // Les pièces partagent une poignée de matériaux : on note l'id une
+                // fois, le gain leur sera posé par `sys_follow_exposure`.
+                let id = material.id();
+                if !stats.materials.contains(&id) {
+                    stats.materials.push(id);
+                }
                 applied = true;
             }
             if let Ok(children) = q_children.get(current) {
@@ -236,6 +257,34 @@ fn sys_follow_flip(
             uv_rect: flipped,
             bicubic_sampling: false,
         });
+    }
+}
+
+/// Pose le gain sur les matériaux du château, et le suit à chaud.
+///
+/// 🚨 Sans lui, la lumière cuite est invisible. Ses valeurs ont une médiane de
+/// 0,05 quand l'ambiante Bevy qu'elles remplacent valait 400 : au gain 1 par
+/// défaut de Bevy, poser les lightmaps **assombrit** le Hall au lieu de l'éclairer,
+/// puisqu'on a coupé l'ambiante, le diffus de l'éclairage par image et le soleil
+/// sur la géométrie cuite.
+fn sys_follow_exposure(
+    tuning: Res<crate::castle_flames::CastleLighting>,
+    mut stats: ResMut<LightmapStats>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut known: Local<usize>,
+) {
+    let target = tuning.lightmaps_exposure.max(0.0);
+    // Rien à faire tant que ni le réglage ni la liste de matériaux n'ont bougé —
+    // toucher un matériau le marque modifié et relance sa préparation GPU.
+    if stats.applied_exposure == target && *known == stats.materials.len() {
+        return;
+    }
+    stats.applied_exposure = target;
+    *known = stats.materials.len();
+    for id in &stats.materials {
+        if let Some(material) = materials.get_mut(*id) {
+            material.lightmap_exposure = target;
+        }
     }
 }
 
@@ -281,7 +330,7 @@ fn sys_write_sensor(
     game_mode: Res<State<GameMode>>,
     tuning: Res<crate::castle_flames::CastleLighting>,
     table: Res<LightmapTable>,
-    stats: Res<LightmapStats>,
+    mut stats: ResMut<LightmapStats>,
     q_pending: Query<(), With<NeedsLightmap>>,
 ) {
     let now = time.elapsed_secs();
@@ -291,6 +340,18 @@ fn sys_write_sensor(
     *next_write = now + SENSOR_PERIOD_SECS;
 
     let in_hub = matches!(game_mode.get(), GameMode::CastleHub);
+    // 🚨 Retenir le dernier état DANS le Hall. Un capteur écrasé chaque seconde
+    // ne montre plus rien dès qu'on en sort — or on regarde presque toujours
+    // après coup, une fois la capture prise et le Hall quitté.
+    if in_hub && stats.applied > 0 {
+        stats.last_active = Some((now, stats.applied, table.atlases.len()));
+    }
+    let last_active = match stats.last_active {
+        Some((at, applied, atlases)) => {
+            format!(r#"{{"timestamp_secs":{at:.1},"applied":{applied},"atlases":{atlases}}}"#)
+        }
+        None => "null".to_string(),
+    };
     let pending = q_pending.iter().count() as u32;
     let (severity, next_step) = severity_for_lightmaps(
         in_hub,
@@ -300,12 +361,14 @@ fn sys_write_sensor(
         stats.elapsed_secs,
     );
     let json = format!(
-        r#"{{"id":"castle_lightmaps","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{now:.1},"in_hub":{in_hub},"enabled":{},"known":{},"applied":{},"pending":{pending},"atlases":{},"flip_v":{}}}"#,
+        r#"{{"id":"castle_lightmaps","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{now:.1},"in_hub":{in_hub},"enabled":{},"known":{},"applied":{},"pending":{pending},"atlases":{},"flip_v":{},"exposure":{:.0},"materials":{},"last_active":{last_active}}}"#,
         tuning.lightmaps_enabled,
         table.by_node.len(),
         stats.applied,
         table.atlases.len(),
         tuning.lightmaps_flip_v,
+        stats.applied_exposure,
+        stats.materials.len(),
     );
     let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 }

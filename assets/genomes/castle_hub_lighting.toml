@@ -86,6 +86,14 @@ enabled = true
 # d'une fenêtre au sol au lieu du mur), c'est CETTE valeur qu'il faut inverser.
 # Relu à chaud : le changement s'applique sans quitter le Hall.
 flip_v = false
+# 🚨 LE réglage qui décide si on voit quelque chose. Ses valeurs cuites ont une
+# médiane de 0,05, alors que l'ambiante Bevy qu'elles remplacent valait 400 : les
+# deux moteurs ne comptent pas dans la même unité. Au gain 1 (le défaut de Bevy),
+# poser les lightmaps ASSOMBRIT le Hall — on a coupé l'ambiante, le diffus de
+# l'éclairage par image et le soleil sur la géométrie cuite, et rien ne les
+# remplace. 8000 = 400 / 0,05, le facteur qui rétablit l'équivalence.
+# Monte-le si l'intérieur reste noir, baisse-le s'il crame.
+exposure = 8000.0
 
 [environment]
 # Éclairage par image. Forgia n'en avait AUCUN : `EnvironmentMapLight` n'était
