@@ -1,1 +1,752 @@
-{"asset":{"generator":"Khronos glTF Blender I/O v5.0.21","version":"2.0"},"extensionsUsed":["KHR_materials_specular","KHR_materials_ior","KHR_texture_transform"],"extensionsRequired":["KHR_texture_transform"],"scene":0,"scenes":[{"name":"Scene","nodes":[0,1,2,3,4]}],"nodes":[{"mesh":0,"name":"SM_MOD_column_02_castle_LOD0.004","rotation":[5.645781129715033e-05,-0.0039714002050459385,-0.0038049055729061365,0.999984860420227],"translation":[63.25751876831055,11.32159423828125,-97.1678466796875]},{"mesh":1,"name":"SM_ENV_cliff_castle_02_LOD0.007","rotation":[-0.001766738947480917,-0.6900725960731506,-0.13566958904266357,0.7109082341194153],"scale":[6.004493713378906,6.00449275970459,6.004494667053223],"translation":[43.848514556884766,-27.63140869140625,-107.64785766601562]},{"mesh":1,"name":"SM_ENV_cliff_castle_02_LOD0.008","rotation":[0.6617580652236938,-0.49128368496894836,-0.409738689661026,0.39093586802482605],"scale":[2.0546841621398926,2.0546844005584717,2.05468487739563],"translation":[51.02851486206055,1.6885986328125,-102.48785400390625]},{"mesh":2,"name":"SM_ENV_tree_castle_01_LOD0.010","rotation":[0.009934142231941223,-0.7598230242729187,-0.010624062269926071,0.6499672532081604],"scale":[0.9027699828147888,0.9027698636054993,0.9027699828147888],"translation":[55.871517181396484,13.018600463867188,-110.16986083984375]},{"mesh":0,"name":"SM_MOD_column_02_castle_LOD0.142","rotation":[0,0.08036885410547256,0,0.9967651963233948],"translation":[58.45651626586914,11.121597290039062,-97.51185607910156]}],"materials":[{"doubleSided":true,"name":"M_TRIM_castle","normalTexture":{"index":0,"scale":4},"pbrMetallicRoughness":{"baseColorTexture":{"index":1},"metallicRoughnessTexture":{"index":2}}},{"doubleSided":true,"name":"M_CliffGrassVC","normalTexture":{"extensions":{"KHR_texture_transform":{"offset":[0,-6],"scale":[7,7]}},"index":3,"scale":0.6000000238418579},"pbrMetallicRoughness":{"metallicFactor":0,"roughnessFactor":0.9200000166893005}},{"doubleSided":true,"extensions":{"KHR_materials_specular":{"specularFactor":0},"KHR_materials_ior":{"ior":1.4500000476837158}},"name":"M_ENV_tree_wood_castle","normalTexture":{"index":4,"scale":2},"pbrMetallicRoughness":{"baseColorFactor":[1,1,1,1],"baseColorTexture":{"index":5},"metallicRoughnessTexture":{"index":6}}},{"alphaMode":"MASK","doubleSided":true,"extensions":{"KHR_materials_specular":{"specularFactor":0},"KHR_materials_ior":{"ior":1.4500000476837158}},"name":"M_ENV_tree_leaves_castle_01","pbrMetallicRoughness":{"baseColorFactor":[0.08437485992908478,0.39157116413116455,0.028426364064216614,1],"baseColorTexture":{"index":7},"metallicFactor":0,"roughnessFactor":0}}],"meshes":[{"name":"Cube.3213","primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"indices":4,"material":0}]},{"name":"SM_ENV_cliff_castle_02_instantmeshesexp_02.004","primitives":[{"attributes":{"POSITION":5,"NORMAL":6,"TEXCOORD_0":7,"TEXCOORD_1":8,"COLOR_0":9},"indices":10,"material":1}]},{"name":"Cylinder.294","primitives":[{"attributes":{"POSITION":11,"NORMAL":12,"TEXCOORD_0":13,"TEXCOORD_1":14,"COLOR_0":15,"COLOR_1":16},"indices":17,"material":2},{"attributes":{"POSITION":18,"NORMAL":19,"TEXCOORD_0":20,"TEXCOORD_1":21,"COLOR_0":22,"COLOR_1":23},"indices":24,"material":3}]}],"textures":[{"sampler":0,"source":0},{"sampler":0,"source":1},{"sampler":0,"source":2},{"sampler":0,"source":3},{"sampler":0,"source":4},{"sampler":0,"source":5},{"sampler":0,"source":6},{"sampler":0,"source":7}],"images":[{"mimeType":"image/png","name":"T_TRIM_castle_01_N","uri":"textures/T_TRIM_castle_01_N.png"},{"mimeType":"image/png","name":"T_TRIM_castle_01_BC","uri":"textures/T_TRIM_castle_01_BC.png"},{"mimeType":"image/png","name":"T_TRIM_castle_01_PBR","uri":"textures/T_TRIM_castle_01_PBR.png"},{"mimeType":"image/png","name":"T_ENV_cliff_castle_01_N","uri":"textures/T_ENV_cliff_castle_01_N.png"},{"mimeType":"image/png","name":"T_ENV_wood_castle_01_N","uri":"textures/T_ENV_wood_castle_01_N.png"},{"mimeType":"image/png","name":"T_ENV_wood_castle_01_BC","uri":"textures/T_ENV_wood_castle_01_BC.png"},{"mimeType":"image/png","name":"T_ENV_wood_castle_01_PBR","uri":"textures/T_ENV_wood_castle_01_PBR.png"},{"mimeType":"image/png","name":"T_ENV_tree_leaves_castle_01","uri":"textures/T_ENV_tree_leaves_castle_01.png"}],"accessors":[{"bufferView":0,"componentType":5126,"count":509,"max":[0.39473864436149597,1.2359495162963867,0.39473864436149597],"min":[-0.39473864436149597,-0.12311287224292755,-0.39473864436149597],"type":"VEC3"},{"bufferView":1,"componentType":5126,"count":509,"type":"VEC3"},{"bufferView":2,"componentType":5126,"count":509,"type":"VEC2"},{"bufferView":3,"componentType":5126,"count":509,"type":"VEC2"},{"bufferView":4,"componentType":5123,"count":2112,"type":"SCALAR"},{"bufferView":5,"componentType":5126,"count":4265,"max":[5.037600517272949,6.843289375305176,3.3966786861419678],"min":[-5.224124431610107,-6.786053657531738,-3.7081243991851807],"type":"VEC3"},{"bufferView":6,"componentType":5126,"count":4265,"type":"VEC3"},{"bufferView":7,"componentType":5126,"count":4265,"type":"VEC2"},{"bufferView":8,"componentType":5126,"count":4265,"type":"VEC2"},{"bufferView":9,"componentType":5126,"count":4265,"type":"VEC3"},{"bufferView":10,"componentType":5123,"count":22374,"type":"SCALAR"},{"bufferView":11,"componentType":5126,"count":1275,"max":[3.5537283420562744,9.484169960021973,3.4337213039398193],"min":[-3.0713250637054443,-1.0320329666137695,-2.8968093395233154],"type":"VEC3"},{"bufferView":12,"componentType":5126,"count":1275,"type":"VEC3"},{"bufferView":13,"componentType":5126,"count":1275,"type":"VEC2"},{"bufferView":14,"componentType":5126,"count":1275,"type":"VEC2"},{"bufferView":15,"componentType":5126,"count":1275,"type":"VEC3"},{"bufferView":16,"componentType":5123,"count":1275,"normalized":true,"type":"VEC4"},{"bufferView":17,"componentType":5123,"count":5718,"type":"SCALAR"},{"bufferView":18,"componentType":5126,"count":1920,"max":[6.43494987487793,15.562984466552734,6.57190465927124],"min":[-5.903852462768555,4.755402088165283,-5.87698221206665],"type":"VEC3"},{"bufferView":19,"componentType":5126,"count":1920,"type":"VEC3"},{"bufferView":20,"componentType":5126,"count":1920,"type":"VEC2"},{"bufferView":21,"componentType":5126,"count":1920,"type":"VEC2"},{"bufferView":22,"componentType":5126,"count":1920,"type":"VEC3"},{"bufferView":23,"componentType":5123,"count":1920,"normalized":true,"type":"VEC4"},{"bufferView":24,"componentType":5123,"count":2880,"type":"SCALAR"}],"bufferViews":[{"buffer":0,"byteLength":6108,"byteOffset":0,"target":34962},{"buffer":0,"byteLength":6108,"byteOffset":6108,"target":34962},{"buffer":0,"byteLength":4072,"byteOffset":12216,"target":34962},{"buffer":0,"byteLength":4072,"byteOffset":16288,"target":34962},{"buffer":0,"byteLength":4224,"byteOffset":20360,"target":34963},{"buffer":0,"byteLength":51180,"byteOffset":24584,"target":34962},{"buffer":0,"byteLength":51180,"byteOffset":75764,"target":34962},{"buffer":0,"byteLength":34120,"byteOffset":126944,"target":34962},{"buffer":0,"byteLength":34120,"byteOffset":161064,"target":34962},{"buffer":0,"byteLength":51180,"byteOffset":195184,"target":34962},{"buffer":0,"byteLength":44748,"byteOffset":246364,"target":34963},{"buffer":0,"byteLength":15300,"byteOffset":291112,"target":34962},{"buffer":0,"byteLength":15300,"byteOffset":306412,"target":34962},{"buffer":0,"byteLength":10200,"byteOffset":321712,"target":34962},{"buffer":0,"byteLength":10200,"byteOffset":331912,"target":34962},{"buffer":0,"byteLength":15300,"byteOffset":342112,"target":34962},{"buffer":0,"byteLength":10200,"byteOffset":357412,"target":34962},{"buffer":0,"byteLength":11436,"byteOffset":367612,"target":34963},{"buffer":0,"byteLength":23040,"byteOffset":379048,"target":34962},{"buffer":0,"byteLength":23040,"byteOffset":402088,"target":34962},{"buffer":0,"byteLength":15360,"byteOffset":425128,"target":34962},{"buffer":0,"byteLength":15360,"byteOffset":440488,"target":34962},{"buffer":0,"byteLength":23040,"byteOffset":455848,"target":34962},{"buffer":0,"byteLength":15360,"byteOffset":478888,"target":34962},{"buffer":0,"byteLength":5760,"byteOffset":494248,"target":34963}],"samplers":[{"magFilter":9729,"minFilter":9987}],"buffers":[{"byteLength":500008,"uri":"cell_x1_z-4_render.bin"}]}
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.0.21",
+    "version": "2.0"
+  },
+  "extensionsUsed": [
+    "KHR_materials_specular",
+    "KHR_materials_ior",
+    "KHR_texture_transform"
+  ],
+  "extensionsRequired": [
+    "KHR_texture_transform"
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "SM_MOD_column_02_castle_LOD0.004",
+      "rotation": [
+        5.645781129715033e-05,
+        -0.0039714002050459385,
+        -0.0038049055729061365,
+        0.999984860420227
+      ],
+      "translation": [
+        63.25751876831055,
+        11.32159423828125,
+        -97.1678466796875
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "SM_ENV_cliff_castle_02_LOD0.007",
+      "rotation": [
+        -0.001766738947480917,
+        -0.6900725960731506,
+        -0.13566958904266357,
+        0.7109082341194153
+      ],
+      "scale": [
+        6.004493713378906,
+        6.00449275970459,
+        6.004494667053223
+      ],
+      "translation": [
+        43.848514556884766,
+        -27.63140869140625,
+        -107.64785766601562
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "SM_ENV_cliff_castle_02_LOD0.008",
+      "rotation": [
+        0.6617580652236938,
+        -0.49128368496894836,
+        -0.409738689661026,
+        0.39093586802482605
+      ],
+      "scale": [
+        2.0546841621398926,
+        2.0546844005584717,
+        2.05468487739563
+      ],
+      "translation": [
+        51.02851486206055,
+        1.6885986328125,
+        -102.48785400390625
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "SM_ENV_tree_castle_01_LOD0.010",
+      "rotation": [
+        0.009934142231941223,
+        -0.7598230242729187,
+        -0.010624062269926071,
+        0.6499672532081604
+      ],
+      "scale": [
+        0.9027699828147888,
+        0.9027698636054993,
+        0.9027699828147888
+      ],
+      "translation": [
+        55.871517181396484,
+        13.018600463867188,
+        -110.16986083984375
+      ]
+    },
+    {
+      "mesh": 0,
+      "name": "SM_MOD_column_02_castle_LOD0.142",
+      "rotation": [
+        0,
+        0.08036885410547256,
+        0,
+        0.9967651963233948
+      ],
+      "translation": [
+        58.45651626586914,
+        11.121597290039062,
+        -97.51185607910156
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "M_TRIM_castle",
+      "normalTexture": {
+        "index": 0,
+        "scale": 4
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "M_CliffGrassVC",
+      "normalTexture": {
+        "extensions": {
+          "KHR_texture_transform": {
+            "offset": [
+              0,
+              -6
+            ],
+            "scale": [
+              7,
+              7
+            ]
+          }
+        },
+        "index": 3,
+        "scale": 0.6000000238418579
+      },
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "roughnessFactor": 0.9200000166893005
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "M_ENV_tree_wood_castle",
+      "normalTexture": {
+        "index": 4,
+        "scale": 2
+      },
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "baseColorTexture": {
+          "index": 5
+        },
+        "metallicRoughnessTexture": {
+          "index": 6
+        }
+      }
+    },
+    {
+      "alphaMode": "MASK",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "M_ENV_tree_leaves_castle_01",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.08437485992908478,
+          0.39157116413116455,
+          0.028426364064216614,
+          1
+        ],
+        "baseColorTexture": {
+          "index": 7
+        },
+        "metallicFactor": 0,
+        "roughnessFactor": 0
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cube.3213",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "TEXCOORD_1": 3,
+            "TANGENT": 25
+          },
+          "indices": 4,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "SM_ENV_cliff_castle_02_instantmeshesexp_02.004",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 5,
+            "NORMAL": 6,
+            "TEXCOORD_0": 7,
+            "TEXCOORD_1": 8,
+            "COLOR_0": 9,
+            "TANGENT": 26
+          },
+          "indices": 10,
+          "material": 1
+        }
+      ]
+    },
+    {
+      "name": "Cylinder.294",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 11,
+            "NORMAL": 12,
+            "TEXCOORD_0": 13,
+            "TEXCOORD_1": 14,
+            "COLOR_0": 15,
+            "COLOR_1": 16,
+            "TANGENT": 27
+          },
+          "indices": 17,
+          "material": 2
+        },
+        {
+          "attributes": {
+            "POSITION": 18,
+            "NORMAL": 19,
+            "TEXCOORD_0": 20,
+            "TEXCOORD_1": 21,
+            "COLOR_0": 22,
+            "COLOR_1": 23
+          },
+          "indices": 24,
+          "material": 3
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    },
+    {
+      "sampler": 0,
+      "source": 5
+    },
+    {
+      "sampler": 0,
+      "source": 6
+    },
+    {
+      "sampler": 0,
+      "source": 7
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/png",
+      "name": "T_TRIM_castle_01_N",
+      "uri": "textures/T_TRIM_castle_01_N.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_TRIM_castle_01_BC",
+      "uri": "textures/T_TRIM_castle_01_BC.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_TRIM_castle_01_PBR",
+      "uri": "textures/T_TRIM_castle_01_PBR.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_ENV_cliff_castle_01_N",
+      "uri": "textures/T_ENV_cliff_castle_01_N.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_ENV_wood_castle_01_N",
+      "uri": "textures/T_ENV_wood_castle_01_N.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_ENV_wood_castle_01_BC",
+      "uri": "textures/T_ENV_wood_castle_01_BC.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_ENV_wood_castle_01_PBR",
+      "uri": "textures/T_ENV_wood_castle_01_PBR.png"
+    },
+    {
+      "mimeType": "image/png",
+      "name": "T_ENV_tree_leaves_castle_01",
+      "uri": "textures/T_ENV_tree_leaves_castle_01.png"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 509,
+      "max": [
+        0.39473864436149597,
+        1.2359495162963867,
+        0.39473864436149597
+      ],
+      "min": [
+        -0.39473864436149597,
+        -0.12311287224292755,
+        -0.39473864436149597
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 509,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 509,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 509,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5123,
+      "count": 2112,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 4265,
+      "max": [
+        5.037600517272949,
+        6.843289375305176,
+        3.3966786861419678
+      ],
+      "min": [
+        -5.224124431610107,
+        -6.786053657531738,
+        -3.7081243991851807
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 4265,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 4265,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 4265,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 4265,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5123,
+      "count": 22374,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5126,
+      "count": 1275,
+      "max": [
+        3.5537283420562744,
+        9.484169960021973,
+        3.4337213039398193
+      ],
+      "min": [
+        -3.0713250637054443,
+        -1.0320329666137695,
+        -2.8968093395233154
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 12,
+      "componentType": 5126,
+      "count": 1275,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 13,
+      "componentType": 5126,
+      "count": 1275,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 14,
+      "componentType": 5126,
+      "count": 1275,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 15,
+      "componentType": 5126,
+      "count": 1275,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 16,
+      "componentType": 5123,
+      "count": 1275,
+      "normalized": true,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 17,
+      "componentType": 5123,
+      "count": 5718,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 18,
+      "componentType": 5126,
+      "count": 1920,
+      "max": [
+        6.43494987487793,
+        15.562984466552734,
+        6.57190465927124
+      ],
+      "min": [
+        -5.903852462768555,
+        4.755402088165283,
+        -5.87698221206665
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 19,
+      "componentType": 5126,
+      "count": 1920,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 20,
+      "componentType": 5126,
+      "count": 1920,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 21,
+      "componentType": 5126,
+      "count": 1920,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 22,
+      "componentType": 5126,
+      "count": 1920,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 23,
+      "componentType": 5123,
+      "count": 1920,
+      "normalized": true,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 24,
+      "componentType": 5123,
+      "count": 2880,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 25,
+      "componentType": 5126,
+      "count": 509,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 26,
+      "componentType": 5126,
+      "count": 4265,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 27,
+      "componentType": 5126,
+      "count": 1275,
+      "type": "VEC4"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 6108,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 6108,
+      "byteOffset": 6108,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4072,
+      "byteOffset": 12216,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4072,
+      "byteOffset": 16288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4224,
+      "byteOffset": 20360,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 51180,
+      "byteOffset": 24584,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 51180,
+      "byteOffset": 75764,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 34120,
+      "byteOffset": 126944,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 34120,
+      "byteOffset": 161064,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 51180,
+      "byteOffset": 195184,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 44748,
+      "byteOffset": 246364,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15300,
+      "byteOffset": 291112,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15300,
+      "byteOffset": 306412,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10200,
+      "byteOffset": 321712,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10200,
+      "byteOffset": 331912,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15300,
+      "byteOffset": 342112,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10200,
+      "byteOffset": 357412,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 11436,
+      "byteOffset": 367612,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 23040,
+      "byteOffset": 379048,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 23040,
+      "byteOffset": 402088,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15360,
+      "byteOffset": 425128,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15360,
+      "byteOffset": 440488,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 23040,
+      "byteOffset": 455848,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15360,
+      "byteOffset": 478888,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5760,
+      "byteOffset": 494248,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 500008,
+      "byteLength": 8144,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 508152,
+      "byteLength": 68240,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 576392,
+      "byteLength": 20400,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 596792,
+      "uri": "cell_x1_z-4_render.bin"
+    }
+  ]
+}

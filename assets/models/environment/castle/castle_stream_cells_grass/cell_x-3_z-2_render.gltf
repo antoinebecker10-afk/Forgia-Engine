@@ -1,198 +1,211 @@
 {
-	"asset":{
-		"generator":"Khronos glTF Blender I/O v5.0.21",
-		"version":"2.0"
-	},
-	"extensionsUsed":[
-		"KHR_texture_transform"
-	],
-	"extensionsRequired":[
-		"KHR_texture_transform"
-	],
-	"scene":0,
-	"scenes":[
-		{
-			"name":"Scene",
-			"nodes":[
-				0
-			]
-		}
-	],
-	"nodes":[
-		{
-			"mesh":0,
-			"name":"SM_ENV_cliff_castle_01_LOD0.041",
-			"rotation":[
-				0.265882670879364,
-				0.3548651337623596,
-				-0.10601147264242172,
-				0.8900217413902283
-			],
-			"scale":[
-				3.757347345352173,
-				3.7573468685150146,
-				3.757347345352173
-			],
-			"translation":[
-				-83.94148254394531,
-				-66.07139587402344,
-				-42.827842712402344
-			]
-		}
-	],
-	"materials":[
-		{
-			"doubleSided":true,
-			"name":"M_CliffGrassVC",
-			"normalTexture":{
-				"extensions":{
-					"KHR_texture_transform":{
-						"offset":[
-							0,
-							-6
-						],
-						"scale":[
-							7,
-							7
-						]
-					}
-				},
-				"index":0,
-				"scale":0.6000000238418579
-			},
-			"pbrMetallicRoughness":{
-				"metallicFactor":0,
-				"roughnessFactor":0.9200000166893005
-			}
-		}
-	],
-	"meshes":[
-		{
-			"name":"SM_ENV_cliff_castle_01_instantmeshesexp_02",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":0,
-						"NORMAL":1,
-						"TEXCOORD_0":2,
-						"TEXCOORD_1":3,
-						"COLOR_0":4
-					},
-					"indices":5,
-					"material":0
-				}
-			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/png",
-			"name":"T_ENV_cliff_castle_01_N",
-			"uri":"textures/T_ENV_cliff_castle_01_N.png"
-		}
-	],
-	"accessors":[
-		{
-			"bufferView":0,
-			"componentType":5126,
-			"count":4613,
-			"max":[
-				4.855959892272949,
-				5.9515485763549805,
-				3.302274227142334
-			],
-			"min":[
-				-4.882627487182617,
-				-5.545106887817383,
-				-3.2813682556152344
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":1,
-			"componentType":5126,
-			"count":4613,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":2,
-			"componentType":5126,
-			"count":4613,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":3,
-			"componentType":5126,
-			"count":4613,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":4,
-			"componentType":5126,
-			"count":4613,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":5,
-			"componentType":5123,
-			"count":23661,
-			"type":"SCALAR"
-		}
-	],
-	"bufferViews":[
-		{
-			"buffer":0,
-			"byteLength":55356,
-			"byteOffset":0,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":55356,
-			"byteOffset":55356,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":36904,
-			"byteOffset":110712,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":36904,
-			"byteOffset":147616,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":55356,
-			"byteOffset":184520,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":47322,
-			"byteOffset":239876,
-			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
-		}
-	],
-	"buffers":[
-		{
-			"byteLength":287200,
-			"uri":"cell_x-3_z-2_render.bin"
-		}
-	]
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v5.0.21",
+    "version": "2.0"
+  },
+  "extensionsUsed": [
+    "KHR_texture_transform"
+  ],
+  "extensionsRequired": [
+    "KHR_texture_transform"
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "SM_ENV_cliff_castle_01_LOD0.041",
+      "rotation": [
+        0.265882670879364,
+        0.3548651337623596,
+        -0.10601147264242172,
+        0.8900217413902283
+      ],
+      "scale": [
+        3.757347345352173,
+        3.7573468685150146,
+        3.757347345352173
+      ],
+      "translation": [
+        -83.94148254394531,
+        -66.07139587402344,
+        -42.827842712402344
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "M_CliffGrassVC",
+      "normalTexture": {
+        "extensions": {
+          "KHR_texture_transform": {
+            "offset": [
+              0,
+              -6
+            ],
+            "scale": [
+              7,
+              7
+            ]
+          }
+        },
+        "index": 0,
+        "scale": 0.6000000238418579
+      },
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "roughnessFactor": 0.9200000166893005
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "SM_ENV_cliff_castle_01_instantmeshesexp_02",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "TEXCOORD_1": 3,
+            "COLOR_0": 4,
+            "TANGENT": 6
+          },
+          "indices": 5,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/png",
+      "name": "T_ENV_cliff_castle_01_N",
+      "uri": "textures/T_ENV_cliff_castle_01_N.png"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 4613,
+      "max": [
+        4.855959892272949,
+        5.9515485763549805,
+        3.302274227142334
+      ],
+      "min": [
+        -4.882627487182617,
+        -5.545106887817383,
+        -3.2813682556152344
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 4613,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 4613,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 4613,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 4613,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5123,
+      "count": 23661,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 4613,
+      "type": "VEC4"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 55356,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 55356,
+      "byteOffset": 55356,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 36904,
+      "byteOffset": 110712,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 36904,
+      "byteOffset": 147616,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 55356,
+      "byteOffset": 184520,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 47322,
+      "byteOffset": 239876,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 287200,
+      "byteLength": 73808,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 361008,
+      "uri": "cell_x-3_z-2_render.bin"
+    }
+  ]
 }
