@@ -540,7 +540,7 @@ fn write_skinning_weights_sensor(
         bones.len(),
         entries.join(",\n"),
     );
-    let _ = std::fs::write("forgia_skinning_weights.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_skinning_weights.json", json);
 }
 
 /// BFS descendants pour collecter les entités avec un `Mesh3d` (incluant

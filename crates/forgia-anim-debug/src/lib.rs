@@ -223,9 +223,7 @@ fn write_sensor_and_health(
         timer.overrun_accum_s,
         alert_severity,
     );
-    if let Err(e) = std::fs::write("forgia_anim_layer.json", json) {
-        warn!("[forgia-anim-debug] sensor write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue("forgia_anim_layer.json", json);
 
     // ── Health alert side-file ───────────────────────────────────────────────
     // BUG-ANIMQA-07 fix : convention V1 forgia_health.json = side-file écrit
@@ -233,7 +231,7 @@ fn write_sensor_and_health(
     // côté Claude / dev. Si severity retombe à ok, on supprime le file existant.
     if alert_severity == "ok" {
         // Best-effort delete (fail silencieux si fichier n'existe pas)
-        let _ = std::fs::remove_file("forgia_anim_layer_health.json");
+        let _ = forgia_core::sensor_io::remove("forgia_anim_layer_health.json");
     } else {
         let health_json = format!(
             r#"{{
@@ -249,9 +247,7 @@ fn write_sensor_and_health(
             ANIM_LAYER_BUDGET_US,
             timer.overrun_accum_s,
         );
-        if let Err(e) = std::fs::write("forgia_anim_layer_health.json", health_json) {
-            warn!("[forgia-anim-debug] health write failed: {e}");
-        }
+        let _ = forgia_core::sensor_io::enqueue("forgia_anim_layer_health.json", health_json);
     }
 }
 

@@ -102,7 +102,10 @@ pub fn sys_track_player_state(
     }
 }
 
-pub fn severity_for_player_state(stuck_consecutive: u32, kcc_collisions: usize) -> (&'static str, &'static str) {
+pub fn severity_for_player_state(
+    stuck_consecutive: u32,
+    kcc_collisions: usize,
+) -> (&'static str, &'static str) {
     if stuck_consecutive > 300 {
         (
             "critical",
@@ -134,10 +137,8 @@ pub fn sys_write_player_state_sensor(
     }
     *tick_accum = 0.0;
 
-    let (severity, next_step) = severity_for_player_state(
-        accum.stuck_frames_consecutive,
-        accum.last_kcc_collisions,
-    );
+    let (severity, next_step) =
+        severity_for_player_state(accum.stuck_frames_consecutive, accum.last_kcc_collisions);
 
     let json = format!(
         r#"{{"id":"player_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"position":[{:.3},{:.3},{:.3}],"velocity_planar_m_s":{:.3},"velocity_y_m_s":{:.3},"grounded":{},"kcc_collisions":{},"move_intent_planar":{:.4},"stuck_frames_consecutive":{},"stuck_events_session":{},"frames_observed":{}}}"#,
@@ -155,7 +156,7 @@ pub fn sys_write_player_state_sensor(
         accum.frames_observed,
     );
 
-    if let Err(e) = std::fs::write("forgia2_player_state.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_player_state.json", json) {
         warn!("[forgia-observability] player_state sensor write failed: {e}");
     }
 }

@@ -534,9 +534,7 @@ fn write_chunk_stream_sensor(
         coverage_state.sustained_s,
         severity,
     );
-    if let Err(e) = std::fs::write(SENSOR_PATH, json) {
-        warn!("[forgia-streaming] sensor write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 
     if severity == "ok" {
         let _ = std::fs::remove_file(HEALTH_PATH);
@@ -550,9 +548,7 @@ fn write_chunk_stream_sensor(
             coverage_state.sustained_s,
             severity,
         );
-        if let Err(e) = std::fs::write(HEALTH_PATH, health) {
-            warn!("[forgia-streaming] health write failed: {e}");
-        }
+        let _ = forgia_core::sensor_io::enqueue(HEALTH_PATH, health);
     }
 }
 

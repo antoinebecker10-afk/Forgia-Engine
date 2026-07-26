@@ -23,7 +23,6 @@
 
 use bevy::prelude::*;
 use serde::Serialize;
-use std::fs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -292,7 +291,7 @@ fn write_anchor_sensor(stats: Res<AnchorStats>, mut last_write: Local<f64>) {
     };
 
     if let Ok(json) = serde_json::to_string_pretty(&payload) {
-        let _ = fs::write(SENSOR_PATH, json);
+        let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
     }
 }
 

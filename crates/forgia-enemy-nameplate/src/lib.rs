@@ -30,7 +30,6 @@ use forgia_combat::prelude::CombatHitEvent;
 use forgia_combat::Health as CombatHealth;
 use forgia_damage::DefenseLayer;
 use std::collections::HashMap;
-use std::fs;
 
 mod tuning;
 pub use tuning::{EnemyNameplate, EnemyNameplateTuning, EnemyNameplateTuningHandle};
@@ -537,5 +536,5 @@ fn sensor_write(
         "mean_lifetime_left": mean_lifetime,
         "status": if active_count == 0 { "idle" } else { "active" },
     });
-    let _ = fs::write("forgia_enemy_nameplate.json", payload.to_string());
+    let _ = forgia_core::sensor_io::enqueue("forgia_enemy_nameplate.json", payload.to_string());
 }

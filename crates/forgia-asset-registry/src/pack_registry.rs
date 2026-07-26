@@ -188,7 +188,7 @@ pub(crate) fn write_pack_registry_sensor(
         packs_json,
         severity,
     );
-    if let Err(e) = std::fs::write(SENSOR_PATH, json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-asset-registry::packs] sensor write failed: {e}");
     }
 

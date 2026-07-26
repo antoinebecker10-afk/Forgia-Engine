@@ -29,7 +29,6 @@ use forgia_anchor::AnchorKind;
 use forgia_genome_core::{Genome, GenomeLoader};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ─── AnchorKind string mapping (helper consommé par stage-arena phase 3) ────
@@ -288,7 +287,7 @@ fn write_level_modules_sensor(
     };
 
     if let Ok(json) = serde_json::to_string_pretty(&payload) {
-        let _ = fs::write(SENSOR_PATH, json);
+        let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
     }
 }
 

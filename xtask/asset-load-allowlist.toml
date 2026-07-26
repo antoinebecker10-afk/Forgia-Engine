@@ -2,26 +2,21 @@
 #
 # Per-file budget of asset-load call-sites. CI gate : `cargo xtask asset-load`.
 # Regenerate after removing loads : `cargo xtask asset-load --fix`.
-# Baseline total : 92 (target V2 Lock L1 : <= 30).
+# Baseline total : 94 (target V2 Lock L1 : <= 30).
 #
 # Detection : .load( / .load::<> / .load_with_settings( / .load_folder( with
 # non-empty parens, excluding genome configs (genomes/, Genome<, .toml).
 
 [budgets]
-# story-652/653/655 (2026-07-03, autre terminal) — VFX texturés : sprites/atlas
-# chargés par le pipeline weapon_vfx. Entrée ajoutée pour débloquer le push
-# (gate pre-push) ; à re-serrer si le preload GameAssets absorbe ces loads.
-"crates/forgia-effects/src/weapon_vfx/mod.rs" = 10
 "crates/forgia-mode-fps-arena/src/lib.rs" = 22
+"crates/forgia-effects/src/weapon_vfx/mod.rs" = 10
 "crates/forgia-rpg/src/lib.rs" = 10
 "crates/forgia-qa-replay/src/player.rs" = 7
-"crates/forgia-stage/src/lib.rs" = 6
-"crates/forgia-village-loader/src/lib.rs" = 5
+"crates/forgia-stage/src/lib.rs" = 5
 "crates/forgia-viewmodel/src/attach.rs" = 4
 "crates/forgia-foliage/src/material_override.rs" = 3
-"crates/forgia-prefab/src/lib.rs" = 3
 "crates/forgia-terrain/src/terrain_material.rs" = 3
-"crates/forgia-anchor/src/lib.rs" = 2
+"crates/forgia-assets/src/lib.rs" = 2
 "crates/forgia-mode-roguelite/src/boss_portal.rs" = 2
 "crates/forgia-mode-roguelite/src/merchant.rs" = 2
 "crates/forgia-rpg/src/character.rs" = 2
@@ -40,6 +35,7 @@
 "crates/forgia-mode-roguelite/src/waves.rs" = 1
 "crates/forgia-mode-roguelite/src/weapon_select.rs" = 1
 "crates/forgia-observability/src/asset_handles.rs" = 1
+"crates/forgia-prefab/src/lib.rs" = 1
 "crates/forgia-qa-harness/src/test_app.rs" = 1
 "crates/forgia-rpg/src/worldgen_village.rs" = 1
 "crates/forgia-skeleton-template/src/lib.rs" = 1

@@ -112,7 +112,7 @@ pub fn sys_write_npcs_sensor(
         sanitize(&current_node),
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] npcs_sensor write failed: {e}");
     }
 }

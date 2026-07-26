@@ -1,7 +1,8 @@
 //! memory_sensor.rs — Producteur `forgia2_memory.json` (1Hz, cross-mode).
 //!
-//! Lit RAM process via `sysinfo` (refresh cooldownné 5s pour absorber ~2ms
-//! coût Windows API). VRAM = stub `"N/A"` honnête — wgpu 0.18 n'expose pas
+//! Lit RAM process via `sysinfo` sur un worker dédié (refresh cooldownné 5s).
+//! Le thread de jeu relit seulement un entier atomique : l'appel Windows ne peut
+//! donc plus provoquer de hitch. VRAM = stub `"N/A"` honnête — wgpu 0.18 n'expose pas
 //! d'API memory budget cross-backend (Vulkan/DX12/Metal divergents).
 //!
 //! Severity heuristic :
@@ -11,13 +12,53 @@
 //! Story-467 — Vague 5 Phase 5b Session B.
 
 use bevy::prelude::*;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    mpsc::{sync_channel, SyncSender},
+    Arc,
+};
+use std::thread;
 use sysinfo::System;
 
-#[derive(Default)]
 pub struct MemSensorState {
-    system: Option<System>,
-    last_refresh_secs: f32,
-    cached_ram_bytes: u64,
+    request_tx: Option<SyncSender<()>>,
+    cached_ram_bytes: Arc<AtomicU64>,
+    last_request_secs: f32,
+}
+
+impl Default for MemSensorState {
+    fn default() -> Self {
+        Self {
+            request_tx: None,
+            cached_ram_bytes: Arc::new(AtomicU64::new(0)),
+            last_request_secs: f32::NEG_INFINITY,
+        }
+    }
+}
+
+/// Démarre un worker à capacité 1 : une mesure déjà en attente n'est jamais
+/// empilée. Le PID est capturé ici (et non dans le worker), sinon `sysinfo`
+/// mesurerait le thread worker au lieu du processus jeu.
+fn start_memory_probe() -> Option<(SyncSender<()>, Arc<AtomicU64>)> {
+    let pid = sysinfo::get_current_pid().ok()?;
+    let (request_tx, request_rx) = sync_channel(1);
+    let cached_ram_bytes = Arc::new(AtomicU64::new(0));
+    let cached_for_worker = Arc::clone(&cached_ram_bytes);
+    thread::Builder::new()
+        .name("forgia-memory-probe".to_string())
+        .spawn(move || {
+            let mut system = System::new();
+            while request_rx.recv().is_ok() {
+                system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
+                let bytes = system
+                    .process(pid)
+                    .map(|process| process.memory())
+                    .unwrap_or(0);
+                cached_for_worker.store(bytes, Ordering::Relaxed);
+            }
+        })
+        .ok()?;
+    Some((request_tx, cached_ram_bytes))
 }
 
 /// Pur — extrait pour tests headless.
@@ -46,20 +87,22 @@ pub fn sys_write_memory_sensor(
     *accum = 0.0;
 
     let now = time.elapsed_secs();
-    if state.system.is_none() || now - state.last_refresh_secs > 5.0 {
-        let sys = state.system.get_or_insert_with(System::new);
-        if let Ok(pid) = sysinfo::get_current_pid() {
-            // Story-592 (M0.5, audit 2026-06-10 P1) : rafraîchir UNIQUEMENT notre
-            // process. `ProcessesToUpdate::All` énumérait tous les process Windows
-            // sur le thread de jeu → stutter métronome période 5,01 s mesuré
-            // (forgia2_lag_events.json, spikes 30-50 ms). Some(&[pid]) ≈ ~2 ms.
-            sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
-            state.cached_ram_bytes = sys.process(pid).map(|p| p.memory()).unwrap_or(0);
+    if state.request_tx.is_none() {
+        if let Some((request_tx, cached_ram_bytes)) = start_memory_probe() {
+            state.request_tx = Some(request_tx);
+            state.cached_ram_bytes = cached_ram_bytes;
         }
-        state.last_refresh_secs = now;
+    }
+    if now - state.last_request_secs > 5.0 {
+        if let Some(request_tx) = &state.request_tx {
+            // `try_send` est essentiel : le thread jeu ne patiente jamais sur
+            // l'API Windows, même si une mesure précédente est encore en cours.
+            let _ = request_tx.try_send(());
+        }
+        state.last_request_secs = now;
     }
 
-    let ram_bytes = state.cached_ram_bytes;
+    let ram_bytes = state.cached_ram_bytes.load(Ordering::Relaxed);
     let ram_mb = ram_bytes as f64 / 1024.0 / 1024.0;
     let (severity, next_step) = severity_for_memory(ram_mb);
 
@@ -70,7 +113,7 @@ pub fn sys_write_memory_sensor(
         ram_mb,
     );
 
-    if let Err(e) = std::fs::write("forgia2_memory.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_memory.json", json) {
         warn!("[forgia-observability] memory sensor write failed: {e}");
     }
 }

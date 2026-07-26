@@ -15,7 +15,6 @@ use forgia_combat::Health;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
-use std::fs;
 
 use crate::{default_arena_bots, ArenaBotsGenome, ArenaBotsGenomeHandle, ArenaMarker, TargetCube};
 
@@ -468,5 +467,5 @@ fn wave_sensor(state: Res<WaveState>, mut last_write: Local<f32>, time: Res<Time
         state.bots_total_wave,
         state.break_timer.remaining_secs(),
     );
-    let _ = fs::write("forgia_arena_waves.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_arena_waves.json", json);
 }

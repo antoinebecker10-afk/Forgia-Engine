@@ -64,9 +64,9 @@ pub fn sys_write_rpg_health_json(
 
     match serde_json::to_string_pretty(&payload) {
         Ok(json_str) => {
-            if let Err(e) = std::fs::write(OUTPUT_PATH, &json_str) {
+            if let Err(e) = forgia_core::sensor_io::enqueue(OUTPUT_PATH, json_str) {
                 if !*warned_write {
-                    warn!("[rpg-monitor] Cannot write {OUTPUT_PATH}: {e}");
+                    warn!("[rpg-monitor] Cannot enqueue {OUTPUT_PATH}: {e}");
                     *warned_write = true;
                 }
             } else {

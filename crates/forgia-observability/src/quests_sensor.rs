@@ -67,17 +67,16 @@ pub fn sys_write_quests_sensor(
                 QuestStatus::Active => {
                     active += 1;
                     if active_entries_json.len() < MAX_ACTIVE_QUESTS_DUMP {
-                        let (title, percent) = if let Some(def) =
-                            catalogue.as_ref().and_then(|c| c.defs.get(qid))
-                        {
-                            let total_target: u32 =
-                                def.objectives.iter().map(|o| o.target).sum::<u32>().max(1);
-                            let total_progress: u32 = st.progress.iter().sum();
-                            let pct = (total_progress as f32 / total_target as f32) * 100.0;
-                            (def.title.clone(), pct)
-                        } else {
-                            (qid.0.clone(), 0.0)
-                        };
+                        let (title, percent) =
+                            if let Some(def) = catalogue.as_ref().and_then(|c| c.defs.get(qid)) {
+                                let total_target: u32 =
+                                    def.objectives.iter().map(|o| o.target).sum::<u32>().max(1);
+                                let total_progress: u32 = st.progress.iter().sum();
+                                let pct = (total_progress as f32 / total_target as f32) * 100.0;
+                                (def.title.clone(), pct)
+                            } else {
+                                (qid.0.clone(), 0.0)
+                            };
                         let safe_id = sanitize_json_str(&qid.0);
                         let safe_title = sanitize_json_str(&title);
                         active_entries_json.push(format!(
@@ -119,7 +118,7 @@ pub fn sys_write_quests_sensor(
         now,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] quests_sensor write failed: {e}");
     }
 }

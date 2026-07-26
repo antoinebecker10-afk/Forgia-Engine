@@ -111,7 +111,7 @@ pub fn sys_write_rpg_player_sensor(
         depth,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] rpg_player_sensor write failed: {e}");
     }
 }

@@ -79,7 +79,7 @@ pub fn sys_write_fps_feel_sensor(
         metrics.aim_assist_engagements_total,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] fps_feel_sensor write failed: {e}");
     }
 }

@@ -198,7 +198,7 @@ pub fn sys_write_vram_sensor(
 
     match serde_json::to_string(&payload) {
         Ok(json) => {
-            if let Err(e) = std::fs::write("forgia2_vram.json", &json) {
+            if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_vram.json", json) {
                 warn!("[forgia-observability] vram sensor write failed: {e}");
             }
         }

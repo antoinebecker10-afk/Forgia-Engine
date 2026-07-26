@@ -51,7 +51,11 @@ pub fn bound_hint(frame_ms: f64, gpu_ms: f64, gpu_passes: usize) -> &'static str
     if gpu_passes == 0 {
         return "gpu_timing_unavailable";
     }
-    let ratio = if frame_ms > 0.001 { gpu_ms / frame_ms } else { 0.0 };
+    let ratio = if frame_ms > 0.001 {
+        gpu_ms / frame_ms
+    } else {
+        0.0
+    };
     if ratio >= 0.80 {
         "gpu_bound"
     } else if ratio <= 0.50 {
@@ -103,7 +107,13 @@ fn render_frame_stats(diagnostics: &DiagnosticsStore) -> (f64, f64, usize, usize
         .map(|(p, ms)| format!(r#"{{"p":"{p}","ms":{ms:.3}}}"#))
         .collect::<Vec<_>>()
         .join(",");
-    (gpu_sum_ms, cpu_sum_ms, gpu_passes, render_total, format!("[{arr}]"))
+    (
+        gpu_sum_ms,
+        cpu_sum_ms,
+        gpu_passes,
+        render_total,
+        format!("[{arr}]"),
+    )
 }
 
 pub fn sys_write_perf_sensor(
@@ -139,11 +149,19 @@ pub fn sys_write_perf_sensor(
     // CPU-bound vs GPU-bound. Décalage 1 frame (GPU frame N lu en N+1) — sans effet à 1Hz.
     let (gpu_sum_ms, render_cpu_sum_ms, gpu_passes, render_total, gpu_paths) =
         render_frame_stats(&diagnostics);
-    let gpu_ratio = if avg_ms > 0.001 { gpu_sum_ms / avg_ms } else { 0.0 };
+    let gpu_ratio = if avg_ms > 0.001 {
+        gpu_sum_ms / avg_ms
+    } else {
+        0.0
+    };
     // render_cpu_ratio : part du frame passée en encodage CPU des passes de rendu.
     // Élevé → le coût est la soumission/préparation du rendu (meshes/draw calls) ;
     // bas alors que cpu_bound → le coût est dans les systèmes gameplay (main world).
-    let render_cpu_ratio = if avg_ms > 0.001 { render_cpu_sum_ms / avg_ms } else { 0.0 };
+    let render_cpu_ratio = if avg_ms > 0.001 {
+        render_cpu_sum_ms / avg_ms
+    } else {
+        0.0
+    };
     let hint = bound_hint(avg_ms, gpu_sum_ms, gpu_passes);
 
     let (severity, next_step) = severity_for_perf(avg_ms);
@@ -164,7 +182,7 @@ pub fn sys_write_perf_sensor(
         render_cpu_ratio,
     );
 
-    if let Err(e) = std::fs::write("forgia2_perf.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_perf.json", json) {
         warn!("[forgia-observability] perf sensor write failed: {e}");
     }
 }

@@ -190,7 +190,7 @@ pub fn sys_write_qa_sensor(
         "dedup_hits": dedup_hits,
     });
 
-    if let Err(e) = std::fs::write(QA_SENSOR_PATH, json.to_string()) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(QA_SENSOR_PATH, json.to_string()) {
         warn!("[forgia-observability] qa sensor write failed: {e}");
     }
 }

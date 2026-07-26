@@ -20,6 +20,7 @@
 //! Shift+F12 : recharge `config/genomes/rpg_monitor.toml` à chaud.
 
 pub mod asset_handles;
+pub mod assets_load_sensor;
 pub mod checks;
 pub mod config;
 pub mod exporter;
@@ -37,6 +38,7 @@ pub mod audio_sensor;
 pub mod input_sensor;
 pub mod lifecycle_sensor;
 pub mod sensor_health_sensor;
+pub mod sensor_io_sensor;
 pub mod watchdog_sensor;
 // Story-520+ regression detector cross-migration. Snapshot baseline T+5s →
 // compare cross-runs → HealthAlert on drift (entity count / sensor missing /
@@ -59,6 +61,9 @@ pub mod fps_feel_sensor;
 // Story-529 Phase 1 — boons foundation (catalogue + active + tag unlocks).
 pub mod boons_sensor;
 pub mod render_sensor;
+// Story-690 — le capteur existait mais n'était jamais planifié : sans lui, une
+// hausse mémoire native ne pouvait pas être corrélée aux images/meshes chargés.
+pub mod vram_sensor;
 // Story-622 (Phase 0.2) — pont santé → bus QA (premier producteur BugReport).
 pub mod qa_bridge;
 
@@ -103,6 +108,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             .init_resource::<SensorSnapshots>()
             .init_resource::<LastWriteTimestamps>()
             .init_resource::<Forgia2AggregatorState>()
+            .init_resource::<assets_load_sensor::AssetLoadSensorState>()
             .init_resource::<lifecycle_sensor::LifecycleCounter>()
             .init_resource::<watchdog_sensor::GameTickCounter>()
             .init_resource::<migration_baseline::MigrationBaselineState>()
@@ -157,6 +163,8 @@ impl Plugin for ForgiaObservabilityPlugin {
                 perf_sensor::sys_write_perf_sensor,
                 entities_sensor::sys_write_entities_sensor,
                 memory_sensor::sys_write_memory_sensor,
+                assets_load_sensor::sys_write_assets_sensor,
+                sensor_io_sensor::sys_write_sensor_io_sensor,
             )
                 .in_set(GameSet::Sensors),
         );
@@ -198,6 +206,20 @@ impl Plugin for ForgiaObservabilityPlugin {
             Update,
             render_sensor::sys_write_render_sensor.in_set(GameSet::Sensors),
         );
+        // Diagnostic mémoire GPU/asset à cadence lente (5 s) : indispensable
+        // pour identifier les assets responsables d'une hausse RSS/VRAM sans
+        // ajouter de travail au hot path de rendu.
+        app.add_systems(
+            Update,
+            vram_sensor::sys_write_vram_sensor.in_set(GameSet::Sensors),
+        );
+        // `RpgHealthState` contient aussi les checks Roguelite RGL-*. Le fichier
+        // canonique doit donc être produit dans tous les modes : le laisser gaté
+        // RPG faisait échouer `sensor_health` pendant une run Roguelite saine.
+        app.add_systems(
+            Update,
+            sys_write_rpg_health_json.in_set(GameSet::Sensors),
+        );
         // story-622 (Phase 0.2) — réveil du bus QA : pont santé→BugReport
         // (edge-trigger sur les checks RpgHealthState) + sensor forgia2_qa.json.
         // Cross-mode (RpgHealthState peuplé par RPG via CHK-* ou Roguelite via RGL-*).
@@ -236,7 +258,6 @@ impl Plugin for ForgiaObservabilityPlugin {
                 sys_reload_config_on_hotkey,
                 sys_read_sensors_1hz,
                 sys_run_crosschecks,
-                sys_write_rpg_health_json,
                 sys_sensor_liveness_watchdog,
             )
                 .chain()

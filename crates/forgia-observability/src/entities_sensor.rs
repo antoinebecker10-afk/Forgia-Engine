@@ -70,7 +70,7 @@ pub fn sys_write_entities_sensor(
         time.elapsed_secs(),
     );
 
-    if let Err(e) = std::fs::write("forgia2_entities.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_entities.json", json) {
         warn!("[forgia-observability] entities sensor write failed: {e}");
     }
 }

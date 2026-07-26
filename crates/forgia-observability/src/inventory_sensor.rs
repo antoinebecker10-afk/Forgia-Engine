@@ -84,10 +84,8 @@ pub fn sys_write_inventory_sensor(
     let slots_free = capacity.saturating_sub(slots_used);
     let unique_item_types = counts.len();
 
-    let mut top: Vec<(ItemId, u32, u32)> = counts
-        .into_iter()
-        .map(|(id, (c, m))| (id, c, m))
-        .collect();
+    let mut top: Vec<(ItemId, u32, u32)> =
+        counts.into_iter().map(|(id, (c, m))| (id, c, m)).collect();
     top.sort_by_key(|t| std::cmp::Reverse(t.1));
     let top_json: String = top
         .iter()
@@ -123,7 +121,7 @@ pub fn sys_write_inventory_sensor(
         now,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] inventory_sensor write failed: {e}");
     }
 }

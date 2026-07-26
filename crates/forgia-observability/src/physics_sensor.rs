@@ -106,7 +106,7 @@ pub fn sys_write_physics_sensor(
         format_f32(gravity_y),
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] physics_sensor write failed: {e}");
     }
 }

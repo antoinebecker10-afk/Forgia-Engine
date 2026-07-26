@@ -478,7 +478,7 @@ fn write_village_sensor(time: Res<Time>, stats: Res<VillageStats>) {
         now, status, village_id, buildings, ramparts, roads,
         spawn_pos.x, spawn_pos.y, spawn_pos.z, missing
     );
-    let _ = std::fs::write("forgia_village.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_village.json", json);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -843,7 +843,7 @@ fn write_village_debug_sensor(
     let Some(v) = village else {
         // Pas de village = sensor minimal, status only (cohérent post-cleanup).
         let json = format!("{{\"timestamp_secs\":{:.1},\"village\":null}}", now);
-        let _ = std::fs::write("forgia_village_debug.json", json);
+        write_village_debug_json(json);
         return;
     };
 
@@ -894,5 +894,11 @@ fn write_village_debug_sensor(
         roads_json
     );
 
-    let _ = std::fs::write("forgia_village_debug.json", json);
+    write_village_debug_json(json);
+}
+
+/// Point d'écriture unique : les branches « village absent » et « village
+/// chargé » gardent le même producer, sans last-write-wins ambigu.
+fn write_village_debug_json(json: String) {
+    let _ = forgia_core::sensor_io::enqueue("forgia_village_debug.json", json);
 }

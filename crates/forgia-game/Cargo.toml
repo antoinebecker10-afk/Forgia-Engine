@@ -14,6 +14,12 @@ workspace = true
 # 1 write/bug distinct). Une story release pourra gater via `--no-default-features`.
 default = ["qa"]
 qa = ["forgia-qa-core/qa-runtime", "forgia-qa-core/qa-record"]
+# Bevy 0.18 : spans ECS et rendu exportés au client Tracy. Opt-in depuis le
+# package racine via `cargo run --features profile-tracy`.
+profile-tracy = ["bevy/trace_tracy"]
+# Inclut les spans Tracy et profile chaque allocation système. Diagnostic
+# ponctuel uniquement : ne pas l'utiliser pour statuer sur les FPS de ship.
+profile-tracy-memory = ["bevy/trace_tracy_memory"]
 
 [dependencies]
 bevy = { workspace = true }
@@ -60,6 +66,7 @@ forgia-worldgen = { workspace = true }
 # Story-581 — debug overlay dev-loop (monitor perf/mémoire/VRAM egui). La crate
 # existait (story-547) mais n'était jamais branchée dans le jeu → monitor invisible.
 forgia-debug = { workspace = true }
+forgia-editor = { workspace = true }
 # Story-602 — color grading par mode (genome TOML hot-reload).
 serde = { workspace = true }
 toml = { workspace = true }

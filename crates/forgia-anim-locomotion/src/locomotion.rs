@@ -623,16 +623,11 @@ pub fn attach_locomotion_bones(
                 fmt_bone(&bones.spine, None),
                 fmt_bone(&bones.hip, None),
             );
-            if let Err(e) = std::fs::write("forgia2_rex_bones.json", &json) {
-                warn!("[anim-locomotion] Failed to write forgia2_rex_bones.json: {e}");
-            }
+            let _ = forgia_core::sensor_io::enqueue("forgia2_rex_bones.json", json.clone());
             // Indexed per-cycle sensor — persists across RPG re-entries.
             let indexed_path = format!("forgia2_rex_bones_entry_{}_bind.json", entry_idx);
-            if let Err(e) = std::fs::write(&indexed_path, &json) {
-                warn!("[anim-locomotion] Failed to write {indexed_path}: {e}");
-            } else {
-                info!("[anim-locomotion] Bind snapshot persisted → {indexed_path}");
-            }
+            let _ = forgia_core::sensor_io::enqueue(indexed_path.clone(), json);
+            info!("[anim-locomotion] Bind snapshot queued → {indexed_path}");
             cache.bones = bones;
             cache.topology = topo;
             cache.ready = true;
@@ -1210,7 +1205,7 @@ pub fn write_rex_bones_live_sensor(
             "{{\n  \"id\":\"rex_bones_live\",\n  \"severity\":\"{}\",\n  \"next_step\":\"{}\",\n  \"timestamp_secs\":{:.4},\n  \"entry_index\":{},\n  \"state\":\"{}\",\n  \"cache_ready\":{},\n  \"frames_waited\":{},\n  \"gave_up\":{}\n}}\n",
             severity, next_step, time.elapsed_secs(), entry_idx, state_str, ready, frames_waited, gave_up
         );
-        let _ = std::fs::write(REX_BONES_LIVE_SENSOR_PATH, &payload);
+        let _ = forgia_core::sensor_io::enqueue(REX_BONES_LIVE_SENSOR_PATH, payload);
         return;
     }
     let cache = cache_opt.unwrap();
@@ -1255,12 +1250,12 @@ pub fn write_rex_bones_live_sensor(
         fmt("spine", &b.spine),
         fmt("hip", &b.hip),
     );
-    let _ = std::fs::write(REX_BONES_LIVE_SENSOR_PATH, &json);
+    let _ = forgia_core::sensor_io::enqueue(REX_BONES_LIVE_SENSOR_PATH, json.clone());
     // Indexed per-cycle live snapshot — écrasé à chaque tick mais le path
     // change quand RpgEntryCount incrémente, donc entry_1_live.json reste
     // figé sur le dernier tick du cycle 1 quand on entre dans le cycle 2.
     let indexed_path = format!("forgia2_rex_bones_entry_{}_live.json", entry_idx);
-    let _ = std::fs::write(&indexed_path, json);
+    let _ = forgia_core::sensor_io::enqueue(indexed_path, json);
 }
 
 const WALK_POSE_SENSOR_PATH: &str = "forgia2_walk_pose.json";
@@ -1289,7 +1284,7 @@ pub fn write_walk_pose_sensor(
             "{{\n  \"id\":\"walk_pose\",\n  \"severity\":\"warn\",\n  \"next_step\":\"LocomotionState absent — entrer en GameMode::Rpg pour activer locomotion\",\n  \"state\":\"no_locomotion_state\",\n  \"timestamp_secs\":{:.1}\n}}\n",
             time.elapsed_secs()
         );
-        let _ = std::fs::write(WALK_POSE_SENSOR_PATH, payload);
+        let _ = forgia_core::sensor_io::enqueue(WALK_POSE_SENSOR_PATH, payload);
         return;
     };
 
@@ -1356,9 +1351,7 @@ pub fn write_walk_pose_sensor(
         snap.bob_y_cm,
     );
 
-    if let Err(e) = std::fs::write(WALK_POSE_SENSOR_PATH, json) {
-        warn!("[anim-locomotion] walk pose sensor write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue(WALK_POSE_SENSOR_PATH, json);
 }
 
 // ── Walk direction probe v2 (debug 2026-06-03) ──────────────────────────────
@@ -1462,7 +1455,7 @@ pub fn write_walk_dir_probe(
             time.elapsed_secs(),
             samples,
         );
-        let _ = std::fs::write(WALK_DIR_PROBE_PATH, json);
+        let _ = forgia_core::sensor_io::enqueue(WALK_DIR_PROBE_PATH, json);
     }
 }
 
@@ -1500,21 +1493,21 @@ pub fn write_anim_full_sensor(
 
     let n_targets = q_root.iter().count();
     let Some((cache, stance_opt, root_gt)) = q_root.iter().next() else {
-        let _ = std::fs::write(
+        let _ = forgia_core::sensor_io::enqueue(
             ANIM_FULL_PATH,
             format!("{{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"locomotion_target_count={n_targets}\",\"next_step\":\"0 LocomotionTarget (RPG entré ? lineup spawné ?) — capteur lit le 1er target\"}}\n"),
         );
         return;
     };
     let Some(lstate) = q_state.iter().next() else {
-        let _ = std::fs::write(
+        let _ = forgia_core::sensor_io::enqueue(
             ANIM_FULL_PATH,
             "{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"no_locomotion_state\"}\n",
         );
         return;
     };
     if !cache.ready {
-        let _ = std::fs::write(
+        let _ = forgia_core::sensor_io::enqueue(
             ANIM_FULL_PATH,
             format!("{{\"id\":\"anim_full\",\"severity\":\"warn\",\"state\":\"cache_not_ready\",\"frames_waited\":{},\"gave_up\":{}}}\n", cache.frames_waited, cache.gave_up),
         );
@@ -1701,9 +1694,7 @@ pub fn write_anim_full_sensor(
         mesh_half.x, mesh_half.y, mesh_half.z, mesh_height, desync,
         bones_json,
     );
-    if let Err(e) = std::fs::write(ANIM_FULL_PATH, json) {
-        warn!("[anim-locomotion] anim_full sensor write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue(ANIM_FULL_PATH, json);
 }
 
 #[cfg(test)]

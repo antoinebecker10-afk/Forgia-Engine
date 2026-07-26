@@ -90,7 +90,7 @@ pub fn sys_write_lifecycle_sensor(
         counter.arena_bots_removed,
     );
 
-    if let Err(e) = std::fs::write("forgia2_lifecycle.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_lifecycle.json", json) {
         warn!("[forgia-observability] lifecycle sensor write failed: {e}");
     }
 

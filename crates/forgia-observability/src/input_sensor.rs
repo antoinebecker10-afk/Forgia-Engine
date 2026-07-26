@@ -69,7 +69,7 @@ pub fn sys_track_input_accum(
         accum.actions_just_pressed,
     );
 
-    if let Err(e) = std::fs::write("forgia2_input.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_input.json", json) {
         warn!("[forgia-observability] input sensor write failed: {e}");
     }
 

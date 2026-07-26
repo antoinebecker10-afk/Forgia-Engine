@@ -262,15 +262,13 @@ fn write_json(timestamp_secs: f32, snapshots: &[CharacterSnapshot]) {
         json.push_str("]}");
     }
     json.push_str("]}");
-    if let Err(e) = std::fs::write("forgia_bone_trace.json", json) {
-        warn!("[forgia-anim-debug::bone_trace] sensor write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace.json", json);
 }
 
 fn write_health(timestamp_secs: f32, desync_count: u32, snapshots: &[CharacterSnapshot]) {
     if desync_count == 0 {
         // Convention V1 : delete health file si tout OK pour signaler "all green"
-        let _ = std::fs::remove_file("forgia_bone_trace_health.json");
+        let _ = forgia_core::sensor_io::remove("forgia_bone_trace_health.json");
         return;
     }
     let json = format!(
@@ -287,9 +285,7 @@ fn write_health(timestamp_secs: f32, desync_count: u32, snapshots: &[CharacterSn
         snapshots.len(),
         desync_count,
     );
-    if let Err(e) = std::fs::write("forgia_bone_trace_health.json", json) {
-        warn!("[forgia-anim-debug::bone_trace] health write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace_health.json", json);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

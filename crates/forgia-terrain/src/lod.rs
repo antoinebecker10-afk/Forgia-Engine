@@ -892,7 +892,7 @@ pub fn export_lod_sensor_system(
         worst_gap_r,
         max_gap_frac,
     );
-    let _ = std::fs::write("forgia_terrain_lod.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_terrain_lod.json", json);
 }
 
 /// Story-453 : remplit `LodStats.sample_points` à 1Hz pour CHK-3 LOD asymmetry.

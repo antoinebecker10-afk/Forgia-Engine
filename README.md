@@ -30,10 +30,17 @@ cargo clippy --workspace --no-deps
 cargo test -p forgia-mode-roguelite        # tests par crate (voir note)
 
 # Lancer le jeu (binaire canonique = `forgia`, package racine)
-cargo run                                   # debug
-cargo run --profile release-fast            # itération rapide optimisée
-.\run_debug.ps1                              # lance le build existant + log forgia2_run.log
+cargo forgia-dev                            # debug + Tracy (commande de dev canonique)
+cargo forgia-fast                           # release-fast + Tracy
+                                               # capture mémoire ponctuelle (Tracy ouvert) :
+cargo forgia-memory                         # allocations, pas une mesure FPS fiable
+.\run_debug.ps1                             # build release-fast + Tracy + log forgia2_run.log
+# Build joueur / distribution, sans instrumentation :
+cargo run --profile release-fast
 ```
+
+> Les builds lourds sont volontairement limités à deux jobs dans `.cargo/config.toml` :
+> Bevy + wgpu + Tracy peuvent sinon épuiser la mémoire lors d'une compilation complète.
 
 > **Note `cargo test --workspace`** : casse actuellement en local (builds concurrents /
 > artefacts incrémentaux — voir story-592). La CI et le dev testent **par crate** :

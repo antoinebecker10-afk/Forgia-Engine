@@ -17,11 +17,14 @@ const EXPECTED_SENSORS: &[&str] = &[
     "forgia2_perf.json",
     "forgia2_entities.json",
     "forgia2_memory.json",
+    "forgia2_assets.json",
+    "forgia2_vram.json",
     "forgia2_lifecycle.json",
     "forgia2_watchdog.json",
     "forgia2_audio.json",
     "forgia2_input.json",
     "forgia2_sensor_health.json",
+    "forgia2_sensor_io.json",
 ];
 const STALE_THRESHOLD_SECS: u64 = 10;
 
@@ -83,7 +86,7 @@ pub fn sys_write_sensor_health(time: Res<Time>, mut accum: Local<f32>) {
         stale_json,
     );
 
-    if let Err(e) = std::fs::write("forgia2_sensor_health.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_sensor_health.json", json) {
         warn!("[forgia-observability] sensor_health sensor write failed: {e}");
     }
 }
@@ -117,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn expected_sensors_count_is_12() {
-        assert_eq!(EXPECTED_SENSORS.len(), 12);
+    fn expected_sensors_count_is_15() {
+        assert_eq!(EXPECTED_SENSORS.len(), 15);
     }
 }

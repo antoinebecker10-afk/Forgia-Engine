@@ -17,6 +17,151 @@ pub mod prelude {
     pub use crate::ForgiaCorePlugin;
 }
 
+/// Écriture asynchrone et bornée des capteurs de diagnostic.
+///
+/// Les capteurs ne doivent jamais bloquer le thread de jeu sur une écriture de
+/// fichier. Les sauvegardes métier restent volontairement hors de ce module :
+/// elles ont leurs propres garanties de durabilité et d'atomicité.
+pub mod sensor_io {
+    use std::fmt;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::mpsc::{self, SyncSender};
+    use std::sync::OnceLock;
+
+    const QUEUE_CAPACITY: usize = 256;
+
+    enum SensorJob {
+        Write { path: PathBuf, contents: String },
+        Remove { path: PathBuf },
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum EnqueueError {
+        Full,
+        Disconnected,
+    }
+
+    impl fmt::Display for EnqueueError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::Full => f.write_str("file de capteurs pleine"),
+                Self::Disconnected => f.write_str("writer de capteurs arrêté"),
+            }
+        }
+    }
+
+    static SENSOR_WRITER: OnceLock<SyncSender<SensorJob>> = OnceLock::new();
+    static ENQUEUED: AtomicU64 = AtomicU64::new(0);
+    static PROCESSED: AtomicU64 = AtomicU64::new(0);
+    static DROPPED_FULL: AtomicU64 = AtomicU64::new(0);
+    static DISCONNECTED: AtomicU64 = AtomicU64::new(0);
+    static WRITE_FAILURES: AtomicU64 = AtomicU64::new(0);
+
+    /// Instantané de santé du writer asynchrone des capteurs.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub struct SensorIoStats {
+        pub enqueued: u64,
+        pub processed: u64,
+        pub pending: u64,
+        pub dropped_full: u64,
+        pub disconnected: u64,
+        pub write_failures: u64,
+    }
+
+    fn sender() -> &'static SyncSender<SensorJob> {
+        SENSOR_WRITER.get_or_init(|| {
+            let (tx, rx) = mpsc::sync_channel::<SensorJob>(QUEUE_CAPACITY);
+            std::thread::Builder::new()
+                .name("forgia-sensor-io".to_string())
+                .spawn(move || {
+                    while let Ok(job) = rx.recv() {
+                        // Best effort : un capteur ne doit jamais tuer le writer.
+                        match job {
+                            SensorJob::Write { path, contents } => {
+                                if std::fs::write(path, contents).is_err() {
+                                    WRITE_FAILURES.fetch_add(1, Ordering::Relaxed);
+                                }
+                            }
+                            SensorJob::Remove { path } => {
+                                if let Err(error) = std::fs::remove_file(path) {
+                                    // L'absence est le résultat nominal de la
+                                    // convention « health file absent = OK ».
+                                    if error.kind() != std::io::ErrorKind::NotFound {
+                                        WRITE_FAILURES.fetch_add(1, Ordering::Relaxed);
+                                    }
+                                }
+                            }
+                        }
+                        PROCESSED.fetch_add(1, Ordering::Relaxed);
+                    }
+                })
+                .expect("le thread writer des capteurs doit démarrer");
+            tx
+        })
+    }
+
+    /// Place une mise à jour de capteur en file sans bloquer la frame.
+    ///
+    /// Si la file est pleine, on préfère perdre l'échantillon le plus récent à
+    /// bloquer le jeu. Le prochain heartbeat remplacera naturellement le JSON.
+    pub fn enqueue(
+        path: impl Into<PathBuf>,
+        contents: impl Into<String>,
+    ) -> Result<(), EnqueueError> {
+        match sender().try_send(SensorJob::Write {
+            path: path.into(),
+            contents: contents.into(),
+        }) {
+            Ok(()) => {
+                ENQUEUED.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }
+            Err(mpsc::TrySendError::Full(_)) => {
+                DROPPED_FULL.fetch_add(1, Ordering::Relaxed);
+                Err(EnqueueError::Full)
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                DISCONNECTED.fetch_add(1, Ordering::Relaxed);
+                Err(EnqueueError::Disconnected)
+            }
+        }
+    }
+
+    /// Programme la suppression d'un fichier de santé sans bloquer la frame.
+    pub fn remove(path: impl Into<PathBuf>) -> Result<(), EnqueueError> {
+        match sender().try_send(SensorJob::Remove { path: path.into() }) {
+            Ok(()) => {
+                ENQUEUED.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }
+            Err(mpsc::TrySendError::Full(_)) => {
+                DROPPED_FULL.fetch_add(1, Ordering::Relaxed);
+                Err(EnqueueError::Full)
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                DISCONNECTED.fetch_add(1, Ordering::Relaxed);
+                Err(EnqueueError::Disconnected)
+            }
+        }
+    }
+
+    /// Lecture non bloquante des compteurs du writer. `pending` est une
+    /// estimation (atomiques Relaxed) suffisante pour signaler une saturation.
+    pub fn stats() -> SensorIoStats {
+        let enqueued = ENQUEUED.load(Ordering::Relaxed);
+        let processed = PROCESSED.load(Ordering::Relaxed);
+        SensorIoStats {
+            enqueued,
+            processed,
+            pending: enqueued.saturating_sub(processed),
+            dropped_full: DROPPED_FULL.load(Ordering::Relaxed),
+            disconnected: DISCONNECTED.load(Ordering::Relaxed),
+            write_failures: WRITE_FAILURES.load(Ordering::Relaxed),
+        }
+    }
+}
+
 pub mod hud_visibility {
     use bevy::prelude::*;
 
@@ -149,6 +294,11 @@ pub mod states {
         /// avec flycam libre pour stress-tester rendu/VRAM. Pas de gameplay.
         /// Géré par `forgia_game::cyber_city::CyberCityDemoPlugin`.
         CyberCity,
+        /// Hall de Forgia (2026-07-22) — hub social 3D walkable : château importé
+        /// (Unity FANTASTIC Highlands Castle). Zone NEUTRE sans combat, point de
+        /// rassemblement (multijoueur à terme). Géré par
+        /// `forgia_game::castle_hub::CastleHubPlugin`.
+        CastleHub,
     }
 
     /// WorldMode — gate la simulation (Editor désactive AI/physics).

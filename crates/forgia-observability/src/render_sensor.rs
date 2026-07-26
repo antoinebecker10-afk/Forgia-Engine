@@ -134,7 +134,7 @@ pub fn sys_write_render_sensor(
         cc.blue,
     );
 
-    if let Err(e) = std::fs::write("forgia2_render.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_render.json", json) {
         warn!("[forgia-observability] render sensor write failed: {e}");
     }
 }

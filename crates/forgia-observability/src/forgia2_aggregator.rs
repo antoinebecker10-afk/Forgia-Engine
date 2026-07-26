@@ -130,10 +130,10 @@ pub fn sys_write_forgia2_aggregates(time: Res<Time>, mut state: ResMut<Forgia2Ag
     state.last_write_secs = now;
 
     let (combat_json, _, _) = compose_aggregate("combat", now, COMBAT_SOURCES);
-    let _ = std::fs::write("forgia2_combat.json", combat_json);
+    let _ = forgia_core::sensor_io::enqueue("forgia2_combat.json", combat_json);
 
     let (arena_json, _, _) = compose_aggregate("arena", now, ARENA_SOURCES);
-    let _ = std::fs::write("forgia2_arena.json", arena_json);
+    let _ = forgia_core::sensor_io::enqueue("forgia2_arena.json", arena_json);
 }
 
 #[cfg(test)]

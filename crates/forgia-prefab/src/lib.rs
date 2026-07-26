@@ -161,5 +161,5 @@ fn write_prefab_sensor(time: Res<Time>, stats: Res<PrefabStats>) {
         "{{\"timestamp_secs\":{:.1},\"total_spawned\":{},\"total_errors\":{}}}",
         now, total, errs
     );
-    let _ = std::fs::write("forgia_prefab.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_prefab.json", json);
 }

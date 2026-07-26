@@ -365,7 +365,7 @@ pub fn write_foliage_fallback_sensor(
         diag.events.len(),
         events_json
     );
-    let _ = std::fs::write("forgia_foliage_fallback.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_foliage_fallback.json", json);
 }
 
 // ---------------------------------------------------------------------------

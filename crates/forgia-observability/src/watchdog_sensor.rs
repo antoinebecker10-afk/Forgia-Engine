@@ -71,7 +71,7 @@ pub fn sys_write_watchdog_sensor(
         counter.consecutive_lag_frames,
     );
 
-    if let Err(e) = std::fs::write("forgia2_watchdog.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_watchdog.json", json) {
         warn!("[forgia-observability] watchdog sensor write failed: {e}");
     }
 }

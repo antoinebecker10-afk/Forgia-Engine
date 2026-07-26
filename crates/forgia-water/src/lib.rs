@@ -129,7 +129,7 @@ fn sys_write_water_sensor(
         now, settings.height,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-water] sensor write failed: {e}");
     }
 }

@@ -27,7 +27,7 @@
 //! ```
 
 use bevy::prelude::*;
-use forgia_rpg_data::boons::{ActiveBoons, BoonsCatalogue, BoonRarity};
+use forgia_rpg_data::boons::{ActiveBoons, BoonRarity, BoonsCatalogue};
 
 const SENSOR_PATH: &str = "forgia2_boons.json";
 const ACTIVE_IDS_DUMP: usize = 16;
@@ -105,7 +105,7 @@ pub fn sys_write_boons_sensor(
         now,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-observability] boons_sensor write failed: {e}");
     }
 }

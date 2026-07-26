@@ -48,20 +48,22 @@
 | `forgia_terrain_lod.json` | T1 | forgia-terrain | `src/lod.rs:690` | 1Hz | LOD0/LOD1 producteurs, story-502 | active |
 | `forgia_vegetation.json` | T1 | forgia-foliage | `src/lib.rs:513` | 1Hz | vegetation placement, density | active |
 | `forgia_viewmodel_calibration.json` | T1 | forgia-viewmodel | `src/calibration_sensor.rs:298` | 1Hz | viewmodel offset, FOV calibration | active |
+| `forgia2_viewmodel_arms.json` | T0 | forgia-viewmodel | `src/arms_sensor.rs:93` | 1Hz | bras GLB/procéduraux : visibilité, chargement et mode actif | active |
 | `forgia_village.json` | T1 | forgia-village-loader | `src/lib.rs:481` | 1Hz | village spawn, prefab loading | active |
-| `forgia_village_debug.json` | T1 | forgia-village-loader | `src/lib.rs:846,897` | event | village placement debug — ⚠ pipeline DÉBRANCHÉ (story-586), écrit `village:null`, dépose prévue | **duplicate-writer** |
+| `forgia_village_debug.json` | T1 | forgia-village-loader | `src/lib.rs::write_village_debug_sensor` | 1Hz | village placement debug ; `village:null` lorsque le pipeline village n'est pas chargé | active |
 | `forgia2_anchor.json` | T0 | forgia-anchor | `src/lib.rs:30` | 1Hz | AnchorKind stats, props_spawned counter | active |
 | `forgia2_boss_gate.json` | T0 | forgia-mode-roguelite | `src/boss_portal.rs:728` | event | boss gate door open/closed, dais detection (story-603) | active |
 | `forgia2_enemy_scaling.json` | T0 | forgia-mode-roguelite | `src/enemy_scaling.rs:33` | 1Hz | scaling ennemis par profondeur (story-658, autre terminal) | active |
-| `forgia2_gamefeel.json` | T0 | forgia-juice-lib | `src/hit_stop.rs:28` | 1Hz | hitstop/gamefeel tuning (story-650) | active |
 | `forgia2_head_hitbox.json` | T0 | forgia-mode-roguelite | `src/head_hitbox.rs:23` | 1Hz | proxy tete os-tracke (story-656, autre terminal) | active |
 | `forgia2_identity.json` | T0 | forgia-mode-roguelite | `src/identity.rs:26` | 1Hz | forgeron identity/level state | active |
 | `forgia2_knockback.json` | T0 | forgia-juice-lib | `src/knockback.rs:28` | 1Hz | pushes/kill_pushes knockback par hit (story-650) | active |
 | `forgia2_perf_diag.json` | T0 | forgia-mode-roguelite | `src/perf_diag.rs:37` | 1Hz | roguelite perf diagnostics | active |
+| `forgia2_pipeline_warmup.json` | T0 | forgia-mode-roguelite | `src/pipeline_warmup.rs:84` | 1Hz | état du préchauffage PBR ; alerte si le warmup atteint son plafond | active |
 | `forgia2_render_fx.json` | T0 | forgia-mode-roguelite | `src/render_quality.rs:29` | 1Hz | SSAO + atmosphere state, render guardrail (story-625 Tier 4) | active |
 | `forgia2_mushrooms.json` | T0 | forgia-mode-roguelite | `src/mushrooms.rs:30` | 1Hz | champignons émissifs crypts : clusters/counts + health (story-625) | active |
 | `forgia2_arena.json` | T0 | forgia-observability | `src/forgia2_aggregator.rs:136` | 1Hz | Arena unified (arena_feedback + arena_waves agrégés) | active |
 | `forgia2_assets.json` | T0 | forgia-observability | `src/assets_load_sensor.rs:98` | 1Hz | LoadState::Failed silencieux, scene_failed, mesh_failed | active |
+| `forgia2_sensor_io.json` | T0 | forgia-observability | `src/sensor_io_sensor.rs` | 1Hz | saturation/erreurs du writer asynchrone des capteurs | active |
 | `forgia2_audio.json` | T0 | forgia-observability | `src/audio_sensor.rs:56` | 1Hz | audio channels, music_state, voicelines | active |
 | `forgia2_auto_rig.json` | T0 | forgia-auto-rig | `src/lib.rs:187` | event | Pinocchio rig success/fail | active |
 | `forgia2_auto_rig_health.json` | T2 | forgia-auto-rig | `src/lib.rs:188` | 1Hz | auto_rig sensor liveness | active |
@@ -128,6 +130,10 @@
 | `forgia2_color_grading.json` | T0 | forgia-game | `src/color_grading.rs:26` | 1Hz | tonemapping / color grade params, rendu terne | active |
 | `forgia2_ftue.json` | T0 | forgia-mode-roguelite | `src/ftue.rs:19` | 1Hz | funnel FTUE (first_death_run_secs, hints vus) — story-597 | active |
 | `forgia2_load_timing.json` | T0 | forgia-mode-roguelite | `src/load_timing.rs:115` | event | freeze/stutter au load de stage (total_freezes, recent) | active |
+| `forgia2_castle_hub.json` | T0 | forgia-game | `src/castle_hub.rs` | 1Hz | Hall de Forgia : état scène, cellules streamées/plan, instanciation, colliders, placement joueur et cleanup | active |
+| `forgia2_castle_ground.json` | T0 | forgia-game | `src/castle_ground.rs` | 1Hz | Hall de Forgia : état du gazon/terrain, alignement visuel-physique et collider de terrain | active |
+| `forgia2_transform_lag.json` | T0 | forgia-mode-roguelite | `src/transform_hierarchy_sensor.rs` | frame lente uniquement | racines des transforms modifiés pendant un hitch ; historique borné des 8 derniers pics | active |
+| `forgia2_transform_hierarchy.json` | T0 | forgia-mode-roguelite | `src/transform_hierarchy_sensor.rs` | 1Hz | plus grandes hiérarchies de scène, squelettes et VFX ; diagnostic propagation transforms | active |
 | `forgia2_merchant.json` | T0 | forgia-mode-roguelite | `src/merchant.rs:50` | 1Hz | marchand : offres, proximité, achats Or/Âmes, revives — story-591 | active |
 | `forgia2_render.json` | T0 | forgia-observability | `src/render_sensor.rs:137` | 1Hz | mesh3d_visible vs total (écran vide/brun), caméras 3D actives, clear_color | active |
 

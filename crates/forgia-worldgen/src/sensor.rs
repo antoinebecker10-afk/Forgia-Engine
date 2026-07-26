@@ -51,9 +51,7 @@ pub fn sys_write_worldgen_sensor(
         streaming.active_chunks(),
     );
 
-    if let Err(e) = std::fs::write("forgia2_worldgen.json", &json) {
-        warn!("[forgia-worldgen] sensor write failed: {e}");
-    }
+    let _ = forgia_core::sensor_io::enqueue("forgia2_worldgen.json", json);
 }
 
 #[cfg(test)]

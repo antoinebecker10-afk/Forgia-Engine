@@ -94,8 +94,6 @@ pub fn sys_write_assets_sensor(
             "warn",
             "Asset load failures — check failed_paths + event_failed_paths (echecs hors-world : handle jamais spawne) + verify file exists relative to assets/",
         )
-    } else if scene_loading > 0 || mesh_loading > 0 {
-        ("ok", "")
     } else {
         ("ok", "")
     };
@@ -117,7 +115,7 @@ pub fn sys_write_assets_sensor(
         now,
     );
 
-    if let Err(e) = std::fs::write("forgia2_assets.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_assets.json", json) {
         warn!("[forgia-observability] assets_load_sensor write failed: {e}");
     }
 }

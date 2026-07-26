@@ -557,5 +557,5 @@ pub fn write_bot_ai_sensor(
         tuning.gunshot_alert_radius_m,
         tuning.los_lost_grace_secs,
     );
-    let _ = std::fs::write("forgia_bot_ai.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_bot_ai.json", json);
 }

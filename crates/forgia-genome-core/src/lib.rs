@@ -5,7 +5,7 @@
 //! loader infrastructure.
 //!
 //! Genome categories live under `assets/genomes/<category>/<name>.toml`.
-//! Each consumer crate (forgia-weapon-hitscan, forgia-terrain, etc.) declares
+//! Each consumer crate (forgia-fps, forgia-terrain, etc.) declares
 //! its own typed genome struct + uses `Genome::<MyGenome>` asset handle.
 
 use bevy::asset::{io::Reader, Asset, AssetLoader, LoadContext};

@@ -540,7 +540,7 @@ fn populate_registry(mut registry: ResMut<AssetRegistry>) {
     let json = format!(
         "{{\"total\":{total},\"active\":{active},\"trees\":{trees},\"autumn\":{autumn},\"snow\":{snow},\"dead\":{dead},\"missing\":{missing},\"disabled\":{disabled}}}"
     );
-    let _ = fs::write("forgia_asset_registry.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_asset_registry.json", json);
 
     registry.entries = entries;
 }

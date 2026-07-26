@@ -1279,7 +1279,7 @@ fn write_chunks_sensor(
         terrain_cfg.max_height,
         dist_json,
     );
-    let _ = std::fs::write("forgia_chunks_snapshot.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_chunks_snapshot.json", json);
 }
 
 /// Marqueur Resource posée OnEnter(Rpg), retirée par `teleport_player_to_terrain`

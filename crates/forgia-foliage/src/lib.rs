@@ -572,7 +572,7 @@ fn write_vegetation_sensor(
         "{{\"timestamp_secs\":{:.1},\"loaded_chunks\":{},\"total_trees\":{},\"per_biome\":{{{}}}{}{}}}",
         now, veg.chunk_entities.len(), veg.total_trees, dist, trunk_json, live_diag,
     );
-    let _ = std::fs::write("forgia_vegetation.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_vegetation.json", json);
 }
 
 /// Story-502-B : producteur du `FoliageCoverageReport` côté foliage.

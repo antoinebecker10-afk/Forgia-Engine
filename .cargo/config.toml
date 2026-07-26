@@ -1,2 +1,14 @@
 [alias]
 xtask = "run --package xtask --"
+# Commandes de dev : Tracy est systématiquement activé pour diagnostiquer les
+# hitches pendant l'itération. Le build release joueur n'active pas cette feature.
+forgia-dev = "run -p forgia --features profile-tracy --"
+forgia-fast = "run -p forgia --profile release-fast --features profile-tracy --"
+# À lancer seulement pour une enquête mémoire avec le viewer Tracy ouvert.
+forgia-memory = "run -p forgia --profile release-fast --features profile-tracy-memory --"
+
+# Bevy + wgpu + Tracy peuvent épuiser la RAM/pagefile si rustc compile les 20+
+# crates lourdes en parallèle. Deux jobs gardent le build reproductible sur la
+# machine de dev sans changer le binaire produit.
+[build]
+jobs = 2

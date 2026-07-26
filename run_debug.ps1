@@ -18,16 +18,16 @@ Write-Host "[run_debug] Backtrace : full" -ForegroundColor Gray
 Write-Host "[run_debug] ESC pour quitter, Alt+F4 si menu mort" -ForegroundColor Yellow
 Write-Host ""
 
-# Run with full output capture.
+# Build + run with full output capture. Le launcher de dev active toujours Tracy
+# afin que le profilage soit disponible sans se souvenir d'un flag Cargo. Les
+# builds de livraison restent explicitement sans `profile-tracy`.
 # Story-593 (M1.8) : binaire canonique = forgia.exe (racine src/main.rs).
 # forgia-game est une LIB depuis le pattern root-binary — l'ancien forgia-game.exe
 # etait un artefact stale (failure mode "silent stale binary", regle multi-terminal §5).
 $exe = "target\release-fast\forgia.exe"
-if (-not (Test-Path $exe)) {
-    Write-Host "[run_debug] $exe introuvable — builder d'abord :" -ForegroundColor Red
-    Write-Host "[run_debug]   cargo build -p forgia --profile release-fast" -ForegroundColor Yellow
-    exit 1
-}
+Write-Host "[run_debug] Building release-fast + Tracy..." -ForegroundColor Gray
+cargo build -j 2 -p forgia --profile release-fast --features profile-tracy
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $exe *> forgia2_run.log
 $exitCode = $LASTEXITCODE
 

@@ -329,5 +329,5 @@ pub fn write_foot_ik_sensor(
         stats.smoothed_offset_l,
         stats.smoothed_offset_r,
     );
-    let _ = std::fs::write(FOOT_IK_SENSOR_PATH, json);
+    let _ = forgia_core::sensor_io::enqueue(FOOT_IK_SENSOR_PATH, json);
 }

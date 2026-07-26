@@ -120,7 +120,7 @@ fn sys_write_volume_sensor(
         music.is_some(),
         ambient.is_some(),
     );
-    if let Err(e) = std::fs::write("forgia2_volume.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_volume.json", json) {
         warn!("[forgia-audio] volume sensor write failed: {e}");
     }
 }
