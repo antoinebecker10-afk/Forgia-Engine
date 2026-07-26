@@ -133,10 +133,6 @@ pub struct ForgiaCombatPlugin;
 
 impl Plugin for ForgiaCombatPlugin {
     fn build(&self, app: &mut App) {
-        // Hit-stop time pause — crate dédié (règle fine-grained-crates).
-        if !app.is_plugin_added::<forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin>() {
-            app.add_plugins(forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin);
-        }
         // Recoil data (WeaponRecoilImpulse Message + WeaponRecoilDebt Resource) — crate dédié.
         if !app.is_plugin_added::<forgia_juice_lib::recoil::ForgiaJuiceRecoilPlugin>() {
             app.add_plugins(forgia_juice_lib::recoil::ForgiaJuiceRecoilPlugin);
@@ -173,9 +169,8 @@ impl Plugin for ForgiaCombatPlugin {
             .add_systems(Startup, weapons::setup_casing_resources)
             // Keystone 0.1a-2 slice 2 (story-634) — cooldowns d'arme/melee = timers
             // PURS (Res<Time> seul, 0 input) → migrés en FixedUpdate (sim déterministe).
-            // En FixedUpdate, Res<Time> == Time<Fixed> ; le hit-stop (Time<Virtual>
-            // ralenti → moins de steps fixes accumulés) ralentit toujours le cooldown
-            // → feel identique. Ordre via la chaîne GameSet aussi en FixedUpdate (0.1a-1).
+            // En FixedUpdate, les cooldowns suivent uniquement la simulation fixe.
+            // Ordre via la chaîne GameSet aussi en FixedUpdate (0.1a-1).
             .add_systems(
                 FixedUpdate,
                 (
@@ -194,15 +189,13 @@ impl Plugin for ForgiaCombatPlugin {
             .add_systems(
                 Update,
                 (
-                    // trauma/hit_flash (cat B hit-stop) restent Update : validation
-                    // hit-stop reportée slice 3/4. Sensor reste Update (télémétrie).
+                    // Trauma/hit_flash restent Update ; sensor reste Update (télémétrie).
                     combat_juice::trauma_decay_system.in_set(GameSet::Effects),
                     combat_juice::hit_flash_tick_system.in_set(GameSet::Effects),
                     // Story-650 — pousse l'ennemi à chaque CombatHitEvent (Vlambeer).
                     combat_juice::sys_apply_hit_knockback.in_set(GameSet::Effects),
                     sensor::sys_write_combat_sensor.in_set(GameSet::Sensors),
                     ultimate::sys_write_ultimate_sensor.in_set(GameSet::Sensors),
-                    // hitstop_tick_system : wired par forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin (Tier 1D).
                 ),
             );
         // TODO: wire weapon_fire_system, doom_projectile_system, melee_attack_system,

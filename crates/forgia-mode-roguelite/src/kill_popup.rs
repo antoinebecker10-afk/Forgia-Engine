@@ -75,7 +75,9 @@ pub fn sys_track_kill_popups(
     }
     // Expire les popups écoulés.
     let now = time.elapsed_secs();
-    state.active.retain(|p| now - p.spawned_secs < POPUP_LIFETIME_SECS);
+    state
+        .active
+        .retain(|p| now - p.spawned_secs < POPUP_LIFETIME_SECS);
 }
 
 /// Draw les popups en EguiPrimaryContextPass. World→viewport via Camera.
@@ -199,7 +201,10 @@ mod tests {
         assert!((ease_out_back(1.0) - 1.0).abs() < 1e-3);
         // Overshoot intermédiaire (signature ease-out-back) — > 1.0 vers 60-80%.
         let mid = ease_out_back(0.7);
-        assert!(mid > 1.0, "ease-out-back doit overshoot vers 70% (got {mid})");
+        assert!(
+            mid > 1.0,
+            "ease-out-back doit overshoot vers 70% (got {mid})"
+        );
     }
 
     #[test]

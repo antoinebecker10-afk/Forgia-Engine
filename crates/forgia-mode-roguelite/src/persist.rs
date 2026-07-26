@@ -9,6 +9,7 @@ use bevy::log::warn;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Répertoire de sauvegarde STABLE, découplé du dossier d'installation :
 /// `%APPDATA%\Forgia\` sur Windows (créé si absent). Objectif distribution
@@ -47,19 +48,53 @@ pub(crate) fn legacy_config_dir() -> PathBuf {
 /// Charge un save TOML avec MIGRATION transparente : lit d'abord le nouvel
 /// emplacement (`save_dir()/file_name`) ; si absent, retombe sur l'ancien
 /// (`legacy_config_dir()/file_name`) pour ne pas perdre une progression écrite
-/// avant la relocalisation. Toute erreur (fichier absent, TOML corrompu) →
-/// `Default`. Le prochain `save()` réécrira dans `save_dir()`, rendant l'ancien
-/// fichier inerte (source de vérité unique dès la 1re sauvegarde).
+/// avant la relocalisation. Un TOML corrompu est préservé sous un nom
+/// `.corrupt-<timestamp>` avant le fallback : il ne doit jamais provoquer une
+/// perte de progression silencieuse. Le prochain `save()` réécrira dans
+/// `save_dir()`, rendant l'ancien fichier inerte (source de vérité unique dès
+/// la première sauvegarde réussie).
 pub(crate) fn load_toml_migrating<T: DeserializeOwned + Default>(file_name: &str) -> T {
-    if let Ok(c) = std::fs::read_to_string(save_dir().join(file_name)) {
-        return toml::from_str(&c).unwrap_or_default();
-    }
-    if let Ok(c) = std::fs::read_to_string(legacy_config_dir().join(file_name)) {
-        if let Ok(v) = toml::from_str::<T>(&c) {
-            return v;
+    for path in [
+        save_dir().join(file_name),
+        legacy_config_dir().join(file_name),
+    ] {
+        let Ok(contents) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        match toml::from_str(&contents) {
+            Ok(value) => return value,
+            Err(error) => {
+                let backup = corrupt_backup_path(&path, now_unix_secs());
+                match std::fs::rename(&path, &backup) {
+                    Ok(()) => warn!(
+                        "[save] invalid TOML in {}: {error}; preserved as {}",
+                        path.display(),
+                        backup.display()
+                    ),
+                    Err(rename_error) => warn!(
+                        "[save] invalid TOML in {}: {error}; failed to preserve backup: {rename_error}",
+                        path.display()
+                    ),
+                }
+            }
         }
     }
     T::default()
+}
+
+fn now_unix_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn corrupt_backup_path(path: &Path, timestamp_unix_secs: u64) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("save.toml");
+    path.with_file_name(format!("{file_name}.corrupt-{timestamp_unix_secs}"))
 }
 
 /// Sérialise `value` en TOML pretty puis l'écrit atomiquement dans `path`
@@ -85,5 +120,19 @@ pub(crate) fn save_toml_atomic<T: Serialize>(path: &Path, value: &T, tag: &str) 
             path.display()
         );
         let _ = std::fs::remove_file(&tmp); // pas de tmp orphelin qui traîne
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn corrupt_backup_keeps_the_original_file_name() {
+        let path = Path::new("C:/saves/meta.toml");
+        assert_eq!(
+            corrupt_backup_path(path, 1_780_000_000),
+            PathBuf::from("C:/saves/meta.toml.corrupt-1780000000")
+        );
     }
 }

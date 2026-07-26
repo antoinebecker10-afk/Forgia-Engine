@@ -293,7 +293,7 @@ fn sys_write_knockback_sensor(
         tuning.max_m,
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[juice-knockback] sensor write failed: {e}");
     }
 }

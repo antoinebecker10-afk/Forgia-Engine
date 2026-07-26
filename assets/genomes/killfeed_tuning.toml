@@ -11,7 +11,7 @@
 
 # ─── Layout feed (top-right) ──────────────────────────────────────────
 padding_right = 32.0       # marge bord droit
-first_entry_y = 110.0      # Y du premier entry (sous wave counter top-center)
+first_entry_y = 132.0      # Y du premier entry — sous les compteurs Or/Âmes (bas y≈118, top-right) pour éviter le chevauchement
 entry_width = 360.0        # largeur d'un entry
 entry_height = 34.0        # hauteur d'un entry
 entry_spacing = 6.0        # espacement vertical

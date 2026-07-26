@@ -26,6 +26,15 @@ use bevy::render::{ExtractSchedule, MainWorld, RenderApp};
 #[derive(Resource, Debug, Default, Clone, Copy)]
 pub struct PipelinesReady(pub bool);
 
+/// Instantané du cache de pipelines rendu, copié chaque frame vers le monde
+/// principal. Ce compteur est une preuve plus fiable qu'une attribution par
+/// défaut : un hitch sans spawn n'est pas forcément une compilation shader.
+#[derive(Resource, Debug, Default, Clone, Copy)]
+pub struct PipelineCacheStats {
+    /// Pipelines encore en attente de compilation/validation par le backend.
+    pub waiting: usize,
+}
+
 /// Branche le suivi de `PipelineCache` (sous-app rendu) sur une resource lisible
 /// depuis le monde principal. Idempotent-safe : ne fait rien si le `RenderApp`
 /// n'existe pas (mode headless/test sans backend rendu).
@@ -33,7 +42,8 @@ pub struct PipelinesReadyPlugin;
 
 impl Plugin for PipelinesReadyPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PipelinesReady>();
+        app.init_resource::<PipelinesReady>()
+            .init_resource::<PipelineCacheStats>();
         // Le `RenderApp` est absent en headless (tests, CI sans GPU) → skip propre.
         if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app.add_systems(ExtractSchedule, extract_pipelines_ready);
@@ -44,9 +54,13 @@ impl Plugin for PipelinesReadyPlugin {
 /// Tourne dans `ExtractSchedule` du `RenderApp` : compte les pipelines encore en
 /// attente et écrit le booléen dans le monde principal (`MainWorld`).
 fn extract_pipelines_ready(mut main_world: ResMut<MainWorld>, cache: Res<PipelineCache>) {
-    let ready = cache.waiting_pipelines().count() == 0;
+    let waiting = cache.waiting_pipelines().count();
+    let ready = waiting == 0;
     if let Some(mut flag) = main_world.get_resource_mut::<PipelinesReady>() {
         flag.0 = ready;
+    }
+    if let Some(mut stats) = main_world.get_resource_mut::<PipelineCacheStats>() {
+        stats.waiting = waiting;
     }
 }
 

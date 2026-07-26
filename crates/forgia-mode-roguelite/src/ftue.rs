@@ -97,7 +97,7 @@ pub fn sys_write_ftue_sensor(time: Res<Time>, mut accum: Local<f32>, ftue: Res<F
         ftue.first_death_run_secs,
         ftue.seen_hints.len(),
     );
-    let _ = std::fs::write(SENSOR_PATH, json);
+    let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 }
 
 pub struct FtuePlugin;

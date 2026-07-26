@@ -552,10 +552,9 @@ fn sys_music_update(
         return;
     }
     music.stop();
-    music
-        .play(handle.clone())
-        .looped()
-        .with_volume(amp_to_db(def.volume * cfg.music_volume * user_vol.0.clamp(0.0, 1.0)));
+    music.play(handle.clone()).looped().with_volume(amp_to_db(
+        def.volume * cfg.music_volume * user_vol.0.clamp(0.0, 1.0),
+    ));
     track.current = Some(handle.clone());
     stats.music_playing = true;
 }
@@ -607,7 +606,7 @@ fn sys_write_audio_sensor(
         cfg.master_volume,
         cfg.music_volume,
     );
-    let _ = fs::write(SENSOR_PATH, json);
+    let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 }
 
 #[cfg(test)]

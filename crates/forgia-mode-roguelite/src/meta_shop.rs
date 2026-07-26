@@ -587,33 +587,16 @@ pub fn sys_meta_shop_input(
         start_run.write(StartRunEvent { seed: None });
         return;
     }
-    // Déblocage paliers d'atouts (Digit5/6/7) — story-616.
+    // Déblocage paliers d'atouts (Digit5/6/7) — story-616. Logique partagée avec
+    // le hub-menu cliquable (`apply_meta_purchase`).
     let tier_idx = [KeyCode::Digit5, KeyCode::Digit6, KeyCode::Digit7]
         .iter()
         .position(|k| keys.just_pressed(*k));
     if let Some(ti) = tier_idx {
-        if let Some(bt) = cat.boon_tier_unlocks.get(ti) {
-            if save.is_boon_tier_unlocked(&bt.key) {
-                info!("[meta-shop] palier d'atouts {} déjà débloqué", bt.name);
-            } else if meta.current < bt.cost {
-                info!(
-                    "[meta-shop] pas assez d'âmes pour {} ({}/{})",
-                    bt.name, meta.current, bt.cost
-                );
-            } else {
-                meta.current -= bt.cost;
-                save.unlock_boon_tier(&bt.key);
-                save.souls_total = meta.current;
-                save.save();
-                info!(
-                    "[meta-shop] palier d'atouts débloqué : {} (-{} âmes, reste {})",
-                    bt.name, bt.cost, meta.current
-                );
-            }
-        }
+        apply_meta_purchase(&cat, &mut save, &mut meta, MetaPurchase::BoonTier(ti));
         return;
     }
-    // Achat upgrades 1..=4.
+    // Achat upgrades 1..=4 (même logique partagée).
     let idx = [
         KeyCode::Digit1,
         KeyCode::Digit2,
@@ -622,35 +605,180 @@ pub fn sys_meta_shop_input(
     ]
     .iter()
     .position(|k| keys.just_pressed(*k));
-    let Some(i) = idx else {
-        return;
-    };
-    let Some(up) = cat.upgrades.get(i) else {
-        return;
-    };
-    let rank = save.rank(&up.id);
-    let Some(cost) = up.cost_for_next(rank) else {
-        info!("[meta-shop] {} déjà au rang max", up.name);
-        return;
-    };
-    if meta.current < cost {
-        info!(
-            "[meta-shop] pas assez d'âmes pour {} ({}/{})",
-            up.name, meta.current, cost
-        );
-        return;
+    if let Some(i) = idx {
+        apply_meta_purchase(&cat, &mut save, &mut meta, MetaPurchase::Upgrade(i));
     }
-    meta.current -= cost;
-    *save.ranks.entry(up.id.clone()).or_insert(0) += 1;
-    save.souls_total = meta.current;
-    save.save();
-    info!(
-        "[meta-shop] acheté {} rang {} (-{} âmes, reste {})",
-        up.name,
-        rank + 1,
-        cost,
-        meta.current
+}
+
+/// Un achat possible à l'Enclume (améliration de stat OU palier d'atouts).
+/// Détecté au clic (`draw_enclume_panel`) ou au clavier (`sys_meta_shop_input`).
+#[derive(Clone, Copy, Debug)]
+pub enum MetaPurchase {
+    /// Améliration de stat `cat.upgrades[i]` (rang +1).
+    Upgrade(usize),
+    /// Palier d'atouts `cat.boon_tier_unlocks[i]` (déblocage permanent).
+    BoonTier(usize),
+}
+
+/// Applique un achat Enclume : mute `save`/`meta` + sauve sur disque. Logique
+/// PARTAGÉE entre le clavier (Lobby) et le clic (hub-menu). Retourne `true` si
+/// l'achat a bien eu lieu (assez d'âmes + pas déjà max/débloqué).
+pub fn apply_meta_purchase(
+    cat: &MetaShopCatalogue,
+    save: &mut MetaShopSave,
+    meta: &mut MetaSouls,
+    purchase: MetaPurchase,
+) -> bool {
+    match purchase {
+        MetaPurchase::Upgrade(i) => {
+            let Some(up) = cat.upgrades.get(i) else {
+                return false;
+            };
+            let rank = save.rank(&up.id);
+            let Some(cost) = up.cost_for_next(rank) else {
+                info!("[meta-shop] {} déjà au rang max", up.name);
+                return false;
+            };
+            if meta.current < cost {
+                info!(
+                    "[meta-shop] pas assez d'âmes pour {} ({}/{})",
+                    up.name, meta.current, cost
+                );
+                return false;
+            }
+            meta.current -= cost;
+            *save.ranks.entry(up.id.clone()).or_insert(0) += 1;
+            save.souls_total = meta.current;
+            save.save();
+            info!(
+                "[meta-shop] acheté {} rang {} (-{} âmes, reste {})",
+                up.name,
+                rank + 1,
+                cost,
+                meta.current
+            );
+            true
+        }
+        MetaPurchase::BoonTier(ti) => {
+            let Some(bt) = cat.boon_tier_unlocks.get(ti) else {
+                return false;
+            };
+            if save.is_boon_tier_unlocked(&bt.key) {
+                info!("[meta-shop] palier d'atouts {} déjà débloqué", bt.name);
+                return false;
+            }
+            if meta.current < bt.cost {
+                info!(
+                    "[meta-shop] pas assez d'âmes pour {} ({}/{})",
+                    bt.name, meta.current, bt.cost
+                );
+                return false;
+            }
+            meta.current -= bt.cost;
+            save.unlock_boon_tier(&bt.key);
+            save.souls_total = meta.current;
+            save.save();
+            info!(
+                "[meta-shop] palier d'atouts débloqué : {} (-{} âmes, reste {})",
+                bt.name, bt.cost, meta.current
+            );
+            true
+        }
+    }
+}
+
+/// Rend l'Enclume en **cartes cliquables** dans un `Ui` donné (souris) — réutilisé
+/// par le hub-menu (`forgia-ui`). PUR affichage + détection de clic (aucune
+/// mutation) : retourne l'achat cliqué s'il y en a un, à appliquer par l'appelant
+/// via [`apply_meta_purchase`]. `souls` = solde d'Âmes courant (`MetaSouls.current`).
+pub fn draw_enclume_panel(
+    ui: &mut egui::Ui,
+    cat: &MetaShopCatalogue,
+    save: &MetaShopSave,
+    souls: u32,
+) -> Option<MetaPurchase> {
+    let mut intent = None;
+    ui.label(
+        egui::RichText::new(format!("◇ {souls}  Âmes"))
+            .size(22.0)
+            .strong()
+            .color(FORGE_TEAL),
     );
+    ui.add_space(12.0);
+    // ── Améliorations de stat (cliquables si abordables) ──
+    for (i, up) in cat.upgrades.iter().enumerate() {
+        let rank = save.rank(&up.id);
+        let max = up.max_rank();
+        match up.cost_for_next(rank) {
+            Some(cost) => {
+                let afford = souls >= cost;
+                let btn = egui::Button::new(
+                    egui::RichText::new(format!(
+                        "{}   rang {}/{}   ·   {} ◇",
+                        up.name, rank, max, cost
+                    ))
+                    .size(16.0)
+                    .color(if afford { FORGE_OR } else { C_TEXT_MUTED }),
+                )
+                .min_size(egui::vec2(440.0, 0.0));
+                if ui.add_enabled(afford, btn).clicked() {
+                    intent = Some(MetaPurchase::Upgrade(i));
+                }
+            }
+            None => {
+                let _ = ui.add_enabled(
+                    false,
+                    egui::Button::new(
+                        egui::RichText::new(format!("{}   MAX {}/{}", up.name, max, max))
+                            .size(16.0)
+                            .color(C_HP_HIGH),
+                    )
+                    .min_size(egui::vec2(440.0, 0.0)),
+                );
+            }
+        }
+        ui.label(
+            egui::RichText::new(up.desc.as_str())
+                .size(12.0)
+                .color(C_TEXT_MUTED),
+        );
+        ui.add_space(6.0);
+    }
+    // ── Paliers d'atouts (boons) ──
+    ui.add_space(6.0);
+    ui.label(
+        egui::RichText::new("— ATOUTS (paliers de boons) —")
+            .size(15.0)
+            .strong()
+            .color(FORGE_TEAL),
+    );
+    ui.add_space(4.0);
+    for (i, bt) in cat.boon_tier_unlocks.iter().enumerate() {
+        if save.is_boon_tier_unlocked(&bt.key) {
+            let _ = ui.add_enabled(
+                false,
+                egui::Button::new(
+                    egui::RichText::new(format!("{} — DÉBLOQUÉ", bt.name))
+                        .size(16.0)
+                        .color(C_HP_HIGH),
+                )
+                .min_size(egui::vec2(440.0, 0.0)),
+            );
+        } else {
+            let afford = souls >= bt.cost;
+            let btn = egui::Button::new(
+                egui::RichText::new(format!("{}   ·   {} ◇", bt.name, bt.cost))
+                    .size(16.0)
+                    .color(if afford { FORGE_OR } else { C_TEXT_MUTED }),
+            )
+            .min_size(egui::vec2(440.0, 0.0));
+            if ui.add_enabled(afford, btn).clicked() {
+                intent = Some(MetaPurchase::BoonTier(i));
+            }
+        }
+        ui.add_space(4.0);
+    }
+    intent
 }
 
 /// Dessine l'Enclume au Lobby (EguiPrimaryContextPass).

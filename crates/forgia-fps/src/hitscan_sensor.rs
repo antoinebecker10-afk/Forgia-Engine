@@ -35,7 +35,6 @@
 use bevy::prelude::*;
 use forgia_combat::weapons::WeaponType;
 use std::collections::VecDeque;
-use std::fs;
 
 /// Catégorisation du résultat d'un raycast — clé pour diagnostiquer "aiming on
 /// target, no damage". Si `BlockerNonZone` apparaît alors qu'on visait le bot,
@@ -193,5 +192,5 @@ pub fn write_hitscan_sensor(
         recent_json,
     );
 
-    let _ = fs::write("forgia_hitscan.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_hitscan.json", json);
 }

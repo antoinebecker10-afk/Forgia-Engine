@@ -1,14 +1,12 @@
 //! forgia-juice-lib — Consolidated game-feel library (story-522 fusion).
 //!
-//! 5 modules ex-crates :
+//! 4 modules ex-crates :
 //! - `recoil` (weapon recoil pattern + decay)
-//! - `hit_stop` (frame freeze on hit)
 //! - `fov_punch` (FOV zoom feedback)
 //! - `camera_shake` (procedural shake)
 //! - `screen_flash` (full-screen color flash on damage/kill)
 
 pub mod recoil;
-pub mod hit_stop;
 pub mod fov_punch;
 pub mod camera_shake;
 pub mod knockback;
@@ -23,7 +21,6 @@ impl Plugin for ForgiaJuiceLibPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             recoil::ForgiaJuiceRecoilPlugin,
-            hit_stop::ForgiaJuiceHitStopPlugin,
             fov_punch::ForgiaJuiceFovPunchPlugin,
             camera_shake::ForgiaJuiceCameraShakePlugin,
             knockback::ForgiaJuiceKnockbackPlugin,

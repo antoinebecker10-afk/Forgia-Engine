@@ -21,8 +21,8 @@ use forgia_damage::DeathEvent;
 // TODO(story-471..479): PickupAnimState + PickupKind supprimés de forgia_loot_tables
 // Story-571 — l'Or in-run EST le `Souls` de forgia-rpg-data, importé `as Gold`
 // pour la clarté (la monnaie MÉTA persistante = `MetaSouls`, défini ici).
-use forgia_rpg_data::loot_tables::{Pickup, PickupCollector, Souls as Gold};
 use forgia_player::Player;
+use forgia_rpg_data::loot_tables::{Pickup, PickupCollector, Souls as Gold};
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 
@@ -488,7 +488,10 @@ pub fn sys_magnetize_pickups_on_break(
     time: Res<Time>,
     coffre: Option<Res<forgia_rpg_data::boons::CoffreSession>>,
     q_player: Query<&Transform, With<PickupCollector>>,
-    mut q_pickups: Query<&mut Transform, (With<Pickup>, Without<PickupCollector>, Without<SoulWisp>)>,
+    mut q_pickups: Query<
+        &mut Transform,
+        (With<Pickup>, Without<PickupCollector>, Without<SoulWisp>),
+    >,
     mut q_wisps: Query<&mut Transform, (With<SoulWisp>, Without<PickupCollector>, Without<Pickup>)>,
 ) {
     let Some(coffre) = coffre else {

@@ -212,13 +212,6 @@ fn draw_identity_panel(
     };
     shown.0 = true;
 
-    let rgb = cfg.color_rgb(&save.equipped_color);
-    let name_col = egui::Color32::from_rgb(
-        (rgb[0] * 255.0) as u8,
-        (rgb[1] * 255.0) as u8,
-        (rgb[2] * 255.0) as u8,
-    );
-
     // Home-hub P2.1 — onglet FORGE : panneau CENTRÉ (le hub gère les onglets).
     // Titre « TON FORGERON » = onglet hub.
     egui::Area::new(egui::Id::new("forgia_identity_panel"))
@@ -231,140 +224,156 @@ fn draw_identity_panel(
                 .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.set_min_width(320.0);
-                    // Pastille couleur + nom coloré.
-                    ui.horizontal(|ui| {
-                        let (r, _) =
-                            ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
-                        ui.painter()
-                            .rect_filled(r, egui::CornerRadius::same(4), name_col);
-                        ui.label(
-                            egui::RichText::new(&save.player_name)
-                                .size(22.0)
-                                .strong()
-                                .color(name_col),
-                        );
-                        if ui.button("✏").on_hover_text("Changer le nom").clicked() {
-                            *editing = !*editing;
-                        }
-                    });
-
-                    // Éditeur de nom (presets cliquables + texte optionnel).
-                    if *editing {
-                        ui.add_space(4.0);
-                        ui.label(egui::RichText::new("Choisis un nom :").size(13.0));
-                        ui.horizontal_wrapped(|ui| {
-                            for p in &cfg.name_presets {
-                                if ui.button(&p.label).clicked() {
-                                    save.player_name = p.label.clone();
-                                    save.name_edited = true;
-                                    save.save();
-                                }
-                            }
-                        });
-                        let mut typed = save.player_name.clone();
-                        if ui
-                            .add(
-                                egui::TextEdit::singleline(&mut typed)
-                                    .hint_text("…ou tape le tien")
-                                    .char_limit(20),
-                            )
-                            .changed()
-                        {
-                            save.player_name = typed;
-                            save.name_edited = true;
-                            // Save léger : sur perte de focus serait idéal ; ici save sur changement (rare).
-                            save.save();
-                        }
-                    }
-
-                    ui.add_space(8.0);
-                    ui.label(egui::RichText::new("Couleur :").size(13.0));
-                    ui.horizontal_wrapped(|ui| {
-                        // Clone des ids débloqués pour éviter l'emprunt simultané de `save`.
-                        let unlocked = save.unlocked_colors.clone();
-                        let equipped = save.equipped_color.clone();
-                        for c in &cfg.colors {
-                            if !unlocked.contains(&c.id) {
-                                continue;
-                            }
-                            let col = egui::Color32::from_rgb(
-                                (c.rgb[0] * 255.0) as u8,
-                                (c.rgb[1] * 255.0) as u8,
-                                (c.rgb[2] * 255.0) as u8,
-                            );
-                            let selected = c.id == equipped;
-                            let size = if selected { 30.0 } else { 24.0 };
-                            let (r, resp) = ui
-                                .allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
-                            ui.painter()
-                                .rect_filled(r, egui::CornerRadius::same(5), col);
-                            if selected {
-                                ui.painter().rect_stroke(
-                                    r,
-                                    egui::CornerRadius::same(5),
-                                    egui::Stroke::new(2.5, egui::Color32::WHITE),
-                                    egui::StrokeKind::Outside,
-                                );
-                            }
-                            if resp.on_hover_text(&c.label).clicked() {
-                                save.equipped_color = c.id.clone();
-                                save.save();
-                            }
-                        }
-                    });
-
-                    // ── Cosmétique des BRAS procéduraux (couleur + style, P3) ──
-                    // Aperçu live : le viewmodel est forcé visible sur l'onglet Forge.
-                    ui.add_space(10.0);
-                    ui.separator();
-                    ui.label(egui::RichText::new("Bras — couleur :").size(13.0));
-                    ui.horizontal_wrapped(|ui| {
-                        let unlocked = save.unlocked_colors.clone();
-                        let cur = save.arm_color.clone();
-                        for c in &cfg.colors {
-                            if !unlocked.contains(&c.id) {
-                                continue;
-                            }
-                            let col = egui::Color32::from_rgb(
-                                (c.rgb[0] * 255.0) as u8,
-                                (c.rgb[1] * 255.0) as u8,
-                                (c.rgb[2] * 255.0) as u8,
-                            );
-                            let selected = c.id == cur;
-                            let size = if selected { 30.0 } else { 24.0 };
-                            let (r, resp) = ui
-                                .allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
-                            ui.painter()
-                                .rect_filled(r, egui::CornerRadius::same(5), col);
-                            if selected {
-                                ui.painter().rect_stroke(
-                                    r,
-                                    egui::CornerRadius::same(5),
-                                    egui::Stroke::new(2.5, egui::Color32::WHITE),
-                                    egui::StrokeKind::Outside,
-                                );
-                            }
-                            if resp.on_hover_text(&c.label).clicked() {
-                                save.arm_color = c.id.clone();
-                                arm_cosmetics.color = c.rgb;
-                                save.save();
-                            }
-                        }
-                    });
-                    ui.add_space(6.0);
-                    ui.label(egui::RichText::new("Bras — style :").size(13.0));
-                    ui.horizontal_wrapped(|ui| {
-                        for style in [ArmStyle::Peau, ArmStyle::Gantelet, ArmStyle::Cyber] {
-                            let selected = save.arm_style == style.key();
-                            if ui.selectable_label(selected, style.label()).clicked() {
-                                save.arm_style = style.key().to_string();
-                                arm_cosmetics.style = style;
-                                save.save();
-                            }
-                        }
-                    });
+                    draw_identity_content(ui, &cfg, &mut save, &mut arm_cosmetics, &mut editing);
                 });
         });
+}
+
+/// Contenu du panneau d'identité (nom + couleurs + bras) rendu dans un `Ui` donné.
+/// PARTAGÉ entre le Lobby (`draw_identity_panel`) et le hub-menu (`forgia-ui`) —
+/// zéro duplication. Mute `save` / `arm_cosmetics` + sauve sur disque. `editing` =
+/// état (ouvert/fermé) de l'éditeur de nom (un `Local<bool>` par appelant).
+pub fn draw_identity_content(
+    ui: &mut egui::Ui,
+    cfg: &IdentityConfig,
+    save: &mut IdentitySave,
+    arm_cosmetics: &mut ArmCosmetics,
+    editing: &mut bool,
+) {
+    let rgb = cfg.color_rgb(&save.equipped_color);
+    let name_col = egui::Color32::from_rgb(
+        (rgb[0] * 255.0) as u8,
+        (rgb[1] * 255.0) as u8,
+        (rgb[2] * 255.0) as u8,
+    );
+
+    // Pastille couleur + nom coloré + bouton crayon (édition non-bloquante, P7).
+    ui.horizontal(|ui| {
+        let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
+        ui.painter()
+            .rect_filled(r, egui::CornerRadius::same(4), name_col);
+        ui.label(
+            egui::RichText::new(save.player_name.as_str())
+                .size(22.0)
+                .strong()
+                .color(name_col),
+        );
+        if ui.button("✏").on_hover_text("Changer le nom").clicked() {
+            *editing = !*editing;
+        }
+    });
+
+    // Éditeur de nom (presets cliquables + texte optionnel).
+    if *editing {
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new("Choisis un nom :").size(13.0));
+        ui.horizontal_wrapped(|ui| {
+            for p in &cfg.name_presets {
+                if ui.button(&p.label).clicked() {
+                    save.player_name = p.label.clone();
+                    save.name_edited = true;
+                    save.save();
+                }
+            }
+        });
+        let mut typed = save.player_name.clone();
+        if ui
+            .add(
+                egui::TextEdit::singleline(&mut typed)
+                    .hint_text("…ou tape le tien")
+                    .char_limit(20),
+            )
+            .changed()
+        {
+            save.player_name = typed;
+            save.name_edited = true;
+            save.save();
+        }
+    }
+
+    ui.add_space(8.0);
+    ui.label(egui::RichText::new("Couleur :").size(13.0));
+    ui.horizontal_wrapped(|ui| {
+        // Clone des ids débloqués pour éviter l'emprunt simultané de `save`.
+        let unlocked = save.unlocked_colors.clone();
+        let equipped = save.equipped_color.clone();
+        for c in &cfg.colors {
+            if !unlocked.contains(&c.id) {
+                continue;
+            }
+            let col = egui::Color32::from_rgb(
+                (c.rgb[0] * 255.0) as u8,
+                (c.rgb[1] * 255.0) as u8,
+                (c.rgb[2] * 255.0) as u8,
+            );
+            let selected = c.id == equipped;
+            let size = if selected { 30.0 } else { 24.0 };
+            let (r, resp) =
+                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
+            if selected {
+                ui.painter().rect_stroke(
+                    r,
+                    egui::CornerRadius::same(5),
+                    egui::Stroke::new(2.5, egui::Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
+            }
+            if resp.on_hover_text(&c.label).clicked() {
+                save.equipped_color = c.id.clone();
+                save.save();
+            }
+        }
+    });
+
+    // ── Cosmétique des BRAS procéduraux (couleur + style, P3) ──
+    ui.add_space(10.0);
+    ui.separator();
+    ui.label(egui::RichText::new("Bras — couleur :").size(13.0));
+    ui.horizontal_wrapped(|ui| {
+        let unlocked = save.unlocked_colors.clone();
+        let cur = save.arm_color.clone();
+        for c in &cfg.colors {
+            if !unlocked.contains(&c.id) {
+                continue;
+            }
+            let col = egui::Color32::from_rgb(
+                (c.rgb[0] * 255.0) as u8,
+                (c.rgb[1] * 255.0) as u8,
+                (c.rgb[2] * 255.0) as u8,
+            );
+            let selected = c.id == cur;
+            let size = if selected { 30.0 } else { 24.0 };
+            let (r, resp) =
+                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
+            if selected {
+                ui.painter().rect_stroke(
+                    r,
+                    egui::CornerRadius::same(5),
+                    egui::Stroke::new(2.5, egui::Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
+            }
+            if resp.on_hover_text(&c.label).clicked() {
+                save.arm_color = c.id.clone();
+                arm_cosmetics.color = c.rgb;
+                save.save();
+            }
+        }
+    });
+    ui.add_space(6.0);
+    ui.label(egui::RichText::new("Bras — style :").size(13.0));
+    ui.horizontal_wrapped(|ui| {
+        for style in [ArmStyle::Peau, ArmStyle::Gantelet, ArmStyle::Cyber] {
+            let selected = save.arm_style == style.key();
+            if ui.selectable_label(selected, style.label()).clicked() {
+                save.arm_style = style.key().to_string();
+                arm_cosmetics.style = style;
+                save.save();
+            }
+        }
+    });
 }
 
 /// Flag « panneau identité affiché » (pour le health check du sensor).
@@ -406,7 +415,7 @@ fn sys_write_identity_sensor(
         cfg.colors.len(),
         shown.0,
     );
-    let _ = std::fs::write(SENSOR_PATH, json);
+    let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 }
 
 pub struct IdentityPlugin;

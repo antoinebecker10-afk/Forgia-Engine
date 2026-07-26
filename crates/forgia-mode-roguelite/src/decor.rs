@@ -264,12 +264,8 @@ impl RogueliteDecorConfig {
                 "decor_landmark_count" => c.landmark_count = gene.default.clamp(0.0, 50.0) as u32,
                 "decor_brazier_ratio" => c.brazier_ratio = gene.default.clamp(0.0, 1.0),
                 "decor_scatter_count" => c.scatter_count = gene.default.clamp(0.0, 600.0) as u32,
-                "decor_scatter_radius_min" => {
-                    c.scatter_radius_min = gene.default.clamp(0.0, 500.0)
-                }
-                "decor_scatter_radius_max" => {
-                    c.scatter_radius_max = gene.default.clamp(0.0, 500.0)
-                }
+                "decor_scatter_radius_min" => c.scatter_radius_min = gene.default.clamp(0.0, 500.0),
+                "decor_scatter_radius_max" => c.scatter_radius_max = gene.default.clamp(0.0, 500.0),
                 "decor_target_landmark" => c.target_landmark = gene.default.clamp(0.5, 50.0),
                 "decor_target_big" => c.target_big = gene.default.clamp(0.5, 50.0),
                 "decor_target_brazier" => c.target_brazier = gene.default.clamp(0.3, 20.0),
@@ -295,9 +291,7 @@ impl RogueliteDecorConfig {
                 "decor_giant_peak_count" => {
                     c.giant_peak_count = gene.default.clamp(0.0, 12.0) as u32
                 }
-                "decor_giant_peak_radius" => {
-                    c.giant_peak_radius = gene.default.clamp(20.0, 800.0)
-                }
+                "decor_giant_peak_radius" => c.giant_peak_radius = gene.default.clamp(20.0, 800.0),
                 "decor_target_giant_peak" => c.target_giant_peak = gene.default.clamp(10.0, 200.0),
                 "decor_forge_ring_count" => {
                     c.forge_ring_count = gene.default.clamp(0.0, 40.0) as u32
@@ -312,9 +306,7 @@ impl RogueliteDecorConfig {
                 "decor_forge_monument_target" => {
                     c.forge_monument_target = gene.default.clamp(2.0, 50.0)
                 }
-                "decor_building_count" => {
-                    c.building_count = gene.default.clamp(0.0, 80.0) as u32
-                }
+                "decor_building_count" => c.building_count = gene.default.clamp(0.0, 80.0) as u32,
                 "decor_building_radius_min" => {
                     c.building_radius_min = gene.default.clamp(10.0, 200.0)
                 }
@@ -725,13 +717,9 @@ pub fn sys_decor_build_hull_colliders(
             continue; // scène pas encore peuplée → retry frame suivante
         }
         // Attendre que TOUS les assets Mesh soient chargés (sinon retry).
-        let all_loaded = mesh_entities.iter().all(|e| {
-            q_mesh
-                .get(*e)
-                .ok()
-                .and_then(|m| meshes.get(&m.0))
-                .is_some()
-        });
+        let all_loaded = mesh_entities
+            .iter()
+            .all(|e| q_mesh.get(*e).ok().and_then(|m| meshes.get(&m.0)).is_some());
         if !all_loaded {
             continue;
         }
@@ -949,6 +937,9 @@ fn spawn_perimeter_prop(
             decor_markers(name),
             RigidBody::Fixed,
             Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+            // Le SceneRoot enfant porte InheritedVisibility : le parent doit
+            // participer à la hiérarchie de visibilité pour éviter B0004.
+            Visibility::Visible,
         ))
         .id();
     // Enfant visuel (scale appliqué par calibration ; parent reste scale 1).
@@ -957,7 +948,10 @@ fn spawn_perimeter_prop(
         Name::new("DecorVisual"),
         SceneRoot(handle.clone()),
         Transform::IDENTITY,
-        NeedsDecorCalibrate { target_m, user_scale },
+        NeedsDecorCalibrate {
+            target_m,
+            user_scale,
+        },
     ));
     // Collider mesh-fidèle : ConvexHull construit depuis le mesh chargé par
     // `sys_decor_build_hull_colliders` (suit la silhouette ; fiable). Fallback
@@ -1097,7 +1091,11 @@ fn plan_decor_set(cfg: &RogueliteDecorConfig, assets: &DecorAssets, seed: u64) -
         let slot = TAU * i as f32 / cfg.building_count.max(1) as f32;
         let jitter = (rng01(&mut rng) - 0.5) * (TAU / cfg.building_count.max(1) as f32) * 0.45;
         let angle = slot + jitter;
-        let radius = lerp(cfg.building_radius_min, cfg.building_radius_max, rng01(&mut rng));
+        let radius = lerp(
+            cfg.building_radius_min,
+            cfg.building_radius_max,
+            rng01(&mut rng),
+        );
         let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
         let yaw = angle + std::f32::consts::PI; // face au centre
         let target = cfg.target_building * (0.85 + rng01(&mut rng) * 0.4);
@@ -1208,7 +1206,14 @@ fn plan_decor_set(cfg: &RogueliteDecorConfig, assets: &DecorAssets, seed: u64) -
         let radius = lerp(cfg.room_radius_min, cfg.room_radius_max, rng01(&mut rng));
         let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
         let yaw0 = rng01(&mut rng) * TAU;
-        plan_wall_room(&mut specs, assets, &mut rng, pos, yaw0, cfg.room_arm_segments);
+        plan_wall_room(
+            &mut specs,
+            assets,
+            &mut rng,
+            pos,
+            yaw0,
+            cfg.room_arm_segments,
+        );
     }
 
     // ── Gravats au sol (masque la répétition des dalles, sans collider) ───────
@@ -1337,7 +1342,7 @@ pub fn sys_write_decor_sensor(
         r#"{{"id":"stage_decor","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"decor_total":{total},"landmarks":{landmarks},"braziers":{braziers},"walls":{walls},"big_props":{big},"rubble":{rubble},"scatter":{scatter}}}"#,
         time.elapsed_secs(),
     );
-    let _ = fs::write(SENSOR_PATH, json);
+    let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 }
 
 /// Pur — testable.
@@ -1348,7 +1353,10 @@ pub fn severity_for_decor(total: u32) -> (&'static str, &'static str) {
             "0 prop décor (hors arène ou decor_enabled=0). Read roguelite_decor.toml.",
         )
     } else {
-        ("ok", "Décor posé. Ajuste rayons/counts/targets via roguelite_decor.toml (Shift+F12).")
+        (
+            "ok",
+            "Décor posé. Ajuste rayons/counts/targets via roguelite_decor.toml (Shift+F12).",
+        )
     }
 }
 

@@ -17,8 +17,8 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_ui_lib::style::{
-    cartoon_btn, glass_frame_hero, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL,
-    FORGE_PANEL_LIGHT, HAIR_GOLD_STRONG,
+    cartoon_btn, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL, FORGE_PANEL_LIGHT,
+    HAIR_GOLD_STRONG,
 };
 use forgia_ui_lib::theme::display_text;
 
@@ -233,15 +233,10 @@ fn draw_hub_chrome(
                 .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        for tab in [
-                            HubTab::Forge,
-                            HubTab::Armes,
-                            HubTab::Talents,
-                            HubTab::Enclume,
-                            HubTab::Codex,
-                            HubTab::Missions,
-                            HubTab::Succes,
-                        ] {
+                        // Hub-menu étape 7 : les sections P1 (Talents/Codex/Missions/
+                        // Succès) vivent au MENU-titre désormais → le hub Lobby ne
+                        // garde que les onglets de configuration de run.
+                        for tab in [HubTab::Forge, HubTab::Armes, HubTab::Enclume] {
                             let selected = *hub == tab;
                             let resp = ui.add(egui::Button::selectable(
                                 selected,
@@ -271,55 +266,10 @@ fn draw_hub_chrome(
             );
         });
 
-    // ── Sections « dashboard » (Talents / Codex / Missions / Succès) — panneau verre ──
-    // P1 « shell » roguelite : la navigation complète est là tout de suite ; le
-    // gameplay de chaque section arrive en stories suivantes. Codex affiche déjà les
-    // vrais archétypes ennemis (données réelles, pas un placeholder).
-    if matches!(
-        *hub,
-        HubTab::Talents | HubTab::Codex | HubTab::Missions | HubTab::Succes
-    ) {
-        let pts = progress.as_ref().map(|p| p.talent_points).unwrap_or(0);
-        egui::Area::new(egui::Id::new("hub_section_panel"))
-            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-            .show(ctx, |ui| {
-                glass_frame_hero()
-                    .inner_margin(egui::Margin::symmetric(40, 30))
-                    .show(ui, |ui| {
-                        ui.set_max_width(700.0);
-                        ui.vertical_centered(|ui| match *hub {
-                            HubTab::Codex => draw_codex_section(ui),
-                            HubTab::Talents => {
-                                section_intro(
-                                    ui,
-                                    "Arbres de talents",
-                                    "Choisis ton style — Feu · Givre · Éclair · Poison — et débloque \
-                                     des combos signature en jouant.",
-                                );
-                                ui.add_space(8.0);
-                                ui.label(display_text(
-                                    format!("{pts} point(s) de talent en attente"),
-                                    18.0,
-                                    FORGE_OR,
-                                ));
-                            }
-                            HubTab::Missions => section_intro(
-                                ui,
-                                "Missions",
-                                "Des défis quotidiens & hebdomadaires. Accomplis-les pour gagner \
-                                 des Âmes et débloquer des titres.",
-                            ),
-                            HubTab::Succes => section_intro(
-                                ui,
-                                "Hauts faits",
-                                "Repousse tes limites — chaque haut fait débloqué rapporte des Âmes \
-                                 et un titre à porter.",
-                            ),
-                            _ => {}
-                        });
-                    });
-            });
-    }
+    // Hub-menu étape 7 : les panneaux « dashboard » P1 (Talents/Codex/Missions/
+    // Succès) ont été retirés du hub Lobby — ils vivent au menu-titre (sections
+    // dédiées de `forgia-ui`). Les helpers `draw_codex_section`/`section_intro`
+    // restent `pub` (réutilisés par le menu).
 
     // ── Bouton LANCER (bas-centre, TOUS les onglets) — équivalent souris de Entrée ──
     // La carte ARMES remonte (ws_card à -98) et les panneaux Forge/Enclume sont
@@ -354,7 +304,10 @@ fn draw_hub_chrome(
 
 /// Intro d'une section « à venir » (Talents / Missions / Succès) : titre display +
 /// pitch + tag discret. Le vrai contenu gameplay vient en stories suivantes.
-fn section_intro(ui: &mut egui::Ui, title: &str, desc: &str) {
+///
+/// `pub` : réutilisé par le hub-menu (`forgia-ui`) pour rendre les mêmes sections
+/// data au menu-titre (story-menu-hub, pas de duplication).
+pub fn section_intro(ui: &mut egui::Ui, title: &str, desc: &str) {
     ui.label(display_text(title, 30.0, C_PRIMARY).strong());
     ui.add_space(12.0);
     ui.label(egui::RichText::new(desc).size(16.0).color(FORGE_CREME));
@@ -369,7 +322,10 @@ fn section_intro(ui: &mut egui::Ui, title: &str, desc: &str) {
 
 /// Codex · Bestiaire — cartes des 4 archétypes ennemis. Contenu réel (comportement
 /// aligné sur `enemies.rs`), pas un placeholder. Textes UI cosmétiques.
-fn draw_codex_section(ui: &mut egui::Ui) {
+///
+/// `pub` : réutilisé par le hub-menu (`forgia-ui`) pour rendre le Codex au
+/// menu-titre (story-menu-hub, pas de duplication).
+pub fn draw_codex_section(ui: &mut egui::Ui) {
     ui.label(display_text("Bestiaire", 28.0, C_PRIMARY).strong());
     ui.add_space(14.0);
     const ENTRIES: [(&str, &str); 4] = [

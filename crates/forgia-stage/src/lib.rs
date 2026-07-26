@@ -54,8 +54,7 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_level_presets::{LevelModulesGenome, LevelModulesHandles, ModulePaletteEntry};
 use forgia_prefab::{spawn_gltf_prefab, PrefabSpawn, PrefabStats};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
+use std::collections::{BTreeSet, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const STAGES_GENOME_PATH: &str = "genomes/roguelite_stages.toml";
@@ -271,6 +270,15 @@ pub struct StageGenomeHandles {
     pub arena_layouts: Handle<Genome<authored::ArenaLayoutsGenome>>,
 }
 
+/// Handles de toutes les scènes référencées par les genomes de stage. Ils sont
+/// résolus dès le boot afin que l'I/O GLTF et les pipelines soient amortis au
+/// Lobby, plutôt que déclenchés au passage d'un portail.
+#[derive(Resource, Default)]
+pub struct StageScenePreloads {
+    pub scenes: Vec<Handle<Scene>>,
+    pub ready: bool,
+}
+
 // Note story-485 phase 3 : `LevelModulesGenome` n'est pas stocké ici. Le
 // `ForgiaLevelPresetsPlugin` (ajouté via `is_plugin_added` guard) gère son
 // propre `LevelModulesHandles` Resource. Phase 5 read directement via
@@ -351,11 +359,16 @@ impl Plugin for ForgiaStageArenaPlugin {
             .register_asset_loader(GenomeLoader::<authored::ArenaLayoutsGenome>::default())
             .init_resource::<StageLoadResult>()
             .init_resource::<StageGenomeHandles>()
+            .init_resource::<StageScenePreloads>()
             .init_resource::<StageArenaTuning>()
             .init_resource::<LayoutResult>()
             // Story-663 — cache des fusions statiques (re-entrée = zéro rebuild).
             .init_resource::<floor_merge::MergedStaticCache>()
             .add_systems(Startup, load_stage_genomes)
+            .add_systems(
+                Update,
+                sys_preload_stage_scenes.in_set(forgia_core::prelude::GameSet::Movement),
+            )
             // L7 SystemSets — stage-arena is **mode-agnostic by design** : il sera
             // consommé par forgia-mode-roguelite (V1), forgia-mode-fps-arena (M4),
             // forgia-rpg (POI hubs), etc. Pas de `run_if(in_state(
@@ -417,6 +430,45 @@ fn load_stage_genomes(asset_server: Res<AssetServer>, mut handles: ResMut<StageG
     info!(
         "[forgia-stage-arena] Genome handles loading: stages={} pois={} arena_layouts={}",
         STAGES_GENOME_PATH, POIS_GENOME_PATH, ARENA_LAYOUTS_GENOME_PATH
+    );
+}
+
+/// Une fois les deux genomes disponibles, charge de façon asynchrone toutes les
+/// scènes possibles de stage. Les handles restent vivants dans la ressource et
+/// sont aussi consommés par le warmup de pipeline Roguelite ; aucun chemin
+/// d'asset n'est dupliqué dans le code du mode.
+fn sys_preload_stage_scenes(
+    handles: Res<StageGenomeHandles>,
+    stages_assets: Res<Assets<Genome<RogueliteStagesGenome>>>,
+    layout_assets: Res<Assets<Genome<authored::ArenaLayoutsGenome>>>,
+    asset_server: Res<AssetServer>,
+    mut preloads: ResMut<StageScenePreloads>,
+) {
+    if preloads.ready {
+        return;
+    }
+    let Some(stages) = stages_assets.get(&handles.stages) else {
+        return;
+    };
+    let Some(layouts) = layout_assets.get(&handles.arena_layouts) else {
+        return;
+    };
+    let mut paths = BTreeSet::new();
+    paths.extend(MERGED_FLOOR_GLB.map(str::to_owned));
+    for stage in stages.data.stages.values() {
+        paths.insert(ramparts_wall_glb(&stage.ramparts_kit).to_owned());
+    }
+    for layout in layouts.data.layouts.values() {
+        paths.extend(layout.pieces.iter().map(|piece| piece.prefab.clone()));
+    }
+    preloads.scenes = paths
+        .into_iter()
+        .map(|path| asset_server.load(format!("{path}#Scene0")))
+        .collect();
+    preloads.ready = true;
+    info!(
+        "[stage-arena] preloaded {} unique stage scene classes from genomes",
+        preloads.scenes.len()
     );
 }
 
@@ -495,7 +547,7 @@ fn write_stage_sensor(
         next_step,
     };
     if let Ok(json) = serde_json::to_string_pretty(&payload) {
-        let _ = fs::write(SENSOR_PATH, json);
+        let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
     }
 }
 
@@ -713,9 +765,9 @@ fn biome_lighting_params(biome: &str) -> (Color, f32, Color, f32, Color) {
         // Crypts of Anvil bible: warm amber sun + fill orange forge + sky rouge sombre
         "Volcanic" => (
             Color::srgb(1.0, 0.75, 0.50),  // sun amber forge
-            8_000.0,                        // dimmer = moodier mais lisible
+            8_000.0,                       // dimmer = moodier mais lisible
             Color::srgb(0.95, 0.55, 0.35), // fill orangé braise (réchauffe les ombres)
-            3_000.0,                        // ~37% du sun, fill généreux
+            3_000.0,                       // ~37% du sun, fill généreux
             Color::srgb(0.12, 0.06, 0.05), // sky rouge braise sombre
         ),
         // Forge Sanctum bible: lumière douce sanctuaire ouvert
@@ -1019,8 +1071,7 @@ fn spawn_stage_arena_on_request(
         .map(|l| l.suppress_procedural_modules)
         .unwrap_or(false);
     let mut authored_pieces_spawned: u32 = 0;
-    let mut authored_sections: std::collections::HashSet<String> =
-        std::collections::HashSet::new();
+    let mut authored_sections: std::collections::HashSet<String> = std::collections::HashSet::new();
     if let Some(layout) = authored_layout.as_ref() {
         for (i, piece) in layout.pieces.iter().enumerate() {
             let pos = Vec3::new(piece.pos[0], piece.pos[1], piece.pos[2]);
@@ -1398,7 +1449,10 @@ mod tests {
             let boss = (intensity * 1.4).min(8_000.0);
             assert!(boss <= 8_000.0, "{biome}: glow boss {boss} dépasse 8k");
             assert!(intensity > 0.0, "{biome}: glow nul");
-            assert!((5.0..=20.0).contains(&range), "{biome}: range {range} hors plage");
+            assert!(
+                (5.0..=20.0).contains(&range),
+                "{biome}: range {range} hors plage"
+            );
         }
     }
 

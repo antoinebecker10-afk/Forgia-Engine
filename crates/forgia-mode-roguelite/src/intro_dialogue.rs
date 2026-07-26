@@ -198,7 +198,7 @@ fn sys_write_intro_sensor(time: Res<Time>, mut accum: Local<f32>, intro: Res<Int
         intro.index,
         intro.revealed,
     );
-    if let Err(e) = std::fs::write("forgia2_roguelite_intro.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_roguelite_intro.json", json) {
         warn!("[roguelite-intro] sensor write failed: {e}");
     }
 }

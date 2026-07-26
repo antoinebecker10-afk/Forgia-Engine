@@ -1,26 +1,5 @@
-# roguelite_gamefeel.toml — story-648 : paliers de hitstop (audit VFX 2026-07-02).
-#
-# La durée de BASE du hitstop reste PAR-ARME (`hit_stop_duration` du genome arme,
-# ~0.05 s) : un hit normal garde EXACTEMENT le feel historique (×1.0). Ces genes
-# multiplient la base selon l'issue du tir — c'est ce qui fait « sentir » la
-# différence entre toucher, critiquer et TUER (réfs SF2 / ULTRAKILL / Vlambeer :
-# kill >> hit). Hot-reload mtime 1Hz. État runtime : forgia2_gamefeel.json.
-#
-# Base 0.05 s → hit 50 ms · crit 75 ms · kill 125 ms · multikill 200 ms.
-
-[[genes]]
-id = "hitstop_crit_mult"
-default = 1.5   # crit OU weakspot (tête) sur au moins un pellet. Clamp 1.0..8.0
-
-[[genes]]
-id = "hitstop_kill_mult"
-default = 2.5   # exactement 1 kill dans le tir
-
-[[genes]]
-id = "hitstop_multikill_mult"
-default = 4.0   # ≥2 kills dans le MÊME tir (shotgun/perçant) — l'événement rare
-
-# ── Knockback (story-650) — chaque balle POUSSE l'ennemi (trick Vlambeer) ─────
+# roguelite_gamefeel.toml — knockback (story-650).
+# Chaque balle pousse l'ennemi ; aucun ralentissement global n'est appliqué au tir.
 # Déplacements en MÈTRES totaux. Capteur : forgia2_knockback.json.
 
 [[genes]]

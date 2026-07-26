@@ -119,8 +119,7 @@ impl WeaponType {
     // Le firing path V2 lit damage/fire_rate/range/pellets/spread_deg via
     // `forgia-fps::ViewmodelGenomeEntry` chargé depuis `viewmodel_arena.toml`.
     // La vraie migration TOML weapons (avec splash/projectile speed/falloff
-    // unifiés) reviendra avec l'extraction Tier 2A `forgia-weapon-hitscan`
-    // (memory `reference_v2_tier1_refacto_status_2026_05_17.md`).
+    // unifiés) ne sera envisagée qu'avec un besoin multi-consommateur mesuré.
 }
 
 // =============================================================================

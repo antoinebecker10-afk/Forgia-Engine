@@ -135,8 +135,9 @@ pub fn place_modules(
             // le corridor de circulation Player↔Boss. Le 1er CoverHigh est l'unique
             // obstacle intentionnel sur l'axe (sight-line break story-485, obstacle
             // contournable par player).
-            let is_sightline_anchor =
-                matches!(def.kind, ModuleKind::CoverWall) && sightline_break_pending && instance_idx == 0;
+            let is_sightline_anchor = matches!(def.kind, ModuleKind::CoverWall)
+                && sightline_break_pending
+                && instance_idx == 0;
             let respect_corridor = !is_sightline_anchor;
 
             let pos_opt = match def.kind {
@@ -1242,13 +1243,10 @@ mod tests {
         let extent = 90.0_f32;
         let player = Vec3::new(0.0, 0.0, 0.0);
         let boss = Vec3::new(0.0, 0.0, -extent * 0.7); // Crypts boss pos
-        // Itère sur plusieurs seeds pour pas dépendre d'un cas unique
+                                                       // Itère sur plusieurs seeds pour pas dépendre d'un cas unique
         for seed in [42u64, 7, 99, 1234, 0xDEAD_BEEF] {
             let placements = place_modules(extent, &modules, &palette, player, Some(boss), seed);
-            assert!(
-                !placements.is_empty(),
-                "seed {seed}: solver n'a rien placé"
-            );
+            assert!(!placements.is_empty(), "seed {seed}: solver n'a rien placé");
 
             // Le 1er CoverWall (sight-line anchor) est exempté. On ne contrôle
             // que les autres modules.
@@ -1300,7 +1298,10 @@ mod tests {
         for seed in [1u64, 2, 3, 7, 42] {
             let placements = place_modules(extent, &modules, &palette, player, Some(boss), seed);
             // Trouve le 1er CoverWall (le sight-line anchor)
-            let Some(first_high) = placements.iter().find(|m| matches!(m.kind, ModuleKind::CoverWall)) else {
+            let Some(first_high) = placements
+                .iter()
+                .find(|m| matches!(m.kind, ModuleKind::CoverWall))
+            else {
                 panic!("seed {seed}: aucun CoverWall placé (palette devrait en avoir au moins 1)");
             };
             // Doit être proche du midpoint (sample_near fallback = 8m max)

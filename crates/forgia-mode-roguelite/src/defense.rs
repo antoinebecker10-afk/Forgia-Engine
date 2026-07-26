@@ -55,12 +55,30 @@ pub struct DefenseConfig {
 impl Default for DefenseConfig {
     fn default() -> Self {
         Self {
-            tank: DefensePool { shield_max: 0.0, armor_max: 80.0 },
-            runner: DefensePool { shield_max: 30.0, armor_max: 0.0 },
-            sniper: DefensePool { shield_max: 40.0, armor_max: 0.0 },
-            boss: DefensePool { shield_max: 200.0, armor_max: 150.0 },
-            player: DefensePool { shield_max: 50.0, armor_max: 0.0 },
-            regen: RegenParams { rate: 20.0, delay: 3.0 },
+            tank: DefensePool {
+                shield_max: 0.0,
+                armor_max: 80.0,
+            },
+            runner: DefensePool {
+                shield_max: 30.0,
+                armor_max: 0.0,
+            },
+            sniper: DefensePool {
+                shield_max: 40.0,
+                armor_max: 0.0,
+            },
+            boss: DefensePool {
+                shield_max: 200.0,
+                armor_max: 150.0,
+            },
+            player: DefensePool {
+                shield_max: 50.0,
+                armor_max: 0.0,
+            },
+            regen: RegenParams {
+                rate: 20.0,
+                delay: 3.0,
+            },
         }
     }
 }
@@ -282,7 +300,7 @@ pub fn sys_write_shield_sensor(
         config.regen.rate,
         config.regen.delay,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[defense] sensor write failed: {e}");
     }
 }
@@ -294,10 +312,19 @@ mod tests {
     #[test]
     fn default_pools_match_gunfire_lite_design() {
         let c = DefenseConfig::default();
-        assert_eq!(c.tank.armor_max, 80.0, "Tank = armure lourde, pas de bouclier");
+        assert_eq!(
+            c.tank.armor_max, 80.0,
+            "Tank = armure lourde, pas de bouclier"
+        );
         assert_eq!(c.tank.shield_max, 0.0);
-        assert_eq!(c.runner.shield_max, 30.0, "Runner = bouclier léger régénérant");
-        assert!(c.boss.shield_max > 0.0 && c.boss.armor_max > 0.0, "Boss = deux couches");
+        assert_eq!(
+            c.runner.shield_max, 30.0,
+            "Runner = bouclier léger régénérant"
+        );
+        assert!(
+            c.boss.shield_max > 0.0 && c.boss.armor_max > 0.0,
+            "Boss = deux couches"
+        );
         assert_eq!(c.player.shield_max, 50.0);
     }
 
@@ -352,6 +379,10 @@ delay = 3.0
 "#;
         let c = DefenseConfig::parse_toml(toml);
         assert_eq!(c.tank.shield_max, 100.0, "override tank shield lu du TOML");
-        assert_ne!(c, DefenseConfig::default(), "diff du Default → hot-reload déclenchable");
+        assert_ne!(
+            c,
+            DefenseConfig::default(),
+            "diff du Default → hot-reload déclenchable"
+        );
     }
 }

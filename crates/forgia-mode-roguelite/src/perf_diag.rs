@@ -147,9 +147,15 @@ pub fn sys_perf_diag(
             "freeze cette seconde — corréler frame_max_ms avec auras/particles/lights/enemies ci-dessous",
         )
     } else if st.spikes_30 > 2 {
-        ("warn", "stutter soutenu (>2 spikes 30ms/s) — charge par-frame trop haute")
+        (
+            "warn",
+            "stutter soutenu (>2 spikes 30ms/s) — charge par-frame trop haute",
+        )
     } else if st.spikes_15 > 4 {
-        ("warn", "micro-stutter (>4 frames 15ms+/s) — hitchs perceptibles sous le seuil 30ms")
+        (
+            "warn",
+            "micro-stutter (>4 frames 15ms+/s) — hitchs perceptibles sous le seuil 30ms",
+        )
     } else {
         ("ok", "")
     };
@@ -224,7 +230,7 @@ pub fn sys_perf_diag(
         st.frames,
         st.freezes.len(),
     );
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[perf-diag] sensor write failed: {e}");
     }
 

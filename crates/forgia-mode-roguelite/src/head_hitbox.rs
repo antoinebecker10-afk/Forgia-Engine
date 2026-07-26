@@ -18,7 +18,6 @@
 
 use bevy::prelude::*;
 use forgia_core::prelude::*;
-use std::fs;
 
 const SENSOR_PATH: &str = "forgia2_head_hitbox.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
@@ -170,7 +169,7 @@ pub fn sys_write_head_hitbox_sensor(
         r#"{{"id":"head_hitbox","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"proxies":{proxies},"bound":{bound}}}"#,
         time.elapsed_secs(),
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[head_hitbox] sensor write failed: {e}");
     }
 }

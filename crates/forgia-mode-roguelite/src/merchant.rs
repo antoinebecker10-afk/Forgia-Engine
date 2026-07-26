@@ -521,86 +521,86 @@ pub fn sys_apply_purchase(
     mut commands: Commands,
 ) {
     for req in reqs.read() {
-    let Some(item) = cat.items.get(req.index) else {
-        continue;
-    };
+        let Some(item) = cat.items.get(req.index) else {
+            continue;
+        };
 
-    // Solde dans la bonne monnaie ?
-    let balance = match item.currency {
-        Currency::Or => gold.as_deref().map(|g| g.current).unwrap_or(0),
-        Currency::Ames => meta.current,
-    };
-    if balance < item.cost {
-        info!(
-            "[merchant] pas assez de {} pour {} ({}/{})",
-            item.currency.label(),
-            item.name,
-            balance,
-            item.cost
-        );
-        continue;
-    }
+        // Solde dans la bonne monnaie ?
+        let balance = match item.currency {
+            Currency::Or => gold.as_deref().map(|g| g.current).unwrap_or(0),
+            Currency::Ames => meta.current,
+        };
+        if balance < item.cost {
+            info!(
+                "[merchant] pas assez de {} pour {} ({}/{})",
+                item.currency.label(),
+                item.name,
+                balance,
+                item.cost
+            );
+            continue;
+        }
 
-    // Débit.
-    match item.currency {
-        Currency::Or => {
-            if let Some(g) = gold.as_deref_mut() {
-                g.current -= item.cost;
+        // Débit.
+        match item.currency {
+            Currency::Or => {
+                if let Some(g) = gold.as_deref_mut() {
+                    g.current -= item.cost;
+                }
+            }
+            Currency::Ames => {
+                meta.current -= item.cost;
             }
         }
-        Currency::Ames => {
-            meta.current -= item.cost;
-        }
-    }
 
-    // Effet.
-    match item.effect {
-        MerchantEffect::AmmoCurrent => {
-            if let Some(eq) = equipped.as_deref_mut() {
-                let current = eq.current;
-                if let Some(slot) = eq.slots.get_mut(&current) {
-                    slot.current_mag = slot.config.mag_size;
-                    slot.reserve = slot.config.reserve_max;
-                } else {
-                    warn!(
+        // Effet.
+        match item.effect {
+            MerchantEffect::AmmoCurrent => {
+                if let Some(eq) = equipped.as_deref_mut() {
+                    let current = eq.current;
+                    if let Some(slot) = eq.slots.get_mut(&current) {
+                        slot.current_mag = slot.config.mag_size;
+                        slot.reserve = slot.config.reserve_max;
+                    } else {
+                        warn!(
                         "[merchant] Munitions : aucun slot pour l'arme courante {:?} — débit sans effet",
                         current
                     );
-                }
-            }
-        }
-        MerchantEffect::AmmoAll => {
-            if let Some(eq) = equipped.as_deref_mut() {
-                for slot in eq.slots.values_mut() {
-                    slot.current_mag = slot.config.mag_size;
-                    slot.reserve = slot.config.reserve_max;
-                }
-            }
-        }
-        MerchantEffect::Heal(amount) => {
-            if let Ok(player_e) = q_player.single() {
-                // Miroir stations heal — défère pour éviter conflit de Query.
-                commands.queue(move |world: &mut World| {
-                    if let Some(mut hp) = world.get_mut::<forgia_damage::Health>(player_e) {
-                        hp.current = (hp.current + amount).min(hp.max);
                     }
-                });
+                }
+            }
+            MerchantEffect::AmmoAll => {
+                if let Some(eq) = equipped.as_deref_mut() {
+                    for slot in eq.slots.values_mut() {
+                        slot.current_mag = slot.config.mag_size;
+                        slot.reserve = slot.config.reserve_max;
+                    }
+                }
+            }
+            MerchantEffect::Heal(amount) => {
+                if let Ok(player_e) = q_player.single() {
+                    // Miroir stations heal — défère pour éviter conflit de Query.
+                    commands.queue(move |world: &mut World| {
+                        if let Some(mut hp) = world.get_mut::<forgia_damage::Health>(player_e) {
+                            hp.current = (hp.current + amount).min(hp.max);
+                        }
+                    });
+                }
+            }
+            MerchantEffect::Revive => {
+                revive.0 += 1;
+                stats.revives_granted += 1;
             }
         }
-        MerchantEffect::Revive => {
-            revive.0 += 1;
-            stats.revives_granted += 1;
-        }
-    }
 
-    stats.purchases_total += 1;
-    stats.last_purchase = item.id.clone();
-    info!(
-        "[merchant] acheté {} (-{} {})",
-        item.name,
-        item.cost,
-        item.currency.label()
-    );
+        stats.purchases_total += 1;
+        stats.last_purchase = item.id.clone();
+        info!(
+            "[merchant] acheté {} (-{} {})",
+            item.name,
+            item.cost,
+            item.currency.label()
+        );
     }
 }
 
@@ -631,7 +631,10 @@ pub fn sys_write_merchant_sensor(
         .replace('\\', "\\\\")
         .replace('"', "\\\"");
     let (severity, next_step) = if cat.items.is_empty() {
-        ("warn", "Catalogue commerçant vide — vérifier roguelite_merchant.toml")
+        (
+            "warn",
+            "Catalogue commerçant vide — vérifier roguelite_merchant.toml",
+        )
     } else {
         ("ok", "")
     };
@@ -647,7 +650,7 @@ pub fn sys_write_merchant_sensor(
         stats.revives_granted,
         last,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[merchant] sensor write failed: {e}");
     }
 }
@@ -688,10 +691,7 @@ impl Plugin for MerchantPlugin {
                 .in_set(GameSet::UI)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        app.add_systems(
-            Update,
-            sys_write_merchant_sensor.in_set(GameSet::Sensors),
-        );
+        app.add_systems(Update, sys_write_merchant_sensor.in_set(GameSet::Sensors));
     }
 }
 

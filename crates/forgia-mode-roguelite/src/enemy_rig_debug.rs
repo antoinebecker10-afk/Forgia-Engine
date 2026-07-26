@@ -172,8 +172,14 @@ mod tests {
 
     #[test]
     fn arch_colors_distinct() {
-        assert_ne!(arch_color(EnemyArchetype::Tank), arch_color(EnemyArchetype::Runner));
-        assert_ne!(arch_color(EnemyArchetype::Sniper), arch_color(EnemyArchetype::Boss));
+        assert_ne!(
+            arch_color(EnemyArchetype::Tank),
+            arch_color(EnemyArchetype::Runner)
+        );
+        assert_ne!(
+            arch_color(EnemyArchetype::Sniper),
+            arch_color(EnemyArchetype::Boss)
+        );
     }
 
     #[test]

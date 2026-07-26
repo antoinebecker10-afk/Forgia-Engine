@@ -216,7 +216,11 @@ pub fn spawn_wave_enemies(
                 Collider::capsule_y(stats.capsule_half_height, stats.capsule_radius),
                 Sensor,
             ));
-            // Visual KayKit Skeleton SceneRoot (story-517 — remplace Capsule3d).
+            // Chaque ennemi garde son rig KayKit complet : animation, rattachement
+            // de la hitbox tête au joint `head` et silhouette cohérente. Le profil
+            // Tracy 17 a identifié le sous-arbre `DemoLevel` comme source majeure
+            // des pics actuels ; un proxy global par vague dégradait inutilement le
+            // combat sans traiter cette racine statique.
             commands
                 .spawn((
                     Name::new(format!(
@@ -229,9 +233,13 @@ pub fn spawn_wave_enemies(
                     // Y offset : KayKit pivot au sol → translate down par
                     // (capsule_half_height + capsule_radius) pour aligner les
                     // pieds avec le BAS de la capsule parent (sinon lévitation).
-                    Transform::from_xyz(0.0, -(stats.capsule_half_height + stats.capsule_radius), 0.0)
-                        .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
-                        .with_scale(Vec3::splat(scene_scale)),
+                    Transform::from_xyz(
+                        0.0,
+                        -(stats.capsule_half_height + stats.capsule_radius),
+                        0.0,
+                    )
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI))
+                    .with_scale(Vec3::splat(scene_scale)),
                 ))
                 // Story-636 — au scene-ready : rend le mesh translucide (clone de
                 // matériau dédupliqué) pour la viz de contrôle du rig.
@@ -313,8 +321,12 @@ pub fn sys_wave_orchestrator(
     // pas déjà en break, et PAS en attente de choix de porte (fix boucle infinie
     // 2026-07-02 : le portail laissait seen_alive=true → re-clear → re-break →
     // re-Coffre → +5 Âmes toutes les 15 s, la run ne quittait jamais la salle 0).
-    if clear_detection_armed(alive, wave.seen_alive, wave.in_break, !wave.portal_choices.is_empty())
-    {
+    if clear_detection_armed(
+        alive,
+        wave.seen_alive,
+        wave.in_break,
+        !wave.portal_choices.is_empty(),
+    ) {
         // Vague nettoyée — démarre break ou victory.
         if in_boss_stage {
             // Story-571 — bonus Souls méta pour le boss/finale (persistant).
@@ -346,8 +358,8 @@ pub fn sys_wave_orchestrator(
         // commands.queue car forgia_damage::Health pas accessible en SystemParam
         // direct (cf miror pattern sys_start_run run.rs:446-451).
         commands.queue(|world: &mut World| {
-            let mut q = world
-                .query_filtered::<&mut forgia_damage::Health, With<forgia_player::Player>>();
+            let mut q =
+                world.query_filtered::<&mut forgia_damage::Health, With<forgia_player::Player>>();
             if let Ok(mut hp) = q.single_mut(world) {
                 hp.current = hp.max;
             }
@@ -543,6 +555,21 @@ pub fn sys_boss_enrage(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::asset::AssetPlugin;
+
+    fn spawn_first_wave_for_qa(
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        stats_cfg: Res<EnemyStatsConfig>,
+        def_cfg: Res<DefenseConfig>,
+        mut spawned: Local<bool>,
+    ) {
+        if *spawned {
+            return;
+        }
+        spawn_wave_enemies(&mut commands, &asset_server, &stats_cfg, &def_cfg, 1);
+        *spawned = true;
+    }
 
     #[test]
     fn wave_composition_grows() {
@@ -584,9 +611,18 @@ mod tests {
             !clear_detection_armed(0, true, false, true),
             "en attente de porte → désarmée (LE bug)"
         );
-        assert!(!clear_detection_armed(0, true, true, false), "en break → désarmée");
-        assert!(!clear_detection_armed(0, false, false, false), "gate anti-race");
-        assert!(!clear_detection_armed(3, true, false, false), "bots vivants");
+        assert!(
+            !clear_detection_armed(0, true, true, false),
+            "en break → désarmée"
+        );
+        assert!(
+            !clear_detection_armed(0, false, false, false),
+            "gate anti-race"
+        );
+        assert!(
+            !clear_detection_armed(3, true, false, false),
+            "bots vivants"
+        );
     }
 
     #[test]
@@ -595,11 +631,165 @@ mod tests {
         let w = RogueliteWave::default();
         assert_eq!(w.stage, 0);
         assert!(!w.seen_alive);
-        assert_eq!(BOSS_WAVE_COMPOSITION, 3, "compos boss = branche _ de wave_composition");
+        assert_eq!(
+            BOSS_WAVE_COMPOSITION, 3,
+            "compos boss = branche _ de wave_composition"
+        );
     }
 
     #[test]
     fn break_secs_positive() {
         assert!(BREAK_SECS > 0.0);
+    }
+
+    /// Régression visuelle : une vague jouable doit conserver un rig KayKit par
+    /// ennemi. Ce test est volontairement headless : il contrôle le contrat ECS
+    /// de spawn sans imposer une progression manuelle jusqu'à l'arène.
+    #[test]
+    fn qa_wave_one_spawns_an_animated_scene_for_every_enemy() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(AssetPlugin::default());
+        app.init_asset::<Scene>();
+        app.insert_resource(EnemyStatsConfig::default());
+        app.insert_resource(DefenseConfig::default());
+        app.add_systems(Update, spawn_first_wave_for_qa);
+
+        app.update();
+
+        let enemy_count = app
+            .world_mut()
+            .query_filtered::<Entity, With<ArenaBot>>()
+            .iter(app.world())
+            .count();
+        let visuals: Vec<String> = app
+            .world_mut()
+            .query_filtered::<&Name, With<SceneRoot>>()
+            .iter(app.world())
+            .map(ToString::to_string)
+            .collect();
+
+        assert_eq!(enemy_count, 8, "la vague 1 doit créer ses 8 bots");
+        assert_eq!(
+            visuals.len(),
+            enemy_count,
+            "chaque bot doit avoir un SceneRoot animé"
+        );
+        assert!(
+            visuals.iter().all(|name| name.contains("_visual")),
+            "aucun visuel de vague ne doit être un proxy statique: {visuals:?}"
+        );
+    }
+
+    /// QA headless du flux de combat : une vague réellement vue vivante, puis
+    /// vidée, doit ouvrir le break et créer la vague suivante. Cela remplace le
+    /// trajet manuel jusqu'à l'arène pour cette régression de progression.
+    #[test]
+    fn qa_wave_clear_transitions_to_the_next_wave() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(AssetPlugin::default());
+        app.init_asset::<Scene>();
+        app.insert_resource(EnemyStatsConfig::default());
+        app.insert_resource(DefenseConfig::default());
+        app.insert_resource(RogueliteWave::default());
+        app.insert_resource(crate::run::MetaSouls::default());
+        app.insert_resource(forgia_stage::graph::RunGraphConfig::default());
+        app.insert_resource(NextState::<crate::run::RunState>::default());
+        app.add_message::<OpenCoffreRequest>();
+        app.add_systems(Update, sys_wave_orchestrator);
+
+        let bot = app.world_mut().spawn(ArenaBot::default()).id();
+        app.update();
+        assert!(app.world().resource::<RogueliteWave>().seen_alive);
+
+        app.world_mut().entity_mut(bot).despawn();
+        app.update();
+        {
+            let wave = app.world().resource::<RogueliteWave>();
+            assert!(wave.in_break, "une vague vidée doit démarrer son break");
+            assert_eq!(wave.current_wave, 1);
+        }
+
+        app.world_mut()
+            .resource_mut::<RogueliteWave>()
+            .break_secs_left = 0.0;
+        app.update();
+
+        let enemy_count = app
+            .world_mut()
+            .query_filtered::<Entity, With<ArenaBot>>()
+            .iter(app.world())
+            .count();
+        let wave = app.world().resource::<RogueliteWave>();
+        assert!(!wave.in_break);
+        assert_eq!(wave.current_wave, 2);
+        assert_eq!(enemy_count, 12, "la vague 2 doit être réellement créée");
+    }
+
+    /// Soak headless : simule 24 salles mono-vague. Le nombre de bots et de
+    /// SceneRoots doit revenir à sa valeur nominale après chaque clear, ce qui
+    /// détecte une accumulation d'entités de combat sans demander de parcourir
+    /// manuellement les niveaux.
+    #[test]
+    fn qa_wave_soak_keeps_combat_entities_bounded_across_rooms() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.add_plugins(AssetPlugin::default());
+        app.init_asset::<Scene>();
+        app.insert_resource(EnemyStatsConfig::default());
+        app.insert_resource(DefenseConfig::default());
+        app.insert_resource(RogueliteWave::default());
+        app.insert_resource(crate::run::MetaSouls::default());
+        app.insert_resource(forgia_stage::graph::RunGraphConfig {
+            total_stages: 26,
+            boss_stage_index: 25,
+            branching: 1,
+            director_credits_base: 2.0,
+            director_credits_stage_mult: 1.25,
+            waves_per_stage: 1,
+        });
+        app.insert_resource(NextState::<crate::run::RunState>::default());
+        app.add_message::<OpenCoffreRequest>();
+        app.add_systems(Update, sys_wave_orchestrator);
+        app.add_systems(Update, spawn_first_wave_for_qa);
+
+        app.update();
+        // Les Commands du spawn sont appliquées après l'orchestrateur : une
+        // frame suivante est nécessaire pour armer `seen_alive`, comme en jeu.
+        app.update();
+        for room in 0..24 {
+            let bots: Vec<Entity> = app
+                .world_mut()
+                .query_filtered::<Entity, With<ArenaBot>>()
+                .iter(app.world())
+                .collect();
+            assert_eq!(bots.len(), 8, "salle {room}: vague attendue");
+            for bot in bots {
+                app.world_mut().entity_mut(bot).despawn();
+            }
+
+            app.update();
+            assert!(
+                app.world().resource::<RogueliteWave>().in_break,
+                "salle {room}: clear doit ouvrir un break"
+            );
+            app.world_mut()
+                .resource_mut::<RogueliteWave>()
+                .break_secs_left = 0.0;
+            app.update();
+
+            let scene_roots = app
+                .world_mut()
+                .query_filtered::<Entity, With<SceneRoot>>()
+                .iter(app.world())
+                .count();
+            assert_eq!(
+                scene_roots, 8,
+                "salle {room}: les visuels précédents doivent être despawnés"
+            );
+            // Arme la vague qui vient d'être créée avant le clear suivant.
+            app.update();
+        }
     }
 }

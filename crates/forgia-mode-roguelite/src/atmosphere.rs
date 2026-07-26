@@ -11,10 +11,10 @@
 //! `#[require(Camera)]` (override de `GlobalAmbientLight`), champs `color,
 //! brightness, affects_lightmapped_meshes`.
 
+use crate::render_quality::RogueliteRenderConfig;
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 use forgia_player::FpsCamera;
-use crate::render_quality::RogueliteRenderConfig;
 
 // ── Réglages (tunables — me demander pour ajuster ; genome possible plus tard) ──
 /// Couleur de la brume = ce vers quoi le lointain se fond (fumée volcanique).

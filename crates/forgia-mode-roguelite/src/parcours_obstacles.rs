@@ -144,10 +144,25 @@ impl Default for ObstacleConfig {
     fn default() -> Self {
         // Miroir EXACT de assets/genomes/roguelite/roguelite_obstacles.toml.
         Self {
-            hammer: HammerParams { enabled: true, swing_deg: 62.0, freq: 1.6 },
-            spinner: SpinnerParams { enabled: true, speed: 1.0 },
-            slider: SliderParams { enabled: true, amplitude: 2.5, freq: 1.1, spin_speed: 2.0 },
-            push: PushParams { enabled: true, speed: 7.0 },
+            hammer: HammerParams {
+                enabled: true,
+                swing_deg: 62.0,
+                freq: 1.6,
+            },
+            spinner: SpinnerParams {
+                enabled: true,
+                speed: 1.0,
+            },
+            slider: SliderParams {
+                enabled: true,
+                amplitude: 2.5,
+                freq: 1.1,
+                spin_speed: 2.0,
+            },
+            push: PushParams {
+                enabled: true,
+                speed: 7.0,
+            },
         }
     }
 }
@@ -238,9 +253,11 @@ pub fn sys_hot_reload_obstacle_genome(
         info!(
             "[obstacles] HOT-RELOADED #{} — hammer {:.0}°/{:.1} spinner {:.1} slider {:.1}m/{:.1}",
             watch.reload_count,
-            new_cfg.hammer.swing_deg, new_cfg.hammer.freq,
+            new_cfg.hammer.swing_deg,
+            new_cfg.hammer.freq,
             new_cfg.spinner.speed,
-            new_cfg.slider.amplitude, new_cfg.slider.freq,
+            new_cfg.slider.amplitude,
+            new_cfg.slider.freq,
         );
         *cfg = new_cfg;
     }
@@ -353,7 +370,10 @@ pub fn sys_obstacle_push(
         return;
     };
     // Direction de répulsion : horizontalement, de l'obstacle vers le joueur.
-    let obs_pos = q_obs_gt.get(obs_e).map(|gt| gt.translation()).unwrap_or(pos);
+    let obs_pos = q_obs_gt
+        .get(obs_e)
+        .map(|gt| gt.translation())
+        .unwrap_or(pos);
     let mut dir = Vec3::new(pos.x - obs_pos.x, 0.0, pos.z - obs_pos.z);
     if dir.length_squared() < 1e-4 {
         // Joueur pile sous/au pivot → fallback : pousser vers l'arrière du joueur.
@@ -418,7 +438,7 @@ pub fn sys_write_obstacles_sensor(
         push.last_dir.z,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[obstacles] sensor write failed: {e}");
     }
 }
@@ -496,7 +516,10 @@ mod tests {
         assert_eq!(a, b, "déterministe");
         assert!((0.0..TAU).contains(&a), "borné [0,TAU)");
         // Deux positions distinctes → phases distinctes (désync).
-        assert_ne!(phase_from_pos(p), phase_from_pos(Vec3::new(0.0, 4.0, -30.0)));
+        assert_ne!(
+            phase_from_pos(p),
+            phase_from_pos(Vec3::new(0.0, 4.0, -30.0))
+        );
     }
 
     #[test]
@@ -511,7 +534,7 @@ mod tests {
     #[test]
     fn parse_garbage_falls_back_to_default() {
         assert_eq!(
-            ObstacleConfig::parse_toml("pas du toml [[[" ),
+            ObstacleConfig::parse_toml("pas du toml [[["),
             ObstacleConfig::default()
         );
     }

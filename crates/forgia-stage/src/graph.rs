@@ -452,7 +452,7 @@ fn write_stage_graph_sensor(
     };
 
     if let Ok(json) = serde_json::to_string_pretty(&payload) {
-        let _ = fs::write(SENSOR_PATH, json);
+        let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
     }
 }
 

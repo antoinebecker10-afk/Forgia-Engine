@@ -72,7 +72,12 @@ pub struct ElementVfxStats {
 fn apply_element_material(m: &mut StandardMaterial, rgb: [f32; 3]) {
     let [r, g, b] = rgb;
     m.base_color = Color::srgba(r, g, b, 0.85);
-    m.emissive = LinearRgba::new(r * EMISSIVE_BOOST, g * EMISSIVE_BOOST, b * EMISSIVE_BOOST, 1.0);
+    m.emissive = LinearRgba::new(
+        r * EMISSIVE_BOOST,
+        g * EMISSIVE_BOOST,
+        b * EMISSIVE_BOOST,
+        1.0,
+    );
     m.unlit = true;
     m.alpha_mode = AlphaMode::Blend;
 }
@@ -192,7 +197,12 @@ impl ElementBurstPool {
 fn retrigger_element_particle(
     commands: &mut Commands,
     q_particle: &mut Query<
-        (&mut ParticleEffect, &mut EffectMaterial, &mut Transform, &mut Visibility),
+        (
+            &mut ParticleEffect,
+            &mut EffectMaterial,
+            &mut Transform,
+            &mut Visibility,
+        ),
         Without<PointLight>,
     >,
     entity: Entity,
@@ -214,7 +224,12 @@ fn retrigger_element_particle(
 /// jamais despawnée (LOT B).
 #[allow(clippy::too_many_arguments)]
 fn retrigger_element_light(
-    q_light: &mut Query<(&mut Transform, &mut PointLight, &mut Visibility, &mut ElementSpark)>,
+    q_light: &mut Query<(
+        &mut Transform,
+        &mut PointLight,
+        &mut Visibility,
+        &mut ElementSpark,
+    )>,
     entity: Entity,
     pos: Vec3,
     rgb: [f32; 3],
@@ -318,9 +333,14 @@ pub fn sys_init_element_bursts(
 ) {
     let vfx = config.map(|c| c.vfx.clone()).unwrap_or_default();
     let t = tuning.as_deref().copied().unwrap_or_default();
-    let names = ["element_burst_fire", "element_burst_poison", "element_burst_shock", "element_burst_pierce"];
-    let handles =
-        ALL_ELEMENTS.map(|e| create_element_burst(&mut effect_assets, &t, e.rgb(&vfx), names[e.idx()]));
+    let names = [
+        "element_burst_fire",
+        "element_burst_poison",
+        "element_burst_shock",
+        "element_burst_pierce",
+    ];
+    let handles = ALL_ELEMENTS
+        .map(|e| create_element_burst(&mut effect_assets, &t, e.rgb(&vfx), names[e.idx()]));
     if let Some(w) = weapon_vfx.as_deref() {
         let hidden = Transform::from_xyz(0.0, -10_000.0, 0.0);
         let particles: [Entity; ELEMENT_BURST_POOL_SIZE] = std::array::from_fn(|i| {
@@ -388,10 +408,20 @@ pub fn sys_spawn_element_impact(
     pool: Option<Res<ElementBurstPool>>,
     weapon_vfx: Option<Res<WeaponVfxEffects>>,
     mut q_particle: Query<
-        (&mut ParticleEffect, &mut EffectMaterial, &mut Transform, &mut Visibility),
+        (
+            &mut ParticleEffect,
+            &mut EffectMaterial,
+            &mut Transform,
+            &mut Visibility,
+        ),
         Without<PointLight>,
     >,
-    mut q_light: Query<(&mut Transform, &mut PointLight, &mut Visibility, &mut ElementSpark)>,
+    mut q_light: Query<(
+        &mut Transform,
+        &mut PointLight,
+        &mut Visibility,
+        &mut ElementSpark,
+    )>,
 ) {
     let (Some(bursts), Some(pool), Some(weapon_vfx)) = (bursts, pool, weapon_vfx) else {
         return;
@@ -424,8 +454,7 @@ pub fn sys_spawn_element_impact(
         // sinon la sphère naît à moitié DANS le mesh du mob, occluse).
         let spawn_pos = match ev.attacker.and_then(|a| q_pos.get(a).ok()) {
             Some(a_gt) => {
-                let toward_shooter =
-                    (a_gt.translation() - ev.hit_world_pos).normalize_or_zero();
+                let toward_shooter = (a_gt.translation() - ev.hit_world_pos).normalize_or_zero();
                 ev.hit_world_pos + toward_shooter * tuning.impact_offset_m
             }
             None => ev.hit_world_pos,
@@ -482,10 +511,20 @@ pub fn sys_spawn_reaction_vfx(
     pool: Option<Res<ElementBurstPool>>,
     weapon_vfx: Option<Res<WeaponVfxEffects>>,
     mut q_particle: Query<
-        (&mut ParticleEffect, &mut EffectMaterial, &mut Transform, &mut Visibility),
+        (
+            &mut ParticleEffect,
+            &mut EffectMaterial,
+            &mut Transform,
+            &mut Visibility,
+        ),
         Without<PointLight>,
     >,
-    mut q_light: Query<(&mut Transform, &mut PointLight, &mut Visibility, &mut ElementSpark)>,
+    mut q_light: Query<(
+        &mut Transform,
+        &mut PointLight,
+        &mut Visibility,
+        &mut ElementSpark,
+    )>,
 ) {
     let (Some(bursts), Some(pool), Some(weapon_vfx)) = (bursts, pool, weapon_vfx) else {
         return;
@@ -606,13 +645,21 @@ pub fn sys_write_element_vfx_sensor(
         stats.sparks_spawned,
         stats.dot_pulses,
         stats.reaction_bursts,
-        v.fire_rgb[0], v.fire_rgb[1], v.fire_rgb[2],
-        v.poison_rgb[0], v.poison_rgb[1], v.poison_rgb[2],
-        v.shock_rgb[0], v.shock_rgb[1], v.shock_rgb[2],
-        v.armor_pierce_rgb[0], v.armor_pierce_rgb[1], v.armor_pierce_rgb[2],
+        v.fire_rgb[0],
+        v.fire_rgb[1],
+        v.fire_rgb[2],
+        v.poison_rgb[0],
+        v.poison_rgb[1],
+        v.poison_rgb[2],
+        v.shock_rgb[0],
+        v.shock_rgb[1],
+        v.shock_rgb[2],
+        v.armor_pierce_rgb[0],
+        v.armor_pierce_rgb[1],
+        v.armor_pierce_rgb[2],
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[element-vfx] sensor write failed: {e}");
     }
 }

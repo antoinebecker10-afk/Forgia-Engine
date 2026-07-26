@@ -152,8 +152,11 @@ pub fn sys_init_status_vfx_pool(
     let Some(effects) = effects else {
         return;
     };
-    const KINDS: [StatusVfxKind; 3] =
-        [StatusVfxKind::Burn, StatusVfxKind::Poison, StatusVfxKind::Shock];
+    const KINDS: [StatusVfxKind; 3] = [
+        StatusVfxKind::Burn,
+        StatusVfxKind::Poison,
+        StatusVfxKind::Shock,
+    ];
     let hidden = Transform::from_xyz(0.0, -10_000.0, 0.0);
     let slots: [Entity; STATUS_VFX_POOL_SIZE] = std::array::from_fn(|i| {
         let kind = KINDS[i % KINDS.len()];
@@ -161,7 +164,9 @@ pub fn sys_init_status_vfx_pool(
             .spawn((
                 Name::new("StatusVfxSlot"),
                 ParticleEffect::new(status_effect_handle(&effects, kind)),
-                EffectMaterial { images: vec![status_texture(&effects, kind)] },
+                EffectMaterial {
+                    images: vec![status_texture(&effects, kind)],
+                },
                 hidden,
                 Visibility::Hidden,
             ))
@@ -334,7 +339,10 @@ fn spawn_status_icon(
     let icon = t.height * 1.4;
     let x = t.width / 2.0 + t.height * (1.0 + icon_slot(kind) * 1.7);
     commands.spawn((
-        StatusIcon { target: enemy, kind },
+        StatusIcon {
+            target: enemy,
+            kind,
+        },
         Mesh3d(icon_assets.quad.clone()),
         MeshMaterial3d(icon_assets.mats[icon_mat_index(kind)].clone()),
         Transform::from_xyz(x, 0.0, 0.0).with_scale(Vec3::splat(icon)),
@@ -531,7 +539,13 @@ pub fn sys_detach_burn_vfx(
         return;
     };
     for enemy in removed.read() {
-        release_status_slot(&mut commands, &mut pool, &mut q_spawners, enemy, StatusVfxKind::Burn);
+        release_status_slot(
+            &mut commands,
+            &mut pool,
+            &mut q_spawners,
+            enemy,
+            StatusVfxKind::Burn,
+        );
         for (icon_e, icon) in &q_icons {
             if icon.target == enemy && icon.kind == StatusVfxKind::Burn {
                 if let Ok(mut e) = commands.get_entity(icon_e) {
@@ -589,7 +603,13 @@ pub fn sys_detach_shock_vfx(
         return;
     };
     for enemy in removed.read() {
-        release_status_slot(&mut commands, &mut pool, &mut q_spawners, enemy, StatusVfxKind::Shock);
+        release_status_slot(
+            &mut commands,
+            &mut pool,
+            &mut q_spawners,
+            enemy,
+            StatusVfxKind::Shock,
+        );
         for (icon_e, icon) in &q_icons {
             if icon.target == enemy && icon.kind == StatusVfxKind::Shock {
                 if let Ok(mut e) = commands.get_entity(icon_e) {

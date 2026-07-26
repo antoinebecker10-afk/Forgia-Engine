@@ -28,9 +28,11 @@ use crate::run::RunState;
 use crate::ultimate_config::UltimateConfig;
 use crate::ultimate_vfx::{weapon_technique_label, weapon_vfx_color};
 use crate::waves::RogueliteWave;
+use forgia_combat::confidence::PepinConfidence;
 use forgia_combat::ultimate::UltimateState;
-use forgia_combat::weapons::{EquippedWeapons, ARENA_V1_WEAPONS};
-use forgia_player::FpsCamera;
+use forgia_combat::weapons::{EquippedWeapons, WeaponType, ARENA_V1_WEAPONS};
+use forgia_damage::{DefenseLayer, Health as DamageHealth};
+use forgia_player::{FpsCamera, Player};
 use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonId, BoonsCatalogue};
 // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
 // use forgia_audio_voicelines::ActiveBark;
@@ -417,7 +419,7 @@ pub(crate) fn draw_defeat_overlay(
             // Story-558 Phase 7 — overlay cartoon kid-friendly :
             // fond bois clair (pas noir grimdark) + border or 5px + shadow stack.
             // Anti-pattern documenté audit §8 : punition cosmétique Defeat = décourage.
-            forge_panel_frame().show(ui, |ui| {
+            glass_frame_hero().inner_margin(egui::Margin::symmetric(80, 48)).show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(4.0);
                     // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
@@ -440,7 +442,7 @@ pub(crate) fn draw_defeat_overlay(
                                 egui::RichText::new(line)
                                     .size(22.0)
                                     .strong()
-                                    .color(FORGE_CHARBON),
+                                    .color(FORGE_CREME),
                             );
                         }
                     } else {
@@ -448,7 +450,7 @@ pub(crate) fn draw_defeat_overlay(
                             egui::RichText::new("Mais le marteau t'attend.")
                                 .size(22.0)
                                 .italics()
-                                .color(FORGE_CHARBON),
+                                .color(FORGE_CREME),
                         );
                     }
 
@@ -472,13 +474,15 @@ pub(crate) fn draw_defeat_overlay(
                             last_defeat.souls_persistent, last_defeat.or_lost
                         ))
                         .size(16.0)
-                        .color(FORGE_CHARBON),
+                        .color(FORGE_CREME),
                     );
                     ui.add_space(36.0);
 
                     // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
-                    if cartoon_btn(ui, "↻  L'ENCLUME", FORGE_OR).clicked() {
-                        info!("[roguelite-hud] Defeat → Lobby (Enclume)");
+                    // Hub-menu étape 6 : le Lobby auto-lance la run (config au menu)
+                    // → ce bouton = REJOUER direct. Shopping/reconfig = Retour au menu.
+                    if cartoon_btn(ui, "↻  REJOUER", FORGE_OR).clicked() {
+                        info!("[roguelite-hud] Defeat → Lobby (rejouer, auto-start)");
                         // Story-597 — marque le récap vu (couvre ce chemin de sortie).
                         ftue.mark_first_death(timer.secs);
                         next_run.set(RunState::Lobby);
@@ -541,7 +545,7 @@ pub(crate) fn draw_victory_overlay(
             // Story-596 Phase A — miroir cartoon du Defeat (bois + or, boutons
             // partagés) : l'écran de victoire ne peut pas être moins soigné que
             // l'écran d'échec (était : noir alpha + boutons egui par défaut).
-            forge_panel_frame().show(ui, |ui| {
+            glass_frame_hero().inner_margin(egui::Margin::symmetric(80, 48)).show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(4.0);
                     ui.heading(display_text("VICTOIRE !", 64.0, FORGE_OR).strong());
@@ -550,7 +554,7 @@ pub(crate) fn draw_victory_overlay(
                         egui::RichText::new("Le Forgeron Noir plie le genou… pour cette fois.")
                             .size(22.0)
                             .italics()
-                            .color(FORGE_CHARBON),
+                            .color(FORGE_CREME),
                     );
                     ui.add_space(20.0);
                     ui.label(
@@ -586,7 +590,7 @@ pub(crate) fn draw_victory_overlay(
                                 fmt(save.best_victory_secs)
                             ))
                             .size(18.0)
-                            .color(FORGE_CHARBON),
+                            .color(FORGE_CREME),
                         );
                     }
                     ui.label(
@@ -595,12 +599,13 @@ pub(crate) fn draw_victory_overlay(
                             save.victories, save.runs_played
                         ))
                         .size(16.0)
-                        .color(FORGE_CHARBON),
+                        .color(FORGE_CREME),
                     );
                     ui.add_space(28.0);
 
-                    if cartoon_btn(ui, "↻  L'ENCLUME DES ÂMES", FORGE_OR).clicked() {
-                        info!("[roguelite-hud] Victory → Lobby (Enclume)");
+                    // Hub-menu étape 6 : Lobby auto-lance → REJOUER direct.
+                    if cartoon_btn(ui, "↻  REJOUER", FORGE_OR).clicked() {
+                        info!("[roguelite-hud] Victory → Lobby (rejouer, auto-start)");
                         next_run.set(RunState::Lobby);
                     }
                     ui.add_space(10.0);
@@ -701,15 +706,15 @@ pub(crate) fn draw_portal_overlay(
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, -40.0))
         .show(ctx, |ui| {
             egui::Frame::new()
-                .fill(FORGE_BOIS_CLAIR)
-                .stroke(egui::Stroke::new(5.0, FORGE_OR))
+                .fill(VERRE_GLASS)
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .corner_radius(egui::CornerRadius::same(18))
                 .inner_margin(22)
                 .show(ui, |ui| {
                     ui.set_min_size(egui::vec2(panel_w, panel_h));
                     ui.set_max_width(panel_w);
                     ui.vertical_centered(|ui| {
-                        ui.label(display_text("CHOISIS TA PORTE", 32.0, FORGE_CHARBON).strong());
+                        ui.label(display_text("CHOISIS TA PORTE", 32.0, FORGE_OR).strong());
                         ui.add_space(12.0);
                     });
                     ui.horizontal(|ui| {
@@ -838,20 +843,10 @@ pub fn draw_enemy_archetype_labels(
             EnemyArchetype::Sniper => "SNIPER",
             EnemyArchetype::Boss => "BOSS",
         };
-        let color = match archetype {
-            EnemyArchetype::Tank => {
-                egui::Color32::from_rgba_unmultiplied(240, 70, 70, (255.0 * alpha) as u8)
-            }
-            EnemyArchetype::Runner => {
-                egui::Color32::from_rgba_unmultiplied(255, 180, 60, (255.0 * alpha) as u8)
-            }
-            EnemyArchetype::Sniper => {
-                egui::Color32::from_rgba_unmultiplied(190, 100, 255, (255.0 * alpha) as u8)
-            }
-            EnemyArchetype::Boss => {
-                egui::Color32::from_rgba_unmultiplied(255, 80, 200, (255.0 * alpha) as u8)
-            }
-        };
+        // Couleur d'archétype (source unique `archetype_color`) + alpha de fade distance.
+        let base = archetype_color(*archetype);
+        let color =
+            egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), (255.0 * alpha) as u8);
         let pos = egui::pos2(screen_pos.x, screen_pos.y);
         let outline = egui::Color32::from_rgba_unmultiplied(0, 0, 0, (255.0 * alpha) as u8);
         // Outline 8 directions.
@@ -994,6 +989,17 @@ pub(crate) fn draw_boss_enrage_banner(
 
 // ─── Minimap (top-left) — radar style Gunfire Reborn ───────────────────────
 
+/// Couleur cartoon par archétype ennemi — source unique (blips minimap + labels
+/// 3D), remplace les littéraux rgb dupliqués. Valeurs inchangées (no-speculative).
+pub(crate) fn archetype_color(a: EnemyArchetype) -> egui::Color32 {
+    match a {
+        EnemyArchetype::Boss => egui::Color32::from_rgb(255, 80, 200),
+        EnemyArchetype::Tank => egui::Color32::from_rgb(240, 70, 70),
+        EnemyArchetype::Sniper => egui::Color32::from_rgb(190, 100, 255),
+        EnemyArchetype::Runner => egui::Color32::from_rgb(255, 180, 60),
+    }
+}
+
 /// 2026-06-02 — Minimap radar cartoon (HUD Roguelite, modèle Gunfire Reborn).
 ///
 /// **Player-relative** : la carte tourne avec le joueur, la flèche reste fixe
@@ -1042,10 +1048,16 @@ pub(crate) fn draw_minimap(
     let center = egui::pos2(screen.min.x + pad + RADIUS, screen.min.y + pad + RADIUS);
     let scale = RADIUS / RANGE_M;
 
-    // Fond + double anneau cartoon (charbon épais + liseré or).
-    painter.circle_filled(center, RADIUS, C_BG_DARK);
-    painter.circle_stroke(center, RADIUS, egui::Stroke::new(4.0, FORGE_CHARBON));
-    painter.circle_stroke(center, RADIUS, egui::Stroke::new(2.0, FORGE_OR));
+    // Radar verre « Verre & Braise » : ombre douce + fond verre + liseré or unique
+    // (`glass_panel` est rect-only ; on en reproduit l'esprit pour le cercle, à la
+    // place de l'ancien double anneau charbon+or qui détonnait des autres panneaux).
+    painter.circle_filled(
+        center + egui::vec2(0.0, 4.0),
+        RADIUS,
+        egui::Color32::from_black_alpha(60),
+    );
+    painter.circle_filled(center, RADIUS, VERRE_GLASS);
+    painter.circle_stroke(center, RADIUS, egui::Stroke::new(1.5, HAIR_GOLD_STRONG));
 
     // Heading joueur projeté sur le plan XZ (le pitch caméra est ignoré).
     let fwd = cam_tf.forward();
@@ -1067,11 +1079,12 @@ pub(crate) fn draw_minimap(
         if blip.length() > RADIUS - 6.0 {
             blip = blip.normalized() * (RADIUS - 6.0);
         }
-        let (color, r) = match archetype {
-            EnemyArchetype::Boss => (egui::Color32::from_rgb(255, 80, 200), 5.5),
-            EnemyArchetype::Tank => (egui::Color32::from_rgb(240, 70, 70), 4.5),
-            EnemyArchetype::Sniper => (egui::Color32::from_rgb(190, 100, 255), 4.0),
-            EnemyArchetype::Runner => (egui::Color32::from_rgb(255, 180, 60), 3.5),
+        let color = archetype_color(*archetype);
+        let r = match archetype {
+            EnemyArchetype::Boss => 5.5,
+            EnemyArchetype::Tank => 4.5,
+            EnemyArchetype::Sniper => 4.0,
+            EnemyArchetype::Runner => 3.5,
         };
         let p = center + blip;
         painter.circle_filled(p, r + 1.0, FORGE_CHARBON); // outline lisibilité
@@ -1188,6 +1201,8 @@ pub(crate) fn draw_weapon_slots(
         } else {
             C_BG_DARK.gamma_multiply(0.45)
         };
+        // Ombre douce (profondeur verre, cohérent glass_panel) sous chaque slot.
+        cartoon_drop_shadow(&painter, rect, 8.0, egui::vec2(0.0, 4.0));
         painter.rect_filled(rect, 8.0, fill);
         painter.rect_stroke(
             rect,
@@ -1243,88 +1258,56 @@ pub(crate) fn draw_weapon_slots(
 
 /// 2026-06-02 — portrait cartoon de l'Apprenti (bible v1), au-dessus du HP bar.
 /// Placeholder dessiné (visage amical) en attendant un asset dédié. Roguelite-only.
-pub(crate) fn draw_player_portrait(
+/// Carte vitals unique du coin bas-gauche — **un seul système possède la zone**,
+/// donc zéro chevauchement (avant : portrait + barres défense + cœurs énergie +
+/// cœurs confiance = 4 painters indépendants qui se recouvraient). Panneau verre
+/// « Verre & Braise » (`glass_panel`), stack vertical déterministe :
+///   [portrait + nom + niveau] → [bouclier] → [armure] → [énergie] → [confiance Pépin]
+/// Gaté `in_run_or_boss` au wire-up (pas de garde interne).
+pub(crate) fn draw_vitals_card(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    game_mode: Res<State<GameMode>>,
-    run_state: Option<Res<State<RunState>>>,
-) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
-        return;
-    }
-    let in_combat = matches!(
-        run_state.as_deref().map(|s| s.get()),
-        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
-    );
-    if !in_combat {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
-    let screen = ctx.content_rect();
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Foreground,
-        egui::Id::new("forgia_roguelite_portrait"),
-    ));
-
-    use std::f32::consts::PI;
-    const R: f32 = 34.0;
-    let pad = 24.0;
-    // Juste au-dessus du HP bar (bar h=32 + container 6 + pad bas), aligné à gauche.
-    let hp_outer_top = screen.max.y - pad - 32.0 - 6.0;
-    let center = egui::pos2(screen.min.x + pad + R, hp_outer_top - 10.0 - R);
-
-    // Disque visage + double anneau cartoon (cohérent minimap/slots).
-    painter.circle_filled(center, R, FORGE_BOIS_CLAIR);
-    painter.circle_stroke(center, R, egui::Stroke::new(4.0, FORGE_CHARBON));
-    painter.circle_stroke(center, R, egui::Stroke::new(2.0, FORGE_OR));
-
-    // Yeux (2 points charbon).
-    let eye_dx = R * 0.30;
-    let eye_dy = -R * 0.12;
-    let eye_r = R * 0.11;
-    painter.circle_filled(center + egui::vec2(-eye_dx, eye_dy), eye_r, FORGE_CHARBON);
-    painter.circle_filled(center + egui::vec2(eye_dx, eye_dy), eye_r, FORGE_CHARBON);
-
-    // Sourire (arc bas du visage = amical, bible "Apprenti doux").
-    arc_stroke(
-        &painter,
-        center,
-        R * 0.5,
-        0.18 * PI,
-        0.64 * PI,
-        1.0,
-        FORGE_CHARBON,
-        3.0,
-        16,
-    );
-}
-
-// ─── Nameplate joueur en jeu (nom + niveau, à droite du portrait) ──────────
-
-/// Affiche le nom + niveau du forgeron pendant la run (demande user — voir son
-/// personnage en jeu). Placé à droite du portrait (bas-gauche, même repère que
-/// `draw_player_portrait`). Niveau = placeholder « Niv. 1 » (le système d'XP = P4).
-pub(crate) fn draw_player_identity_badge(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    game_mode: Res<State<GameMode>>,
-    save: Option<Res<crate::identity::IdentitySave>>,
+    q_player: Query<(&DamageHealth, Option<&DefenseLayer>), With<Player>>,
+    identity: Option<Res<crate::identity::IdentitySave>>,
     progress: Option<Res<crate::progress::PlayerProgress>>,
+    equipped: Option<Res<EquippedWeapons>>,
+    conf: Option<Res<PepinConfidence>>,
+    time: Res<Time>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+    // `in_run_or_boss` (run_if) garantit Roguelite mais PAS `AppMode::InGame` —
+    // Pause est indépendante du RunState. Sans ce guard, la carte resterait
+    // peinte derrière le menu pause (non-fullscreen). Cohérent avec les autres
+    // widgets HUD du même tuple.
+    if *app_state.get() != AppMode::InGame {
         return;
     }
+    let Ok((health, defense)) = q_player.single() else {
+        return;
+    };
     let Ok(ctx) = contexts.ctx_mut() else {
         return;
     };
     let screen = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::new(
         egui::Order::Foreground,
-        egui::Id::new("forgia_roguelite_identity_badge"),
+        egui::Id::new("forgia_vitals_card"),
     ));
-    let name = save
+
+    // Constantes de layout (cosmétique UI — exempt no-hardcode).
+    const PORTRAIT_R: f32 = 26.0;
+    const CARD_W: f32 = 300.0;
+    const MARGIN: f32 = 14.0;
+    const SCREEN_PAD: f32 = 24.0;
+    const SEG_H: f32 = 10.0;
+    const SEG_GAP: f32 = 5.0;
+    const BAR_H: f32 = 26.0;
+    const ROW_GAP: f32 = 8.0;
+    const HEART_ROW_H: f32 = 14.0;
+    const HEADER_H: f32 = PORTRAIT_R * 2.0;
+
+    // ── Données ──
+    let frac = health.fraction();
+    let name = identity
         .as_ref()
         .map(|s| {
             if s.player_name.is_empty() {
@@ -1334,31 +1317,225 @@ pub(crate) fn draw_player_identity_badge(
             }
         })
         .unwrap_or("Forgeron");
-    // Même repère que le portrait : à sa droite, nom au-dessus / niveau en dessous.
-    let pad = 24.0;
-    let r = 34.0;
-    let hp_outer_top = screen.max.y - pad - 32.0 - 6.0;
-    let portrait_center = egui::pos2(screen.min.x + pad + r, hp_outer_top - 10.0 - r);
-    let text_x = portrait_center.x + r + 14.0;
+    let level = progress.as_ref().map(|p| p.level).unwrap_or(1);
+    let has_shield = defense.is_some_and(|d| d.shield_max > 0.5);
+    let has_armor = defense.is_some_and(|d| d.armor_max > 0.5);
+    // Confiance Pépin visible seulement arme ModernAR (Pépin) en main.
+    let pepin = conf.as_ref().filter(|_| {
+        equipped
+            .as_ref()
+            .is_some_and(|e| e.current == WeaponType::ModernAR)
+    });
+
+    // ── Hauteur dynamique du panneau ──
+    let n_def = u8::from(has_shield) + u8::from(has_armor);
+    let def_block = f32::from(n_def) * (SEG_H + SEG_GAP);
+    let heart_block = if pepin.is_some() {
+        ROW_GAP + HEART_ROW_H
+    } else {
+        0.0
+    };
+    let content_h = HEADER_H + ROW_GAP + def_block + BAR_H + heart_block;
+    let card_h = content_h + 2.0 * MARGIN;
+
+    let card_left = screen.min.x + SCREEN_PAD;
+    let card_bottom = screen.max.y - SCREEN_PAD;
+    let card = egui::Rect::from_min_max(
+        egui::pos2(card_left, card_bottom - card_h),
+        egui::pos2(card_left + CARD_W, card_bottom),
+    );
+    glass_panel(&painter, card, 14.0);
+
+    let content_left = card_left + MARGIN;
+    let bar_w = CARD_W - 2.0 * MARGIN;
+    let mut y = card.min.y + MARGIN;
+
+    // ── Header : portrait apprenti + nom + niveau ──
+    let pc = egui::pos2(content_left + PORTRAIT_R, y + PORTRAIT_R);
+    draw_apprentice_face(&painter, pc, PORTRAIT_R);
+    let text_x = pc.x + PORTRAIT_R + 12.0;
     text_with_outline(
         &painter,
-        egui::pos2(text_x, portrait_center.y - 11.0),
+        egui::pos2(text_x, pc.y - 10.0),
         egui::Align2::LEFT_CENTER,
         name,
         display_font(20.0),
         C_TEXT_LIGHT,
         1.8,
     );
-    let lvl_text = format!("Niv. {}", progress.as_ref().map(|p| p.level).unwrap_or(1));
     text_with_outline(
         &painter,
-        egui::pos2(text_x, portrait_center.y + 13.0),
+        egui::pos2(text_x, pc.y + 13.0),
         egui::Align2::LEFT_CENTER,
-        &lvl_text,
-        egui::FontId::proportional(14.0),
+        &format!("Niv. {level}"),
+        display_font(14.0),
         FORGE_OR,
         1.2,
     );
+    y += HEADER_H + ROW_GAP;
+
+    // ── Défense : bouclier puis armure (chacune si sa couche existe) ──
+    if let Some(def) = defense {
+        if has_shield {
+            draw_vitals_bar(
+                &painter,
+                content_left,
+                y,
+                bar_w,
+                SEG_H,
+                def.shield / def.shield_max,
+                DEFENSE_SHIELD,
+                3.0,
+            );
+            y += SEG_H + SEG_GAP;
+        }
+        if has_armor {
+            draw_vitals_bar(
+                &painter,
+                content_left,
+                y,
+                bar_w,
+                SEG_H,
+                def.armor / def.armor_max,
+                DEFENSE_ARMOR,
+                3.0,
+            );
+            y += SEG_H + SEG_GAP;
+        }
+    }
+
+    // ── Barre d'énergie (vie relabelée — anti-canon : jamais le mot « HP ») ──
+    draw_vitals_bar(&painter, content_left, y, bar_w, BAR_H, frac, hp_color(frac), 5.0);
+    text_with_outline(
+        &painter,
+        egui::pos2(content_left + 8.0, y + BAR_H * 0.5),
+        egui::Align2::LEFT_CENTER,
+        "ÉNERGIE",
+        display_font(11.0),
+        FORGE_OR,
+        1.0,
+    );
+    text_with_outline(
+        &painter,
+        egui::pos2(content_left + bar_w * 0.5, y + BAR_H * 0.5),
+        egui::Align2::CENTER_CENTER,
+        &format!(
+            "{} / {}",
+            health.current.round() as i32,
+            health.max.round() as i32
+        ),
+        display_font(16.0),
+        C_TEXT_LIGHT,
+        1.2,
+    );
+    y += BAR_H;
+
+    // ── Confiance Pépin (discret, cœur de tête clignote après changement) ──
+    if let Some(conf) = pepin {
+        y += ROW_GAP;
+        const BLINK_SECS: f32 = 0.5;
+        // Cyan Pépin (couleur dominante persona — story-531 AC8).
+        const PEPIN_CYAN: egui::Color32 = egui::Color32::from_rgb(80, 220, 255);
+        let since = time.elapsed_secs() - conf.last_change_secs;
+        let blinking = (0.0..BLINK_SECS).contains(&since);
+        let pulse = if blinking {
+            ((since / BLINK_SECS) * std::f32::consts::TAU * 2.0)
+                .sin()
+                .abs()
+        } else {
+            1.0
+        };
+        let stacks = usize::from(conf.stacks);
+        let spacing = 16.0;
+        let size = 9.0;
+        let cy = y + HEART_ROW_H * 0.5;
+        for i in 0..10usize {
+            let filled = i < stacks;
+            let is_head = i + 1 == stacks;
+            let alpha = if filled {
+                if is_head && blinking {
+                    (80.0 + 175.0 * pulse) as u8
+                } else {
+                    255
+                }
+            } else {
+                55
+            };
+            let color = egui::Color32::from_rgba_unmultiplied(
+                PEPIN_CYAN.r(),
+                PEPIN_CYAN.g(),
+                PEPIN_CYAN.b(),
+                alpha,
+            );
+            draw_cartoon_heart(
+                &painter,
+                content_left + size * 0.5 + i as f32 * spacing,
+                cy,
+                size,
+                color,
+            );
+        }
+    }
+}
+
+/// Barre vitals (track sombre + fill coloré + reflet bombé + liseré or) — réutilisée
+/// pour l'énergie et les couches de défense de la carte vitals.
+fn draw_vitals_bar(
+    painter: &egui::Painter,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    frac: f32,
+    fill: egui::Color32,
+    corner: f32,
+) {
+    let rect = egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(w, h));
+    painter.rect_filled(
+        rect,
+        corner,
+        egui::Color32::from_rgba_unmultiplied(20, 22, 28, 235),
+    );
+    let fw = w * frac.clamp(0.0, 1.0);
+    if fw > 0.5 {
+        let fr = egui::Rect::from_min_size(rect.min, egui::vec2(fw, h));
+        painter.rect_filled(fr, corner, fill);
+        // Reflet bombé (quart haut plus clair) — cohérent HP bar cartoon.
+        let hl = egui::Rect::from_min_size(fr.min, egui::vec2(fw, h * 0.35));
+        painter.rect_filled(
+            hl,
+            corner,
+            egui::Color32::from_rgba_unmultiplied(
+                fill.r().saturating_add(40),
+                fill.g().saturating_add(40),
+                fill.b().saturating_add(40),
+                150,
+            ),
+        );
+    }
+    painter.rect_stroke(
+        rect,
+        corner,
+        egui::Stroke::new(1.5, HAIR_GOLD_STRONG),
+        egui::StrokeKind::Inside,
+    );
+}
+
+/// Visage « Apprenti » cohérent DA Verre & Braise : disque aubergine clair + liseré
+/// or (remplace l'ancien disque bois clair, qui détonnait au milieu des panneaux
+/// verre en plein combat). Placeholder en attendant un asset de portrait dédié.
+fn draw_apprentice_face(painter: &egui::Painter, center: egui::Pos2, r: f32) {
+    use std::f32::consts::PI;
+    painter.circle_filled(center, r, FORGE_PANEL_LIGHT);
+    painter.circle_stroke(center, r, egui::Stroke::new(2.0, HAIR_GOLD_STRONG));
+    // Yeux (2 points crème).
+    let eye_dx = r * 0.30;
+    let eye_dy = -r * 0.12;
+    let eye_r = r * 0.11;
+    painter.circle_filled(center + egui::vec2(-eye_dx, eye_dy), eye_r, C_TEXT_LIGHT);
+    painter.circle_filled(center + egui::vec2(eye_dx, eye_dy), eye_r, C_TEXT_LIGHT);
+    // Sourire (arc bas = amical, bible « Apprenti doux »).
+    arc_stroke(painter, center, r * 0.5, 0.18 * PI, 0.64 * PI, 1.0, FORGE_OR, 2.5, 16);
 }
 
 // ─── Bandeau Ultime (touche F, 10 s) — story-596 T4b ────────────────────────
@@ -1483,6 +1660,8 @@ pub(crate) fn draw_shockwave_indicator(
 
     use std::f32::consts::{FRAC_PI_2, TAU};
     const R: f32 = 30.0;
+    // Pastille du sort F, CENTRÉE. L'Ultime (même touche F) est rendu en anneau
+    // extérieur concentrique par `draw_ultimate_gauge` — un seul bouton, pas deux.
     let center = egui::pos2(screen.center().x, screen.max.y - 64.0);
     // Story-573 — cooldown PAR ARME + couleur persona (identité armes parlantes).
     let current = equipped.as_ref().map(|e| e.current).unwrap_or_default();
@@ -1530,6 +1709,102 @@ pub(crate) fn draw_shockwave_indicator(
             1.0,
         );
     }
+}
+
+// ─── Jauge d'Ultime (bas-centre, à droite du sort F) ───────────────────────
+
+/// Rend visible la CHARGE de l'Ultime — comble le trou où l'Ultime n'avait aucun
+/// indicateur hors-actif (seul le bandeau plein écran s'affichait, une fois lancé).
+/// L'Ultime s'ouvre avec le sort F quand il est prêt (cooldown propre, plus long
+/// que celui du sort). États : prêt = anneau accent + « ULT » + halo pulsé (attire
+/// l'œil) ; en charge = arc de recharge + secondes ; actif = arc qui se vide.
+/// Couleur accent = VFX de la technique de l'arme (identité), comme le bandeau.
+pub(crate) fn draw_ultimate_gauge(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    run_state: Option<Res<State<RunState>>>,
+    time: Res<Time>,
+    ult: Res<UltimateState>,
+    ult_cfg: Option<Res<UltimateConfig>>,
+    equipped: Option<Res<EquippedWeapons>>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    let in_combat = matches!(
+        run_state.as_deref().map(|s| s.get()),
+        Some(RunState::InRun { .. }) | Some(RunState::Boss { .. })
+    );
+    if !in_combat {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let screen = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("forgia_roguelite_ultimate_gauge"),
+    ));
+
+    use std::f32::consts::{FRAC_PI_2, TAU};
+    const R: f32 = 30.0;
+    // Anneau CONCENTRIQUE autour de la pastille F (même touche F, pas un 2e bouton) :
+    // track sombre + arc de charge (0→1 sur le cooldown), plein + halo pulsé quand
+    // prêt, se vide pendant l'Ultime actif.
+    const RING_R: f32 = R + 11.0;
+    let center = egui::pos2(screen.center().x, screen.max.y - 64.0);
+
+    let cfg = ult_cfg.map(|c| *c).unwrap_or_default();
+    let weapon = equipped.as_ref().map(|e| e.current).unwrap_or_default();
+    let [r, g, b] = weapon_vfx_color(&cfg, weapon);
+    let accent = egui::Color32::from_rgb(
+        (r.clamp(0.0, 1.0) * 255.0) as u8,
+        (g.clamp(0.0, 1.0) * 255.0) as u8,
+        (b.clamp(0.0, 1.0) * 255.0) as u8,
+    );
+    let ready = ult.can_activate();
+    let active = ult.is_active();
+
+    // Track de fond (cercle complet discret).
+    painter.circle_stroke(
+        center,
+        RING_R,
+        egui::Stroke::new(
+            3.5,
+            egui::Color32::from_rgba_unmultiplied(20, 22, 28, 200),
+        ),
+    );
+    // Halo pulsé quand prêt — invite à lâcher l'Ultime avec F.
+    if ready {
+        let pulse = 0.5 + 0.5 * (time.elapsed_secs() * TAU * 1.5).sin();
+        let a = (45.0 + 60.0 * pulse) as u8;
+        painter.circle_stroke(
+            center,
+            RING_R,
+            egui::Stroke::new(
+                5.0,
+                egui::Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), a),
+            ),
+        );
+    }
+    // Arc de charge (recharge) / vidange (actif) ; plein quand prêt.
+    let progress = if ready { 1.0 } else { ult.hud_fill() };
+    let arc_col = if ready || active { accent } else { FORGE_OR };
+    arc_stroke(&painter, center, RING_R, -FRAC_PI_2, TAU, progress, arc_col, 3.5, 64);
+
+    // Étiquette discrète « ULT » au-dessus de l'anneau (pas un bouton cliquable).
+    let cap_col = if ready || active { accent } else { C_TEXT_MUTED };
+    text_with_outline(
+        &painter,
+        egui::pos2(center.x, center.y - RING_R - 6.0),
+        egui::Align2::CENTER_BOTTOM,
+        "ULT",
+        display_font(11.0),
+        cap_col,
+        1.0,
+    );
 }
 
 pub struct RogueliteHudPlugin;
@@ -1680,9 +1955,9 @@ impl Plugin for RogueliteHudPlugin {
                 (
                     draw_minimap,
                     draw_weapon_slots,
-                    draw_player_portrait,
-                    draw_player_identity_badge,
+                    draw_vitals_card,
                     draw_shockwave_indicator,
+                    draw_ultimate_gauge,
                     draw_ultimate_banner,
                     draw_wave_counter,
                     draw_currency_counters,

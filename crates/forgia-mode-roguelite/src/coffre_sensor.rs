@@ -129,7 +129,7 @@ pub fn sys_write_coffre_sensor(
         open_duration,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-mode-roguelite] coffre sensor write failed: {e}");
     }
 }

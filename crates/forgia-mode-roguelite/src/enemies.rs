@@ -96,34 +96,74 @@ impl Default for EnemyStatsConfig {
         // (le Runner avait 33 cm de crâne sans collider, le Boss 2 m de vide touchable).
         Self {
             tank: EnemyStats {
-                hp: 120.0, speed: 2.8, stop_distance: 3.0, attack_range: 4.0,
-                detect_range: 22.0, attack_cooldown: 1.8, warmup_secs: 2.0,
-                capsule_radius: 0.55, capsule_half_height: 0.43, head_radius: None,
-                color_rgb: [0.55, 0.10, 0.10], emissive_rgb: [0.25, 0.03, 0.03],
-                shoot_damage: 25.0, shoot_range: 5.0, shoot_jitter_deg: 6.0,
+                hp: 120.0,
+                speed: 2.8,
+                stop_distance: 3.0,
+                attack_range: 4.0,
+                detect_range: 22.0,
+                attack_cooldown: 1.8,
+                warmup_secs: 2.0,
+                capsule_radius: 0.55,
+                capsule_half_height: 0.43,
+                head_radius: None,
+                color_rgb: [0.55, 0.10, 0.10],
+                emissive_rgb: [0.25, 0.03, 0.03],
+                shoot_damage: 25.0,
+                shoot_range: 5.0,
+                shoot_jitter_deg: 6.0,
             },
             runner: EnemyStats {
-                hp: 35.0, speed: 7.0, stop_distance: 6.0, attack_range: 7.0,
-                detect_range: 40.0, attack_cooldown: 0.7, warmup_secs: 1.2,
-                capsule_radius: 0.32, capsule_half_height: 0.38, head_radius: None,
-                color_rgb: [0.95, 0.45, 0.10], emissive_rgb: [0.40, 0.18, 0.04],
-                shoot_damage: 8.0, shoot_range: 8.0, shoot_jitter_deg: 5.0,
+                hp: 35.0,
+                speed: 7.0,
+                stop_distance: 6.0,
+                attack_range: 7.0,
+                detect_range: 40.0,
+                attack_cooldown: 0.7,
+                warmup_secs: 1.2,
+                capsule_radius: 0.32,
+                capsule_half_height: 0.38,
+                head_radius: None,
+                color_rgb: [0.95, 0.45, 0.10],
+                emissive_rgb: [0.40, 0.18, 0.04],
+                shoot_damage: 8.0,
+                shoot_range: 8.0,
+                shoot_jitter_deg: 5.0,
             },
             sniper: EnemyStats {
-                hp: 45.0, speed: 3.2, stop_distance: 22.0, attack_range: 24.0,
-                detect_range: 55.0, attack_cooldown: 1.6, warmup_secs: 1.8,
-                capsule_radius: 0.30, capsule_half_height: 0.47, head_radius: None,
-                color_rgb: [0.55, 0.20, 0.80], emissive_rgb: [0.22, 0.08, 0.35],
-                shoot_damage: 18.0, shoot_range: 28.0, shoot_jitter_deg: 1.5,
+                hp: 45.0,
+                speed: 3.2,
+                stop_distance: 22.0,
+                attack_range: 24.0,
+                detect_range: 55.0,
+                attack_cooldown: 1.6,
+                warmup_secs: 1.8,
+                capsule_radius: 0.30,
+                capsule_half_height: 0.47,
+                head_radius: None,
+                color_rgb: [0.55, 0.20, 0.80],
+                emissive_rgb: [0.22, 0.08, 0.35],
+                shoot_damage: 18.0,
+                shoot_range: 28.0,
+                shoot_jitter_deg: 1.5,
             },
             // Boss : tanky, mi-range, intimidant. Phase 2 enrage à 50% HP :
             // speed×1.8, cooldown×0.55 (cf sys_boss_enrage).
             boss: EnemyStats {
-                hp: 800.0, speed: 3.5, stop_distance: 10.0, attack_range: 30.0,
-                detect_range: 80.0, attack_cooldown: 1.3, warmup_secs: 2.5,
-                capsule_radius: 1.4, capsule_half_height: 0.35, head_radius: None,
-                color_rgb: [0.90, 0.10, 0.50], emissive_rgb: [0.50, 0.05, 0.25],
-                shoot_damage: 22.0, shoot_range: 32.0, shoot_jitter_deg: 3.0,
+                hp: 800.0,
+                speed: 3.5,
+                stop_distance: 10.0,
+                attack_range: 30.0,
+                detect_range: 80.0,
+                attack_cooldown: 1.3,
+                warmup_secs: 2.5,
+                capsule_radius: 1.4,
+                capsule_half_height: 0.35,
+                head_radius: None,
+                color_rgb: [0.90, 0.10, 0.50],
+                emissive_rgb: [0.50, 0.05, 0.25],
+                shoot_damage: 22.0,
+                shoot_range: 32.0,
+                shoot_jitter_deg: 3.0,
             },
         }
     }
@@ -293,7 +333,11 @@ pub fn sys_hot_reload_enemy_genome(
         watch.reload_count = watch.reload_count.saturating_add(1);
         info!(
             "[enemies] HOT-RELOADED #{} — tank hp{:.0} runner hp{:.0} sniper hp{:.0} boss hp{:.0}",
-            watch.reload_count, new_cfg.tank.hp, new_cfg.runner.hp, new_cfg.sniper.hp, new_cfg.boss.hp,
+            watch.reload_count,
+            new_cfg.tank.hp,
+            new_cfg.runner.hp,
+            new_cfg.sniper.hp,
+            new_cfg.boss.hp,
         );
         *cfg = new_cfg;
     }
@@ -318,12 +362,20 @@ pub fn sys_write_enemies_sensor(
     let json = format!(
         r#"{{"id":"enemies","severity":"ok","next_step":"","spawn_live":true,"reload_count":{},"tank":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"runner":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"sniper":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}},"boss":{{"hp":{:.0},"speed":{:.1},"dmg":{:.0}}}}}"#,
         watch.reload_count,
-        cfg.tank.hp, cfg.tank.speed, cfg.tank.shoot_damage,
-        cfg.runner.hp, cfg.runner.speed, cfg.runner.shoot_damage,
-        cfg.sniper.hp, cfg.sniper.speed, cfg.sniper.shoot_damage,
-        cfg.boss.hp, cfg.boss.speed, cfg.boss.shoot_damage,
+        cfg.tank.hp,
+        cfg.tank.speed,
+        cfg.tank.shoot_damage,
+        cfg.runner.hp,
+        cfg.runner.speed,
+        cfg.runner.shoot_damage,
+        cfg.sniper.hp,
+        cfg.sniper.speed,
+        cfg.sniper.shoot_damage,
+        cfg.boss.hp,
+        cfg.boss.speed,
+        cfg.boss.shoot_damage,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[enemies] sensor write failed: {e}");
     }
 }
@@ -477,7 +529,11 @@ shoot_jitter_deg = 3.0
         let c = EnemyStatsConfig::parse_toml(toml);
         assert_eq!(c.tank.hp, 200.0, "override tank hp lu du TOML");
         assert_eq!(c.tank.shoot_damage, 30.0);
-        assert_ne!(c, EnemyStatsConfig::default(), "diff du Default → hot-reload déclenchable");
+        assert_ne!(
+            c,
+            EnemyStatsConfig::default(),
+            "diff du Default → hot-reload déclenchable"
+        );
     }
 
     #[test]

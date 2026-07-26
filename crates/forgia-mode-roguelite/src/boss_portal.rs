@@ -12,7 +12,9 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 use bevy::state::state_scoped::DespawnOnExit;
-use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, QueryFilter, ReadRapierContext, RigidBody};
+use bevy_rapier3d::prelude::{
+    Collider, ComputedColliderShape, QueryFilter, ReadRapierContext, RigidBody,
+};
 use forgia_anchor::{AnchorKind, AnchorPoint};
 use forgia_core::prelude::*;
 
@@ -252,11 +254,7 @@ fn spawn_closed_portal(
         ChildOf(parent),
         Name::new("ClosedPortalCollider"),
         Transform::from_xyz(0.0, PORTAL_TARGET_HEIGHT * 0.5, 0.0),
-        Collider::cuboid(
-            PORTAL_TARGET_HEIGHT * 0.30,
-            PORTAL_TARGET_HEIGHT * 0.5,
-            0.6,
-        ),
+        Collider::cuboid(PORTAL_TARGET_HEIGHT * 0.30, PORTAL_TARGET_HEIGHT * 0.5, 0.6),
     ));
     // Visuel GLB (scale calibré + posé sur le socle par sys_calibrate/ground_portal).
     commands.spawn((
@@ -520,7 +518,14 @@ pub(crate) fn sys_reconcile_boss_gate(
             gate.diag_stage = GateStage::NoDais;
             return; // module melee_pit pas encore spawné
         };
-        if !solidify_dais(&mut commands, root, &q_children, &q_mesh3d, &q_has_col, &meshes) {
+        if !solidify_dais(
+            &mut commands,
+            root,
+            &q_children,
+            &q_mesh3d,
+            &q_has_col,
+            &meshes,
+        ) {
             gate.diag_stage = GateStage::Solidifying;
             return; // meshes du dais pas tous chargés → retry
         }
@@ -556,7 +561,14 @@ pub(crate) fn sys_reconcile_boss_gate(
             return; // pas encore résolu (sous le seuil d'attempts) → retry
         };
         let portal_pos = Vec3::new(dais_center.x, top + PORTAL_Y_OFFSET, dais_center.z);
-        spawn_closed_portal(&mut commands, &asset_server, &mut meshes, &mut materials, portal_pos, yaw);
+        spawn_closed_portal(
+            &mut commands,
+            &asset_server,
+            &mut meshes,
+            &mut materials,
+            portal_pos,
+            yaw,
+        );
         gate.dais_top_y = Some(top);
         gate.portal_pos = portal_pos;
         gate.diag_stage = GateStage::Placed;
@@ -589,7 +601,14 @@ pub(crate) fn sys_reconcile_boss_gate(
         for e in &q_open {
             commands.entity(e).despawn();
         }
-        spawn_closed_portal(&mut commands, &asset_server, &mut meshes, &mut materials, gate.portal_pos, yaw);
+        spawn_closed_portal(
+            &mut commands,
+            &asset_server,
+            &mut meshes,
+            &mut materials,
+            gate.portal_pos,
+            yaw,
+        );
         gate.opened = false;
         gate.diag_stage = GateStage::Placed;
         info!("[boss-gate] nouveau run → porte du dais REFERMÉE");
@@ -726,7 +745,7 @@ pub(crate) fn sys_write_boss_gate_sensor(
         gate.raycast_attempts,
         *stuck_secs,
     );
-    if let Err(e) = std::fs::write("forgia2_boss_gate.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_boss_gate.json", json) {
         warn!("[boss-gate] sensor write failed: {e}");
     }
 }
@@ -786,8 +805,7 @@ mod tests {
 
     #[test]
     fn severity_warn_when_stuck_past_threshold() {
-        let (sev, next) =
-            severity_for_boss_gate(GateStage::Raycasting, GATE_STUCK_WARN_SECS + 0.1);
+        let (sev, next) = severity_for_boss_gate(GateStage::Raycasting, GATE_STUCK_WARN_SECS + 0.1);
         assert_eq!(sev, "warn");
         assert!(next.contains("raycast"));
     }

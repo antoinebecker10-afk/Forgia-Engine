@@ -115,6 +115,10 @@ struct Checkpoint {
 struct DemoLevelRoot;
 #[derive(Component)]
 struct DemoUnmarked;
+/// Handle préchargé du parcours. Garder l'asset en mémoire évite l'I/O au moment
+/// de la victoire, sans pour autant instancier ses milliers d'entités pendant le combat.
+#[derive(Resource)]
+struct DemoLevelScene(Handle<Scene>);
 /// Mesh du niveau démo en attente de son collider ConvexHull (généré par lots).
 #[derive(Component)]
 struct NeedsLevelCollider;
@@ -220,6 +224,13 @@ impl Plugin for RogueliteLootRoomPlugin {
             .init_resource::<ShrinkBuff>()
             .init_resource::<ZoneReward>()
             .add_systems(OnEnter(GameMode::Roguelite), sys_setup)
+            // Le parcours est une scène lourde (~3 000 descendants). Une victoire
+            // reste dans GameMode::Roguelite et passe seulement à RunState::Lobby :
+            // DespawnOnExit(GameMode) ne la nettoie donc pas. Sans ce cleanup, le
+            // lobby continue à propager ses transforms et la run suivante hérite de
+            // l'ancien niveau. On ne despawn que la racine de scène, pas les portails
+            // et props statiques préparés par sys_setup pour la prochaine run.
+            .add_systems(OnEnter(RunState::Lobby), sys_despawn_demo_level_in_lobby)
             // Story-603 — reset parcours au démarrage d'un run (anti soft-lock
             // si abandon depuis le parcours). Lobby → InRun = sortie du Lobby.
             .add_systems(OnExit(RunState::Lobby), sys_reset_parcours_on_run_start)
@@ -233,6 +244,7 @@ impl Plugin for RogueliteLootRoomPlugin {
                     sys_spin_portals,
                     sys_collect_level_items,
                     sys_player_shrink,
+                    sys_spawn_demo_level_after_boss,
                     sys_mark_demo_meshes,
                     sys_collide_demo_incremental,
                 )
@@ -267,17 +279,12 @@ fn sys_setup(
         ROOM_ORIGIN.z - s * LVL_CENTER.z,
     );
 
-    // ── Niveau démo COMPLET (Scene 0) — colliders incrémentaux ──────────────────
+    // Précharge le GLB mais ne l'instancie pas encore. `DemoLevel` contient près de
+    // 3 000 descendants : le créer dès l'entrée du mode faisait travailler la
+    // propagation des transforms pendant chaque vague, alors qu'il est inaccessible
+    // avant la victoire du boss.
     let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset(KIT_PATH));
-    commands.spawn((
-        LootRoomMarker,
-        DespawnOnExit(GameMode::Roguelite),
-        DemoLevelRoot,
-        DemoUnmarked,
-        Name::new("DemoLevel"),
-        SceneRoot(scene),
-        Transform::from_translation(level_t).with_scale(Vec3::splat(s)),
-    ));
+    commands.insert_resource(DemoLevelScene(scene));
 
     // ── Points de spawn/téléport au DÉBUT de chaque zone (sur la géométrie du
     //    niveau démo). 2026-06-08 : plus de pad cuboïde — le sol du GLB suffit.
@@ -301,7 +308,13 @@ fn sys_setup(
         for off in [Vec3::new(-4.0, 1.0, 2.0), Vec3::new(4.0, 1.0, 2.0)] {
             spawn_coin(&mut commands, &mut meshes, &mut materials, base + off, 16);
         }
-        spawn_soul(&mut commands, &mut meshes, &mut materials, base + Vec3::new(0.0, 1.4, 3.5), 5);
+        spawn_soul(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            base + Vec3::new(0.0, 1.4, 3.5),
+            5,
+        );
     }
 
     // ── Story-603 — la porte (boss-gated) est posée sur le dais melee_pit central
@@ -317,11 +330,27 @@ fn sys_setup(
     for z in 0..3 {
         let pos = level_t + s * ZONE_END_NATIVE[z] + Vec3::Y * 2.0;
         let (kind, target, emissive) = if z < 2 {
-            (PortalKind::Next, pad_spawns[z + 1], LinearRgba::new(0.6, 3.0, 0.4, 1.0))
+            (
+                PortalKind::Next,
+                pad_spawns[z + 1],
+                LinearRgba::new(0.6, 3.0, 0.4, 1.0),
+            )
         } else {
-            (PortalKind::Return, Vec3::ZERO, LinearRgba::new(3.2, 1.4, 0.3, 1.0))
+            (
+                PortalKind::Return,
+                Vec3::ZERO,
+                LinearRgba::new(3.2, 1.4, 0.3, 1.0),
+            )
         };
-        spawn_portal(&mut commands, &mut meshes, &mut materials, pos, emissive, kind, target);
+        spawn_portal(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            pos,
+            emissive,
+            kind,
+            target,
+        );
     }
 
     // ── Checkpoint par zone, juste après la porte/herse (sur une vraie plateforme) : tomber
@@ -332,6 +361,60 @@ fn sys_setup(
     }
 
     info!("[loot-room] mode parcours 3 zones spawné (offset {ROOM_ORIGIN:?})");
+}
+
+/// Instancie le parcours seulement après le boss. La porte ne devient alors
+/// franchissable qu'une fois la scène déjà demandée, ce qui retire son grand arbre
+/// de transforms de toute la phase combat.
+fn sys_spawn_demo_level_after_boss(
+    mut commands: Commands,
+    scene: Option<Res<DemoLevelScene>>,
+    wave: Res<RogueliteWave>,
+    q_existing: Query<(), With<DemoLevelRoot>>,
+) {
+    if !wave.boss_defeated || !q_existing.is_empty() {
+        return;
+    }
+    let Some(scene) = scene else {
+        return;
+    };
+
+    let s = LEVEL_SCALE;
+    let level_t = Vec3::new(
+        ROOM_ORIGIN.x - s * LVL_CENTER.x,
+        ROOM_ORIGIN.y - s * LVL_MIN_Y,
+        ROOM_ORIGIN.z - s * LVL_CENTER.z,
+    );
+    commands.spawn((
+        LootRoomMarker,
+        DespawnOnExit(GameMode::Roguelite),
+        DemoLevelRoot,
+        DemoUnmarked,
+        Name::new("DemoLevel"),
+        SceneRoot(scene.0.clone()),
+        Transform::from_translation(level_t).with_scale(Vec3::splat(s)),
+    ));
+    info!("[loot-room] parcours instancié après la victoire du boss");
+}
+
+/// Nettoie le sous-arbre lourd du parcours dès le retour au lobby intra-mode.
+/// `despawn()` cascade aux descendants Bevy et le handle de scène est relâché :
+/// aucune référence forte ne retient alors ce gros GLB entre deux runs. La scène
+/// est préchargée à nouveau à la sortie du lobby, pendant la préparation de run.
+/// L'événement arrive hors combat, après l'overlay de résultat.
+fn sys_despawn_demo_level_in_lobby(
+    mut commands: Commands,
+    q_root: Query<Entity, With<DemoLevelRoot>>,
+) {
+    let mut count = 0u32;
+    for root in &q_root {
+        commands.entity(root).despawn();
+        count += 1;
+    }
+    if count > 0 {
+        info!("[loot-room] Lobby — parcours DemoLevel despawned ({count} root)");
+    }
+    commands.remove_resource::<DemoLevelScene>();
 }
 
 // ── Colliders incrémentaux du niveau démo ───────────────────────────────────────
@@ -385,9 +468,7 @@ fn sys_mark_demo_meshes(
                         if let Some(anim) = classify(name.as_str()) {
                             let base = q_tf.get(e).copied().unwrap_or_default();
                             animated = true;
-                            commands
-                                .entity(e)
-                                .insert(RigidBody::KinematicPositionBased);
+                            commands.entity(e).insert(RigidBody::KinematicPositionBased);
                             match anim {
                                 ObstacleAnim::Hammer => {
                                     commands.entity(e).insert(SwingingHammer {
@@ -450,7 +531,9 @@ fn sys_collide_demo_incremental(
         budget -= 1;
         // TriMesh (pas ConvexHull) : suit la vraie forme → les arches gardent leur
         // ouverture (traversable), au lieu d'être bouchées par l'enveloppe convexe.
-        if let Some(col) = Collider::from_bevy_mesh(mesh, &ComputedColliderShape::TriMesh(default())) {
+        if let Some(col) =
+            Collider::from_bevy_mesh(mesh, &ComputedColliderShape::TriMesh(default()))
+        {
             commands.entity(e).try_insert(col);
         }
         commands.entity(e).remove::<NeedsLevelCollider>();
@@ -603,9 +686,17 @@ fn spawn_checkpoint(
 fn sys_reset_parcours_on_run_start(
     mut state: ResMut<LootRoomState>,
     mut shrink: ResMut<ShrinkBuff>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     *state = LootRoomState::default();
     shrink.active = false;
+    // Le handle a été relâché au retour lobby pour rendre le gros niveau
+    // évictable. On relance l'I/O asynchrone dès le départ de la run afin que le
+    // parcours soit déjà prêt quand le boss est vaincu, sans charge synchrone au
+    // passage de porte.
+    let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset(KIT_PATH));
+    commands.insert_resource(DemoLevelScene(scene));
 }
 
 /// Toucher une balise (et seulement en avançant : z croissant) met à jour le respawn sur chute.
@@ -631,7 +722,10 @@ fn sys_checkpoint_touch(
                 color: egui::Color32::from_rgb(120, 255, 160),
                 spawned_secs: time.elapsed_secs(),
             });
-            info!("[loot-room] checkpoint atteint ({:.0},{:.0})", cp.pos.x, cp.pos.z);
+            info!(
+                "[loot-room] checkpoint atteint ({:.0},{:.0})",
+                cp.pos.x, cp.pos.z
+            );
         }
     }
 }
@@ -730,7 +824,10 @@ fn sys_collect_level_items(
             color,
             spawned_secs: time.elapsed_secs(),
         });
-        info!("[loot-room] item ramassé : {text} (pos {:.0},{:.0})", ipos.x, ipos.z);
+        info!(
+            "[loot-room] item ramassé : {text} (pos {:.0},{:.0})",
+            ipos.x, ipos.z
+        );
         commands.entity(e).despawn();
     }
 }
@@ -945,11 +1042,7 @@ fn sys_zone_reward_pick(
                 text: element.armed_popup(),
                 color: {
                     let [r, g, b] = element.rgb(&Default::default());
-                    egui::Color32::from_rgb(
-                        (r * 255.0) as u8,
-                        (g * 255.0) as u8,
-                        (b * 255.0) as u8,
-                    )
+                    egui::Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
                 },
                 spawned_secs: time.elapsed_secs(),
             });

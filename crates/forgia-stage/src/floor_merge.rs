@@ -143,7 +143,10 @@ pub(crate) fn spawn_static_merge(
             commands.spawn((
                 Name::new(format!("MergeProbe_{label}_{idx}")),
                 StageArenaMarker,
-                MergeProbe { label, scene_idx: idx },
+                MergeProbe {
+                    label,
+                    scene_idx: idx,
+                },
                 SceneRoot(scenes[idx as usize].clone()),
                 Transform::IDENTITY,
                 Visibility::Hidden,
@@ -307,14 +310,18 @@ pub fn sys_build_merged_static(
         }
 
         // ── Fusion par (cellule, matériau) — vertices bakés en espace monde ──
-        let mut acc: HashMap<(i32, i32, AssetId<StandardMaterial>), (Mesh, Handle<StandardMaterial>)> =
-            HashMap::new();
+        let mut acc: HashMap<
+            (i32, i32, AssetId<StandardMaterial>),
+            (Mesh, Handle<StandardMaterial>),
+        > = HashMap::new();
         let mut merge_failed = false;
         'instances: for (kind, inst_tf) in &pending.instances {
             let cx = (inst_tf.translation.x / MERGE_CELL_WORLD_M).floor() as i32;
             let cz = (inst_tf.translation.z / MERGE_CELL_WORLD_M).floor() as i32;
             for (mesh_h, mat_h, rel) in &per_scene[*kind as usize] {
-                let Some(src) = meshes.get(mesh_h) else { continue };
+                let Some(src) = meshes.get(mesh_h) else {
+                    continue;
+                };
                 let piece = src.clone().transformed_by(inst_tf.mul_transform(*rel));
                 match acc.entry((cx, cz, mat_h.id())) {
                     std::collections::hash_map::Entry::Occupied(mut e) => {

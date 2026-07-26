@@ -22,6 +22,7 @@ use bevy::gltf::Gltf;
 use bevy::prelude::*;
 use forgia_ai_arena_bot::{ArenaBot, BotState};
 use forgia_core::prelude::*;
+use forgia_player::Player;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -50,6 +51,10 @@ struct EnemyAnimGenomeToml {
     rig_visible: Option<bool>,
     mesh_alpha: Option<f32>,
     gizmo_enabled: Option<bool>,
+    lod_near_distance_m: Option<f32>,
+    lod_far_distance_m: Option<f32>,
+    lod_mid_frame_divisor: Option<u32>,
+    lod_far_frame_divisor: Option<u32>,
 }
 
 // ─── Config (Resource) ──────────────────────────────────────────────────────
@@ -74,6 +79,14 @@ pub struct EnemyAnimConfig {
     pub rig_visible: bool,
     pub mesh_alpha: f32,
     pub gizmo_enabled: bool,
+    /// Distance où une animation ennemie doit rester à fréquence native.
+    pub lod_near_distance_m: f32,
+    /// Au-delà, une animation est échantillonnée à cadence réduite.
+    pub lod_far_distance_m: f32,
+    /// Cadence des ennemis entre near/far (2 = 30 Hz à 60 FPS).
+    pub lod_mid_frame_divisor: u32,
+    /// Cadence des ennemis au-delà de far (4 = 15 Hz à 60 FPS).
+    pub lod_far_frame_divisor: u32,
 }
 
 impl Default for EnemyAnimConfig {
@@ -92,6 +105,10 @@ impl Default for EnemyAnimConfig {
             rig_visible: true,
             mesh_alpha: 0.45,
             gizmo_enabled: true,
+            lod_near_distance_m: 18.0,
+            lod_far_distance_m: 38.0,
+            lod_mid_frame_divisor: 2,
+            lod_far_frame_divisor: 4,
         }
     }
 }
@@ -112,12 +129,34 @@ impl EnemyAnimConfig {
             attack_clip: parsed.attack_clip.unwrap_or(d.attack_clip),
             death_clip: parsed.death_clip.unwrap_or(d.death_clip),
             hit_clip: parsed.hit_clip.unwrap_or(d.hit_clip),
-            walk_speed_min: parsed.walk_speed_min.unwrap_or(d.walk_speed_min).clamp(0.0, 20.0),
-            run_speed_min: parsed.run_speed_min.unwrap_or(d.run_speed_min).clamp(0.1, 30.0),
+            walk_speed_min: parsed
+                .walk_speed_min
+                .unwrap_or(d.walk_speed_min)
+                .clamp(0.0, 20.0),
+            run_speed_min: parsed
+                .run_speed_min
+                .unwrap_or(d.run_speed_min)
+                .clamp(0.1, 30.0),
             crossfade_ms: parsed.crossfade_ms.unwrap_or(d.crossfade_ms).clamp(0, 2000),
             rig_visible: parsed.rig_visible.unwrap_or(d.rig_visible),
             mesh_alpha: parsed.mesh_alpha.unwrap_or(d.mesh_alpha).clamp(0.05, 1.0),
             gizmo_enabled: parsed.gizmo_enabled.unwrap_or(d.gizmo_enabled),
+            lod_near_distance_m: parsed
+                .lod_near_distance_m
+                .unwrap_or(d.lod_near_distance_m)
+                .clamp(1.0, 200.0),
+            lod_far_distance_m: parsed
+                .lod_far_distance_m
+                .unwrap_or(d.lod_far_distance_m)
+                .clamp(2.0, 300.0),
+            lod_mid_frame_divisor: parsed
+                .lod_mid_frame_divisor
+                .unwrap_or(d.lod_mid_frame_divisor)
+                .clamp(1, 4),
+            lod_far_frame_divisor: parsed
+                .lod_far_frame_divisor
+                .unwrap_or(d.lod_far_frame_divisor)
+                .clamp(1, 8),
         }
     }
 
@@ -192,6 +231,16 @@ pub struct EnemyAnimCurrent {
     pub node: AnimationNodeIndex,
 }
 
+/// Compteurs de cadence d'animation pour rendre le gain vérifiable dans le
+/// capteur, plutôt que de déclarer l'optimisation sans donnée runtime.
+#[derive(Resource, Clone, Default, Debug)]
+pub struct EnemyAnimLodMetrics {
+    pub near: u32,
+    pub mid: u32,
+    pub far: u32,
+    pub paused: u32,
+}
+
 // ─── Sélection de clip (pur, testable) ──────────────────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -230,6 +279,20 @@ fn node_for(ag: &ArchetypeGraph, kind: ClipKind) -> AnimationNodeIndex {
         ClipKind::Run => ag.run,
         ClipKind::Attack => ag.attack,
         ClipKind::Death => ag.death,
+    }
+}
+
+/// Politique d'animation LOD. Les actions/deaths restent natives : elles sont
+/// des feedbacks de combat lisibles. Les ennemis éloignés conservent le même
+/// temps d'animation mais leurs os ne sont évalués qu'à une cadence réduite,
+/// déphasée par entité pour éviter un burst synchronisé de rigs.
+pub fn animation_lod_divisor(distance_m: f32, state: BotState, cfg: &EnemyAnimConfig) -> u32 {
+    if matches!(state, BotState::Attack | BotState::Dead) || distance_m <= cfg.lod_near_distance_m {
+        1
+    } else if distance_m <= cfg.lod_far_distance_m.max(cfg.lod_near_distance_m) {
+        cfg.lod_mid_frame_divisor
+    } else {
+        cfg.lod_far_frame_divisor
     }
 }
 
@@ -399,7 +462,9 @@ pub fn sys_wire_enemy_anim(
             continue; // graphe absent pour ce GLB (clips manquants) — sensor le dira
         };
         let mut transitions = AnimationTransitions::new();
-        transitions.play(&mut player, ag.idle, Duration::ZERO).repeat();
+        transitions
+            .play(&mut player, ag.idle, Duration::ZERO)
+            .repeat();
         commands.entity(player_e).insert((
             AnimationGraphHandle(ag.graph.clone()),
             transitions,
@@ -451,6 +516,53 @@ pub fn sys_update_enemy_anim(
     }
 }
 
+/// Réduit la pression de `propagate_parent_transforms` confirmée par Tracy :
+/// chaque rig KayKit modifie ~41 os, donc tous les mettre à jour dans la même
+/// frame crée des pics. Cette passe s'exécute avant l'animation PostUpdate de
+/// Bevy ; les joueurs éloignés sont pausés la plupart des frames puis rattrapent
+/// le temps écoulé lors de leur frame attribuée.
+pub fn sys_apply_enemy_animation_lod(
+    time: Res<Time>,
+    cfg: Res<EnemyAnimConfig>,
+    player: Query<&GlobalTransform, With<Player>>,
+    enemies: Query<(Entity, &GlobalTransform, &ArenaBot, &EnemyAnimLink)>,
+    mut players: Query<&mut AnimationPlayer>,
+    mut metrics: ResMut<EnemyAnimLodMetrics>,
+    mut frame: Local<u64>,
+) {
+    let Ok(player_transform) = player.single() else {
+        return;
+    };
+    *frame = frame.wrapping_add(1);
+    *metrics = EnemyAnimLodMetrics::default();
+    let player_pos = player_transform.translation();
+    for (entity, enemy_transform, bot, link) in &enemies {
+        let distance = enemy_transform.translation().distance(player_pos);
+        let divisor = animation_lod_divisor(distance, bot.state, &cfg);
+        match divisor {
+            1 => metrics.near = metrics.near.saturating_add(1),
+            2 => metrics.mid = metrics.mid.saturating_add(1),
+            _ => metrics.far = metrics.far.saturating_add(1),
+        }
+        let Ok(mut animation_player) = players.get_mut(link.player) else {
+            continue;
+        };
+        // Déphasage par Entity index : pour divisor=4, environ un quart des
+        // rigs éloignés réévaluent leurs bones à chaque frame au lieu de tous.
+        let update_this_frame = divisor == 1
+            || (*frame + u64::from(entity.index().index())).is_multiple_of(u64::from(divisor));
+        if update_this_frame {
+            if divisor > 1 {
+                animation_player.seek_all_by(time.delta_secs() * (divisor - 1) as f32);
+            }
+            animation_player.resume_all();
+        } else {
+            animation_player.pause_all();
+            metrics.paused = metrics.paused.saturating_add(1);
+        }
+    }
+}
+
 // ─── Sensor ─────────────────────────────────────────────────────────────────
 
 /// Pur — severity/next_step du capteur.
@@ -464,7 +576,10 @@ pub fn severity_for_enemy_anim(
         return ("info", "Animations ennemies coupées (enabled=false).");
     }
     if !graphs_built {
-        return ("info", "Graphes d'anim en cours de build (GLB en chargement).");
+        return (
+            "info",
+            "Graphes d'anim en cours de build (GLB en chargement).",
+        );
     }
     if enemies > 0 && bound == 0 {
         return (
@@ -482,6 +597,7 @@ pub fn sys_write_enemy_anim_sensor(
     watch: Option<Res<EnemyAnimWatch>>,
     q_enemies: Query<(), With<EnemyArchetype>>,
     q_bound: Query<(), With<EnemyAnimBound>>,
+    lod: Option<Res<EnemyAnimLodMetrics>>,
 ) {
     *accum += time.delta_secs();
     if *accum < POLL_PERIOD_SEC {
@@ -495,8 +611,9 @@ pub fn sys_write_enemy_anim_sensor(
     let bound = q_bound.iter().count() as u32;
     let (severity, next_step) =
         severity_for_enemy_anim(cfg.enabled, watch.graphs_built, enemies, bound);
+    let lod = lod.as_deref().cloned().unwrap_or_default();
     let json = format!(
-        r#"{{"id":"enemy_anim","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"graphs_built":{},"enemies_total":{},"players_bound":{},"rig_visible":{},"gizmo_enabled":{},"crossfade_ms":{},"reload_count":{}}}"#,
+        r#"{{"id":"enemy_anim","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"graphs_built":{},"enemies_total":{},"players_bound":{},"rig_visible":{},"gizmo_enabled":{},"crossfade_ms":{},"lod_near":{},"lod_mid":{},"lod_far":{},"lod_paused":{},"reload_count":{}}}"#,
         time.elapsed_secs(),
         cfg.enabled,
         watch.graphs_built,
@@ -505,9 +622,13 @@ pub fn sys_write_enemy_anim_sensor(
         cfg.rig_visible,
         cfg.gizmo_enabled,
         cfg.crossfade_ms,
+        lod.near,
+        lod.mid,
+        lod.far,
+        lod.paused,
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[enemy_anim] sensor write failed: {e}");
     }
 }
@@ -519,10 +640,8 @@ pub struct ForgiaRogueliteEnemyAnimPlugin;
 impl Plugin for ForgiaRogueliteEnemyAnimPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<crate::enemy_rig_debug::EnemyMatRegistry>();
-        app.add_systems(
-            Startup,
-            (sys_init_enemy_anim_genome, sys_load_enemy_gltf),
-        );
+        app.init_resource::<EnemyAnimLodMetrics>();
+        app.add_systems(Startup, (sys_init_enemy_anim_genome, sys_load_enemy_gltf));
         // Driver d'anim : hot-reload → build graphes → bind → select clip.
         app.add_systems(
             Update,
@@ -531,6 +650,7 @@ impl Plugin for ForgiaRogueliteEnemyAnimPlugin {
                 sys_build_enemy_anim_graphs,
                 sys_wire_enemy_anim,
                 sys_update_enemy_anim,
+                sys_apply_enemy_animation_lod,
             )
                 .chain()
                 .in_set(GameSet::Movement)
@@ -609,7 +729,10 @@ mesh_alpha = 0.3
     fn desired_clip_states() {
         // Idle / Attack / Dead indépendants de la vitesse.
         assert_eq!(desired_clip(BotState::Idle, 5.0, 0.3, 4.0), ClipKind::Idle);
-        assert_eq!(desired_clip(BotState::Attack, 5.0, 0.3, 4.0), ClipKind::Attack);
+        assert_eq!(
+            desired_clip(BotState::Attack, 5.0, 0.3, 4.0),
+            ClipKind::Attack
+        );
         assert_eq!(desired_clip(BotState::Dead, 5.0, 0.3, 4.0), ClipKind::Death);
     }
 
@@ -619,6 +742,16 @@ mesh_alpha = 0.3
         assert_eq!(desired_clip(BotState::Chase, 0.1, 0.3, 4.0), ClipKind::Idle);
         assert_eq!(desired_clip(BotState::Chase, 2.0, 0.3, 4.0), ClipKind::Walk);
         assert_eq!(desired_clip(BotState::Chase, 7.0, 0.3, 4.0), ClipKind::Run);
+    }
+
+    #[test]
+    fn animation_lod_keeps_combat_native_and_staggers_distance_bands() {
+        let cfg = EnemyAnimConfig::default();
+        assert_eq!(animation_lod_divisor(5.0, BotState::Chase, &cfg), 1);
+        assert_eq!(animation_lod_divisor(25.0, BotState::Chase, &cfg), 2);
+        assert_eq!(animation_lod_divisor(60.0, BotState::Chase, &cfg), 4);
+        assert_eq!(animation_lod_divisor(60.0, BotState::Attack, &cfg), 1);
+        assert_eq!(animation_lod_divisor(60.0, BotState::Dead, &cfg), 1);
     }
 
     #[test]

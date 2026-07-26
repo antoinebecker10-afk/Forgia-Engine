@@ -78,7 +78,10 @@ impl EnemyScalingConfig {
         Self {
             enabled: s.enabled.unwrap_or(d.enabled),
             hp_per_stage: s.hp_per_stage.unwrap_or(d.hp_per_stage).clamp(0.0, 10.0),
-            damage_per_stage: s.damage_per_stage.unwrap_or(d.damage_per_stage).clamp(0.0, 10.0),
+            damage_per_stage: s
+                .damage_per_stage
+                .unwrap_or(d.damage_per_stage)
+                .clamp(0.0, 10.0),
         }
     }
 
@@ -163,7 +166,11 @@ pub fn sys_scale_enemies_by_depth(
     wave: Res<RogueliteWave>,
     mut watch: ResMut<EnemyScalingWatch>,
     mut q: Query<
-        (&mut Health, Option<&mut DefenseLayer>, Option<&mut BotShootConfig>),
+        (
+            &mut Health,
+            Option<&mut DefenseLayer>,
+            Option<&mut BotShootConfig>,
+        ),
         Added<EnemyArchetype>,
     >,
 ) {
@@ -238,7 +245,7 @@ pub fn sys_write_enemy_scaling_sensor(
         watch.scaled_total,
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[enemy_scaling] sensor write failed: {e}");
     }
 }
@@ -281,9 +288,7 @@ mod tests {
 
     #[test]
     fn parse_reads_scaling_section() {
-        let c = EnemyScalingConfig::parse_toml(
-            "[scaling]\nenabled = false\nhp_per_stage = 0.5\n",
-        );
+        let c = EnemyScalingConfig::parse_toml("[scaling]\nenabled = false\nhp_per_stage = 0.5\n");
         assert!(!c.enabled);
         assert!((c.hp_per_stage - 0.5).abs() < 1e-6);
         // damage_per_stage non précisé → défaut.

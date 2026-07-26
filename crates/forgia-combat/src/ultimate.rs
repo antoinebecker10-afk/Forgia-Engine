@@ -155,7 +155,7 @@ pub fn sys_write_ultimate_sensor(
         ult.hud_fill(),
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[ultimate] sensor write failed: {e}");
     }
 }

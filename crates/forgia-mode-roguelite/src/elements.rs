@@ -240,7 +240,10 @@ pub struct ShockParams {
 impl Default for ShockParams {
     fn default() -> Self {
         // Miroir EXACT de la section [shock] de roguelite_elements.toml.
-        Self { duration: 4.0, vuln_mul: 1.1 }
+        Self {
+            duration: 4.0,
+            vuln_mul: 1.1,
+        }
     }
 }
 
@@ -377,10 +380,26 @@ impl Default for AffinityTable {
         // Miroir EXACT de la section [affinity] de roguelite_elements.toml.
         Self {
             base_hit: false,
-            fire: AffinityGene { shield: 0.75, armor: 0.75, life: 1.5 },
-            poison: AffinityGene { shield: 0.75, armor: 1.5, life: 0.75 },
-            shock: AffinityGene { shield: 1.5, armor: 0.75, life: 0.75 },
-            armor_pierce: AffinityGene { shield: 0.75, armor: 1.5, life: 0.75 },
+            fire: AffinityGene {
+                shield: 0.75,
+                armor: 0.75,
+                life: 1.5,
+            },
+            poison: AffinityGene {
+                shield: 0.75,
+                armor: 1.5,
+                life: 0.75,
+            },
+            shock: AffinityGene {
+                shield: 1.5,
+                armor: 0.75,
+                life: 0.75,
+            },
+            armor_pierce: AffinityGene {
+                shield: 0.75,
+                armor: 1.5,
+                life: 0.75,
+            },
         }
     }
 }
@@ -490,20 +509,48 @@ impl Default for ElementConfig {
                 rocket_launcher: "poison".into(),
             },
             matchup: MatchupTable {
-                fire: Matchup { tank: 1.0, runner: 1.3, sniper: 1.1, boss: 1.0 },
-                poison: Matchup { tank: 1.4, runner: 1.0, sniper: 1.1, boss: 1.2 },
-                shock: Matchup { tank: 1.1, runner: 1.4, sniper: 1.2, boss: 1.0 },
-                armor_pierce: Matchup { tank: 2.0, runner: 1.0, sniper: 1.3, boss: 1.5 },
+                fire: Matchup {
+                    tank: 1.0,
+                    runner: 1.3,
+                    sniper: 1.1,
+                    boss: 1.0,
+                },
+                poison: Matchup {
+                    tank: 1.4,
+                    runner: 1.0,
+                    sniper: 1.1,
+                    boss: 1.2,
+                },
+                shock: Matchup {
+                    tank: 1.1,
+                    runner: 1.4,
+                    sniper: 1.2,
+                    boss: 1.0,
+                },
+                armor_pierce: Matchup {
+                    tank: 2.0,
+                    runner: 1.0,
+                    sniper: 1.3,
+                    boss: 1.5,
+                },
             },
-            burn: BurnParams { dps: 8.0, duration: 3.0 },
+            burn: BurnParams {
+                dps: 8.0,
+                duration: 3.0,
+            },
             poison: PoisonParams {
                 dps_per_stack: 4.0,
                 duration: 4.0,
                 max_stacks: 5,
                 shred_per_stack: 0.04,
             },
-            aoe: AoeParams { radius: 3.5, damage_factor: 0.5 },
-            execute: ExecuteParams { hp_ratio_threshold: 0.25 },
+            aoe: AoeParams {
+                radius: 3.5,
+                damage_factor: 0.5,
+            },
+            execute: ExecuteParams {
+                hp_ratio_threshold: 0.25,
+            },
             vfx: VfxParams::default(),
             combustion: CombustionParams::default(),
             shock: ShockParams::default(),
@@ -1154,7 +1201,11 @@ pub fn sys_apply_elements_on_hit(
                 .map(|p| 1.0 + p.stacks as f32 * config.poison.shred_per_stack)
                 .unwrap_or(1.0);
             // ×vuln si la cible portait déjà StatusShock (Inc.2).
-            let vuln_mul = if had_shock { config.shock.vuln_mul } else { 1.0 };
+            let vuln_mul = if had_shock {
+                config.shock.vuln_mul
+            } else {
+                1.0
+            };
 
             if let Ok(mut hp) = q_health.get_mut(ev.target) {
                 // P0-4 — le bonus élémentaire draine d'abord le DefenseLayer (affinité
@@ -1210,9 +1261,10 @@ pub fn sys_apply_elements_on_hit(
                     // Marque électrique (non-stackante) : try_insert écrase → rafraîchit.
                     // `Vulnerability` (forgia-damage) porte le mult → lu par le hit de
                     // base (forgia-fps) ET la couche élémentaire (P0-4 Inc.3).
-                    commands
-                        .entity(ev.target)
-                        .try_insert(Vulnerability::new(config.shock.vuln_mul, config.shock.duration));
+                    commands.entity(ev.target).try_insert(Vulnerability::new(
+                        config.shock.vuln_mul,
+                        config.shock.duration,
+                    ));
                     stats.shocks_applied = stats.shocks_applied.saturating_add(1);
                 }
                 Element::ArmorPierce => {}
@@ -1235,7 +1287,11 @@ pub fn sys_apply_elements_on_hit(
             let now_poison = had_poison || element == Element::Poison;
             let now_shock = had_shock || element == Element::Shock;
             // Cible déjà électrisée → la réaction (décharge) est amplifiée (vuln Inc.2).
-            let vuln = if had_shock { config.shock.vuln_mul } else { 1.0 };
+            let vuln = if had_shock {
+                config.shock.vuln_mul
+            } else {
+                1.0
+            };
             let origin = ev.hit_world_pos;
             for kind in ReactionTable::triggered(now_fire, now_poison, now_shock) {
                 // Miasma = DoT sur la CIBLE : inutile (et stat trompeuse) si le hit
@@ -1264,7 +1320,12 @@ pub fn sys_apply_elements_on_hit(
                         // l'élément de la réaction) avant la Vie : cible + voisins.
                         let aff = config.affinity_for(kind.damage_element());
                         route_elemental_damage(
-                            ev.target, tgt_dmg, &aff, &mut q_health, &mut q_defense, &mut stats,
+                            ev.target,
+                            tgt_dmg,
+                            &aff,
+                            &mut q_health,
+                            &mut q_defense,
+                            &mut stats,
                         );
                         let r2 = radius * radius;
                         react.buf.clear();
@@ -1274,10 +1335,19 @@ pub fn sys_apply_elements_on_hit(
                         }));
                         for &e in &*react.buf {
                             route_elemental_damage(
-                                e, area_dmg, &aff, &mut q_health, &mut q_defense, &mut stats,
+                                e,
+                                area_dmg,
+                                &aff,
+                                &mut q_health,
+                                &mut q_defense,
+                                &mut stats,
                             );
                         }
-                        react.vfx_events.write(ReactionEvent { kind, pos: origin, radius });
+                        react.vfx_events.write(ReactionEvent {
+                            kind,
+                            pos: origin,
+                            radius,
+                        });
                     }
                     // Miasma : DoT stackant %PV max (pas d'instant-damage → pas de
                     // vuln ici, l'amplification passe par les stacks).
@@ -1311,13 +1381,18 @@ pub fn sys_apply_elements_on_hit(
             let aff = config.affinity_for(Element::Shock);
             aoe_buf.clear();
             aoe_buf.extend(q_pos.iter().filter_map(|(e, gt)| {
-                (e != ev.target && (gt.translation() - origin).length_squared() <= r2)
-                    .then_some(e)
+                (e != ev.target && (gt.translation() - origin).length_squared() <= r2).then_some(e)
             }));
             let mut hits = 0u32;
             for &e in &*aoe_buf {
-                if route_elemental_damage(e, splash, &aff, &mut q_health, &mut q_defense, &mut stats)
-                {
+                if route_elemental_damage(
+                    e,
+                    splash,
+                    &aff,
+                    &mut q_health,
+                    &mut q_defense,
+                    &mut stats,
+                ) {
                     hits += 1;
                 }
             }
@@ -1400,8 +1475,12 @@ pub fn sys_tick_element_status(
             if m.tick_accum >= STATUS_TICK_INTERVAL {
                 let ticks = (m.tick_accum / STATUS_TICK_INTERVAL).floor();
                 m.tick_accum -= ticks * STATUS_TICK_INTERVAL;
-                miasma_dmg =
-                    miasma_damage(m.stacks, m.pct_max_hp_per_sec, max_hp, STATUS_TICK_INTERVAL * ticks);
+                miasma_dmg = miasma_damage(
+                    m.stacks,
+                    m.pct_max_hp_per_sec,
+                    max_hp,
+                    STATUS_TICK_INTERVAL * ticks,
+                );
             }
             let expired = m.secs_left <= 0.0;
             if miasma_dmg > 0.0 {
@@ -1494,7 +1573,7 @@ pub fn sys_write_elements_sensor(
         stats.surcharges,
     );
 
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[elements] sensor write failed: {e}");
     }
 }
@@ -1510,7 +1589,10 @@ mod tests {
         let c = ElementConfig::default();
         assert_eq!(c.element_for(WeaponType::ModernAR), Some(Element::Shock));
         assert_eq!(c.element_for(WeaponType::AssaultRifle), Some(Element::Fire));
-        assert_eq!(c.element_for(WeaponType::Shotgun), Some(Element::ArmorPierce));
+        assert_eq!(
+            c.element_for(WeaponType::Shotgun),
+            Some(Element::ArmorPierce)
+        );
         assert_eq!(
             c.element_for(WeaponType::RocketLauncher),
             Some(Element::Poison)
@@ -1605,15 +1687,26 @@ mod tests {
         // matchup ×2.0 → bonus 50 → survives 20 < 0.25×120=30 → exécution.
         let (hp, exec) =
             resolve_target_hit(Element::ArmorPierce, 70.0, 120.0, 50.0, 2.0, 1.0, 1.0, 0.25);
-        assert!(exec, "perforant doit exécuter un Tank affaibli sous le seuil");
+        assert!(
+            exec,
+            "perforant doit exécuter un Tank affaibli sous le seuil"
+        );
         assert_eq!(hp, 0.0);
     }
 
     #[test]
     fn armor_pierce_does_not_execute_boss() {
         // Boss 800 PV, body 50 → cur 750, matchup boss 1.5 → bonus 25 → 725 ≫ 200.
-        let (hp, exec) =
-            resolve_target_hit(Element::ArmorPierce, 750.0, 800.0, 50.0, 1.5, 1.0, 1.0, 0.25);
+        let (hp, exec) = resolve_target_hit(
+            Element::ArmorPierce,
+            750.0,
+            800.0,
+            50.0,
+            1.5,
+            1.0,
+            1.0,
+            0.25,
+        );
         assert!(!exec, "perforant ne doit PAS one-shot le Boss");
         assert!((hp - 725.0).abs() < 1e-3);
     }
@@ -1628,7 +1721,8 @@ mod tests {
 
     #[test]
     fn neutral_matchup_is_noop() {
-        let (hp, exec) = resolve_target_hit(Element::Poison, 50.0, 100.0, 20.0, 1.0, 1.0, 1.0, 0.25);
+        let (hp, exec) =
+            resolve_target_hit(Element::Poison, 50.0, 100.0, 20.0, 1.0, 1.0, 1.0, 0.25);
         assert!(!exec);
         assert_eq!(hp, 50.0, "matchup 1.0 = aucun bonus");
     }
@@ -1678,7 +1772,10 @@ mod tests {
     fn shock_params_default_sane() {
         let s = ShockParams::default();
         assert!(s.duration > 0.0, "la marque électrique doit durer");
-        assert!(s.vuln_mul > 1.0, "vulnérabilité = dégâts subis amplifiés (>1.0)");
+        assert!(
+            s.vuln_mul > 1.0,
+            "vulnérabilité = dégâts subis amplifiés (>1.0)"
+        );
     }
 
     #[test]
@@ -1686,7 +1783,8 @@ mod tests {
         // Runner, base 16 (SMG), matchup fire×runner 1.3 → bonus 4.8.
         // Sans marque (vuln 1.0) : cur 30 → 25.2. Avec marque (vuln 1.1) : bonus
         // 5.28 → 24.72. La cible électrisée encaisse plus.
-        let (no_shock, _) = resolve_target_hit(Element::Fire, 30.0, 35.0, 16.0, 1.3, 1.0, 1.0, 0.25);
+        let (no_shock, _) =
+            resolve_target_hit(Element::Fire, 30.0, 35.0, 16.0, 1.3, 1.0, 1.0, 0.25);
         let (shocked, _) = resolve_target_hit(Element::Fire, 30.0, 35.0, 16.0, 1.3, 1.0, 1.1, 0.25);
         assert!((no_shock - 25.2).abs() < 1e-3);
         assert!((shocked - 24.72).abs() < 1e-3);
@@ -1704,7 +1802,10 @@ mod tests {
             resolve_target_hit(Element::ArmorPierce, 72.0, 120.0, 40.0, 2.0, 1.0, 1.1, 0.25);
         assert!(!exec_no, "sans marque, la cible survit au-dessus du seuil");
         assert!((hp_no - 32.0).abs() < 1e-3);
-        assert!(exec_yes, "avec marque, la vulnérabilité pousse sous le seuil → exécution");
+        assert!(
+            exec_yes,
+            "avec marque, la vulnérabilité pousse sous le seuil → exécution"
+        );
         assert_eq!(hp_yes, 0.0);
     }
 
@@ -1723,7 +1824,10 @@ mod tests {
             ReactionKind::Combustion.pair(),
             (Element::Fire, Element::Poison)
         );
-        assert_eq!(ReactionKind::Miasma.pair(), (Element::Shock, Element::Poison));
+        assert_eq!(
+            ReactionKind::Miasma.pair(),
+            (Element::Shock, Element::Poison)
+        );
         assert_eq!(
             ReactionKind::Surcharge.pair(),
             (Element::Fire, Element::Shock)
@@ -1773,7 +1877,10 @@ mod tests {
         assert!(c.reaction_enabled(ReactionKind::Combustion));
         assert!(c.reaction_enabled(ReactionKind::Miasma));
         assert!(c.reaction_enabled(ReactionKind::Surcharge));
-        assert_eq!(c.reaction_cooldown(ReactionKind::Miasma), c.miasma.retrigger_cooldown);
+        assert_eq!(
+            c.reaction_cooldown(ReactionKind::Miasma),
+            c.miasma.retrigger_cooldown
+        );
         assert_eq!(
             c.reaction_cooldown(ReactionKind::Surcharge),
             c.surcharge.retrigger_cooldown
@@ -1785,11 +1892,19 @@ mod tests {
         let c = ElementConfig::default();
         assert_eq!(
             c.reaction_burst(ReactionKind::Combustion),
-            (c.combustion.target_pct, c.combustion.area_pct, c.combustion.radius)
+            (
+                c.combustion.target_pct,
+                c.combustion.area_pct,
+                c.combustion.radius
+            )
         );
         assert_eq!(
             c.reaction_burst(ReactionKind::Surcharge),
-            (c.surcharge.target_pct, c.surcharge.area_pct, c.surcharge.radius)
+            (
+                c.surcharge.target_pct,
+                c.surcharge.area_pct,
+                c.surcharge.radius
+            )
         );
         assert_eq!(
             c.reaction_burst(ReactionKind::Miasma),
@@ -1826,16 +1941,29 @@ mod tests {
     fn affinity_maps_each_element_to_its_favored_layer() {
         let c = ElementConfig::default();
         let fire = c.affinity_for(Element::Fire);
-        assert!(fire.life_mult > 1.0 && fire.shield_mult < 1.0, "Feu → fort Vie, faible Bouclier");
+        assert!(
+            fire.life_mult > 1.0 && fire.shield_mult < 1.0,
+            "Feu → fort Vie, faible Bouclier"
+        );
         let shock = c.affinity_for(Element::Shock);
         assert!(shock.shield_mult > 1.0, "Électrique → fort Bouclier");
-        assert!(c.affinity_for(Element::ArmorPierce).armor_mult > 1.0, "Perforant → forte Armure");
-        assert!(c.affinity_for(Element::Poison).armor_mult > 1.0, "Poison → forte Armure");
+        assert!(
+            c.affinity_for(Element::ArmorPierce).armor_mult > 1.0,
+            "Perforant → forte Armure"
+        );
+        assert!(
+            c.affinity_for(Element::Poison).armor_mult > 1.0,
+            "Poison → forte Armure"
+        );
     }
 
     #[test]
     fn affinity_gene_converts_to_element_affinity() {
-        let g = AffinityGene { shield: 0.75, armor: 0.75, life: 1.5 };
+        let g = AffinityGene {
+            shield: 0.75,
+            armor: 0.75,
+            life: 1.5,
+        };
         assert_eq!(g.to_affinity(), ElementAffinity::new(0.75, 0.75, 1.5));
     }
 
@@ -1864,7 +1992,8 @@ mod tests {
     fn resolve_target_hit_composes_bonus_and_leak() {
         // Sanity : le wrapper sans couche = bonus brut appliqué à la Vie.
         let bonus = elemental_bonus(16.0, 1.3, 1.0, 1.0);
-        let (via_wrapper, _) = resolve_target_hit(Element::Fire, 30.0, 35.0, 16.0, 1.3, 1.0, 1.0, 0.25);
+        let (via_wrapper, _) =
+            resolve_target_hit(Element::Fire, 30.0, 35.0, 16.0, 1.3, 1.0, 1.0, 0.25);
         let (via_split, _) = resolve_leak_to_health(Element::Fire, 30.0, 35.0, bonus, 0.25);
         assert_eq!(via_wrapper, via_split);
     }
@@ -1889,8 +2018,12 @@ mod tests {
         assert!(!exec, "le bonus n'atteint pas la Vie → pas d'exécution");
         assert_eq!(hp, 100.0);
         // Contraste : le même bonus en DIRECT (cible sans couche) exécute bien.
-        let (_, exec_direct) = resolve_leak_to_health(Element::ArmorPierce, 100.0, 120.0, 75.0, 0.25);
-        assert!(exec_direct, "sans bouclier, 75 ramène sous le seuil → exécution");
+        let (_, exec_direct) =
+            resolve_leak_to_health(Element::ArmorPierce, 100.0, 120.0, 75.0, 0.25);
+        assert!(
+            exec_direct,
+            "sans bouclier, 75 ramène sous le seuil → exécution"
+        );
     }
 
     // ── Routage bursts/arc/Miasma via DefenseLayer (story-642 P0-4 Inc.2) ──
@@ -1910,15 +2043,28 @@ mod tests {
         let c = ElementConfig::default();
         let mut sh_surcharge = DefenseLayer::new(100.0, 0.0, 20.0, 3.0);
         let mut sh_combustion = DefenseLayer::new(100.0, 0.0, 20.0, 3.0);
-        let leak_s = sh_surcharge
-            .absorb_elemental(40.0, &c.affinity_for(ReactionKind::Surcharge.damage_element()));
-        let leak_c = sh_combustion
-            .absorb_elemental(40.0, &c.affinity_for(ReactionKind::Combustion.damage_element()));
+        let leak_s = sh_surcharge.absorb_elemental(
+            40.0,
+            &c.affinity_for(ReactionKind::Surcharge.damage_element()),
+        );
+        let leak_c = sh_combustion.absorb_elemental(
+            40.0,
+            &c.affinity_for(ReactionKind::Combustion.damage_element()),
+        );
         assert_eq!(leak_s, 0.0);
         assert_eq!(leak_c, 0.0);
-        assert!((sh_surcharge.shield - 40.0).abs() < 1e-3, "40×1.5=60 retirés → 40");
-        assert!((sh_combustion.shield - 70.0).abs() < 1e-3, "40×0.75=30 retirés → 70");
-        assert!(sh_surcharge.shield < sh_combustion.shield, "surcharge perce mieux");
+        assert!(
+            (sh_surcharge.shield - 40.0).abs() < 1e-3,
+            "40×1.5=60 retirés → 40"
+        );
+        assert!(
+            (sh_combustion.shield - 70.0).abs() < 1e-3,
+            "40×0.75=30 retirés → 70"
+        );
+        assert!(
+            sh_surcharge.shield < sh_combustion.shield,
+            "surcharge perce mieux"
+        );
     }
 
     #[test]
@@ -1938,7 +2084,10 @@ mod tests {
 
     #[test]
     fn affinity_base_hit_defaults_off() {
-        assert!(!AffinityTable::default().base_hit, "toggle base_hit OFF par défaut");
+        assert!(
+            !AffinityTable::default().base_hit,
+            "toggle base_hit OFF par défaut"
+        );
         assert!(!ElementConfig::default().affinity.base_hit);
     }
 
@@ -1967,8 +2116,16 @@ mod tests {
         assert_eq!(map.len(), 4, "4 armes mappées + armées");
         let fire_aff = c.affinity_for(Element::Fire);
         let shock_aff = c.affinity_for(Element::Shock);
-        assert_eq!(map.get(&WeaponType::AssaultRifle), Some(&fire_aff), "SMG=feu");
-        assert_eq!(map.get(&WeaponType::ModernAR), Some(&shock_aff), "pistolet=électrique");
+        assert_eq!(
+            map.get(&WeaponType::AssaultRifle),
+            Some(&fire_aff),
+            "SMG=feu"
+        );
+        assert_eq!(
+            map.get(&WeaponType::ModernAR),
+            Some(&shock_aff),
+            "pistolet=électrique"
+        );
     }
 
     #[test]
@@ -1978,9 +2135,19 @@ mod tests {
         let mut u = ElementUnlocks::default();
         u.unlock(Element::Fire); // seul Feu armé
         let map = build_base_hit_affinities(&c, &u);
-        assert_eq!(map.len(), 1, "seule l'arme dont l'élément est armé est affine");
-        assert!(map.contains_key(&WeaponType::AssaultRifle), "SMG=feu → affine");
-        assert!(!map.contains_key(&WeaponType::ModernAR), "Shock non armé → pistolet neutre");
+        assert_eq!(
+            map.len(),
+            1,
+            "seule l'arme dont l'élément est armé est affine"
+        );
+        assert!(
+            map.contains_key(&WeaponType::AssaultRifle),
+            "SMG=feu → affine"
+        );
+        assert!(
+            !map.contains_key(&WeaponType::ModernAR),
+            "Shock non armé → pistolet neutre"
+        );
     }
 
     // ── VFX (story-588) ──
@@ -1996,7 +2163,11 @@ mod tests {
         .iter()
         .map(|e| e.idx())
         .collect();
-        assert_eq!(idx, vec![0, 1, 2, 3], "idx doit indexer [0..4] sans collision");
+        assert_eq!(
+            idx,
+            vec![0, 1, 2, 3],
+            "idx doit indexer [0..4] sans collision"
+        );
     }
 
     #[test]
@@ -2062,6 +2233,10 @@ damage_factor = 0.5
 hp_ratio_threshold = 0.25
 "#;
         let c = ElementConfig::parse_toml(toml);
-        assert_eq!(c.vfx, VfxParams::default(), "section [vfx] absente → default");
+        assert_eq!(
+            c.vfx,
+            VfxParams::default(),
+            "section [vfx] absente → default"
+        );
     }
 }

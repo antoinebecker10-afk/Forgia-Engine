@@ -61,7 +61,12 @@ pub struct UltimateVfxAssets {
 fn apply_vfx_material(m: &mut StandardMaterial, rgb: [f32; 3]) {
     let [r, g, b] = rgb;
     m.base_color = Color::srgba(r, g, b, 0.85);
-    m.emissive = LinearRgba::new(r * EMISSIVE_BOOST, g * EMISSIVE_BOOST, b * EMISSIVE_BOOST, 1.0);
+    m.emissive = LinearRgba::new(
+        r * EMISSIVE_BOOST,
+        g * EMISSIVE_BOOST,
+        b * EMISSIVE_BOOST,
+        1.0,
+    );
     m.unlit = true;
     m.alpha_mode = AlphaMode::Blend;
 }
@@ -171,7 +176,11 @@ pub fn sys_spawn_ultimate_vfx(
             continue;
         }
         let idx = ev.technique.min(3);
-        let light0 = if ev.light { config.vfx.light_intensity } else { 0.0 };
+        let light0 = if ev.light {
+            config.vfx.light_intensity
+        } else {
+            0.0
+        };
         let mut ent = commands.spawn((
             Mesh3d(assets.sphere.clone()),
             MeshMaterial3d(assets.mats[idx].clone()),
@@ -228,9 +237,18 @@ mod tests {
     #[test]
     fn weapon_maps_to_its_technique_color() {
         let c = UltimateConfig::default();
-        assert_eq!(weapon_technique_idx(WeaponType::ModernAR), Some(VFX_EXPLOSION));
-        assert_eq!(weapon_technique_idx(WeaponType::RocketLauncher), Some(VFX_FREEZE));
-        assert_eq!(weapon_vfx_color(&c, WeaponType::AssaultRifle), c.vfx.chain_rgb);
+        assert_eq!(
+            weapon_technique_idx(WeaponType::ModernAR),
+            Some(VFX_EXPLOSION)
+        );
+        assert_eq!(
+            weapon_technique_idx(WeaponType::RocketLauncher),
+            Some(VFX_FREEZE)
+        );
+        assert_eq!(
+            weapon_vfx_color(&c, WeaponType::AssaultRifle),
+            c.vfx.chain_rgb
+        );
         assert_eq!(weapon_technique_label(WeaponType::Shotgun), "PERFORATION");
     }
 }

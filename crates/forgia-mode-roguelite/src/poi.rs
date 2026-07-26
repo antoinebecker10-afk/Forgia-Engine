@@ -118,9 +118,7 @@ impl RoguelitePoiConfig {
                 "poi_vault_souls_reward" => {
                     c.vault_souls_reward = gene.default.clamp(0.0, 100_000.0) as u32
                 }
-                "poi_loot_trigger_radius" => {
-                    c.loot_trigger_radius = gene.default.clamp(0.5, 20.0)
-                }
+                "poi_loot_trigger_radius" => c.loot_trigger_radius = gene.default.clamp(0.5, 20.0),
                 "poi_lava_radius" => c.lava_radius = gene.default.clamp(0.5, 30.0),
                 "poi_lava_damage_per_tick" => {
                     c.lava_damage_per_tick = gene.default.clamp(0.0, 1000.0)
@@ -550,7 +548,7 @@ fn spawn_forge(
 ) {
     let mesh = meshes.add(Cuboid::new(1.3, 1.1, 0.9));
     let mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.32, 0.28, 0.30), // fer sombre
+        base_color: Color::srgb(0.32, 0.28, 0.30),     // fer sombre
         emissive: LinearRgba::new(2.0, 0.8, 0.2, 1.0), // braise de forge
         metallic: 0.7,
         perceptual_roughness: 0.4,
@@ -751,7 +749,7 @@ pub fn sys_write_poi_sensor(
         stats.lava_kills_total,
         stats.lava_player_ticks,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[poi] sensor write failed: {e}");
     }
 }
@@ -764,7 +762,10 @@ pub fn severity_for_poi(total: u32) -> (&'static str, &'static str) {
             "0 POI (hors run ou stage sans anchor PoiSlot). Read forgia2_anchor.json::counts.poi_slot.",
         )
     } else {
-        ("ok", "POI actifs. forgia2_anchor.json::counts.poi_slot doit etre > 0.")
+        (
+            "ok",
+            "POI actifs. forgia2_anchor.json::counts.poi_slot doit etre > 0.",
+        )
     }
 }
 
@@ -829,8 +830,8 @@ default = 0.0
     fn different_seeds_can_diverge() {
         let cfg = RoguelitePoiConfig::default();
         // Au moins un slot diffère entre deux seeds (sinon RNG dégénéré).
-        let any_diff = (1..16u32)
-            .any(|s| assign_poi_kind(s, 1, &cfg) != assign_poi_kind(s, 999_999, &cfg));
+        let any_diff =
+            (1..16u32).any(|s| assign_poi_kind(s, 1, &cfg) != assign_poi_kind(s, 999_999, &cfg));
         assert!(any_diff, "aucune divergence inter-seed");
     }
 
@@ -850,7 +851,10 @@ default = 0.0
         cfg.vault_weight = 0.0;
         cfg.lava_weight = 10.0;
         for slot in 1..12u32 {
-            assert_eq!(assign_poi_kind(slot, u64::from(slot), &cfg), PoiKind::LavaHazard);
+            assert_eq!(
+                assign_poi_kind(slot, u64::from(slot), &cfg),
+                PoiKind::LavaHazard
+            );
         }
     }
 

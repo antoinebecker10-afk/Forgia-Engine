@@ -21,7 +21,6 @@ use forgia_damage::DamageEvent;
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::Player;
 use serde::Deserialize;
-use std::fs;
 
 pub mod prelude {
     pub use crate::{ForgiaJuiceScreenFlashPlugin, ScreenFlashTuning};
@@ -308,7 +307,7 @@ pub(crate) fn write_screen_flash_sensor(
         sensor.kill_flashes_session,
         sensor.low_hp_active,
     );
-    let _ = fs::write("forgia_screen_flash.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_screen_flash.json", json);
 }
 
 // ─── Plugin ───────────────────────────────────────────────────────────

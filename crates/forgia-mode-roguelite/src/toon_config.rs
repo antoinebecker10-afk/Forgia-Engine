@@ -85,7 +85,9 @@ impl RogueliteToonConfig {
                 "roguelite_toon_edge_dark" => c.edge_dark = gene.default.clamp(0.0, 1.0),
                 "roguelite_outline_enabled" => c.outline_enabled = gene.default >= 0.5,
                 "roguelite_outline_thickness" => c.outline_thickness = gene.default.clamp(0.5, 3.0),
-                "roguelite_outline_threshold" => c.outline_threshold = gene.default.clamp(0.05, 0.5),
+                "roguelite_outline_threshold" => {
+                    c.outline_threshold = gene.default.clamp(0.05, 0.5)
+                }
                 "roguelite_outline_strength" => c.outline_strength = gene.default.clamp(0.0, 1.0),
                 _ => {}
             }
@@ -212,14 +214,14 @@ pub fn sys_apply_toon_settings(
         let mut count = 0u32;
         for e in &q_cam_all {
             commands.entity(e).insert(toon);
-        let _ = outline;
+            let _ = outline;
             count += 1;
         }
         watch.attached_cameras = count;
     } else {
         for e in &q_cam_new {
             commands.entity(e).insert(toon);
-        let _ = outline;
+            let _ = outline;
             watch.attached_cameras = watch.attached_cameras.saturating_add(1);
         }
     }
@@ -309,7 +311,7 @@ pub fn sys_write_toon_sensor(
         watch.last_reload_secs,
     );
 
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[roguelite-toon] sensor write failed: {e}");
     }
 }

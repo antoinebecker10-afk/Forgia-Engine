@@ -92,7 +92,10 @@ impl TrempeConfig {
         let d = Self::default();
         Self {
             enabled: t.enabled.unwrap_or(d.enabled),
-            damage_per_level: t.damage_per_level.unwrap_or(d.damage_per_level).clamp(0.0, 5.0),
+            damage_per_level: t
+                .damage_per_level
+                .unwrap_or(d.damage_per_level)
+                .clamp(0.0, 5.0),
             level_cap: t.level_cap.unwrap_or(d.level_cap).clamp(0, 50),
             cost_base: t.cost_base.unwrap_or(d.cost_base),
             cost_growth: t.cost_growth.unwrap_or(d.cost_growth).clamp(1.0, 5.0),
@@ -298,7 +301,11 @@ pub fn sys_apply_temper(
 // ─── Sensor ──────────────────────────────────────────────────────────────────
 
 /// Pur — severity/next_step du capteur.
-pub fn severity_for_trempe(enabled: bool, level: u32, level_cap: u32) -> (&'static str, &'static str) {
+pub fn severity_for_trempe(
+    enabled: bool,
+    level: u32,
+    level_cap: u32,
+) -> (&'static str, &'static str) {
     if !enabled {
         return ("info", "Trempe désactivée (enabled=false).");
     }
@@ -342,7 +349,7 @@ pub fn sys_write_trempe_sensor(
         cfg.cost_for_next(level),
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[trempe] sensor write failed: {e}");
     }
 }
@@ -370,10 +377,7 @@ impl Plugin for RogueliteTrempePlugin {
                 .in_set(GameSet::UI)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        app.add_systems(
-            Update,
-            sys_write_trempe_sensor.in_set(GameSet::Sensors),
-        );
+        app.add_systems(Update, sys_write_trempe_sensor.in_set(GameSet::Sensors));
     }
 }
 
@@ -400,7 +404,10 @@ mod tests {
 
     #[test]
     fn parse_garbage_falls_back() {
-        assert_eq!(TrempeConfig::parse_toml("pas du toml [[["), TrempeConfig::default());
+        assert_eq!(
+            TrempeConfig::parse_toml("pas du toml [[["),
+            TrempeConfig::default()
+        );
     }
 
     #[test]
@@ -447,6 +454,9 @@ mod tests {
     fn severity_paths() {
         assert_eq!(severity_for_trempe(false, 0, 5).0, "info");
         assert_eq!(severity_for_trempe(true, 0, 5).0, "ok");
-        assert_eq!(severity_for_trempe(true, 5, 5).1, "Arme trempée au palier max.");
+        assert_eq!(
+            severity_for_trempe(true, 5, 5).1,
+            "Arme trempée au palier max."
+        );
     }
 }

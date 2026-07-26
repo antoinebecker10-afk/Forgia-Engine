@@ -165,9 +165,15 @@ mod tests {
     #[test]
     fn role_gameplay_maps_to_anchor() {
         assert_eq!(role_to_anchor("melee_pit"), Some(AnchorKind::MeleePit));
-        assert_eq!(role_to_anchor("sniper_perch"), Some(AnchorKind::SniperPerch));
+        assert_eq!(
+            role_to_anchor("sniper_perch"),
+            Some(AnchorKind::SniperPerch)
+        );
         assert_eq!(role_to_anchor("boss_pad"), Some(AnchorKind::BossPad));
-        assert_eq!(role_to_anchor("player_spawn"), Some(AnchorKind::PlayerSpawn));
+        assert_eq!(
+            role_to_anchor("player_spawn"),
+            Some(AnchorKind::PlayerSpawn)
+        );
     }
 
     #[test]

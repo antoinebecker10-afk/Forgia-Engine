@@ -67,7 +67,7 @@ impl Default for KillfeedTuning {
     fn default() -> Self {
         Self {
             padding_right: 32.0,
-            first_entry_y: 110.0,
+            first_entry_y: 132.0,
             entry_width: 360.0,
             entry_height: 34.0,
             entry_spacing: 6.0,

@@ -40,7 +40,7 @@ const GUST_RADIUS: f32 = 12.0;
 const GUST_DAMAGE: f32 = 25.0;
 const GUST_PUSH_SPEED: f32 = 22.0;
 const GUST_POP: f32 = 1.5; // hauteur du saut (m), retombe au sol
-// Mme Lenoir (Shotgun = SNIPER) — Tir Perçant : rayon ligne.
+                           // Mme Lenoir (Shotgun = SNIPER) — Tir Perçant : rayon ligne.
 const PIERCE_CD: f32 = 9.0;
 const PIERCE_RANGE: f32 = 30.0;
 const PIERCE_HALF_WIDTH: f32 = 1.5;
@@ -83,7 +83,7 @@ pub fn spell_max_cooldown(w: WeaponType) -> f32 {
 /// sur le Transform des bots KinematicPositionBased).
 #[derive(Component)]
 pub struct Knockback {
-    pub vel: Vec3,       // vélocité HORIZONTALE
+    pub vel: Vec3, // vélocité HORIZONTALE
     pub time_left: f32,
     pub total: f32,      // durée totale (arc pop + décélération horizontale)
     pub pop_height: f32, // hauteur du saut (0 = pas de pop) — arc qui retombe
@@ -182,12 +182,28 @@ pub fn sys_shockwave_input(
                 }
             });
             let (aff, tot) = aoe_strike(
-                origin, CALIN_PUSH_RADIUS, 0.0, origin, CALIN_PUSH_SPEED, 0.0,
-                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                origin,
+                CALIN_PUSH_RADIUS,
+                0.0,
+                origin,
+                CALIN_PUSH_SPEED,
+                0.0,
+                Some(current),
+                player_e,
+                &q_bots,
+                &mut q_health,
+                &mut hits_w,
+                &mut commands,
             );
             spawn_disc_vfx(
-                &mut commands, &mut meshes, &mut materials, ground_center, 0.5, CALIN_PUSH_RADIUS,
-                Srgba::new(0.45, 0.85, 0.40, 0.55), LinearRgba::rgb(0.3, 1.2, 0.4),
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                ground_center,
+                0.5,
+                CALIN_PUSH_RADIUS,
+                Srgba::new(0.45, 0.85, 0.40, 0.55),
+                LinearRgba::rgb(0.3, 1.2, 0.4),
             );
             trauma.add(0.2);
             info!(
@@ -199,12 +215,28 @@ pub fn sys_shockwave_input(
         // ── Bourrasque : repousse (gust) ──────────────────────────────────
         WeaponType::AssaultRifle => {
             let (aff, tot) = aoe_strike(
-                origin, GUST_RADIUS, GUST_DAMAGE, origin, GUST_PUSH_SPEED, GUST_POP,
-                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                origin,
+                GUST_RADIUS,
+                GUST_DAMAGE,
+                origin,
+                GUST_PUSH_SPEED,
+                GUST_POP,
+                Some(current),
+                player_e,
+                &q_bots,
+                &mut q_health,
+                &mut hits_w,
+                &mut commands,
             );
             spawn_disc_vfx(
-                &mut commands, &mut meshes, &mut materials, ground_center, 0.5, GUST_RADIUS,
-                Srgba::new(0.43, 0.71, 0.94, 0.85), LinearRgba::rgb(0.6, 1.2, 2.0),
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                ground_center,
+                0.5,
+                GUST_RADIUS,
+                Srgba::new(0.43, 0.71, 0.94, 0.85),
+                LinearRgba::rgb(0.6, 1.2, 2.0),
             );
             trauma.add(0.4);
             info!("[roguelite] Coup de Bourrasque — repousse {aff}/{tot} bots ({GUST_RADIUS}m)");
@@ -213,13 +245,27 @@ pub fn sys_shockwave_input(
         // ── Mme Lenoir (sniper) : Tir Perçant (ligne) ─────────────────────
         WeaponType::Shotgun => {
             let (hit, tot) = line_strike(
-                origin, fwd_xz, PIERCE_RANGE, PIERCE_HALF_WIDTH, PIERCE_DAMAGE,
-                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w,
+                origin,
+                fwd_xz,
+                PIERCE_RANGE,
+                PIERCE_HALF_WIDTH,
+                PIERCE_DAMAGE,
+                Some(current),
+                player_e,
+                &q_bots,
+                &mut q_health,
+                &mut hits_w,
             );
             spawn_beam_vfx(
-                &mut commands, &mut meshes, &mut materials,
-                Vec3::new(origin.x, cam_pos.y, origin.z), fwd_xz, PIERCE_RANGE,
-                PIERCE_HALF_WIDTH, Srgba::new(0.71, 0.51, 0.86, 0.85), LinearRgba::rgb(1.4, 0.6, 2.0),
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                Vec3::new(origin.x, cam_pos.y, origin.z),
+                fwd_xz,
+                PIERCE_RANGE,
+                PIERCE_HALF_WIDTH,
+                Srgba::new(0.71, 0.51, 0.86, 0.85),
+                LinearRgba::rgb(1.4, 0.6, 2.0),
             );
             trauma.add(0.45);
             info!("[roguelite] Tir Perçant — {hit}/{tot} alignés touchés (ligne {PIERCE_RANGE}m, large {PIERCE_HALF_WIDTH}m)");
@@ -233,12 +279,28 @@ pub fn sys_shockwave_input(
                 origin.z + fwd_xz.z * BOUM_RANGE,
             );
             let (aff, tot) = aoe_strike(
-                impact, BOUM_RADIUS, BOUM_DAMAGE, impact, BOUM_PUSH_SPEED, BOUM_POP,
-                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                impact,
+                BOUM_RADIUS,
+                BOUM_DAMAGE,
+                impact,
+                BOUM_PUSH_SPEED,
+                BOUM_POP,
+                Some(current),
+                player_e,
+                &q_bots,
+                &mut q_health,
+                &mut hits_w,
+                &mut commands,
             );
             spawn_disc_vfx(
-                &mut commands, &mut meshes, &mut materials, impact, 0.5, BOUM_RADIUS,
-                Srgba::new(0.90, 0.30, 0.20, 0.90), LinearRgba::rgb(3.0, 0.6, 0.3),
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                impact,
+                0.5,
+                BOUM_RADIUS,
+                Srgba::new(0.90, 0.30, 0.20, 0.90),
+                LinearRgba::rgb(3.0, 0.6, 0.3),
             );
             trauma.add(0.7);
             info!("[roguelite] Boum-Bidoche — {aff}/{tot} touchés (impact {BOUM_RANGE}m devant)");
@@ -247,12 +309,28 @@ pub fn sys_shockwave_input(
         // ── Fallback (AK47/Plasma/Chainsaw hors set V1) : gust ────────────
         _ => {
             aoe_strike(
-                origin, GUST_RADIUS, GUST_DAMAGE, origin, GUST_PUSH_SPEED, GUST_POP,
-                Some(current), player_e, &q_bots, &mut q_health, &mut hits_w, &mut commands,
+                origin,
+                GUST_RADIUS,
+                GUST_DAMAGE,
+                origin,
+                GUST_PUSH_SPEED,
+                GUST_POP,
+                Some(current),
+                player_e,
+                &q_bots,
+                &mut q_health,
+                &mut hits_w,
+                &mut commands,
             );
             spawn_disc_vfx(
-                &mut commands, &mut meshes, &mut materials, ground_center, 0.5, GUST_RADIUS,
-                Srgba::new(0.43, 0.71, 0.94, 0.85), LinearRgba::rgb(0.6, 1.2, 2.0),
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                ground_center,
+                0.5,
+                GUST_RADIUS,
+                Srgba::new(0.43, 0.71, 0.94, 0.85),
+                LinearRgba::rgb(0.6, 1.2, 2.0),
             );
             trauma.add(0.4);
             GUST_CD
@@ -294,8 +372,12 @@ fn aoe_strike(
         }
         affected += 1;
         // Push depuis push_from (+ pop vertical en arc).
-        let mut dir = Vec3::new(tf.translation.x - push_from.x, 0.0, tf.translation.z - push_from.z)
-            .normalize_or_zero();
+        let mut dir = Vec3::new(
+            tf.translation.x - push_from.x,
+            0.0,
+            tf.translation.z - push_from.z,
+        )
+        .normalize_or_zero();
         if dir == Vec3::ZERO {
             dir = Vec3::Z;
         }
@@ -306,7 +388,15 @@ fn aoe_strike(
             pop_height: push_pop,
             ground_y: tf.translation.y,
         });
-        deal_damage(e, tf.translation, damage, weapon, player_e, q_health, hits_w);
+        deal_damage(
+            e,
+            tf.translation,
+            damage,
+            weapon,
+            player_e,
+            q_health,
+            hits_w,
+        );
     }
     (affected, total)
 }
@@ -333,7 +423,11 @@ fn line_strike(
     let mut hit = 0u32;
     for (e, tf) in q_bots {
         total += 1;
-        let rel = Vec3::new(tf.translation.x - origin.x, 0.0, tf.translation.z - origin.z);
+        let rel = Vec3::new(
+            tf.translation.x - origin.x,
+            0.0,
+            tf.translation.z - origin.z,
+        );
         let along = rel.dot(fwd_xz);
         if along < 0.0 || along > range {
             continue;
@@ -342,7 +436,15 @@ fn line_strike(
             continue;
         }
         hit += 1;
-        deal_damage(e, tf.translation, damage, weapon, player_e, q_health, hits_w);
+        deal_damage(
+            e,
+            tf.translation,
+            damage,
+            weapon,
+            player_e,
+            q_health,
+            hits_w,
+        );
     }
     (hit, total)
 }
@@ -404,9 +506,18 @@ pub(crate) fn spawn_disc_vfx(
     commands.spawn((
         Mesh3d(mesh),
         MeshMaterial3d(mat.clone()),
-        Transform::from_translation(center + Vec3::Y * 0.1)
-            .with_scale(Vec3::new(start_scale, 1.0, start_scale)),
-        ShockwaveVfx { age: 0.0, mat, start_scale, end_scale, base_color },
+        Transform::from_translation(center + Vec3::Y * 0.1).with_scale(Vec3::new(
+            start_scale,
+            1.0,
+            start_scale,
+        )),
+        ShockwaveVfx {
+            age: 0.0,
+            mat,
+            start_scale,
+            end_scale,
+            base_color,
+        },
     ));
 }
 
@@ -441,7 +552,13 @@ fn spawn_beam_vfx(
         Mesh3d(mesh),
         MeshMaterial3d(mat.clone()),
         Transform::from_translation(mid).with_rotation(Quat::from_rotation_y(angle)),
-        ShockwaveVfx { age: 0.0, mat, start_scale: 1.0, end_scale: 1.0, base_color },
+        ShockwaveVfx {
+            age: 0.0,
+            mat,
+            start_scale: 1.0,
+            end_scale: 1.0,
+            base_color,
+        },
     ));
 }
 

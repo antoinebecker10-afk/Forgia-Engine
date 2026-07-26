@@ -25,7 +25,6 @@ use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_combat::Health;
 use forgia_core::prelude::*;
 use forgia_player::{FpsCamera, Player};
-use std::fs;
 
 use crate::shockwave::{spawn_disc_vfx, Knockback};
 
@@ -207,15 +206,31 @@ fn sys_fly_rockets(
         match impact {
             Some(point) => {
                 explode(
-                    point, player_e, &q_bots, &mut q_health, &mut hits_w, &mut trauma,
-                    &mut stats, &mut commands, &mut meshes, &mut materials,
+                    point,
+                    player_e,
+                    &q_bots,
+                    &mut q_health,
+                    &mut hits_w,
+                    &mut trauma,
+                    &mut stats,
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
                 );
                 commands.entity(rocket_e).despawn();
             }
             None if rocket.age >= ROCKET_LIFETIME => {
                 explode(
-                    next, player_e, &q_bots, &mut q_health, &mut hits_w, &mut trauma,
-                    &mut stats, &mut commands, &mut meshes, &mut materials,
+                    next,
+                    player_e,
+                    &q_bots,
+                    &mut q_health,
+                    &mut hits_w,
+                    &mut trauma,
+                    &mut stats,
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
                 );
                 commands.entity(rocket_e).despawn();
             }
@@ -288,9 +303,15 @@ fn explode(
     stats.explosions_run += 1;
     stats.enemies_hit_run += affected;
     spawn_disc_vfx(
-        commands, meshes, materials, center, 0.5, EXPLOSION_RADIUS,
+        commands,
+        meshes,
+        materials,
+        center,
+        0.5,
+        EXPLOSION_RADIUS,
         // Vert POISON (cf roquette) — distinct de l'AOE Pépin (jaune) et du feu.
-        Srgba::new(0.35, 0.95, 0.20, 0.90), LinearRgba::rgb(0.6, 3.5, 0.3),
+        Srgba::new(0.35, 0.95, 0.20, 0.90),
+        LinearRgba::rgb(0.6, 3.5, 0.3),
     );
     trauma.add(0.5);
     info!("[boucherie] BOUM ! roquette → {affected} touchés (r={EXPLOSION_RADIUS}m)");
@@ -320,7 +341,9 @@ fn sys_draw_trajectory_preview(
         return;
     }
     let Ok(cam) = q_cam.single() else { return };
-    let Ok(player_e) = q_player.single() else { return };
+    let Ok(player_e) = q_player.single() else {
+        return;
+    };
     // Exclut le joueur + ses descendants (mêmes règles que la roquette réelle).
     let is_world = |e: Entity| -> bool {
         let mut cur = e;
@@ -396,11 +419,7 @@ fn sys_count_kills(mut hits: MessageReader<CombatHitEvent>, mut stats: ResMut<Bo
 }
 
 /// Sensor `forgia2_boucherie.json` 1Hz — story-534 AC10.
-fn sys_write_boucherie_sensor(
-    time: Res<Time>,
-    mut accum: Local<f32>,
-    stats: Res<BoucherieStats>,
-) {
+fn sys_write_boucherie_sensor(time: Res<Time>, mut accum: Local<f32>, stats: Res<BoucherieStats>) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
         return;
@@ -420,7 +439,7 @@ fn sys_write_boucherie_sensor(
         avg_hits,
         stats.kills_run,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[boucherie] sensor write failed: {e}");
     }
 }

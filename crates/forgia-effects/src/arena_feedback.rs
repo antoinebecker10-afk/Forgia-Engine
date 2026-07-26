@@ -81,7 +81,7 @@ pub fn arena_feedback_sensor_export(
         stats.kill_audio_missing_count,
         stats.damage_audio_missing_count,
     );
-    let _ = std::fs::write("forgia_arena_feedback.json", &json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_arena_feedback.json", json);
 }
 
 #[cfg(test)]

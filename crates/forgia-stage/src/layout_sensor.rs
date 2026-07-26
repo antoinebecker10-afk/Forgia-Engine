@@ -10,7 +10,6 @@ use crate::LayoutResult;
 use bevy::prelude::*;
 use forgia_level_presets::ModuleKind;
 use serde::Serialize;
-use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const SENSOR_PATH: &str = "forgia2_stage_layout.json";
@@ -210,7 +209,7 @@ pub fn write_layout_sensor(layout: Res<LayoutResult>, mut last_write: Local<f64>
     };
 
     if let Ok(json) = serde_json::to_string_pretty(&payload) {
-        let _ = fs::write(SENSOR_PATH, json);
+        let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
     }
 }
 

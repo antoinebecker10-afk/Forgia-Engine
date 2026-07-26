@@ -15,7 +15,6 @@ use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::{GameMode, GameSet};
 use forgia_genome_core::{Genome, GenomeLoader};
 use serde::Deserialize;
-use std::fs;
 
 /// L'arme persona « Pépin » dans l'enum héritée Arena.
 pub const PEPIN_WEAPON: WeaponType = WeaponType::ModernAR;
@@ -149,7 +148,7 @@ fn sys_write_pepin_sensor(
         accuracy,
         confidence_damage_mul(&conf, &tuning, PEPIN_WEAPON),
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-fps/pepin] sensor write failed: {e}");
     }
 }

@@ -38,16 +38,15 @@
 //! l'inverse — parenté caméra + occlus par le viewmodel — mais lui n'a pas de
 //! meshes hors-champ à couvrir.)
 
-use bevy::prelude::*;
 use bevy::camera::visibility::NoFrustumCulling;
+use bevy::prelude::*;
 use bevy::scene::SceneInstanceReady;
 use bevy::state::state_scoped::DespawnOnExit;
 use forgia_core::prelude::{GameMode, GameSet};
 use forgia_effects::prelude::PipelinesReady;
+use std::collections::HashSet;
 
-use crate::boss_portal::{PORTAL_CLOSED_GLB, PORTAL_OPEN_GLB};
 use crate::decor::DecorAssets;
-use crate::enemies::{skeleton_asset_path, EnemyArchetype};
 use crate::run::RunState;
 
 /// Plugin du warmup de pipelines PBR au Lobby (anti-freeze « tourner la caméra »).
@@ -62,7 +61,14 @@ impl Plugin for PipelineWarmupPlugin {
             .add_systems(OnExit(RunState::Lobby), sys_clear_warmup)
             .add_systems(
                 Update,
-                sys_tick_warmup
+                (
+                    // La FpsCamera peut être spawné après la transition vers le
+                    // Lobby. Réessayer tant que le diorama n'est pas actif évite
+                    // de manquer définitivement le warmup à cause de cet ordre.
+                    sys_spawn_warmup_diorama,
+                    sys_drain_warmup_queue.after(sys_spawn_warmup_diorama),
+                    sys_tick_warmup.after(sys_drain_warmup_queue),
+                )
                     .in_set(GameSet::Effects)
                     .run_if(in_state(RunState::Lobby)),
             )
@@ -80,6 +86,12 @@ const WARMUP_OFFSCREEN_Y: f32 = -500.0;
 const WARMUP_MIN_FRAMES: u32 = 90;
 /// Plafond dur (anti-lock) : despawn le diorama même si le gate n'est jamais prêt.
 const WARMUP_MAX_FRAMES: u32 = 900;
+
+/// Les `SceneRoot` GLTF se développent en centaines voire milliers d'entités.
+/// Les lancer tous ensemble (52 classes dans la capture Tracy du 2026-07-21)
+/// créait une énorme branche de transforms à propager d'un coup au Lobby. Deux
+/// classes/frame étalent ce coût sans retarder significativement le warmup.
+const WARMUP_SCENES_PER_FRAME: usize = 2;
 
 const SENSOR_PATH: &str = "forgia2_pipeline_warmup.json";
 
@@ -106,16 +118,24 @@ pub struct WarmupState {
     pub frames_to_ready: u32,
     /// `true` tant que le diorama est vivant (spawn fait, pas encore despawné).
     pub active: bool,
+    /// Scènes à instancier, construites une fois après l'apparition de la caméra.
+    pending_scenes: Vec<Handle<Scene>>,
+    /// Prochaine scène de [`Self::pending_scenes`] à spawner.
+    next_scene: usize,
+    /// `true` seulement après que toute la file a été drainée. Empêche le gate
+    /// pipeline de conclure prématurément avec zéro scène encore spawnée.
+    spawn_complete: bool,
 }
 
-/// OnEnter(Lobby) — spawn le diorama de warmup (1re fois de la session). Chaque
-/// GLB distinct du catalogue (`DecorAssets` + 3 squelettes) est rendu une fois,
-/// minuscule et occlus, pour compiler son pipeline au Lobby et non en combat.
+/// Prépare le diorama de warmup (1re fois de la session). Appelé à l'entrée du
+/// Lobby puis réessayé à chaque frame jusqu'à ce qu'une caméra 3D active existe.
+/// La file est ensuite drainée par [`sys_drain_warmup_queue`] afin qu'un cold
+/// boot ne crée jamais toutes les hiérarchies GLTF dans la même frame.
 pub fn sys_spawn_warmup_diorama(
-    mut commands: Commands,
     mut state: ResMut<WarmupState>,
-    asset_server: Res<AssetServer>,
+    game_assets: Res<forgia_assets::GameAssets>,
     decor: Option<Res<DecorAssets>>,
+    stage_scenes: Option<Res<forgia_stage::StageScenePreloads>>,
     q_cam: Query<&Camera, With<Camera3d>>,
 ) {
     if state.done || state.active {
@@ -126,27 +146,17 @@ pub fn sys_spawn_warmup_diorama(
     if !q_cam.iter().any(|c| c.is_active) {
         return;
     }
+    // Les chemins des arènes authored vivent dans leurs genomes. Attendre que
+    // forgia-stage les ait résolus permet d'inclure le prochain niveau dans le
+    // warmup plutôt que d'avoir un premier chargement GLTF au portail.
+    if stage_scenes
+        .as_ref()
+        .is_some_and(|preloads| !preloads.ready)
+    {
+        return;
+    }
 
-    let mut count: u32 = 0;
-    let mut spawn_scene = |commands: &mut Commands, scene: Handle<Scene>| {
-        commands
-            .spawn((
-                Name::new("PipelineWarmupProp"),
-                WarmupProp,
-                SceneRoot(scene),
-                // Hors-champ + Visible : les meshes reçoivent `NoFrustumCulling` au
-                // scene-ready (observer ci-dessous) → rendus (donc pipeline compilé)
-                // SANS être vus du joueur. `Hidden` ne compilerait rien (piège PBR).
-                Transform::from_xyz(0.0, WARMUP_OFFSCREEN_Y, 0.0),
-                Visibility::Visible,
-                // BUG #3 auto-QA : filet de sécurité, comme tout prop du mode
-                // (`decor_markers`) — despawn garanti si on quitte le mode sans
-                // passer proprement par `OnExit(RunState::Lobby)`.
-                DespawnOnExit(GameMode::Roguelite),
-            ))
-            .observe(on_warmup_scene_ready);
-        count += 1;
-    };
+    let mut scenes = Vec::new();
 
     // 1) Tous les GLB de décor distincts (handles déjà préchargés au Startup).
     if let Some(decor) = decor {
@@ -161,48 +171,69 @@ pub fn sys_spawn_warmup_diorama(
             &decor.buildings,
         ] {
             for handle in group {
-                spawn_scene(&mut commands, handle.clone());
+                scenes.push(handle.clone());
             }
         }
     }
 
-    // 2) Les squelettes ennemis distincts (skinned mesh = pipeline distinct).
-    //    Dédupliqué : 4 archétypes → 3 GLB (Boss réutilise Warrior).
-    let mut seen: Vec<&'static str> = Vec::new();
-    for arch in [
-        EnemyArchetype::Tank,
-        EnemyArchetype::Runner,
-        EnemyArchetype::Sniper,
-        EnemyArchetype::Boss,
-    ] {
-        let path = skeleton_asset_path(arch);
-        if seen.contains(&path) {
-            continue;
-        }
-        seen.push(path);
-        let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset(path));
-        spawn_scene(&mut commands, scene);
+    // 2) Squelettes, sols et portails garantis visibles en combat. Leurs handles
+    // viennent de GameAssets : aucun chargement asynchrone au premier Lobby.
+    for scene in &game_assets.warmup_scenes {
+        scenes.push(scene.clone());
     }
 
-    // 3) BUG #1 auto-QA — assets GARANTIS visibles en combat mais absents de
-    //    `DecorAssets` : le SOL de l'arène (vu dès la 1re frame de CHAQUE run,
-    //    source unique `forgia_stage::MERGED_FLOOR_GLB`) et les portails de boss.
-    //    (Non couverts : matériaux procéduraux mushrooms/stations + VFX blend —
-    //    story de suivi, cf story-664 §limites.)
-    for path in forgia_stage::MERGED_FLOOR_GLB {
-        let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset(path));
-        spawn_scene(&mut commands, scene);
+    // 3) Tous les assets de stage issus des TOML (sols, murs, pièces authored).
+    // Ils sont dédupliqués ci-dessous avec les autres catalogues.
+    if let Some(stage_scenes) = stage_scenes {
+        scenes.extend(stage_scenes.scenes.iter().cloned());
     }
-    for path in [PORTAL_CLOSED_GLB, PORTAL_OPEN_GLB] {
-        let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset(path));
-        spawn_scene(&mut commands, scene);
-    }
+
+    // Le catalogue peut volontairement contenir deux fois le même asset pour
+    // varier le décor (p.ex. blacksmith). Une seule instance suffit à warmer
+    // son pipeline et évite du travail ECS inutile.
+    let mut seen = HashSet::new();
+    scenes.retain(|scene| seen.insert(scene.id()));
+    let count = scenes.len() as u32;
 
     state.active = true;
     state.frames = 0;
     state.scenes_ready = 0;
-    state.classes_spawned = count;
-    info!("[pipeline-warmup] diorama spawné : {count} classes de pipeline (décor + squelettes) — Lobby, session-once");
+    state.classes_spawned = 0;
+    state.pending_scenes = scenes;
+    state.next_scene = 0;
+    state.spawn_complete = false;
+    info!(
+        "[pipeline-warmup] file préparée : {count} classes de pipeline (décor + squelettes), {WARMUP_SCENES_PER_FRAME}/frame — Lobby, session-once"
+    );
+}
+
+/// Instancie un petit budget de `SceneRoot` par frame. Le SceneSpawner reste
+/// asynchrone, mais ce budget borne le nombre de nouvelles hiérarchies que Bevy
+/// devra propager au même instant.
+pub fn sys_drain_warmup_queue(mut commands: Commands, mut state: ResMut<WarmupState>) {
+    if !state.active || state.spawn_complete {
+        return;
+    }
+    let end = (state.next_scene + WARMUP_SCENES_PER_FRAME).min(state.pending_scenes.len());
+    let batch: Vec<Handle<Scene>> = state.pending_scenes[state.next_scene..end].to_vec();
+    for scene in batch {
+        commands
+            .spawn((
+                Name::new("PipelineWarmupProp"),
+                WarmupProp,
+                SceneRoot(scene),
+                // Hors-champ + Visible : les meshes reçoivent `NoFrustumCulling` au
+                // scene-ready (observer ci-dessous) → rendus (donc pipeline compilé)
+                // SANS être vus du joueur. `Hidden` ne compilerait rien (piège PBR).
+                Transform::from_xyz(0.0, WARMUP_OFFSCREEN_Y, 0.0),
+                Visibility::Visible,
+                DespawnOnExit(GameMode::Roguelite),
+            ))
+            .observe(on_warmup_scene_ready);
+        state.classes_spawned = state.classes_spawned.saturating_add(1);
+    }
+    state.next_scene = end;
+    state.spawn_complete = state.next_scene == state.pending_scenes.len();
 }
 
 /// Observer posé sur chaque `WarmupProp` : au scene-ready, marque tous les meshes
@@ -253,7 +284,7 @@ pub fn sys_tick_warmup(
     // BUG #2 auto-QA — toutes les scènes spawnées ont-elles été instanciées ?
     // Tant que non, `PipelinesReady` peut être `true` par absence de travail (une
     // scène lourde n'a pas encore émis ses demandes de pipeline) → despawn interdit.
-    let all_scenes_ready = state.scenes_ready >= state.classes_spawned;
+    let all_scenes_ready = state.spawn_complete && state.scenes_ready >= state.classes_spawned;
     let timed_out = state.frames >= WARMUP_MAX_FRAMES;
 
     // Despawn quand : (délai min écoulé ET toutes les scènes instanciées ET
@@ -300,15 +331,14 @@ pub fn sys_clear_warmup(
         state.active = false;
         state.done = true;
     }
+    state.pending_scenes.clear();
+    state.next_scene = 0;
+    state.spawn_complete = false;
 }
 
 /// Sensor `forgia2_pipeline_warmup.json` (règle observability-required) : état du
 /// warmup + health check si le gate n'a jamais été atteint (compile bloquée).
-pub fn sys_write_warmup_sensor(
-    time: Res<Time>,
-    mut accum: Local<f32>,
-    state: Res<WarmupState>,
-) {
+pub fn sys_write_warmup_sensor(time: Res<Time>, mut accum: Local<f32>, state: Res<WarmupState>) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
         return;
@@ -335,7 +365,7 @@ pub fn sys_write_warmup_sensor(
         state.scenes_ready,
         state.frames_to_ready,
     );
-    if let Err(e) = std::fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[pipeline-warmup] sensor write failed: {e}");
     }
 }
@@ -343,11 +373,18 @@ pub fn sys_write_warmup_sensor(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enemies::{skeleton_asset_path, EnemyArchetype};
 
     #[test]
     fn min_before_max_frames() {
         // Le plafond anti-lock doit laisser une vraie fenêtre de warmup.
         assert!(WARMUP_MIN_FRAMES < WARMUP_MAX_FRAMES);
+    }
+
+    #[test]
+    fn warmup_scene_budget_is_conservative() {
+        assert!(WARMUP_SCENES_PER_FRAME > 0);
+        assert!(WARMUP_SCENES_PER_FRAME <= 2);
     }
 
     #[test]

@@ -4,8 +4,8 @@
 //! pre-build a single oriented quad mesh + emissive material at Startup, then
 //! reuse for every tracer (spawn cheap, mark lifetime, despawn).
 //!
-//! Spawn via `TracerSpawn` message — emitted typically by forgia-weapon-hitscan
-//! consumers (Game listens to HitscanFired, converts to TracerSpawn).
+//! Spawn via `TracerSpawn` message — emitted by the active forgia-fps firing
+//! pipeline.
 
 use bevy::prelude::*;
 

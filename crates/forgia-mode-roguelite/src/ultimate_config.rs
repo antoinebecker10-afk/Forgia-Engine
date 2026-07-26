@@ -322,7 +322,11 @@ aoe_radius = 6.5
         let c = UltimateConfig::parse_toml(toml);
         assert_eq!(c.duration, 12.0);
         assert_eq!(c.freeze.secs, 4.0);
-        assert_eq!(c.explosion, ExplosionParams::default(), "section absente → défaut");
+        assert_eq!(
+            c.explosion,
+            ExplosionParams::default(),
+            "section absente → défaut"
+        );
         assert_eq!(c.chain, ChainParams::default());
     }
 

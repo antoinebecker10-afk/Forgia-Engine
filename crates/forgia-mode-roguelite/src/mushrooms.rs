@@ -101,13 +101,19 @@ impl MushroomsConfig {
         let d = Self::default();
         Self {
             enabled: parsed.enabled.unwrap_or(d.enabled),
-            mushroom_size: parsed.mushroom_size.unwrap_or(d.mushroom_size).clamp(0.1, 3.0),
+            mushroom_size: parsed
+                .mushroom_size
+                .unwrap_or(d.mushroom_size)
+                .clamp(0.1, 3.0),
             light_intensity: parsed
                 .light_intensity
                 .unwrap_or(d.light_intensity)
                 .clamp(0.0, MUSHROOM_LUMEN_CAP),
             light_range: parsed.light_range.unwrap_or(d.light_range).clamp(0.5, 40.0),
-            emissive_boost: parsed.emissive_boost.unwrap_or(d.emissive_boost).clamp(0.0, 30.0),
+            emissive_boost: parsed
+                .emissive_boost
+                .unwrap_or(d.emissive_boost)
+                .clamp(0.0, 30.0),
             clusters: parsed
                 .clusters
                 .into_iter()
@@ -357,7 +363,10 @@ pub fn severity_for_mushrooms(
     spawned: u32,
 ) -> (&'static str, &'static str) {
     if !enabled {
-        return ("info", "Champignons coupés (roguelite_mushrooms.toml enabled=false).");
+        return (
+            "info",
+            "Champignons coupés (roguelite_mushrooms.toml enabled=false).",
+        );
     }
     if clusters == 0 {
         return (
@@ -406,7 +415,7 @@ pub fn sys_write_mushroom_sensor(
         cfg.emissive_boost,
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[mushrooms] sensor write failed: {e}");
     }
 }
@@ -417,7 +426,10 @@ pub struct ForgiaRogueliteMushroomsPlugin;
 
 impl Plugin for ForgiaRogueliteMushroomsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (sys_init_mushroom_genome, sys_init_mushroom_assets));
+        app.add_systems(
+            Startup,
+            (sys_init_mushroom_genome, sys_init_mushroom_assets),
+        );
         app.add_systems(
             Update,
             (sys_hot_reload_mushroom_genome, sys_reconcile_mushrooms)

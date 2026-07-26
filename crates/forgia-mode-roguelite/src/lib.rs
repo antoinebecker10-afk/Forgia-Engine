@@ -22,7 +22,6 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 
 pub mod atmosphere;
-pub mod render_quality;
 pub mod audio;
 pub mod boons_apply;
 pub mod boss_portal;
@@ -52,19 +51,21 @@ pub mod mushrooms;
 pub mod parcours_obstacles;
 pub mod perf_diag;
 pub mod persist;
+pub mod pipeline_warmup;
 pub mod poi;
 pub mod progress;
+pub mod render_quality;
 pub mod run;
 pub mod sensor;
 pub mod shockwave;
 pub mod stations;
 pub mod status_vfx;
 pub mod toon_config;
+pub mod transform_hierarchy_sensor;
 pub mod trempe;
 pub mod ultimate_apply;
 pub mod ultimate_config;
 pub mod ultimate_tech;
-pub mod pipeline_warmup;
 pub mod ultimate_vfx;
 pub mod waves;
 pub mod weapon_select;
@@ -123,6 +124,22 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Sensors)
                 .run_if(in_state(GameMode::Roguelite)),
         );
+        // Profil Tracy 2026-07-21 : `propagate_parent_transforms` atteint 64 ms.
+        // Ce capteur 1 Hz identifie les `SceneRoot` réellement massifs avant toute
+        // fusion de décor, pour préserver les hiérarchies animées.
+        app.init_resource::<transform_hierarchy_sensor::TransformLagHistory>();
+        app.add_systems(
+            Update,
+            transform_hierarchy_sensor::sys_write_transform_hierarchy_sensor
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        app.add_systems(
+            Update,
+            transform_hierarchy_sensor::sys_capture_transform_lag_roots
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         app.add_systems(
             Update,
             (
@@ -174,7 +191,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 ..default()
             });
         }
-        app.add_systems(Update, sys_toggle_collider_debug);
+        // Gardé InGame : F10 au menu est le hotkey d'entrée du Hall de Forgia
+        // (castle_hub). Sans cette garde, le même appui menu entrait dans le
+        // Hall ET allumait le wireframe des colliders (TriMesh château 55 632
+        // tris re-poly-lineé chaque frame → gel apparent). Anti-piège
+        // « 1 KeyCode = 1 handler avec gardes par AppMode » (CLAUDE.md §6),
+        // diagnostiqué 2026-07-23.
+        app.add_systems(
+            Update,
+            sys_toggle_collider_debug.run_if(in_state(forgia_core::prelude::AppMode::InGame)),
+        );
         // Story-544 close (2026-05-29) — toon cel-shading + Sobel outline pour
         // direction cartoon bible v1. Genome-driven via roguelite_toon.toml
         // (hot-reload mtime 1Hz). Attaché OnEnter Roguelite, retiré OnExit.
@@ -245,10 +271,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Combat)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        app.add_systems(
-            Update,
-            poi::sys_write_poi_sensor.in_set(GameSet::Sensors),
-        );
+        app.add_systems(Update, poi::sys_write_poi_sensor.in_set(GameSet::Sensors));
         // Story-582 (2026-06-07) — système d'éléments par-arme (feu/poison/
         // explosif/perforant) : matchups vs archetype + status DoT + AOE +
         // exécution. Mute forgia_combat::Health directement (despawn_dead_cubes
@@ -381,8 +404,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             (
                 ultimate_apply::sys_apply_ultimate_technique
                     .after(elements::sys_apply_elements_on_hit),
-                ultimate_apply::sys_tick_ultimate_freeze
-                    .after(shockwave::sys_apply_knockback),
+                ultimate_apply::sys_tick_ultimate_freeze.after(shockwave::sys_apply_knockback),
             )
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -401,7 +423,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             Update,
             (
                 ultimate_vfx::sys_refresh_ultimate_vfx_materials,
-                ultimate_vfx::sys_spawn_ultimate_vfx.after(ultimate_apply::sys_apply_ultimate_technique),
+                ultimate_vfx::sys_spawn_ultimate_vfx
+                    .after(ultimate_apply::sys_apply_ultimate_technique),
             )
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -541,7 +564,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // anim VFX (Effects). Tout gaté Roguelite.
         app.add_systems(
             Update,
-            (shockwave::sys_shockwave_input, shockwave::sys_tick_shockwave_cooldown)
+            (
+                shockwave::sys_shockwave_input,
+                shockwave::sys_tick_shockwave_cooldown,
+            )
                 .in_set(GameSet::Combat)
                 .run_if(in_state(GameMode::Roguelite)),
         );

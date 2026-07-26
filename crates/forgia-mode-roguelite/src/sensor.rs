@@ -129,8 +129,11 @@ pub fn sys_write_roguelite_state(
     let meta_ranks = meta_save
         .as_ref()
         .map(|s| {
-            let mut parts: Vec<String> =
-                s.ranks.iter().map(|(k, v)| format!("\"{k}\":{v}")).collect();
+            let mut parts: Vec<String> = s
+                .ranks
+                .iter()
+                .map(|(k, v)| format!("\"{k}\":{v}"))
+                .collect();
             parts.sort();
             format!("{{{}}}", parts.join(","))
         })
@@ -146,7 +149,7 @@ pub fn sys_write_roguelite_state(
         break_secs_left,
     );
 
-    if let Err(e) = std::fs::write("forgia2_roguelite_state.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_roguelite_state.json", json) {
         warn!("[forgia-mode-roguelite] sensor write failed: {e}");
     }
 }

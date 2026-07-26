@@ -21,7 +21,6 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::Player;
 use forgia_ui_lib::style::*;
 use std::collections::VecDeque;
-use std::fs;
 
 mod tuning;
 
@@ -421,7 +420,7 @@ pub(crate) fn write_killfeed_sensor(
         sensor.last_attacker_label.replace('"', "'"),
         sensor.last_victim_label.replace('"', "'"),
     );
-    let _ = fs::write("forgia_killfeed.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_killfeed.json", json);
 }
 
 // ─── Helper alpha ──────────────────────────────────────────────────────

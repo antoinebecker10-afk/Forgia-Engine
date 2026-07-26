@@ -288,7 +288,7 @@ fn sys_write_sensor(
         watch.attached_cameras,
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[color-grading] sensor write failed: {e}");
     }
 }

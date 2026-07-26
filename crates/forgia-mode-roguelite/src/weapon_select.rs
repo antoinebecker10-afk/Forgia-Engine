@@ -110,6 +110,14 @@ pub fn weapon_dps(damage: f32, fire_rate: f32, pellets: u32) -> f32 {
     damage * fire_rate * pellets.max(1) as f32
 }
 
+/// Chemin du GLB d'arme (relatif à `assets/`) pour l'aperçu 3D du hub-menu (RTT).
+/// `idx` = index dans [`ARENA_V1_WEAPONS`] (= `StartingWeaponChoice.idx`). Évite
+/// d'exposer `vm_key`/`ARENA_V1_WEAPONS` à `forgia-ui`.
+pub fn weapon_preview_glb_path(idx: usize) -> String {
+    let w = ARENA_V1_WEAPONS[idx % ARENA_V1_WEAPONS.len()];
+    format!("models/weapons/forgia/{}.glb", vm_key(w))
+}
+
 /// Miroir EXACT des 4 armes de `viewmodel_arena.toml` (fallback si fichier KO).
 fn mirror_default() -> HashMap<WeaponType, WeaponCard> {
     HashMap::from([
@@ -725,6 +733,240 @@ pub fn draw_weapon_select(
                     });
                 });
         });
+}
+
+/// Rend la **carte d'arme du hub-menu** dans un `Ui` donné : aperçu 3D (image RTT
+/// passée par l'appelant, ou placeholder si `None`) + nom/élément/stats/matchup +
+/// sélecteur ‹ › + déblocage cliquable. Réutilise les helpers privés du module
+/// (`persona`, `elem_color`, `strong_weak`, `stat_row`…). Mute `choice` (sélection)
+/// et `save`/`meta` (déblocage) + sauve.
+///
+/// Note : rendu voisin de `draw_weapon_select` (Lobby) mais viewport différent
+/// (image RTT ici vs viewport 3D transparent au Lobby) → panneau dédié assumé,
+/// unifiable plus tard (dette tech mineure, story-menu-hub).
+#[allow(clippy::too_many_arguments)]
+pub fn draw_weapon_menu_panel(
+    ui: &mut egui::Ui,
+    choice: &mut StartingWeaponChoice,
+    cards: &WeaponCards,
+    elem_cfg: &ElementConfig,
+    save: &mut MetaShopSave,
+    cat: &MetaShopCatalogue,
+    meta: &mut MetaSouls,
+    weapon_image: Option<egui::TextureId>,
+    image_size: f32,
+) {
+    let n = ARENA_V1_WEAPONS.len();
+    let sel = choice.idx % n;
+    let w = ARENA_V1_WEAPONS[sel];
+    let key = vm_key(w);
+    let owned = save.is_weapon_unlocked(key);
+    let unlock = cat.weapon_unlock(key);
+    let accent = if owned {
+        crate::hud::speaker_color(weapon_to_speaker(w))
+    } else {
+        C_TEXT_MUTED
+    };
+    let (name, tagline) = persona(w);
+    let card = cards.cards.get(&w);
+    let element = elem_cfg.element_for(w);
+
+    ui.set_min_width(400.0);
+    ui.vertical_centered(|ui| {
+        // ── Aperçu 3D (image RTT) OU placeholder ──
+        match weapon_image {
+            Some(tex) => {
+                ui.add(egui::Image::new(egui::load::SizedTexture::new(
+                    tex,
+                    egui::vec2(image_size, image_size),
+                )));
+            }
+            None => {
+                let (r, _) = ui.allocate_exact_size(
+                    egui::vec2(image_size, image_size),
+                    egui::Sense::hover(),
+                );
+                ui.painter()
+                    .rect_filled(r, egui::CornerRadius::same(8), egui::Color32::from_black_alpha(120));
+                ui.painter().text(
+                    r.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "Aperçu 3D…",
+                    egui::FontId::proportional(16.0),
+                    C_TEXT_MUTED,
+                );
+            }
+        }
+        ui.add_space(10.0);
+
+        // En-tête : nom + index parcouru + tagline.
+        ui.horizontal(|ui| {
+            ui.heading(display_text(name, 28.0, accent).strong());
+            ui.label(
+                egui::RichText::new(format!("‹ {}/{} ›", sel + 1, n))
+                    .size(16.0)
+                    .color(FORGE_TEAL),
+            );
+        });
+        ui.label(
+            egui::RichText::new(tagline)
+                .size(14.0)
+                .italics()
+                .color(C_TEXT_MUTED),
+        );
+
+        // Statut verrou + niveau de maîtrise.
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if owned {
+                ui.label(
+                    egui::RichText::new("DÉBLOQUÉE")
+                        .size(15.0)
+                        .strong()
+                        .color(C_HP_HIGH),
+                );
+            } else {
+                ui.label(
+                    egui::RichText::new("VERROUILLÉE")
+                        .size(15.0)
+                        .strong()
+                        .color(C_TEXT_MUTED),
+                );
+            }
+            let lvl = save.weapon_level(key);
+            let bonus = lvl.saturating_sub(1) as f32 * WEAPON_MASTERY_DMG_PER_LEVEL * 100.0;
+            ui.label(
+                egui::RichText::new(format!("·  Niveau {lvl}  (+{bonus:.0}% dégâts)"))
+                    .size(15.0)
+                    .strong()
+                    .color(FORGE_OR),
+            );
+        });
+        ui.add_space(8.0);
+
+        if let Some(e) = element {
+            ui.label(
+                egui::RichText::new(format!("Élément : {} — {}", e.fr_name(), e.tag()))
+                    .size(16.0)
+                    .strong()
+                    .color(elem_color(e, elem_cfg)),
+            );
+            ui.add_space(8.0);
+        }
+
+        match card {
+            Some(c) => {
+                let dps = if c.damage <= 0.0 {
+                    "roquette AOE".to_string()
+                } else {
+                    format!("{:.0}", weapon_dps(c.damage, c.fire_rate, c.pellets))
+                };
+                let dmg = if c.damage <= 0.0 {
+                    "—".to_string()
+                } else {
+                    format!("{:.0}", c.damage)
+                };
+                egui::Grid::new("forgia_ws_menu_grid")
+                    .num_columns(2)
+                    .spacing([18.0, 5.0])
+                    .show(ui, |ui| {
+                        stat_row(ui, "DMG / coup", &dmg);
+                        stat_row(ui, "Cadence", &format!("{:.1} /s", c.fire_rate));
+                        stat_row_strong(ui, "DPS", &dps, FORGE_OR);
+                        stat_row(ui, "Chargeur", &c.mag_size.to_string());
+                        stat_row(ui, "Recharge", &format!("{:.2} s", c.reload_time_secs));
+                        stat_row(ui, "Portée", &format!("{:.0} m", c.range));
+                        if c.head_damage_mul > 1.0 {
+                            stat_row(ui, "Tête", &format!("×{:.1}", c.head_damage_mul));
+                        }
+                    });
+            }
+            None => {
+                ui.label(
+                    egui::RichText::new("stats indisponibles (genome non chargé)")
+                        .size(14.0)
+                        .color(C_TEXT_MUTED),
+                );
+            }
+        }
+
+        if let Some(e) = element {
+            let (best, worst) = strong_weak(elem_cfg, e);
+            ui.add_space(6.0);
+            ui.separator();
+            ui.label(
+                egui::RichText::new(format!("Fort vs   {}   ×{:.1}", arch_fr(best.0), best.1))
+                    .size(15.0)
+                    .color(C_HP_HIGH),
+            );
+            ui.label(
+                egui::RichText::new(format!("Faible vs {}   ×{:.1}", arch_fr(worst.0), worst.1))
+                    .size(15.0)
+                    .color(C_TEXT_MUTED),
+            );
+        }
+
+        // Sélecteur d'arme ‹ › (mute `choice`).
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            let prev = ui
+                .add(egui::Button::new(egui::RichText::new("‹").size(28.0).strong()).min_size(egui::vec2(56.0, 40.0)))
+                .on_hover_text("Arme précédente")
+                .clicked();
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("Changer d'arme").size(15.0).color(C_TEXT_MUTED));
+            ui.add_space(8.0);
+            let next = ui
+                .add(egui::Button::new(egui::RichText::new("›").size(28.0).strong()).min_size(egui::vec2(56.0, 40.0)))
+                .on_hover_text("Arme suivante")
+                .clicked();
+            if prev {
+                choice.idx = (sel + n - 1) % n;
+            }
+            if next {
+                choice.idx = (sel + 1) % n;
+            }
+        });
+
+        // Déblocage cliquable si l'arme est verrouillée (coûte des Âmes).
+        if !owned {
+            if let Some(u) = unlock {
+                ui.add_space(8.0);
+                let afford = meta.current >= u.cost;
+                let mut unlock_clicked = false;
+                ui.add_enabled_ui(afford, |ui| {
+                    unlock_clicked = ui
+                        .add(
+                            egui::Button::new(
+                                egui::RichText::new(format!("Débloquer ({} Âmes)", u.cost))
+                                    .size(16.0)
+                                    .strong(),
+                            )
+                            .min_size(egui::vec2(220.0, 36.0)),
+                        )
+                        .clicked();
+                });
+                if unlock_clicked {
+                    meta.current -= u.cost;
+                    save.unlock_weapon(key);
+                    save.souls_total = meta.current;
+                    save.save();
+                }
+                if !afford {
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{} Âmes manquantes",
+                            u.cost.saturating_sub(meta.current)
+                        ))
+                        .size(12.0)
+                        .color(C_TEXT_MUTED),
+                    );
+                }
+            }
+        }
+    });
 }
 
 fn stat_row(ui: &mut egui::Ui, label: &str, val: &str) {

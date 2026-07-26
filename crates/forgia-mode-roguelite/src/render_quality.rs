@@ -162,7 +162,12 @@ pub fn sys_init_render_genome(mut commands: Commands) {
     });
     info!(
         "[roguelite-render] genome loaded — ssao({} q{} th{:.2}) fog({} d{:.3}) ambient({:.0})",
-        cfg.ssao_enabled, cfg.ssao_quality, cfg.ssao_thickness, cfg.fog_enabled, cfg.fog_density, cfg.ambient_brightness
+        cfg.ssao_enabled,
+        cfg.ssao_quality,
+        cfg.ssao_thickness,
+        cfg.fog_enabled,
+        cfg.fog_density,
+        cfg.ambient_brightness
     );
 }
 
@@ -261,7 +266,10 @@ pub fn sys_force_apply_ssao(
         }
     }
     watch.ssao_attached = n;
-    info!("[roguelite-render] force-applied SSAO (enabled={}) to {n} cam", cfg.ssao_enabled);
+    info!(
+        "[roguelite-render] force-applied SSAO (enabled={}) to {n} cam",
+        cfg.ssao_enabled
+    );
 }
 
 /// OnExit(Roguelite) — retire le SSAO (les autres modes retrouvent leur rendu).
@@ -445,7 +453,7 @@ pub fn sys_write_render_sensor(
         cfg.ambient_brightness,
         watch.reload_count,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[roguelite-render] sensor write failed: {e}");
     }
 }
@@ -467,7 +475,11 @@ impl Plugin for ForgiaRogueliteRenderPlugin {
         );
         app.add_systems(
             Update,
-            (sys_hot_reload_render_genome, sys_apply_ssao, sys_apply_bloom)
+            (
+                sys_hot_reload_render_genome,
+                sys_apply_ssao,
+                sys_apply_bloom,
+            )
                 .chain()
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -518,16 +530,28 @@ default = 0.05
     fn quality_level_mapping() {
         let mut c = RogueliteRenderConfig::default();
         c.ssao_quality = 0;
-        assert_eq!(c.ssao_quality_level(), ScreenSpaceAmbientOcclusionQualityLevel::Low);
+        assert_eq!(
+            c.ssao_quality_level(),
+            ScreenSpaceAmbientOcclusionQualityLevel::Low
+        );
         c.ssao_quality = 3;
-        assert_eq!(c.ssao_quality_level(), ScreenSpaceAmbientOcclusionQualityLevel::Ultra);
+        assert_eq!(
+            c.ssao_quality_level(),
+            ScreenSpaceAmbientOcclusionQualityLevel::Ultra
+        );
         c.ssao_quality = 2;
-        assert_eq!(c.ssao_quality_level(), ScreenSpaceAmbientOcclusionQualityLevel::High);
+        assert_eq!(
+            c.ssao_quality_level(),
+            ScreenSpaceAmbientOcclusionQualityLevel::High
+        );
     }
 
     #[test]
     fn severity_warn_when_enabled_but_unattached() {
-        assert_eq!(severity_for_render(true, 0, false, 0, true, false).0, "warn");
+        assert_eq!(
+            severity_for_render(true, 0, false, 0, true, false).0,
+            "warn"
+        );
         assert_eq!(severity_for_render(true, 1, false, 0, true, false).0, "ok");
         assert_eq!(severity_for_render(false, 0, false, 0, true, false).0, "ok");
         // pas de caméra encore → pas de warn (transitoire boot)
@@ -541,7 +565,10 @@ default = 0.05
         assert_eq!(sev, "warn");
         assert!(next.contains("b0004"));
         // Conflit prioritaire même si le reste paraît "ok" (SSAO attaché, cam présente).
-        assert_eq!(severity_for_render(false, 0, false, 0, false, true).0, "warn");
+        assert_eq!(
+            severity_for_render(false, 0, false, 0, false, true).0,
+            "warn"
+        );
     }
 
     #[test]

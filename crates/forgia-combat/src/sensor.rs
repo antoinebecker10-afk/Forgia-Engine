@@ -114,7 +114,7 @@ pub fn sys_write_combat_sensor(
         hits,
     );
 
-    if let Err(e) = std::fs::write("forgia_combat.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia_combat.json", json) {
         warn!("[forgia-combat] sensor write failed: {e}");
     }
 }

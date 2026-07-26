@@ -218,13 +218,17 @@ mod tests {
     fn pierce_hits_enemies_in_corridor_only() {
         // Forward = +X. Trois ennemis : 2 alignés dans le couloir, 1 décalé hors largeur.
         let cands = [
-            (1usize, v(5.0, 0.0)),  // dans l'axe, à 5 m → touché
-            (2, v(10.0, 1.0)),      // à 10 m, décalé 1 m < 1.5 → touché
-            (3, v(8.0, 3.0)),       // décalé 3 m > 1.5 → raté
+            (1usize, v(5.0, 0.0)), // dans l'axe, à 5 m → touché
+            (2, v(10.0, 1.0)),     // à 10 m, décalé 1 m < 1.5 → touché
+            (3, v(8.0, 3.0)),      // décalé 3 m > 1.5 → raté
         ];
         let mut out = Vec::new();
         pierce_targets(v(0.0, 0.0), v(1.0, 0.0), 25.0, 1.5, &cands, &mut out);
-        assert_eq!(out, vec![1, 2], "seuls les ennemis dans le couloir sont perforés");
+        assert_eq!(
+            out,
+            vec![1, 2],
+            "seuls les ennemis dans le couloir sont perforés"
+        );
     }
 
     #[test]
@@ -241,8 +245,15 @@ mod tests {
     #[test]
     fn frozen_speed_factor_clamps_and_thaws() {
         assert_eq!(frozen_speed_factor(1.0, 0.0), 0.0, "gelé = immobile");
-        assert_eq!(frozen_speed_factor(0.0, 0.0), 1.0, "dégelé = vitesse normale");
-        assert!((frozen_speed_factor(1.0, 0.3) - 0.3).abs() < 1e-6, "ralenti partiel");
+        assert_eq!(
+            frozen_speed_factor(0.0, 0.0),
+            1.0,
+            "dégelé = vitesse normale"
+        );
+        assert!(
+            (frozen_speed_factor(1.0, 0.3) - 0.3).abs() < 1e-6,
+            "ralenti partiel"
+        );
         assert_eq!(frozen_speed_factor(1.0, 1.5), 1.0, "clamp haut");
         assert_eq!(frozen_speed_factor(1.0, -0.2), 0.0, "clamp bas");
     }
@@ -250,6 +261,10 @@ mod tests {
     #[test]
     fn freeze_tick_counts_down_to_zero() {
         assert!((freeze_secs_after_tick(2.5, 0.5) - 2.0).abs() < 1e-6);
-        assert_eq!(freeze_secs_after_tick(0.3, 1.0), 0.0, "clamp à 0, pas de négatif");
+        assert_eq!(
+            freeze_secs_after_tick(0.3, 1.0),
+            0.0,
+            "clamp à 0, pas de négatif"
+        );
     }
 }

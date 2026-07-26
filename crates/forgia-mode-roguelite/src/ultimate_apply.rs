@@ -31,12 +31,13 @@ use forgia_combat::ultimate::UltimateState;
 use forgia_combat::weapons::WeaponType;
 use forgia_combat::Health;
 use forgia_player::FpsCamera;
-use std::fs;
 
 use crate::elements::{ElementConfig, StatusPoison};
 use crate::enemies::EnemyArchetype;
 use crate::ultimate_config::UltimateConfig;
-use crate::ultimate_tech::{chain_targets, freeze_secs_after_tick, frozen_speed_factor, pierce_targets};
+use crate::ultimate_tech::{
+    chain_targets, freeze_secs_after_tick, frozen_speed_factor, pierce_targets,
+};
 use crate::ultimate_vfx::{UltimateVfxEvent, VFX_CHAIN, VFX_EXPLOSION, VFX_FREEZE, VFX_PIERCE};
 
 const SENSOR_PATH: &str = "forgia2_ultimate_tech.json";
@@ -314,7 +315,7 @@ pub fn sys_write_ultimate_tech_sensor(
         stats.freeze_hits,
     );
 
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[ultimate_tech] sensor write failed: {e}");
     }
 }

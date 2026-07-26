@@ -169,7 +169,7 @@ pub fn mesh_fader_debug_sensor(
         avg_progress,
         avg_alpha,
     );
-    let _ = std::fs::write("forgia_mesh_fader.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_mesh_fader.json", json);
 }
 
 /// Plugin qui wire les 3 systems + sensor.

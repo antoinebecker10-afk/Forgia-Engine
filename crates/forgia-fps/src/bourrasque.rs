@@ -16,7 +16,6 @@ use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_combat::confidence::ShotResolved;
 use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::{GameMode, GameSet};
-use std::fs;
 
 /// L'arme persona « Bourrasque » dans l'enum héritée Arena.
 pub const BOURRASQUE_WEAPON: WeaponType = WeaponType::AssaultRifle;
@@ -112,7 +111,7 @@ fn sys_write_bourrasque_sensor(
         pellet_ratio,
         stats.kills_run,
     );
-    if let Err(e) = fs::write(SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[forgia-fps/bourrasque] sensor write failed: {e}");
     }
 }

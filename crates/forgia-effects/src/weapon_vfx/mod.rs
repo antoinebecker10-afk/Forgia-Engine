@@ -735,7 +735,7 @@ pub fn sys_write_weapon_vfx_sensor(
         w.kill_bursts,
         w.reload_count,
     );
-    if let Err(e) = std::fs::write(VFX_SENSOR_PATH, &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue(VFX_SENSOR_PATH, json) {
         warn!("[weapon-vfx] sensor write failed: {e}");
     }
 }

@@ -67,8 +67,7 @@ pub fn sys_recompute_boon_mods(
                 new_mods.knockback_strength += strength;
             }
             BoonEffectKind::ChainTargets { count } => {
-                new_mods.chain_extra_targets =
-                    new_mods.chain_extra_targets.saturating_add(*count);
+                new_mods.chain_extra_targets = new_mods.chain_extra_targets.saturating_add(*count);
             }
             BoonEffectKind::FlatBonus { stat, amount } => match stat.as_str() {
                 "crit_chance" => {
@@ -93,8 +92,7 @@ pub fn sys_recompute_boon_mods(
     new_mods.damage_mul *= trempe.damage_mul;
     new_mods.damage_reduction = (new_mods.damage_reduction + perm.damage_reduction).min(0.85);
     // Log seulement au changement (recompute tourne chaque frame désormais).
-    let changed =
-        *mods != new_mods || (heal.hp_per_kill - new_heal).abs() > f32::EPSILON;
+    let changed = *mods != new_mods || (heal.hp_per_kill - new_heal).abs() > f32::EPSILON;
     *mods = new_mods;
     heal.hp_per_kill = new_heal;
     if changed {
@@ -250,10 +248,7 @@ pub fn sys_apply_chain_targets(
 
 /// OnExit Roguelite — reset Mods + heal cumul à neutre.
 /// Évite que les boons d'une run Roguelite polluent Arena/RPG.
-pub fn sys_reset_boon_mods(
-    mut mods: ResMut<PlayerCombatMods>,
-    mut heal: ResMut<HealOnKillCumul>,
-) {
+pub fn sys_reset_boon_mods(mut mods: ResMut<PlayerCombatMods>, mut heal: ResMut<HealOnKillCumul>) {
     mods.reset();
     heal.hp_per_kill = 0.0;
 }
