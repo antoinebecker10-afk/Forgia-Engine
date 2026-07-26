@@ -13,7 +13,15 @@
 # 250 au lieu de 900 : l'ambiante ne sert plus à *voir* l'intérieur (les bougies
 # s'en chargent), seulement à empêcher le noir absolu. Une ambiante n'a pas de
 # direction — trop forte, elle supprime le modelé au lieu de le révéler.
-brightness = 250.0
+#
+# 🚨 POURQUOI ON S'ÉCARTE DES VALEURS DU CRÉATEUR
+# Ses réglages sont relevés dans sa scène, mais ils supposent ses **lightmaps** :
+# chez lui le rebond est cuit, donc une bougie de 2,45 m de portée suffit à faire
+# vivre une pièce entière. Nous n'avons pas ce rebond (correctif F non fait), donc
+# l'éclairage direct est tout ce qu'on a. Reprendre ses chiffres tels quels donne
+# des pièces trop sombres. Les valeurs ci-dessous sont donc VOLONTAIREMENT plus
+# généreuses que les siennes — ce n'est pas une dérive, c'est la compensation.
+brightness = 400.0
 # Légèrement froide : c'est le contraste avec les bougies chaudes qui crée la
 # lecture du volume (ombres bleu-vert / lumières orangées chez le créateur).
 color = [0.72, 0.80, 0.92]
@@ -36,13 +44,19 @@ enabled = true
 #
 # Toutes allumées : ses 78 bougies allumées le sont en permanence. Avec une
 # portée courte (voir ci-dessous), le coût de groupement reste faible.
-max_active_lights = 96
+max_active_lights = 128
 # Valeurs RELEVÉES dans ses prefabs `_lit` : chacun porte une lumière ponctuelle
 # d'intensité 0,7 et de portée 2,45 m. Ses bougies éclairent à peine au-delà
 # d'elles-mêmes — c'est ce qui donne des points nets au lieu d'un halo qui bave.
 # 630 lm ≈ 0,7 × le facteur de conversion utilisé pour ses autres lumières.
-light_intensity_lm = 630.0
-light_range_m = 2.45
+#
+# 🚨 Ses valeurs sont 630 lm / 2,45 m. On les dépasse SCIEMMENT : à 2,45 m une
+# bougie n'éclaire qu'elle-même, ce qui lui suffit parce que ses lightmaps portent
+# la lumière jusqu'aux murs. Sans elles, la pièce reste noire à deux pas.
+# Le levier de PORTÉE est celui qui fait la différence sur une pièce ; l'intensité
+# ne fait que rendre le point plus brillant.
+light_intensity_lm = 1400.0
+light_range_m = 5.5
 # Sa couleur exacte de flamme.
 light_color = [1.0, 0.846, 0.288]
 # Luminance de la flamme elle-même (ce qu'on voit briller sur la mèche).
@@ -73,7 +87,7 @@ enabled = true
 # En cd/m². Ses sondes sont très sombres (luminance moyenne 0,008) : ce facteur
 # les remonte au niveau du reste de l'éclairage. Monte-le si la pierre reste
 # mate, baisse-le si tout se met à briller comme du métal.
-intensity = 900.0
+intensity = 2000.0
 
 [creator_lights]
 # Les 56 lumières placées à la main par le créateur du pack (43 ponctuelles +
@@ -84,4 +98,9 @@ intensity = 900.0
 enabled = true
 # Son intensité est en unités Unity (0,4 à 59), pas en lumens. Ce facteur unique
 # les convertit toutes : monte-le si l'intérieur reste sombre, baisse-le s'il crame.
-scale = 900.0
+#
+# 🚨 C'est LE levier pour éclairer une pièce : ses 43 lumières ponctuelles ont une
+# portée médiane de 6,9 m et ses 13 spots de 11,7 m — elles sont placées à la main
+# pour couvrir des zones, là où une bougie n'éclaire que son coin. Monte celui-ci
+# en premier si les pièces restent sombres.
+scale = 2200.0
