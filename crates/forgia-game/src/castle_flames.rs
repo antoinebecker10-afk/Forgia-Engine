@@ -100,6 +100,14 @@ pub struct CastleLighting {
     /// sombres (luminance moyenne 0,008) : ce facteur les remonte au niveau du
     /// reste de l'éclairage.
     pub env_intensity: f32,
+
+    /// Lumière cuite du créateur — cf `castle_lightmaps`. C'est elle qui apporte
+    /// le rebond, absent de tout éclairage temps réel.
+    pub lightmaps_enabled: bool,
+    /// Sens vertical des UV de lightmap. Unity place l'origine d'une texture en
+    /// bas à gauche, glTF en haut à gauche : impossible de trancher sans lancer
+    /// le jeu. Si les lightmaps sortent retournées, c'est **cette** valeur.
+    pub lightmaps_flip_v: bool,
 }
 
 impl Default for CastleLighting {
@@ -123,6 +131,8 @@ impl Default for CastleLighting {
             fill_lux: 600.0,
             env_enabled: true,
             env_intensity: 900.0,
+            lightmaps_enabled: true,
+            lightmaps_flip_v: false,
         }
     }
 }
@@ -136,7 +146,10 @@ impl CastleLighting {
                 self.ambient_color[2],
             ),
             brightness: self.ambient_brightness.max(0.0),
-            ..default()
+            // 🚨 Le rebond est déjà dans les lightmaps. Laisser l'ambiante
+            // s'ajouter par-dessus le compterait deux fois — et une ambiante
+            // plate est justement ce que la lumière cuite remplace.
+            affects_lightmapped_meshes: !self.lightmaps_enabled,
         }
     }
 
@@ -153,6 +166,7 @@ impl CastleLighting {
         let flames = parsed.flames.unwrap_or_default();
         let creator = parsed.creator_lights.unwrap_or_default();
         let environment = parsed.environment.unwrap_or_default();
+        let lightmaps = parsed.lightmaps.unwrap_or_default();
         Self {
             ambient_brightness: ambient.brightness.unwrap_or(base.ambient_brightness),
             ambient_color: ambient.color.unwrap_or(base.ambient_color),
@@ -172,6 +186,8 @@ impl CastleLighting {
             fill_lux: ambient.fill_lux.unwrap_or(base.fill_lux),
             env_enabled: environment.enabled.unwrap_or(base.env_enabled),
             env_intensity: environment.intensity.unwrap_or(base.env_intensity),
+            lightmaps_enabled: lightmaps.enabled.unwrap_or(base.lightmaps_enabled),
+            lightmaps_flip_v: lightmaps.flip_v.unwrap_or(base.lightmaps_flip_v),
         }
     }
 
@@ -192,6 +208,13 @@ struct LightingToml {
     flames: Option<FlamesToml>,
     creator_lights: Option<CreatorLightsToml>,
     environment: Option<EnvironmentToml>,
+    lightmaps: Option<LightmapsToml>,
+}
+
+#[derive(Deserialize, Default)]
+struct LightmapsToml {
+    enabled: Option<bool>,
+    flip_v: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -486,11 +509,20 @@ fn sys_apply_sun(
     if !tuning.is_changed() {
         return;
     }
+    // 🚨 Son soleil est **cuit** : chez lui, la lumière directionnelle n'existe
+    // pas au runtime, elle est déjà dans les lightmaps. Quand les nôtres sont
+    // posées, nos directionnelles ne doivent donc plus éclairer la géométrie
+    // cuite — sinon le soleil compte deux fois et l'intérieur se délave. Elles
+    // restent utiles pour ce qui n'est pas cuit : le joueur, les ennemis, les
+    // pièces réimportées.
+    let affects_baked = !tuning.lightmaps_enabled;
     for mut light in &mut q_key {
         light.illuminance = tuning.key_lux.max(0.0);
+        light.affects_lightmapped_mesh_diffuse = affects_baked;
     }
     for mut light in &mut q_fill {
         light.illuminance = tuning.fill_lux.max(0.0);
+        light.affects_lightmapped_mesh_diffuse = affects_baked;
     }
 }
 

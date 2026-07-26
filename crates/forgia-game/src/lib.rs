@@ -39,6 +39,10 @@ mod castle_props;
 /// « pierre mouillée » : une surface PBR sans environnement à réfléchir tombe sur un
 /// reflet plat. La cubemap vient des 27 sondes d'intérieur cuites par le créateur.
 mod castle_envmap;
+/// Lumière cuite du créateur (2026-07-26) — 11 atlas portant 2 rebonds et une
+/// occlusion ambiante. C'est le seul apport de lumière **indirecte** du Hall :
+/// aucun éclairage temps réel ne produit de rebond.
+mod castle_lightmaps;
 /// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
 /// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
 mod color_grading;
@@ -201,6 +205,12 @@ pub fn run_game() -> AppExit {
     // laissait toute surface PBR sans rien à réfléchir. La cubemap est moyennée
     // depuis les 27 sondes d'intérieur cuites par le créateur du pack.
     app.add_plugins(castle_envmap::CastleEnvMapPlugin);
+    // 7e-octies. Lumière CUITE du pack : 11 atlas portant deux rebonds et une
+    // occlusion ambiante, associés pièce par pièce via la table extraite du binaire
+    // Unity. C'est le seul apport de lumière indirecte du Hall — sans lui, tout ce
+    // qui n'est pas frappé directement tombe au plancher de l'ambiante.
+    // Étude : docs/audits/audit-2026-07-26-etude-eclairage.md
+    app.add_plugins(castle_lightmaps::CastleLightmapsPlugin);
     // 7e-quater. Éditeur de scène in-game (story-665) — `.` du pavé numérique dans
     // le Hall : sélection, déplacement/rotation/échelle façon Blender, bibliothèque
     // d'assets, aimant au sol. Persistance non destructive dans

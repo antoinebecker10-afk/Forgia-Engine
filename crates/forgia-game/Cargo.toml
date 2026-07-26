@@ -69,4 +69,6 @@ forgia-debug = { workspace = true }
 forgia-editor = { workspace = true }
 # Story-602 — color grading par mode (genome TOML hot-reload).
 serde = { workspace = true }
+# Table pièce -> zone de lightmap : 6801 entrées, trop volumineuses pour du TOML.
+serde_json = { workspace = true }
 toml = { workspace = true }

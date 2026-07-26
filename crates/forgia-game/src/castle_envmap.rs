@@ -152,13 +152,20 @@ fn sys_apply_env_map(
         }
         // Rien à faire tant que l'intensité n'a pas bougé : ré-insérer chaque
         // frame relancerait le filtrage GPU de la cubemap.
-        if existing.is_some_and(|light| light.intensity == tuning.env_intensity) {
+        if existing.is_some_and(|light| {
+            light.intensity == tuning.env_intensity
+                && light.affects_lightmapped_mesh_diffuse != tuning.lightmaps_enabled
+        }) {
             attached += 1;
             continue;
         }
         commands.entity(entity).insert(GeneratedEnvironmentMapLight {
             environment_map: env.handle.clone(),
             intensity: tuning.env_intensity,
+            // 🚨 Sa part **diffuse** fait double emploi avec le rebond déjà cuit
+            // dans les lightmaps. On ne garde donc que le spéculaire — c'est-à-dire
+            // exactement ce qu'on lui demandait : des reflets sur la pierre.
+            affects_lightmapped_mesh_diffuse: !tuning.lightmaps_enabled,
             ..default()
         });
         attached += 1;

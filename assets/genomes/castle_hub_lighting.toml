@@ -74,6 +74,19 @@ flicker_speed_hz = 6.5
 # GÉOMÉTRIE, parce que beaucoup de bougeoirs ont leurs bougies modelées dans le
 # mesh — il n'existe alors aucun objet séparé où accrocher une flamme.
 
+[lightmaps]
+# La lumière CUITE du créateur : 11 atlas portant deux rebonds et une occlusion
+# ambiante. C'est le seul apport de lumière **indirecte** du Hall — aucun
+# éclairage temps réel n'en produit. Étude complète :
+# docs/audits/audit-2026-07-26-etude-eclairage.md
+enabled = true
+# 🚨 Sens vertical des UV. Unity place l'origine d'une texture en bas à gauche,
+# glTF en haut à gauche. Ça ne se tranche qu'en regardant le jeu : si les
+# lightmaps sortent retournées (l'ombre d'un pilier du mauvais côté, la lumière
+# d'une fenêtre au sol au lieu du mur), c'est CETTE valeur qu'il faut inverser.
+# Relu à chaud : le changement s'applique sans quitter le Hall.
+flip_v = false
+
 [environment]
 # Éclairage par image. Forgia n'en avait AUCUN : `EnvironmentMapLight` n'était
 # employé nulle part. Une surface PBR avec une carte de rugosité et rien à

@@ -3406,6 +3406,7 @@ dependencies = [
  "forgia-water",
  "forgia-worldgen",
  "serde",
+ "serde_json",
  "toml",
 ]
 
