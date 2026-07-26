@@ -52,8 +52,8 @@ each with a dedicated mechanism.
 
 ### 1. Code extensibility → fine-grained static crates
 
-The workspace is ~62 atomic crates (`forgia-crosshair`, `forgia-viewmodel`,
-`forgia-weapon-hitscan`, `forgia-genome-core`, …), each owning one concept, each a
+The workspace is ~61 atomic crates (`forgia-crosshair`, `forgia-viewmodel`,
+`forgia-genome-core`, …), each owning one concept, each a
 standard Bevy `Plugin`. Thin **orchestrator crates** wire them together:
 
 ```rust

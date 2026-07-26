@@ -165,12 +165,12 @@ Effort réel ~3 h (vs 6 h estimé — research bevy-specialist a écarté piège
 
 | Étape | Cible | Statut | Commit |
 |---|---|---|---|
-| E1 | `forgia-weapon-hitscan` (scaffold design alternatif Component `Hitscan` + `TryFire` event, 148 LOC) | ✅ scaffold présent | (terminal // user) |
 | E2 | `forgia-viewmodel` (extraction Tier 2B) — `WeaponViewmodel`, `WeaponModelAssets`, `ads`, `scope_glass`, `viewmodel_debug`, `ViewmodelGenome*`, `attach/switch/auto-scale` | ✅ DONE | `6a45c6322` extraction + `138dcc056` fix init_asset |
 
-**Note honnête** : Le scaffold `forgia-weapon-hitscan` (148 LOC) adopte un design *différent* du plan original ROADMAP (`LeftMouseState` + `dispatch_fire_trigger` + `fire_weapon_minimal` restent dans `forgia-fps`). Le scaffold expose plutôt `Hitscan` Component + `TryFire`/`HitscanFired` events. Migration complète des helpers `LeftMouseState` etc. → reportée à V7 ou plus tard si nécessité concrète (pas bloquant pour V7 roguelite qui peut consommer `Hitscan` Component directement).
-
-Zéro breaking change FPS Arena. V7 roguelite peut consommer `forgia-weapon-hitscan` (firing déclaratif) + `forgia-viewmodel` (1P render) directement.
+**Note honnête** : le scaffold alternatif de hitscan a été retiré le 2026-07-21 : il
+doublait le pipeline réellement utilisé par `forgia-fps` (munitions, VFX, dégâts,
+cooldown). Toute extraction future devra partir de ce pipeline, avec un besoin réel
+validé ; le Roguelite utilise aujourd'hui `forgia-fps` + `forgia-viewmodel`.
 
 ### V7 — 3e jeu : Roguelite FPS Coop 🟢 M1 FONDATIONS DONE 2026-05-19 (story-470)
 

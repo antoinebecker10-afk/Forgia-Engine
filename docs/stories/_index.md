@@ -8,13 +8,13 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 45 |
-| REVIEW | 49 |
+| REVIEW | 51 |
 | BLOCKED | 4 |
 | DRAFT | 34 |
 | UNKNOWN | 10 |
-| DONE | 43 |
+| DONE | 44 |
 | CANCELLED | 1 |
-| **Total** | **186** |
+| **Total** | **189** |
 
 > 🚨 **45 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
@@ -68,10 +68,11 @@
 | 659 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-659-forge-shop-unified-window.md](./story-659-forge-shop-unified-window.md) |
 | 661 | Story 661 — Bras viewmodel GLB cartoon (remplace les poings procéduraux) | [story-661-bras-viewmodel-glb-cartoon.md](./story-661-bras-viewmodel-glb-cartoon.md) |
 
-## REVIEW (49)
+## REVIEW (51)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
+| 0 | Story — Menu-titre devient le hub roguelite complet | [story-menu-hub-roguelite.md](./story-menu-hub-roguelite.md) |
 | 455 | FPS UI Juice AAA (Ammo HUD + Kill Feed + Damage Direction + Cleanup + Pause) | [story-455-fps-ui-juice-aaa.md](./story-455-fps-ui-juice-aaa.md) |
 | 467 | V5 Session B : sensors perf + entities + memory | [story-467-v5-session-b-perf-entities-memory.md](./story-467-v5-session-b-perf-entities-memory.md) |
 | 469 | V5 Session C : sensors lifecycle + watchdog + audio + input + sensor_health | [story-469-v5-session-c-lifecycle-watchdog-audio-input.md](./story-469-v5-session-c-lifecycle-watchdog-audio-input.md) |
@@ -121,6 +122,7 @@
 | 659 | Cohérence élémentaire des projectiles/tracers + retrait du « POW! » | [story-659-projectiles-elementaires-pow-retire.md](./story-659-projectiles-elementaires-pow-retire.md) |
 | 660 | « Le Bourg de l'Enclume » : DA authored pour forge_sanctum (salle 2) | [story-660-bourg-enclume-forge-sanctum-authored.md](./story-660-bourg-enclume-forge-sanctum-authored.md) |
 | 662 | Correctifs audit 360° : Vague 1, lot 1 (chaîne, capteur, robustesse, diamant) | [story-662-correctifs-audit-360-vague1-lot1.md](./story-662-correctifs-audit-360-vague1-lot1.md) |
+| 663 | Perf : fusion de la géométrie statique d'arène par cellule × matériau (sol + murs) | [story-663-floor-merge-cellules-perf.md](./story-663-floor-merge-cellules-perf.md) |
 
 ## BLOCKED (4)
 
@@ -185,7 +187,7 @@
 | 609 | `cargo xtask gene-search` (introspection genome cross-pack) | [story-609-xtask-gene-search.md](./story-609-xtask-gene-search.md) |
 | 654 | Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut | [story-654-nameplate-v2-plaques-icones.md](./story-654-nameplate-v2-plaques-icones.md) |
 
-## DONE (43)
+## DONE (44)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -232,6 +234,7 @@
 | 640 | P0-2 : défense tri-couche Vie / Bouclier / Armure | [story-640-p0-2-defense-layer-shield-armor.md](./story-640-p0-2-defense-layer-shield-armor.md) |
 | 641 | P0-3 : moteur de réactions générique + Element::Shock (Électrique) | [story-641-p0-3-reactions-engine-shock-element.md](./story-641-p0-3-reactions-engine-shock-element.md) |
 | 645 | R3 : sceller la boucle (Victory + maîtrise + best-run + boons pondérés) | [story-645-r3-seal-the-loop.md](./story-645-r3-seal-the-loop.md) |
+| 664 | Warmup des pipelines PBR au Lobby (anti-freeze « tourner la caméra ») | [story-664-pipeline-warmup-pbr-lobby.md](./story-664-pipeline-warmup-pbr-lobby.md) |
 
 ## CANCELLED (1)
 
