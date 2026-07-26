@@ -299,3 +299,67 @@ Grande Salle reste noire.
 Il n'allume que **78** bougies sur 176 ; nous allumons les 767 mèches détectées.
 Rétablir son choix suppose le correctif **I** — importer les 78 positions `_lit`,
 qui sont extraites et vérifiées — et n'allumer que celles-là.
+
+
+---
+
+## 9. Correctif I — les 50 bannières murales (2026-07-26)
+
+### Ce qui manquait n'était pas de la géométrie
+
+`P_PROP_flag_castle_02_static` référence exactement le même
+`SM_PROP_flag_castle_02.fbx` que sa version non statique — l'inventaire du pack ne
+contient d'ailleurs **aucun** FBX `_static`. Le prefab n'ajoute qu'un matériau
+(`M_PROP_flag_static_castle`). Ces 50 instances ne demandaient donc que des
+**transformations**, jamais un mesh.
+
+### La conversion des rotations, vérifiée et non devinée
+
+Les positions se reflètent en niant X. Une **rotation** ne se traite pas ainsi :
+son axe est un pseudo-vecteur. Sous la réflexion `diag(-1, 1, 1)`, l'axe devient
+`det(M) · M·a`, à angle constant, soit sur le quaternion :
+
+    (x, y, z, w)  ->  (x, −y, −z, w)
+
+Nier X comme sur une position aurait retourné les bannières. Le point est vérifié
+sur `P_PROP_flag_castle_02`, présent des deux côtés — nos 4 nœuds existants sont
+reproduits à :
+
+| | Écart |
+|---|---|
+| Position | **0,0006 m** |
+| Rotation | **≤ 0,104°** (bruit de flottant) |
+| Échelle | **identique** (1,0 et 0,8409) |
+
+La chaîne d'extraction reproduit donc exactement ce que la reconstruction
+d'origine avait produit — c'est ce qui autorise à lui faire confiance sur les 50
+instances qu'elle n'avait pas produites.
+
+### Pourquoi cloner un mesh chargé plutôt qu'ajouter un asset
+
+Deux autres voies, écartées :
+
+- **Injecter les nœuds dans les cellules glTF.** L'éditeur de scène identifie une
+  pièce par son *rang de fratrie* : insérer des nœuds décalerait ces rangs et
+  invaliderait les retouches enregistrées dans `castle_hub_edits.json`.
+- **Extraire un GLB autonome.** Duplique une géométrie déjà en mémoire et impose
+  de re-router ses textures.
+
+Le château tient dans 193 m, le streaming charge à 240 m : dans le Hall, une
+bannière d'origine est toujours chargée quelque part. On capte les `Handle` de son
+mesh et de ses matériaux, on les réutilise. Zéro octet ajouté, matériau exact par
+construction. Chaque drapeau ayant **2 primitives**, la capture les relève toutes.
+
+### Reste du correctif I
+
+| Absentes | Nature | État |
+|---|---|---|
+| 50 bannières | variantes `_static`, même mesh | ✅ **fait** |
+| 78 bougies allumées | variantes `_lit`, même mesh | ⏸️ voir ci-dessous |
+| 61 FX | brume, poussières, rai de lumière | ❌ systèmes de particules Unity — à réauthorer |
+| 2 grandes portes | prefab **composite** multi-mesh | ❌ hors du format à un mesh |
+
+Les 78 `_lit` sont extractibles par le même outil, mais les poser rouvre une
+décision : nous allumons aujourd'hui les 767 mèches détectées, lui n'en allume que
+78. Ajouter ses bougies allumées sans restreindre l'allumage donnerait 845 flammes.
+C'est un choix d'ambiance, pas un défaut technique — à trancher avant de l'appliquer.

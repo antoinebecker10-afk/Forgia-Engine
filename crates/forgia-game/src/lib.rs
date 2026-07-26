@@ -31,6 +31,10 @@ mod castle_ground;
 /// module rend les ~300 bougeoirs vivants et remplace l'ambiante à 900, qui
 /// compensait leur absence en aplatissant tout le modelé.
 mod castle_flames;
+/// Instances écartées par la reconstruction du château (2026-07-26) — les prefabs
+/// composites (`_static`, `_lit`, `_comp`) n'avaient pas de FBX 1:1 et sont tombés
+/// en silence : 50 bannières murales manquaient alors que leur mesh était chargé.
+mod castle_props;
 /// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
 /// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
 mod color_grading;
@@ -184,6 +188,11 @@ pub fn run_game() -> AppExit {
     // (`assets/genomes/castle_hub_lighting.toml`, hot-reload). Remplace l'ambiante
     // en dur à 900. Détail : docs/audits/audit-2026-07-26-comparaison-interieur-createur.md
     app.add_plugins(castle_flames::CastleFlamesPlugin);
+    // 7e-sexies. Réimport des instances écartées par la reconstruction du château :
+    // les variantes composites du pack (`_static`, `_lit`) n'ayant pas de FBX 1:1,
+    // 50 bannières murales manquaient. Leur mesh est déjà chargé — on clone ses
+    // handles. Détail : docs/audits/audit-2026-07-26-diff-complet-map-createur.md
+    app.add_plugins(castle_props::CastlePropsPlugin);
     // 7e-quater. Éditeur de scène in-game (story-665) — `.` du pavé numérique dans
     // le Hall : sélection, déplacement/rotation/échelle façon Blender, bibliothèque
     // d'assets, aimant au sol. Persistance non destructive dans

@@ -132,6 +132,8 @@
 | `forgia2_load_timing.json` | T0 | forgia-mode-roguelite | `src/load_timing.rs:115` | event | freeze/stutter au load de stage (total_freezes, recent) | active |
 | `forgia2_castle_hub.json` | T0 | forgia-game | `src/castle_hub.rs` | 1Hz | Hall de Forgia : état scène, cellules streamées/plan, instanciation, colliders, placement joueur et cleanup | active |
 | `forgia2_castle_ground.json` | T0 | forgia-game | `src/castle_ground.rs` | 1Hz | Hall de Forgia : état du gazon/terrain, alignement visuel-physique et collider de terrain | active |
+| `forgia2_castle_flames.json` | T0 | forgia-game | `src/castle_flames.rs:42` | 1Hz | Hall de Forgia : flammes posées/allumées par mèche, lumières du créateur portées depuis Unity, ambiante et rechargements à chaud du genome ; alert critical si 0 flamme dans le Hall | active |
+| `forgia2_castle_props.json` | T0 | forgia-game | `src/castle_props.rs:44` | 1Hz | Hall de Forgia : instances écartées par la reconstruction (bannières `_static`) — table chargée, posées, en attente et meshes sources captés ; alert critical si aucun mesh source après le délai de streaming | active |
 | `forgia2_transform_lag.json` | T0 | forgia-mode-roguelite | `src/transform_hierarchy_sensor.rs` | frame lente uniquement | racines des transforms modifiés pendant un hitch ; historique borné des 8 derniers pics | active |
 | `forgia2_transform_hierarchy.json` | T0 | forgia-mode-roguelite | `src/transform_hierarchy_sensor.rs` | 1Hz | plus grandes hiérarchies de scène, squelettes et VFX ; diagnostic propagation transforms | active |
 | `forgia2_merchant.json` | T0 | forgia-mode-roguelite | `src/merchant.rs:50` | 1Hz | marchand : offres, proximité, achats Or/Âmes, revives — story-591 | active |
