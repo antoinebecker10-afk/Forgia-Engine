@@ -12,6 +12,7 @@
 [weapons.pepin]
 # Slot 1 (Digit1) — Gun (pistolet semi-auto) — Pépin
 target_size = 0.90              # ★ réduit hipfire 1.10→0.90 (au jugé moins encombrant)
+hide_support_hand = true        # pistolet une-main : pas de main gauche (story-661)
 offset_x = 0.22
 offset_y = -0.35
 offset_z = -1.30
@@ -67,6 +68,10 @@ low_ammo_threshold = 0.25      # flash <= 3 bullets
 [weapons.bourrasque]
 # Slot 2 (Digit2) — Mitraillette classique (SMG full-auto, 1 balle/tir) — Bourrasque
 target_size = 0.90              # ★ réduit hipfire 1.10→0.90
+# Ancres mains GLB (story-661) — tubes MK_R/MK_L placés par Antoine 2026-07-20
+# (calibration_bourrasque.blend → read_grip_markers). Camera-local, m.
+grip_anchor = [-0.002, -0.131, 0.040]
+barrel_anchor = [-0.033, 0.069, -0.360]
 offset_x = 0.22
 offset_y = -0.35
 offset_z = -1.30
@@ -123,7 +128,11 @@ low_ammo_threshold = 0.25      # flash <= 7 ("Saperlipopette, faut recharger !")
 [weapons.madame_lenoir]
 # Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
 # Meshy axis : +X local (vs -X pour Pepin/Bourrasque). R_y(+90)·(+1,0,0)=(0,0,-1) forward.
-target_size = 1.00              # ★ réduit hipfire 1.20→1.00 (sniper reste un peu + gros)
+target_size = 1.15              # ★ sniper un peu + gros (user 2026-07-20)
+# Ancres mains GLB (story-661). Main soutien SOUS le canon, en avant (sniper).
+grip_anchor = [-0.002, -0.131, 0.120]
+barrel_anchor = [-0.020, -0.080, -0.560]
+barrel_roll_deg = 90.0          # paume tournée vers le HAUT (tient le canon par le bas)
 offset_x = 0.25
 offset_y = -0.40
 offset_z = -1.30

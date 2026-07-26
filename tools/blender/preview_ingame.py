@@ -100,18 +100,32 @@ def genome_hipfire_rotation():
 
 
 def hand_transform(mirror):
-    """Copie exacte de `position_hands` (hipfire, delta_rot = identité)."""
+    """Copie exacte de `position_hands` (hipfire, delta_rot = identité) :
+    ancre PAR-ARME du genome si présente, sinon fractions globales."""
     gun = Vector((GENOME["offset_x"], GENOME["offset_y"], GENOME["offset_z"]))
     length = GENOME["target_size"]
     if mirror > 0.0:
-        offset = Vector((ARMS["grip_x"], ARMS["grip_drop"], ARMS["grip_back"] * length))
+        anchor = GENOME.get("grip_anchor")
+        offset = (
+            Vector(anchor)
+            if anchor
+            else Vector((ARMS["grip_x"], ARMS["grip_drop"], ARMS["grip_back"] * length))
+        )
         elbow_out = ARMS["grip_elbow_out"]
+        roll_deg = GENOME.get("grip_roll_deg", 0.0)
     else:
-        offset = Vector((ARMS["barrel_x"], ARMS["barrel_drop"], -ARMS["barrel_fwd"] * length))
+        anchor = GENOME.get("barrel_anchor")
+        offset = (
+            Vector(anchor)
+            if anchor
+            else Vector((ARMS["barrel_x"], ARMS["barrel_drop"], -ARMS["barrel_fwd"] * length))
+        )
         elbow_out = ARMS["barrel_elbow_out"]
+        roll_deg = GENOME.get("barrel_roll_deg", 0.0)
     wrist = gun + offset
     elbow = wrist + Vector((mirror * elbow_out, -ARMS["elbow_drop"], ARMS["elbow_back"]))
-    rot = rot_arc_y_to(wrist - elbow)
+    # Roulis par-arme autour de l'axe avant-bras (Y local) — cf position_hands.
+    rot = rot_arc_y_to(wrist - elbow) @ Quaternion((0, 1, 0), math.radians(roll_deg))
     return bevy_trs(wrist, rot, ARMS.get("glb_scale", 1.0))
 
 
@@ -126,12 +140,16 @@ def main():
     apply_bevy_transform(weapon_roots, bevy_trs(gun, genome_hipfire_rotation(), w_scale))
     print(f"[preview] weapon extent={extent:.3f} scale={w_scale:.4f}")
 
-    # Bras : placement exact position_hands.
+    # Bras : placement exact position_hands. La main soutien (gauche) est masquée
+    # pour les armes une-main (genome `hide_support_hand`, ex. pistolet).
+    hide_support = bool(GENOME.get("hide_support_hand", False))
     arm_r = import_glb(ARM_R_GLB)
     apply_bevy_transform(arm_r, hand_transform(1.0))
-    arm_l = import_glb(ARM_L_GLB)
-    apply_bevy_transform(arm_l, hand_transform(-1.0))
-    arm_roots = arm_r + arm_l
+    arm_roots = list(arm_r)
+    if not hide_support:
+        arm_l = import_glb(ARM_L_GLB)
+        apply_bevy_transform(arm_l, hand_transform(-1.0))
+        arm_roots += arm_l
 
     # Repères-TUBES aux ancres calculées : l'utilisateur place/tourne le tube
     # comme la poignée réelle (position + AXE) ; `read_grip_markers.py` en déduit

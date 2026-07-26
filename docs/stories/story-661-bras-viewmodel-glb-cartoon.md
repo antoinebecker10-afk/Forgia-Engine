@@ -82,8 +82,21 @@ strict mesh+armature.
       Peau/Gantelet métal/Cyber émissif) + `ArmGlbMaterial` consommé par
       `sync_arm_cosmetics` → le picker couleur+style du début de partie marche
       en GLB. Event-driven, zéro scan par-frame. Clippy 0 warning, 15 tests.
-- [ ] Test in-game : les 2 mains suivent l'arme (hipfire + ADS + sniper hide)
-      + le choix couleur/style Forge teinte les bras GLB
+- [x] **Placement PAR-ARME + nb de mains data-driven (2026-07-20)** :
+      ancres `grip_anchor`/`barrel_anchor` par-arme dans `viewmodel_arena.toml`
+      (fallback fractions globales si absent — no-hardcode) ; genome
+      `hide_support_hand` (défaut false) + système `update_support_hand_visibility`
+      masque la main gauche → **Pépin = pistolet une-main**. Bouchon du coude
+      UV-hérité (fini la plaque pâle). Poignet gauche = pronation rigide sans
+      flexion (bras droit, retour user « poignée pliée »). Clippy 0, 15 tests.
+- [x] **Sniper (Madame Lenoir) — validé user 2026-07-21** : arme agrandie
+      (target_size 1.15), main gauche paume sous le canon via `barrel_roll_deg`
+      (roulis de paume **par-arme**, data-driven, sans re-baker) + `barrel_anchor`
+      dédié. Bourrasque ✅, Pépin une-main ✅, Lenoir ✅ (« bras c'est bon »).
+- [~] Calibration Pépin/Boucherie fine : placement générique acceptable, ancres
+      par-arme optionnelles plus tard (tubes `calibration_<arme>.blend`).
+- [ ] **Test RUNTIME final** (visuel validé sur previews WYSIWYG ; en jeu en
+      attente du déblocage build — erreur clippy roguelite autre terminal).
 
 **Dette notée** : arms.rs = hotspot (~750 LOC, procédural + GLB + cosmétiques) →
 split en module `arms_glb.rs` à faire APRÈS le merge de l'arbre de l'autre

@@ -90,7 +90,7 @@ pub fn write_arms_sensor(
         tuning.use_glb,
         tuning.glb_scale,
     );
-    if let Err(e) = std::fs::write("forgia2_viewmodel_arms.json", &json) {
+    if let Err(e) = forgia_core::sensor_io::enqueue("forgia2_viewmodel_arms.json", json) {
         warn!("[forgia-viewmodel] arms sensor write failed: {e}");
     }
 }

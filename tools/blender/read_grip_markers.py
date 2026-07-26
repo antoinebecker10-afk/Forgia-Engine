@@ -78,7 +78,12 @@ for name, mirror, keys in (
     a = axis.normalized()
     print(f'AXIS {side} = ({a.x:.3f}, {a.y:.3f}, {a.z:.3f})  # Bevy world')
 
-print("# Valeurs [viewmodel_arms] déduites des tubes (fps_tuning.toml) :")
+print(f"# Ancres PAR-ARME pour viewmodel_arena.toml [weapons.{WEAPON_KEY}] :")
+r_off = to_bevy(mk_r.matrix_world.translation) - gun
+l_off = to_bevy(mk_l.matrix_world.translation) - gun
+print(f"grip_anchor = [{r_off.x:.3f}, {r_off.y:.3f}, {r_off.z:.3f}]")
+print(f"barrel_anchor = [{l_off.x:.3f}, {l_off.y:.3f}, {l_off.z:.3f}]")
+print("# (fallback fractions [viewmodel_arms], si besoin) :")
 for line in out_toml:
     print(line)
 print("# ROLL_DEG suggérés (cartoonize_arms.py, nécessite un rebake) :")

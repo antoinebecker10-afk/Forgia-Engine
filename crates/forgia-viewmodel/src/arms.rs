@@ -17,6 +17,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::scene::SceneInstanceReady;
+use forgia_assets::GameAssets;
 use forgia_combat::weapons::EquippedWeapons;
 use forgia_core::prelude::{ArmCosmetics, ArmStyle, GameMode};
 use forgia_genome_core::Genome;
@@ -522,7 +523,7 @@ pub fn spawn_arms(
     mut commands: Commands,
     tuning: Res<ViewmodelArmsTuning>,
     cosmetics: Res<ArmCosmetics>,
-    asset_server: Res<AssetServer>,
+    game_assets: Res<GameAssets>,
     q_cam: Query<Entity, With<FpsCamera>>,
     q_arms: Query<(Entity, &ArmsGlbMode), With<ViewmodelArms>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -555,11 +556,14 @@ pub fn spawn_arms(
             ))
             .id();
         commands.entity(cam).add_child(root);
-        for (mirror, path) in [(1.0, ARM_GLB_RIGHT), (-1.0, ARM_GLB_LEFT)] {
+        for (mirror, scene) in [
+            (1.0, game_assets.viewmodel_arm_right.clone()),
+            (-1.0, game_assets.viewmodel_arm_left.clone()),
+        ] {
             let hand = commands
                 .spawn((
                     ViewmodelHand { mirror },
-                    SceneRoot(asset_server.load(path)),
+                    SceneRoot(scene),
                     Transform::IDENTITY,
                     Visibility::Inherited,
                     Name::new("ViewmodelHandGlb"),
@@ -649,13 +653,24 @@ pub fn position_hands(
         Err(_) => (hipfire.translation, Quat::IDENTITY, base_len),
     };
 
+    // Shrink ADS appliqué aux ancres par-arme (absolues à l'hipfire).
+    let ads_mul = if base_len > 1e-6 { len / base_len } else { 1.0 };
     for (mut tf, hand) in &mut q {
+        // Ancre PAR-ARME (genome, calibrée aux tubes) si présente ; sinon
+        // fallback fractions globales — no-hardcode : la prise dépend de la
+        // géométrie de CHAQUE arme (retour user Madame Lenoir 2026-07-20).
         let offset = if hand.mirror > 0.0 {
-            // Main crosse : arrière (+Z vers caméra), sous l'arme.
-            Vec3::new(tuning.grip_x, tuning.grip_drop, tuning.grip_back * len)
+            match entry.and_then(|e| e.grip_anchor) {
+                Some(a) => Vec3::from(a) * ads_mul,
+                // Main crosse : arrière (+Z vers caméra), sous l'arme.
+                None => Vec3::new(tuning.grip_x, tuning.grip_drop, tuning.grip_back * len),
+            }
         } else {
-            // Main soutien : avant (-Z vers le canon), sous l'arme.
-            Vec3::new(tuning.barrel_x, tuning.barrel_drop, -tuning.barrel_fwd * len)
+            match entry.and_then(|e| e.barrel_anchor) {
+                Some(a) => Vec3::from(a) * ads_mul,
+                // Main soutien : avant (-Z vers le canon), sous l'arme.
+                None => Vec3::new(tuning.barrel_x, tuning.barrel_drop, -tuning.barrel_fwd * len),
+            }
         };
         let wrist = gun + delta_rot * offset;
         let elbow_out = if hand.mirror > 0.0 {
@@ -670,7 +685,19 @@ pub fn position_hands(
                 tuning.elbow_back,
             );
         let fwd = (wrist - elbow).normalize_or_zero();
-        let rot = Quat::from_rotation_arc(Vec3::Y, fwd);
+        // Roulis par-arme (deg) autour de l'axe avant-bras (= Y local de la main) :
+        // oriente la paume par-arme (ex. sniper paume sous le canon) sans re-baker.
+        let roll_deg = entry
+            .map(|e| {
+                if hand.mirror > 0.0 {
+                    e.grip_roll_deg
+                } else {
+                    e.barrel_roll_deg
+                }
+            })
+            .unwrap_or(0.0);
+        let rot = Quat::from_rotation_arc(Vec3::Y, fwd)
+            * Quat::from_rotation_y(roll_deg.to_radians());
         // GLB = mètres réels (glb_scale ~1) ; procédural = proportions internes ×scale.
         let scale = if tuning.use_glb {
             tuning.glb_scale
@@ -722,6 +749,34 @@ pub fn update_arms_visibility(
     }
 }
 
+/// Masque la main soutien (gauche, `mirror < 0`) pour les armes une-main
+/// (genome `hide_support_hand`, ex. pistolet). Data-driven par-arme, hot-reload.
+/// Visibility PAR-MAIN : compose avec le masquage sniper du root (root Hidden
+/// cache tout ; sinon chaque main applique sa propre visibilité). `Without<
+/// ViewmodelArms>` = disjoint de `update_arms_visibility` (pas de conflit query).
+pub fn update_support_hand_visibility(
+    equipped: Res<EquippedWeapons>,
+    genome_handle: Option<Res<ViewmodelGenomeHandle>>,
+    genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
+    mut q: Query<(&ViewmodelHand, &mut Visibility), Without<ViewmodelArms>>,
+) {
+    let hide_support = genome_handle
+        .as_deref()
+        .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current))
+        .map(|e| e.hide_support_hand)
+        .unwrap_or(false);
+    for (hand, mut vis) in &mut q {
+        let target = if hand.mirror < 0.0 && hide_support {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *vis != target {
+            *vis = target;
+        }
+    }
+}
+
 /// Plugin bras : spawn + placement auto par-arme + motion. Gated FPS + Roguelite.
 pub struct ForgiaViewmodelArmsPlugin;
 
@@ -738,6 +793,7 @@ impl Plugin for ForgiaViewmodelArmsPlugin {
                     .before(apply_viewmodel_sway_bob),
                 apply_arms_motion.after(apply_viewmodel_sway_bob),
                 update_arms_visibility,
+                update_support_hand_visibility,
                 sync_arm_cosmetics,
                 // Story-661 — capteur forgia2_viewmodel_arms.json (1 Hz).
                 crate::arms_sensor::write_arms_sensor,

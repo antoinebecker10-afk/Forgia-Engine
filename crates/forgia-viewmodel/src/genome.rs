@@ -10,7 +10,7 @@
 //! - **Sniper overlay** : `sniper_scope_fullscreen`
 //! - **Gameplay** (lus par `forgia-fps::fire_weapon_minimal`) : fire_mode, damage,
 //!   fire_rate, range, pellets, spread, burst_count, head_damage_mul, falloff_*,
-//!   shake/recoil/fov_punch (juice), hit_flash/hit_stop, mag/reserve/reload
+//!   shake/recoil/fov_punch (juice), hit_flash, mag/reserve/reload
 //!
 //! Tous les champs gameplay restent ici pour rester sur **une seule source de
 //! vérité TOML par arme** (`viewmodel_arena.toml`). Si plus tard on veut une
@@ -45,6 +45,25 @@ pub struct ViewmodelGenomeEntry {
     /// Utilisé pour spawn muzzle flash + tracer à la bonne position monde.
     #[serde(default = "default_barrel_length")]
     pub barrel_length: f32,
+    /// Ancres de prise PAR-ARME (story-661, mains GLB) — camera-local (m),
+    /// relatives au centre viewmodel hipfire. Calibrées via les tubes MK_R/MK_L
+    /// (`tools/blender/preview_ingame.py` + `read_grip_markers.py`).
+    /// `None` → fallback fractions globales `[viewmodel_arms]` (fps_tuning).
+    #[serde(default)]
+    pub grip_anchor: Option<[f32; 3]>,
+    #[serde(default)]
+    pub barrel_anchor: Option<[f32; 3]>,
+    /// Masque la main soutien (gauche) — armes une-main type pistolet (story-661).
+    /// Défaut `false` (deux mains). Hot-reload.
+    #[serde(default)]
+    pub hide_support_hand: bool,
+    /// Roulis PAR-ARME (deg) autour de l'axe avant-bras, ajouté à la pose bakée →
+    /// oriente la paume par-arme sans re-baker le GLB (story-661). Défaut 0.
+    /// `grip_` = main crosse (droite), `barrel_` = main soutien (gauche).
+    #[serde(default)]
+    pub grip_roll_deg: f32,
+    #[serde(default)]
+    pub barrel_roll_deg: f32,
     #[serde(default = "default_ads_offset_x")]
     pub ads_offset_x: f32,
     #[serde(default = "default_ads_offset_y")]
@@ -119,10 +138,6 @@ pub struct ViewmodelGenomeEntry {
     // ─── Hit feedback timings ────────────────────────────────
     #[serde(default = "default_hit_flash_duration")]
     pub hit_flash_duration: f32,
-    #[serde(default = "default_hit_stop_duration")]
-    pub hit_stop_duration: f32,
-    #[serde(default = "default_hit_stop_speed")]
-    pub hit_stop_speed: f32,
     // ─── Ammo / Reload ──────────────────────────────────────
     #[serde(default = "default_mag_size")]
     pub mag_size: u32,
@@ -188,12 +203,6 @@ fn default_spread_deg() -> f32 {
 }
 fn default_hit_flash_duration() -> f32 {
     0.15
-}
-fn default_hit_stop_duration() -> f32 {
-    0.05
-}
-fn default_hit_stop_speed() -> f32 {
-    0.05
 }
 fn default_ads_viewmodel_fade_alpha() -> f32 {
     0.4

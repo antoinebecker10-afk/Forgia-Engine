@@ -26,7 +26,6 @@ use bevy::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType};
 use forgia_player::prelude::FpsCamera;
 use std::collections::HashMap;
-use std::fs;
 
 /// Mesure individuelle pour une arme.
 #[derive(Clone, Debug)]
@@ -295,7 +294,7 @@ fn write_json(store: &CalibrationStore) {
         store.per_weapon.len(),
         weapons_json
     );
-    let _ = fs::write("forgia_viewmodel_calibration.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_viewmodel_calibration.json", json);
 }
 
 pub struct ForgiaViewmodelCalibrationPlugin;

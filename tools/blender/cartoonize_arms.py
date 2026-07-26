@@ -41,13 +41,23 @@ GRIP_POSE = {"R": ("grab.R", 11), "L": ("grab.L", 11)}
 # maximum du chemin vers l'axe cible, wrist_align n'absorbe que le résidu
 # (>60° de flexion bakée = coude cassé, vu sur la gauche à 75°).
 # Valeurs = suggestions read_grip_markers (axes des tubes MK_R/MK_L).
-ROLL_DEG = {"R": -75.0, "L": -69.0}
+# L : -69+180=111 — le « main à l'envers » se corrige par PRONATION (roulis
+# rigide de l'avant-bras), PAS par spin baké au poignet (180° dans le blend =
+# torsion essorage). Le spin ne sert qu'aux petits ajustements (<45°).
+ROLL_DEG = {"R": -75.0, "L": 111.0}
 # FLEXION DU POIGNET : le roulis seul ne peut pas rendre le tunnel des doigts
 # vertical (l'avant-bras monte en diagonale ; le tunnel vit dans le plan ⊥).
 # On plie la MAIN au poignet pour aligner le tunnel des doigts sur l'axe de la
 # poignée (Bevy world). R = manche vertical (tube rouge), L = canon horizontal
 # (tube bleu). None = pas de flexion.
-WRIST_ALIGN_AXIS = {"R": (0.0, 1.0, 0.0), "L": (0.0, 0.0, 1.0)}
+# L : None — la flexion bakée pliait le poignet à angle vif (« poignée pliée »,
+# screen user Pépin 2026-07-20) ; la gauche reste DROITE (pronation seule),
+# quitte à ce que le tunnel ne soit pas parfaitement sur l'axe du canon.
+WRIST_ALIGN_AXIS = {"R": (0.0, 1.0, 0.0), "L": None}
+# Sens d'enroulement AUTOUR du tunnel (paume dessus/dessous) — le degré de
+# liberté restant après alignement ; l'arc-le-plus-court l'avait mis à l'envers
+# pour la gauche (« main à l'envers », user 2026-07-20).
+TUNNEL_SPIN_DEG = {"R": 0.0, "L": 0.0}
 # Arme de référence pour la direction d'avant-bras in-game (genome + tuning).
 CAL_WEAPON = "bourrasque"
 _ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -329,6 +339,10 @@ def wrist_align(mesh, arm, side):
     if tunnel_ent.dot(handle_ent) < 0.0:
         handle_ent = -handle_ent
     qfix_ent = tunnel_ent.rotation_difference(handle_ent)  # Bevy entité
+    # Spin explicite autour du tunnel aligné (sens d'enroulement de la paume).
+    spin = math.radians(TUNNEL_SPIN_DEG[side])
+    if abs(spin) > 1e-3:
+        qfix_ent = Quaternion(handle_ent.normalized(), spin) @ qfix_ent
     angle = math.degrees(qfix_ent.angle)
     if angle < 3.0:
         return
@@ -413,6 +427,24 @@ def isolate_side(mesh, arm, keep):
         if wo > wk:
             doomed.append(v)
     bmesh.ops.delete(bm, geom=doomed, context="VERTS")
+    # Bouche le trou de la coupe au coude : le tube creux ouvert rend un « cône »
+    # difforme quand la caméra voit l'intérieur (retour user Lenoir 2026-07-20).
+    # Les faces du bouchon HÉRITENT des UV du bord — sinon UV (0,0) = texel pâle
+    # → grande plaque claire « cassée » au bout du bras (retour user).
+    uv = bm.loops.layers.uv.active
+    vert_uv = {}
+    if uv is not None:
+        for f in bm.faces:
+            for loop in f.loops:
+                vert_uv.setdefault(loop.vert.index, loop[uv].uv.copy())
+    boundary = [e for e in bm.edges if e.is_boundary]
+    if boundary:
+        res = bmesh.ops.holes_fill(bm, edges=boundary)
+        if uv is not None:
+            for f in res.get("faces", []):
+                for loop in f.loops:
+                    if loop.vert.index in vert_uv:
+                        loop[uv].uv = vert_uv[loop.vert.index]
     bm.to_mesh(mesh.data)
     bm.free()
 
