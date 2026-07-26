@@ -20,7 +20,9 @@ use crate::select::{decor_key_from_parts, EditorDecor};
 /// Fichier d'édition (racine du repo, à côté de `castle_ground_tune.json`).
 const EDITS_PATH: &str = "castle_hub_edits.json";
 /// Version du format — toute sauvegarde est versionnée (règle `scalability`).
-const FORMAT_VERSION: u32 = 1;
+/// v2 ajoute le journal `history` ; un fichier v1 se relit tel quel (le champ est
+/// simplement absent), donc aucune édition existante n'est perdue.
+const FORMAT_VERSION: u32 = 2;
 /// Délai de regroupement avant écriture : on ne touche pas le disque à chaque
 /// pixel de souris, seulement quand l'édition s'est stabilisée.
 const AUTOSAVE_DELAY_SECS: f32 = 2.0;
@@ -56,6 +58,10 @@ struct EditsFile {
     props: Vec<PropEntry>,
     #[serde(default)]
     overrides: Vec<OverrideEntry>,
+    /// Journal des modifications — persisté pour que « annuler à la main » vaille
+    /// aussi après un redémarrage.
+    #[serde(default)]
+    history: Vec<crate::history::EditRecord>,
 }
 
 /// État d'édition de la scène — vérité runtime, miroir du fichier.
@@ -153,6 +159,28 @@ impl SceneEdits {
             .iter()
             .find(|entry| entry.key.as_str() == key)
     }
+
+    pub fn hidden_count(&self) -> usize {
+        self.overrides.iter().filter(|entry| entry.hidden).count()
+    }
+
+    /// Rend visibles toutes les pièces masquées. Sans cette porte de sortie,
+    /// masquer serait irréversible : une pièce invisible n'est plus sélectionnable
+    /// (le picking ignore l'invisible), donc plus « démasquable » à la souris.
+    pub fn restore_all_hidden(&mut self) -> usize {
+        let mut restored = 0;
+        for entry in &mut self.overrides {
+            if entry.hidden {
+                entry.hidden = false;
+                restored += 1;
+            }
+        }
+        if restored > 0 {
+            self.dirty = true;
+            self.dirty_timer = 0.0;
+        }
+        restored
+    }
 }
 
 /// Marque une racine de scène dont les overrides ont déjà été appliqués.
@@ -164,11 +192,13 @@ pub fn load_edits(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut edits: ResMut<SceneEdits>,
+    mut history: ResMut<crate::history::EditHistory>,
 ) {
     *edits = SceneEdits {
         last_save_ok: true,
         ..default()
     };
+    *history = crate::history::EditHistory::default();
     let raw = match std::fs::read_to_string(EDITS_PATH) {
         Ok(raw) => raw,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -209,10 +239,17 @@ pub fn load_edits(
             transform,
         );
     }
-    let (props, overrides) = (file.props.len(), file.overrides.len());
+    let (props, overrides, records) = (
+        file.props.len(),
+        file.overrides.len(),
+        file.history.len(),
+    );
     edits.props = file.props;
     edits.overrides = file.overrides;
-    info!("[forgia-editor] {EDITS_PATH} chargé : {props} objet(s), {overrides} override(s)");
+    history.adopt(file.history);
+    info!(
+        "[forgia-editor] {EDITS_PATH} chargé : {props} objet(s), {overrides} override(s), {records} entrée(s) d'historique"
+    );
 }
 
 fn transform_from(position: [f32; 3], rotation: [f32; 4], scale: [f32; 3]) -> Transform {
@@ -227,7 +264,11 @@ fn transform_from(position: [f32; 3], rotation: [f32; 4], scale: [f32; 3]) -> Tr
 ///
 /// `Time<Real>` et non `Time<Virtual>` : c'est un outil, il ne doit pas geler
 /// avec la pause du jeu (anti-trap V1 « Time<Real> vs Time<Virtual> »).
-pub fn sys_autosave(time: Res<Time<Real>>, mut edits: ResMut<SceneEdits>) {
+pub fn sys_autosave(
+    time: Res<Time<Real>>,
+    history: Res<crate::history::EditHistory>,
+    mut edits: ResMut<SceneEdits>,
+) {
     if !edits.dirty {
         return;
     }
@@ -235,17 +276,18 @@ pub fn sys_autosave(time: Res<Time<Real>>, mut edits: ResMut<SceneEdits>) {
     if edits.dirty_timer < AUTOSAVE_DELAY_SECS {
         return;
     }
-    save_now(&mut edits);
+    save_now(&mut edits, &history);
 }
 
 /// Écriture immédiate (autosave arrivé à échéance, fermeture de l'éditeur,
 /// sortie du Hall). Passe par un fichier temporaire puis un renommage : une
 /// coupure en cours d'écriture ne laisse pas un JSON tronqué.
-pub fn save_now(edits: &mut SceneEdits) {
+pub fn save_now(edits: &mut SceneEdits, history: &crate::history::EditHistory) {
     let file = EditsFile {
         version: FORMAT_VERSION,
         props: edits.props.clone(),
         overrides: edits.overrides.clone(),
+        history: history.records.clone(),
     };
     let json = match serde_json::to_string_pretty(&file) {
         Ok(json) => json,
@@ -286,9 +328,12 @@ pub fn save_now(edits: &mut SceneEdits) {
 
 /// Sauvegarde en quittant le Hall — aucune édition ne doit se perdre parce que
 /// le délai d'autosave n'était pas écoulé.
-pub fn flush_on_exit(mut edits: ResMut<SceneEdits>) {
+pub fn flush_on_exit(
+    history: Res<crate::history::EditHistory>,
+    mut edits: ResMut<SceneEdits>,
+) {
     if edits.dirty {
-        save_now(&mut edits);
+        save_now(&mut edits, &history);
     }
 }
 
@@ -357,9 +402,52 @@ pub fn sys_apply_overrides(
     }
 }
 
+/// Aligne la visibilité des pièces de décor sur le fichier d'édition.
+///
+/// C'est ce système — et non l'action de masquage — qui fait autorité : il rend
+/// le masquage réversible (restauration depuis le panneau) et rattrape les pièces
+/// revenues par streaming.
+pub fn sys_sync_decor_visibility(
+    edits: Res<SceneEdits>,
+    mut q_decor: Query<(&EditorDecor, &mut Visibility)>,
+) {
+    // Ne balaie que sur changement du fichier d'édition, et seules les pièces
+    // effectivement adoptées par l'éditeur portent `EditorDecor`.
+    if !edits.is_changed() {
+        return;
+    }
+    for (decor, mut visibility) in &mut q_decor {
+        let hidden = edits
+            .find_override(&decor.key)
+            .map(|entry| entry.hidden)
+            .unwrap_or(false);
+        let wanted = if hidden {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn restoring_hidden_pieces_clears_every_flag() {
+        let mut edits = SceneEdits::default();
+        edits.set_override_hidden("scene#0:A", true);
+        edits.set_override_hidden("scene#1:B", true);
+        edits.update_override("scene#2:C", &Transform::default());
+        assert_eq!(edits.hidden_count(), 2);
+        assert_eq!(edits.restore_all_hidden(), 2);
+        assert_eq!(edits.hidden_count(), 0);
+        // L'entrée déplacée (non masquée) survit à la restauration.
+        assert_eq!(edits.overrides.len(), 3);
+    }
 
     #[test]
     fn push_prop_assigns_increasing_ids() {

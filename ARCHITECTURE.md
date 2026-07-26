@@ -130,7 +130,7 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 | forgia-ui-lib | 3550 | style + hud + hud_ammo + pause_menu + damage_direction + dialogue + quest_journal + inventory + shop | ✅ (×7 sub-plugins) |
 | forgia-postprocess | 444 | Matériaux fullscreen — **2 shaders réels (toon, outline), 43 stubs passthrough** | ✦ (toon via roguelite) |
 | forgia-effects | 1857 | VFX hanabi + tracers + damage numbers (prespawn anti-freeze = TODO, roadmap M2-B5) | ✅ |
-| forgia-editor | 2050 | Éditeur de scène in-game (pavé num `.`) — sélection, transform Blender, bibliothèque, aimant, persistance non destructive. Gaté `GameMode::CastleHub` (story-665) | ✅ (Hall only) |
+| forgia-editor | 3520 | Éditeur de scène in-game (pavé num `.`) — sélection, transform Blender, bibliothèque, aimant, persistance non destructive. Gaté `GameMode::CastleHub` (story-665) | ✅ (Hall only) |
 
 ### Audio & assets
 | Crate | LOC | Rôle | Wired |

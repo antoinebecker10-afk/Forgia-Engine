@@ -13,6 +13,7 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 
+use crate::history::{age_label, EditHistory, RevertQueue};
 use crate::library::{EditorLibrary, SpawnQueue};
 use crate::persist::SceneEdits;
 use crate::select::{EditorDecor, EditorProp, Selection};
@@ -34,10 +35,12 @@ pub fn draw_editor_ui(
     mut session: ResMut<EditorSession>,
     mut filter: ResMut<LibraryFilter>,
     mut queue: ResMut<SpawnQueue>,
+    mut revert_queue: ResMut<RevertQueue>,
     mut status: ResMut<EditorStatus>,
     mut edits: ResMut<SceneEdits>,
     mut commands: Commands,
     library: Res<EditorLibrary>,
+    history: Res<EditHistory>,
     selection: Res<Selection>,
     op: Res<ActiveOp>,
     undo: Res<UndoStack>,
@@ -53,14 +56,18 @@ pub fn draw_editor_ui(
         ctx,
         &mut session,
         &mut status,
-        &edits,
+        &mut edits,
         &library,
+        &history,
         &selection,
         &op,
         &undo,
     );
     if session.library_open {
         draw_library(ctx, &library, &mut filter, &mut queue, &mut session);
+    }
+    if session.history_open {
+        draw_history(ctx, &history, &mut revert_queue, &mut session);
     }
     draw_inspector(
         ctx,
@@ -73,10 +80,12 @@ pub fn draw_editor_ui(
         &q_decor,
     );
 
-    // Drapeau lu à la frame suivante par les outils 3D : un clic sur un panneau
-    // ne doit pas aussi sélectionner ou valider derrière lui, et taper dans le
-    // champ de recherche ne doit pas déclencher G/R/T.
-    session.ui_capture = ctx.wants_pointer_input() || ctx.wants_keyboard_input();
+    // Drapeaux lus à la frame suivante par les outils 3D. Deux drapeaux distincts :
+    // un clic sur un panneau ne doit pas sélectionner derrière lui (pointeur), et
+    // taper dans le champ de filtre ne doit pas déclencher G/R/T (clavier) — mais
+    // le simple survol d'un panneau ne doit RIEN bloquer au clavier.
+    session.ui_pointer = ctx.wants_pointer_input();
+    session.ui_keyboard = ctx.wants_keyboard_input();
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -84,8 +93,9 @@ fn draw_toolbar(
     ctx: &egui::Context,
     session: &mut EditorSession,
     status: &mut EditorStatus,
-    edits: &SceneEdits,
+    edits: &mut SceneEdits,
     library: &EditorLibrary,
+    history: &EditHistory,
     selection: &Selection,
     op: &ActiveOp,
     undo: &UndoStack,
@@ -115,6 +125,13 @@ fn draw_toolbar(
                 ui.label(format!("{} asset(s)", library.total));
             });
 
+            ui.horizontal(|ui| {
+                if ui.button("Historique (H)").clicked() {
+                    session.history_open = !session.history_open;
+                }
+                ui.label(format!("{} modification(s)", history.pending_count()));
+            });
+
             ui.separator();
             ui.label(format!(
                 "Ajoutés : {} · Déplacés : {} · Sélection : {}",
@@ -122,6 +139,18 @@ fn draw_toolbar(
                 edits.overrides.len(),
                 selection.items.len()
             ));
+            let hidden = edits.hidden_count();
+            if hidden > 0 {
+                // Une pièce masquée n'est plus sélectionnable : sans ce bouton,
+                // « Suppr » sur du décor serait sans retour.
+                if ui
+                    .button(format!("Restaurer {hidden} pièce(s) masquée(s)"))
+                    .clicked()
+                {
+                    let restored = edits.restore_all_hidden();
+                    status.set(format!("{restored} pièce(s) restaurée(s)"));
+                }
+            }
             ui.label(format!(
                 "Geste : {} ({}) · Annulations : {}",
                 op.kind.label(),
@@ -141,6 +170,14 @@ fn draw_toolbar(
                 egui::RichText::new("Sauvegardé").color(egui::Color32::from_rgb(140, 220, 140))
             };
             ui.label(save_text);
+            if session.hover_blocked {
+                ui.label(
+                    egui::RichText::new(
+                        "Décor de fond (terrain / végétation) — non éditable comme un objet",
+                    )
+                    .color(egui::Color32::from_rgb(255, 200, 100)),
+                );
+            }
             if !status.text.is_empty() {
                 ui.label(egui::RichText::new(&status.text).italics());
             }
@@ -231,6 +268,110 @@ fn draw_library(
     }
 }
 
+/// Journal des modifications — chaque ligne est annulable indépendamment.
+///
+/// Ordre **anti-chronologique** : la dernière bêtise est en haut, c'est celle
+/// qu'on cherche en priorité.
+fn draw_history(
+    ctx: &egui::Context,
+    history: &EditHistory,
+    revert_queue: &mut RevertQueue,
+    session: &mut EditorSession,
+) {
+    let mut open = true;
+    egui::Window::new("Historique des modifications")
+        .default_pos([380.0, 320.0])
+        .default_size([420.0, 420.0])
+        .open(&mut open)
+        .show(ctx, |ui| {
+            if history.records.is_empty() {
+                ui.label("Aucune modification enregistrée.");
+                return;
+            }
+            ui.horizontal(|ui| {
+                ui.label(format!(
+                    "{} en vigueur / {} au total",
+                    history.pending_count(),
+                    history.records.len()
+                ));
+                if ui.button("Tout annuler").clicked() {
+                    // De la plus récente à la plus ancienne : annuler dans l'ordre
+                    // inverse évite qu'une entrée ancienne soit réécrite par une
+                    // plus récente restée en vigueur.
+                    for record in history.records.iter().rev() {
+                        if record.can_revert() {
+                            revert_queue.0.push(record.seq);
+                        }
+                    }
+                }
+            });
+            ui.separator();
+
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for record in history.records.iter().rev() {
+                    ui.horizontal(|ui| {
+                        if record.reverted {
+                            ui.label(
+                                egui::RichText::new(record.summary())
+                                    .weak()
+                                    .strikethrough(),
+                            );
+                            ui.label(egui::RichText::new("annulé").weak().italics());
+                        } else {
+                            ui.label(record.summary());
+                            if ui
+                                .add_enabled(record.can_revert(), egui::Button::new("Annuler"))
+                                .clicked()
+                            {
+                                revert_queue.0.push(record.seq);
+                            }
+                        }
+                    });
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "    {} · {}",
+                            age_label(record.at_epoch_secs),
+                            movement_summary(record)
+                        ))
+                        .small()
+                        .weak(),
+                    );
+                }
+            });
+        });
+    if !open {
+        session.history_open = false;
+    }
+}
+
+/// Résumé chiffré d'une entrée : ce qui a bougé, et de combien. C'est ce qui
+/// permet de repérer l'entrée fautive sans la tester (« +102,6 m en Y »).
+fn movement_summary(record: &crate::history::EditRecord) -> String {
+    match (record.before, record.after) {
+        (Some(before), Some(after)) => {
+            let delta = Vec3::from_array(after.position) - Vec3::from_array(before.position);
+            let scale_ratio = Vec3::from_array(after.scale).length()
+                / Vec3::from_array(before.scale).length().max(f32::EPSILON);
+            if delta.length() > 0.001 {
+                format!("Δ {:+.2} ; {:+.2} ; {:+.2} m", delta.x, delta.y, delta.z)
+            } else if (scale_ratio - 1.0).abs() > 0.001 {
+                format!("taille ×{scale_ratio:.2}")
+            } else {
+                "rotation".to_owned()
+            }
+        }
+        (None, Some(after)) => format!(
+            "posé en {:.1} ; {:.1} ; {:.1}",
+            after.position[0], after.position[1], after.position[2]
+        ),
+        (Some(before), None) => format!(
+            "était en {:.1} ; {:.1} ; {:.1}",
+            before.position[0], before.position[1], before.position[2]
+        ),
+        (None, None) => "—".to_owned(),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn draw_inspector(
     ctx: &egui::Context,
@@ -294,13 +435,14 @@ fn draw_inspector(
                 changed = true;
             }
 
-            let mut uniform = transform.scale.x;
+            // Trois champs et non une taille unique : une pièce du château peut
+            // porter une échelle **miroir** (négative), qu'un `splat` uniforme
+            // écraserait silencieusement.
             ui.horizontal(|ui| {
                 ui.label("Taille");
-                if drag(ui, &mut uniform, "×", 0.01) {
-                    transform.scale = Vec3::splat(uniform.max(MIN_INSPECTOR_SCALE));
-                    changed = true;
-                }
+                changed |= drag(ui, &mut transform.scale.x, "X", 0.01);
+                changed |= drag(ui, &mut transform.scale.y, "Y", 0.01);
+                changed |= drag(ui, &mut transform.scale.z, "Z", 0.01);
             });
 
             ui.separator();
@@ -325,10 +467,6 @@ fn draw_inspector(
             }
         });
 }
-
-/// Échelle plancher côté inspecteur (une saisie à 0 rendrait l'objet invisible
-/// et impossible à re-sélectionner).
-const MIN_INSPECTOR_SCALE: f32 = 0.01;
 
 fn drag(ui: &mut egui::Ui, value: &mut f32, prefix: &str, speed: f32) -> bool {
     ui.add(

@@ -194,6 +194,7 @@ pub fn sys_process_spawn_queue(
     ray: Res<crate::pick::EditorRay>,
     session: Res<EditorSession>,
     mut edits: ResMut<crate::persist::SceneEdits>,
+    mut history: ResMut<crate::history::EditHistory>,
     mut selection: ResMut<Selection>,
     mut status: ResMut<EditorStatus>,
 ) {
@@ -204,6 +205,14 @@ pub fn sys_process_spawn_queue(
     for asset in queue.0.drain(..) {
         let transform = Transform::from_translation(ray.placement_point());
         let id = edits.push_prop(&asset, &transform);
+        history.record(
+            crate::history::EditKind::Added,
+            crate::history::EditTarget::Prop { id },
+            crate::history::asset_label(&asset),
+            Some(asset.clone()),
+            None,
+            Some((&transform).into()),
+        );
         let entity = spawn_prop_entity(&mut commands, &asset_server, id, &asset, transform);
         // La boîte englobante n'est connue qu'une fois la scène instanciée : le
         // système de magnétisme réessaie jusque-là. Un objet neuf est toujours

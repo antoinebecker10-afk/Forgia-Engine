@@ -129,9 +129,37 @@ pub fn decor_key_from_parts(scene_path: &str, sibling_index: usize, node_name: &
     format!("{scene_path}#{sibling_index}:{node_name}")
 }
 
-/// Survol : résout la pièce visée à partir du balayage AABB.
-pub fn sys_hover(ray: Res<EditorRay>, lookup: HierarchyLookup, mut selection: ResMut<Selection>) {
-    selection.hovered = ray.picked.and_then(|hit| lookup.editable_root(hit));
+/// Taille maximale d'une pièce éditable, en mètres.
+///
+/// Le terrain du Hall et le tapis de végétation sont, du point de vue de la
+/// hiérarchie glTF, des « pièces » comme les autres — mais elles font 300 m et
+/// **sont** le monde, pas des objets à placer. Les attraper par mégarde a envoyé
+/// le sol au plafond (incident 2026-07-26). Les plus grosses pièces du château
+/// (tours, pans de mur) restent loin sous ce seuil.
+const MAX_SELECTABLE_SIZE_M: f32 = 80.0;
+
+/// Survol : résout la pièce visée à partir du balayage AABB, et refuse le décor
+/// de fond trop grand pour être manipulé comme un objet.
+pub fn sys_hover(
+    ray: Res<EditorRay>,
+    lookup: HierarchyLookup,
+    q_children: Query<&Children>,
+    q_shape: Query<(&GlobalTransform, &Aabb)>,
+    mut scratch: Local<Vec<Entity>>,
+    mut session: ResMut<EditorSession>,
+    mut selection: ResMut<Selection>,
+) {
+    let candidate = ray.picked.and_then(|hit| lookup.editable_root(hit));
+    let Some(candidate) = candidate else {
+        selection.hovered = None;
+        session.hover_blocked = false;
+        return;
+    };
+    let oversized = world_bounds(candidate, &q_children, &q_shape, &mut scratch)
+        .map(|(_, size)| size.max_element() > MAX_SELECTABLE_SIZE_M)
+        .unwrap_or(false);
+    session.hover_blocked = oversized;
+    selection.hovered = if oversized { None } else { Some(candidate) };
 }
 
 /// Clic gauche = sélectionner. `Maj` ajoute / retire de la sélection.
@@ -149,7 +177,7 @@ pub fn sys_click(
     lookup: HierarchyLookup,
     mut selection: ResMut<Selection>,
 ) {
-    if session.ui_capture || session.navigating || op.kind != OpKind::None {
+    if session.ui_pointer || session.navigating || op.kind != OpKind::None {
         return;
     }
     if !mouse.just_pressed(MouseButton::Left) {
@@ -192,12 +220,13 @@ pub fn sys_shortcuts(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut edits: ResMut<SceneEdits>,
+    mut history: ResMut<crate::history::EditHistory>,
     mut selection: ResMut<Selection>,
     q_prop: Query<(&EditorProp, &Transform)>,
     mut q_decor: Query<(&EditorDecor, &mut Visibility)>,
     mut status: ResMut<crate::EditorStatus>,
 ) {
-    if session.ui_capture || op.kind != OpKind::None {
+    if session.ui_keyboard || op.kind != OpKind::None {
         return;
     }
     let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
@@ -206,13 +235,33 @@ pub fn sys_shortcuts(
         let mut removed = 0u32;
         let mut hidden = 0u32;
         for entity in std::mem::take(&mut selection.items) {
-            if let Ok((prop, _)) = q_prop.get(entity) {
+            if let Ok((prop, transform)) = q_prop.get(entity) {
+                // Journalisé AVANT le despawn : l'entrée porte le chemin d'asset
+                // et la position, ce qui rend la suppression réversible.
+                history.record(
+                    crate::history::EditKind::Deleted,
+                    crate::history::EditTarget::Prop { id: prop.id },
+                    crate::history::asset_label(&prop.asset),
+                    Some(prop.asset.clone()),
+                    Some(transform.into()),
+                    None,
+                );
                 edits.remove_prop(prop.id);
                 commands.entity(entity).despawn();
                 removed += 1;
             } else if let Ok((decor, mut visibility)) = q_decor.get_mut(entity) {
                 *visibility = Visibility::Hidden;
                 edits.set_override_hidden(&decor.key, true);
+                history.record(
+                    crate::history::EditKind::Hidden,
+                    crate::history::EditTarget::Decor {
+                        key: decor.key.clone(),
+                    },
+                    crate::history::decor_label(&decor.key),
+                    None,
+                    None,
+                    None,
+                );
                 hidden += 1;
             }
         }
@@ -230,6 +279,14 @@ pub fn sys_shortcuts(
             let mut clone = *transform;
             clone.translation += Vec3::new(DUPLICATE_OFFSET_M, 0.0, DUPLICATE_OFFSET_M);
             let id = edits.push_prop(&prop.asset, &clone);
+            history.record(
+                crate::history::EditKind::Added,
+                crate::history::EditTarget::Prop { id },
+                crate::history::asset_label(&prop.asset),
+                Some(prop.asset.clone()),
+                None,
+                Some((&clone).into()),
+            );
             spawned.push(crate::library::spawn_prop_entity(
                 &mut commands,
                 &asset_server,

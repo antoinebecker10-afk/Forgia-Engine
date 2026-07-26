@@ -69,6 +69,12 @@ pub struct NeedsGroundSnap {
 
 /// Nombre de frames d'attente accordées à l'instanciation de la scène.
 const MAX_GROUND_SNAP_ATTEMPTS: u8 = 120;
+/// Remontée maximale acceptée par une pose au sol. Descendre est normal (on
+/// dépose), remonter de plusieurs mètres signifie que le rayon a touché autre
+/// chose que le sol : on refuse au lieu de déplacer le décor.
+const MAX_SNAP_LIFT_M: f32 = 5.0;
+/// Garde-fou de parcours de hiérarchie (mêmes scènes que le picking).
+const MAX_SUBTREE_NODES: usize = 4096;
 
 /// Demande d'alignement sur la grille (déplacement validé en mode Grille).
 #[derive(Component)]
@@ -84,7 +90,7 @@ pub fn sys_snap_shortcuts(
     mut session: ResMut<EditorSession>,
     mut status: ResMut<EditorStatus>,
 ) {
-    if session.ui_capture || op.active() {
+    if session.ui_keyboard || op.active() {
         return;
     }
     if keys.just_pressed(KeyCode::KeyF) {
@@ -116,8 +122,11 @@ pub fn sys_apply_ground_snap(
     q_decor: Query<&EditorDecor>,
     mut q_transform: Query<&mut Transform>,
     mut scratch: Local<Vec<Entity>>,
+    mut subtree: Local<Vec<Entity>>,
     mut commands: Commands,
+    mut status: ResMut<EditorStatus>,
     mut edits: ResMut<crate::persist::SceneEdits>,
+    mut history: ResMut<crate::history::EditHistory>,
 ) {
     if q_pending.is_empty() {
         return;
@@ -125,10 +134,7 @@ pub fn sys_apply_ground_snap(
     let Ok(ctx) = rapier.single() else {
         return;
     };
-    let mut filter = QueryFilter::default().exclude_sensors();
-    if let Ok(player) = q_player.single() {
-        filter = filter.exclude_collider(player);
-    }
+    let player_entity = q_player.single().ok();
 
     for (entity, mut pending) in &mut q_pending {
         let Some((center, size)) = world_bounds(entity, &q_children, &q_shape, &mut scratch) else {
@@ -142,6 +148,18 @@ pub fn sys_apply_ground_snap(
             continue;
         };
         commands.entity(entity).remove::<NeedsGroundSnap>();
+
+        // 🚨 Le rayon ne doit PAS toucher l'objet qu'on est en train de poser.
+        // Sinon on le pose sur lui-même : c'est exactement ce qui a envoyé le
+        // terrain du Hall au plafond (bas à −59 m posé sur son propre sommet à
+        // +57 m = +116 m). Tout objet ayant son propre collider est concerné.
+        subtree.clear();
+        collect_subtree(entity, &q_children, &mut subtree);
+        let keep = |candidate: Entity| {
+            !subtree.contains(&candidate) && Some(candidate) != player_entity
+        };
+        let filter = QueryFilter::default().exclude_sensors().predicate(&keep);
+
         let bottom = center.y - size.y * 0.5;
         let origin = Vec3::new(center.x, center.y + size.y * 0.5 + SNAP_PROBE_UP_M, center.z);
         let Some((_, toi)) = ctx.cast_ray(
@@ -155,6 +173,22 @@ pub fn sys_apply_ground_snap(
         };
         let surface_y = origin.y - toi;
         let world_delta = Vec3::new(0.0, surface_y - bottom, 0.0);
+
+        // Garde-fou de dernier recours : poser au sol doit *déposer*, pas
+        // catapulter. Une remontée massive signifie qu'on a touché autre chose
+        // que le sol — on refuse bruyamment plutôt que de déplacer le décor.
+        if snap_lift_rejected(world_delta.y) {
+            warn!(
+                "[forgia-editor] pose au sol refusée : remontée de {:.1} m (max {MAX_SNAP_LIFT_M} m)",
+                world_delta.y
+            );
+            status.set(format!(
+                "Pose au sol refusée — remontée de {:.0} m jugée aberrante",
+                world_delta.y
+            ));
+            continue;
+        }
+
         apply_world_translation(
             entity,
             world_delta,
@@ -162,6 +196,8 @@ pub fn sys_apply_ground_snap(
             &q_global,
             &mut q_transform,
             &mut edits,
+            &mut history,
+            crate::history::EditKind::Snapped,
             &q_prop,
             &q_decor,
         );
@@ -180,6 +216,7 @@ pub fn sys_apply_grid_snap(
     mut q_transform: Query<&mut Transform>,
     mut commands: Commands,
     mut edits: ResMut<crate::persist::SceneEdits>,
+    mut history: ResMut<crate::history::EditHistory>,
 ) {
     for entity in &q_pending {
         commands.entity(entity).remove::<NeedsGridSnap>();
@@ -199,6 +236,8 @@ pub fn sys_apply_grid_snap(
             &q_global,
             &mut q_transform,
             &mut edits,
+            &mut history,
+            crate::history::EditKind::Moved,
             &q_prop,
             &q_decor,
         );
@@ -215,6 +254,8 @@ fn apply_world_translation(
     q_global: &Query<&GlobalTransform>,
     q_transform: &mut Query<&mut Transform>,
     edits: &mut crate::persist::SceneEdits,
+    history: &mut crate::history::EditHistory,
+    kind: crate::history::EditKind,
     q_prop: &Query<&EditorProp>,
     q_decor: &Query<&EditorDecor>,
 ) {
@@ -231,13 +272,51 @@ fn apply_world_translation(
     let Ok(mut transform) = q_transform.get_mut(entity) else {
         return;
     };
+    let before = *transform;
     transform.translation += local_delta;
     let snapshot = *transform;
     record_transform(edits, entity, &snapshot, q_prop, q_decor);
+    // L'aimant est une modification à part entière : c'est lui qui a un jour
+    // remonté tout le terrain du Hall de 102 m. Il doit donc être journalisé et
+    // annulable comme n'importe quel geste.
+    if let Some((target, label, asset)) =
+        crate::history::describe(q_prop.get(entity).ok(), q_decor.get(entity).ok())
+    {
+        history.record(
+            kind,
+            target,
+            label,
+            asset,
+            Some((&before).into()),
+            Some((&snapshot).into()),
+        );
+    }
 }
 
 fn snap_to_grid(value: f32) -> f32 {
     (value / GRID_STEP_M).round() * GRID_STEP_M
+}
+
+/// Une pose au sol qui *remonte* fortement l'objet est refusée : elle signifie
+/// que le rayon a touché autre chose que le sol. Descendre reste libre — déposer
+/// un objet placé en l'air est le cas nominal.
+fn snap_lift_rejected(delta_y: f32) -> bool {
+    delta_y > MAX_SNAP_LIFT_M
+}
+
+/// Rassemble la racine et tous ses descendants — sert à exclure l'objet posé de
+/// son propre rayon de sondage. Borné : une scène pathologique ne doit pas faire
+/// boucler la frame.
+fn collect_subtree(root: Entity, q_children: &Query<&Children>, out: &mut Vec<Entity>) {
+    out.push(root);
+    let mut cursor = 0;
+    while cursor < out.len() && out.len() < MAX_SUBTREE_NODES {
+        let entity = out[cursor];
+        cursor += 1;
+        if let Ok(children) = q_children.get(entity) {
+            out.extend(children.iter());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -249,6 +328,21 @@ mod tests {
         assert_eq!(snap_to_grid(1.10), 1.0);
         assert_eq!(snap_to_grid(1.20), 1.25);
         assert_eq!(snap_to_grid(-0.60), -0.5);
+    }
+
+    #[test]
+    fn dropping_is_always_allowed() {
+        assert!(!snap_lift_rejected(-120.0), "déposer un objet en l'air est nominal");
+        assert!(!snap_lift_rejected(0.0));
+    }
+
+    #[test]
+    fn small_lift_is_allowed_big_lift_is_refused() {
+        // Un objet légèrement enfoncé remonte : normal.
+        assert!(!snap_lift_rejected(1.5));
+        // Le cas vécu : le terrain posé sur son propre sommet (+116 m).
+        assert!(snap_lift_rejected(116.0));
+        assert!(snap_lift_rejected(102.6));
     }
 
     #[test]

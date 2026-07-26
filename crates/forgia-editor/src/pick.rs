@@ -10,11 +10,17 @@
 //!   fusionné + boîtes de la Grande Salle, cf `castle_hub.rs`) : un rayon physique
 //!   ne peut donc PAS désigner un tonneau ou une colonne. Le test AABB, lui, voit
 //!   la géométrie réellement affichée.
+//!
+//! Les deux partent **du curseur** (l'éditeur libère la souris), et non de l'axe
+//! de la caméra — voir [`sys_editor_ray`].
 
 use bevy::camera::primitives::Aabb;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_player::prelude::{FpsCamera, Player};
+
+use crate::EditorSession;
 
 /// Portée de visée de l'éditeur, en mètres. Outil de dev/création : ne touche
 /// aucune valeur de gameplay, donc `const` nommée plutôt que gène TOML.
@@ -62,17 +68,38 @@ const PLACEMENT_FALLBACK_M: f32 = 8.0;
 /// château, `Visibility::Hidden`, qui ne doivent jamais être sélectionnables.
 pub fn sys_editor_ray(
     rapier: ReadRapierContext,
-    q_cam: Query<&GlobalTransform, With<FpsCamera>>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<FpsCamera>>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
     q_player: Query<Entity, With<Player>>,
     q_meshes: Query<(Entity, &GlobalTransform, &Aabb, &InheritedVisibility), With<Mesh3d>>,
+    session: Res<EditorSession>,
     mut ray: ResMut<EditorRay>,
 ) {
-    let Ok(cam) = q_cam.single() else {
+    let Ok((camera, cam_tf)) = q_cam.single() else {
         *ray = EditorRay::default();
         return;
     };
-    let origin = cam.translation();
-    let dir = cam.forward().as_vec3();
+
+    // 🚨 Le rayon part **du curseur**, pas du centre de l'écran.
+    //
+    // L'éditeur libère la souris : le créateur pointe un objet avec son curseur
+    // et clique. Tirer le rayon depuis l'axe de la caméra testerait ce qu'il y a
+    // au centre de l'écran — donc « rien ne se sélectionne » alors que la visée
+    // paraît bonne. Repli sur l'axe caméra pendant la navigation (clic droit
+    // maintenu), où le curseur est verrouillé et n'a plus de sens.
+    let cursor_ray = if session.navigating {
+        None
+    } else {
+        q_window
+            .single()
+            .ok()
+            .and_then(|window| window.cursor_position())
+            .and_then(|position| camera.viewport_to_world(cam_tf, position).ok())
+    };
+    let (origin, dir) = match cursor_ray {
+        Some(cursor) => (cursor.origin, *cursor.direction),
+        None => (cam_tf.translation(), cam_tf.forward().as_vec3()),
+    };
     ray.origin = origin;
     ray.dir = dir;
 

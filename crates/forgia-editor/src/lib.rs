@@ -33,6 +33,7 @@ use bevy_egui::EguiPrimaryContextPass;
 use forgia_core::prelude::*;
 use forgia_input::prelude::InputBlockers;
 
+pub mod history;
 pub mod library;
 mod panel;
 pub mod persist;
@@ -59,10 +60,22 @@ pub struct EditorSession {
     pub navigating: bool,
     pub snap: snap::SnapMode,
     pub library_open: bool,
-    /// Vrai quand egui veut la souris ou le clavier. Posé par le panneau, lu à la
-    /// frame suivante par les outils 3D : un clic sur un bouton ne doit pas aussi
-    /// agir dans la scène derrière.
-    pub ui_capture: bool,
+    /// Journal des modifications ouvert (touche `H`).
+    pub history_open: bool,
+    /// La pièce visée est trop grande pour être éditée (terrain, tapis de
+    /// végétation). Drapeau plutôt que message : ce serait une allocation par
+    /// frame de survol.
+    pub hover_blocked: bool,
+    /// Vrai quand le pointeur est sur un panneau egui. Posé par le panneau, lu à
+    /// la frame suivante : un clic sur un bouton ne doit pas aussi agir dans la
+    /// scène derrière.
+    pub ui_pointer: bool,
+    /// Vrai quand egui a le focus clavier (saisie dans le champ de filtre).
+    ///
+    /// **Séparé de [`Self::ui_pointer`]** : un seul drapeau pour les deux rendait
+    /// tous les raccourcis muets dès que le curseur *survolait* un panneau — le
+    /// curseur étant libre en édition, il y passe son temps.
+    pub ui_keyboard: bool,
 }
 
 /// Dernier retour d'action, affiché dans la barre d'outils.
@@ -111,6 +124,8 @@ impl Plugin for ForgiaEditorPlugin {
             .init_resource::<transform_ops::UndoStack>()
             .init_resource::<library::EditorLibrary>()
             .init_resource::<library::SpawnQueue>()
+            .init_resource::<history::EditHistory>()
+            .init_resource::<history::RevertQueue>()
             .init_resource::<panel::LibraryFilter>()
             .init_resource::<persist::SceneEdits>();
 
@@ -154,6 +169,7 @@ impl Plugin for ForgiaEditorPlugin {
                 transform_ops::sys_undo,
                 select::sys_shortcuts,
                 snap::sys_snap_shortcuts,
+                sys_panel_shortcuts,
                 select::sys_draw_highlight,
             )
                 .chain()
@@ -168,10 +184,12 @@ impl Plugin for ForgiaEditorPlugin {
         app.add_systems(
             Update,
             (
+                history::sys_process_revert_queue,
                 library::sys_process_spawn_queue,
                 snap::sys_apply_ground_snap,
                 snap::sys_apply_grid_snap,
                 persist::sys_apply_overrides,
+                persist::sys_sync_decor_visibility,
                 persist::sys_autosave,
             )
                 .chain()
@@ -200,6 +218,7 @@ fn sys_toggle_editor(
     mut selection: ResMut<select::Selection>,
     mut status: ResMut<EditorStatus>,
     mut edits: ResMut<persist::SceneEdits>,
+    history: Res<history::EditHistory>,
     mut q_transform: Query<&mut Transform>,
 ) {
     if !keys.just_pressed(TOGGLE_KEY) {
@@ -209,15 +228,33 @@ fn sys_toggle_editor(
         transform_ops::cancel_active_op(&mut op, &mut q_transform);
         session.open = false;
         session.library_open = false;
+        session.history_open = false;
         selection.clear();
         // Fermer, c'est valider : on n'attend pas le délai d'autosave.
         if edits.dirty() {
-            persist::save_now(&mut edits);
+            persist::save_now(&mut edits, &history);
         }
         info!("[forgia-editor] éditeur fermé");
     } else {
         session.open = true;
         status.set("Éditeur ouvert — clic gauche pour sélectionner".to_owned());
+    }
+}
+
+/// Ouverture des panneaux au clavier : `B` bibliothèque, `H` historique.
+fn sys_panel_shortcuts(
+    keys: Res<ButtonInput<KeyCode>>,
+    op: Res<transform_ops::ActiveOp>,
+    mut session: ResMut<EditorSession>,
+) {
+    if session.ui_keyboard || op.active() {
+        return;
+    }
+    if keys.just_pressed(KeyCode::KeyB) {
+        session.library_open = !session.library_open;
+    }
+    if keys.just_pressed(KeyCode::KeyH) {
+        session.history_open = !session.history_open;
     }
 }
 
@@ -256,7 +293,8 @@ fn sys_cursor_and_blockers(
         *was_open = true;
     } else if *was_open {
         session.navigating = false;
-        session.ui_capture = false;
+        session.ui_pointer = false;
+        session.ui_keyboard = false;
         blockers.block_look = false;
         blockers.block_fire = false;
         if let Ok(mut options) = q_cursor.single_mut() {
@@ -280,8 +318,10 @@ fn sys_close_session(
     transform_ops::cancel_active_op(&mut op, &mut q_transform);
     session.open = false;
     session.library_open = false;
+    session.history_open = false;
     session.navigating = false;
-    session.ui_capture = false;
+    session.ui_pointer = false;
+    session.ui_keyboard = false;
     blockers.block_look = false;
     blockers.block_fire = false;
     info!("[forgia-editor] éditeur refermé (sortie du Hall ou pause)");
