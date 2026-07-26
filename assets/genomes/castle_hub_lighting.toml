@@ -9,22 +9,28 @@
 # particules Unity, perdues à l'import. Les flammes ci-dessous les remplacent.
 # Détail : docs/audits/audit-2026-07-26-comparaison-interieur-createur.md
 
-# 🚨 VALEURS REVENUES À CELLES DU CRÉATEUR (2026-07-26, correctif F4)
-# Elles avaient été gonflées pour compenser l'absence de rebond. Ses lightmaps
-# étant maintenant posées, le rebond est là : la compensation n'a plus d'objet, et
-# elle coûtait cher — 128 lumières de 5,5 m de portée, c'est ONZE FOIS le volume à
-# grouper de ses 2,45 m, le volume croissant au cube du rayon.
+# 🚨 SANS REBOND, IL FAUT COMPENSER — MAIS PAS N'IMPORTE OÙ (2026-07-26)
+# La lumière cuite est coupée (voir `[lightmaps]`), donc il n'y a plus aucune
+# lumière indirecte : ce qui n'est pas frappé directement tombe au plancher de
+# l'ambiante. Il faut compenser, et le choix du levier n'est pas neutre.
 #
-# 🚨 Si le Hall est trop sombre, le bon levier est désormais `[lightmaps] exposure`,
-# PAS ces valeurs-ci. C'est la lumière indirecte qui remplit une pièce ; monter le
-# direct ne fait qu'élargir les flaques et cramer leur centre.
+# Ce qui est REMONTÉ, parce que ça ne coûte presque rien :
+#   - l'ambiante, qui n'a pas de coût par lumière ;
+#   - le facteur des 56 lumières placées à la main par le créateur. Elles existent
+#     de toute façon, portent à 6,9 m (ponctuelles) et 11,7 m (spots), et sont
+#     posées pour couvrir des ZONES. C'est LE bon levier pour éclairer une pièce.
+#
+# Ce qui reste aux valeurs mesurées du créateur, parce que c'est ce qui coûtait :
+#   - la portée et le nombre des bougies. Le volume d'une lumière croît au CUBE de
+#     son rayon : 128 bougies à 5,5 m, c'était environ quinze fois le travail de
+#     groupement de 96 à 2,45 m — et la baisse de FPS constatée en jeu.
 
 [ambient]
 # L'ambiante ne sert plus à *voir* l'intérieur — les lightmaps et les bougies s'en
 # chargent — seulement à empêcher le noir absolu. Elle n'a pas de direction : trop
-# forte, elle supprime le modelé au lieu de le révéler. Et elle n'éclaire plus la
-# géométrie cuite, dont le rebond est déjà dans les atlas.
-brightness = 250.0
+# forte, elle supprime le modelé au lieu de le révéler. Remontée à 400 faute de
+# rebond ; elle redescendra à 250 le jour où la lumière cuite reviendra.
+brightness = 400.0
 # Légèrement froide : c'est le contraste avec les bougies chaudes qui crée la
 # lecture du volume (ombres bleu-vert / lumières orangées chez le créateur).
 color = [0.72, 0.80, 0.92]
@@ -77,7 +83,15 @@ flicker_speed_hz = 6.5
 # ambiante. C'est le seul apport de lumière **indirecte** du Hall — aucun
 # éclairage temps réel n'en produit. Étude complète :
 # docs/audits/audit-2026-07-26-etude-eclairage.md
-enabled = true
+#
+# 🚨 COUPÉ le 2026-07-26 sur décision utilisateur : le rendu en jeu était trop
+# sombre et les performances en baisse. Toute la chaîne reste en place (module,
+# table de 6801 pièces, 11 atlas, outils) — remettre `true` suffit à réessayer.
+# Le passer à `true` rebascule AUSSI l'ambiante, le diffus de l'éclairage par
+# image et le soleil hors de la géométrie cuite, pour ne pas compter deux fois.
+# Ce qui reste à trancher avant un nouvel essai : la valeur de `exposure`
+# (8000 est un calcul, jamais une observation) et `flip_v`.
+enabled = false
 # 🚨 Sens vertical des UV. Unity place l'origine d'une texture en bas à gauche,
 # glTF en haut à gauche. Ça ne se tranche qu'en regardant le jeu : si les
 # lightmaps sortent retournées (l'ombre d'un pilier du mauvais côté, la lumière
@@ -119,5 +133,6 @@ enabled = true
 # les convertit toutes. Ses 43 ponctuelles portent à 6,9 m de médiane et ses 13
 # spots à 11,7 m : elles éclairent des ZONES, là où une bougie n'éclaire que son
 # coin. Revenu à 900 avec le rebond cuit ; c'était monté à 2200 quand il n'y avait
-# que du direct.
-scale = 900.0
+# que du direct. Remonté à 2200 puisque le rebond est coupé : c'est le levier le
+# moins cher pour éclairer une pièce, ces lumières étant déjà dans la scène.
+scale = 2200.0
