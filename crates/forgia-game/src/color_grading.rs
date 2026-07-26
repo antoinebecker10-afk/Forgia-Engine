@@ -7,6 +7,8 @@
 //! - **Roguelite** : chaud, punchy (forge volcanique cartoon)
 //! - **CyberCity** : froid/néon, contrasté
 //! - **RPG** : naturel, doux
+//! - **CastleHub** : ombres froides / lumières chaudes (référence du créateur du
+//!   pack — cf `docs/audits/audit-2026-07-26-comparaison-interieur-createur.md`)
 //! - Menu/Fps/None : neutre (reset → aucune fuite inter-mode, cf audit mode-coupling)
 //!
 //! La COURBE (Tonemapping) reste le réglage user global (ESC). Le grading est
@@ -71,6 +73,7 @@ pub struct ColorGradingConfig {
     pub roguelite: ModeGrade,
     pub cybercity: ModeGrade,
     pub rpg: ModeGrade,
+    pub castle_hub: ModeGrade,
 }
 
 impl Default for ColorGradingConfig {
@@ -100,6 +103,24 @@ impl Default for ColorGradingConfig {
                 contrast: 0.0,
                 saturation: 0.0,
             },
+            // Hall de Forgia — valeurs RELEVÉES dans le profil de post-traitement
+            // du créateur (`Global Volume Profile World Castle.asset`), pas
+            // devinées. Conversion d'échelle URP → Bevy :
+            //   ColorAdjustments.contrast   +10   /100 → +0.10
+            //   ColorAdjustments.saturation +7.4  /100 → +0.074
+            //   WhiteBalance.temperature    +14.9 /100 → +0.149
+            // Son `postExposure` est à +1,8 EV ; on n'en reprend qu'une part :
+            // il compensait une scène lightmappée que nous n'avons pas, et notre
+            // éclairage vient d'être refait (ambiante 250 + 56 lumières portées).
+            // À finir de caler à l'œil — le fichier est en hot-reload.
+            castle_hub: ModeGrade {
+                exposure: 0.60,
+                temperature: 0.149,
+                tint: 0.0,
+                post_saturation: 0.074,
+                contrast: 0.10,
+                saturation: 0.074,
+            },
         }
     }
 }
@@ -111,6 +132,7 @@ impl ColorGradingConfig {
             GameMode::Roguelite => Some(self.roguelite),
             GameMode::CyberCity => Some(self.cybercity),
             GameMode::Rpg => Some(self.rpg),
+            GameMode::CastleHub => Some(self.castle_hub),
             _ => None,
         }
     }
@@ -123,6 +145,7 @@ impl ColorGradingConfig {
             roguelite: merge(base.roguelite, &parsed.roguelite),
             cybercity: merge(base.cybercity, &parsed.cybercity),
             rpg: merge(base.rpg, &parsed.rpg),
+            castle_hub: merge(base.castle_hub, &parsed.castle_hub),
         }
     }
 
@@ -149,6 +172,7 @@ struct GradingToml {
     roguelite: Option<ModeGradeToml>,
     cybercity: Option<ModeGradeToml>,
     rpg: Option<ModeGradeToml>,
+    castle_hub: Option<ModeGradeToml>,
 }
 
 fn merge(base: ModeGrade, t: &Option<ModeGradeToml>) -> ModeGrade {

@@ -1,0 +1,59 @@
+# Points de flamme par type de bougie ou bougeoir — positions LOCALES.
+# Généré par tools/gltf/extract_candle_mounts.py — ne pas éditer à la main.
+#
+# Beaucoup de bougeoirs ont leurs bougies modelées dans le mesh : il n'existe
+# aucun objet séparé où accrocher une flamme. Ces points sont les mèches,
+# détectées dans la géométrie (amas de sommets au sommet du mesh).
+#
+# La flamme est posée 3.4 cm au-dessus de la cire — écart mesuré entre
+# notre détection et la hauteur authorée par le créateur dans ses prefabs `_lit`.
+#
+# Un type absent d'ici ne reçoit aucune flamme (bougeoir vide, objet sans mèche).
+
+[[mount]]
+type = "SM_PROP_candle_castle_01"
+points = [[0.0011, 0.3131, -0.0006]]
+
+[[mount]]
+type = "SM_PROP_candle_castle_02"
+points = [[-0.0011, 0.2093, -0.0057]]
+
+[[mount]]
+type = "SM_PROP_candle_castle_03"
+points = [[0.0008, 0.108, -0.0]]
+
+[[mount]]
+type = "SM_PROP_candle_castle_04"
+points = [[0.008, 0.3131, -0.0277]]
+
+[[mount]]
+type = "SM_PROP_candle_castle_05"
+points = [[-0.0722, 0.3597, -0.0376]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_01"
+points = [[-0.0011, 0.7173, 0.0037]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_02"
+points = [[-0.0011, 0.7207, 0.0037]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_03"
+points = [[-0.143, 0.4351, 0.1461], [-0.002, 0.4351, 0.2058], [0.1396, 0.4351, 0.1408]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_04"
+points = [[-0.2078, 1.712, -0.0039], [-0.0019, 1.712, 0.2023], [-0.0011, 1.7892, 0.0037], [0.0034, 1.712, -0.2084], [0.2065, 1.712, 0.0037]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_05"
+points = [[-0.0068, 0.4494, -0.0173]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_06"
+points = [[-0.0068, 0.4494, -0.0173]]
+
+[[mount]]
+type = "SM_PROP_candleholder_castle_08"
+points = [[-0.2124, 1.4385, 0.018], [-0.018, 1.4385, -0.2124], [-0.0035, 1.5193, -0.0127], [0.018, 1.4385, 0.2124], [0.2124, 1.4385, -0.018]]

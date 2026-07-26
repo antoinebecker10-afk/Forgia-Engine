@@ -42,3 +42,27 @@ tint = 0.0
 post_saturation = 0.0
 contrast = 0.0
 saturation = 0.0
+
+[castle_hub]
+# Hall de Forgia — valeurs RELEVÉES dans le profil de post-traitement du créateur
+# du pack (`Global Volume Profile World Castle.asset`), pas devinées :
+#   ColorAdjustments : postExposure +1.8 EV · contrast +10 · saturation +7.4
+#   WhiteBalance     : temperature +14.9
+#   ShadowsMidtonesHighlights : ombres poussées vers le BLEU (0.767, 0.808, 1.0)
+#   Vignette bleu nuit 0.306 · Bloom seuil 0.5 intensité 2 teinte chaude
+#
+# Conversion d'échelle URP → Bevy : les curseurs Unity sont en pourcentage
+# (-100..100), les nôtres en multiplicateur autour de 1 → on divise par 100.
+#
+# `exposure` : il est à +1.8 EV, on n'en reprend qu'une part (0.6). Son +1.8
+# compensait une scène lightmappée que nous n'avons pas. À caler à l'œil.
+#
+# NON REPRIS faute d'équivalent dans notre ModeGrade : ses ombres bleues
+# (Bevy a bien un `ColorGrading.shadows`, mais notre structure n'expose que le
+# global) et sa vignette. C'est le prochain écart à combler.
+exposure = 0.60
+temperature = 0.149
+tint = 0.0
+post_saturation = 0.074
+contrast = 0.10
+saturation = 0.074

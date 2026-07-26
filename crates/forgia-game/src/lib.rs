@@ -26,6 +26,11 @@ mod castle_hub;
 /// orientation calée via `yaw_deg` du tune live `castle_ground_tune.json` (le
 /// chemin pointe vers l'AVANT du château). Détail : reference_castle_terrain_unity_reconstruction.
 mod castle_ground;
+/// Bougies allumées + éclairage du Hall (2026-07-26) — les lumières et particules
+/// du pack Unity ont été perdues à l'import (elles ne portent pas de mesh) : ce
+/// module rend les ~300 bougeoirs vivants et remplace l'ambiante à 900, qui
+/// compensait leur absence en aplatissant tout le modelé.
+mod castle_flames;
 /// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
 /// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
 mod color_grading;
@@ -175,6 +180,10 @@ pub fn run_game() -> AppExit {
     // fin position/relief (align, vscale) passe par le même fichier. Findings :
     // memory/reference_castle_terrain_unity_reconstruction.md.
     app.add_plugins(castle_ground::CastleGroundPlugin);
+    // 7e-quinquies. Bougies allumées du Hall + éclairage data-driven
+    // (`assets/genomes/castle_hub_lighting.toml`, hot-reload). Remplace l'ambiante
+    // en dur à 900. Détail : docs/audits/audit-2026-07-26-comparaison-interieur-createur.md
+    app.add_plugins(castle_flames::CastleFlamesPlugin);
     // 7e-quater. Éditeur de scène in-game (story-665) — `.` du pavé numérique dans
     // le Hall : sélection, déplacement/rotation/échelle façon Blender, bibliothèque
     // d'assets, aimant au sol. Persistance non destructive dans

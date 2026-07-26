@@ -26,6 +26,7 @@
 use bevy::asset::{LoadState, RenderAssetUsages};
 use bevy::math::Affine3A;
 use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
+use bevy::light::CascadeShadowConfigBuilder;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
@@ -294,10 +295,23 @@ fn enter_castle_hub_hotkey(
     }
 }
 
+/// Soleil principal du Hall (porte les ombres).
+#[derive(Component)]
+pub(crate) struct CastleKeyLight;
+
+/// Remplissage ciel — SANS ombres, donc traversant. Doit rester discret.
+#[derive(Component)]
+pub(crate) struct CastleFillLight;
+
+/// Portée des cascades d'ombre du soleil, en mètres. Le château fait ~193 m
+/// d'emprise : en deçà, ses intérieurs lointains ne sont pas ombrés du tout.
+const CASTLE_SHADOW_DISTANCE_M: f32 = 420.0;
+
 fn spawn_castle_hub(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     time: Res<Time>,
+    lighting: Res<crate::castle_flames::CastleLighting>,
     mut telemetry: ResMut<CastleHubTelemetry>,
 ) {
     telemetry.entries = telemetry.entries.saturating_add(1);
@@ -347,24 +361,43 @@ fn spawn_castle_hub(
     }
     spawn_castle_collision(&mut commands, &asset_server);
 
-    // Lumière jour : key soleil chaud + fill ciel froid (le château promo est
-    // ensoleillé). Ambiante ajoutée à la caméra (interiors lisibles).
+    // Lumière jour : key soleil chaud (avec ombres) + fill ciel froid.
+    //
+    // 🚨 Le fill n'a PAS d'ombres — il traverse donc murs et toit et éclaire
+    // l'intérieur comme s'il n'y avait pas de château. À 7 000 lux (sa valeur
+    // d'origine) c'était la cause principale des murs incohérents : identiques
+    // côte à côte, l'un blanc éclatant parce qu'il lui fait face, l'autre noir.
+    // Il reste utile comme soupçon de ciel, mais doit rester DISCRET.
+    // Les deux intensités vivent maintenant dans `castle_hub_lighting.toml`
+    // (hot-reload) : elles se jugent à l'œil, pas à la compilation.
     commands.spawn((
         CastleHubMarker,
+        CastleKeyLight,
         DirectionalLight {
             color: Color::srgb(1.0, 0.97, 0.90),
-            illuminance: 20_000.0,
+            illuminance: lighting.key_lux,
             shadows_enabled: true,
             ..default()
         },
+        // Les cascades par défaut ne portent pas jusqu'au bout du château
+        // (~193 m d'emprise) : sans ça, les intérieurs lointains reçoivent le
+        // soleil SANS ombre, donc à pleine puissance à travers le toit.
+        CascadeShadowConfigBuilder {
+            num_cascades: 4,
+            maximum_distance: CASTLE_SHADOW_DISTANCE_M,
+            first_cascade_far_bound: 24.0,
+            ..default()
+        }
+        .build(),
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.9, 0.5, 0.0)),
         Name::new("CastleHubKeyLight"),
     ));
     commands.spawn((
         CastleHubMarker,
+        CastleFillLight,
         DirectionalLight {
             color: Color::srgb(0.68, 0.78, 1.0),
-            illuminance: 7_000.0,
+            illuminance: lighting.fill_lux,
             shadows_enabled: false,
             ..default()
         },
@@ -893,22 +926,20 @@ fn castle_ambient_fog() -> DistanceFog {
 
 fn ensure_castle_ambient(
     mut commands: Commands,
+    lighting: Res<crate::castle_flames::CastleLighting>,
     q_cam: Query<Entity, (With<Camera3d>, Without<CastleAmbientApplied>)>,
 ) {
     for cam in &q_cam {
         commands.entity(cam).insert((
             CastleAmbientApplied,
-            AmbientLight {
-                // Ambiante chaude ensoleillée (déboucher les intérieurs pierre +
-                // sous les toits). Historique : 700 (trop sombre) → 1600. Mais 1600
-                // est colossal (usuel Bevy 100-500) : il CRAMAIT la roche pâle des
-                // falaises + l'herbe en aplats blancs/fluo (relief perdu, 2026-07-23).
-                // 1600 → 900 : compromis — assez de fill pour les intérieurs, mais
-                // les ombres/relief reviennent dehors (roche = pierre, herbe = 3D).
-                color: Color::srgb(0.92, 0.88, 0.80),
-                brightness: 900.0,
-                ..default()
-            },
+            // Valeur pilotée par `assets/genomes/castle_hub_lighting.toml`
+            // (hot-reload). Historique de l'ancienne const : 700 « trop sombre »
+            // → 1600 « cramait la roche » → 900. Ces allers-retours étaient le
+            // symptôme de l'absence de lumières locales, pas un mauvais réglage :
+            // une ambiante n'a pas de direction, trop forte elle SUPPRIME le
+            // modelé. Les bougies allumées (castle_flames) prennent le relais,
+            // donc l'ambiante peut redescendre.
+            lighting.ambient(),
             // Brouillard de distance : donne de la profondeur atmosphérique
             // (le lointain se fond dans le ciel crépusculaire) + un halo doré
             // autour du soleil vu à travers la brume. Volontairement SUBTIL —

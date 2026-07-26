@@ -1,0 +1,72 @@
+# Éclairage du Hall de Forgia — hot-reload (poll mtime 1 Hz, aucun rebuild).
+#
+# Pourquoi ce fichier : l'ambiante du Hall a oscillé 700 → 1600 → 900 en dur dans
+# le code, chaque valeur étant un compromis à l'œil. Ce réglage se juge en jeu, pas
+# à la compilation — il appartient donc à la donnée.
+#
+# Contexte : la scène du pack est authorée pour être **lightmappée** (UV2 présent
+# sur 100 % des meshes) et son éclairage d'origine repose sur des lumières et des
+# particules Unity, perdues à l'import. Les flammes ci-dessous les remplacent.
+# Détail : docs/audits/audit-2026-07-26-comparaison-interieur-createur.md
+
+[ambient]
+# 250 au lieu de 900 : l'ambiante ne sert plus à *voir* l'intérieur (les bougies
+# s'en chargent), seulement à empêcher le noir absolu. Une ambiante n'a pas de
+# direction — trop forte, elle supprime le modelé au lieu de le révéler.
+brightness = 250.0
+# Légèrement froide : c'est le contraste avec les bougies chaudes qui crée la
+# lecture du volume (ombres bleu-vert / lumières orangées chez le créateur).
+color = [0.72, 0.80, 0.92]
+# Soleil principal, en lux. Il PORTE les ombres (cascades étendues à 420 m pour
+# couvrir les 193 m du château — sinon les intérieurs lointains reçoivent le
+# soleil à pleine puissance à travers le toit).
+key_lux = 12000.0
+# Remplissage ciel, en lux. 🚨 Il n'a PAS d'ombres : il traverse murs et toit.
+# À 7 000 (valeur d'origine) c'était la cause des murs incohérents — identiques
+# côte à côte, l'un blanc éclatant, l'autre noir, selon leur seule orientation.
+# Il ne doit servir qu'à teinter légèrement le ciel. Monte-le avec prudence.
+fill_lux = 600.0
+
+[flames]
+enabled = true
+# 🚨 Les bougies sont des objets SÉPARÉS des bougeoirs (audit 2026-07-26) : sa
+# scène compte 176 bougies posées sur 203 bougeoirs en métal. Une flamme ne va
+# donc QUE sur un nœud `candle_castle_NN`, jamais sur un `candleholder` — sinon
+# elle se pose au sommet du métal, à côté de la mèche. Nous avons 98 bougies.
+#
+# Toutes allumées : ses 78 bougies allumées le sont en permanence. Avec une
+# portée courte (voir ci-dessous), le coût de groupement reste faible.
+max_active_lights = 96
+# Valeurs RELEVÉES dans ses prefabs `_lit` : chacun porte une lumière ponctuelle
+# d'intensité 0,7 et de portée 2,45 m. Ses bougies éclairent à peine au-delà
+# d'elles-mêmes — c'est ce qui donne des points nets au lieu d'un halo qui bave.
+# 630 lm ≈ 0,7 × le facteur de conversion utilisé pour ses autres lumières.
+light_intensity_lm = 630.0
+light_range_m = 2.45
+# Sa couleur exacte de flamme.
+light_color = [1.0, 0.846, 0.288]
+# Luminance de la flamme elle-même (ce qu'on voit briller sur la mèche).
+emissive_luminance = 9000.0
+# Taille de la flamme (rayon, en mètres) et hauteur au-dessus du haut de la bougie.
+size_m = 0.022
+lift_m = 0.012
+# Vacillement : amplitude relative de l'intensité et vitesse. 0 = flamme figée.
+flicker_amplitude = 0.22
+flicker_speed_hz = 6.5
+
+# Les points de flamme (combien, et où) vivent dans
+# `castle_hub_candle_mounts.toml`, généré par
+# `tools/gltf/extract_candle_mounts.py` : les mèches sont détectées dans la
+# GÉOMÉTRIE, parce que beaucoup de bougeoirs ont leurs bougies modelées dans le
+# mesh — il n'existe alors aucun objet séparé où accrocher une flamme.
+
+[creator_lights]
+# Les 56 lumières placées à la main par le créateur du pack (43 ponctuelles +
+# 13 spots), portées 1:1 depuis sa scène Unity vers
+# `castle_hub_creator_lights.toml`. Elles ne sont PAS dérivées des bougies : il
+# éclaire des zones, avec des oranges ET des cyans d'appoint — c'est ce couple
+# chaud/froid qui fait le rendu de sa capture.
+enabled = true
+# Son intensité est en unités Unity (0,4 à 59), pas en lumens. Ce facteur unique
+# les convertit toutes : monte-le si l'intérieur reste sombre, baisse-le s'il crame.
+scale = 900.0
