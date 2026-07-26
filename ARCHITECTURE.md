@@ -69,7 +69,6 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 | forgia-damage | 280 | Health JOUEUR + DamageEvent + HitZone (⚠ dual-Health connu, M4) | ✅ |
 | forgia-fps | 1801 | Orchestrator firing path + ammo + aim assist + tuning | ✅ |
 | forgia-viewmodel | 1529 | Bras/arme 1P (CBaseViewModel-like), ADS | ✅ (calibration) ✦ |
-| forgia-weapon-hitscan | 136 | Raycast hitscan + falloff | ⚠️ orpheline (0 consommateur) |
 | forgia-crosshair | 343 | Crosshair dynamique (spread, hit confirm) | ✦ (via fps) |
 | forgia-juice-lib | 513 | recoil + hit_stop + fov_punch + camera_shake | ✦ (via fps/combat) |
 | forgia-juice-screen-flash | 291 | Flash écran damage/heal/kill (egui overlay) | ✅ |
@@ -107,6 +106,8 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 | forgia-village-generator | 866 | Procgen hamlet/village (R-tree) — consommé par le pipeline débranché | ✦ (zombie) |
 | forgia-village-kit | 457 | Vocabulaire kit TOML | ✦ (zombie) |
 | forgia-procgen-graph | 266 | Graphe village (nodes/edges) pure data | ✦ (zombie) |
+| forgia-pcg-core | 1450 | Contrats PCG purs headless : content-spec / kit-manifest / registry-lock, solveur constructif, validateurs hard, cellules & ladder de streaming | ✦ (xtask + runtime) |
+| forgia-pcg-runtime | 330 | Adapter Bevy : SpatialPlan→cellules + ordonnancement d'activation collision/nav→rendu (pas encore câblé dans l'app live) | ✦ (isolée) |
 
 ### Animation & auto-rig (différenciateur FORGE)
 | Crate | LOC | Rôle | Wired |
@@ -129,6 +130,7 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 | forgia-ui-lib | 3550 | style + hud + hud_ammo + pause_menu + damage_direction + dialogue + quest_journal + inventory + shop | ✅ (×7 sub-plugins) |
 | forgia-postprocess | 444 | Matériaux fullscreen — **2 shaders réels (toon, outline), 43 stubs passthrough** | ✦ (toon via roguelite) |
 | forgia-effects | 1857 | VFX hanabi + tracers + damage numbers (prespawn anti-freeze = TODO, roadmap M2-B5) | ✅ |
+| forgia-editor | 2050 | Éditeur de scène in-game (pavé num `.`) — sélection, transform Blender, bibliothèque, aimant, persistance non destructive. Gaté `GameMode::CastleHub` (story-665) | ✅ (Hall only) |
 
 ### Audio & assets
 | Crate | LOC | Rôle | Wired |
@@ -176,7 +178,6 @@ test per-crate (ubuntu), fmt, ratchets. Timeouts sur tous les jobs lourds.
 |---|---|---|
 | Pipeline village zombie (4 crates + 2 sensors fantômes) | story-586 §Suite | dépose après validation runtime du village hex |
 | Dual Health (combat=ennemis vs damage=joueur) | audit 2026-06-10 | unification ou renommage M4 |
-| forgia-weapon-hitscan orpheline | audit | supprimer ou consommer (M2) |
 | Player controller hors GameSet + movement hardcodé | audit | M2-B4 (player_movement.toml) |
 | forgia-terrain ~30 % port V1 dormant sous allow(dead_code) | audit | feature-gate `legacy-v1` ou suppression (post-ship) |
 | QA crates no-op | ADR-0004 (PROPOSED) | décision Antoine |

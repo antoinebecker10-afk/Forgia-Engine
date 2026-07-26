@@ -8,5 +8,9 @@ description = "Forgia V2 — Automation tasks : check-orphans, schedule-dump, ba
 workspace = true
 
 [dependencies]
+forgia-pcg-core = { workspace = true }
 serde_json = { workspace = true }
+# SHA-256 du publisher PCG : validate-pcg recalcule le hash des manifests
+# référencés par registry.lock.toml et refuse toute divergence.
+sha2 = "0.10"
 toml = { workspace = true }

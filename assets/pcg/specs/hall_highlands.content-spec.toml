@@ -1,0 +1,84 @@
+# content-spec — Hall de Forgia (grey-box vertical slice, castle.stone@1.0.0).
+# Intention only: capabilities and registry IDs, never GLB paths (those live in
+# the kit-manifest). Validated by `cargo xtask validate-pcg`.
+schema_version = "forgia.content-spec/v1"
+id = "forgia.hall.highlands@0.1.0"
+kind = "structure"
+title = "Hall de Forgia — Highlands (grey-box slice)"
+
+[generation]
+seed = 0xF0471A22
+solver = "constructive"
+registry_lock = "registry.lock.toml"
+
+[intent]
+tags = ["biome.highlands", "theme.medieval_stone", "mood.warm_hub"]
+requires = ["space.hall", "portal.door", "nav.walkable", "social.safe"]
+forbids = ["combat.spawn", "theme.sci_fi"]
+
+[bounds]
+max_extent_m = [96.0, 32.0, 84.0]
+anchor = "world_origin"
+
+# Per-target budgets. Only stream_cells / visible_meshes / collision_proxies are
+# proven at the plan level; triangles / materials / vram are offline gates.
+[budgets.target_desktop]
+max_stream_cells = 16
+max_visible_meshes = 1200
+max_collision_proxies = 32
+max_triangles = 2500000
+max_materials = 96
+max_texture_vram_mb = 768
+max_load_p99_ms = 250
+
+[[zones]]
+id = "great_hall"
+kind = "space.hall"
+requires = ["nav.walkable", "social.safe", "landmark.high"]
+size_m = { min = [16.0, 8.0, 12.0], preferred = [16.0, 8.0, 12.0] }
+stream_cell = "hall.main"
+
+[[zones]]
+id = "west_entry"
+kind = "space.entrance"
+parent = "great_hall"
+requires = ["portal.door", "nav.walkable"]
+
+[[zones]]
+id = "rampart"
+kind = "space.wall"
+parent = "great_hall"
+requires = ["wall.load_bearing"]
+
+[[zones]]
+id = "tower"
+kind = "poi.tower"
+parent = "rampart"
+requires = ["landmark.high"]
+
+[[constraints.hard]]
+id = "hall_accessible"
+kind = "reachability"
+from = "west_entry"
+to = ["great_hall"]
+
+[[constraints.hard]]
+id = "physical_proxy_budget"
+kind = "budget"
+metric = "collision_proxies"
+op = "<="
+value = 32
+
+# Capsule walkability is proven by the navmesh/bot executor, not at plan level;
+# the validator records it as a deferred check rather than passing it silently.
+[[constraints.hard]]
+id = "capsule_clearance"
+kind = "clearance"
+radius_m = 0.30
+height_m = 2.00
+
+[streaming]
+cell_size_m = [32.0, 24.0, 32.0]
+preload_neighbors = 1
+activate_order = ["collision_proxy", "navmesh", "render"]
+deactivate_order = ["render", "collision_proxy"]

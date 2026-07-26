@@ -1,0 +1,10 @@
+{
+  "comment": "Layout du vertical slice assemblé — transforms produits par le solveur constructif et figés en golden values dans crates/forgia-pcg-core/tests/castle_stone_slice.rs (coordonnées Forgia Y-up, mètres). Consommé par tools/blender/render_pcg_kit_preview.py.",
+  "instances": [
+    { "piece": "great_hall", "translation_m": [0.0, 0.0, 0.0], "yaw_deg": 0.0 },
+    { "piece": "entree", "translation_m": [0.0, 0.0, 6.25], "yaw_deg": 0.0 },
+    { "piece": "mur_droit", "translation_m": [-4.0, 0.0, 6.25], "yaw_deg": 0.0 },
+    { "piece": "tour", "translation_m": [-8.0, 0.0, 6.25], "yaw_deg": 0.0 },
+    { "piece": "angle", "translation_m": [2.25, 0.0, 6.25], "yaw_deg": 0.0 }
+  ]
+}

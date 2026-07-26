@@ -1,0 +1,12 @@
+# PCG registry lockfile — freezes the exact kit/grammar/pattern versions a
+# generation resolves. `content_hash` is the real SHA-256 of the referenced file
+# (recomputed by the offline publisher; validate-pcg checks the shape today).
+# Paths are relative to this registry root (assets/pcg/).
+schema_version = "forgia.pcg-registry-lock/v1"
+
+[[entries]]
+id = "forgia.castle.stone@1.0.0"
+kind = "kit"
+manifest = "kits/castle_stone/1.0.0/kit.toml"
+content_hash = "sha256:f24813db4a285aa5ad86dfc5bd56b3c2798fb307bf957ee0dedaee0214f6b09b"
+dependencies = []

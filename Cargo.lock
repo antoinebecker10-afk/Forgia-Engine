@@ -471,6 +471,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd310426290cec560221f9750c2f4484be4a8eeea7de3483c423329b465c40e"
 dependencies = [
  "bevy_internal",
+ "tracing",
 ]
 
 [[package]]
@@ -580,6 +581,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "log",
  "thiserror 2.0.18",
+ "tracing",
  "variadics_please",
  "wasm-bindgen",
  "web-sys",
@@ -814,6 +816,7 @@ dependencies = [
  "slotmap",
  "smallvec",
  "thiserror 2.0.18",
+ "tracing",
  "variadics_please",
 ]
 
@@ -1216,10 +1219,13 @@ dependencies = [
  "bevy_platform",
  "bevy_utils",
  "tracing",
+ "tracing-error",
  "tracing-log",
  "tracing-oslog",
  "tracing-subscriber",
+ "tracing-tracy",
  "tracing-wasm",
+ "tracy-client",
 ]
 
 [[package]]
@@ -1499,10 +1505,12 @@ dependencies = [
  "naga",
  "nonmax",
  "offset-allocator",
+ "profiling",
  "send_wrapper",
  "smallvec",
  "thiserror 2.0.18",
  "tracing",
+ "tracy-client",
  "variadics_please",
  "wasm-bindgen",
  "web-sys",
@@ -3139,6 +3147,7 @@ dependencies = [
  "bevy",
  "bevy_rapier3d",
  "forgia-anim-debug",
+ "forgia-core",
  "forgia-genome-core",
  "forgia-ik",
  "forgia-rig-topology",
@@ -3276,6 +3285,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-editor"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "bevy_rapier3d",
+ "forgia-core",
+ "forgia-input",
+ "forgia-player",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "forgia-effects"
 version = "0.1.0"
 dependencies = [
@@ -3357,6 +3380,7 @@ dependencies = [
  "forgia-core",
  "forgia-damage",
  "forgia-debug",
+ "forgia-editor",
  "forgia-effects",
  "forgia-enemy-nameplate",
  "forgia-foliage",
@@ -3515,6 +3539,7 @@ dependencies = [
  "bevy_rapier3d",
  "forgia-ai-arena-bot",
  "forgia-anchor",
+ "forgia-assets",
  "forgia-audio",
  "forgia-combat",
  "forgia-core",
@@ -3531,6 +3556,7 @@ dependencies = [
  "forgia-ui-lib",
  "rand_xoshiro",
  "serde",
+ "serde_json",
  "toml",
 ]
 
@@ -3561,12 +3587,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "forgia-pcg-core"
+version = "0.1.0"
+dependencies = [
+ "forgia-rng",
+ "serde",
+ "thiserror 2.0.18",
+ "toml",
+]
+
+[[package]]
+name = "forgia-pcg-runtime"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "forgia-pcg-core",
+]
+
+[[package]]
 name = "forgia-player"
 version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_rapier3d",
  "forgia-ai-arena-bot",
+ "forgia-assets",
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
@@ -3597,6 +3642,7 @@ name = "forgia-procgen-graph"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-pcg-core",
  "forgia-rng",
 ]
 
@@ -3772,6 +3818,7 @@ name = "forgia-streaming"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-core",
  "serde",
  "thiserror 2.0.18",
  "toml",
@@ -3803,6 +3850,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "forgia-assets",
  "forgia-combat",
  "forgia-core",
  "forgia-crosshair",
@@ -3837,6 +3885,7 @@ name = "forgia-viewmodel"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "forgia-assets",
  "forgia-combat",
  "forgia-core",
  "forgia-effects",
@@ -3891,16 +3940,6 @@ dependencies = [
  "bevy",
  "bevy_water",
  "forgia-core",
-]
-
-[[package]]
-name = "forgia-weapon-hitscan"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_rapier3d",
- "forgia-core",
- "forgia-damage",
 ]
 
 [[package]]
@@ -3995,6 +4034,21 @@ dependencies = [
  "futures-task",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "generator"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52f04ae4152da20c76fe800fa48659201d5cf627c5149ca0b707b69d7eef6cf9"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "log",
+ "rustversion",
+ "windows-link 0.1.3",
+ "windows-result 0.3.4",
 ]
 
 [[package]]
@@ -5086,6 +5140,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "loom"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "419e0dc8046cb947daa77eb95ae174acfbddb7673b4151f56d1eed8e93fbfaca"
+dependencies = [
+ "cfg-if",
+ "generator",
+ "scoped-tls",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "mach2"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6163,6 +6230,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 dependencies = [
  "profiling-procmacros",
+ "tracing",
 ]
 
 [[package]]
@@ -7481,6 +7549,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-error"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b1581020d7a273442f5b45074a6a57d5757ad0a47dac0e9f0bd57b81936f3db"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-log"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7522,6 +7600,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-tracy"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0eaa1852afa96e0fe9e44caa53dc0bd2d9d05e0f2611ce09f97f8677af56e4ba"
+dependencies = [
+ "tracing-core",
+ "tracing-subscriber",
+ "tracy-client",
+]
+
+[[package]]
 name = "tracing-wasm"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7530,6 +7619,27 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "tracy-client"
+version = "0.18.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4f6fc3baeac5d86ab90c772e9e30620fc653bf1864295029921a15ef478e6a5"
+dependencies = [
+ "loom",
+ "once_cell",
+ "tracy-client-sys",
+]
+
+[[package]]
+name = "tracy-client-sys"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5f7c95348f20c1c913d72157b3c6dee6ea3e30b3d19502c5a7f6d3f160dacbf"
+dependencies = [
+ "cc",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -8980,7 +9090,9 @@ checksum = "3ae8337f8a065cfc972643663ea4279e04e7256de865aa66fe25cec5fb912d3f"
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "forgia-pcg-core",
  "serde_json",
+ "sha2",
  "toml",
 ]
 

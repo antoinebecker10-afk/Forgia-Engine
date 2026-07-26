@@ -1,0 +1,14 @@
+[package]
+name = "forgia-pcg-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure PCG contracts: content specs, deterministic provenance and logical/spatial plans."
+
+[lints]
+workspace = true
+
+[dependencies]
+forgia-rng = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }

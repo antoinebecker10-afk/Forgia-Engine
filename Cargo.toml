@@ -19,6 +19,7 @@ members = [
     "crates/forgia-crosshair",
     "crates/forgia-damage",
     "crates/forgia-debug",
+    "crates/forgia-editor",
     "crates/forgia-enemy-nameplate",
     "crates/forgia-effects",
     "crates/forgia-foliage",
@@ -53,11 +54,12 @@ members = [
     "crates/forgia-viewmodel",
     "crates/forgia-genome-village",
     "crates/forgia-procgen-graph",
+    "crates/forgia-pcg-core",
+    "crates/forgia-pcg-runtime",
     "crates/forgia-village-generator",
     "crates/forgia-village-kit",
     "crates/forgia-village-loader",
     "crates/forgia-water",
-    "crates/forgia-weapon-hitscan",
     "crates/forgia-worldgen",
     "crates/forgia-rpg-data",
     "crates/forgia-qa-core",
@@ -161,6 +163,7 @@ forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
 forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
 forgia-observability = { path = "crates/forgia-observability" }
 forgia-debug = { path = "crates/forgia-debug" }
+forgia-editor = { path = "crates/forgia-editor" }
 forgia-player = { path = "crates/forgia-player" }
 forgia-postprocess = { path = "crates/forgia-postprocess" }
 forgia-prefab = { path = "crates/forgia-prefab" }
@@ -177,11 +180,12 @@ forgia-killfeed = { path = "crates/forgia-killfeed" }
 forgia-viewmodel = { path = "crates/forgia-viewmodel" }
 forgia-genome-village = { path = "crates/forgia-genome-village" }
 forgia-procgen-graph = { path = "crates/forgia-procgen-graph" }
+forgia-pcg-core = { path = "crates/forgia-pcg-core" }
+forgia-pcg-runtime = { path = "crates/forgia-pcg-runtime" }
 forgia-village-generator = { path = "crates/forgia-village-generator" }
 forgia-village-kit = { path = "crates/forgia-village-kit" }
 forgia-village-loader = { path = "crates/forgia-village-loader" }
 forgia-water = { path = "crates/forgia-water" }
-forgia-weapon-hitscan = { path = "crates/forgia-weapon-hitscan" }
 forgia-worldgen = { path = "crates/forgia-worldgen" }
 forgia-rpg-data = { path = "crates/forgia-rpg-data" }
 forgia-qa-core = { path = "crates/forgia-qa-core" }
@@ -206,6 +210,14 @@ workspace = true
 forgia-game = { path = "crates/forgia-game" }
 # Story-592 (M0.4) : panic hook -> forgia2_crash.json (echappement JSON correct).
 serde_json = { workspace = true }
+
+[features]
+# Build de diagnostic uniquement : active les spans CPU/rendu de Bevy pour Tracy.
+# Ne jamais activer dans un build joueur, l'instrumentation a un coût mesurable.
+profile-tracy = ["forgia-game/profile-tracy"]
+# Capture d'allocations Tracy. À réserver aux investigations mémoire : le coût
+# d'instrumentation fausse les mesures de frame time normales.
+profile-tracy-memory = ["forgia-game/profile-tracy-memory"]
 
 [[bin]]
 name = "forgia"

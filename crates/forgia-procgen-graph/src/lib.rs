@@ -20,6 +20,11 @@
 
 use bevy::math::Vec2;
 
+/// Contrats PCG génériques partagés avec les graphes spécialisés (village,
+/// donjon, véhicule). `VillageGraph` reste son IR métier historique ; les
+/// nouveaux générateurs peuvent transiter par ces types purs avant adaptation.
+pub use forgia_pcg_core::{ContentSpec, GenerationContext, LogicalPlan, SpatialPlan};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RoadSegment2D — capsule 2D for road-vs-building validation (story-446)
 // ─────────────────────────────────────────────────────────────────────────────

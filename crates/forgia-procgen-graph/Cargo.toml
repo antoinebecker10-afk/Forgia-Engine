@@ -10,3 +10,4 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 forgia-rng = { workspace = true }
+forgia-pcg-core = { workspace = true }

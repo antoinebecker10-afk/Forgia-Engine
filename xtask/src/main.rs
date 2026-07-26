@@ -5,7 +5,10 @@
 //! - `schedule-dump` : dump Bevy schedule en .dot/.svg pour audit GameSet ordering
 //! - `baseline-e1-e2` : génère asset_load_whitelist.txt baseline
 //! - `verify-sensors-format` : CI gate validation 13 forgia2_*.json canoniques + format conforme
+//! - `validate-pcg` : valide les contrats PCG publiables (content-spec + kit-manifest)
 
+use forgia_pcg_core::{ContentSpec, KitManifest, PcgRegistryLock};
+use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,10 +19,7 @@ fn main() {
     let cmd = args.get(1).map(String::as_str).unwrap_or("help");
 
     let exit_code = match cmd {
-        "check-orphans" => {
-            check_orphans();
-            0
-        }
+        "check-orphans" => check_orphans(&args),
         "schedule-dump" => {
             schedule_dump();
             0
@@ -30,12 +30,14 @@ fn main() {
         }
         "verify-sensors-format" => verify_sensors_format(),
         "sensor-audit" => sensor_audit(&args),
+        "sensor-sync-writes" => sensor_sync_writes(&args),
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
         "asset-load" => asset_load(&args),
         "arch-drift" => arch_drift(),
         "story-ids" => story_ids(),
         "validate-genomes" => validate_genomes(&args),
+        "validate-pcg" => validate_pcg(&args),
         "story-index" => story_index(&args),
         "wip-check" => wip_check(&args),
         "dist-roguelite" => dist_roguelite(&args),
@@ -52,20 +54,210 @@ fn print_help() {
     println!("xtask — Forgia V2 automation");
     println!();
     println!("Commands :");
-    println!("  check-orphans            Detect plugins/sensors/fields orphans");
+    println!(
+        "  check-orphans [--strict] Report workspace crates without an internal Cargo consumer; --strict fails on unexpected ones"
+    );
     println!("  schedule-dump            Dump Bevy schedule for GameSet audit");
     println!("  baseline-e1-e2           Regenerate asset_load_whitelist.txt baseline");
     println!("  verify-sensors-format    Validate forgia2_*.json canonical sensors");
     println!("  sensor-audit [--strict]  Cross-check sensor producers (crates/**/*.rs) vs docs/observability/SENSOR_REGISTRY.md");
+    println!("  sensor-sync-writes [--strict] Report synchronous sensor JSON writes; --strict fails if any remain");
     println!("  story-gate [--all-done|--story <id>]   Verify DONE stories claims vs git/code");
     println!("  no-scaffold [--fix]      Fail if any crate is a scaffold (<50 effective LOC or >80% TODO comments). Allowlist in xtask/no-scaffold-allowlist.toml.");
     println!("  asset-load [--fix]       Lock L1 ratchet : fail if asset-load call-sites drift above per-file baseline. Allowlist in xtask/asset-load-allowlist.toml.");
     println!("  arch-drift               Fail si ARCHITECTURE.md ne liste pas exactement les crates members de Cargo.toml (story-593).");
     println!("  story-ids                Fail sur tout NOUVEAU doublon d'ID story dans docs/stories/ (9 collisions historiques grandfathered).");
     println!("  validate-genomes         Gate QA couche 1 : parse tous les assets/genomes/**/*.toml + bornes gènes (min<=default<=max) + ids uniques + cross-refs déclarées.");
+    println!("  validate-pcg [--root <dir>] [--require-any]  Valide les content-spec et kit-manifest PCG publiables (assets/pcg par défaut).");
     println!("  story-index [--check]    Régénère docs/stories/_index.md (board unique, statuts normalisés). --check = gate anti-drift (fail si périmé).");
     println!("  wip-check                Fail si > 3 stories IN_PROGRESS (limite WIP — « stop starting, start finishing »).");
     println!("  dist-roguelite [--out <dir>] [--full] [--skip-build]   Assemble le build joueur Roguelite (exe + assets élagués + config) prêt à pousser sur itch/butler.");
+}
+
+// ───────────────────────────── validate-pcg ─────────────────────────────
+
+/// Gate de publication PCG. Elle ne devine pas l'intention depuis le nom du
+/// fichier : le discriminant est exclusivement `schema_version`. Ainsi un TOML
+/// non-PCG voisin reste hors périmètre, tandis qu'un contrat PCG inconnu échoue
+/// avant d'arriver dans Blender ou Bevy.
+fn validate_pcg(args: &[String]) -> i32 {
+    let mut root = PathBuf::from("assets/pcg");
+    let mut require_any = false;
+    let mut index = 2;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--root" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("[validate-pcg] FAIL — --root exige un chemin");
+                    return 2;
+                };
+                root = PathBuf::from(value);
+                index += 1;
+            }
+            "--require-any" => require_any = true,
+            other => {
+                eprintln!("[validate-pcg] FAIL — argument inconnu `{other}`");
+                return 2;
+            }
+        }
+        index += 1;
+    }
+
+    if !root.is_dir() {
+        if require_any {
+            eprintln!(
+                "[validate-pcg] FAIL — aucun dossier PCG à publier : {}",
+                norm_path(&root)
+            );
+            return 1;
+        }
+        println!(
+            "[validate-pcg] SKIP — {} absent (aucun contrat PCG publié)",
+            norm_path(&root)
+        );
+        return 0;
+    }
+
+    let mut files = Vec::new();
+    collect_toml(&root, &mut files);
+    files.sort_by_cached_key(|path| norm_path(path));
+    let mut content_specs = 0;
+    let mut manifests = 0;
+    let mut lockfiles = 0;
+    let mut failures = 0;
+
+    for file in files {
+        let source = match fs::read_to_string(&file) {
+            Ok(source) => source,
+            Err(error) => {
+                eprintln!("[validate-pcg] FAIL lecture {} : {error}", norm_path(&file));
+                failures += 1;
+                continue;
+            }
+        };
+        let table = match source.parse::<toml::Table>() {
+            Ok(table) => table,
+            Err(error) => {
+                eprintln!("[validate-pcg] FAIL TOML {} : {error}", norm_path(&file));
+                failures += 1;
+                continue;
+            }
+        };
+        let schema = table
+            .get("schema_version")
+            .and_then(toml::Value::as_str)
+            .unwrap_or_default();
+        match schema {
+            forgia_pcg_core::CONTENT_SPEC_SCHEMA_V1 => match ContentSpec::parse_toml(&source) {
+                Ok(_) => content_specs += 1,
+                Err(error) => {
+                    eprintln!(
+                        "[validate-pcg] FAIL content-spec {} : {error}",
+                        norm_path(&file)
+                    );
+                    failures += 1;
+                }
+            },
+            forgia_pcg_core::kit::KIT_MANIFEST_SCHEMA_V1 => {
+                match KitManifest::parse_toml(&source) {
+                    Ok(_) => manifests += 1,
+                    Err(error) => {
+                        eprintln!(
+                            "[validate-pcg] FAIL kit-manifest {} : {error}",
+                            norm_path(&file)
+                        );
+                        failures += 1;
+                    }
+                }
+            }
+            forgia_pcg_core::registry::REGISTRY_LOCK_SCHEMA_V1 => {
+                match PcgRegistryLock::parse_toml(&source) {
+                    Ok(lock) => {
+                        lockfiles += 1;
+                        failures += verify_lock_hashes(&file, &lock);
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "[validate-pcg] FAIL registry lock {} : {error}",
+                            norm_path(&file)
+                        );
+                        failures += 1;
+                    }
+                }
+            }
+            value if value.starts_with("forgia.") && value.contains("/v") => {
+                eprintln!(
+                    "[validate-pcg] FAIL schema PCG inconnu `{value}` dans {}",
+                    norm_path(&file)
+                );
+                failures += 1;
+            }
+            _ => {}
+        }
+    }
+
+    let validated = content_specs + manifests + lockfiles;
+    if require_any && validated == 0 {
+        eprintln!("[validate-pcg] FAIL — aucun content-spec ou kit-manifest trouvé");
+        return 1;
+    }
+    println!(
+        "[validate-pcg] content-specs={content_specs} kit-manifests={manifests} registry-locks={lockfiles} failures={failures}"
+    );
+    i32::from(failures != 0)
+}
+
+/// Publisher PCG : recalcule le SHA-256 de chaque manifest référencé par un
+/// lockfile et refuse toute divergence — une seed ne reproduit un monde que si
+/// les contenus résolus sont exactement ceux figés (`forgia-pcg-core::registry`
+/// ne vérifie que la forme ; l'IO/hash appartient au publisher, donc ici).
+/// Hash sur les octets bruts : les TOML PCG sont écrits en LF par l'outillage ;
+/// si un checkout CRLF cassait ce hash, normaliser via .gitattributes, pas ici.
+fn verify_lock_hashes(lock_path: &Path, lock: &PcgRegistryLock) -> usize {
+    let root = lock_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut failures = 0;
+    for entry in &lock.entries {
+        let manifest = entry.manifest.as_str();
+        if Path::new(manifest).is_absolute()
+            || manifest.split(['/', '\\']).any(|part| part == "..")
+        {
+            eprintln!(
+                "[validate-pcg] FAIL lock {} : entrée `{}` — chemin manifest hors racine `{manifest}`",
+                norm_path(lock_path),
+                entry.id
+            );
+            failures += 1;
+            continue;
+        }
+        let path = root.join(manifest);
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                eprintln!(
+                    "[validate-pcg] FAIL lock {} : entrée `{}` — manifest `{}` illisible : {error}",
+                    norm_path(lock_path),
+                    entry.id,
+                    norm_path(&path)
+                );
+                failures += 1;
+                continue;
+            }
+        };
+        let actual = format!("{:x}", Sha256::digest(&bytes));
+        let expected = entry
+            .content_hash
+            .strip_prefix("sha256:")
+            .unwrap_or(entry.content_hash.as_str());
+        if actual != expected {
+            eprintln!(
+                "[validate-pcg] FAIL lock {} : entrée `{}` — hash divergent (déclaré sha256:{expected}, réel sha256:{actual})",
+                norm_path(lock_path),
+                entry.id
+            );
+            failures += 1;
+        }
+    }
+    failures
 }
 
 // ─────────────────────────── validate-genomes (story-619, M0.5 QA) ───────────────────────────
@@ -396,9 +588,218 @@ fn arch_drift() -> i32 {
     }
 }
 
-fn check_orphans() {
-    println!("[xtask] check-orphans — Phase 0 placeholder");
-    // Phase 5 : scan workspace pour `impl Plugin for X` vs `add_plugins(X)` diff.
+/// Détecte les crates workspace sans aucun consommateur Cargo interne.
+///
+/// Ce gate ne prétend pas déterminer si chaque sous-plugin Bevy est wiré : un
+/// `add_plugins` peut être indirect, conditionnel ou regroupé dans un bundle.
+/// Il couvre le niveau fiable et mécanique : une crate de production sans aucune
+/// dépendance interne ne peut pas être atteinte par le binaire jeu. `--strict`
+/// transforme les orphelines inattendues en échec, ce qui permet de l'ajouter à
+/// la CI après résolution de la baseline existante.
+fn check_orphans(args: &[String]) -> i32 {
+    let strict = args.iter().any(|arg| arg == "--strict");
+    let crates = match workspace_crates() {
+        Ok(crates) => crates,
+        Err(e) => {
+            eprintln!("[check-orphans] FAIL — {e}");
+            return 1;
+        }
+    };
+
+    let mut consumers: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for consumer in &crates {
+        let manifest = Path::new("crates").join(consumer).join("Cargo.toml");
+        let src = match fs::read_to_string(&manifest) {
+            Ok(src) => src,
+            Err(e) => {
+                eprintln!(
+                    "[check-orphans] FAIL lecture {} : {e}",
+                    norm_path(&manifest)
+                );
+                return 1;
+            }
+        };
+        let dependencies = match manifest_internal_dependencies(&src, &crates) {
+            Ok(dependencies) => dependencies,
+            Err(e) => {
+                eprintln!("[check-orphans] FAIL parse {} : {e}", norm_path(&manifest));
+                return 1;
+            }
+        };
+        for dependency in dependencies {
+            if dependency != *consumer {
+                consumers
+                    .entry(dependency)
+                    .or_default()
+                    .push(consumer.clone());
+            }
+        }
+    }
+
+    // Le binaire joueur est le package racine `forgia`, hors de `crates/`.
+    // Sans lui `forgia-game` serait faussement classé orphelin alors qu'il est
+    // précisément l'assemblage consommé par l'exécutable livré.
+    let root_manifest = Path::new("Cargo.toml");
+    let root_src = match fs::read_to_string(root_manifest) {
+        Ok(src) => src,
+        Err(e) => {
+            eprintln!("[check-orphans] FAIL lecture Cargo.toml : {e}");
+            return 1;
+        }
+    };
+    let root_dependencies = match manifest_internal_dependencies(&root_src, &crates) {
+        Ok(dependencies) => dependencies,
+        Err(e) => {
+            eprintln!("[check-orphans] FAIL parse Cargo.toml : {e}");
+            return 1;
+        }
+    };
+    for dependency in root_dependencies {
+        consumers
+            .entry(dependency)
+            .or_default()
+            .push("forgia (root binary)".to_string());
+    }
+
+    // Ces crates sont des outils/frameworks exécutés directement par Cargo, pas
+    // des dépendances du binaire joueur. Les garder explicites évite de masquer
+    // une vraie crate gameplay orpheline derrière une allowlist vague.
+    const EXPECTED_STANDALONE: &[&str] = &[
+        "forgia-asset-cdn",
+        "forgia-qa-autopilot",
+        "forgia-qa-harness",
+    ];
+
+    let mut unexpected = Vec::new();
+    let mut standalone = Vec::new();
+    for name in &crates {
+        if consumers.contains_key(name) {
+            continue;
+        }
+        if EXPECTED_STANDALONE.contains(&name.as_str()) {
+            standalone.push(name.clone());
+        } else {
+            unexpected.push(name.clone());
+        }
+    }
+    unexpected.sort();
+    standalone.sort();
+
+    println!(
+        "[check-orphans] scanned {} crates — {} unexpected orphan(s), {} standalone tool(s)",
+        crates.len(),
+        unexpected.len(),
+        standalone.len()
+    );
+    if !standalone.is_empty() {
+        println!("  standalone tools: {}", standalone.join(", "));
+    }
+    for name in &unexpected {
+        println!(
+            "  ORPHAN {name} — no internal Cargo consumer; wire it, remove it, or classify it as a standalone tool"
+        );
+    }
+
+    if strict && !unexpected.is_empty() {
+        eprintln!(
+            "[check-orphans] FAIL — unexpected orphan crates found (run without --strict for the report)."
+        );
+        1
+    } else {
+        0
+    }
+}
+
+/// Retourne les dépendances internes déclarées dans un manifeste Cargo.
+///
+/// Les dépendances Cargo peuvent être écrites sous forme courte
+/// (`forgia-core.workspace = true`) ou renommées (`combat = { package =
+/// "forgia-combat", ... }`). Lire le TOML évite les faux positifs causés par
+/// les commentaires et couvre les sections `target.*.dependencies`.
+fn manifest_internal_dependencies(
+    src: &str,
+    workspace_crates: &[String],
+) -> Result<Vec<String>, toml::de::Error> {
+    let manifest: toml::Value = toml::from_str(src)?;
+    let known: std::collections::HashSet<&str> =
+        workspace_crates.iter().map(String::as_str).collect();
+    let mut found = std::collections::HashSet::new();
+    collect_manifest_dependencies(&manifest, &known, &mut found);
+    let mut dependencies: Vec<_> = found.into_iter().collect();
+    dependencies.sort_unstable();
+    Ok(dependencies)
+}
+
+fn collect_manifest_dependencies(
+    value: &toml::Value,
+    known: &std::collections::HashSet<&str>,
+    found: &mut std::collections::HashSet<String>,
+) {
+    let Some(table) = value.as_table() else {
+        return;
+    };
+    for (key, child) in table {
+        // `[workspace.dependencies]` est un catalogue partagé, pas une preuve
+        // qu'un package consomme effectivement la crate. C'est particulièrement
+        // important pour le manifeste racine.
+        if key == "workspace" {
+            continue;
+        }
+        if matches!(
+            key.as_str(),
+            "dependencies" | "build-dependencies" | "dev-dependencies"
+        ) {
+            let Some(dependencies) = child.as_table() else {
+                continue;
+            };
+            for (alias, spec) in dependencies {
+                let package = spec
+                    .as_table()
+                    .and_then(|table| table.get("package"))
+                    .and_then(toml::Value::as_str)
+                    .unwrap_or(alias);
+                if known.contains(package) {
+                    found.insert(package.to_string());
+                }
+            }
+        } else {
+            collect_manifest_dependencies(child, known, found);
+        }
+    }
+}
+
+/// Noms `forgia-*` déclarés dans `[workspace].members`.
+fn workspace_crates() -> Result<Vec<String>, String> {
+    let cargo = fs::read_to_string("Cargo.toml")
+        .map_err(|e| format!("Cargo.toml illisible (lancer depuis la racine workspace ?) : {e}"))?;
+    let mut crates = Vec::new();
+    let mut in_members = false;
+    for line in cargo.lines() {
+        let line = line.trim();
+        if line.starts_with("members") && line.contains('[') {
+            in_members = true;
+            continue;
+        }
+        if !in_members {
+            continue;
+        }
+        if line.starts_with(']') {
+            break;
+        }
+        let Some(path) = line
+            .trim_matches(|c| c == '"' || c == ',' || c == ' ')
+            .strip_prefix("crates/")
+        else {
+            continue;
+        };
+        crates.push(path.to_string());
+    }
+    if crates.is_empty() {
+        Err("aucune crate trouvée dans [workspace].members".to_string())
+    } else {
+        Ok(crates)
+    }
 }
 
 fn schedule_dump() {
@@ -1094,6 +1495,61 @@ fn sensor_audit(args: &[String]) -> i32 {
     }
 }
 
+/// Répertorie les écritures JSON de capteurs faites directement sur le thread
+/// Bevy. Les capteurs doivent passer par `forgia_core::sensor_io::enqueue` :
+/// une saturation disque ne doit jamais allonger une frame. Les sauvegardes
+/// métier ne sont pas visées, car elles n'écrivent pas de `forgia*.json`.
+fn sensor_sync_writes(args: &[String]) -> i32 {
+    let strict = args.iter().any(|arg| arg == "--strict");
+    let mut sites = Vec::new();
+
+    fn visit(dir: &Path, sites: &mut Vec<String>) {
+        let Ok(entries) = fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                visit(&path, sites);
+                continue;
+            }
+            if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(source) = fs::read_to_string(&path) else { continue };
+            let is_sensor_file = source.contains("forgia") && source.contains(".json");
+            if !is_sensor_file {
+                continue;
+            }
+            for (line_no, line) in source.lines().enumerate() {
+                let trimmed = line.trim_start();
+                if trimmed.starts_with("//") || !trimmed.contains("fs::write(") {
+                    continue;
+                }
+                // Literal direct, ou constante de capteur du même fichier.
+                if trimmed.contains("forgia")
+                    || trimmed.contains("SENSOR_PATH")
+                    || trimmed.contains("OUTPUT_PATH")
+                    || trimmed.contains("VFX_SENSOR_PATH")
+                {
+                    sites.push(format!("{}:{}", norm_path(&path), line_no + 1));
+                }
+            }
+        }
+    }
+
+    visit(Path::new("crates"), &mut sites);
+    sites.sort();
+    println!("[sensor-sync-writes] {} synchronous sensor write(s)", sites.len());
+    for site in &sites {
+        println!("  {site}");
+    }
+    if strict && !sites.is_empty() {
+        eprintln!("[sensor-sync-writes] FAIL — migrate these writers to forgia_core::sensor_io::enqueue");
+        1
+    } else {
+        0
+    }
+}
+
 /// Parse les filenames `forgia*.json` listés dans le registry (markdown table).
 /// Look-up des occurrences `` `forgia*_*.json` `` (backticks inline-code).
 fn parse_registry_filenames(content: &str) -> std::collections::HashSet<String> {
@@ -1157,14 +1613,16 @@ fn scan_sensor_producers(
                         continue;
                     }
                     // Write context detection : literal counts as a write only if
-                    // `fs::write` / `write_all` / `serde_json::to_string` apparait
-                    // dans une fenêtre de 3 lignes (line + 2 suivantes).
+                    // Les producteurs peuvent écrire directement, ou déléguer la
+                    // persistance à `sensor_io::enqueue` pour ne pas bloquer la
+                    // frame. Les deux chemins sont des producteurs valides.
                     let window_end = (idx + 3).min(lines.len());
                     let window = lines[idx..window_end].join(" ");
                     let is_write_ctx = window.contains("fs::write")
                         || window.contains(".write_all")
                         || window.contains("write_atomic")
-                        || window.contains("serde_json::to_string");
+                        || window.contains("serde_json::to_string")
+                        || window.contains("sensor_io::enqueue");
                     if !is_write_ctx {
                         continue;
                     }
@@ -1207,6 +1665,7 @@ fn scan_sensor_producers(
                                 || w.contains(".write_all")
                                 || w.contains("write_atomic")
                                 || w.contains("serde_json::to_string")
+                                || w.contains("sensor_io::enqueue")
                         }
                     });
                     if used_in_write {
@@ -1380,6 +1839,11 @@ fn is_asset_load_line(line: &str) -> bool {
     }
     // Genome config loads (Handle<Genome<T>> sur .toml) = pattern data-driven, pas un handle.
     if line.contains("genomes/") || line.contains("Genome<") || line.contains(".toml") {
+        return false;
+    }
+    // Les atomiques (`Atomic*::load(Ordering::...)`) ne chargent pas d'asset.
+    // Le gate est syntaxique et doit exclure ce faux positif lock-free.
+    if line.contains(".load(Ordering::") {
         return false;
     }
     const FORMS: [&str; 4] = [
@@ -2012,5 +2476,48 @@ mod tests {
             "Roguefight UI Modernization"
         );
     }
-}
 
+    #[test]
+    fn orphan_check_parses_workspace_and_renamed_dependencies() {
+        let workspace = vec![
+            "forgia-core".to_string(),
+            "forgia-combat".to_string(),
+            "forgia-ui".to_string(),
+        ];
+        let manifest = r#"
+            [dependencies]
+            forgia-core = { workspace = true }
+            combat_alias = { package = "forgia-combat", workspace = true }
+
+            [target.'cfg(windows)'.build-dependencies]
+            forgia-ui = { workspace = true }
+
+            # forgia-ui = { workspace = true } -- commentaire, pas une dépendance
+        "#;
+
+        let deps = manifest_internal_dependencies(manifest, &workspace).unwrap();
+        assert_eq!(deps, vec!["forgia-combat", "forgia-core", "forgia-ui"]);
+    }
+
+    #[test]
+    fn orphan_check_ignores_external_dependencies() {
+        let workspace = vec!["forgia-core".to_string()];
+        let deps = manifest_internal_dependencies(
+            "[dependencies]\nbevy = \"0.18\"\nserde = { version = \"1\" }\n",
+            &workspace,
+        )
+        .unwrap();
+        assert!(deps.is_empty());
+    }
+
+    #[test]
+    fn orphan_check_ignores_workspace_dependency_catalogue() {
+        let workspace = vec!["forgia-core".to_string()];
+        let deps = manifest_internal_dependencies(
+            "[workspace.dependencies]\nforgia-core = { path = \"crates/forgia-core\" }\n",
+            &workspace,
+        )
+        .unwrap();
+        assert!(deps.is_empty());
+    }
+}
