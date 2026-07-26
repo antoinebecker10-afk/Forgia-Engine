@@ -13,8 +13,8 @@
 //! 3. `Update` : `Res<StageLoadResult>` is_changed et `.biome != ""` →
 //!    lookup palette dans le genome → set `CurrentSkyPalette` si différente.
 //! 4. `Update` : `CurrentSkyPalette` is_changed → re-générer le cubemap via
-//!    `crate::generate_cartoon_skybox` + remplacer le handle dans
-//!    `Assets<Image>` + insérer `Skybox` neuf sur toutes les `Camera3d`.
+//!    `crate::generate_cartoon_skybox` et remplacer le contenu du même asset.
+//!    Toutes les caméras, présentes ou futures, conservent donc le bon handle.
 //!
 //! ## Pattern
 //!
@@ -23,11 +23,10 @@
 //!
 //! ## Hot path
 //!
-//! Non hot — regen cubemap = 1 alloc 262KB par changement palette (256×256×6×4),
+//! Non hot — regen cubemap = 1 alloc 1.5MiB par changement palette (256×256×6×4),
 //! déclenché uniquement OnEnter stage OR Shift+F12. Pas par-frame.
 
 use bevy::asset::AssetEvent;
-use bevy::core_pipeline::Skybox;
 use bevy::image::Image;
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
@@ -36,7 +35,7 @@ use forgia_stage::StageLoadResult;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::{generate_cartoon_skybox, SKYBOX_BRIGHTNESS};
+use crate::{generate_cartoon_skybox, SkyboxPending};
 
 /// 3 couleurs RGB 0-255 d'une palette skybox cartoon.
 ///
@@ -46,6 +45,12 @@ pub struct SkyPalette {
     pub zenith_rgb: [u8; 3],
     pub horizon_rgb: [u8; 3],
     pub ground_rgb: [u8; 3],
+    /// Fondu du ciel cartoon `sky_129` PAR-DESSUS le gradient de biome (0-1).
+    /// 0 = gradient seul (ciel actuel intact) ; 0.6 ≈ nuages roses fondus dans
+    /// les teintes du biome. Hot-reload. Défaut 0 → un biome sans la clé garde
+    /// exactement son ciel.
+    #[serde(default)]
+    pub overlay_blend: f32,
 }
 
 impl Default for SkyPalette {
@@ -54,13 +59,14 @@ impl Default for SkyPalette {
             zenith_rgb: [61, 36, 102],
             horizon_rgb: [255, 107, 53],
             ground_rgb: [42, 27, 61],
+            overlay_blend: 0.0,
         }
     }
 }
 
 /// Resource Resource — palette skybox courante. Re-générée à chaque change.
 /// L'image cubemap actuellement attachée aux Cameras est dans `SkyboxPending`
-/// (cf lib.rs), elle est remplacée par `regen_skybox_image` à chaque is_changed.
+/// (cf lib.rs), dont le contenu est remplacé par `regen_skybox_image`.
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct CurrentSkyPalette(pub SkyPalette);
 
@@ -94,6 +100,12 @@ impl SkyPaletteGenome {
 #[derive(Resource)]
 pub struct SkyPaletteGenomeHandle(pub Handle<Genome<SkyPaletteGenome>>);
 
+/// Handle du ciel cartoon overlay (`sky_129_stacked.png`, cubemap 6 faces
+/// empilées) gardé vivant + lu CPU-side par `regen_skybox_image` pour fondre
+/// les nuages dans le gradient.
+#[derive(Resource)]
+pub struct SkyOverlayHandle(pub Handle<Image>);
+
 const GENOME_PATH: &str = "genomes/biome_sky.toml";
 
 pub struct SkyboxGenomePlugin;
@@ -103,12 +115,16 @@ impl Plugin for SkyboxGenomePlugin {
         app.init_asset::<Genome<SkyPaletteGenome>>()
             .register_asset_loader(GenomeLoader::<SkyPaletteGenome>::default())
             .init_resource::<CurrentSkyPalette>()
-            .add_systems(Startup, load_sky_palette_genome)
+            .add_systems(
+                Startup,
+                load_sky_palette_genome.after(forgia_assets::AssetPreloadSet),
+            )
             .add_systems(
                 Update,
                 (
                     sync_palette_from_genome,
                     track_stage_biome,
+                    force_regen_on_overlay_load,
                     regen_skybox_image,
                 )
                     .chain(),
@@ -116,10 +132,39 @@ impl Plugin for SkyboxGenomePlugin {
     }
 }
 
-fn load_sky_palette_genome(mut commands: Commands, server: Res<AssetServer>) {
+fn load_sky_palette_genome(
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    game_assets: Res<forgia_assets::GameAssets>,
+) {
     let handle: Handle<Genome<SkyPaletteGenome>> = server.load(GENOME_PATH);
     commands.insert_resource(SkyPaletteGenomeHandle(handle));
-    info!("[forgia-player] Sky palette genome load requested ({GENOME_PATH})");
+    // L'overlay est préchargé par forgia-assets. Le module joueur ne déclenche
+    // donc aucun I/O asset et ne risque pas de premier hitch à son activation.
+    commands.insert_resource(SkyOverlayHandle(game_assets.sky_overlay.clone()));
+    info!("[forgia-player] Sky palette genome load requested ({GENOME_PATH}); overlay preloaded");
+}
+
+/// Quand l'overlay finit de charger (ou est hot-reload), force un regen du
+/// skybox — sinon la 1re génération (au boot) tombe avant que l'image soit
+/// dispo et le fondu ne s'applique jamais.
+fn force_regen_on_overlay_load(
+    mut events: MessageReader<AssetEvent<Image>>,
+    overlay: Option<Res<SkyOverlayHandle>>,
+    mut current: ResMut<CurrentSkyPalette>,
+) {
+    let Some(overlay) = overlay else { return };
+    for ev in events.read() {
+        if matches!(
+            ev,
+            AssetEvent::Added { id }
+                | AssetEvent::Modified { id }
+                | AssetEvent::LoadedWithDependencies { id }
+                if *id == overlay.0.id()
+        ) {
+            current.set_changed(); // re-déclenche regen_skybox_image (chaîné après)
+        }
+    }
 }
 
 /// On AssetEvent (Added/Modified/Loaded) : re-set CurrentSkyPalette depuis
@@ -192,34 +237,35 @@ fn track_stage_biome(
     info!("[forgia-player] Palette switched to biome '{biome_id}'");
 }
 
-/// Si `CurrentSkyPalette` a changé : régénérer le cubemap + remplacer le
-/// handle dans `Assets<Image>` + insérer un nouveau `Skybox` sur chaque
-/// `Camera3d` existante.
+/// Si `CurrentSkyPalette` a changé : régénérer le cubemap et remplacer le
+/// contenu de l'asset existant. Le handle reste stable : pas de fuite d'images,
+/// et une caméra créée plus tard reçoit automatiquement le ciel courant.
 fn regen_skybox_image(
-    mut commands: Commands,
     current: Res<CurrentSkyPalette>,
+    overlay: Option<Res<SkyOverlayHandle>>,
+    pending: Res<SkyboxPending>,
     mut images: ResMut<Assets<Image>>,
-    // Story-618 : exclure la ViewmodelCamera — sinon elle reçoit un Skybox et,
-    // en ClearColorConfig::None + order 1, le peint plein écran PAR-DESSUS le
-    // monde rendu par la caméra monde → la map disparaît (bug observé).
-    q_cam: Query<Entity, (With<Camera3d>, Without<crate::ViewmodelCamera>)>,
 ) {
     if !current.is_changed() {
         return;
     }
-    let new_image = generate_cartoon_skybox(&current.0);
-    let new_handle: Handle<Image> = images.add(new_image);
-
-    let mut count = 0;
-    for cam in q_cam.iter() {
-        commands.entity(cam).insert(Skybox {
-            image: new_handle.clone(),
-            brightness: SKYBOX_BRIGHTNESS,
-            rotation: Quat::IDENTITY,
-        });
-        count += 1;
+    // Lit l'overlay CPU-side dans un scope (borrow immuable) fermé avant le
+    // `images.insert` (borrow mutable). Overlay = image 2D `ovf` de large × 6·ovf
+    // de haut ; `data` Some car chargée en MAIN_WORLD (défaut loader Bevy 0.18).
+    let new_image = {
+        let ov = overlay
+            .as_ref()
+            .and_then(|h| images.get(&h.0))
+            .and_then(|img| {
+                img.data
+                    .as_deref()
+                    .map(|d| (d, img.width() as usize, img.height() as usize))
+            });
+        generate_cartoon_skybox(&current.0, ov)
+    };
+    if images.insert(pending.handle.id(), new_image).is_err() {
+        error!("[forgia-player] Skybox regeneration failed: bootstrap image missing");
+        return;
     }
-    info!(
-        "[forgia-player] Skybox regenerated (palette changed) — re-attached to {count} Camera3d(s)"
-    );
+    info!("[forgia-player] Skybox regenerated in place (palette changed)");
 }

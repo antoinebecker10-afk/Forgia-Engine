@@ -152,16 +152,40 @@ pub(crate) const SKYBOX_BRIGHTNESS: f32 = 500.0;
 /// - +Y (top) : solid zenith
 /// - -Y (bottom) : solid ground
 /// - sides : gradient vertical zenith (haut) → horizon (bas)
-pub(crate) fn generate_cartoon_skybox(palette: &skybox_genome::SkyPalette) -> Image {
+///
+/// `overlay` = `(données_rgba_empilées, taille_face)` d'un cubemap image
+/// (6 faces empilées verticalement, même ordre wgpu) — ex. le ciel cartoon
+/// `sky_129_stacked.png`. Fondu PAR-DESSUS le gradient selon `palette.overlay_blend`
+/// (0 = gradient seul, 1 = overlay seul). Le gradient de biome n'est JAMAIS
+/// supprimé : à 0.6 on garde ses teintes ET on y fond les nuages (story-661bis).
+pub(crate) fn generate_cartoon_skybox(
+    palette: &skybox_genome::SkyPalette,
+    overlay: Option<(&[u8], usize, usize)>,
+) -> Image {
     let face_size = SKYBOX_FACE_SIZE as usize;
     let total_pixels = face_size * face_size * 6;
     let mut data = vec![0u8; total_pixels * 4];
+
+    // Overlay valide seulement si son image est exactement 6 faces carrées
+    // empilées et encodée RGB/RGBA. Évite de lire hors limites si un artiste
+    // remplace l'asset par une image 2D ordinaire ou un format inattendu.
+    let overlay = overlay.and_then(|(buf, width, height)| {
+        let pixels = width.checked_mul(height)?;
+        let bpp = buf.len().checked_div(pixels)?;
+        (palette.overlay_blend > 0.001
+            && width > 0
+            && height == width.checked_mul(6)?
+            && matches!(bpp, 3 | 4)
+            && buf.len() == pixels.checked_mul(bpp)?)
+        .then_some((buf, width, bpp))
+    });
+    let blend = palette.overlay_blend.clamp(0.0, 1.0);
 
     for face in 0..6 {
         for y in 0..face_size {
             for x in 0..face_size {
                 let idx = (face * face_size * face_size + y * face_size + x) * 4;
-                let [r, g, b] = match face {
+                let base = match face {
                     2 => palette.zenith_rgb, // +Y top
                     3 => palette.ground_rgb, // -Y bottom
                     _ => {
@@ -169,6 +193,19 @@ pub(crate) fn generate_cartoon_skybox(palette: &skybox_genome::SkyPalette) -> Im
                         let t = y as f32 / (face_size - 1) as f32;
                         lerp_rgb(palette.zenith_rgb, palette.horizon_rgb, t)
                     }
+                };
+                let [r, g, b] = match overlay {
+                    Some((buf, ovf, bpp)) => {
+                        // Échantillonne la face `face` de l'overlay (nearest) puis
+                        // fond au-dessus du gradient.
+                        let ox = x * ovf / face_size;
+                        let oy = y * ovf / face_size;
+                        let orow = face * ovf + oy;
+                        let oi = (orow * ovf + ox) * bpp;
+                        let ov = [buf[oi], buf[oi + 1], buf[oi + 2]];
+                        lerp_rgb(base, ov, blend)
+                    }
+                    None => base,
                 };
                 data[idx] = r;
                 data[idx + 1] = g;
@@ -398,7 +435,9 @@ fn load_skybox(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     // Boot avec palette default (Crypts) — sera resync par
     // skybox_genome::sync_palette_from_genome dès que le TOML est loaded.
     let palette = skybox_genome::SkyPalette::default();
-    let handle: Handle<Image> = images.add(generate_cartoon_skybox(&palette));
+    // Boot : pas d'overlay (image pas encore chargée + default blend 0) ; le
+    // fondu s'applique au 1er regen (genome + overlay loaded).
+    let handle: Handle<Image> = images.add(generate_cartoon_skybox(&palette, None));
     commands.insert_resource(SkyboxPending { handle });
     info!(
         "[forgia-player] Skybox cartoon bootstrap ({}x{}x6 RGBA8 sRGB) — default palette",
@@ -729,5 +768,55 @@ mod tests {
         assert_eq!(t.max_fall_speed, 30.0);
         assert_eq!(t.rpg_keyboard_turn_rad_per_sec, 2.5);
         assert_eq!(t.rpg_rmb_steer_rad_per_px, 0.005);
+    }
+
+    #[test]
+    fn cartoon_skybox_is_a_srgb_cubemap_with_expected_poles() {
+        let palette = skybox_genome::SkyPalette {
+            zenith_rgb: [1, 2, 3],
+            horizon_rgb: [10, 20, 30],
+            ground_rgb: [4, 5, 6],
+            overlay_blend: 0.0,
+        };
+        let image = generate_cartoon_skybox(&palette, None);
+
+        assert_eq!(image.width(), SKYBOX_FACE_SIZE);
+        assert_eq!(image.height(), SKYBOX_FACE_SIZE);
+        assert_eq!(image.texture_descriptor.size.depth_or_array_layers, 6);
+        assert_eq!(
+            image.texture_descriptor.format,
+            TextureFormat::Rgba8UnormSrgb
+        );
+        assert_eq!(
+            image
+                .texture_view_descriptor
+                .as_ref()
+                .and_then(|d| d.dimension),
+            Some(TextureViewDimension::Cube)
+        );
+
+        let data = image
+            .data
+            .as_deref()
+            .expect("generated skybox keeps CPU data");
+        let face_bytes = (SKYBOX_FACE_SIZE * SKYBOX_FACE_SIZE * 4) as usize;
+        assert_eq!(&data[0..4], &[1, 2, 3, 255]);
+        assert_eq!(&data[face_bytes * 3..face_bytes * 3 + 4], &[4, 5, 6, 255]);
+    }
+
+    #[test]
+    fn malformed_overlay_is_ignored_without_corrupting_the_gradient() {
+        let palette = skybox_genome::SkyPalette {
+            overlay_blend: 1.0,
+            ..default()
+        };
+        // Une image carrée n'est pas un cubemap verticalement empilé.
+        let malformed = vec![255; 4 * 4 * 4];
+        let image = generate_cartoon_skybox(&palette, Some((&malformed, 4, 4)));
+        let data = image
+            .data
+            .as_deref()
+            .expect("generated skybox keeps CPU data");
+        assert_eq!(&data[0..3], &palette.zenith_rgb);
     }
 }

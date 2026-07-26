@@ -12,6 +12,7 @@ bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 leafwing-input-manager = { workspace = true }
 forgia-core = { workspace = true }
+forgia-assets = { workspace = true }
 forgia-input = { workspace = true }
 forgia-combat = { workspace = true }
 forgia-damage = { workspace = true }
