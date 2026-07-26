@@ -285,49 +285,6 @@ def g_tube(axis, sections, n=RING_SEGMENTS, cap_start=True, cap_end=True):
     return verts, faces
 
 
-def g_planar_tube(axis, sections, n=28, sides=8, planar=0.5, cap_start=True, cap_end=True):
-    """Tube à section POLYGONALE adoucie — donne des PLANS, pas une révolution.
-
-    Principe Asaro : un visage est fait de plans qui accrochent la lumière
-    différemment, et c'est la cassure entre eux qui crée la valeur. Une section
-    circulaire ne produit aucune cassure, d'où l'aspect « plat » quel que soit
-    le sculpt appliqué ensuite.
-
-    Le rayon est ramené vers celui d'un polygone régulier à `sides` côtés :
-    `planar=0` garde l'ellipse, `1` donne le polygone franc. La phase est calée
-    pour qu'un plan soit CENTRÉ sur l'avant (+Y) — le plan du visage.
-    """
-    ti, ui, vi = AXES[axis]
-    step = 2.0 * pi / sides
-    phase = pi / 2.0 - step / 2.0
-    apothem = cos(step / 2.0)
-    verts, faces = [], []
-    for t, cu, cv, ru, rv in sections:
-        for k in range(n):
-            a = 2.0 * pi * k / n
-            local = ((a - phase) % step) - step / 2.0
-            mod = 1.0 + planar * (apothem / cos(local) - 1.0)
-            p = [0.0, 0.0, 0.0]
-            p[ti], p[ui], p[vi] = t, cu + ru * mod * cos(a), cv + rv * mod * sin(a)
-            verts.append(tuple(p))
-    for s in range(len(sections) - 1):
-        b0, b1 = s * n, (s + 1) * n
-        for k in range(n):
-            k2 = (k + 1) % n
-            faces.append((b0 + k, b0 + k2, b1 + k2, b1 + k))
-    for cap, sec, base in ((cap_start, sections[0], 0), (cap_end, sections[-1], (len(sections) - 1) * n)):
-        if not cap:
-            continue
-        t, cu, cv, _, _ = sec
-        centre = len(verts)
-        p = [0.0, 0.0, 0.0]
-        p[ti], p[ui], p[vi] = t, cu, cv
-        verts.append(tuple(p))
-        for k in range(n):
-            faces.append((centre, base + k, base + (k + 1) % n))
-    return verts, faces
-
-
 def g_cloth(axis, sections, n=24, folds=8, depth=0.045, twist=0.55, cap_start=True, cap_end=True):
     """Tube d'ÉTOFFE : rayon modulé angulairement pour créer de vrais plis.
 
@@ -605,41 +562,6 @@ def g_relax(geom, factor=0.35, iterations=4):
     mod = obj.modifiers.new("relax", "SMOOTH")
     mod.factor = factor
     mod.iterations = iterations
-    bpy.context.view_layer.update()
-    deps = bpy.context.evaluated_depsgraph_get()
-    baked = bpy.data.meshes.new_from_object(obj.evaluated_get(deps))
-    out = (
-        [tuple(v.co) for v in baked.vertices],
-        [tuple(p.vertices) for p in baked.polygons],
-    )
-    bpy.data.meshes.remove(baked)
-    mesh = obj.data
-    bpy.data.objects.remove(obj, do_unlink=True)
-    bpy.data.meshes.remove(mesh)
-    return out
-
-
-def g_remesh(geom, voxel=0.005, ratio=0.18):
-    """Fusionne un empilement de primitives en UNE surface continue.
-
-    C'est le plafond de réalisme du procédural par primitives : tant que le nez,
-    l'arcade et les oreilles sont des coques distinctes qui s'interpénètrent, il
-    n'existe aucune surface continue et l'œil lit « pièces assemblées ». Le
-    remaillage voxel les fond en un seul volume avec des raccords doux, façon
-    sculpt ; la décimation ramène le polycount à un budget de jeu.
-
-    À réserver aux formes ORGANIQUES : sur l'armure, le voxel arrondirait les
-    arêtes vives et mangerait les rivets.
-    """
-    obj = _temp_object("remesh_src", geom)
-    rem = obj.modifiers.new("remesh", "REMESH")
-    rem.mode = "VOXEL"
-    rem.voxel_size = voxel
-    rem.use_smooth_shade = True
-    dec = obj.modifiers.new("decimate", "DECIMATE")
-    dec.decimate_type = "COLLAPSE"
-    dec.ratio = ratio
-
     bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     baked = bpy.data.meshes.new_from_object(obj.evaluated_get(deps))
