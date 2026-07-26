@@ -18,6 +18,14 @@ use forgia_core::prelude::*;
 /// Démo perf moteur (2026-06-15) — "Cyber City démo" : charge un GLB lourd +
 /// flycam libre pour stress-tester le rendu. Entrée via le menu principal.
 mod cyber_city;
+/// Hall de Forgia (2026-07-22) — hub social 3D walkable : château importé
+/// (`castle_highlands.glb`), zone neutre sans combat. Entrée debug F10.
+mod castle_hub;
+/// Sol gazon du Hall de Forgia — terrain reconstruit depuis le Unity Terrain
+/// (heightmap + splatmap chemins pavés + 21k tree-instances). RÉACTIVÉ 2026-07-25 :
+/// orientation calée via `yaw_deg` du tune live `castle_ground_tune.json` (le
+/// chemin pointe vers l'AVANT du château). Détail : reference_castle_terrain_unity_reconstruction.
+mod castle_ground;
 /// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
 /// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
 mod color_grading;
@@ -155,6 +163,18 @@ pub fn run_game() -> AppExit {
     // 7e. Démo perf "Cyber City" (2026-06-15) — GLB lourd + flycam libre,
     // entrée menu dédiée. Mode self-contained (GameMode::CyberCity).
     app.add_plugins(cyber_city::CyberCityDemoPlugin);
+
+    // 7e-bis. Hall de Forgia (2026-07-22) — hub social 3D walkable (château
+    // importé). Zone neutre sans combat. Mode self-contained (GameMode::CastleHub),
+    // entrée debug F10 depuis le menu. Aucune dépendance à forgia-mode-roguelite.
+    app.add_plugins(castle_hub::CastleHubPlugin);
+    // 7e-ter. Sol/terrain du Hall — RÉACTIVÉ 2026-07-25 : reconstruction du Unity
+    // Terrain (heightmap + splatmap chemins pavés + 21k tree-instances). L'orientation
+    // (le chemin/la pente doit pointer vers l'AVANT du château) se cale via `yaw_deg`
+    // du tune LIVE `castle_ground_tune.json` — hot-reload 1×/s, zéro rebuild. Le calage
+    // fin position/relief (align, vscale) passe par le même fichier. Findings :
+    // memory/reference_castle_terrain_unity_reconstruction.md.
+    app.add_plugins(castle_ground::CastleGroundPlugin);
 
     // 7f. Color grading filmique par mode (story-602) — ColorGrading par GameMode,
     // hot-reload assets/genomes/color_grading.toml. Sensor forgia2_color_grading.json.
