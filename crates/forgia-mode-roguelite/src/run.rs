@@ -660,8 +660,9 @@ pub fn sys_start_run(
     // de run (même graine → mêmes crits, indépendamment de l'horloge).
     mut combat_rng: ResMut<forgia_combat::combat_rng::CombatRng>,
     // Story-640 P0-2 — configs live pour le spawn wave 1 (stats hot-reload + défense).
-    stats_cfg: Res<crate::enemies::EnemyStatsConfig>,
-    def_cfg: Res<crate::defense::DefenseConfig>,
+    // Story-669 — bundle SystemParam : ce système était à 16 params, le plafond Bevy ;
+    // la config de composition n'y serait pas entrée autrement (cf `scalability.md`).
+    spawn_cfgs: crate::waves::WaveSpawnConfigs,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -779,20 +780,32 @@ pub fn sys_start_run(
         });
         commands.insert_resource(graph.clone());
 
-        // TODO(story-471..479): API removed, refactor abandonné — re-implémenter
-        // current_stage_node / composition_for_stage / spawn_stage_enemies supprimés de crate::waves.
-        // wave.current_stage_depth / wave.current_stage_kind supprimés de RogueliteWave.
-        // Fallback : spawn wave 1 directement via spawn_wave_enemies.
+        // Story-669 — le TODO(story-471..479) « refactor abandonné » est LEVÉ : la
+        // composition de la salle 0 est de nouveau tirée du graph (kind + budget du
+        // nœud) au lieu d'un spawn de vague 1 en aveugle.
         {
-            let _ = &graph; // graph utilisé pour total_stages + boss_depth ci-dessus
+            let node = graph.stages.first().and_then(|v| v.first());
+            let kind = node.map(|n| n.kind);
+            let budget = node
+                .map(|n| n.difficulty_budget)
+                .unwrap_or_else(|| stage_graph_config.director_budget_for_depth(0));
+            // Salle 0 = la référence : sa densité vaut 1.0 par construction.
+            let density = crate::wave_comp::density_from_budget(
+                budget,
+                stage_graph_config.director_budget_for_depth(0),
+            );
+            wave.stage = 0;
+            wave.room_kind = kind;
+            wave.room_budget = budget;
             let spawned = crate::waves::spawn_wave_enemies(
                 &mut commands,
                 &asset_server,
-                &stats_cfg,
-                &def_cfg,
-                1, // wave 1
+                &spawn_cfgs.ctx(1, 0, kind, density, seed),
             );
-            info!("[roguelite] sys_start_run fallback — wave 1 spawned {spawned} enemies");
+            info!(
+                "[roguelite] salle 1 — {spawned} ennemis ({:?}, densité ×{:.2})",
+                kind, density
+            );
             next.set(RunState::InRun { stage: 0 });
         }
         info!(

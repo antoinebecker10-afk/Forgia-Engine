@@ -101,6 +101,9 @@ pub fn sys_write_roguelite_state(
     // Story-668 — plafond de maîtrise (genome `[mastery]`), pour rendre l'invariant
     // observable : sans ça, il fallait ouvrir %APPDATA% à la main pour le vérifier.
     meta_cat: Option<Res<crate::meta_shop::MetaShopCatalogue>>,
+    // Story-669 — type de salle + densité : la preuve, en une lecture, que le choix
+    // de porte change RÉELLEMENT le combat (avant, `room_kind` n'était même pas lu).
+    graph_cfg: Option<Res<forgia_stage::graph::RunGraphConfig>>,
 ) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -132,6 +135,17 @@ pub fn sys_write_roguelite_state(
         (Some(s), cap) if cap > 0 => s.weapon_levels.values().any(|&lvl| lvl > cap),
         _ => false,
     };
+    // Story-669 — la salle courante : son TYPE (porte choisie) et sa DENSITÉ.
+    let room_kind = wave
+        .as_ref()
+        .and_then(|w| w.room_kind)
+        .map(|k| format!("{k:?}").to_ascii_lowercase())
+        .unwrap_or_else(|| "none".to_string());
+    let room_budget = wave.as_ref().map(|w| w.room_budget).unwrap_or(0);
+    let room_density = graph_cfg
+        .as_ref()
+        .map(|c| crate::wave_comp::density_from_budget(room_budget, c.director_budget_for_depth(0)))
+        .unwrap_or(1.0);
     let (severity, next_step) =
         severity_for_roguelite(tel.time_in_state_secs, state_str, mastery_over_cap);
     // Story-571 — Or in-run + Souls méta persistant.
@@ -177,7 +191,7 @@ pub fn sys_write_roguelite_state(
         .unwrap_or_else(|| "{}".to_string());
 
     let json = format!(
-        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"meta_souls_total":{meta_souls_total},"meta_ranks":{meta_ranks},"weapon_levels":{weapon_levels},"mastery_cap":{mastery_cap},"run_timer_secs":{run_timer_secs:.1},"shockwave_casts":{shockwave_casts},"shockwave_cd":{shockwave_cd:.1},"current_wave":{current_wave},"room":{room},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"run_ended":{run_ended},"victories_total":{victories_total},"boss_defeated":{boss_defeated}}}"#,
+        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"meta_souls_total":{meta_souls_total},"meta_ranks":{meta_ranks},"weapon_levels":{weapon_levels},"mastery_cap":{mastery_cap},"run_timer_secs":{run_timer_secs:.1},"shockwave_casts":{shockwave_casts},"shockwave_cd":{shockwave_cd:.1},"current_wave":{current_wave},"room":{room},"room_kind":"{room_kind}","room_budget":{room_budget},"room_density":{room_density:.2},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"run_ended":{run_ended},"victories_total":{victories_total},"boss_defeated":{boss_defeated}}}"#,
         time.elapsed_secs(),
         tel.tick_count,
         tel.time_in_state_secs,

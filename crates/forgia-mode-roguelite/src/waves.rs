@@ -13,6 +13,7 @@
 
 use crate::enemies::{self, EnemyArchetype};
 use crate::run::RogueliteRunMarker;
+use crate::wave_comp::WaveCompConfig;
 use bevy::prelude::*;
 use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, RigidBody, Sensor};
@@ -70,8 +71,14 @@ pub struct RogueliteWave {
     /// Index de la porte choisie (écrit par l'overlay, consommé par l'orchestrateur).
     pub portal_pick: Option<u8>,
     /// Kind de la salle courante (porte choisie ; None = salle 0 / boss / fallback).
-    /// Inc.3 le consommera pour la composition/récompense.
+    /// Story-669 — CONSOMMÉ par `wave_comp::compose` : c'est ce qui rend le choix
+    /// de porte réel. Il était écrit puis lu nulle part (hors un `info!`).
     pub room_kind: Option<forgia_stage::graph::StageKind>,
+    /// Story-669 — budget de difficulté du nœud de graph choisi
+    /// (`StageNode.difficulty_budget`). Ce champ était calculé à chaque run par
+    /// `director_budget_for_depth` puis JETÉ : zéro lecteur dans tout le workspace.
+    /// Il pilote maintenant la densité d'ennemis de la salle. 0 = pas de graph.
+    pub room_budget: u32,
 }
 
 impl Default for RogueliteWave {
@@ -88,34 +95,71 @@ impl Default for RogueliteWave {
             portal_choices: Vec::new(),
             portal_pick: None,
             room_kind: None,
+            room_budget: 0,
         }
     }
 }
 
-/// Vague « boss » dans [`wave_composition`] (branche `_`). La salle Boss (story-646)
+/// Vague « boss » (branche `_` de `wave_comp::compose`). La salle Boss (story-646)
 /// spawn cette composition directement.
 pub const BOSS_WAVE_COMPOSITION: u8 = 3;
 
 /// Composition par vague : `(archetype, count, ring_radius)`.
-pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
-    match wave {
-        1 => vec![
-            (EnemyArchetype::Tank, 3, 12.0),
-            (EnemyArchetype::Runner, 3, 25.0),
-            (EnemyArchetype::Sniper, 2, 50.0),
-        ],
-        2 => vec![
-            (EnemyArchetype::Tank, 4, 14.0),
-            (EnemyArchetype::Runner, 4, 28.0),
-            (EnemyArchetype::Sniper, 4, 55.0),
-        ],
-        _ => vec![
-            // Wave 3 (final boss — M3 step 1) : 1 boss + 4 ennemis support pour
-            // pression de zone (cohérent climax RoR2 / Hadès).
-            (EnemyArchetype::Boss, 1, 12.0),
-            (EnemyArchetype::Runner, 4, 28.0),
-        ],
+/// Contexte de spawn d'une vague (story-669).
+///
+/// Bundle plutôt que 10 paramètres : `spawn_wave_enemies` reçoit désormais la
+/// SALLE, son TYPE et la GRAINE DE RUN, les trois entrées qui manquaient à
+/// l'ancienne `wave_composition(wave: u8)` et dont l'absence figeait la boucle
+/// (mêmes ennemis, mêmes places, choix de porte sans effet).
+/// Les 3 configs nécessaires au spawn d'une vague, en un seul `SystemParam`.
+///
+/// `sys_start_run` était DÉJÀ à 16 params — le plafond dur de Bevy. Ajouter la
+/// config de composition l'aurait fait déborder. `scalability.md` prescrit
+/// exactement ce remède : « SystemParam bundle quand > 12 params ».
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct WaveSpawnConfigs<'w> {
+    pub stats: Res<'w, EnemyStatsConfig>,
+    pub defense: Res<'w, DefenseConfig>,
+    pub comp: Res<'w, WaveCompConfig>,
+}
+
+impl WaveSpawnConfigs<'_> {
+    /// Contexte de spawn pour une vague donnée.
+    pub fn ctx(
+        &self,
+        wave: u8,
+        stage: u8,
+        kind: Option<forgia_stage::graph::StageKind>,
+        density: f32,
+        run_seed: u64,
+    ) -> WaveSpawnCtx<'_> {
+        WaveSpawnCtx {
+            stats: &self.stats,
+            defense: &self.defense,
+            comp: &self.comp,
+            wave,
+            stage,
+            kind,
+            density,
+            run_seed,
+        }
     }
+}
+
+pub struct WaveSpawnCtx<'a> {
+    pub stats: &'a EnemyStatsConfig,
+    pub defense: &'a DefenseConfig,
+    pub comp: &'a WaveCompConfig,
+    /// Vague dans la salle (1, 2, … ; `BOSS_WAVE_COMPOSITION` = boss).
+    pub wave: u8,
+    /// Profondeur de salle (0-indexée) — pour la graine et le log.
+    pub stage: u8,
+    /// Type de la salle choisie à la porte. `None` = graph absent → neutre.
+    pub kind: Option<forgia_stage::graph::StageKind>,
+    /// `budget_director(salle) / budget_director(0)`, borné par le genome.
+    pub density: f32,
+    /// Graine de la RUN. Sans elle, les positions étaient les mêmes à chaque run.
+    pub run_seed: u64,
 }
 
 /// Spawn N ennemis de la composition wave donnée. Caller : OnEnter scene ou
@@ -129,18 +173,28 @@ pub fn wave_composition(wave: u8) -> Vec<(EnemyArchetype, u32, f32)> {
 /// GLB et DÉPASSE de la capsule (recalibrée aux épaules) — sinon le raycast
 /// premier-hit de forgia-fps ne la touchait jamais (0 headshot possible). Elle est
 /// ensuite recollée sur le joint `head` du rig animé (cf `head_hitbox.rs`).
+/// Story-669 : la composition et le placement viennent désormais de
+/// `wave_comp::compose` (genome + salle + type de salle) et la graine de spawn
+/// dérive de la RUN, plus d'une constante.
 pub fn spawn_wave_enemies(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    // Story-640 P0-2 — stats LIVE (hot-reload) au lieu du Default : un hot-reload de
-    // `roguelite_enemies.toml` change désormais les ennemis spawnés (spawn_live=true).
-    stats_cfg: &EnemyStatsConfig,
-    // Story-640 P0-2 — couche défensive par archétype (bouclier/armure).
-    def_cfg: &DefenseConfig,
-    wave: u8,
+    ctx: &WaveSpawnCtx<'_>,
 ) -> u32 {
-    let composition = wave_composition(wave);
-    let mut yaw_rng = Xoshiro256StarStar::seed_from_u64(WAVE_BASE_SEED ^ u64::from(wave));
+    let stats_cfg = ctx.stats;
+    let def_cfg = ctx.defense;
+    let wave = ctx.wave;
+    let composition = crate::wave_comp::compose(ctx.comp, wave, ctx.kind, ctx.density);
+    // Graine de placement : RUN × salle × vague. Avant story-669 c'était
+    // `WAVE_BASE_SEED ^ wave` — une CONSTANTE : le joueur mémorisait en 2 runs où
+    // arrivent les 3 Tanks, et deux runs différentes étaient superposables.
+    let place_seed = ctx
+        .run_seed
+        .rotate_left(u32::from(ctx.stage) % 64)
+        ^ u64::from(wave).wrapping_mul(0xBF58_476D_1CE4_E5B9)
+        ^ WAVE_BASE_SEED;
+    let mut yaw_rng = Xoshiro256StarStar::seed_from_u64(place_seed);
+    let jitter_m = ctx.comp.ring.jitter_m.max(0.0);
     let mut total = 0u32;
     for (archetype, count, ring_radius) in &composition {
         let stats = stats_cfg.for_archetype(*archetype);
@@ -160,8 +214,13 @@ pub fn spawn_wave_enemies(
         let yaw0 = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * std::f32::consts::TAU;
         for i in 0..*count {
             let theta = yaw0 + (i as f32 / *count as f32) * std::f32::consts::TAU;
-            let x = ring_radius * theta.cos();
-            let z = ring_radius * theta.sin();
+            // Dispersion du rayon (genome `ring.jitter_m`) : sans elle, les ennemis
+            // se posent sur un anneau parfait, identique d'une salle à l'autre.
+            // Le rayon reste positif quoi qu'il arrive (0.5 m plancher).
+            let unit = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * 2.0 - 1.0;
+            let r = (ring_radius + unit * jitter_m).max(0.5);
+            let x = r * theta.cos();
+            let z = r * theta.sin();
             let y = stats.capsule_half_height + stats.capsule_radius + 0.05;
 
             // Pattern miroir forgia-mode-fps-arena::wave::spawn_wave_bots:343 :
@@ -290,13 +349,15 @@ pub fn sys_wave_orchestrator(
     // Story-571 — gain de Souls méta en fin de wave/boss (persistant).
     mut meta: ResMut<crate::run::MetaSouls>,
     // Story-640 P0-2 — configs live pour le spawn (stats hot-reload + défense).
-    stats_cfg: Res<EnemyStatsConfig>,
-    def_cfg: Res<DefenseConfig>,
+    // Story-669 — + la composition, en un seul SystemParam (cf `WaveSpawnConfigs`).
+    spawn_cfgs: WaveSpawnConfigs,
     // Story-646 R2 — multi-salles : structure de run (genome) + graph (kinds) +
     // transitions RunState (le dispatch d'arène crypts/forge suit tout seul).
     graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
     graph: Option<Res<forgia_stage::graph::RunGraph>>,
     mut next_run: ResMut<NextState<crate::run::RunState>>,
+    // Story-669 — la graine de RUN pilote enfin le placement des ennemis.
+    run_seed: Option<Res<crate::run::RunSeed>>,
 ) {
     let alive = q_bots.iter().count() as u32;
     wave.bots_alive = alive;
@@ -420,7 +481,8 @@ pub fn sys_wave_orchestrator(
                     return;
                 }
                 // Pas de choix possible (boss / graph absent / 1 seul variant) → auto.
-                advance_to_room(&mut wave, next, is_boss, choices.first().copied());
+                let budget = node_budget(graph.as_deref(), &graph_cfg, next, 0);
+                advance_to_room(&mut wave, next, is_boss, choices.first().copied(), budget);
                 if is_boss {
                     next_run.set(crate::run::RunState::Boss { stage: wave.stage });
                 } else {
@@ -434,12 +496,20 @@ pub fn sys_wave_orchestrator(
                     wave.room_kind,
                 );
             }
+            let density = crate::wave_comp::density_from_budget(
+                wave.room_budget,
+                graph_cfg.director_budget_for_depth(0),
+            );
             spawn_wave_enemies(
                 &mut commands,
                 &asset_server,
-                &stats_cfg,
-                &def_cfg,
-                wave.current_wave,
+                &spawn_cfgs.ctx(
+                    wave.current_wave,
+                    wave.stage,
+                    wave.room_kind,
+                    density,
+                    run_seed.as_ref().map(|s| s.seed).unwrap_or(0),
+                ),
             );
             // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.
             wave.seen_alive = false;
@@ -459,22 +529,47 @@ pub fn sys_wave_orchestrator(
             .copied();
         wave.portal_choices.clear();
         let next = wave.stage + 1;
-        advance_to_room(&mut wave, next, false, kind);
+        // Story-669 — le budget du nœud RÉELLEMENT choisi pilote la densité.
+        let budget = node_budget(graph.as_deref(), &graph_cfg, next, pick as usize);
+        advance_to_room(&mut wave, next, false, kind, budget);
         next_run.set(crate::run::RunState::InRun { stage: wave.stage });
+        let density =
+            crate::wave_comp::density_from_budget(budget, graph_cfg.director_budget_for_depth(0));
         info!(
-            "[roguelite] → SALLE {}/{} — porte choisie : {:?}",
+            "[roguelite] → SALLE {}/{} — porte choisie : {:?} (densité ×{:.2})",
             wave.stage + 1,
             boss_stage + 1,
             kind,
+            spawn_cfgs.comp.density_factor(density),
         );
         spawn_wave_enemies(
             &mut commands,
             &asset_server,
-            &stats_cfg,
-            &def_cfg,
-            wave.current_wave,
+            &spawn_cfgs.ctx(
+                wave.current_wave,
+                wave.stage,
+                wave.room_kind,
+                density,
+                run_seed.as_ref().map(|s| s.seed).unwrap_or(0),
+            ),
         );
     }
+}
+
+/// Budget de difficulté du nœud de graph `(depth, variant)`, avec repli sur la
+/// formule du director si le graph est absent. C'est le premier consommateur de
+/// `StageNode.difficulty_budget`, calculé à chaque run depuis story-470 et jeté.
+fn node_budget(
+    graph: Option<&forgia_stage::graph::RunGraph>,
+    cfg: &forgia_stage::graph::RunGraphConfig,
+    depth: u8,
+    variant: usize,
+) -> u32 {
+    graph
+        .and_then(|g| g.stages.get(depth as usize))
+        .and_then(|v| v.get(variant).or_else(|| v.first()))
+        .map(|n| n.difficulty_budget)
+        .unwrap_or_else(|| cfg.director_budget_for_depth(depth))
 }
 
 /// PUR (testable) — la détection « vague nettoyée » n'est armée que si : tous les
@@ -497,10 +592,13 @@ fn advance_to_room(
     next: u8,
     is_boss: bool,
     kind: Option<forgia_stage::graph::StageKind>,
+    budget: u32,
 ) {
     wave.stage = next;
     wave.seen_alive = false;
     wave.room_kind = kind;
+    // Story-669 — le budget du nœud de graph choisi pilote la densité de la salle.
+    wave.room_budget = budget;
     wave.current_wave = if is_boss { BOSS_WAVE_COMPOSITION } else { 1 };
 }
 
@@ -560,22 +658,36 @@ mod tests {
     fn spawn_first_wave_for_qa(
         mut commands: Commands,
         asset_server: Res<AssetServer>,
-        stats_cfg: Res<EnemyStatsConfig>,
-        def_cfg: Res<DefenseConfig>,
+        cfgs: WaveSpawnConfigs,
         mut spawned: Local<bool>,
     ) {
         if *spawned {
             return;
         }
-        spawn_wave_enemies(&mut commands, &asset_server, &stats_cfg, &def_cfg, 1);
+        // Salle 0, type Combat, densité de référence, graine fixe : la QA doit
+        // rester déterministe.
+        spawn_wave_enemies(
+            &mut commands,
+            &asset_server,
+            &cfgs.ctx(1, 0, Some(forgia_stage::graph::StageKind::Combat), 1.0, 0),
+        );
         *spawned = true;
     }
 
+    /// Story-669 — la composition est passée en couche definition ; ces deux tests
+    /// vérifient désormais que l'ÉQUILIBRE DE RÉFÉRENCE n'a pas bougé au passage
+    /// (salle 0, type Combat, densité 1.0 → exactement l'ancienne table Rust).
     #[test]
     fn wave_composition_grows() {
-        let w1: u32 = wave_composition(1).iter().map(|(_, c, _)| *c).sum();
-        let w2: u32 = wave_composition(2).iter().map(|(_, c, _)| *c).sum();
-        let w3: u32 = wave_composition(3).iter().map(|(_, c, _)| *c).sum();
+        use forgia_stage::graph::StageKind;
+        let cfg = WaveCompConfig::default();
+        let sum = |w: u8| -> u32 {
+            crate::wave_comp::compose(&cfg, w, Some(StageKind::Combat), 1.0)
+                .iter()
+                .map(|(_, c, _)| *c)
+                .sum()
+        };
+        let (w1, w2, w3) = (sum(1), sum(2), sum(3));
         assert!(w1 < w2, "wave 2 doit avoir plus d'ennemis que wave 1");
         assert_eq!(w1, 8);
         assert_eq!(w2, 12);
@@ -584,7 +696,7 @@ mod tests {
 
     #[test]
     fn wave_3_contains_boss() {
-        let w3 = wave_composition(3);
+        let w3 = crate::wave_comp::compose(&WaveCompConfig::default(), 3, None, 1.0);
         assert!(
             w3.iter().any(|(a, _, _)| *a == EnemyArchetype::Boss),
             "wave 3 doit contenir un Boss"
@@ -653,6 +765,9 @@ mod tests {
         app.init_asset::<Scene>();
         app.insert_resource(EnemyStatsConfig::default());
         app.insert_resource(DefenseConfig::default());
+        // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
+        // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
+        app.insert_resource(WaveCompConfig::default());
         app.add_systems(Update, spawn_first_wave_for_qa);
 
         app.update();
@@ -692,6 +807,9 @@ mod tests {
         app.init_asset::<Scene>();
         app.insert_resource(EnemyStatsConfig::default());
         app.insert_resource(DefenseConfig::default());
+        // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
+        // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
+        app.insert_resource(WaveCompConfig::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
         app.insert_resource(forgia_stage::graph::RunGraphConfig::default());
@@ -739,6 +857,9 @@ mod tests {
         app.init_asset::<Scene>();
         app.insert_resource(EnemyStatsConfig::default());
         app.insert_resource(DefenseConfig::default());
+        // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
+        // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
+        app.insert_resource(WaveCompConfig::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
         app.insert_resource(forgia_stage::graph::RunGraphConfig {
@@ -758,13 +879,29 @@ mod tests {
         // Les Commands du spawn sont appliquées après l'orchestrateur : une
         // frame suivante est nécessaire pour armer `seen_alive`, comme en jeu.
         app.update();
+        // Story-669 — l'effectif n'est plus constant (la densité monte avec la
+        // profondeur), donc on ne l'assertionne plus à 8. Ce que ce test garde,
+        // et qui est son vrai objet, c'est l'ABSENCE DE FUITE : un visuel par bot,
+        // les précédents despawnés, et un effectif qui reste borné.
+        //
+        // Plafond : `density.max_factor` (2.5) appliqué à la vague 1 (3T/3R/2S)
+        // donne au pire 8+8+5 = 21 ennemis. 32 laisse de la marge sans rien cacher.
+        const MAX_BOTS_PER_WAVE: usize = 32;
         for room in 0..24 {
             let bots: Vec<Entity> = app
                 .world_mut()
                 .query_filtered::<Entity, With<ArenaBot>>()
                 .iter(app.world())
                 .collect();
-            assert_eq!(bots.len(), 8, "salle {room}: vague attendue");
+            assert!(
+                !bots.is_empty(),
+                "salle {room}: une vague VIDE figerait la run (seen_alive jamais posé)"
+            );
+            assert!(
+                bots.len() <= MAX_BOTS_PER_WAVE,
+                "salle {room}: effectif non borné ({}) — budget de frame en danger",
+                bots.len()
+            );
             for bot in bots {
                 app.world_mut().entity_mut(bot).despawn();
             }
@@ -784,9 +921,14 @@ mod tests {
                 .query_filtered::<Entity, With<SceneRoot>>()
                 .iter(app.world())
                 .count();
+            let live_bots = app
+                .world_mut()
+                .query_filtered::<Entity, With<ArenaBot>>()
+                .iter(app.world())
+                .count();
             assert_eq!(
-                scene_roots, 8,
-                "salle {room}: les visuels précédents doivent être despawnés"
+                scene_roots, live_bots,
+                "salle {room}: 1 visuel par bot — les précédents doivent être despawnés"
             );
             // Arme la vague qui vient d'être créée avant le clear suivant.
             app.update();

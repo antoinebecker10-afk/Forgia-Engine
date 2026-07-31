@@ -67,6 +67,8 @@ pub mod ultimate_apply;
 pub mod ultimate_config;
 pub mod ultimate_tech;
 pub mod ultimate_vfx;
+/// Story-669 — composition de vague dérivée (genome + salle + type de salle + graine).
+pub mod wave_comp;
 pub mod waves;
 pub mod weapon_select;
 
@@ -332,6 +334,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             enemies::sys_hot_reload_enemy_genome
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Story-669 — composition de vague DÉRIVÉE (genome roguelite_waves.toml).
+        // Startup : la config doit exister avant le 1er `sys_start_run`.
+        app.add_systems(Startup, wave_comp::sys_init_wave_comp_genome);
+        app.add_systems(
+            Update,
+            wave_comp::sys_hot_reload_wave_comp_genome
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
