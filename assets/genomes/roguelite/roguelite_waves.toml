@@ -97,10 +97,19 @@ runner = 0.5
 sniper = 0.5
 
 [room_kind.rest]
-# La respiration. Le plancher d'1 ennemi s'applique : la salle reste franchissable.
-tank = 0.3
-runner = 0.3
-sniper = 0.3
+# La respiration — VRAIE salle sans combat (story-670). C'est le feu de camp de
+# Slay the Spire / la fontaine d'Hadès. `spawns_enemies = false` court-circuite le
+# plancher d'1 ennemi : celui-ci est un garde anti-run-figée pour les salles de
+# COMBAT, pas une raison de trahir le nom d'une salle.
+# Contrepartie : le Coffre y est OFFERT. Sans ça la salle ne vaudrait rien — les PV
+# sont déjà restaurés à chaque break, donc « se reposer » ne rendrait aucune
+# ressource. Les multiplicateurs ci-dessous sont sans effet tant que
+# `spawns_enemies = false` ; ils sont conservés pour pouvoir rebasculer la salle en
+# combat léger d'un seul booléen.
+spawns_enemies = false
+tank = 0.0
+runner = 0.0
+sniper = 0.0
 
 [room_kind.treasure]
 # Le trésor est gardé DE LOIN : peu de contact, beaucoup de tir à distance. Aller

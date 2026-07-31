@@ -62,6 +62,15 @@ pub struct KindMods {
     pub runner: f32,
     pub sniper: f32,
     pub boss: f32,
+    /// `false` = salle SANS COMBAT (story-670). La composition est alors vide et
+    /// l'orchestrateur clôt la salle immédiatement, au lieu d'attendre des ennemis
+    /// qui n'arriveront jamais.
+    ///
+    /// Le plancher d'1 ennemi ne s'applique qu'aux salles de COMBAT : c'est un
+    /// garde anti-run-figée, pas une raison de trahir le nom d'une salle. Une porte
+    /// « Repos » qui donne un combat rompt le contrat du nom
+    /// (`map-design-intention.md` §5.1) — constaté en jeu le 2026-07-31.
+    pub spawns_enemies: bool,
 }
 
 impl Default for KindMods {
@@ -71,6 +80,7 @@ impl Default for KindMods {
             runner: 1.0,
             sniper: 1.0,
             boss: 1.0,
+            spawns_enemies: true,
         }
     }
 }
@@ -227,30 +237,37 @@ impl Default for WaveCompConfig {
                     runner: 0.4,
                     sniper: 1.0,
                     boss: 1.0,
+                    spawns_enemies: true,
                 }),
                 event: Some(KindMods {
                     tank: 0.5,
                     runner: 1.8,
                     sniper: 0.6,
                     boss: 1.0,
+                    spawns_enemies: true,
                 }),
                 shop: Some(KindMods {
                     tank: 0.5,
                     runner: 0.5,
                     sniper: 0.5,
                     boss: 1.0,
+                    spawns_enemies: true,
                 }),
+                // Story-670 — le Repos ne fait PAS combattre. C'est le battement du
+                // genre (feu de camp Slay the Spire, fontaine d'Hadès).
                 rest: Some(KindMods {
-                    tank: 0.3,
-                    runner: 0.3,
-                    sniper: 0.3,
+                    tank: 0.0,
+                    runner: 0.0,
+                    sniper: 0.0,
                     boss: 1.0,
+                    spawns_enemies: false,
                 }),
                 treasure: Some(KindMods {
                     tank: 0.6,
                     runner: 0.6,
                     sniper: 1.6,
                     boss: 1.0,
+                    spawns_enemies: true,
                 }),
             },
         }
@@ -345,6 +362,12 @@ pub fn density_from_budget(room_budget: u32, base_budget: u32) -> f32 {
     room_budget as f32 / base_budget as f32
 }
 
+/// Une salle de ce type fait-elle combattre ? `None` (graph absent) = oui, par
+/// prudence : on ne transforme jamais une salle en salle vide par accident.
+pub fn room_spawns_enemies(cfg: &WaveCompConfig, kind: Option<StageKind>) -> bool {
+    kind.is_none() || cfg.mods_for(kind).spawns_enemies
+}
+
 /// Ordre STABLE d'itération — le spawn doit être déterministe à graine égale.
 const ARCHETYPE_ORDER: [EnemyArchetype; 4] = [
     EnemyArchetype::Tank,
@@ -362,6 +385,10 @@ const ARCHETYPE_ORDER: [EnemyArchetype; 4] = [
 pub fn compose(cfg: &WaveCompConfig, wave: u8, kind: Option<StageKind>, density: f32) -> Vec<CompLine> {
     let base = cfg.base_for(wave);
     let mods = cfg.mods_for(kind);
+    // Salle sans combat : rien à spawner, et surtout PAS de plancher.
+    if !mods.spawns_enemies {
+        return Vec::new();
+    }
     let d = cfg.density_factor(density);
 
     let mut out: Vec<CompLine> = Vec::with_capacity(ARCHETYPE_ORDER.len());
@@ -525,14 +552,44 @@ mod tests {
     #[test]
     fn a_wave_can_never_be_empty_whatever_the_genome_says() {
         let mut c = WaveCompConfig::default();
-        c.kinds.rest = Some(KindMods {
+        // Une salle de COMBAT dont tous les modificateurs tomberaient à 0.
+        c.kinds.combat = Some(KindMods {
             tank: 0.0,
             runner: 0.0,
             sniper: 0.0,
             boss: 0.0,
+            spawns_enemies: true,
         });
-        let lines = compose(&c, 1, Some(StageKind::Rest), 1.0);
+        let lines = compose(&c, 1, Some(StageKind::Combat), 1.0);
         assert!(total(&lines) >= 1, "plancher d'1 ennemi respecté");
+    }
+
+    /// Story-670 — le plancher ne s'applique PAS à une salle sans combat : sinon la
+    /// porte « Repos » donne un combat, et le nom ment (`map-design-intention` §5.1).
+    #[test]
+    fn a_non_combat_room_spawns_nothing_and_the_floor_does_not_apply() {
+        let c = WaveCompConfig::default();
+        assert!(
+            !room_spawns_enemies(&c, Some(StageKind::Rest)),
+            "Repos est déclaré sans combat"
+        );
+        assert!(
+            compose(&c, 1, Some(StageKind::Rest), 1.0).is_empty(),
+            "aucun ennemi dans une salle de Repos, plancher compris"
+        );
+        // …et toutes les autres restent des salles de combat.
+        for k in [
+            StageKind::Combat,
+            StageKind::Elite,
+            StageKind::Event,
+            StageKind::Shop,
+            StageKind::Treasure,
+        ] {
+            assert!(room_spawns_enemies(&c, Some(k)), "{k:?} doit faire combattre");
+            assert!(total(&compose(&c, 1, Some(k), 1.0)) >= 1, "{k:?} non vide");
+        }
+        // Graph absent → prudence : on ne vide jamais une salle par accident.
+        assert!(room_spawns_enemies(&c, None));
     }
 
     #[test]

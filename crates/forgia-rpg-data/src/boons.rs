@@ -305,10 +305,23 @@ pub struct OpenCoffreRequest {
     pub count: usize,
 }
 
+/// Source d'un Coffre dont l'atout est OFFERT (coût nul). Story-670 : la salle de
+/// Repos. Sans gratuité elle ne vaudrait rien — les PV sont déjà restaurés à chaque
+/// break, donc « se reposer » ne rendrait aucune ressource.
+pub const COFFRE_SOURCE_FREE_REST: &str = "rest";
+
 impl OpenCoffreRequest {
     pub fn wave_clear() -> Self {
         Self {
             source: "wave_clear".into(),
+            count: 3,
+        }
+    }
+
+    /// Coffre de la salle de Repos : 3 candidats, **gratuits**.
+    pub fn rest() -> Self {
+        Self {
+            source: COFFRE_SOURCE_FREE_REST.into(),
             count: 3,
         }
     }
@@ -489,7 +502,11 @@ pub fn sys_handle_coffre_pick(
                 pick.boon_id
             );
         }
-        let cost = def.effective_souls_cost();
+        // Story-670 — le Coffre de la salle de Repos est OFFERT. La gratuité vient
+        // de la SOURCE de la session, pas d'un champ de plus : `source` était déjà
+        // porté par la requête et recopié dans la session.
+        let free = session.source == COFFRE_SOURCE_FREE_REST;
+        let cost = if free { 0 } else { def.effective_souls_cost() };
         if let Some(souls) = souls.as_deref_mut() {
             if souls.current < cost {
                 warn!(
@@ -714,6 +731,21 @@ mod tests {
         assert!(
             active.unlocked_legendary.is_empty(),
             "knockback tag stacks should not unlock fire/chaos legendaries"
+        );
+    }
+
+    /// Story-670 — la gratuité du Coffre de Repos passe par la SOURCE de la
+    /// session. Si quelqu'un change la chaîne d'un côté sans l'autre, le joueur
+    /// paie ce qui devait être offert, en silence. Ce test lie les deux.
+    #[test]
+    fn the_rest_coffre_declares_the_free_source() {
+        let req = OpenCoffreRequest::rest();
+        assert_eq!(req.source, COFFRE_SOURCE_FREE_REST);
+        assert_eq!(req.count, 3, "3 candidats, comme un Coffre de vague");
+        assert_ne!(
+            OpenCoffreRequest::wave_clear().source,
+            COFFRE_SOURCE_FREE_REST,
+            "le Coffre de vague, lui, reste payant"
         );
     }
 

@@ -407,6 +407,28 @@ pub fn sys_wave_orchestrator(
             );
             return;
         }
+        // Story-670 — salle SANS COMBAT (Repos) : pas d'Âmes de vague (rien n'a été
+        // tué), mais le Coffre est OFFERT. Sans ça la salle ne vaudrait rien : les PV
+        // sont déjà restaurés à chaque break, donc « se reposer » ne rendrait aucune
+        // ressource. C'est le feu de camp de Slay the Spire.
+        let is_rest = !crate::wave_comp::room_spawns_enemies(&spawn_cfgs.comp, wave.room_kind);
+        if is_rest {
+            wave.in_break = true;
+            wave.break_secs_left = BREAK_SECS;
+            commands.queue(|world: &mut World| {
+                let mut q =
+                    world.query_filtered::<&mut forgia_damage::Health, With<forgia_player::Player>>();
+                if let Ok(mut hp) = q.single_mut(world) {
+                    hp.current = hp.max;
+                }
+            });
+            open_coffre.write(OpenCoffreRequest::rest());
+            info!(
+                "[roguelite] Salle {} — REPOS : aucun combat, atout OFFERT",
+                wave.stage + 1
+            );
+            return;
+        }
         // Story-571 — Souls méta pour une wave régulière nettoyée (persistant).
         meta.current = meta.current.saturating_add(crate::run::SOULS_PER_WAVE);
         meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_WAVE);
@@ -482,6 +504,7 @@ pub fn sys_wave_orchestrator(
                 // Pas de choix possible (boss / graph absent / 1 seul variant) → auto.
                 let budget = node_budget(graph.as_deref(), &graph_cfg, next, 0);
                 advance_to_room(&mut wave, next, is_boss, choices.first().copied(), budget);
+                arm_non_combat_room(&mut wave, &spawn_cfgs.comp, graph_cfg.waves_per_stage);
                 if is_boss {
                     next_run.set(crate::run::RunState::Boss { stage: wave.stage });
                 } else {
@@ -531,6 +554,7 @@ pub fn sys_wave_orchestrator(
         // Story-669 — le budget du nœud RÉELLEMENT choisi pilote la densité.
         let budget = node_budget(graph.as_deref(), &graph_cfg, next, pick as usize);
         advance_to_room(&mut wave, next, false, kind, budget);
+        arm_non_combat_room(&mut wave, &spawn_cfgs.comp, graph_cfg.waves_per_stage);
         next_run.set(crate::run::RunState::InRun { stage: wave.stage });
         let density =
             crate::wave_comp::density_from_budget(budget, graph_cfg.director_budget_for_depth(0));
@@ -553,6 +577,24 @@ pub fn sys_wave_orchestrator(
             ),
         );
     }
+}
+
+/// Story-670 — prépare une salle SANS COMBAT dès qu'on y entre.
+///
+/// Deux choses, et les deux sont indispensables :
+/// 1. `seen_alive = true` — la détection de clôture exige d'avoir VU des ennemis
+///    vivants. Aucun ne viendra, donc sans ça `clear_detection_armed` ne s'arme
+///    jamais et **la run se fige**. C'était le vrai obstacle derrière le plancher
+///    d'1 ennemi que story-669 avait posé faute de mieux.
+/// 2. `current_wave` sur la DERNIÈRE vague de la salle — sinon la fin du break
+///    enchaînerait sur la vague 2 de la même salle de Repos, qui offrirait un
+///    second atout gratuit, puis un troisième…
+fn arm_non_combat_room(wave: &mut RogueliteWave, comp: &WaveCompConfig, waves_per_stage: u8) {
+    if crate::wave_comp::room_spawns_enemies(comp, wave.room_kind) {
+        return;
+    }
+    wave.seen_alive = true;
+    wave.current_wave = waves_per_stage.max(1);
 }
 
 /// Budget de difficulté du nœud de graph `(depth, variant)`, avec repli sur la
@@ -700,6 +742,42 @@ mod tests {
             w3.iter().any(|(a, _, _)| *a == EnemyArchetype::Boss),
             "wave 3 doit contenir un Boss"
         );
+    }
+
+    /// Story-670 — les deux pièges d'une salle sans combat, verrouillés.
+    #[test]
+    fn a_non_combat_room_is_armed_on_entry() {
+        let comp = WaveCompConfig::default();
+        let mut w = RogueliteWave {
+            room_kind: Some(forgia_stage::graph::StageKind::Rest),
+            current_wave: 1,
+            seen_alive: false,
+            ..Default::default()
+        };
+        arm_non_combat_room(&mut w, &comp, 2);
+        assert!(
+            w.seen_alive,
+            "sans ça, aucun ennemi n'arrive, la clôture ne s'arme jamais → RUN FIGÉE"
+        );
+        assert_eq!(
+            w.current_wave, 2,
+            "la salle doit être sur sa DERNIÈRE vague, sinon le Repos se rejoue \
+             et offre un atout gratuit par vague"
+        );
+    }
+
+    #[test]
+    fn a_combat_room_is_left_untouched_by_the_arming() {
+        let comp = WaveCompConfig::default();
+        let mut w = RogueliteWave {
+            room_kind: Some(forgia_stage::graph::StageKind::Elite),
+            current_wave: 1,
+            seen_alive: false,
+            ..Default::default()
+        };
+        arm_non_combat_room(&mut w, &comp, 2);
+        assert!(!w.seen_alive, "une salle de combat garde son gate anti-race");
+        assert_eq!(w.current_wave, 1);
     }
 
     #[test]
