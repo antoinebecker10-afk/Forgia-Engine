@@ -96,25 +96,71 @@ impl RunSeed {
 #[derive(Component, Default)]
 pub struct RogueliteRunMarker;
 
-/// Mapping V1 depth → stage_id. Pattern simple alternance + boss force volcanique.
+/// Salle à charger à une profondeur donnée — **tirée de la graine de run**.
 ///
-/// Story-483 P2 (2026-05-20). V7 ne shippe que 2 stages TOML (`crypts_of_anvil`
-/// + `forge_sanctum`). Mapping :
-/// - Boss state → toujours `crypts_of_anvil` (le seul stage avec `boss_pad_required`)
-/// - Pair depths (0, 2, ...) → `crypts_of_anvil` (Volcanic, boss-ready)
-/// - Impair depths (1, 3, ...) → `forge_sanctum` (Plains, lighter biome)
+/// Story-671. Avant : `depth % 2` sur deux stages, donc le même enchaînement à
+/// chaque run (`crypts → forge → crypts → forge`), à la 1re comme à la 50e.
+/// Maintenant : 4 salles, ordre seedé, jamais deux identiques d'affilée — et
+/// chacune porte sa propre DA (`roguelite_palettes.toml`).
 ///
-/// V2 : étendre `roguelite_stages.toml` + remplacer ce mapping par lookup
-/// `RunGraph::stages[depth].variants[chosen].stage_id_pool` (data-driven).
-pub fn stage_id_for_depth(depth: u8, is_boss: bool) -> &'static str {
+/// Le boss garde `crypts_of_anvil` : c'est la seule salle du génome avec
+/// `boss_pad_required = true`.
+pub fn stage_id_for_depth(depth: u8, is_boss: bool, run_seed: u64) -> &'static str {
     if is_boss {
-        return "crypts_of_anvil";
+        return BOSS_STAGE_ID;
     }
-    if depth.is_multiple_of(2) {
-        "crypts_of_anvil"
-    } else {
-        "forge_sanctum"
+    stage_sequence(run_seed, depth.saturating_add(1))
+        .get(depth as usize)
+        .copied()
+        .unwrap_or(BOSS_STAGE_ID)
+}
+
+/// Seule salle portant `boss_pad_required` (`roguelite_stages.toml`).
+const BOSS_STAGE_ID: &str = "crypts_of_anvil";
+
+/// Salles tirables hors boss. **MIROIR de `roguelite_stages.toml`** — le test
+/// `the_stage_pool_mirrors_the_genome` compare les deux ensembles, donc la dérive
+/// est impossible : ajouter une salle au TOML sans l'ajouter ici casse le build.
+const STAGE_POOL: &[&str] = &[
+    "crypts_of_anvil",
+    "forge_sanctum",
+    "donjon_oublie",
+    "hauts_paturages",
+];
+
+/// Story-671 — l'ordre des salles d'une run, tiré de la GRAINE.
+///
+/// Avant : `depth % 2` — deux salles alternées, le même enchaînement à chaque
+/// run, dans le même ordre. Le joueur voyait la même chose à la 1re et à la 50e.
+///
+/// Maintenant : une permutation seedée, **sans deux salles identiques
+/// consécutives**. Deux runs ne visitent plus le même donjon dans le même ordre,
+/// et comme chaque salle porte sa propre DA (`roguelite_palettes.toml`), l'habillage
+/// change en même temps que la géométrie.
+///
+/// PUR — testable sans App.
+pub fn stage_sequence(run_seed: u64, count: u8) -> Vec<&'static str> {
+    let n = STAGE_POOL.len();
+    let mut out: Vec<&'static str> = Vec::with_capacity(count as usize);
+    if n == 0 {
+        return out;
     }
+    let mut prev: Option<usize> = None;
+    for depth in 0..count {
+        // Hash (graine, profondeur) → index. Xoshiro pour rester cohérent avec le
+        // reste du déterminisme de run (`RunSeed::stage_seed`).
+        let mixed = run_seed ^ u64::from(depth).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let mut rng = Xoshiro256StarStar::seed_from_u64(mixed);
+        let mut idx = (rng.next_u64() % n as u64) as usize;
+        // Anti-répétition immédiate : deux salles de suite identiques annuleraient
+        // le bénéfice — même arène, même DA, le joueur ne verrait pas la transition.
+        if n > 1 && prev == Some(idx) {
+            idx = (idx + 1) % n;
+        }
+        prev = Some(idx);
+        out.push(STAGE_POOL[idx]);
+    }
+    out
 }
 
 /// Story-483 V7 P2 (2026-05-20) — dispatcher stage_id sur transition RunState.
@@ -155,8 +201,13 @@ pub fn sys_stage_dispatch(
     let Some((depth, is_boss)) = key else {
         return;
     };
-    let stage_id = stage_id_for_depth(depth, is_boss);
     const FALLBACK_SEED: u64 = 0xC0FF_EE51_C0BA_1700;
+    // Story-671 — l'ORDRE DES SALLES dérive de la graine de run (plus de `depth % 2`).
+    let stage_id = stage_id_for_depth(
+        depth,
+        is_boss,
+        run_seed.as_ref().map(|s| s.seed).unwrap_or(FALLBACK_SEED),
+    );
     let seed = run_seed
         .as_ref()
         .map(|s| s.stage_seed(depth))
@@ -942,20 +993,69 @@ mod tests {
         assert_eq!(RunState::default(), RunState::Lobby);
     }
 
+    /// Story-671 — l'ex-`stage_id_for_depth_alternates` verrouillait `depth % 2`,
+    /// c'est-à-dire le défaut lui-même : deux salles alternées, même ordre à chaque
+    /// run. Ce qu'on verrouille maintenant, c'est ce qui doit rester vrai.
     #[test]
-    fn stage_id_for_depth_alternates() {
-        assert_eq!(stage_id_for_depth(0, false), "crypts_of_anvil");
-        assert_eq!(stage_id_for_depth(1, false), "forge_sanctum");
-        assert_eq!(stage_id_for_depth(2, false), "crypts_of_anvil");
-        assert_eq!(stage_id_for_depth(3, false), "forge_sanctum");
+    fn the_stage_order_is_deterministic_per_seed_but_differs_between_seeds() {
+        let a = stage_sequence(0x1234_5678, 4);
+        assert_eq!(a, stage_sequence(0x1234_5678, 4), "même graine → même donjon");
+        // Sur un échantillon de graines, au moins deux ordres distincts doivent
+        // apparaître — sinon la « variété » est fictive.
+        let mut seen = std::collections::HashSet::new();
+        for seed in 0..64u64 {
+            seen.insert(stage_sequence(seed.wrapping_mul(0x9E37_79B9), 4));
+        }
+        assert!(
+            seen.len() > 1,
+            "toutes les graines donnent le même ordre de salles"
+        );
+    }
+
+    #[test]
+    fn no_two_consecutive_rooms_are_the_same() {
+        for seed in 0..256u64 {
+            let seq = stage_sequence(seed.wrapping_mul(0xBF58_476D), 8);
+            for w in seq.windows(2) {
+                assert_ne!(
+                    w[0], w[1],
+                    "graine {seed} : deux salles identiques d'affilée —                      même arène, même DA, la transition ne se voit pas"
+                );
+            }
+        }
     }
 
     #[test]
     fn stage_id_for_depth_boss_forces_crypts() {
         // Boss state utilise toujours crypts_of_anvil (boss_pad_required=true).
-        assert_eq!(stage_id_for_depth(4, true), "crypts_of_anvil");
-        assert_eq!(stage_id_for_depth(5, true), "crypts_of_anvil");
-        assert_eq!(stage_id_for_depth(0, true), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(4, true, 42), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(5, true, 7), "crypts_of_anvil");
+        assert_eq!(stage_id_for_depth(0, true, 0), "crypts_of_anvil");
+    }
+
+    /// Le pool Rust est un MIROIR de `roguelite_stages.toml`. Ce test rend la
+    /// dérive impossible : ajouter une salle au TOML sans l'ajouter au pool (ou
+    /// l'inverse) casse le build, au lieu de produire une salle jamais tirée ou
+    /// une requête de stage inexistant.
+    #[test]
+    fn the_stage_pool_mirrors_the_genome() {
+        const P: &str = "assets/genomes/roguelite_stages.toml";
+        let content = std::fs::read_to_string(P)
+            .or_else(|_| std::fs::read_to_string(format!("../../{P}")))
+            .expect("roguelite_stages.toml introuvable");
+        let genome: forgia_stage::RogueliteStagesGenome =
+            toml::from_str(&content).expect("genome stages illisible");
+        let declared: std::collections::BTreeSet<&str> =
+            genome.stages.keys().map(String::as_str).collect();
+        let pool: std::collections::BTreeSet<&str> = STAGE_POOL.iter().copied().collect();
+        assert_eq!(
+            pool, declared,
+            "le pool Rust et le génome ont divergé (pool={pool:?}, génome={declared:?})"
+        );
+        assert!(
+            declared.contains(BOSS_STAGE_ID),
+            "la salle de boss doit exister dans le génome"
+        );
     }
 
     // Story-571 — l'ancien carry-over 25% (Souls) est supprimé : l'Or in-run

@@ -1,0 +1,210 @@
+# roguelite_palettes.toml — LES DIRECTIONS ARTISTIQUES (story-671).
+#
+# ── Pourquoi ce fichier existe ───────────────────────────────────────────────
+# Les catalogues de props vivaient en `const &[&str]` dans decor.rs : UNE seule
+# palette (pack Inferno + murs KayKit dungeon), donc toutes les salles de toutes
+# les runs avaient exactement le même habillage. Le décor bougeait — les props
+# sont semés à la graine — mais c'étaient toujours les mêmes objets.
+#
+# Une DA = un jeu de props cohérent + le kit de remparts qui va avec. Le stage
+# déclare sa palette (`[stage_palette]` en bas), et le décor la lit.
+#
+# ⚠️ Tous les chemins ci-dessous existent dans `assets/models/` — vérifiés fichier
+# par fichier. Un chemin absent ne casse rien (Bevy log une erreur d'asset et le
+# prop est simplement absent), mais ça fait une salle plus vide que prévu.
+#
+# Hot-reload : sauvegarder ce fichier recharge les catalogues (poll mtime 1 Hz).
+# Miroir exact des `Default` Rust (decor_palettes.rs).
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 1. LA CRYPTE DE L'ENCLUME — volcanique, la DA de référence
+#    Pack Inferno. Sombre, braises, colonnes brisées, engrenages. C'est
+#    l'identité forge/enfer du jeu : celle qu'on garde comme point de comparaison.
+# ═══════════════════════════════════════════════════════════════════════════
+[palettes.inferno]
+name = "La Crypte de l'Enclume"
+landmarks = [
+    "models/environment/inferno/StatueKnight_002.glb",
+    "models/environment/inferno/TowerBig_001.glb",
+]
+big = [
+    "models/environment/inferno/RockBig_001.glb",
+    "models/environment/inferno/RockBig_003.glb",
+    "models/environment/inferno/RockBig_004.glb",
+    "models/environment/inferno/Crag_001.glb",
+    "models/environment/inferno/Crag_003.glb",
+    "models/environment/inferno/Mound_005.glb",
+    "models/environment/inferno/Mound_008.glb",
+    "models/environment/inferno/ColumnBig_001.glb",
+    "models/environment/inferno/ColumnBigBroken_001.glb",
+    "models/environment/inferno/ColumnBigBroken_002.glb",
+]
+braziers = [
+    "models/environment/inferno/Brazier_002.glb",
+    "models/environment/inferno/Brazier_004.glb",
+]
+scatter = [
+    "models/environment/inferno/RockMid_001.glb",
+    "models/environment/inferno/RockMid_002.glb",
+    "models/environment/inferno/RockMid_003.glb",
+    "models/environment/inferno/Box_001.glb",
+    "models/environment/inferno/Vase_001.glb",
+    "models/environment/inferno/Vase_002.glb",
+    "models/environment/inferno/Gear_001.glb",
+    "models/environment/inferno/Gear_002.glb",
+]
+walls = [
+    "models/kaykit/dungeon/wall.glb",
+    "models/kaykit/dungeon/wall.glb",
+    "models/kaykit/dungeon/wall_broken.glb",
+    "models/kaykit/dungeon/wall_window.glb",
+]
+wall_corner = "models/kaykit/dungeon/wall_corner.glb"
+rubble = ["models/kaykit/dungeon/rubble.glb"]
+buildings = [
+    "models/kaykit/hexagon/red/building_blacksmith_red.gltf",
+    "models/kaykit/hexagon/red/building_mine_red.gltf",
+    "models/kaykit/hexagon/red/building_tower_A_red.gltf",
+    "models/kaykit/hexagon/red/building_tower_catapult_red.gltf",
+    "models/kaykit/hexagon/neutral/building_scaffolding.gltf",
+    "models/kaykit/hexagon/neutral/building_destroyed.gltf",
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2. LE DONJON OUBLIÉ — intérieur bâti, clos et lisible
+#    Pack KayKit Dungeon pur. Contraste avec la Crypte : ce n'est pas un
+#    extérieur volcanique, c'est une SALLE. Tonneaux, caisses, coffres,
+#    bannières colorées, colonnes régulières. Le sol est dallé, pas rocheux.
+#    Lecture de combat : repères réguliers, silhouettes basses et denses.
+# ═══════════════════════════════════════════════════════════════════════════
+[palettes.donjon]
+name = "Le Donjon Oublié"
+landmarks = [
+    "models/kaykit/dungeon/column.glb",
+    "models/kaykit/dungeon/banner_blue.glb",
+]
+big = [
+    "models/kaykit/dungeon/column.glb",
+    "models/kaykit/dungeon/barrels_stack.glb",
+    "models/kaykit/dungeon/crates.glb",
+    "models/kaykit/dungeon/chest_gold.glb",
+    "models/kaykit/dungeon/wall_broken.glb",
+]
+braziers = [
+    "models/kaykit/dungeon/banner_red.glb",
+    "models/kaykit/dungeon/banner_yellow.glb",
+]
+scatter = [
+    "models/kaykit/dungeon/barrel.glb",
+    "models/kaykit/dungeon/crates.glb",
+    "models/kaykit/dungeon/chest.glb",
+    "models/kaykit/dungeon/chest_basic.glb",
+    "models/kaykit/dungeon/rubble.glb",
+    "models/kaykit/dungeon/floor_rocks.glb",
+]
+walls = [
+    "models/kaykit/dungeon/wall.glb",
+    "models/kaykit/dungeon/wall_window.glb",
+    "models/kaykit/dungeon/wall.glb",
+    "models/kaykit/dungeon/wall_broken.glb",
+]
+wall_corner = "models/kaykit/dungeon/wall_corner.glb"
+rubble = ["models/kaykit/dungeon/rubble.glb"]
+buildings = []
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3. LES HAUTS PÂTURAGES — extérieur clair, low-poly coloré
+#    Pack KayKit Hexagon (nature). CONTRASTE MAXIMAL avec la Crypte : lumineux,
+#    dégagé, collines et arbres. Longues lignes de vue → c'est la salle où
+#    Madame Lenoir (sniper, portée 300 m, aucun falloff) prend enfin son sens.
+#    Les « braseros » deviennent des arbres : la catégorie porte une lumière,
+#    ici on l'éteint en n'y mettant que du végétal (le ratio brasero du génome
+#    de décor reste réglable si tu veux des feux de camp).
+# ═══════════════════════════════════════════════════════════════════════════
+[palettes.paturages]
+name = "Les Hauts Pâturages"
+landmarks = [
+    "models/kaykit/hexagon/decoration/nature/trees_A_large.gltf",
+    "models/kaykit/hexagon/decoration/nature/mountain_A_grass_trees.gltf",
+]
+big = [
+    "models/kaykit/hexagon/decoration/nature/hills_A.gltf",
+    "models/kaykit/hexagon/decoration/nature/hills_B.gltf",
+    "models/kaykit/hexagon/decoration/nature/hills_C.gltf",
+    "models/kaykit/hexagon/decoration/nature/hills_A_trees.gltf",
+    "models/kaykit/hexagon/decoration/nature/hills_B_trees.gltf",
+    "models/kaykit/hexagon/decoration/nature/mountain_A_grass.gltf",
+]
+braziers = [
+    "models/kaykit/hexagon/decoration/nature/trees_B_large.gltf",
+    "models/kaykit/hexagon/decoration/nature/trees_A_medium.gltf",
+]
+scatter = [
+    "models/kaykit/hexagon/decoration/nature/hill_single_A.gltf",
+    "models/kaykit/hexagon/decoration/nature/hill_single_B.gltf",
+    "models/kaykit/hexagon/decoration/nature/hill_single_C.gltf",
+    "models/kaykit/hexagon/decoration/nature/rock_single_A.gltf",
+    "models/kaykit/hexagon/decoration/nature/rock_single_B.gltf",
+    "models/kaykit/hexagon/decoration/nature/tree_single_A.gltf",
+]
+walls = ["models/kaykit/medieval_hexagon/walls/wall_straight.gltf"]
+wall_corner = "models/kaykit/medieval_hexagon/walls/wall_straight.gltf"
+rubble = ["models/kaykit/hexagon/decoration/nature/rock_single_C.gltf"]
+buildings = []
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 4. LE BOURG — village civil, verticalité de toits
+#    Pack KayKit Hexagon rouge, versant CIVIL (église, moulins, taverne,
+#    maisons, puits, marché) — l'industriel en ruine (forge, mine, catapulte,
+#    échafaudages) reste à la Crypte. Des bâtiments à CONTOURNER : couloirs
+#    entre les maisons, toits qui cassent les lignes de vue. C'est la salle la
+#    plus « couloirs », l'inverse exact des Pâturages.
+# ═══════════════════════════════════════════════════════════════════════════
+[palettes.bourg]
+name = "Le Bourg"
+landmarks = [
+    "models/kaykit/hexagon/red/building_church_red.gltf",
+    "models/kaykit/hexagon/red/building_castle_red.gltf",
+]
+big = [
+    "models/kaykit/hexagon/red/building_home_A_red.gltf",
+    "models/kaykit/hexagon/red/building_home_B_red.gltf",
+    "models/kaykit/hexagon/red/building_market_red.gltf",
+    "models/kaykit/hexagon/red/building_tavern_red.gltf",
+    "models/kaykit/hexagon/red/building_windmill_red.gltf",
+    "models/kaykit/hexagon/red/building_watermill_red.gltf",
+]
+braziers = [
+    "models/kaykit/hexagon/red/building_tower_A_red.gltf",
+    "models/kaykit/hexagon/red/building_well_red.gltf",
+]
+scatter = [
+    "models/kaykit/hexagon/decoration/props/barrel.gltf",
+    "models/kaykit/hexagon/decoration/props/crate_A_big.gltf",
+    "models/kaykit/hexagon/decoration/props/crate_A_small.gltf",
+    "models/kaykit/hexagon/decoration/props/bucket_water.gltf",
+    "models/kaykit/hexagon/decoration/props/bucket_arrows.gltf",
+]
+walls = ["models/kaykit/medieval_hexagon/walls/wall_straight.gltf"]
+wall_corner = "models/kaykit/medieval_hexagon/walls/wall_straight.gltf"
+rubble = ["models/kaykit/hexagon/decoration/props/crate_A_small.gltf"]
+buildings = [
+    "models/kaykit/hexagon/red/building_home_A_red.gltf",
+    "models/kaykit/hexagon/red/building_home_B_red.gltf",
+    "models/kaykit/hexagon/red/building_market_red.gltf",
+    "models/kaykit/hexagon/red/building_tavern_red.gltf",
+    "models/kaykit/hexagon/red/building_church_red.gltf",
+    "models/kaykit/hexagon/red/building_windmill_red.gltf",
+]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Quel stage porte quelle DA.
+# C'est ICI qu'on ré-habille une salle sans toucher au code : change la valeur,
+# sauvegarde, le décor se reconstruit à la prochaine salle.
+# Un stage absent de cette table retombe sur `inferno` (avec un warn).
+# ═══════════════════════════════════════════════════════════════════════════
+[stage_palette]
+crypts_of_anvil = "inferno"
+forge_sanctum = "bourg"
+donjon_oublie = "donjon"
+hauts_paturages = "paturages"

@@ -52,80 +52,13 @@ const SENSOR_PATH: &str = "forgia2_stage_decor.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
 const ATMOSPHERE_LUMEN_CAP: f32 = 8_000.0;
 
-// ─── Catalogue de props (pack Inferno CC0, déjà dans assets/) ─────────────────
-
-/// Landmarks hauts = points focaux (statue, tour).
-const LANDMARK_PROPS: &[&str] = &[
-    "models/environment/inferno/StatueKnight_002.glb",
-    "models/environment/inferno/TowerBig_001.glb",
-];
-
-/// Gros props de remplissage (rochers, crags, mounds, colonnes).
-const BIG_PROPS: &[&str] = &[
-    "models/environment/inferno/RockBig_001.glb",
-    "models/environment/inferno/RockBig_003.glb",
-    "models/environment/inferno/RockBig_004.glb",
-    "models/environment/inferno/Crag_001.glb",
-    "models/environment/inferno/Crag_003.glb",
-    "models/environment/inferno/Mound_005.glb",
-    "models/environment/inferno/Mound_008.glb",
-    "models/environment/inferno/ColumnBig_001.glb",
-    "models/environment/inferno/ColumnBigBroken_001.glb",
-    "models/environment/inferno/ColumnBigBroken_002.glb",
-];
-
-/// Braseros — élément lumineux (feu GLB + PointLight chaud).
-const BRAZIERS: &[&str] = &[
-    "models/environment/inferno/Brazier_002.glb",
-    "models/environment/inferno/Brazier_004.glb",
-];
-
-/// Petits props dispersés au sol.
-const SCATTER_PROPS: &[&str] = &[
-    "models/environment/inferno/RockMid_001.glb",
-    "models/environment/inferno/RockMid_002.glb",
-    "models/environment/inferno/RockMid_003.glb",
-    "models/environment/inferno/Box_001.glb",
-    "models/environment/inferno/Vase_001.glb",
-    "models/environment/inferno/Vase_002.glb",
-    "models/environment/inferno/Gear_001.glb",
-    "models/environment/inferno/Gear_002.glb",
-];
-
-/// Segments de mur KayKit dungeon (salles en L). Échelle NATIVE (modulaires).
-const WALL_VARIANTS: &[&str] = &[
-    "models/kaykit/dungeon/wall.glb",
-    "models/kaykit/dungeon/wall.glb",
-    "models/kaykit/dungeon/wall_broken.glb",
-    "models/kaykit/dungeon/wall_window.glb",
-];
-const WALL_CORNER: &str = "models/kaykit/dungeon/wall_corner.glb";
-
-/// Gravats au sol pour casser la répétition des dalles (masque, pas collider).
-const RUBBLE_PROPS: &[&str] = &["models/kaykit/dungeon/rubble.glb"];
-
-/// Bâtiments KayKit Medieval Hexagon (couleur ROUGE = forge/feu) pour la ville
-/// industrielle « Cratère de la Forge » (incr.3). Self-contained .gltf + atlas
-/// `hexagons_medieval.png`. Mix industriel dominant (blacksmith ×2, mine, tours,
-/// barracks, castle, lumbermill, scaffolding, ruines) + un peu de civil.
-const BUILDINGS: &[&str] = &[
-    "models/kaykit/hexagon/red/building_blacksmith_red.gltf",
-    "models/kaykit/hexagon/red/building_blacksmith_red.gltf",
-    "models/kaykit/hexagon/red/building_mine_red.gltf",
-    "models/kaykit/hexagon/red/building_tower_A_red.gltf",
-    "models/kaykit/hexagon/red/building_tower_B_red.gltf",
-    "models/kaykit/hexagon/red/building_tower_catapult_red.gltf",
-    "models/kaykit/hexagon/red/building_barracks_red.gltf",
-    "models/kaykit/hexagon/red/building_castle_red.gltf",
-    "models/kaykit/hexagon/red/building_lumbermill_red.gltf",
-    "models/kaykit/hexagon/red/building_tavern_red.gltf",
-    "models/kaykit/hexagon/red/building_home_A_red.gltf",
-    "models/kaykit/hexagon/red/building_home_B_red.gltf",
-    "models/kaykit/hexagon/red/building_market_red.gltf",
-    "models/kaykit/hexagon/neutral/building_scaffolding.gltf",
-    "models/kaykit/hexagon/neutral/building_destroyed.gltf",
-    "models/kaykit/hexagon/neutral/building_grain.gltf",
-];
+// ─── Catalogues de props : PARTIS EN COUCHE DEFINITION (story-671) ───────────
+// Les ex-`const LANDMARK_PROPS / BIG_PROPS / BRAZIERS / SCATTER_PROPS /
+// WALL_VARIANTS / WALL_CORNER / RUBBLE_PROPS / BUILDINGS` vivent désormais dans
+// `assets/genomes/roguelite/roguelite_palettes.toml` (cf `decor_palettes.rs`),
+// une entrée par DIRECTION ARTISTIQUE. Le miroir Rust de la palette historique
+// est `DecorPalette::inferno()` : sans génome, le jeu se comporte exactement
+// comme avant story-671.
 
 /// Dimensions natives KayKit dungeon wall.glb (cf forgia-stage : largeur 1 m,
 /// hauteur `RAMPARTS_WALL_HEIGHT_M`=4, épaisseur `RAMPARTS_WALL_THICKNESS_M`=0.4).
@@ -353,8 +286,10 @@ pub struct DecorGenomeWatch {
 }
 
 /// Handles de scènes GLB préchargés (réutilisés sur toutes les instances).
-#[derive(Resource, Default)]
-pub struct DecorAssets {
+/// Handles d'une DA (story-671). C'est l'ex-`DecorAssets` : le planificateur ne
+/// voit toujours qu'un seul jeu de props à la fois, celui de la salle en cours.
+#[derive(Default, Clone)]
+pub struct DecorPaletteAssets {
     pub landmarks: Vec<Handle<Scene>>,
     pub big: Vec<Handle<Scene>>,
     pub braziers: Vec<Handle<Scene>>,
@@ -363,6 +298,47 @@ pub struct DecorAssets {
     pub wall_corner: Vec<Handle<Scene>>,
     pub rubble: Vec<Handle<Scene>>,
     pub buildings: Vec<Handle<Scene>>,
+}
+
+/// Toutes les DA préchargées, indexées par id de palette (story-671).
+#[derive(Resource, Default)]
+pub struct DecorAssets {
+    by_palette: std::collections::HashMap<String, DecorPaletteAssets>,
+    /// Repli : la DA historique. Garantit qu'une salle n'est JAMAIS sans props.
+    fallback: DecorPaletteAssets,
+}
+
+impl DecorAssets {
+    /// Handles d'une palette, avec repli explicite sur la DA historique.
+    pub fn for_palette(&self, id: &str) -> &DecorPaletteAssets {
+        self.by_palette.get(id).unwrap_or(&self.fallback)
+    }
+
+    pub fn palette_count(&self) -> usize {
+        self.by_palette.len()
+    }
+
+    /// Tous les handles, TOUTES palettes confondues — pour le préchauffage des
+    /// pipelines. Il faut chauffer les 4 DA, pas seulement celle de la salle 1 :
+    /// sinon entrer dans une salle d'une DA jamais vue déclenche la spécialisation
+    /// PBR en plein combat (cf `reference_pbr_pipeline_warmup_frustum_trap`).
+    /// Coût assumé : un premier Lobby plus long, une seule fois par session.
+    pub fn all_handles(&self) -> impl Iterator<Item = &Handle<Scene>> {
+        self.by_palette.values().flat_map(|p| {
+            [
+                &p.landmarks,
+                &p.big,
+                &p.braziers,
+                &p.scatter,
+                &p.walls,
+                &p.wall_corner,
+                &p.rubble,
+                &p.buildings,
+            ]
+            .into_iter()
+            .flatten()
+        })
+    }
 }
 
 /// Marqueur sur l'entité racine d'un prop (count sensor + cleanup).
@@ -557,24 +533,57 @@ pub fn sys_init_decor_genome(mut commands: Commands) {
 }
 
 /// Précharge toutes les scènes GLB une fois (un seul call-site `load`).
-pub fn sys_load_decor_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn sys_load_decor_assets(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
+) {
     let load = |paths: &[&str]| -> Vec<Handle<Scene>> {
         paths
             .iter()
+            .filter(|p| !p.is_empty())
             .map(|p| asset_server.load(GltfAssetLabel::Scene(0).from_asset(p.to_string())))
             .collect()
     };
+    let load_owned = |paths: &[String]| -> Vec<Handle<Scene>> {
+        paths
+            .iter()
+            .map(|p| asset_server.load(GltfAssetLabel::Scene(0).from_asset(p.clone())))
+            .collect()
+    };
+    // Story-671 — précharge TOUTES les DA déclarées au génome. `Option<Res<..>>`
+    // + repli sur un chargement direct : ce système ne dépend d'aucun ordre de
+    // Startup (les `insert_resource` d'un autre système ne sont pas encore
+    // appliqués à ce moment-là).
+    let cfg = palettes
+        .map(|c| c.clone())
+        .unwrap_or_else(crate::decor_palettes::DecorPalettesConfig::load_or_default_public);
+    let mut by_palette = std::collections::HashMap::new();
+    for (id, p) in &cfg.palettes {
+        by_palette.insert(
+            id.clone(),
+            DecorPaletteAssets {
+                landmarks: load_owned(&p.landmarks),
+                big: load_owned(&p.big),
+                braziers: load_owned(&p.braziers),
+                scatter: load_owned(&p.scatter),
+                walls: load_owned(&p.walls),
+                wall_corner: load(&[p.wall_corner.as_str()]),
+                rubble: load_owned(&p.rubble),
+                buildings: load_owned(&p.buildings),
+            },
+        );
+    }
+    let fallback = by_palette
+        .get(crate::decor_palettes::FALLBACK_PALETTE)
+        .cloned()
+        .unwrap_or_default();
+    let n = by_palette.len();
     commands.insert_resource(DecorAssets {
-        landmarks: load(LANDMARK_PROPS),
-        big: load(BIG_PROPS),
-        braziers: load(BRAZIERS),
-        scatter: load(SCATTER_PROPS),
-        walls: load(WALL_VARIANTS),
-        wall_corner: load(&[WALL_CORNER]),
-        rubble: load(RUBBLE_PROPS),
-        buildings: load(BUILDINGS),
+        by_palette,
+        fallback,
     });
-    info!("[decor] preloaded inferno + wall + rubble + kaykit buildings scenes");
+    info!("[decor] {n} DA préchargées");
 }
 
 /// Poll mtime 1Hz. Sur changement réel, despawn le décor → réconciliation le
@@ -802,6 +811,9 @@ pub fn sys_reconcile_decor(
     assets: Option<Res<DecorAssets>>,
     run_seed: Option<Res<RunSeed>>,
     stage_result: Option<Res<StageLoadResult>>,
+    // Story-671 — la DA de la salle : `stage_id` courant → palette → props.
+    stage_request: Option<Res<forgia_stage::StageLoadRequest>>,
+    palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
     q_anchors: Query<&AnchorPoint>,
     q_decor: Query<(), With<DecorProp>>,
     mut queue: ResMut<DecorSpawnQueue>,
@@ -827,13 +839,24 @@ pub fn sys_reconcile_decor(
         .map(|r| r.biome.clone())
         .unwrap_or_else(|| "default".to_string());
 
+    // Story-671 — quelle DA porte cette salle ? Repli explicite : une salle sans
+    // palette reconnue garde la DA historique, elle n'est jamais vide.
+    let stage_id = stage_request
+        .as_ref()
+        .map(|r| r.stage_id.clone())
+        .unwrap_or_default();
+    let palette_id = palettes
+        .as_ref()
+        .map(|c| c.palette_id_for_stage(&stage_id).to_string())
+        .unwrap_or_else(|| crate::decor_palettes::FALLBACK_PALETTE.to_string());
+
     // Planifie tout (RNG only, pas d'instanciation) → le drain spawne par budget.
-    let specs = plan_decor_set(&cfg, &assets, seed);
+    let specs = plan_decor_set(&cfg, assets.for_palette(&palette_id), seed);
     let count = specs.len();
     queue.pending = specs;
     queue.cursor = 0;
     info!(
-        "[decor] planned {count} GLB props (biome={biome}) — étalés à {}/frame",
+        "[decor] planned {count} GLB props — salle '{stage_id}' / DA '{palette_id}'          (biome={biome}), étalés à {}/frame",
         cfg.spawn_budget_per_frame.max(1)
     );
 }
@@ -987,7 +1010,11 @@ fn spawn_perimeter_prop(
 /// Préserve EXACTEMENT le stream RNG de l'ancien `spawn_decor_set` (les salles
 /// sont décomposées en pièces via `plan_wall_room`, consommant le RNG à
 /// l'identique) → layout décor inchangé, juste étalé dans le temps.
-fn plan_decor_set(cfg: &RogueliteDecorConfig, assets: &DecorAssets, seed: u64) -> Vec<DecorSpec> {
+fn plan_decor_set(
+    cfg: &RogueliteDecorConfig,
+    assets: &DecorPaletteAssets,
+    seed: u64,
+) -> Vec<DecorSpec> {
     let mut rng = Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEC0_DEC0_F00D_BEEF);
     let mut specs: Vec<DecorSpec> = Vec::new();
 
@@ -1246,7 +1273,7 @@ fn plan_decor_set(cfg: &RogueliteDecorConfig, assets: &DecorAssets, seed: u64) -
 /// l'identique de l'ancien `spawn_wall_room` → layout inchangé.
 fn plan_wall_room(
     specs: &mut Vec<DecorSpec>,
-    assets: &DecorAssets,
+    assets: &DecorPaletteAssets,
     rng: &mut Xoshiro256StarStar,
     origin: Vec3,
     yaw0: f32,
@@ -1278,7 +1305,7 @@ fn plan_wall_room(
 /// (`pick`) à l'identique de l'ancien `spawn_wall_arm`.
 fn plan_wall_arm(
     specs: &mut Vec<DecorSpec>,
-    assets: &DecorAssets,
+    assets: &DecorPaletteAssets,
     rng: &mut Xoshiro256StarStar,
     origin: Vec3,
     dir: Vec3,
@@ -1412,19 +1439,41 @@ default = 40.0
         assert_eq!(c.ring_radius_max, 90.0);
     }
 
+    /// Story-671 — remplace l'ex-`prop_paths_valid` (qui vérifiait seulement que
+    /// les chemins étaient des `.glb` du pack Inferno, ce qui n'a plus de sens avec
+    /// 4 DA de packs différents).
+    ///
+    /// Ce test est bien plus fort : **chaque chemin déclaré dans le génome doit
+    /// exister sur le disque**. Un chemin mort ne fait pas planter le jeu — Bevy
+    /// loggue une erreur d'asset et le prop est simplement absent — donc sans ce
+    /// test une DA peut se vider en silence à la faveur d'un renommage de fichier.
     #[test]
-    fn prop_paths_valid() {
-        for p in LANDMARK_PROPS
-            .iter()
-            .chain(BIG_PROPS)
-            .chain(BRAZIERS)
-            .chain(SCATTER_PROPS)
-        {
-            assert!(p.starts_with("models/environment/inferno/"));
-            assert!(p.ends_with(".glb"));
+    fn every_declared_prop_path_exists_on_disk() {
+        use crate::decor_palettes::{DecorPalettesConfig, GENOME_PATH};
+        // `cargo test` tourne avec le CWD sur la crate, le jeu sur la racine.
+        let (content, assets_root) = std::fs::read_to_string(GENOME_PATH)
+            .map(|c| (c, std::path::PathBuf::from("assets")))
+            .or_else(|_| {
+                std::fs::read_to_string(format!("../../{GENOME_PATH}"))
+                    .map(|c| (c, std::path::PathBuf::from("../../assets")))
+            })
+            .expect("roguelite_palettes.toml introuvable depuis la crate ET depuis la racine");
+
+        let cfg = DecorPalettesConfig::parse_toml(&content);
+        let mut missing: Vec<String> = Vec::new();
+        let mut checked = 0usize;
+        for path in cfg.all_paths() {
+            checked += 1;
+            if !assets_root.join(path).is_file() {
+                missing.push(path.to_string());
+            }
         }
-        assert!(!LANDMARK_PROPS.is_empty());
-        assert!(!BIG_PROPS.is_empty());
+        assert!(checked > 0, "aucun chemin mesuré = test aveugle");
+        assert!(
+            missing.is_empty(),
+            "{} chemins déclarés introuvables sur {checked} : {missing:#?}",
+            missing.len()
+        );
     }
 
     #[test]
@@ -1463,7 +1512,7 @@ default = 40.0
     fn plan_decor_set_deterministic_and_budgetable() {
         // Handles factices (le plan ne touche aucun asset, juste du RNG + clone).
         let h = || vec![Handle::<Scene>::default()];
-        let assets = DecorAssets {
+        let assets = DecorPaletteAssets {
             landmarks: h(),
             big: h(),
             braziers: h(),

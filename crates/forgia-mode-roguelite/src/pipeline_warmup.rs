@@ -160,20 +160,8 @@ pub fn sys_spawn_warmup_diorama(
 
     // 1) Tous les GLB de décor distincts (handles déjà préchargés au Startup).
     if let Some(decor) = decor {
-        for group in [
-            &decor.landmarks,
-            &decor.big,
-            &decor.braziers,
-            &decor.scatter,
-            &decor.walls,
-            &decor.wall_corner,
-            &decor.rubble,
-            &decor.buildings,
-        ] {
-            for handle in group {
-                scenes.push(handle.clone());
-            }
-        }
+        // Story-671 — toutes les DA, pas seulement celle de la salle 1.
+        scenes.extend(decor.all_handles().cloned());
     }
 
     // 2) Squelettes, sols et portails garantis visibles en combat. Leurs handles

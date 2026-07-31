@@ -28,6 +28,8 @@ pub mod boss_portal;
 pub mod boucherie_rocket;
 pub mod coffre_sensor;
 pub mod decor;
+/// Story-671 — les directions artistiques (palettes de props) en couche definition.
+pub mod decor_palettes;
 pub mod defense;
 pub mod element_vfx;
 pub mod elements;
@@ -334,6 +336,15 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Update,
             enemies::sys_hot_reload_enemy_genome
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
+        // Story-671 — les DIRECTIONS ARTISTIQUES (palettes de props). Startup :
+        // le préchargement des assets de décor lit cette config.
+        app.add_systems(Startup, decor_palettes::sys_init_decor_palettes);
+        app.add_systems(
+            Update,
+            decor_palettes::sys_hot_reload_decor_palettes
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
