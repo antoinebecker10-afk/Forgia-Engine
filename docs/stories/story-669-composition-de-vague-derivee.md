@@ -159,6 +159,47 @@ vide et borné.
 
 ---
 
+## Correctif post-runtime — le budget était quantifié trop grossièrement
+
+**Trouvé en jeu**, sur la première run réelle (capteur du 2026-07-31 18:07) :
+
+```
+room: 2   room_kind: "event"   room_budget: 3   room_density: 1.50
+```
+
+`room_density` valait **1,50 en salle 3**, alors que cette story annonçait 1,56.
+En remontant : `director_budget_for_depth` renvoyait des **crédits entiers**
+(`u32` arrondi), soit `2 / 3 / 3 / 4` — la courbe réelle était donc :
+
+| Salle | Densité **avant** | Densité **après** |
+|---|---|---|
+| 1 | ×1,00 | ×1,00 |
+| 2 | ×1,50 | ×1,25 |
+| 3 | **×1,50** ← plateau | ×1,57 |
+| boss | ×2,00 | ×1,96 |
+
+Deux défauts : un saut de +50 % en salle 2 au lieu de +25 %, et surtout **les
+salles 2 et 3 avaient exactement la même densité**. La moitié de la montée en
+difficulté que cette story était censée apporter était annulée par un arrondi.
+
+**Correctif** : le budget est stocké en **centi-crédits** (`DIRECTOR_BUDGET_SCALE
+= 100`) → `200 / 250 / 313 / 391`. Le champ est renommé
+`StageNode.difficulty_budget_centi` : l'unité est dans le nom, parce qu'une unité
+implicite est exactement le piège qui a déjà coûté une passe sur
+`damage_per_level` (commentaire en %, valeur en fraction). Les gènes créateur
+restent en crédits — l'échelle est une résolution de champ, pas un slider.
+
+**Pourquoi le test ne l'avait pas vu** : `director_budget_grows_with_depth`
+assertait `b1 >= b0` — un `>=` tolère le plateau, donc ne mesure pas la
+croissance. Remplacé par une croissance **strictement** monotone sur toutes les
+profondeurs consécutives, plus un test qui vérifie que les rapports suivent bien
+la courbe géométrique des gènes (1,25 / 1,5625 / 1,9531).
+
+Le capteur expose désormais `room_budget_credits` (en crédits, avec l'unité dans
+le nom) au lieu de `room_budget`.
+
+---
+
 ## Ce que cette story ne fait PAS
 
 - **Aucun nouvel archétype.** « Élite » module les archétypes existants ; il n'y a

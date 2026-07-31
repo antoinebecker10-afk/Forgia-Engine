@@ -21,6 +21,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_run.toml";
 const SENSOR_PATH: &str = "forgia_stage_graph.json";
+
+/// Échelle du point fixe des budgets de difficulté : 1 crédit = 100 unités
+/// stockées. Ce n'est PAS un réglage de gameplay — c'est la résolution du champ,
+/// un détail d'implémentation (cf `creator-simplicity.md` : les détails
+/// d'implémentation ne s'exposent pas au créateur). Les gènes restent en crédits.
+pub const DIRECTOR_BUDGET_SCALE: u16 = 100;
 const SENSOR_WRITE_PERIOD_SEC: f64 = 1.0;
 
 // ─── splitmix64 RNG (inline, déterministe, pas de dep) ─────────────────────
@@ -160,7 +166,11 @@ pub fn forced_kind_for_depth(depth: u8, total: u8) -> Option<StageKind> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StageNode {
     pub kind: StageKind,
-    pub difficulty_budget: u32,
+    /// Budget de difficulté du nœud, en **CENTI-CRÉDITS** (crédits × 100).
+    /// Le suffixe est dans le nom exprès : une unité implicite est le piège qui a
+    /// déjà coûté une passe sur `damage_per_level` (commentaire en %, valeur en
+    /// fraction). Cf [`RunGraphConfig::director_budget_for_depth`].
+    pub difficulty_budget_centi: u32,
     pub depth: u8,
     pub variant_index: u8,
 }
@@ -284,10 +294,22 @@ impl RunGraphConfig {
     }
 
     /// Budget Director (credits/sec) pour un stage à profondeur `depth`.
+    /// Budget de difficulté d'une profondeur, en **CENTI-CRÉDITS** (crédits × 100).
+    ///
+    /// Pourquoi du point fixe et pas un `u32` de crédits : arrondi aux crédits
+    /// entiers, la courbe s'écrase. Avec les gènes par défaut (base 2,0, ×1,25) on
+    /// obtenait `2 / 3 / 3 / 4` — c'est-à-dire un saut de +50 % en salle 2 **puis un
+    /// plateau : les salles 2 et 3 avaient exactement la même densité**. Mesuré en
+    /// jeu le 2026-07-31 (`room_budget: 3`, `room_density: 1.50` en salle 3).
+    /// En centi-crédits : `200 / 250 / 313 / 391` → densités 1,00 / 1,25 / 1,57 /
+    /// 1,96, strictement croissantes.
+    ///
+    /// Les gènes créateur restent exprimés en crédits (`director_credits_base`
+    /// = 2,0) : l'unité de stockage est un détail d'implémentation, pas un slider.
     pub fn director_budget_for_depth(&self, depth: u8) -> u32 {
         let mult = self.director_credits_stage_mult.max(1.0);
         let budget = self.director_credits_base * mult.powi(i32::from(depth));
-        budget.max(0.0).round() as u32
+        (budget.max(0.0) * f32::from(DIRECTOR_BUDGET_SCALE)).round() as u32
     }
 }
 
@@ -361,7 +383,7 @@ pub fn generate_run_graph(config: &RunGraphConfig, seed: u64) -> RunGraph {
 
             variants.push(StageNode {
                 kind,
-                difficulty_budget: budget,
+                difficulty_budget_centi: budget,
                 depth,
                 variant_index: variant_idx,
             });
@@ -559,14 +581,40 @@ default = 999.0
         assert!(c.total_stages <= 12);
     }
 
+    /// Le `>=` d'origine laissait passer le PLATEAU : avec des crédits entiers,
+    /// `depth 1` et `depth 2` valaient tous deux 3, donc deux salles consécutives
+    /// avaient la même densité — mesuré en jeu le 2026-07-31 avant correction.
+    /// Un test qui tolère l'égalité ne mesure pas la croissance.
     #[test]
-    fn director_budget_grows_with_depth() {
+    fn director_budget_grows_strictly_at_every_depth() {
         let c = RunGraphConfig::default();
-        let b0 = c.director_budget_for_depth(0);
-        let b1 = c.director_budget_for_depth(1);
-        let b4 = c.director_budget_for_depth(4);
-        assert!(b1 >= b0);
-        assert!(b4 > b0);
+        let budgets: Vec<u32> = (0..5).map(|d| c.director_budget_for_depth(d)).collect();
+        for w in budgets.windows(2) {
+            assert!(
+                w[1] > w[0],
+                "budgets non STRICTEMENT croissants (plateau) : {budgets:?}"
+            );
+        }
+        // Point fixe : depth 0 vaut exactement `base` crédits.
+        assert_eq!(
+            budgets[0],
+            (c.director_credits_base * f32::from(DIRECTOR_BUDGET_SCALE)) as u32
+        );
+    }
+
+    /// La densité (rapport de budgets) doit suivre la courbe géométrique des
+    /// gènes, pas une version écrasée par l'arrondi.
+    #[test]
+    fn density_ratios_follow_the_genome_curve() {
+        let c = RunGraphConfig::default();
+        let b0 = c.director_budget_for_depth(0) as f32;
+        for (depth, expected) in [(1u8, 1.25_f32), (2, 1.5625), (3, 1.9531)] {
+            let ratio = c.director_budget_for_depth(depth) as f32 / b0;
+            assert!(
+                (ratio - expected).abs() < 0.01,
+                "salle {depth}: densité {ratio:.4}, attendu ≈ {expected}"
+            );
+        }
     }
 
     #[test]

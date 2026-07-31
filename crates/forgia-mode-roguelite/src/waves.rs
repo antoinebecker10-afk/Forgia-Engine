@@ -104,13 +104,6 @@ impl Default for RogueliteWave {
 /// spawn cette composition directement.
 pub const BOSS_WAVE_COMPOSITION: u8 = 3;
 
-/// Composition par vague : `(archetype, count, ring_radius)`.
-/// Contexte de spawn d'une vague (story-669).
-///
-/// Bundle plutôt que 10 paramètres : `spawn_wave_enemies` reçoit désormais la
-/// SALLE, son TYPE et la GRAINE DE RUN, les trois entrées qui manquaient à
-/// l'ancienne `wave_composition(wave: u8)` et dont l'absence figeait la boucle
-/// (mêmes ennemis, mêmes places, choix de porte sans effet).
 /// Les 3 configs nécessaires au spawn d'une vague, en un seul `SystemParam`.
 ///
 /// `sys_start_run` était DÉJÀ à 16 params — le plafond dur de Bevy. Ajouter la
@@ -146,6 +139,12 @@ impl WaveSpawnConfigs<'_> {
     }
 }
 
+/// Contexte de spawn d'une vague (story-669).
+///
+/// Bundle plutôt que 10 paramètres : `spawn_wave_enemies` reçoit désormais la
+/// SALLE, son TYPE et la GRAINE DE RUN — les trois entrées qui manquaient à
+/// l'ancienne `wave_composition(wave: u8)` et dont l'absence figeait la boucle
+/// (mêmes ennemis, mêmes places, choix de porte sans effet).
 pub struct WaveSpawnCtx<'a> {
     pub stats: &'a EnemyStatsConfig,
     pub defense: &'a DefenseConfig,
@@ -568,7 +567,7 @@ fn node_budget(
     graph
         .and_then(|g| g.stages.get(depth as usize))
         .and_then(|v| v.get(variant).or_else(|| v.first()))
-        .map(|n| n.difficulty_budget)
+        .map(|n| n.difficulty_budget_centi)
         .unwrap_or_else(|| cfg.director_budget_for_depth(depth))
 }
 

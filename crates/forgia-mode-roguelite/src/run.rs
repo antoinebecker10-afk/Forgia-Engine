@@ -787,7 +787,7 @@ pub fn sys_start_run(
             let node = graph.stages.first().and_then(|v| v.first());
             let kind = node.map(|n| n.kind);
             let budget = node
-                .map(|n| n.difficulty_budget)
+                .map(|n| n.difficulty_budget_centi)
                 .unwrap_or_else(|| stage_graph_config.director_budget_for_depth(0));
             // Salle 0 = la référence : sa densité vaut 1.0 par construction.
             let density = crate::wave_comp::density_from_budget(
