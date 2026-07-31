@@ -1,0 +1,713 @@
+# Arena Test — banc de blockout (story-667). « Le Creuset » v3, carte trois voies.
+#
+# ⚠️ ÉTAPE « GREYBOX ». Ici on juge la FORME, pas l'art. Tout est en primitives
+# grises. On habille quand le gameplay est bon, pas avant.
+#
+# SOURCE DE VÉRITÉ de la carte : le Rust ne contient aucune coordonnée.
+# Hot-reload : sauvegarder ce fichier reconstruit la carte à la volée.
+# Convention : `pos` = centre de l'EMPREINTE AU SOL, la boîte monte de `pos.y`
+# à `pos.y + size[1]`. Repère Bevy Y-up, angles en degrés.
+#
+# ── v3 (2026-07-27) — refonte trois voies, modèle Call of Duty ────────────────
+# Doctrine sourcée (Treyarch, David Vonderhaar / Matt Scronce) :
+#   · deux voies extérieures + une centrale relient les deux camps ;
+#   · CHAQUE VOIE A UNE PORTÉE DÉDIÉE — extérieures longues, centrale courte ;
+#   · les positions de force vont par paires en miroir ;
+#   · « au plus trois décisions » : la carte se lit d'un coup d'œil au spawn.
+# Échec type à éviter (Berlin, CoD Vanguard) : trop de lignes ouvertes, le tireur
+# d'élite domine toutes les routes, la partie devient une boucherie ou un statu quo.
+#
+# Symétrie MIROIR sur X : les deux camps voient exactement la même carte, et les
+# trois voies gardent chacune leur caractère. (Une symétrie 180° les échangerait
+# et forcerait les deux voies extérieures à être identiques.)
+#
+# PROFILS MESURÉS (audit géométrique, lignes de vue dégagées à hauteur d'œil) :
+#   Voie A longue   17 % courte · 56 % moyenne · 27 % LONGUE   médiane 15,0  max 76,5 m
+#   Voie B courte   41 % COURTE · 58 % moyenne ·  0 % longue   médiane  7,5  max 29,2 m
+#   Voie C moyenne  38 % courte · 60 % MOYENNE ·  2 % longue   médiane  8,5  max 61,5 m
+
+# ───────────────────────────────────────────────────────────────────────────────
+# METRICS — MESURÉES, pas choisies. Toute forme de la carte en découle.
+# ───────────────────────────────────────────────────────────────────────────────
+# Sources : player_movement.toml, forgia-player (capsule + caméra), viewmodel_arena.toml.
+# Les dérivées sont RECALCULÉES au boot et comparées : ce bloc ne peut pas mentir.
+[metrics]
+player_height_m = 2.0
+player_radius_m = 0.3
+
+# Œil = centre de la capsule (1.0) + offset caméra (0.7).
+# Source : crates/forgia-player/src/lib.rs:426.
+# ⚠️ SEUIL DE COUVERTURE. Forgia n'a PAS d'accroupissement : sous 1,70 m un
+# obstacle ne casse aucune ligne de vue. La taxonomie « couverture basse / haute »
+# d'Uncharted ou Gears ne transpose pas — elle suppose qu'on s'accroupisse.
+eye_height_m = 1.7
+
+walk_speed_ms = 6.5
+sprint_speed_ms = 9.75
+jump_velocity_ms = 6.5
+gravity_ms2 = 18.0
+
+# Dérivées : hauteur = v²/2g ; temps d'air = 2v/g ; portée = vitesse × temps d'air.
+jump_height_m = 1.174
+air_time_s = 0.722
+jump_reach_walk_m = 4.69
+jump_reach_sprint_m = 7.04
+
+# Bandes d'engagement. Nos deux armes principales perdent 40 % au-delà de 30 m.
+# Recoupé par Team Fortress 2 : proche 6,5 m · moyen 26 m · long 52 m.
+engagement_close_m = 6.5
+engagement_core_m = 26.0
+engagement_sniper_m = 52.0
+
+# ───────────────────────────────────────────────────────────────────────────────
+# GRILLE — le vocabulaire de construction.
+# ───────────────────────────────────────────────────────────────────────────────
+[grid]
+module_m = 2.0
+step_max_m = 0.4
+platform_step_m = 1.1
+# Sans accroupissement il n'existe pas de « couverture basse » utile : le seuil
+# bas est 1,8 m, juste au-dessus de l'œil.
+cover_low_m = 1.8
+cover_high_m = 2.4
+wall_min_m = 1.5
+gap_max_m = 4.0
+show = true
+cell_count = 44
+
+# ───────────────────────────────────────────────────────────────────────────────
+# PALETTE — code couleur fonctionnel. Le joueur lit la fonction, pas la déco.
+# ───────────────────────────────────────────────────────────────────────────────
+[palette]
+floor = [0.52, 0.52, 0.54]
+platform = [0.62, 0.60, 0.56]
+cover = [0.44, 0.44, 0.47]
+wall = [0.34, 0.34, 0.37]
+traversal = [0.85, 0.68, 0.22]
+perch = [0.35, 0.62, 0.78]
+
+# ───────────────────────────────────────────────────────────────────────────────
+# CARTE
+# ───────────────────────────────────────────────────────────────────────────────
+# 80 × 56 m = 4 480 m², dont 72 % praticables. Traversée en sprint : 8 s.
+# À comparer : « Le Creuset » v2 faisait 52 m de large (arène centrée), et
+# `crypts_of_anvil` 180 m — dont 90 % hors de portée utile de trois armes sur quatre.
+[arena]
+name = "Le Creuset"
+shape = "rectangular"
+size_x = 80.0
+size_z = 56.0
+wall_height_m = 8.0
+wall_thickness_m = 1.0
+# Conservé pour une éventuelle carte hexagonale — ignoré en rectangulaire.
+extent_m = 30.0
+# Spawn du camp ouest, face à l'est : les trois voies s'ouvrent devant.
+# ⚠️ Y = centre de la capsule (demi-hauteur 1,0) : sous 1,0 le joueur naît encastré.
+spawn_pos = [-36.0, 1.5, 0.0]
+spawn_yaw_deg = -90.0
+
+# ── LES TROIS VOIES ───────────────────────────────────────────────────────────
+# Déclarées en donnée pour que l'analyse mesure la domination d'une position de
+# force SUR SA VOIE. Rapportée à la carte entière, la mesure ne voudrait rien dire.
+[[lanes]]
+name = "Haute Halle"
+z_min = 9.0
+z_max = 28.0
+range = "longue"
+
+[[lanes]]
+name = "Les Fours"
+z_min = -9.0
+z_max = 9.0
+range = "courte"
+
+[[lanes]]
+name = "L'Atelier"
+z_min = -28.0
+z_max = -9.0
+range = "moyenne"
+
+[lighting]
+# Éclairage NEUTRE volontaire : une lumière dramatique flatte un blockout et
+# masque ses défauts de lisibilité. La couleur vient à l'étape d'habillage.
+sun_illuminance = 11000.0
+sun_color = [1.0, 0.99, 0.96]
+fill_illuminance = 4000.0
+fill_color = [0.78, 0.82, 0.90]
+ambient_brightness = 700.0
+ambient_color = [0.80, 0.82, 0.88]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LE BLOCKOUT — généré puis figé ici. Éditable à la main : c'est ce fichier qui
+# fait foi, pas le script qui l'a produit une première fois.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ────────────────────────────────────────────────────────────────────────────
+# Sol. Il DEBORDE l'enceinte : une bordure sans plancher = chute hors carte.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [0, -0.5, 0]
+size = [84, 0.5, 60]
+role = "floor"
+section = "sol"
+
+# ────────────────────────────────────────────────────────────────────────────
+# Cloisons entre voies, percees aux jonctions (x = 0 et ±20).
+# C'est la ou l'arme courte prend l'avantage sur celui qui joue la distance.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [10, 0, 9]
+size = [15, 4.5, 2]
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [30, 0, 9]
+size = [15, 4.5, 2]
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [10, 0, -9]
+size = [15, 4.5, 2]
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [30, 0, -9]
+size = [15, 4.5, 2]
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [-10, 0, 9]
+size = [15, 4.5, 2]
+yaw_deg = 180
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [-30, 0, 9]
+size = [15, 4.5, 2]
+yaw_deg = 180
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [-10, 0, -9]
+size = [15, 4.5, 2]
+yaw_deg = 180
+role = "wall"
+section = "cloison"
+
+[[blocks]]
+pos = [-30, 0, -9]
+size = [15, 4.5, 2]
+yaw_deg = 180
+role = "wall"
+section = "cloison"
+
+# ────────────────────────────────────────────────────────────────────────────
+# VOIE A (Z+18) — LONGUE PORTEE. La moins dense des trois : la
+# traversee doit couter. Ligne degagee d'un bout a l'autre (~77 m) : la
+# seule ou Madame Lenoir existe. Abris en quinconce hors de l'axe.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [6, 0, 24.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [2, 0, 11.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [15, 0, 24.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [11, 0, 11.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [24, 0, 24.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [20, 0, 11.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [33, 0, 24.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [29, 0, 11.5]
+size = [4, 2.4, 1.4]
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [27, 0, 18]
+size = [9, 4, 8]
+role = "perch"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-6, 0, 24.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-2, 0, 11.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-15, 0, 24.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-11, 0, 11.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-24, 0, 24.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-20, 0, 11.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-33, 0, 24.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-29, 0, 11.5]
+size = [4, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_longue"
+
+[[blocks]]
+pos = [-27, 0, 18]
+size = [9, 4, 8]
+yaw_deg = 180
+role = "perch"
+section = "voie_longue"
+
+[[ramps]]
+from = [18, 0, 22.5]
+to = [26, 4, 22.5]
+width_m = 3.5
+section = "voie_longue"
+
+[[ramps]]
+from = [-18, 0, 22.5]
+to = [-26, 4, 22.5]
+width_m = 3.5
+section = "voie_longue"
+
+# ────────────────────────────────────────────────────────────────────────────
+# VOIE B (Z 0) — COURTE PORTEE. Chicane : refends alternes qui
+# imposent un zigzag. Aucune ligne droite ne traverse (max 29 m mesures).
+# Mediane 7,5 m : le terrain du fusil a pompe et du corps a corps.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [8, 0, -3.5]
+size = [1.6, 4, 11]
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [16, 0, 3.5]
+size = [1.6, 4, 11]
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [24, 0, -3.5]
+size = [1.6, 4, 11]
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [32, 0, 3.5]
+size = [1.6, 4, 11]
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [12, 0, -5.5]
+size = [3, 2.4, 3]
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [20, 0, 5.5]
+size = [3, 2.4, 3]
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [28, 0, -5]
+size = [3, 2.4, 3]
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [36, 0, 4.5]
+size = [3, 2.4, 3]
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [20, 2.8, 0]
+size = [11, 0.5, 3.5]
+role = "platform"
+section = "voie_courte"
+
+[[blocks]]
+pos = [13.2, 0, 0]
+size = [2.2, 1.1, 2.2]
+role = "traversal"
+section = "voie_courte"
+
+[[blocks]]
+pos = [14.6, 0, 0]
+size = [2.2, 2.2, 2.2]
+role = "traversal"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-8, 0, -3.5]
+size = [1.6, 4, 11]
+yaw_deg = 180
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-16, 0, 3.5]
+size = [1.6, 4, 11]
+yaw_deg = 180
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-24, 0, -3.5]
+size = [1.6, 4, 11]
+yaw_deg = 180
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-32, 0, 3.5]
+size = [1.6, 4, 11]
+yaw_deg = 180
+role = "wall"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-12, 0, -5.5]
+size = [3, 2.4, 3]
+yaw_deg = 180
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-20, 0, 5.5]
+size = [3, 2.4, 3]
+yaw_deg = 180
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-28, 0, -5]
+size = [3, 2.4, 3]
+yaw_deg = 180
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-36, 0, 4.5]
+size = [3, 2.4, 3]
+yaw_deg = 180
+role = "cover"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-20, 2.8, 0]
+size = [11, 0.5, 3.5]
+yaw_deg = 180
+role = "platform"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-13.2, 0, 0]
+size = [2.2, 1.1, 2.2]
+yaw_deg = 180
+role = "traversal"
+section = "voie_courte"
+
+[[blocks]]
+pos = [-14.6, 0, 0]
+size = [2.2, 2.2, 2.2]
+yaw_deg = 180
+role = "traversal"
+section = "voie_courte"
+
+# ────────────────────────────────────────────────────────────────────────────
+# VOIE C (Z-18) — MOYENNE PORTEE. Couvertures tous les ~8 m,
+# bornee a ~30 m par des redans en quinconce. La zone de Pepin.
+# Sans les redans elle offrait 74 m et devenait une 2e voie de sniper.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [0, 0, -13.4]
+size = [1.6, 4.2, 8.8]
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [27, 0, -13.4]
+size = [1.6, 4.2, 8.8]
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [13, 0, -22.6]
+size = [1.6, 4.2, 8.8]
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [6, 0, -13]
+size = [5, 2, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [1.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [15, 0, -13]
+size = [5, 2, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [10.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [24, 0, -13]
+size = [5, 2, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [19.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [33, 0, -13]
+size = [5, 2, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [28.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [14, 0, -18]
+size = [10, 3, 7]
+role = "perch"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [21.5, 0, -19]
+size = [2.2, 1.1, 2.2]
+role = "traversal"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [23, 0, -19]
+size = [2.2, 2.2, 2.2]
+role = "traversal"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [30, 0, -14]
+size = [1.6, 4.2, 9]
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [38, 0, -23]
+size = [1.6, 4.2, 8]
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-27, 0, -13.4]
+size = [1.6, 4.2, 8.8]
+yaw_deg = 180
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-13, 0, -22.6]
+size = [1.6, 4.2, 8.8]
+yaw_deg = 180
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-6, 0, -13]
+size = [5, 2, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-1.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-15, 0, -13]
+size = [5, 2, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-10.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-24, 0, -13]
+size = [5, 2, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-19.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-33, 0, -13]
+size = [5, 2, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-28.5, 0, -23.5]
+size = [5, 2.4, 1.4]
+yaw_deg = 180
+role = "cover"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-14, 0, -18]
+size = [10, 3, 7]
+yaw_deg = 180
+role = "perch"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-21.5, 0, -19]
+size = [2.2, 1.1, 2.2]
+yaw_deg = 180
+role = "traversal"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-23, 0, -19]
+size = [2.2, 2.2, 2.2]
+yaw_deg = 180
+role = "traversal"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-30, 0, -14]
+size = [1.6, 4.2, 9]
+yaw_deg = 180
+role = "wall"
+section = "voie_moyenne"
+
+[[blocks]]
+pos = [-38, 0, -23]
+size = [1.6, 4.2, 8]
+yaw_deg = 180
+role = "wall"
+section = "voie_moyenne"
+
+[[ramps]]
+from = [2, 0, -13.5]
+to = [9, 3, -13.5]
+width_m = 3.5
+section = "voie_moyenne"
+
+[[ramps]]
+from = [-2, 0, -13.5]
+to = [-9, 3, -13.5]
+width_m = 3.5
+section = "voie_moyenne"

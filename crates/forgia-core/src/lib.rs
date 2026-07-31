@@ -299,6 +299,13 @@ pub mod states {
         /// rassemblement (multijoueur à terme). Géré par
         /// `forgia_game::castle_hub::CastleHubPlugin`.
         CastleHub,
+        /// Arena Test (2026-07-27) — banc de blockout d'arène, isolé du Roguelite
+        /// pour ne rien casser de ce qui tourne. Géométrie grise pilotée par
+        /// `assets/genomes/arena_test.toml`, grille au sol à l'échelle des metrics
+        /// joueur mesurées, tir autorisé. C'est l'étape « greybox » du process de
+        /// level design : on joue la forme avant de l'habiller.
+        /// Géré par `forgia_game::arena_test::ArenaTestPlugin`.
+        ArenaTest,
     }
 
     /// WorldMode — gate la simulation (Editor désactive AI/physics).

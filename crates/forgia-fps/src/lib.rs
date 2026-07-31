@@ -455,6 +455,22 @@ pub fn falloff_multiplier(toi: f32, e: &ViewmodelGenomeEntry) -> f32 {
 // Plugin
 // ════════════════════════════════════════════════════════════════════════════
 
+/// Modes où le combat FPS tourne (tir, ammo, sélection d'arme, aim assist).
+///
+/// Story-667 : source unique, en remplacement des quatre
+/// `in_state(Fps).or(in_state(Roguelite))` recopiés. Ajouter un mode de combat
+/// se fait désormais ici, pas en quatre endroits — c'était la mécanique exacte
+/// par laquelle un mode finissait à moitié câblé.
+///
+/// `ArenaTest` en fait partie : un blockout qu'on ne peut pas tirer dessus ne se
+/// juge pas. Les distances d'engagement sont la moitié du level design FPS.
+fn fps_combat_mode(mode: Res<State<GameMode>>) -> bool {
+    matches!(
+        mode.get(),
+        GameMode::Fps | GameMode::Roguelite | GameMode::ArenaTest
+    )
+}
+
 pub struct ForgiaFpsPlugin;
 
 impl Plugin for ForgiaFpsPlugin {
@@ -519,7 +535,7 @@ impl Plugin for ForgiaFpsPlugin {
             .add_systems(
                 Update,
                 aim_assist::write_aim_assist_sensor
-                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+                    .run_if(fps_combat_mode),
             )
             // Keystone 0.1a-2 slice 4 (story-634) — clic gauche latché en
             // `RunFixedMainLoop::BeforeFixedMainLoop` (lit `MouseButtonInput` brut,
@@ -529,7 +545,7 @@ impl Plugin for ForgiaFpsPlugin {
                 bevy::app::RunFixedMainLoop,
                 track_left_mouse_state
                     .in_set(bevy::app::RunFixedMainLoopSystems::BeforeFixedMainLoop)
-                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+                    .run_if(fps_combat_mode),
             )
             // Input/UI non-twitch (switch arme, reload key, despawn morts) restent Update.
             .add_systems(
@@ -542,7 +558,7 @@ impl Plugin for ForgiaFpsPlugin {
                 )
                     .chain()
                     .in_set(GameSet::Combat)
-                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+                    .run_if(fps_combat_mode),
             )
             // Tir + ammo en FixedUpdate (sim déterministe, aligné mouvement/physique).
             // drain (Input) avant fire (Combat) via la chaîne GameSet. tick_ammo_reload
@@ -558,7 +574,7 @@ impl Plugin for ForgiaFpsPlugin {
                         .chain()
                         .in_set(GameSet::Combat),
                 )
-                    .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
+                    .run_if(fps_combat_mode),
             );
     }
 }

@@ -268,6 +268,13 @@ enum MenuPage {
     Missions,
     Succes,
     Stats,
+    // `ArenaTest` (banc de blockout, story-667) RETIRÉ DU MENU le 2026-07-30 —
+    // temporaire, et rien n'est supprimé côté moteur : `GameMode::ArenaTest`, le
+    // plugin, le génome, le générateur et les 26 tests restent en place.
+    // Accès entre-temps : `FORGIA_BOOT_MODE=arena_test`.
+    // Pour rouvrir l'onglet : restaurer la variante ici, son `nav_label`, son
+    // `section_title`, son bras de `draw_page` et `draw_arena_test_section`
+    // (voir l'historique git de ce fichier).
     Options,
 }
 
@@ -283,6 +290,12 @@ impl MenuPage {
         MenuPage::Missions,
         MenuPage::Succes,
         MenuPage::Stats,
+        // `MenuPage::ArenaTest` RETIRÉ DE LA NAVIGATION (2026-07-30, temporaire).
+        // Le banc de blockout reste entièrement en place — page, section, mode,
+        // génome, générateur, tests. Seule son entrée de menu est masquée, le
+        // temps que le sujet redevienne d'actualité.
+        // Pour le rouvrir : remettre `MenuPage::ArenaTest,` sur cette ligne.
+        // Accès entre-temps : `FORGIA_BOOT_MODE=arena_test`.
         MenuPage::Options,
     ];
 
@@ -528,6 +541,11 @@ enum MenuAction {
     Launch(GameMode),
     Quit,
 }
+
+// `draw_arena_test_section` retirée avec l'onglet (2026-07-30, temporaire) — elle
+// n'avait plus qu'un appelant, supprimé lui aussi. Son contenu est dans
+// l'historique git de ce fichier ; la restaurer suffit à rouvrir le banc.
+// Rien n'a été touché côté moteur.
 
 /// Cadre « chip » cohérent avec le hub (verre aubergine + liseré or).
 fn hub_chip_frame() -> egui::Frame {

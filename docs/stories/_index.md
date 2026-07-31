@@ -8,13 +8,13 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 45 |
-| REVIEW | 51 |
+| REVIEW | 53 |
 | BLOCKED | 4 |
 | DRAFT | 34 |
 | UNKNOWN | 10 |
 | DONE | 44 |
 | CANCELLED | 1 |
-| **Total** | **189** |
+| **Total** | **191** |
 
 > 🚨 **45 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
@@ -65,10 +65,10 @@
 | 656 | Hitbox tête ennemis : suivie de l'os + capsules recalibrées sur les meshs | [story-656-enemy-head-hitbox-bone-tracked.md](./story-656-enemy-head-hitbox-bone-tracked.md) |
 | 657 | La Trempe : progression de l'arme en cours de run (Inc.1) | [story-657-trempe-weapon-in-run-progression.md](./story-657-trempe-weapon-in-run-progression.md) |
 | 658 | Scaling ennemi par profondeur de salle (la pression) | [story-658-enemy-scaling-by-depth.md](./story-658-enemy-scaling-by-depth.md) |
-| 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 | 661 | Story 661 — Bras viewmodel GLB cartoon (remplace les poings procéduraux) | [story-661-bras-viewmodel-glb-cartoon.md](./story-661-bras-viewmodel-glb-cartoon.md) |
+| 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 
-## REVIEW (51)
+## REVIEW (53)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -123,6 +123,8 @@
 | 660 | « Le Bourg de l'Enclume » : DA authored pour forge_sanctum (salle 2) | [story-660-bourg-enclume-forge-sanctum-authored.md](./story-660-bourg-enclume-forge-sanctum-authored.md) |
 | 662 | Correctifs audit 360° : Vague 1, lot 1 (chaîne, capteur, robustesse, diamant) | [story-662-correctifs-audit-360-vague1-lot1.md](./story-662-correctifs-audit-360-vague1-lot1.md) |
 | 663 | Perf : fusion de la géométrie statique d'arène par cellule × matériau (sol + murs) | [story-663-floor-merge-cellules-perf.md](./story-663-floor-merge-cellules-perf.md) |
+| 665 | Éditeur in-game du Hall (lot 1 : props) | [story-665-editeur-hall-props.md](./story-665-editeur-hall-props.md) |
+| 667 | Arena Test : le banc de blockout d'arène | [story-667-arena-test-blockout-bench.md](./story-667-arena-test-blockout-bench.md) |
 
 ## BLOCKED (4)
 

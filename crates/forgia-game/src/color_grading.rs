@@ -127,6 +127,10 @@ impl Default for ColorGradingConfig {
 
 impl ColorGradingConfig {
     /// Grade du mode courant. None = mode neutre (Menu/Fps/None → reset).
+    ///
+    /// `ArenaTest` reste volontairement neutre (story-667) : un grading
+    /// dramatique flatte un blockout et masque ses défauts de lisibilité. On
+    /// colore à l'étape d'habillage, pas pendant qu'on juge la forme.
     pub fn grade_for(&self, mode: &GameMode) -> Option<ModeGrade> {
         match mode {
             GameMode::Roguelite => Some(self.roguelite),

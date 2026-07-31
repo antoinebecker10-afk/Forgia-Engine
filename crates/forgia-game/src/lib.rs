@@ -46,6 +46,11 @@ mod castle_lightmaps;
 /// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
 /// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
 mod color_grading;
+/// Banc de blockout d'arène (story-667, 2026-07-27) — l'étape « greybox » du
+/// process de level design, isolée du Roguelite. Géométrie grise pilotée par
+/// `assets/genomes/arena_test.toml`, grille au sol à l'échelle des metrics joueur
+/// mesurées. On joue la forme avant de l'habiller.
+mod arena_test;
 
 /// Build the App with all Forgia plugins wired, then run it. Returns `AppExit`.
 pub fn run_game() -> AppExit {
@@ -219,6 +224,12 @@ pub fn run_game() -> AppExit {
     // sont les lots suivants.
     app.add_plugins(forgia_editor::prelude::ForgiaEditorPlugin);
 
+    // 7e-nonies. Banc de blockout d'arène (story-667) — onglet « Arena Test » du
+    // menu. Mode self-contained (`GameMode::ArenaTest`), isolé du Roguelite pour
+    // ne rien casser de ce qui tourne : aucune arène existante n'est touchée.
+    // Géométrie 100 % data-driven (`assets/genomes/arena_test.toml`, hot-reload).
+    app.add_plugins(arena_test::ArenaTestPlugin);
+
     // 7f. Color grading filmique par mode (story-602) — ColorGrading par GameMode,
     // hot-reload assets/genomes/color_grading.toml. Sensor forgia2_color_grading.json.
     app.add_plugins(color_grading::ColorGradingPlugin);
@@ -242,6 +253,36 @@ pub fn run_game() -> AppExit {
     app.run()
 }
 
-fn boot_to_menu(mut next: ResMut<NextState<AppMode>>) {
-    next.set(AppMode::Menu);
+/// Amorçage. Par défaut le menu ; `FORGIA_BOOT_MODE` entre directement dans un
+/// mode, pour que le jeu puisse être PILOTÉ sans souris.
+///
+/// Sans cette porte, le seul chemin vers un mode passe par des clics dans le
+/// menu : aucune vérification runtime n'est automatisable, et « lance et
+/// ping-moi » reste la seule option — ce qui n'est pas une vérification, c'est
+/// une délégation. Variable absente ou inconnue : comportement inchangé.
+///
+/// ```text
+/// FORGIA_BOOT_MODE=arena_test cargo run -p forgia-game --release
+/// ```
+fn boot_to_menu(mut app_mode: ResMut<NextState<AppMode>>, mut game: ResMut<NextState<GameMode>>) {
+    let demande = std::env::var("FORGIA_BOOT_MODE").unwrap_or_default();
+    let direct = match demande.as_str() {
+        "arena_test" => Some(GameMode::ArenaTest),
+        "roguelite" => Some(GameMode::Roguelite),
+        "castle_hub" => Some(GameMode::CastleHub),
+        "fps" => Some(GameMode::Fps),
+        "" => None,
+        autre => {
+            warn!("[forgia-game] FORGIA_BOOT_MODE=\"{autre}\" inconnu — démarrage au menu");
+            None
+        }
+    };
+    match direct {
+        Some(mode) => {
+            info!("[forgia-game] amorçage direct sur {mode:?} (FORGIA_BOOT_MODE)");
+            game.set(mode);
+            app_mode.set(AppMode::InGame);
+        }
+        None => app_mode.set(AppMode::Menu),
+    }
 }
