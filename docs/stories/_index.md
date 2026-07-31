@@ -125,6 +125,7 @@
 | 663 | Perf : fusion de la géométrie statique d'arène par cellule × matériau (sol + murs) | [story-663-floor-merge-cellules-perf.md](./story-663-floor-merge-cellules-perf.md) |
 | 665 | Éditeur in-game du Hall (lot 1 : props) | [story-665-editeur-hall-props.md](./story-665-editeur-hall-props.md) |
 | 667 | Arena Test : le banc de blockout d'arène | [story-667-arena-test-blockout-bench.md](./story-667-arena-test-blockout-bench.md) |
+| 668 | Vague 0 : remettre les invariants de la boucle roguelite debout | [story-668-vague0-invariants-boucle-roguelite.md](./story-668-vague0-invariants-boucle-roguelite.md) |
 
 ## BLOCKED (4)
 

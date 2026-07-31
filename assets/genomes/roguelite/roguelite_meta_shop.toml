@@ -36,6 +36,19 @@ effect = "start_gold"
 amount = 50.0
 costs = [15, 35, 60]
 
+# ── Maîtrise d'arme (progression permanente par arme) ──
+# L'arme équipée gagne +1 niveau à CHAQUE run terminée (victoire OU défaite).
+# Le bonus s'applique par niveau AU-DESSUS de 1 : au plafond il vaut
+# (max_level - 1) × damage_per_level. Ici 5 × 0.04 = +20 %.
+# SANS plafond, +4 %/run non borné finit par annuler le scaling ennemi
+# (+35 % PV/salle) et rend la courbe de difficulté intenable.
+[mastery]
+# Niveau maximum par arme. Borné 1..=20 par le code (au-delà = ramené + warn).
+max_level = 6
+# ⚠️ FRACTION, pas un pourcentage : 0.04 = +4 % par niveau. Écrire `4` donnerait
+# +400 %/niveau — le code borne à 0.25 max et loggue la correction.
+damage_per_level = 0.04
+
 # ── Déblocage permanent des armes (Âmes) — story-613 ──
 # Pépin = arme de départ : toujours débloquée, jamais listée ici.
 # key = clé genome viewmodel (pepin/bourrasque/madame_lenoir/boucherie).

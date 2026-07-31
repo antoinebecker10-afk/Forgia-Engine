@@ -300,16 +300,16 @@ pub fn sys_weapon_select_input(
     }
 }
 
-/// Bonus de dégâts par niveau de maîtrise d'arme (P3). Balance — à externaliser en
-/// genome (cf `run::SOULS_PER_BOSS`). +4%/niveau → niveau 6 = +20% de dégâts.
-const WEAPON_MASTERY_DMG_PER_LEVEL: f32 = 0.04;
-
 /// OnExit(Lobby) = run-start : applique le choix à `EquippedWeapons.current` + calcule
 /// le bonus de maîtrise (niveau de l'arme) dans `WeaponMasteryMods`. No-op si la
 /// Resource est absente.
+///
+/// Le bonus/niveau ET le plafond viennent du genome `[mastery]` (`MetaShopCatalogue`),
+/// plus d'un `const` Rust : la maîtrise est de la balance, elle vit en couche definition.
 pub fn sys_apply_weapon_choice(
     choice: Res<StartingWeaponChoice>,
     save: Res<MetaShopSave>,
+    cat: Res<MetaShopCatalogue>,
     equipped: Option<ResMut<EquippedWeapons>>,
     mut mastery: ResMut<crate::meta_shop::WeaponMasteryMods>,
 ) {
@@ -324,12 +324,12 @@ pub fn sys_apply_weapon_choice(
         WeaponType::ModernAR
     };
     eq.current = w;
-    // P3 — bonus de maîtrise : +WEAPON_MASTERY_DMG_PER_LEVEL par niveau au-dessus de 1.
+    // P3 — bonus de maîtrise, clampé au plafond du genome (anti-progression infinie).
     let level = save.weapon_level(vm_key(w));
-    mastery.damage_mul = 1.0 + level.saturating_sub(1) as f32 * WEAPON_MASTERY_DMG_PER_LEVEL;
+    mastery.damage_mul = cat.mastery.damage_mul(level);
     info!(
-        "[weapon-select] run start — arme = {:?} (niv {level}, dmg ×{:.2})",
-        w, mastery.damage_mul
+        "[weapon-select] run start — arme = {:?} (niv {level}/{}, dmg ×{:.2})",
+        w, cat.mastery.max_level, mastery.damage_mul
     );
 }
 
@@ -400,18 +400,27 @@ pub fn sys_weapon_unlock_input(
 }
 
 /// Run terminée (Defeat/Victory) → l'arme équipée gagne 1 niveau de maîtrise (P3,
-/// persisté). Chaque arme progresse indépendamment selon son usage.
+/// persisté), dans la limite du plafond `[mastery] max_level` du genome. Chaque arme
+/// progresse indépendamment selon son usage.
 pub fn sys_level_up_equipped_weapon(
     equipped: Option<Res<EquippedWeapons>>,
+    cat: Res<MetaShopCatalogue>,
     mut save: ResMut<MetaShopSave>,
 ) {
     let Some(eq) = equipped else {
         return;
     };
     let key = vm_key(eq.current);
-    save.level_up_weapon(key);
+    let before = save.weapon_level(key);
+    let level = save.level_up_weapon(key, cat.mastery.max_level);
+    if level == before {
+        return; // déjà au plafond : pas de niveau gagné, pas d'écriture disque
+    }
     save.save();
-    info!("[weapon-select] {key} → niveau {}", save.weapon_level(key));
+    info!(
+        "[weapon-select] {key} → niveau {level}/{}",
+        cat.mastery.max_level
+    );
 }
 
 /// Dessine la carte de choix d'arme au Lobby (à droite de L'Enclume).
@@ -530,13 +539,15 @@ pub fn draw_weapon_select(
                                                     .color(C_TEXT_MUTED),
                                             );
                                         }
-                                        let lvl = save.weapon_level(key);
-                                        let bonus = lvl.saturating_sub(1) as f32
-                                            * WEAPON_MASTERY_DMG_PER_LEVEL
-                                            * 100.0;
+                                        // Niveau EFFECTIF : un save antérieur au plafond
+                                        // stocke 13 ; afficher « 13/6 » serait illisible.
+                                        // Bonus dérivé de la même source que le runtime.
+                                        let lvl = cat.mastery.effective_level(save.weapon_level(key));
+                                        let bonus = (cat.mastery.damage_mul(lvl) - 1.0) * 100.0;
+                                        let cap = cat.mastery.max_level;
                                         ui.label(
                                             egui::RichText::new(format!(
-                                                "·  Niveau {lvl}  (+{bonus:.0}% dégâts)"
+                                                "·  Niveau {lvl}/{cap}  (+{bonus:.0}% dégâts)"
                                             ))
                                             .size(15.0)
                                             .strong()
@@ -833,10 +844,12 @@ pub fn draw_weapon_menu_panel(
                         .color(C_TEXT_MUTED),
                 );
             }
-            let lvl = save.weapon_level(key);
-            let bonus = lvl.saturating_sub(1) as f32 * WEAPON_MASTERY_DMG_PER_LEVEL * 100.0;
+            // Niveau EFFECTIF (borné au plafond) — cf draw_weapon_select.
+            let lvl = cat.mastery.effective_level(save.weapon_level(key));
+            let bonus = (cat.mastery.damage_mul(lvl) - 1.0) * 100.0;
+            let cap = cat.mastery.max_level;
             ui.label(
-                egui::RichText::new(format!("·  Niveau {lvl}  (+{bonus:.0}% dégâts)"))
+                egui::RichText::new(format!("·  Niveau {lvl}/{cap}  (+{bonus:.0}% dégâts)"))
                     .size(15.0)
                     .strong()
                     .color(FORGE_OR),

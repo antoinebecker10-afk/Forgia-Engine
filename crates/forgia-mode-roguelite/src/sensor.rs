@@ -28,14 +28,26 @@ pub struct RogueliteTelemetry {
 const STUCK_RUN_THRESHOLD_SECS: f32 = 30.0 * 60.0; // 30 min sans transition = warn
 
 /// Pur — extrait pour tests headless.
+///
+/// `mastery_over_cap` (story-668) : au moins une arme a un niveau de maîtrise
+/// STOCKÉ au-dessus du plafond `[mastery] max_level`. Sans plafond avant story-668,
+/// c'est le cas normal des saves existantes — le bonus, lui, est borné à la lecture.
+/// Le signaler évite de re-diagnostiquer « le plafond ne marche pas » en voyant un
+/// niveau 13 dans le save alors que le jeu applique bien +20 %.
 pub fn severity_for_roguelite(
     time_in_state_secs: f32,
     state_label: &str,
+    mastery_over_cap: bool,
 ) -> (&'static str, &'static str) {
     if state_label == "in_run" && time_in_state_secs > STUCK_RUN_THRESHOLD_SECS {
         (
             "warn",
             "InRun > 30min sans transition — run possiblement gelée (boss pas tué ?)",
+        )
+    } else if mastery_over_cap {
+        (
+            "info",
+            "Save antérieure au plafond de maîtrise : niveau stocké > mastery_cap. Le bonus EST borné à la lecture, rien à corriger — relever [mastery] max_level rendrait la progression réelle.",
         )
     } else {
         ("ok", "")
@@ -86,6 +98,9 @@ pub fn sys_write_roguelite_state(
     wave: Option<Res<RogueliteWave>>,
     // Story-591 — méta-progression persistée disque (L'Enclume des Âmes).
     meta_save: Option<Res<crate::meta_shop::MetaShopSave>>,
+    // Story-668 — plafond de maîtrise (genome `[mastery]`), pour rendre l'invariant
+    // observable : sans ça, il fallait ouvrir %APPDATA% à la main pour le vérifier.
+    meta_cat: Option<Res<crate::meta_shop::MetaShopCatalogue>>,
 ) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -96,7 +111,29 @@ pub fn sys_write_roguelite_state(
     let (state_str, stage) = state_label(run_state.as_deref());
     let seed = run_seed.as_ref().map(|s| s.seed).unwrap_or(0);
     let stage_count = run_seed.as_ref().map(|s| s.stage_count).unwrap_or(0);
-    let (severity, next_step) = severity_for_roguelite(tel.time_in_state_secs, state_str);
+    // Story-668 — maîtrise d'arme : niveaux stockés + plafond du genome.
+    let mastery_cap = meta_cat
+        .as_ref()
+        .map(|c| c.mastery.max_level)
+        .unwrap_or(0);
+    let weapon_levels = meta_save
+        .as_ref()
+        .map(|s| {
+            let mut parts: Vec<String> = s
+                .weapon_levels
+                .iter()
+                .map(|(k, v)| format!("\"{k}\":{v}"))
+                .collect();
+            parts.sort();
+            format!("{{{}}}", parts.join(","))
+        })
+        .unwrap_or_else(|| "{}".to_string());
+    let mastery_over_cap = match (meta_save.as_ref(), mastery_cap) {
+        (Some(s), cap) if cap > 0 => s.weapon_levels.values().any(|&lvl| lvl > cap),
+        _ => false,
+    };
+    let (severity, next_step) =
+        severity_for_roguelite(tel.time_in_state_secs, state_str, mastery_over_cap);
     // Story-571 — Or in-run + Souls méta persistant.
     let or_current = gold.as_ref().map(|s| s.current).unwrap_or(0);
     let or_collected = gold.as_ref().map(|s| s.total_collected).unwrap_or(0);
@@ -140,7 +177,7 @@ pub fn sys_write_roguelite_state(
         .unwrap_or_else(|| "{}".to_string());
 
     let json = format!(
-        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"meta_souls_total":{meta_souls_total},"meta_ranks":{meta_ranks},"run_timer_secs":{run_timer_secs:.1},"shockwave_casts":{shockwave_casts},"shockwave_cd":{shockwave_cd:.1},"current_wave":{current_wave},"room":{room},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"run_ended":{run_ended},"victories_total":{victories_total},"boss_defeated":{boss_defeated}}}"#,
+        r#"{{"id":"roguelite_state","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"run_state":"{state_str}","stage":{stage},"stage_count":{stage_count},"seed":{seed},"tick_count":{},"time_in_state_secs":{:.1},"transitions_count":{},"elapsed_secs":{:.1},"or_current":{or_current},"or_collected_run":{or_collected},"souls_persistent":{souls_persistent},"souls_earned_run":{souls_earned_run},"meta_souls_total":{meta_souls_total},"meta_ranks":{meta_ranks},"weapon_levels":{weapon_levels},"mastery_cap":{mastery_cap},"run_timer_secs":{run_timer_secs:.1},"shockwave_casts":{shockwave_casts},"shockwave_cd":{shockwave_cd:.1},"current_wave":{current_wave},"room":{room},"bots_alive":{bots_alive},"in_break":{in_break},"break_secs_left":{:.1},"run_ended":{run_ended},"victories_total":{victories_total},"boss_defeated":{boss_defeated}}}"#,
         time.elapsed_secs(),
         tel.tick_count,
         tel.time_in_state_secs,
@@ -160,22 +197,22 @@ mod tests {
 
     #[test]
     fn severity_ok_in_lobby() {
-        assert_eq!(severity_for_roguelite(0.0, "lobby").0, "ok");
-        assert_eq!(severity_for_roguelite(99999.0, "lobby").0, "ok");
+        assert_eq!(severity_for_roguelite(0.0, "lobby", false).0, "ok");
+        assert_eq!(severity_for_roguelite(99999.0, "lobby", false).0, "ok");
     }
 
     #[test]
     fn severity_ok_in_run_under_threshold() {
-        assert_eq!(severity_for_roguelite(1000.0, "in_run").0, "ok");
+        assert_eq!(severity_for_roguelite(1000.0, "in_run", false).0, "ok");
         assert_eq!(
-            severity_for_roguelite(STUCK_RUN_THRESHOLD_SECS, "in_run").0,
+            severity_for_roguelite(STUCK_RUN_THRESHOLD_SECS, "in_run", false).0,
             "ok"
         );
     }
 
     #[test]
     fn severity_warn_in_run_stuck() {
-        let (sev, next) = severity_for_roguelite(STUCK_RUN_THRESHOLD_SECS + 0.1, "in_run");
+        let (sev, next) = severity_for_roguelite(STUCK_RUN_THRESHOLD_SECS + 0.1, "in_run", false);
         assert_eq!(sev, "warn");
         assert!(next.contains("30min"));
     }

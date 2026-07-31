@@ -731,6 +731,48 @@ pub fn sys_start_run(
             }
         });
 
+        // INVARIANT DU GENRE — une run repart de zéro. `ActiveBoons` n'était remis à
+        // zéro NULLE PART en production (`reset_run()` n'avait que son test) : les
+        // atouts, leurs compteurs de tags et les légendaires déverrouillés
+        // s'empilaient d'une run à l'autre pendant toute la session (6 coffres/run →
+        // la 3e run démarrait avec ~15 atouts). La construction du build cessait
+        // d'être un enjeu de run pour devenir un compteur de session.
+        //
+        // `commands.queue` et non un `ResMut` de plus : `sys_start_run` est DÉJÀ à
+        // 16 SystemParams, le plafond Bevy (cf `scalability.md`). Même idiome que le
+        // reset des PV ci-dessus. `boons_apply::sys_recompute_boon_mods` est
+        // INCONDITIONNEL (la garde `is_changed` a été retirée le 2026-06-28, cf
+        // boons_apply.rs:43) et tourne en `GameSet::Effects`, donc après le sync point
+        // qui suit `GameSet::Movement` : il voit `ActiveBoons` vidé dès la même frame.
+        //
+        // `CoffreSession` est purgée EN MÊME TEMPS, et ce n'est pas du zèle : sans
+        // elle, un Coffre laissé ouvert en fin de run 1 (mort pendant le break, ou
+        // ESC vers le menu) survit à la nouvelle run avec ses candidats. Comme
+        // `reset_run()` vide `unlocked_legendary` et que `sys_handle_coffre_pick` ne
+        // revérifie PAS l'éligibilité au moment du pick, le joueur pourrait réclamer
+        // en run 2 un légendaire qu'il n'a plus débloqué — tout le gating par tags
+        // court-circuité. Les deux Resources forment un seul état de run : elles se
+        // remettent à zéro ensemble, dans la même closure exclusive (atomique).
+        commands.queue(|world: &mut World| {
+            if let Some(mut active) =
+                world.get_resource_mut::<forgia_rpg_data::boons::ActiveBoons>()
+            {
+                let had = active.active.len();
+                active.reset_run();
+                if had > 0 {
+                    info!("[roguelite] sys_start_run — {had} atouts purgés (nouvelle run)");
+                }
+            }
+            if let Some(mut session) =
+                world.get_resource_mut::<forgia_rpg_data::boons::CoffreSession>()
+            {
+                if session.is_open || !session.candidates.is_empty() {
+                    info!("[roguelite] sys_start_run — Coffre resté ouvert purgé (offre périmée)");
+                }
+                *session = forgia_rpg_data::boons::CoffreSession::default();
+            }
+        });
+
         commands.insert_resource(RunSeed {
             seed,
             stage_count: total_stages,

@@ -96,6 +96,85 @@ pub struct WeaponUnlock {
     pub cost: u32,
 }
 
+/// Maîtrise d'arme : bonus par niveau + PLAFOND. Data-driven (`[mastery]` du genome).
+///
+/// Sans plafond, +4 % par run terminée (défaite comprise) est une progression
+/// permanente non bornée : à la 25e run avec la même arme elle vaut +96 %, ce qui
+/// annule le scaling ennemi (+35 % PV/salle) et rend la courbe de difficulté
+/// intenable. Le plafond est donc un invariant de balance, pas un confort.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MasteryConfig {
+    /// Niveau maximum atteignable par arme (1 = pas de progression).
+    pub max_level: u32,
+    /// Bonus de dégâts (fraction) par niveau AU-DESSUS de 1.
+    pub damage_per_level: f32,
+}
+
+impl Default for MasteryConfig {
+    /// Miroir EXACT de `[mastery]` dans le genome — 6 niveaux × 4 % = +20 % au cap.
+    fn default() -> Self {
+        Self {
+            max_level: Self::DEFAULT_MAX_LEVEL,
+            damage_per_level: Self::DEFAULT_DAMAGE_PER_LEVEL,
+        }
+    }
+}
+
+impl MasteryConfig {
+    pub const DEFAULT_MAX_LEVEL: u32 = 6;
+    pub const DEFAULT_DAMAGE_PER_LEVEL: f32 = 0.04;
+    /// Bornes de sécurité créateur (`genome-code.md` : « chaque gene a une valeur
+    /// min/max raisonnable » ; `creator-simplicity.md` : « un créateur ne doit jamais
+    /// casser son jeu en bougeant un slider »). Le piège visé est l'erreur d'UNITÉ :
+    /// `damage_per_level = 10` (lu « 10 % ») donnerait ×51 de dégâts permanents.
+    const MAX_LEVEL_BOUNDS: (u32, u32) = (1, 20);
+    const DAMAGE_PER_LEVEL_BOUNDS: (f32, f32) = (0.0, 0.25);
+
+    /// Construit depuis le genome en BORNANT, et en le DISANT (une correction
+    /// silencieuse est aussi opaque que le défaut qu'elle répare).
+    pub fn from_genome(max_level: u32, damage_per_level: f32) -> Self {
+        let (lo, hi) = Self::MAX_LEVEL_BOUNDS;
+        let (dlo, dhi) = Self::DAMAGE_PER_LEVEL_BOUNDS;
+        let clamped = Self {
+            max_level: max_level.clamp(lo, hi),
+            // `clamp` panique sur NaN → on le neutralise d'abord.
+            damage_per_level: if damage_per_level.is_finite() {
+                damage_per_level.clamp(dlo, dhi)
+            } else {
+                Self::DEFAULT_DAMAGE_PER_LEVEL
+            },
+        };
+        if clamped.max_level != max_level {
+            warn!(
+                "[meta-shop] genome [mastery] max_level={max_level} hors bornes {lo}..={hi} → {}",
+                clamped.max_level
+            );
+        }
+        if clamped.damage_per_level != damage_per_level {
+            warn!(
+                "[meta-shop] genome [mastery] damage_per_level={damage_per_level} hors bornes \
+                 {dlo}..={dhi} (c'est une FRACTION : 0.04 = +4 %) → {}",
+                clamped.damage_per_level
+            );
+        }
+        clamped
+    }
+
+    /// Multiplicateur de dégâts d'une arme au niveau donné, CLAMPÉ AU PLAFOND À LA
+    /// LECTURE — jamais à l'écriture, pour qu'un save antérieur au plafond (ou un
+    /// plafond relevé plus tard en genome) ne perde jamais sa progression réelle.
+    /// PUR — testable sans App.
+    pub fn damage_mul(&self, level: u32) -> f32 {
+        1.0 + self.effective_level(level).saturating_sub(1) as f32 * self.damage_per_level
+    }
+
+    /// Niveau EFFECTIF (= stocké, borné au plafond). C'est ce que l'UI doit afficher :
+    /// sinon un save legacy montre « Niveau 13/6 », un compteur illisible.
+    pub fn effective_level(&self, stored: u32) -> u32 {
+        stored.min(self.max_level.max(1))
+    }
+}
+
 #[derive(Resource, Clone, Debug)]
 pub struct MetaShopCatalogue {
     pub upgrades: Vec<MetaUpgrade>,
@@ -103,6 +182,8 @@ pub struct MetaShopCatalogue {
     pub weapon_unlocks: Vec<WeaponUnlock>,
     /// Paliers d'atouts (boons) déblocables en Âmes (story-616) — réutilise key/name/cost.
     pub boon_tier_unlocks: Vec<WeaponUnlock>,
+    /// Maîtrise d'arme : bonus/niveau + plafond (genome `[mastery]`).
+    pub mastery: MasteryConfig,
 }
 
 impl MetaShopCatalogue {
@@ -182,6 +263,8 @@ impl Default for MetaShopCatalogue {
                     cost: 400,
                 },
             ],
+            // Miroir EXACT de [mastery] du genome.
+            mastery: MasteryConfig::default(),
         }
     }
 }
@@ -203,6 +286,26 @@ struct WeaponUnlockToml {
     cost: u32,
 }
 
+/// Les deux champs ont un `default` : une section `[mastery]` PARTIELLE ne doit pas
+/// faire échouer serde. Sans ça, `toml::from_str` échoue sur le DOCUMENT ENTIER et
+/// tout le catalogue (upgrades, prix d'armes, prix de paliers) retombe en silence
+/// sur le miroir Rust — indiscernable d'un chargement réussi.
+#[derive(Deserialize)]
+struct MasteryToml {
+    #[serde(default = "default_mastery_max_level")]
+    max_level: u32,
+    #[serde(default = "default_mastery_damage_per_level")]
+    damage_per_level: f32,
+}
+
+fn default_mastery_max_level() -> u32 {
+    MasteryConfig::DEFAULT_MAX_LEVEL
+}
+
+fn default_mastery_damage_per_level() -> f32 {
+    MasteryConfig::DEFAULT_DAMAGE_PER_LEVEL
+}
+
 #[derive(Deserialize)]
 struct CatalogueToml {
     #[serde(default)]
@@ -211,13 +314,22 @@ struct CatalogueToml {
     weapon_unlocks: Vec<WeaponUnlockToml>,
     #[serde(default)]
     boon_tier_unlocks: Vec<WeaponUnlockToml>,
+    /// Absent → `MasteryConfig::default()` (miroir Rust).
+    #[serde(default)]
+    mastery: Option<MasteryToml>,
 }
 
 impl MetaShopCatalogue {
     /// Pur — testable. Fallback `Default` si parse KO ou liste vide.
     pub fn parse_toml(content: &str) -> Self {
-        let Ok(parsed) = toml::from_str::<CatalogueToml>(content) else {
-            return Self::default();
+        let parsed = match toml::from_str::<CatalogueToml>(content) {
+            Ok(p) => p,
+            Err(e) => {
+                // Le fallback muet était indiscernable d'un chargement réussi : le
+                // miroir Rust a lui aussi 4 upgrades, donc le log de succès mentait.
+                warn!("[meta-shop] genome illisible ({e}) — MIROIR RUST utilisé (le TOML est ignoré en entier)");
+                return Self::default();
+            }
         };
         let upgrades: Vec<MetaUpgrade> = parsed
             .upgrades
@@ -268,13 +380,24 @@ impl MetaShopCatalogue {
             } else {
                 boon_tier_unlocks
             },
+            // Bornage + log si la valeur du créateur a dû être corrigée.
+            mastery: match parsed.mastery {
+                Some(m) => MasteryConfig::from_genome(m.max_level, m.damage_per_level),
+                None => d.mastery,
+            },
         }
     }
 
     fn load_or_default() -> Self {
         match std::fs::read_to_string(PathBuf::from(GENOME_PATH)) {
             Ok(content) => Self::parse_toml(&content),
-            Err(_) => Self::default(),
+            Err(e) => {
+                // Chemin RELATIF au CWD : en build distribué le fichier n'est pas
+                // trouvé. Le fallback est correct (miroir Rust identique) mais il
+                // doit se VOIR, sinon un tuning de genome semble « ne rien faire ».
+                warn!("[meta-shop] genome {GENOME_PATH} illisible ({e}) — miroir Rust utilisé");
+                Self::default()
+            }
         }
     }
 }
@@ -388,10 +511,23 @@ impl MetaShopSave {
         self.weapon_levels.get(key).copied().unwrap_or(1)
     }
 
-    /// +1 niveau de maîtrise (run terminée avec l'arme). Idempotent par appel.
-    pub fn level_up_weapon(&mut self, key: &str) {
+    /// +1 niveau de maîtrise (run terminée avec l'arme), tant que le plafond n'est
+    /// pas atteint. Retourne le niveau après application.
+    ///
+    /// **NE FAIT JAMAIS DESCENDRE une valeur existante.** Le plafond n'existait pas
+    /// avant story-668 : un save réel peut contenir `pepin = 13`. Un `.min(cap)` à
+    /// l'écriture aurait réécrit 13 → 6 sur le disque à la fin de la run suivante,
+    /// détruisant l'information définitivement — et pour rien, puisque le bonus est
+    /// déjà borné à la LECTURE par `MasteryConfig::damage_mul`. Conserver la valeur
+    /// stockée est aussi ce qui permet de relever `max_level` en genome plus tard
+    /// sans avoir amputé les joueurs entre-temps.
+    pub fn level_up_weapon(&mut self, key: &str, max_level: u32) -> u32 {
+        let cap = max_level.max(1);
         let lvl = self.weapon_levels.entry(key.to_string()).or_insert(1);
-        *lvl = lvl.saturating_add(1);
+        if *lvl < cap {
+            *lvl = lvl.saturating_add(1);
+        }
+        *lvl
     }
 
     /// Pépin toujours débloquée ; les autres selon le save (story-613).
@@ -524,6 +660,86 @@ pub fn sys_load_meta_shop(mut commands: Commands, mut meta: ResMut<MetaSouls>) {
 pub fn sys_flush_meta_save(meta: Res<MetaSouls>, mut save: ResMut<MetaShopSave>) {
     save.souls_total = meta.current;
     save.save();
+}
+
+/// Intervalle de l'autosave des Âmes (s). Plomberie de persistance, PAS un levier
+/// de gameplay : ni exposé au créateur (cf `creator-simplicity`), ni lu par un
+/// système de jeu — même statut que `SAVE_VERSION` / `SAVE_FILE` ci-dessus.
+/// 10 s borne la perte maximale à une poignée d'Âmes.
+const AUTOSAVE_INTERVAL_SECS: f32 = 10.0;
+
+/// Autosave périodique des Âmes PENDANT la run.
+///
+/// Avant : `sys_flush_meta_save` n'était câblé que sur `OnExit(GameMode::Roguelite)`,
+/// `OnEnter(Victory)` et `OnEnter(Defeat)` — les Âmes gagnées en run (vagues, wisps,
+/// pièces/étoiles du parcours) ne vivaient que dans la Resource `MetaSouls`, et un
+/// alt-F4 en pleine run perdait TOUT le revenu de la run.
+///
+/// Écriture disque uniquement si le total a MONTÉ, au plus une fois toutes les
+/// `AUTOSAVE_INTERVAL_SECS` — donc zéro I/O quand rien ne change, et pas de churn de
+/// change-detection sur `MetaShopSave`.
+/// `Time<Real>` : l'autosave ne doit pas être gelé par une pause de gameplay.
+///
+/// **Uniquement à la hausse, et c'est délibéré.** Le seul débit d'Âmes en run est le
+/// « Second souffle » du marchand (`merchant.rs`, `Currency::Ames`), dont la
+/// contrepartie — le jeton de revive — est un état de run NON persisté. Persister le
+/// débit sans sa contrepartie ferait perdre au joueur les Âmes ET l'objet s'il quitte
+/// juste après l'achat. Le solde exact est de toute façon scellé par
+/// `sys_flush_meta_save` à la fin de la run.
+pub fn sys_autosave_meta_souls(
+    time: Res<Time<Real>>,
+    meta: Res<MetaSouls>,
+    mut save: ResMut<MetaShopSave>,
+    mut cooldown: Local<f32>,
+) {
+    *cooldown -= time.delta_secs();
+    if *cooldown > 0.0 {
+        return;
+    }
+    *cooldown = AUTOSAVE_INTERVAL_SECS;
+    if meta.current <= save.souls_total {
+        return; // rien gagné depuis le dernier flush → pas d'écriture disque
+    }
+    save.souls_total = meta.current;
+    save.save();
+}
+
+/// Hot-reload 1 Hz du genome méta-shop (patron de `ultimate_config.rs` / `poi.rs`).
+///
+/// `genome-code.md` : « tout gene DOIT fonctionner avec Shift+F12 ». `[mastery]` est
+/// précisément le gène le plus destiné à être itéré en passe de balance ; sans ça,
+/// chaque essai coûte un rebuild + relance au lieu d'une sauvegarde de fichier.
+pub fn sys_hot_reload_meta_shop_genome(
+    time: Res<Time<Real>>,
+    mut cat: ResMut<MetaShopCatalogue>,
+    mut cooldown: Local<f32>,
+    mut last_mtime: Local<Option<std::time::SystemTime>>,
+) {
+    *cooldown -= time.delta_secs();
+    if *cooldown > 0.0 {
+        return;
+    }
+    *cooldown = 1.0;
+    let Ok(mtime) = std::fs::metadata(GENOME_PATH).and_then(|m| m.modified()) else {
+        return; // fichier absent (build distribué) → on garde la Resource en place
+    };
+    if *last_mtime == Some(mtime) {
+        return;
+    }
+    let first = last_mtime.is_none();
+    *last_mtime = Some(mtime);
+    if first {
+        return; // 1er passage = simple prise d'empreinte, pas un rechargement
+    }
+    let Ok(content) = std::fs::read_to_string(GENOME_PATH) else {
+        return;
+    };
+    *cat = MetaShopCatalogue::parse_toml(&content);
+    info!(
+        "[meta-shop] genome HOT-RELOADED — maîtrise {}×{:.0}%",
+        cat.mastery.max_level,
+        cat.mastery.damage_per_level * 100.0
+    );
 }
 
 /// Story-616 — propage les paliers d'atouts débloqués (`MetaShopSave`) vers la
@@ -922,6 +1138,14 @@ impl Plugin for MetaShopPlugin {
         app.add_systems(OnExit(GameMode::Roguelite), sys_flush_meta_save);
         app.add_systems(OnEnter(RunState::Victory), sys_flush_meta_save);
         app.add_systems(OnEnter(RunState::Defeat), sys_flush_meta_save);
+        // Autosave EN run : sans lui, un alt-F4 en pleine run perd toutes les Âmes
+        // gagnées (les 3 flushes ci-dessus ne couvrent que les sorties propres).
+        app.add_systems(
+            Update,
+            sys_autosave_meta_souls.run_if(in_state(GameMode::Roguelite)),
+        );
+        // Hot-reload du genome (dont [mastery]) — aligné sur les autres genomes du crate.
+        app.add_systems(Update, sys_hot_reload_meta_shop_genome);
         // R3.3 (story-645) — stats persistantes (runs/victoires/record) figées AVANT
         // le flush pour partir sur disque dans la même frame.
         app.init_resource::<LastRunStats>();
@@ -941,6 +1165,142 @@ impl Plugin for MetaShopPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Maîtrise d'arme : plafond (anti-progression infinie) ──
+
+    #[test]
+    fn mastery_damage_mul_grows_then_stops_at_cap() {
+        let m = MasteryConfig {
+            max_level: 6,
+            damage_per_level: 0.04,
+        };
+        assert_eq!(m.damage_mul(1), 1.0, "niveau 1 = aucun bonus");
+        assert!((m.damage_mul(6) - 1.20).abs() < 1e-6, "cap = +20 %");
+        assert_eq!(
+            m.damage_mul(50),
+            m.damage_mul(6),
+            "au-delà du plafond, le bonus n'augmente plus"
+        );
+    }
+
+    #[test]
+    fn level_up_weapon_stops_at_cap() {
+        let mut s = MetaShopSave::default();
+        for _ in 0..20 {
+            s.level_up_weapon("pepin", 6);
+        }
+        assert_eq!(
+            s.weapon_level("pepin"),
+            6,
+            "20 runs ne doivent pas dépasser le plafond de 6"
+        );
+    }
+
+    #[test]
+    fn level_up_weapon_returns_unchanged_level_at_cap() {
+        let mut s = MetaShopSave::default();
+        assert_eq!(s.level_up_weapon("pepin", 2), 2);
+        assert_eq!(
+            s.level_up_weapon("pepin", 2),
+            2,
+            "au plafond, le niveau retourné est inchangé (→ pas d'écriture disque)"
+        );
+    }
+
+    /// RÉGRESSION (QA story-668) : un save réel contenait `pepin = 13` AVANT que le
+    /// plafond n'existe. Un `.min(cap)` à l'écriture réécrivait 13 → 6 sur le disque
+    /// à la fin de la run suivante, détruisant la progression pour toujours.
+    #[test]
+    fn level_up_weapon_never_lowers_a_legacy_level() {
+        let mut s = MetaShopSave::default();
+        s.weapon_levels.insert("pepin".to_string(), 13);
+        assert_eq!(
+            s.level_up_weapon("pepin", 6),
+            13,
+            "une progression au-dessus du plafond est CONSERVÉE, jamais rabaissée"
+        );
+        assert_eq!(s.weapon_level("pepin"), 13, "le disque garde 13");
+        // …et le bonus, lui, EST bien borné à la lecture.
+        let m = MasteryConfig::default();
+        assert_eq!(m.damage_mul(13), m.damage_mul(6), "bonus borné au plafond");
+        assert_eq!(m.effective_level(13), 6, "l'UI affiche 6/6, pas 13/6");
+    }
+
+    #[test]
+    fn mastery_comes_from_the_genome_and_falls_back_when_absent() {
+        let with = MetaShopCatalogue::parse_toml("[mastery]\nmax_level = 3\ndamage_per_level = 0.1");
+        assert_eq!(with.mastery.max_level, 3);
+        assert!((with.mastery.damage_mul(3) - 1.20).abs() < 1e-6);
+
+        let without = MetaShopCatalogue::parse_toml("");
+        assert_eq!(
+            without.mastery,
+            MasteryConfig::default(),
+            "genome sans [mastery] → miroir Rust"
+        );
+    }
+
+    /// RÉGRESSION (QA story-668) : sans `#[serde(default)]` sur les champs de
+    /// `MasteryToml`, une section `[mastery]` PARTIELLE faisait échouer serde sur le
+    /// DOCUMENT ENTIER → tout le catalogue (upgrades, prix d'armes, prix de paliers)
+    /// retombait en silence sur le miroir Rust.
+    #[test]
+    fn a_partial_mastery_section_does_not_kill_the_whole_document() {
+        let cat = MetaShopCatalogue::parse_toml(
+            r#"
+[[upgrades]]
+id = "max_hp"
+name = "Vitalité"
+desc = "+15 PV max"
+effect = "max_hp"
+amount = 15.0
+costs = [10, 20]
+
+[mastery]
+max_level = 8
+
+[[weapon_unlocks]]
+key = "bourrasque"
+name = "Bourrasque"
+cost = 7
+"#,
+        );
+        assert_eq!(cat.mastery.max_level, 8, "le champ fourni est lu");
+        assert_eq!(
+            cat.mastery.damage_per_level,
+            MasteryConfig::DEFAULT_DAMAGE_PER_LEVEL,
+            "le champ absent prend le défaut, il ne fait pas échouer le parse"
+        );
+        assert_eq!(cat.upgrades[0].costs, vec![10, 20], "les coûts sont bien lus");
+        assert_eq!(
+            cat.weapon_unlock("bourrasque").map(|w| w.cost),
+            Some(7),
+            "les sections SUIVANTES survivent"
+        );
+    }
+
+    /// `genome-code.md` : « chaque gene a une valeur min/max raisonnable ».
+    /// Le piège visé : `damage_per_level = 10` lu comme « 10 % » → ×51 de dégâts.
+    #[test]
+    fn genome_values_are_bounded_so_a_creator_cannot_break_the_game() {
+        let insane = MasteryConfig::from_genome(1000, 10.0);
+        assert_eq!(insane.max_level, 20);
+        assert!((insane.damage_per_level - 0.25).abs() < 1e-6);
+
+        let negative = MasteryConfig::from_genome(0, -0.5);
+        assert_eq!(negative.max_level, 1, "un plafond nul est ramené à 1");
+        assert_eq!(
+            negative.damage_per_level, 0.0,
+            "pas de multiplicateur de dégâts négatif"
+        );
+        assert!(
+            negative.damage_mul(50) >= 1.0,
+            "le multiplicateur reste >= 1 quoi qu'écrive le créateur"
+        );
+
+        let nan = MasteryConfig::from_genome(6, f32::NAN);
+        assert_eq!(nan.damage_per_level, MasteryConfig::DEFAULT_DAMAGE_PER_LEVEL);
+    }
 
     // ── record_run_result (R3.3, story-645) ──
 

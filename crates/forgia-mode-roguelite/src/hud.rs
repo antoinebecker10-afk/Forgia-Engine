@@ -487,14 +487,16 @@ pub(crate) fn draw_defeat_overlay(
                         ftue.mark_first_death(timer.secs);
                         next_run.set(RunState::Lobby);
                     }
-                    // Story-597 — 1re mort : flèche guide explicite vers l'Enclume.
+                    // Story-597 — 1re mort : REJOUER relance sans rien dépenser
+                    // (le Lobby auto-lance). On le dit, pour ne pas promettre
+                    // une boutique qui n'est pas sur ce chemin.
                     if first_death {
                         ui.add_space(4.0);
                         ui.label(
-                            egui::RichText::new("↑ dépense tes Âmes ici, puis repars")
+                            egui::RichText::new("↑ tu repars sans rien acheter")
                                 .size(15.0)
                                 .italics()
-                                .color(FORGE_BRAISE),
+                                .color(FORGE_CREME),
                         );
                     }
                     ui.add_space(10.0);
@@ -505,6 +507,19 @@ pub(crate) fn draw_defeat_overlay(
                         ftue.mark_first_death(timer.secs);
                         next_app.set(AppMode::Menu);
                         next_game.set(GameMode::None);
+                    }
+                    // La flèche guide pointe le SEUL chemin qui mène à L'Enclume :
+                    // le menu-titre. Elle était sous REJOUER, qui relance la run
+                    // sans permettre la moindre dépense — le FTUE enseignait donc
+                    // le chemin qui ne marche pas.
+                    if first_death {
+                        ui.add_space(4.0);
+                        ui.label(
+                            egui::RichText::new("↑ passe par L'Enclume, dépense tes Âmes")
+                                .size(15.0)
+                                .italics()
+                                .color(FORGE_BRAISE),
+                        );
                     }
                 });
             });

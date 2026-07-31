@@ -87,7 +87,7 @@
 | `forgia2_rex_bones.json` | T3 | forgia-anim-locomotion | `src/locomotion.rs:477` | event | Rex skeleton bind dump (story-482) | active |
 | `forgia2_rex_bones_live.json` | T3 | forgia-anim-locomotion | `src/locomotion.rs:780` | 1Hz | Rex bones live rotations (clavicle_l/r etc.) | active |
 | `forgia2_roguelite_audio.json` | T0 | forgia-mode-roguelite | `src/audio.rs` | 1Hz | jeu muet (audit Trou #1) : SFX combat (impacts/kills/hurts) + ding (Or/Âmes) + musique combat/break — story-559 slice A | active |
-| `forgia2_roguelite_state.json` | T0 | forgia-mode-roguelite | `src/sensor.rs:110` | 1Hz | run_state, wave, bots_alive, victory | active |
+| `forgia2_roguelite_state.json` | T0 | forgia-mode-roguelite | `src/sensor.rs:88` | 1Hz | run_state, wave, bots_alive, victory, weapon_levels + mastery_cap (story-668) | active |
 | `forgia2_rpg_health.json` | T0 | forgia-observability | `src/exporter.rs:16` | 1Hz | RPG-specific health (terrain ready, player spawn) | active |
 | `forgia2_sensor_health.json` | T0 | forgia-observability | `src/sensor_health_sensor.rs:86` | 1Hz | meta-sensor : liveness des 13 forgia2_ canoniques | active |
 | `forgia2_skeleton_template_registry.json` | T0 | forgia-skeleton-template | `src/lib.rs:786,1267` | once+hot | SkeletonTemplate registry, TOML hot-reload | active |
