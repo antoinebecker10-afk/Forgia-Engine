@@ -8,12 +8,12 @@
 # une taille cible au runtime : le rôle EN JEU se dérive de l'échelle finale.
 # Le registre dit ce que l'asset EST, pas ce qu'on en fait.
 #
-# 454 mesurés / 454 fichiers.
+# 986 mesurés / 986 fichiers.
 
 [meta]
 version = 1
-total_files = 454
-measured = 454
+total_files = 986
+measured = 986
 unmeasured = 0
 
 [[assets]]
@@ -2684,6 +2684,3254 @@ pivot = "base"
 role_native = "cover_high"
 nature = "wall"
 triangles = 635
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24216
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24216
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24216
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternA_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25164
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternA_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25168
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternA_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25168
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternA_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25164
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternA_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25168
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternA_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25168
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternB_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24224
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternB_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternB_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternB_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24224
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternB_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternB_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternC_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24224
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternC_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternC_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternC_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24224
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternC_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_patternC_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24228
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24216
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_shield_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55104
+measured = true
+size_m = [2.232, 3.1961, 0.3741]
+height_m = 3.196
+footprint_radius_m = 1.132
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 639
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_shield_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55104
+measured = true
+size_m = [2.232, 3.1961, 0.3741]
+height_m = 3.196
+footprint_radius_m = 1.132
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 639
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_shield_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55104
+measured = true
+size_m = [2.232, 3.1961, 0.3741]
+height_m = 3.196
+footprint_radius_m = 1.132
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 639
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_shield_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55104
+measured = true
+size_m = [2.232, 3.1961, 0.3741]
+height_m = 3.196
+footprint_radius_m = 1.132
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 639
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_shield_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55104
+measured = true
+size_m = [2.232, 3.1961, 0.3741]
+height_m = 3.196
+footprint_radius_m = 1.132
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 639
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_shield_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55104
+measured = true
+size_m = [2.232, 3.1961, 0.3741]
+height_m = 3.196
+footprint_radius_m = 1.132
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 639
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_thin_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23084
+measured = true
+size_m = [1.1, 3.1711, 0.3623]
+height_m = 3.171
+footprint_radius_m = 0.579
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 83
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_thin_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23084
+measured = true
+size_m = [1.1, 3.1711, 0.3623]
+height_m = 3.171
+footprint_radius_m = 0.579
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 83
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_thin_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23084
+measured = true
+size_m = [1.1, 3.1711, 0.3623]
+height_m = 3.171
+footprint_radius_m = 0.579
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 83
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_thin_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23080
+measured = true
+size_m = [1.1, 3.1711, 0.3623]
+height_m = 3.171
+footprint_radius_m = 0.579
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 83
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_thin_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23084
+measured = true
+size_m = [1.1, 3.1711, 0.3623]
+height_m = 3.171
+footprint_radius_m = 0.579
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 83
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_thin_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23084
+measured = true
+size_m = [1.1, 3.1711, 0.3623]
+height_m = 3.171
+footprint_radius_m = 0.579
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 83
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_triple_blue.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36232
+measured = true
+size_m = [3.7, 3.1961, 0.3623]
+height_m = 3.196
+footprint_radius_m = 1.859
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 263
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_triple_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36232
+measured = true
+size_m = [3.7, 3.1961, 0.3623]
+height_m = 3.196
+footprint_radius_m = 1.859
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 263
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_triple_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36232
+measured = true
+size_m = [3.7, 3.1961, 0.3623]
+height_m = 3.196
+footprint_radius_m = 1.859
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 263
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_triple_red.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36232
+measured = true
+size_m = [3.7, 3.1961, 0.3623]
+height_m = 3.196
+footprint_radius_m = 1.859
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 263
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_triple_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36232
+measured = true
+size_m = [3.7, 3.1961, 0.3623]
+height_m = 3.196
+footprint_radius_m = 1.859
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 263
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_triple_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36236
+measured = true
+size_m = [3.7, 3.1961, 0.3623]
+height_m = 3.196
+footprint_radius_m = 1.859
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 263
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_white.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24216
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/banner_yellow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24220
+measured = true
+size_m = [1.5, 3.1961, 0.3119]
+height_m = 3.196
+footprint_radius_m = 0.766
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 97
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrel_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 44292
+measured = true
+size_m = [1.8, 2.0, 1.8]
+height_m = 2.0
+footprint_radius_m = 1.273
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 561
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrel_large_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 73628
+measured = true
+size_m = [1.938, 2.5565, 1.8554]
+height_m = 2.557
+footprint_radius_m = 1.341
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 1047
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrel_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 32060
+measured = true
+size_m = [1.0014, 1.0177, 1.0014]
+height_m = 1.018
+footprint_radius_m = 0.708
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 207
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrel_small_stack.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 98092
+measured = true
+size_m = [1.8501, 1.7701, 1.0]
+height_m = 1.77
+footprint_radius_m = 1.052
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 1149
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrier.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23292
+measured = true
+size_m = [4.0, 1.1, 0.5]
+height_m = 1.1
+footprint_radius_m = 2.016
+pivot = "base"
+role_native = "traversal"
+nature = "floor"
+triangles = 90
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrier_colum_half.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 23196
+measured = true
+size_m = [2.35, 1.4, 0.7]
+height_m = 1.4
+footprint_radius_m = 1.226
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 86
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrier_column.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24856
+measured = true
+size_m = [4.0, 1.4, 0.7]
+height_m = 1.4
+footprint_radius_m = 2.03
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 110
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrier_corner.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26116
+measured = true
+size_m = [2.395, 1.4, 2.395]
+height_m = 1.4
+footprint_radius_m = 1.694
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 128
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/barrier_half.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 19948
+measured = true
+size_m = [2.0, 1.1, 0.5]
+height_m = 1.1
+footprint_radius_m = 1.031
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 42
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bed_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 94688
+measured = true
+size_m = [2.6063, 1.7008, 3.0572]
+height_m = 1.701
+footprint_radius_m = 2.009
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 1410
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bed_floor.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25496
+measured = true
+size_m = [1.5, 0.5626, 3.0]
+height_m = 0.563
+footprint_radius_m = 1.677
+pivot = "base"
+role_native = "traversal"
+nature = "floor"
+triangles = 232
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bed_frame.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30688
+measured = true
+size_m = [1.5, 1.0626, 3.0]
+height_m = 1.063
+footprint_radius_m = 1.677
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 304
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_A_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26140
+measured = true
+size_m = [0.3684, 0.8857, 0.3684]
+height_m = 0.886
+footprint_radius_m = 0.26
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_A_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26460
+measured = true
+size_m = [0.3684, 0.8857, 0.3684]
+height_m = 0.886
+footprint_radius_m = 0.26
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_A_labeled_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26276
+measured = true
+size_m = [0.3684, 0.8857, 0.3684]
+height_m = 0.886
+footprint_radius_m = 0.26
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_A_labeled_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26596
+measured = true
+size_m = [0.3684, 0.8857, 0.3684]
+height_m = 0.886
+footprint_radius_m = 0.26
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_B_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26140
+measured = true
+size_m = [0.5528, 0.8857, 0.5528]
+height_m = 0.886
+footprint_radius_m = 0.391
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_B_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26460
+measured = true
+size_m = [0.5528, 0.8857, 0.5528]
+height_m = 0.886
+footprint_radius_m = 0.391
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_C_brown.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26140
+measured = true
+size_m = [0.737, 0.9062, 0.737]
+height_m = 0.906
+footprint_radius_m = 0.521
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/bottle_C_green.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26460
+measured = true
+size_m = [0.737, 0.9062, 0.737]
+height_m = 0.906
+footprint_radius_m = 0.521
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/box_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 28740
+measured = true
+size_m = [1.5, 1.5, 1.5]
+height_m = 1.5
+footprint_radius_m = 1.061
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 188
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/box_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 28692
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 188
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/box_small_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 72748
+measured = true
+size_m = [1.4899, 1.4828, 1.4872]
+height_m = 1.483
+footprint_radius_m = 1.053
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 928
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/box_stacked.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 146968
+measured = true
+size_m = [3.4753, 3.3089, 3.6347]
+height_m = 3.309
+footprint_radius_m = 2.514
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 2173
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/candle.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20784
+measured = true
+size_m = [0.3344, 0.873, 0.3293]
+height_m = 0.873
+footprint_radius_m = 0.235
+pivot = "base"
+role_native = "traversal"
+nature = "light"
+triangles = 66
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/candle_lit.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22648
+measured = true
+size_m = [0.3344, 1.0511, 0.3293]
+height_m = 1.051
+footprint_radius_m = 0.235
+pivot = "base"
+role_native = "traversal"
+nature = "light"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/candle_melted.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20788
+measured = true
+size_m = [0.3344, 0.7015, 0.3293]
+height_m = 0.702
+footprint_radius_m = 0.235
+pivot = "base"
+role_native = "traversal"
+nature = "light"
+triangles = 66
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/candle_thin.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20788
+measured = true
+size_m = [0.1932, 0.873, 0.1903]
+height_m = 0.873
+footprint_radius_m = 0.136
+pivot = "base"
+role_native = "traversal"
+nature = "light"
+triangles = 66
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/candle_thin_lit.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22652
+measured = true
+size_m = [0.1932, 1.0511, 0.1903]
+height_m = 1.051
+footprint_radius_m = 0.136
+pivot = "base"
+role_native = "traversal"
+nature = "light"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/candle_triple.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 28240
+measured = true
+size_m = [0.5012, 0.873, 0.3899]
+height_m = 0.873
+footprint_radius_m = 0.317
+pivot = "base"
+role_native = "traversal"
+nature = "light"
+triangles = 198
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/chair.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36252
+measured = true
+size_m = [0.75, 1.2265, 0.75]
+height_m = 1.226
+footprint_radius_m = 0.53
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 294
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/chest.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 81412
+measured = true
+size_m = [1.7, 1.3, 1.4458]
+height_m = 1.3
+footprint_radius_m = 1.116
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 728
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/chest_gold.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 140140
+measured = true
+size_m = [1.7, 1.3, 1.4458]
+height_m = 1.3
+footprint_radius_m = 1.116
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 1568
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/coin.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 21776
+measured = true
+size_m = [0.36, 0.125, 0.36]
+height_m = 0.125
+footprint_radius_m = 0.255
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 80
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/coin_stack_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 101076
+measured = true
+size_m = [1.4365, 1.1569, 1.6587]
+height_m = 1.157
+footprint_radius_m = 1.097
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 1776
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/coin_stack_medium.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 63996
+measured = true
+size_m = [0.9934, 0.6407, 1.0341]
+height_m = 0.641
+footprint_radius_m = 0.717
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 968
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/coin_stack_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 38404
+measured = true
+size_m = [0.9591, 0.4782, 0.8963]
+height_m = 0.478
+footprint_radius_m = 0.656
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 416
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/column.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20260
+measured = true
+size_m = [0.7, 1.4, 0.7]
+height_m = 1.4
+footprint_radius_m = 0.495
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/crates_stacked.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 103704
+measured = true
+size_m = [2.0892, 2.1423, 2.2494]
+height_m = 2.142
+footprint_radius_m = 1.535
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 1331
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24620
+measured = true
+size_m = [4.0, 0.2086, 4.0]
+height_m = 0.209
+footprint_radius_m = 2.828
+pivot = "center"
+role_native = "traversal"
+nature = "floor"
+triangles = 104
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_large_rocky.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30216
+measured = true
+size_m = [4.0, 0.3928, 4.0]
+height_m = 0.393
+footprint_radius_m = 2.828
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 187
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_small_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20460
+measured = true
+size_m = [2.0, 0.1864, 2.0]
+height_m = 0.186
+footprint_radius_m = 1.414
+pivot = "center"
+role_native = "traversal"
+nature = "floor"
+triangles = 45
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_small_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 19536
+measured = true
+size_m = [2.0, 0.1886, 2.0]
+height_m = 0.189
+footprint_radius_m = 1.414
+pivot = "center"
+role_native = "traversal"
+nature = "floor"
+triangles = 36
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_small_C.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 19484
+measured = true
+size_m = [2.0, 0.2086, 2.0]
+height_m = 0.209
+footprint_radius_m = 1.414
+pivot = "center"
+role_native = "traversal"
+nature = "floor"
+triangles = 33
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_small_D.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 18476
+measured = true
+size_m = [2.0, 0.1384, 2.0]
+height_m = 0.138
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 20
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_small_corner.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20752
+measured = true
+size_m = [2.0, 0.1538, 2.0]
+height_m = 0.154
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 56
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_dirt_small_weeds.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 41224
+measured = true
+size_m = [2.0, 0.2955, 2.0]
+height_m = 0.295
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 416
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_foundation_allsides.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 44944
+measured = true
+size_m = [2.2, 2.0, 2.2]
+height_m = 2.0
+footprint_radius_m = 1.556
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 360
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_foundation_corner.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 31996
+measured = true
+size_m = [2.1, 2.0, 2.1]
+height_m = 2.0
+footprint_radius_m = 1.485
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 202
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_foundation_diagonal_corner.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25024
+measured = true
+size_m = [2.1, 2.0, 2.1]
+height_m = 2.0
+footprint_radius_m = 1.485
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 111
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_foundation_front.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25516
+measured = true
+size_m = [2, 2, 2.1]
+height_m = 2
+footprint_radius_m = 1.45
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 123
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_foundation_front_and_back.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 32004
+measured = true
+size_m = [2.0, 2.0, 2.2]
+height_m = 2.0
+footprint_radius_m = 1.487
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 202
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_foundation_front_and_sides.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 38480
+measured = true
+size_m = [2.2, 2.0, 2.1]
+height_m = 2.0
+footprint_radius_m = 1.521
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 281
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_big_grate.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36296
+measured = true
+size_m = [4, 1.05, 4]
+height_m = 1.05
+footprint_radius_m = 2.828
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 292
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_big_grate_open.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35740
+measured = true
+size_m = [4, 1.05, 4]
+height_m = 1.05
+footprint_radius_m = 2.828
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 284
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_big_spikes.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 80644
+measured = true
+size_m = [4.0, 2.1, 4.0]
+height_m = 2.1
+footprint_radius_m = 2.828
+pivot = "base"
+role_native = "cover_high"
+nature = "floor"
+triangles = 638
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_extralarge_grates.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 66408
+measured = true
+size_m = [8.0, 1.13, 8.0]
+height_m = 1.13
+footprint_radius_m = 5.657
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 772
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_extralarge_grates_open.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 65852
+measured = true
+size_m = [8.0, 1.13, 8.0]
+height_m = 1.13
+footprint_radius_m = 5.657
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 764
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_grate.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26700
+measured = true
+size_m = [4.0, 1.03, 2.0]
+height_m = 1.03
+footprint_radius_m = 2.236
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 142
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_grate_open.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26564
+measured = true
+size_m = [4.0, 1.03, 2.0]
+height_m = 1.03
+footprint_radius_m = 2.236
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 140
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 28100
+measured = true
+size_m = [4.0, 0.15, 4.0]
+height_m = 0.15
+footprint_radius_m = 2.828
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 188
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_large_rocks.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 38384
+measured = true
+size_m = [4.0, 0.6362, 4.0]
+height_m = 0.636
+footprint_radius_m = 2.828
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 338
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20740
+measured = true
+size_m = [2.0, 0.15, 2.0]
+height_m = 0.15
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 66
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small_broken_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22132
+measured = true
+size_m = [2.0, 0.15, 2.0]
+height_m = 0.15
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 94
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small_broken_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 21608
+measured = true
+size_m = [2.0, 0.15, 2.0]
+height_m = 0.15
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 76
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small_corner.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 18868
+measured = true
+size_m = [2.0, 0.15, 2.0]
+height_m = 0.15
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 31
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 40812
+measured = true
+size_m = [2.0, 0.773, 2.0]
+height_m = 0.773
+footprint_radius_m = 1.414
+pivot = "base"
+role_native = "traversal"
+nature = "floor"
+triangles = 390
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small_weeds_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 44020
+measured = true
+size_m = [2.0, 0.2955, 2.0]
+height_m = 0.295
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 589
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_tile_small_weeds_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 42368
+measured = true
+size_m = [2.0, 0.2955, 2.0]
+height_m = 0.295
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 447
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_wood_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35612
+measured = true
+size_m = [4.0, 0.15, 4.0]
+height_m = 0.15
+footprint_radius_m = 2.828
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 272
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_wood_large_dark.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35616
+measured = true
+size_m = [4.0, 0.15, 4.0]
+height_m = 0.15
+footprint_radius_m = 2.828
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 272
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_wood_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22156
+measured = true
+size_m = [2.0, 0.15, 2.0]
+height_m = 0.15
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 78
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/floor_wood_small_dark.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22160
+measured = true
+size_m = [2.0, 0.15, 2.0]
+height_m = 0.15
+footprint_radius_m = 1.414
+pivot = "offset"
+role_native = "traversal"
+nature = "floor"
+triangles = 78
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/keg.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 59912
+measured = true
+size_m = [1.8, 2.0507, 2.0]
+height_m = 2.051
+footprint_radius_m = 1.345
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 807
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/keg_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 142052
+measured = true
+size_m = [3.5194, 2.0507, 2.0]
+height_m = 2.051
+footprint_radius_m = 2.024
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 2058
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/key.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 24432
+measured = true
+size_m = [0.8957, 0.4029, 0.1418]
+height_m = 0.403
+footprint_radius_m = 0.453
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 160
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/keyring.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 49100
+measured = true
+size_m = [1.031, 0.2614, 1.2093]
+height_m = 0.261
+footprint_radius_m = 0.795
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 728
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/keyring_hanging.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 49108
+measured = true
+size_m = [0.6797, 1.2195, 0.3835]
+height_m = 1.22
+footprint_radius_m = 0.39
+pivot = "top"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 728
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/pillar.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 25552
+measured = true
+size_m = [1.5, 4.0, 1.5]
+height_m = 4.0
+footprint_radius_m = 1.061
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 136
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/pillar_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 62460
+measured = true
+size_m = [2.232, 4.0, 1.7102]
+height_m = 4.0
+footprint_radius_m = 1.406
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 761
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/plate.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22884
+measured = true
+size_m = [0.9706, 0.1294, 0.9706]
+height_m = 0.129
+footprint_radius_m = 0.686
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/plate_food_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 41236
+measured = true
+size_m = [1.025, 0.7875, 0.9706]
+height_m = 0.787
+footprint_radius_m = 0.706
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 547
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/plate_food_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 31980
+measured = true
+size_m = [0.9706, 0.2361, 0.9706]
+height_m = 0.236
+footprint_radius_m = 0.686
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 306
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/plate_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22892
+measured = true
+size_m = [0.4853, 0.1294, 0.4853]
+height_m = 0.129
+footprint_radius_m = 0.343
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/plate_stack.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35728
+measured = true
+size_m = [0.9971, 0.5639, 1.002]
+height_m = 0.564
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 360
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/rubble_half.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 38836
+measured = true
+size_m = [3.9997, 3.5, 3.0]
+height_m = 3.5
+footprint_radius_m = 2.5
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 390
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/rubble_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 60196
+measured = true
+size_m = [8.1293, 3.4961, 3.1831]
+height_m = 3.496
+footprint_radius_m = 4.365
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 788
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/shelf_large.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 22012
+measured = true
+size_m = [2.0, 0.45, 0.5]
+height_m = 0.45
+footprint_radius_m = 1.031
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/shelf_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 20932
+measured = true
+size_m = [1.0, 0.4, 0.5]
+height_m = 0.4
+footprint_radius_m = 0.559
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/shelf_small_candles.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30036
+measured = true
+size_m = [1.0, 0.9942, 0.5]
+height_m = 0.994
+footprint_radius_m = 0.559
+pivot = "offset"
+role_native = "traversal"
+nature = "light"
+triangles = 231
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/shelves.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26996
+measured = true
+size_m = [2.0, 1.95, 0.5]
+height_m = 1.95
+footprint_radius_m = 1.031
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 152
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 43368
+measured = true
+size_m = [5.0, 5.1, 4.0]
+height_m = 5.1
+footprint_radius_m = 3.202
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 358
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_narrow.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 43372
+measured = true
+size_m = [4.0, 5.1, 4.0]
+height_m = 5.1
+footprint_radius_m = 2.828
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 358
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_wall_left.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 57640
+measured = true
+size_m = [4.0, 5.1, 5.0]
+height_m = 5.1
+footprint_radius_m = 3.202
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 574
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_wall_right.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 57704
+measured = true
+size_m = [4.0, 5.1, 5.0]
+height_m = 5.1
+footprint_radius_m = 3.202
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 574
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_walled.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 72072
+measured = true
+size_m = [5.0, 4.0, 4.0]
+height_m = 4.0
+footprint_radius_m = 3.202
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 790
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_wide.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 43372
+measured = true
+size_m = [7.0, 5.1, 4.0]
+height_m = 5.1
+footprint_radius_m = 4.031
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 358
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_wood.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 34632
+measured = true
+size_m = [3.3, 4.05, 6.0]
+height_m = 4.05
+footprint_radius_m = 3.424
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 296
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stairs_wood_decorated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 171080
+measured = true
+size_m = [3.3, 4.05, 6.0]
+height_m = 4.05
+footprint_radius_m = 3.424
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 2537
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/stool.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 28528
+measured = true
+size_m = [0.75, 0.5, 0.75]
+height_m = 0.5
+footprint_radius_m = 0.53
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 172
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/sword_shield.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 47764
+measured = true
+size_m = [2.232, 1.6674, 0.3357]
+height_m = 1.667
+footprint_radius_m = 1.129
+pivot = "center"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 542
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/sword_shield_broken.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 39980
+measured = true
+size_m = [1.4256, 1.9623, 0.3357]
+height_m = 1.962
+footprint_radius_m = 0.732
+pivot = "center"
+role_native = "cover_high"
+nature = "prop"
+triangles = 396
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/sword_shield_gold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 47768
+measured = true
+size_m = [2.232, 1.6674, 0.3357]
+height_m = 1.667
+footprint_radius_m = 1.129
+pivot = "center"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 542
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_long.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35128
+measured = true
+size_m = [2.0, 1.0, 4.0]
+height_m = 1.0
+footprint_radius_m = 2.236
+pivot = "base"
+role_native = "traversal"
+nature = "floor"
+triangles = 280
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_long_broken.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55192
+measured = true
+size_m = [2.4092, 1.2663, 4.4045]
+height_m = 1.266
+footprint_radius_m = 2.51
+pivot = "base"
+role_native = "cover_useless"
+nature = "floor"
+triangles = 550
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_long_decorated_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 120792
+measured = true
+size_m = [2.0586, 1.8857, 4.0]
+height_m = 1.886
+footprint_radius_m = 2.249
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 1961
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_long_decorated_C.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 231608
+measured = true
+size_m = [2.0, 2.7676, 4.0251]
+height_m = 2.768
+footprint_radius_m = 2.247
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 3499
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_long_tablecloth.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 38400
+measured = true
+size_m = [2.0, 1.0, 4.0]
+height_m = 1.0
+footprint_radius_m = 2.236
+pivot = "base"
+role_native = "traversal"
+nature = "floor"
+triangles = 354
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_long_tablecloth_decorated_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 124064
+measured = true
+size_m = [2.0586, 1.8857, 4.0]
+height_m = 1.886
+footprint_radius_m = 2.249
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 2035
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_medium.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 33832
+measured = true
+size_m = [2.0, 1.0, 2.0]
+height_m = 1.0
+footprint_radius_m = 1.414
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 256
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_medium_broken.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35184
+measured = true
+size_m = [2.2767, 0.9718, 2.4284]
+height_m = 0.972
+footprint_radius_m = 1.664
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 247
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_medium_decorated_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 82588
+measured = true
+size_m = [2.0, 1.8857, 2.0]
+height_m = 1.886
+footprint_radius_m = 1.414
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 1186
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_medium_tablecloth.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35160
+measured = true
+size_m = [2.0, 1.0, 2.0]
+height_m = 1.0
+footprint_radius_m = 1.414
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 270
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_medium_tablecloth_decorated_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 83916
+measured = true
+size_m = [2.0, 1.8857, 2.0]
+height_m = 1.886
+footprint_radius_m = 1.414
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 1200
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 29908
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 192
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_small_decorated_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 67672
+measured = true
+size_m = [1.039, 1.6213, 1.2112]
+height_m = 1.621
+footprint_radius_m = 0.798
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 986
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/table_small_decorated_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 105068
+measured = true
+size_m = [1.0125, 2.1569, 1.0]
+height_m = 2.157
+footprint_radius_m = 0.712
+pivot = "base"
+role_native = "cover_high"
+nature = "prop"
+triangles = 1576
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/torch.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 29380
+measured = true
+size_m = [0.5503, 1.0416, 0.5503]
+height_m = 1.042
+footprint_radius_m = 0.389
+pivot = "center"
+role_native = "traversal"
+nature = "light"
+triangles = 216
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/torch_lit.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 31244
+measured = true
+size_m = [0.5503, 1.1258, 0.5503]
+height_m = 1.126
+footprint_radius_m = 0.389
+pivot = "center"
+role_native = "traversal"
+nature = "light"
+triangles = 270
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/torch_mounted.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 33220
+measured = true
+size_m = [0.5503, 1.0625, 0.6158]
+height_m = 1.062
+footprint_radius_m = 0.413
+pivot = "center"
+role_native = "traversal"
+nature = "light"
+triangles = 278
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_large_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30180
+measured = true
+size_m = [1.5, 1.0, 1.3]
+height_m = 1.0
+footprint_radius_m = 0.992
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 204
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_large_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30180
+measured = true
+size_m = [1.5, 1.0, 1.3]
+height_m = 1.0
+footprint_radius_m = 0.992
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 204
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_large_C.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30180
+measured = true
+size_m = [1.5, 1.0, 1.3]
+height_m = 1.0
+footprint_radius_m = 0.992
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 204
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_medium_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26420
+measured = true
+size_m = [0.953, 0.7265, 0.8751]
+height_m = 0.727
+footprint_radius_m = 0.647
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 148
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_medium_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26420
+measured = true
+size_m = [0.953, 0.7265, 0.8751]
+height_m = 0.727
+footprint_radius_m = 0.647
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 148
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_medium_C.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 26420
+measured = true
+size_m = [0.953, 0.7265, 0.8751]
+height_m = 0.727
+footprint_radius_m = 0.647
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 148
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_small_A.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30184
+measured = true
+size_m = [0.6754, 0.4843, 0.5834]
+height_m = 0.484
+footprint_radius_m = 0.446
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 204
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_small_B.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30184
+measured = true
+size_m = [0.6754, 0.4843, 0.5834]
+height_m = 0.484
+footprint_radius_m = 0.446
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 204
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/trunk_small_C.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 30184
+measured = true
+size_m = [0.6754, 0.4843, 0.5834]
+height_m = 0.484
+footprint_radius_m = 0.446
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 204
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 53132
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 494
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_Tsplit.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 60080
+measured = true
+size_m = [4.0, 4.0, 2.5001]
+height_m = 4.0
+footprint_radius_m = 2.359
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 596
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_Tsplit_sloped.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 57224
+measured = true
+size_m = [4.0, 4.0, 2.5]
+height_m = 4.0
+footprint_radius_m = 2.358
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 555
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_arched.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 69124
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 724
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_archedwindow_gated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 64752
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 732
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_archedwindow_gated_scaffold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 60988
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 674
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_archedwindow_open.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 58028
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 635
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_broken.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 69276
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 784
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_corner.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 49212
+measured = true
+size_m = [2.5, 4.0, 2.5001]
+height_m = 4.0
+footprint_radius_m = 1.768
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 443
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_corner_gated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 51132
+measured = true
+size_m = [2.5, 4.0, 2.5001]
+height_m = 4.0
+footprint_radius_m = 1.768
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 557
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_corner_scaffold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 54200
+measured = true
+size_m = [2.5, 4.0, 2.5001]
+height_m = 4.0
+footprint_radius_m = 1.768
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 515
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_corner_small.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 33640
+measured = true
+size_m = [1.5, 4.0, 1.5001]
+height_m = 4.0
+footprint_radius_m = 1.061
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 223
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_cracked.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 138396
+measured = true
+size_m = [4.0, 4.0, 1.2594]
+height_m = 4.0
+footprint_radius_m = 2.097
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 2010
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_crossing.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 66856
+measured = true
+size_m = [4, 4, 4.0001]
+height_m = 4
+footprint_radius_m = 2.828
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 698
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_doorway.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 100596
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 1068
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_doorway_Tsplit.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 93124
+measured = true
+size_m = [8.0, 4.0, 2.5001]
+height_m = 4.0
+footprint_radius_m = 4.191
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 1096
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_doorway_scaffold.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 109416
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 1150
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_doorway_sides.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 97364
+measured = true
+size_m = [5.0, 4.0, 4.0]
+height_m = 4.0
+footprint_radius_m = 3.202
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 1160
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_endcap.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 33708
+measured = true
+size_m = [1.0669, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 0.731
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 222
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_gated.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 46364
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 449
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_half.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36840
+measured = true
+size_m = [2.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 1.118
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 272
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_half_endcap.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 36724
+measured = true
+size_m = [2.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 1.118
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 268
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_half_endcap_sloped.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 33368
+measured = true
+size_m = [2.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 1.118
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 230
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_open_scaffold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 29908
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 196
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_pillar.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 55156
+measured = true
+size_m = [4.0, 4.0, 1.5]
+height_m = 4.0
+footprint_radius_m = 2.136
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 540
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_scaffold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 59436
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 584
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_shelves.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 122244
+measured = true
+size_m = [4.0, 4.0, 1.3676]
+height_m = 4.0
+footprint_radius_m = 2.114
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 1582
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_sloped.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 35964
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 257
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_window_closed.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 61460
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 664
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_window_closed_scaffold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 66508
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 736
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_window_open.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 57256
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 604
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kaykit/dungeon_remastered/wall_window_open_scaffold.gltf.glb"
+kit = "kaykit_dungeon_remastered"
+bytes = 62308
+measured = true
+size_m = [4.0, 4.0, 1.0]
+height_m = 4.0
+footprint_radius_m = 2.062
+pivot = "base"
+role_native = "cover_high"
+nature = "wall"
+triangles = 676
 materials = 1
 skinned = false
 animations = 0
@@ -7103,6 +10351,5270 @@ triangles = 5934
 materials = 2
 skinned = true
 animations = 95
+
+[[assets]]
+path = "models/kenney/nature/bed.glb"
+kit = "kenney"
+bytes = 19108
+measured = true
+size_m = [0.3349, 0.2737, 0.7473]
+height_m = 0.274
+footprint_radius_m = 0.409
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 268
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bed_floor.glb"
+kit = "kenney"
+bytes = 10688
+measured = true
+size_m = [0.3203, 0.0921, 0.7473]
+height_m = 0.092
+footprint_radius_m = 0.407
+pivot = "center"
+role_native = "traversal"
+nature = "floor"
+triangles = 124
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_center_stone.glb"
+kit = "kenney"
+bytes = 5076
+measured = true
+size_m = [1.0, 0.3, 1.0]
+height_m = 0.3
+footprint_radius_m = 0.707
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_center_stoneRound.glb"
+kit = "kenney"
+bytes = 5080
+measured = true
+size_m = [1.0, 0.2, 1.0]
+height_m = 0.2
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_center_wood.glb"
+kit = "kenney"
+bytes = 5480
+measured = true
+size_m = [1.0, 0.3, 1.0]
+height_m = 0.3
+footprint_radius_m = 0.707
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_center_woodRound.glb"
+kit = "kenney"
+bytes = 6280
+measured = true
+size_m = [1.0, 0.2, 1.0]
+height_m = 0.2
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_side_stone.glb"
+kit = "kenney"
+bytes = 11408
+measured = true
+size_m = [1.02, 0.4, 1.04]
+height_m = 0.4
+footprint_radius_m = 0.728
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 152
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_side_stoneRound.glb"
+kit = "kenney"
+bytes = 13540
+measured = true
+size_m = [1.02, 0.45, 1.04]
+height_m = 0.45
+footprint_radius_m = 0.728
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 198
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_side_wood.glb"
+kit = "kenney"
+bytes = 10604
+measured = true
+size_m = [1.02, 0.4, 1.04]
+height_m = 0.4
+footprint_radius_m = 0.728
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 136
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_side_woodRound.glb"
+kit = "kenney"
+bytes = 13460
+measured = true
+size_m = [1.02, 0.45, 1.04]
+height_m = 0.45
+footprint_radius_m = 0.728
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 190
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_stone.glb"
+kit = "kenney"
+bytes = 17708
+measured = true
+size_m = [1.04, 0.4, 1.04]
+height_m = 0.4
+footprint_radius_m = 0.735
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 252
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_stoneNarrow.glb"
+kit = "kenney"
+bytes = 17724
+measured = true
+size_m = [1.04, 0.35, 0.84]
+height_m = 0.35
+footprint_radius_m = 0.668
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 252
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_stoneRound.glb"
+kit = "kenney"
+bytes = 22552
+measured = true
+size_m = [1.04, 0.45, 1.04]
+height_m = 0.45
+footprint_radius_m = 0.735
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 360
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_stoneRoundNarrow.glb"
+kit = "kenney"
+bytes = 22564
+measured = true
+size_m = [1.04, 0.4, 0.84]
+height_m = 0.4
+footprint_radius_m = 0.668
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 360
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_wood.glb"
+kit = "kenney"
+bytes = 15692
+measured = true
+size_m = [1.04, 0.4, 1.04]
+height_m = 0.4
+footprint_radius_m = 0.735
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 220
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_woodNarrow.glb"
+kit = "kenney"
+bytes = 15708
+measured = true
+size_m = [1.04, 0.35, 0.84]
+height_m = 0.35
+footprint_radius_m = 0.668
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 220
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_woodRound.glb"
+kit = "kenney"
+bytes = 21192
+measured = true
+size_m = [1.04, 0.45, 1.04]
+height_m = 0.45
+footprint_radius_m = 0.735
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 336
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/bridge_woodRoundNarrow.glb"
+kit = "kenney"
+bytes = 21204
+measured = true
+size_m = [1.04, 0.4, 0.84]
+height_m = 0.4
+footprint_radius_m = 0.668
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 336
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cactus_short.glb"
+kit = "kenney"
+bytes = 8844
+measured = true
+size_m = [0.3417, 0.533, 0.2972]
+height_m = 0.533
+footprint_radius_m = 0.226
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 116
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cactus_tall.glb"
+kit = "kenney"
+bytes = 9668
+measured = true
+size_m = [0.3962, 0.75, 0.3391]
+height_m = 0.75
+footprint_radius_m = 0.261
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 122
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/campfire_bricks.glb"
+kit = "kenney"
+bytes = 10220
+measured = true
+size_m = [0.4692, 0.0676, 0.4692]
+height_m = 0.068
+footprint_radius_m = 0.332
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/campfire_logs.glb"
+kit = "kenney"
+bytes = 9284
+measured = true
+size_m = [0.2919, 0.0626, 0.2919]
+height_m = 0.063
+footprint_radius_m = 0.206
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 112
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/campfire_planks.glb"
+kit = "kenney"
+bytes = 8148
+measured = true
+size_m = [0.35, 0.04, 0.35]
+height_m = 0.04
+footprint_radius_m = 0.247
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 108
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/campfire_stones.glb"
+kit = "kenney"
+bytes = 17344
+measured = true
+size_m = [0.5408, 0.0778, 0.5155]
+height_m = 0.078
+footprint_radius_m = 0.374
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 264
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/canoe.glb"
+kit = "kenney"
+bytes = 15780
+measured = true
+size_m = [0.3, 0.1825, 1.15]
+height_m = 0.182
+footprint_radius_m = 0.594
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 200
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/canoe_paddle.glb"
+kit = "kenney"
+bytes = 3952
+measured = true
+size_m = [0.0767, 0.0361, 0.5902]
+height_m = 0.036
+footprint_radius_m = 0.298
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockCave_rock.glb"
+kit = "kenney"
+bytes = 5432
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 56
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockCave_stone.glb"
+kit = "kenney"
+bytes = 5436
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 56
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockDiagonal_rock.glb"
+kit = "kenney"
+bytes = 2564
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 8
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockDiagonal_stone.glb"
+kit = "kenney"
+bytes = 2568
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 8
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockHalf_rock.glb"
+kit = "kenney"
+bytes = 2788
+measured = true
+size_m = [1.0, 0.5, 1.0]
+height_m = 0.5
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 12
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockHalf_stone.glb"
+kit = "kenney"
+bytes = 2792
+measured = true
+size_m = [1.0, 0.5, 1.0]
+height_m = 0.5
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 12
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockQuarter_rock.glb"
+kit = "kenney"
+bytes = 2796
+measured = true
+size_m = [1.0, 0.25, 1.0]
+height_m = 0.25
+footprint_radius_m = 0.707
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 12
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockQuarter_stone.glb"
+kit = "kenney"
+bytes = 2800
+measured = true
+size_m = [1.0, 0.25, 1.0]
+height_m = 0.25
+footprint_radius_m = 0.707
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 12
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockSlopeHalfWalls_rock.glb"
+kit = "kenney"
+bytes = 8880
+measured = true
+size_m = [1.0, 0.5, 1.0]
+height_m = 0.5
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 106
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockSlopeHalfWalls_stone.glb"
+kit = "kenney"
+bytes = 8884
+measured = true
+size_m = [1.0, 0.5, 1.0]
+height_m = 0.5
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 106
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockSlopeWalls_rock.glb"
+kit = "kenney"
+bytes = 8900
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 106
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockSlopeWalls_stone.glb"
+kit = "kenney"
+bytes = 8904
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 106
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockSlope_rock.glb"
+kit = "kenney"
+bytes = 6720
+measured = true
+size_m = [1.2, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.781
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 70
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_blockSlope_stone.glb"
+kit = "kenney"
+bytes = 6724
+measured = true
+size_m = [1.2, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.781
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 70
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_block_rock.glb"
+kit = "kenney"
+bytes = 2776
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 12
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_block_stone.glb"
+kit = "kenney"
+bytes = 2780
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 12
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cave_rock.glb"
+kit = "kenney"
+bytes = 5480
+measured = true
+size_m = [1.0, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.507
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 64
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cave_stone.glb"
+kit = "kenney"
+bytes = 5484
+measured = true
+size_m = [1.0, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.507
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 64
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerInnerLarge_rock.glb"
+kit = "kenney"
+bytes = 4296
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerInnerLarge_stone.glb"
+kit = "kenney"
+bytes = 4300
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerInnerTop_rock.glb"
+kit = "kenney"
+bytes = 7608
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 89
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerInnerTop_stone.glb"
+kit = "kenney"
+bytes = 7612
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 89
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerInner_rock.glb"
+kit = "kenney"
+bytes = 5008
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 56
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerInner_stone.glb"
+kit = "kenney"
+bytes = 8568
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 112
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerLarge_rock.glb"
+kit = "kenney"
+bytes = 2376
+measured = true
+size_m = [0.4185, 1.0, 0.4185]
+height_m = 1.0
+footprint_radius_m = 0.296
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 12
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerLarge_stone.glb"
+kit = "kenney"
+bytes = 3296
+measured = true
+size_m = [0.4185, 1.0, 0.4185]
+height_m = 1.0
+footprint_radius_m = 0.296
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 24
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerTop_rock.glb"
+kit = "kenney"
+bytes = 3108
+measured = true
+size_m = [0.2685, 1.0, 0.2685]
+height_m = 1.0
+footprint_radius_m = 0.19
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_cornerTop_stone.glb"
+kit = "kenney"
+bytes = 3112
+measured = true
+size_m = [0.2685, 1.0, 0.2685]
+height_m = 1.0
+footprint_radius_m = 0.19
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_corner_rock.glb"
+kit = "kenney"
+bytes = 2360
+measured = true
+size_m = [0.1685, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.119
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 12
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_corner_stone.glb"
+kit = "kenney"
+bytes = 2364
+measured = true
+size_m = [0.1685, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.119
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 12
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_diagonal_rock.glb"
+kit = "kenney"
+bytes = 4296
+measured = true
+size_m = [1.1685, 1.0, 1.1685]
+height_m = 1.0
+footprint_radius_m = 0.826
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_diagonal_stone.glb"
+kit = "kenney"
+bytes = 4236
+measured = true
+size_m = [1.1685, 1.0, 1.1685]
+height_m = 1.0
+footprint_radius_m = 0.826
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_halfCornerInner_rock.glb"
+kit = "kenney"
+bytes = 8016
+measured = true
+size_m = [1.0, 0.5, 1.0]
+height_m = 0.5
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 89
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_halfCornerInner_stone.glb"
+kit = "kenney"
+bytes = 8020
+measured = true
+size_m = [1.0, 0.5, 1.0]
+height_m = 0.5
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 89
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_halfCorner_rock.glb"
+kit = "kenney"
+bytes = 3128
+measured = true
+size_m = [0.4185, 0.5, 0.4185]
+height_m = 0.5
+footprint_radius_m = 0.296
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_halfCorner_stone.glb"
+kit = "kenney"
+bytes = 3132
+measured = true
+size_m = [0.4185, 0.5, 0.4185]
+height_m = 0.5
+footprint_radius_m = 0.296
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_half_rock.glb"
+kit = "kenney"
+bytes = 5316
+measured = true
+size_m = [1.0, 0.5, 0.4185]
+height_m = 0.5
+footprint_radius_m = 0.542
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 53
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_half_stone.glb"
+kit = "kenney"
+bytes = 5320
+measured = true
+size_m = [1.0, 0.5, 0.4185]
+height_m = 0.5
+footprint_radius_m = 0.542
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 53
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_large_rock.glb"
+kit = "kenney"
+bytes = 3560
+measured = true
+size_m = [1.0, 1.0, 0.4185]
+height_m = 1.0
+footprint_radius_m = 0.542
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_large_stone.glb"
+kit = "kenney"
+bytes = 3564
+measured = true
+size_m = [1.0, 1.0, 0.4185]
+height_m = 1.0
+footprint_radius_m = 0.542
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_rock.glb"
+kit = "kenney"
+bytes = 3556
+measured = true
+size_m = [1.0, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.507
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_stepsCornerInner_rock.glb"
+kit = "kenney"
+bytes = 15632
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 213
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_stepsCornerInner_stone.glb"
+kit = "kenney"
+bytes = 15636
+measured = true
+size_m = [1.0, 1.0, 1.0]
+height_m = 1.0
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 213
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_stepsCorner_rock.glb"
+kit = "kenney"
+bytes = 17544
+measured = true
+size_m = [1.05, 1.0, 1.05]
+height_m = 1.0
+footprint_radius_m = 0.742
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 245
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_stepsCorner_stone.glb"
+kit = "kenney"
+bytes = 17548
+measured = true
+size_m = [1.05, 1.0, 1.05]
+height_m = 1.0
+footprint_radius_m = 0.742
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 245
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_steps_rock.glb"
+kit = "kenney"
+bytes = 15952
+measured = true
+size_m = [1.0, 1.0, 1.05]
+height_m = 1.0
+footprint_radius_m = 0.725
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 219
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_steps_stone.glb"
+kit = "kenney"
+bytes = 15956
+measured = true
+size_m = [1.0, 1.0, 1.05]
+height_m = 1.0
+footprint_radius_m = 0.725
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 219
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_stone.glb"
+kit = "kenney"
+bytes = 3560
+measured = true
+size_m = [1.0, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.507
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_topDiagonal_rock.glb"
+kit = "kenney"
+bytes = 6220
+measured = true
+size_m = [1.2685, 1.0, 1.2685]
+height_m = 1.0
+footprint_radius_m = 0.897
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 66
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_topDiagonal_stone.glb"
+kit = "kenney"
+bytes = 10540
+measured = true
+size_m = [1.2685, 1.0, 1.2685]
+height_m = 1.0
+footprint_radius_m = 0.897
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 132
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_top_rock.glb"
+kit = "kenney"
+bytes = 5312
+measured = true
+size_m = [1.0, 1.0, 0.2685]
+height_m = 1.0
+footprint_radius_m = 0.518
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 53
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_top_stone.glb"
+kit = "kenney"
+bytes = 5316
+measured = true
+size_m = [1.0, 1.0, 0.2685]
+height_m = 1.0
+footprint_radius_m = 0.518
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 53
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_waterfallTop_rock.glb"
+kit = "kenney"
+bytes = 7076
+measured = true
+size_m = [1.0, 1.0, 0.2685]
+height_m = 1.0
+footprint_radius_m = 0.518
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 60
+materials = 5
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_waterfallTop_stone.glb"
+kit = "kenney"
+bytes = 7508
+measured = true
+size_m = [1.0, 1.0, 0.2685]
+height_m = 1.0
+footprint_radius_m = 0.518
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 6
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_waterfall_rock.glb"
+kit = "kenney"
+bytes = 4488
+measured = true
+size_m = [1.0, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.507
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 34
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/cliff_waterfall_stone.glb"
+kit = "kenney"
+bytes = 6100
+measured = true
+size_m = [1.0, 1.0, 0.1685]
+height_m = 1.0
+footprint_radius_m = 0.507
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 68
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crop_carrot.glb"
+kit = "kenney"
+bytes = 12664
+measured = true
+size_m = [0.3431, 0.6194, 0.3431]
+height_m = 0.619
+footprint_radius_m = 0.243
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 148
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crop_melon.glb"
+kit = "kenney"
+bytes = 13328
+measured = true
+size_m = [0.4176, 0.348, 0.3617]
+height_m = 0.348
+footprint_radius_m = 0.276
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 236
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crop_pumpkin.glb"
+kit = "kenney"
+bytes = 10840
+measured = true
+size_m = [0.4413, 0.3338, 0.4519]
+height_m = 0.334
+footprint_radius_m = 0.316
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 120
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crop_turnip.glb"
+kit = "kenney"
+bytes = 14308
+measured = true
+size_m = [0.3431, 0.6607, 0.3431]
+height_m = 0.661
+footprint_radius_m = 0.243
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 168
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_bambooStageA.glb"
+kit = "kenney"
+bytes = 22092
+measured = true
+size_m = [0.3401, 0.549, 0.308]
+height_m = 0.549
+footprint_radius_m = 0.229
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 276
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_bambooStageB.glb"
+kit = "kenney"
+bytes = 40144
+measured = true
+size_m = [0.3401, 0.89, 0.308]
+height_m = 0.89
+footprint_radius_m = 0.229
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 564
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_cornStageA.glb"
+kit = "kenney"
+bytes = 9076
+measured = true
+size_m = [0.3042, 0.5, 0.3042]
+height_m = 0.5
+footprint_radius_m = 0.215
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 100
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_cornStageB.glb"
+kit = "kenney"
+bytes = 9780
+measured = true
+size_m = [0.3042, 1.0, 0.3042]
+height_m = 1.0
+footprint_radius_m = 0.215
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 116
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_cornStageC.glb"
+kit = "kenney"
+bytes = 11960
+measured = true
+size_m = [0.3042, 1.25, 0.3042]
+height_m = 1.25
+footprint_radius_m = 0.215
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 148
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_cornStageD.glb"
+kit = "kenney"
+bytes = 29316
+measured = true
+size_m = [0.4416, 1.25, 0.4416]
+height_m = 1.25
+footprint_radius_m = 0.312
+pivot = "base"
+role_native = "cover_useless"
+nature = "prop"
+triangles = 300
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtDoubleRow.glb"
+kit = "kenney"
+bytes = 7560
+measured = true
+size_m = [1.0, 0.05, 0.938]
+height_m = 0.05
+footprint_radius_m = 0.686
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 88
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtDoubleRowCorner.glb"
+kit = "kenney"
+bytes = 5396
+measured = true
+size_m = [0.938, 0.05, 0.938]
+height_m = 0.05
+footprint_radius_m = 0.663
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 50
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtDoubleRowEnd.glb"
+kit = "kenney"
+bytes = 6248
+measured = true
+size_m = [0.6, 0.05, 0.938]
+height_m = 0.05
+footprint_radius_m = 0.557
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 64
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtRow.glb"
+kit = "kenney"
+bytes = 4712
+measured = true
+size_m = [1.0, 0.05, 0.62]
+height_m = 0.05
+footprint_radius_m = 0.588
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtRowCorner.glb"
+kit = "kenney"
+bytes = 3248
+measured = true
+size_m = [0.779, 0.05, 0.779]
+height_m = 0.05
+footprint_radius_m = 0.551
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 19
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtRowEnd.glb"
+kit = "kenney"
+bytes = 4064
+measured = true
+size_m = [0.6, 0.05, 0.62]
+height_m = 0.05
+footprint_radius_m = 0.431
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_dirtSingle.glb"
+kit = "kenney"
+bytes = 4196
+measured = true
+size_m = [0.4, 0.1, 0.3464]
+height_m = 0.1
+footprint_radius_m = 0.265
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_leafsStageA.glb"
+kit = "kenney"
+bytes = 7144
+measured = true
+size_m = [0.3894, 0.4271, 0.3894]
+height_m = 0.427
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_leafsStageB.glb"
+kit = "kenney"
+bytes = 7768
+measured = true
+size_m = [0.3894, 0.6771, 0.3894]
+height_m = 0.677
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 84
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_wheatStageA.glb"
+kit = "kenney"
+bytes = 56228
+measured = true
+size_m = [0.5396, 0.3349, 0.4467]
+height_m = 0.335
+footprint_radius_m = 0.35
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 720
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/crops_wheatStageB.glb"
+kit = "kenney"
+bytes = 30040
+measured = true
+size_m = [0.5396, 0.5349, 0.4467]
+height_m = 0.535
+footprint_radius_m = 0.35
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 360
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_bend.glb"
+kit = "kenney"
+bytes = 16276
+measured = true
+size_m = [1.0, 0.345, 1.0]
+height_m = 0.345
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 240
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_bendCenter.glb"
+kit = "kenney"
+bytes = 20016
+measured = true
+size_m = [1.0, 0.345, 1.0]
+height_m = 0.345
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 298
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_corner.glb"
+kit = "kenney"
+bytes = 8644
+measured = true
+size_m = [1.0, 0.345, 1.0]
+height_m = 0.345
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 116
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_gate.glb"
+kit = "kenney"
+bytes = 27652
+measured = true
+size_m = [1.0, 0.345, 0.07]
+height_m = 0.345
+footprint_radius_m = 0.501
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 524
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_planks.glb"
+kit = "kenney"
+bytes = 7720
+measured = true
+size_m = [1.0, 0.345, 0.0959]
+height_m = 0.345
+footprint_radius_m = 0.502
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 96
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_planksDouble.glb"
+kit = "kenney"
+bytes = 11160
+measured = true
+size_m = [1.0, 0.345, 0.0599]
+height_m = 0.345
+footprint_radius_m = 0.501
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 152
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_simple.glb"
+kit = "kenney"
+bytes = 5712
+measured = true
+size_m = [1.0, 0.345, 0.07]
+height_m = 0.345
+footprint_radius_m = 0.501
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 64
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_simpleCenter.glb"
+kit = "kenney"
+bytes = 8660
+measured = true
+size_m = [1.0, 0.345, 0.07]
+height_m = 0.345
+footprint_radius_m = 0.501
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 116
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_simpleDiagonal.glb"
+kit = "kenney"
+bytes = 6688
+measured = true
+size_m = [1.0, 0.345, 1.0]
+height_m = 0.345
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 80
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_simpleDiagonalCenter.glb"
+kit = "kenney"
+bytes = 11064
+measured = true
+size_m = [1.0, 0.345, 1.0]
+height_m = 0.345
+footprint_radius_m = 0.707
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 148
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_simpleHigh.glb"
+kit = "kenney"
+bytes = 4300
+measured = true
+size_m = [1.0412, 0.345, 0.1112]
+height_m = 0.345
+footprint_radius_m = 0.524
+pivot = "base"
+role_native = "traversal"
+nature = "wall"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/fence_simpleLow.glb"
+kit = "kenney"
+bytes = 4312
+measured = true
+size_m = [1.0412, 0.195, 0.1112]
+height_m = 0.195
+footprint_radius_m = 0.524
+pivot = "offset"
+role_native = "traversal"
+nature = "wall"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_purpleA.glb"
+kit = "kenney"
+bytes = 7112
+measured = true
+size_m = [0.1591, 0.2425, 0.1811]
+height_m = 0.242
+footprint_radius_m = 0.121
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_purpleB.glb"
+kit = "kenney"
+bytes = 8084
+measured = true
+size_m = [0.2073, 0.2085, 0.2392]
+height_m = 0.208
+footprint_radius_m = 0.158
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 98
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_purpleC.glb"
+kit = "kenney"
+bytes = 7600
+measured = true
+size_m = [0.1806, 0.1825, 0.1811]
+height_m = 0.182
+footprint_radius_m = 0.128
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 78
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_redA.glb"
+kit = "kenney"
+bytes = 7104
+measured = true
+size_m = [0.1591, 0.2925, 0.1811]
+height_m = 0.292
+footprint_radius_m = 0.121
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_redB.glb"
+kit = "kenney"
+bytes = 8080
+measured = true
+size_m = [0.2073, 0.2585, 0.2392]
+height_m = 0.259
+footprint_radius_m = 0.158
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 98
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_redC.glb"
+kit = "kenney"
+bytes = 7600
+measured = true
+size_m = [0.1806, 0.2325, 0.1811]
+height_m = 0.233
+footprint_radius_m = 0.128
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 78
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_yellowA.glb"
+kit = "kenney"
+bytes = 7120
+measured = true
+size_m = [0.1591, 0.1925, 0.1811]
+height_m = 0.193
+footprint_radius_m = 0.121
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_yellowB.glb"
+kit = "kenney"
+bytes = 11256
+measured = true
+size_m = [0.2073, 0.1585, 0.2392]
+height_m = 0.159
+footprint_radius_m = 0.158
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 154
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/flower_yellowC.glb"
+kit = "kenney"
+bytes = 7616
+measured = true
+size_m = [0.1806, 0.1325, 0.1811]
+height_m = 0.133
+footprint_radius_m = 0.128
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 78
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/grass.glb"
+kit = "kenney"
+bytes = 11496
+measured = true
+size_m = [0.3811, 0.254, 0.3922]
+height_m = 0.254
+footprint_radius_m = 0.273
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 132
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/grass_large.glb"
+kit = "kenney"
+bytes = 18504
+measured = true
+size_m = [0.409, 0.254, 0.4079]
+height_m = 0.254
+footprint_radius_m = 0.289
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 224
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/grass_leafs.glb"
+kit = "kenney"
+bytes = 4608
+measured = true
+size_m = [0.2345, 0.1425, 0.2573]
+height_m = 0.142
+footprint_radius_m = 0.174
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 36
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/grass_leafsLarge.glb"
+kit = "kenney"
+bytes = 13988
+measured = true
+size_m = [0.4759, 0.1425, 0.4873]
+height_m = 0.142
+footprint_radius_m = 0.341
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_grass.glb"
+kit = "kenney"
+bytes = 1576
+measured = true
+size_m = [1.0, 0.0, 1.0]
+height_m = 0.0
+footprint_radius_m = 0.707
+pivot = "flat"
+role_native = "traversal"
+nature = "prop"
+triangles = 2
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathBend.glb"
+kit = "kenney"
+bytes = 4132
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathBendBank.glb"
+kit = "kenney"
+bytes = 4308
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 38
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathCorner.glb"
+kit = "kenney"
+bytes = 3532
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 22
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathCornerSmall.glb"
+kit = "kenney"
+bytes = 3632
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 24
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathCross.glb"
+kit = "kenney"
+bytes = 6404
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 74
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathEnd.glb"
+kit = "kenney"
+bytes = 5044
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathEndClosed.glb"
+kit = "kenney"
+bytes = 5824
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 68
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathOpen.glb"
+kit = "kenney"
+bytes = 1856
+measured = true
+size_m = [1.0, 0.0, 1.0]
+height_m = 0.0
+footprint_radius_m = 0.707
+pivot = "flat"
+role_native = "traversal"
+nature = "prop"
+triangles = 8
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathRocks.glb"
+kit = "kenney"
+bytes = 8036
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "nature"
+triangles = 102
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathSide.glb"
+kit = "kenney"
+bytes = 4124
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 34
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathSideOpen.glb"
+kit = "kenney"
+bytes = 4524
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 40
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathSplit.glb"
+kit = "kenney"
+bytes = 6012
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 68
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathStraight.glb"
+kit = "kenney"
+bytes = 5620
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 62
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_pathTile.glb"
+kit = "kenney"
+bytes = 6624
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 86
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverBend.glb"
+kit = "kenney"
+bytes = 5684
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 54
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverBendBank.glb"
+kit = "kenney"
+bytes = 5692
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 54
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverCorner.glb"
+kit = "kenney"
+bytes = 4844
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 40
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverCornerSmall.glb"
+kit = "kenney"
+bytes = 4236
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 26
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverCross.glb"
+kit = "kenney"
+bytes = 7560
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 82
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverEnd.glb"
+kit = "kenney"
+bytes = 5464
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverEndClosed.glb"
+kit = "kenney"
+bytes = 6920
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 84
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverOpen.glb"
+kit = "kenney"
+bytes = 1852
+measured = true
+size_m = [1.0, 0.0, 1.0]
+height_m = 0.0
+footprint_radius_m = 0.707
+pivot = "flat"
+role_native = "traversal"
+nature = "prop"
+triangles = 8
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverRocks.glb"
+kit = "kenney"
+bytes = 8884
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "nature"
+triangles = 102
+materials = 5
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverSide.glb"
+kit = "kenney"
+bytes = 4544
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 34
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverSideOpen.glb"
+kit = "kenney"
+bytes = 5312
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverSplit.glb"
+kit = "kenney"
+bytes = 6804
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 72
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverStraight.glb"
+kit = "kenney"
+bytes = 6044
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 62
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/ground_riverTile.glb"
+kit = "kenney"
+bytes = 9120
+measured = true
+size_m = [1.0, 0.05, 1.0]
+height_m = 0.05
+footprint_radius_m = 0.707
+pivot = "top"
+role_native = "traversal"
+nature = "floor"
+triangles = 128
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/hanging_moss.glb"
+kit = "kenney"
+bytes = 4776
+measured = true
+size_m = [0.1598, 0.4785, 0.035]
+height_m = 0.478
+footprint_radius_m = 0.082
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/lily_large.glb"
+kit = "kenney"
+bytes = 8044
+measured = true
+size_m = [0.2719, 0.098, 0.3139]
+height_m = 0.098
+footprint_radius_m = 0.208
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 86
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/lily_small.glb"
+kit = "kenney"
+bytes = 5664
+measured = true
+size_m = [0.1888, 0.04, 0.218]
+height_m = 0.04
+footprint_radius_m = 0.144
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/log.glb"
+kit = "kenney"
+bytes = 14288
+measured = true
+size_m = [0.234, 0.1732, 0.71]
+height_m = 0.173
+footprint_radius_m = 0.374
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 200
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/log_large.glb"
+kit = "kenney"
+bytes = 7924
+measured = true
+size_m = [1.0, 0.4167, 0.5493]
+height_m = 0.417
+footprint_radius_m = 0.57
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 96
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/log_stack.glb"
+kit = "kenney"
+bytes = 10896
+measured = true
+size_m = [0.4247, 0.3464, 0.71]
+height_m = 0.346
+footprint_radius_m = 0.414
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 184
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/log_stackLarge.glb"
+kit = "kenney"
+bytes = 17604
+measured = true
+size_m = [0.634, 0.3464, 0.71]
+height_m = 0.346
+footprint_radius_m = 0.476
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 310
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/mushroom_red.glb"
+kit = "kenney"
+bytes = 6364
+measured = true
+size_m = [0.174, 0.2028, 0.2009]
+height_m = 0.203
+footprint_radius_m = 0.133
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 48
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/mushroom_redGroup.glb"
+kit = "kenney"
+bytes = 14960
+measured = true
+size_m = [0.2696, 0.2505, 0.2542]
+height_m = 0.251
+footprint_radius_m = 0.185
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/mushroom_redTall.glb"
+kit = "kenney"
+bytes = 6504
+measured = true
+size_m = [0.1235, 0.2505, 0.1426]
+height_m = 0.251
+footprint_radius_m = 0.094
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 48
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/mushroom_tan.glb"
+kit = "kenney"
+bytes = 5804
+measured = true
+size_m = [0.1914, 0.1539, 0.221]
+height_m = 0.154
+footprint_radius_m = 0.146
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 48
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/mushroom_tanGroup.glb"
+kit = "kenney"
+bytes = 14956
+measured = true
+size_m = [0.2696, 0.2505, 0.2542]
+height_m = 0.251
+footprint_radius_m = 0.185
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 144
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/mushroom_tanTall.glb"
+kit = "kenney"
+bytes = 6500
+measured = true
+size_m = [0.1235, 0.2505, 0.1426]
+height_m = 0.251
+footprint_radius_m = 0.094
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 48
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_stone.glb"
+kit = "kenney"
+bytes = 12392
+measured = true
+size_m = [1.0, 0.05, 0.5766]
+height_m = 0.05
+footprint_radius_m = 0.577
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 136
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_stoneCircle.glb"
+kit = "kenney"
+bytes = 13100
+measured = true
+size_m = [0.9324, 0.05, 0.8766]
+height_m = 0.05
+footprint_radius_m = 0.64
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 164
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_stoneCorner.glb"
+kit = "kenney"
+bytes = 10772
+measured = true
+size_m = [0.7383, 0.05, 0.7784]
+height_m = 0.05
+footprint_radius_m = 0.536
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 112
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_stoneEnd.glb"
+kit = "kenney"
+bytes = 8996
+measured = true
+size_m = [0.6182, 0.05, 0.571]
+height_m = 0.05
+footprint_radius_m = 0.421
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 92
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_wood.glb"
+kit = "kenney"
+bytes = 6448
+measured = true
+size_m = [1.0, 0.05, 0.5144]
+height_m = 0.05
+footprint_radius_m = 0.562
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_woodCorner.glb"
+kit = "kenney"
+bytes = 6444
+measured = true
+size_m = [0.75, 0.05, 0.75]
+height_m = 0.05
+footprint_radius_m = 0.53
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/path_woodEnd.glb"
+kit = "kenney"
+bytes = 5164
+measured = true
+size_m = [0.6148, 0.05, 0.5144]
+height_m = 0.05
+footprint_radius_m = 0.401
+pivot = "top"
+role_native = "traversal"
+nature = "prop"
+triangles = 36
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_bush.glb"
+kit = "kenney"
+bytes = 4396
+measured = true
+size_m = [0.396, 0.2444, 0.396]
+height_m = 0.244
+footprint_radius_m = 0.28
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_bushDetailed.glb"
+kit = "kenney"
+bytes = 10172
+measured = true
+size_m = [0.6025, 0.3604, 0.6025]
+height_m = 0.36
+footprint_radius_m = 0.426
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 104
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_bushLarge.glb"
+kit = "kenney"
+bytes = 6436
+measured = true
+size_m = [0.3743, 0.2429, 0.3357]
+height_m = 0.243
+footprint_radius_m = 0.251
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_bushLargeTriangle.glb"
+kit = "kenney"
+bytes = 4564
+measured = true
+size_m = [0.4077, 0.1693, 0.4708]
+height_m = 0.169
+footprint_radius_m = 0.311
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 39
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_bushSmall.glb"
+kit = "kenney"
+bytes = 3212
+measured = true
+size_m = [0.383, 0.2073, 0.3363]
+height_m = 0.207
+footprint_radius_m = 0.255
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 16
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_bushTriangle.glb"
+kit = "kenney"
+bytes = 3956
+measured = true
+size_m = [0.3644, 0.2955, 0.4136]
+height_m = 0.295
+footprint_radius_m = 0.276
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 30
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_flatShort.glb"
+kit = "kenney"
+bytes = 3936
+measured = true
+size_m = [0.2776, 0.2351, 0.2776]
+height_m = 0.235
+footprint_radius_m = 0.196
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/plant_flatTall.glb"
+kit = "kenney"
+bytes = 3480
+measured = true
+size_m = [0.2717, 0.2843, 0.2717]
+height_m = 0.284
+footprint_radius_m = 0.192
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/platform_beach.glb"
+kit = "kenney"
+bytes = 13204
+measured = true
+size_m = [0.8932, 0.0825, 0.7239]
+height_m = 0.083
+footprint_radius_m = 0.575
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 192
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/platform_grass.glb"
+kit = "kenney"
+bytes = 12568
+measured = true
+size_m = [0.8932, 0.0825, 0.7239]
+height_m = 0.083
+footprint_radius_m = 0.575
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 186
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/platform_stone.glb"
+kit = "kenney"
+bytes = 13632
+measured = true
+size_m = [0.8932, 0.0825, 0.7239]
+height_m = 0.083
+footprint_radius_m = 0.575
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 192
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/pot_large.glb"
+kit = "kenney"
+bytes = 6168
+measured = true
+size_m = [0.5636, 0.2, 0.4881]
+height_m = 0.2
+footprint_radius_m = 0.373
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 68
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/pot_small.glb"
+kit = "kenney"
+bytes = 7004
+measured = true
+size_m = [0.3234, 0.268, 0.2801]
+height_m = 0.268
+footprint_radius_m = 0.214
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 72
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_largeA.glb"
+kit = "kenney"
+bytes = 7552
+measured = true
+size_m = [0.7849, 0.2598, 1.0155]
+height_m = 0.26
+footprint_radius_m = 0.642
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 80
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_largeB.glb"
+kit = "kenney"
+bytes = 8560
+measured = true
+size_m = [0.7667, 0.4303, 1.0155]
+height_m = 0.43
+footprint_radius_m = 0.636
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 85
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_largeC.glb"
+kit = "kenney"
+bytes = 7004
+measured = true
+size_m = [1.0644, 0.3211, 1.0157]
+height_m = 0.321
+footprint_radius_m = 0.736
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 72
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_largeD.glb"
+kit = "kenney"
+bytes = 7992
+measured = true
+size_m = [1.0688, 0.5683, 1.0303]
+height_m = 0.568
+footprint_radius_m = 0.742
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 80
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_largeE.glb"
+kit = "kenney"
+bytes = 6464
+measured = true
+size_m = [1.0955, 0.2922, 0.9199]
+height_m = 0.292
+footprint_radius_m = 0.715
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 64
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_largeF.glb"
+kit = "kenney"
+bytes = 7516
+measured = true
+size_m = [1.0955, 0.479, 0.899]
+height_m = 0.479
+footprint_radius_m = 0.709
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 73
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallA.glb"
+kit = "kenney"
+bytes = 3044
+measured = true
+size_m = [0.3608, 0.1912, 0.3608]
+height_m = 0.191
+footprint_radius_m = 0.255
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallB.glb"
+kit = "kenney"
+bytes = 3528
+measured = true
+size_m = [0.3608, 0.1768, 0.3608]
+height_m = 0.177
+footprint_radius_m = 0.255
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 24
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallC.glb"
+kit = "kenney"
+bytes = 3044
+measured = true
+size_m = [0.3608, 0.1227, 0.3608]
+height_m = 0.123
+footprint_radius_m = 0.255
+pivot = "center"
+role_native = "traversal"
+nature = "nature"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallD.glb"
+kit = "kenney"
+bytes = 4012
+measured = true
+size_m = [0.4257, 0.2309, 0.3687]
+height_m = 0.231
+footprint_radius_m = 0.282
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 32
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallE.glb"
+kit = "kenney"
+bytes = 5932
+measured = true
+size_m = [0.3608, 0.2562, 0.3125]
+height_m = 0.256
+footprint_radius_m = 0.239
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 64
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallF.glb"
+kit = "kenney"
+bytes = 5700
+measured = true
+size_m = [0.3536, 0.2453, 0.3062]
+height_m = 0.245
+footprint_radius_m = 0.234
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 60
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallFlatA.glb"
+kit = "kenney"
+bytes = 3300
+measured = true
+size_m = [0.4958, 0.0649, 0.4296]
+height_m = 0.065
+footprint_radius_m = 0.328
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 20
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallFlatB.glb"
+kit = "kenney"
+bytes = 3056
+measured = true
+size_m = [0.4295, 0.0649, 0.4024]
+height_m = 0.065
+footprint_radius_m = 0.294
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 16
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallFlatC.glb"
+kit = "kenney"
+bytes = 4508
+measured = true
+size_m = [0.4704, 0.0649, 0.3603]
+height_m = 0.065
+footprint_radius_m = 0.296
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 40
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallG.glb"
+kit = "kenney"
+bytes = 4204
+measured = true
+size_m = [0.5937, 0.2453, 0.6855]
+height_m = 0.245
+footprint_radius_m = 0.453
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 32
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallH.glb"
+kit = "kenney"
+bytes = 6200
+measured = true
+size_m = [0.4618, 0.4074, 0.4618]
+height_m = 0.407
+footprint_radius_m = 0.327
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 60
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallI.glb"
+kit = "kenney"
+bytes = 5120
+measured = true
+size_m = [0.3583, 0.2778, 0.4138]
+height_m = 0.278
+footprint_radius_m = 0.274
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 44
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallTopA.glb"
+kit = "kenney"
+bytes = 5220
+measured = true
+size_m = [0.4877, 0.22, 0.4891]
+height_m = 0.22
+footprint_radius_m = 0.345
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 52
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_smallTopB.glb"
+kit = "kenney"
+bytes = 6660
+measured = true
+size_m = [0.6221, 0.28, 0.6463]
+height_m = 0.28
+footprint_radius_m = 0.449
+pivot = "offset"
+role_native = "traversal"
+nature = "nature"
+triangles = 76
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallA.glb"
+kit = "kenney"
+bytes = 12072
+measured = true
+size_m = [0.9831, 0.9959, 0.6832]
+height_m = 0.996
+footprint_radius_m = 0.599
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 136
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallB.glb"
+kit = "kenney"
+bytes = 14060
+measured = true
+size_m = [0.7648, 0.8838, 0.77]
+height_m = 0.884
+footprint_radius_m = 0.543
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 172
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallC.glb"
+kit = "kenney"
+bytes = 5184
+measured = true
+size_m = [0.4562, 0.7829, 0.4365]
+height_m = 0.783
+footprint_radius_m = 0.316
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 37
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallD.glb"
+kit = "kenney"
+bytes = 5132
+measured = true
+size_m = [0.4428, 0.7721, 0.4615]
+height_m = 0.772
+footprint_radius_m = 0.32
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 38
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallE.glb"
+kit = "kenney"
+bytes = 5192
+measured = true
+size_m = [0.4562, 0.4438, 0.5268]
+height_m = 0.444
+footprint_radius_m = 0.348
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 38
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallF.glb"
+kit = "kenney"
+bytes = 5608
+measured = true
+size_m = [0.4437, 0.5737, 0.5123]
+height_m = 0.574
+footprint_radius_m = 0.339
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 46
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallG.glb"
+kit = "kenney"
+bytes = 6772
+measured = true
+size_m = [0.4249, 0.7829, 0.4907]
+height_m = 0.783
+footprint_radius_m = 0.325
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 62
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallH.glb"
+kit = "kenney"
+bytes = 7792
+measured = true
+size_m = [0.5749, 0.7108, 0.6639]
+height_m = 0.711
+footprint_radius_m = 0.439
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 78
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallI.glb"
+kit = "kenney"
+bytes = 5584
+measured = true
+size_m = [0.4562, 0.8118, 0.4644]
+height_m = 0.812
+footprint_radius_m = 0.325
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 44
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/rock_tallJ.glb"
+kit = "kenney"
+bytes = 5424
+measured = true
+size_m = [0.4879, 0.62, 0.5382]
+height_m = 0.62
+footprint_radius_m = 0.363
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 42
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/sign.glb"
+kit = "kenney"
+bytes = 5040
+measured = true
+size_m = [0.3, 0.4088, 0.07]
+height_m = 0.409
+footprint_radius_m = 0.154
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/statue_block.glb"
+kit = "kenney"
+bytes = 11252
+measured = true
+size_m = [0.4, 0.4, 0.4]
+height_m = 0.4
+footprint_radius_m = 0.283
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 140
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/statue_column.glb"
+kit = "kenney"
+bytes = 10472
+measured = true
+size_m = [0.3, 1.0, 0.3]
+height_m = 1.0
+footprint_radius_m = 0.212
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 122
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/statue_columnDamaged.glb"
+kit = "kenney"
+bytes = 8824
+measured = true
+size_m = [0.3, 0.7, 0.3]
+height_m = 0.7
+footprint_radius_m = 0.212
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 108
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/statue_head.glb"
+kit = "kenney"
+bytes = 14704
+measured = true
+size_m = [0.726, 1.0, 0.5544]
+height_m = 1.0
+footprint_radius_m = 0.457
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 196
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/statue_obelisk.glb"
+kit = "kenney"
+bytes = 4416
+measured = true
+size_m = [0.307, 0.8754, 0.307]
+height_m = 0.875
+footprint_radius_m = 0.217
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 38
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/statue_ring.glb"
+kit = "kenney"
+bytes = 6568
+measured = true
+size_m = [0.6, 0.7964, 0.4]
+height_m = 0.796
+footprint_radius_m = 0.361
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_largeA.glb"
+kit = "kenney"
+bytes = 7124
+measured = true
+size_m = [0.7849, 0.2598, 1.0155]
+height_m = 0.26
+footprint_radius_m = 0.642
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 80
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_largeB.glb"
+kit = "kenney"
+bytes = 8132
+measured = true
+size_m = [0.7667, 0.4303, 1.0155]
+height_m = 0.43
+footprint_radius_m = 0.636
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 85
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_largeC.glb"
+kit = "kenney"
+bytes = 6580
+measured = true
+size_m = [1.0644, 0.3211, 1.0157]
+height_m = 0.321
+footprint_radius_m = 0.736
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 72
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_largeD.glb"
+kit = "kenney"
+bytes = 7564
+measured = true
+size_m = [1.0688, 0.5683, 1.0303]
+height_m = 0.568
+footprint_radius_m = 0.742
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 80
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_largeE.glb"
+kit = "kenney"
+bytes = 6036
+measured = true
+size_m = [1.0955, 0.2922, 0.9199]
+height_m = 0.292
+footprint_radius_m = 0.715
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 64
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_largeF.glb"
+kit = "kenney"
+bytes = 7092
+measured = true
+size_m = [1.0955, 0.479, 0.899]
+height_m = 0.479
+footprint_radius_m = 0.709
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 73
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallA.glb"
+kit = "kenney"
+bytes = 2620
+measured = true
+size_m = [0.3608, 0.1912, 0.3608]
+height_m = 0.191
+footprint_radius_m = 0.255
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 16
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallB.glb"
+kit = "kenney"
+bytes = 3100
+measured = true
+size_m = [0.3608, 0.1768, 0.3608]
+height_m = 0.177
+footprint_radius_m = 0.255
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 24
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallC.glb"
+kit = "kenney"
+bytes = 2620
+measured = true
+size_m = [0.3608, 0.1227, 0.3608]
+height_m = 0.123
+footprint_radius_m = 0.255
+pivot = "center"
+role_native = "traversal"
+nature = "prop"
+triangles = 16
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallD.glb"
+kit = "kenney"
+bytes = 3584
+measured = true
+size_m = [0.4257, 0.2309, 0.3687]
+height_m = 0.231
+footprint_radius_m = 0.282
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallE.glb"
+kit = "kenney"
+bytes = 5504
+measured = true
+size_m = [0.3608, 0.2562, 0.3125]
+height_m = 0.256
+footprint_radius_m = 0.239
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 64
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallF.glb"
+kit = "kenney"
+bytes = 5272
+measured = true
+size_m = [0.3536, 0.2453, 0.3062]
+height_m = 0.245
+footprint_radius_m = 0.234
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallFlatA.glb"
+kit = "kenney"
+bytes = 2872
+measured = true
+size_m = [0.4958, 0.0649, 0.4296]
+height_m = 0.065
+footprint_radius_m = 0.328
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 20
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallFlatB.glb"
+kit = "kenney"
+bytes = 2632
+measured = true
+size_m = [0.4295, 0.0649, 0.4024]
+height_m = 0.065
+footprint_radius_m = 0.294
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 16
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallFlatC.glb"
+kit = "kenney"
+bytes = 4080
+measured = true
+size_m = [0.4704, 0.0649, 0.3603]
+height_m = 0.065
+footprint_radius_m = 0.296
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 40
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallG.glb"
+kit = "kenney"
+bytes = 3776
+measured = true
+size_m = [0.5937, 0.2453, 0.6855]
+height_m = 0.245
+footprint_radius_m = 0.453
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 32
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallH.glb"
+kit = "kenney"
+bytes = 5772
+measured = true
+size_m = [0.4618, 0.4074, 0.4618]
+height_m = 0.407
+footprint_radius_m = 0.327
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 60
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallI.glb"
+kit = "kenney"
+bytes = 4692
+measured = true
+size_m = [0.3583, 0.2778, 0.4138]
+height_m = 0.278
+footprint_radius_m = 0.274
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallTopA.glb"
+kit = "kenney"
+bytes = 4792
+measured = true
+size_m = [0.4877, 0.22, 0.4891]
+height_m = 0.22
+footprint_radius_m = 0.345
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 52
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_smallTopB.glb"
+kit = "kenney"
+bytes = 6232
+measured = true
+size_m = [0.6221, 0.28, 0.6463]
+height_m = 0.28
+footprint_radius_m = 0.449
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 76
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallA.glb"
+kit = "kenney"
+bytes = 11644
+measured = true
+size_m = [0.9831, 0.9959, 0.6832]
+height_m = 0.996
+footprint_radius_m = 0.599
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 136
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallB.glb"
+kit = "kenney"
+bytes = 13596
+measured = true
+size_m = [0.7648, 0.8838, 0.77]
+height_m = 0.884
+footprint_radius_m = 0.543
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 172
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallC.glb"
+kit = "kenney"
+bytes = 4788
+measured = true
+size_m = [0.4562, 0.7829, 0.4365]
+height_m = 0.783
+footprint_radius_m = 0.316
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 37
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallD.glb"
+kit = "kenney"
+bytes = 4704
+measured = true
+size_m = [0.4428, 0.7721, 0.4615]
+height_m = 0.772
+footprint_radius_m = 0.32
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 38
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallE.glb"
+kit = "kenney"
+bytes = 4764
+measured = true
+size_m = [0.4562, 0.4438, 0.5268]
+height_m = 0.444
+footprint_radius_m = 0.348
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 38
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallF.glb"
+kit = "kenney"
+bytes = 5180
+measured = true
+size_m = [0.4437, 0.5737, 0.5123]
+height_m = 0.574
+footprint_radius_m = 0.339
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 46
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallG.glb"
+kit = "kenney"
+bytes = 6344
+measured = true
+size_m = [0.4249, 0.7829, 0.4907]
+height_m = 0.783
+footprint_radius_m = 0.325
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 62
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallH.glb"
+kit = "kenney"
+bytes = 7364
+measured = true
+size_m = [0.5749, 0.7108, 0.6639]
+height_m = 0.711
+footprint_radius_m = 0.439
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 78
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallI.glb"
+kit = "kenney"
+bytes = 5160
+measured = true
+size_m = [0.4562, 0.8118, 0.4644]
+height_m = 0.812
+footprint_radius_m = 0.325
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stone_tallJ.glb"
+kit = "kenney"
+bytes = 4808
+measured = true
+size_m = [0.4879, 0.62, 0.5382]
+height_m = 0.62
+footprint_radius_m = 0.363
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 42
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_old.glb"
+kit = "kenney"
+bytes = 9564
+measured = true
+size_m = [0.3565, 0.2665, 0.371]
+height_m = 0.267
+footprint_radius_m = 0.257
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_oldTall.glb"
+kit = "kenney"
+bytes = 9564
+measured = true
+size_m = [0.3565, 0.6665, 0.371]
+height_m = 0.666
+footprint_radius_m = 0.257
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 120
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_round.glb"
+kit = "kenney"
+bytes = 5644
+measured = true
+size_m = [0.3213, 0.2065, 0.371]
+height_m = 0.206
+footprint_radius_m = 0.245
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 56
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_roundDetailed.glb"
+kit = "kenney"
+bytes = 8188
+measured = true
+size_m = [0.3565, 0.2065, 0.371]
+height_m = 0.206
+footprint_radius_m = 0.257
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 96
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_square.glb"
+kit = "kenney"
+bytes = 4584
+measured = true
+size_m = [0.3596, 0.3, 0.3]
+height_m = 0.3
+footprint_radius_m = 0.234
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 44
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_squareDetailed.glb"
+kit = "kenney"
+bytes = 7544
+measured = true
+size_m = [0.44, 0.2, 0.44]
+height_m = 0.2
+footprint_radius_m = 0.311
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 84
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/stump_squareDetailedWide.glb"
+kit = "kenney"
+bytes = 7536
+measured = true
+size_m = [0.64, 0.2, 0.64]
+height_m = 0.2
+footprint_radius_m = 0.453
+pivot = "offset"
+role_native = "traversal"
+nature = "prop"
+triangles = 84
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tent_detailedClosed.glb"
+kit = "kenney"
+bytes = 15460
+measured = true
+size_m = [0.8749, 0.5611, 0.6364]
+height_m = 0.561
+footprint_radius_m = 0.541
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 228
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tent_detailedOpen.glb"
+kit = "kenney"
+bytes = 15324
+measured = true
+size_m = [0.8749, 0.5611, 0.6664]
+height_m = 0.561
+footprint_radius_m = 0.55
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 232
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tent_smallClosed.glb"
+kit = "kenney"
+bytes = 13200
+measured = true
+size_m = [0.5476, 0.5611, 0.6364]
+height_m = 0.561
+footprint_radius_m = 0.42
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 220
+materials = 4
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tent_smallOpen.glb"
+kit = "kenney"
+bytes = 13604
+measured = true
+size_m = [0.5476, 0.5611, 0.6664]
+height_m = 0.561
+footprint_radius_m = 0.431
+pivot = "base"
+role_native = "traversal"
+nature = "prop"
+triangles = 224
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_blocks.glb"
+kit = "kenney"
+bytes = 10128
+measured = true
+size_m = [0.6, 1.185, 0.6]
+height_m = 1.185
+footprint_radius_m = 0.424
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 132
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_blocks_dark.glb"
+kit = "kenney"
+bytes = 10132
+measured = true
+size_m = [0.6, 1.185, 0.6]
+height_m = 1.185
+footprint_radius_m = 0.424
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 132
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_blocks_fall.glb"
+kit = "kenney"
+bytes = 18368
+measured = true
+size_m = [0.6, 1.185, 0.6]
+height_m = 1.185
+footprint_radius_m = 0.424
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 264
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_cone.glb"
+kit = "kenney"
+bytes = 10924
+measured = true
+size_m = [0.5297, 1.4303, 0.5297]
+height_m = 1.43
+footprint_radius_m = 0.375
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 132
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_cone_dark.glb"
+kit = "kenney"
+bytes = 19940
+measured = true
+size_m = [0.5297, 1.4303, 0.5297]
+height_m = 1.43
+footprint_radius_m = 0.375
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 264
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_cone_fall.glb"
+kit = "kenney"
+bytes = 10916
+measured = true
+size_m = [0.5297, 1.4303, 0.5297]
+height_m = 1.43
+footprint_radius_m = 0.375
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 132
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_default.glb"
+kit = "kenney"
+bytes = 9428
+measured = true
+size_m = [0.755, 1.7079, 0.6538]
+height_m = 1.708
+footprint_radius_m = 0.499
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 114
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_default_dark.glb"
+kit = "kenney"
+bytes = 9436
+measured = true
+size_m = [0.755, 1.7079, 0.6538]
+height_m = 1.708
+footprint_radius_m = 0.499
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 114
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_default_fall.glb"
+kit = "kenney"
+bytes = 16940
+measured = true
+size_m = [0.755, 1.7079, 0.6538]
+height_m = 1.708
+footprint_radius_m = 0.499
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 228
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_detailed.glb"
+kit = "kenney"
+bytes = 31412
+measured = true
+size_m = [0.8471, 1.3324, 0.7616]
+height_m = 1.332
+footprint_radius_m = 0.57
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 402
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_detailed_dark.glb"
+kit = "kenney"
+bytes = 31416
+measured = true
+size_m = [0.8471, 1.3324, 0.7616]
+height_m = 1.332
+footprint_radius_m = 0.57
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 402
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_detailed_fall.glb"
+kit = "kenney"
+bytes = 31404
+measured = true
+size_m = [0.8471, 1.3324, 0.7616]
+height_m = 1.332
+footprint_radius_m = 0.57
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 402
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_fat.glb"
+kit = "kenney"
+bytes = 5576
+measured = true
+size_m = [0.755, 1.1504, 0.6538]
+height_m = 1.15
+footprint_radius_m = 0.499
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 50
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_fat_darkh.glb"
+kit = "kenney"
+bytes = 5584
+measured = true
+size_m = [0.755, 1.1504, 0.6538]
+height_m = 1.15
+footprint_radius_m = 0.499
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 50
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_fat_fall.glb"
+kit = "kenney"
+bytes = 5572
+measured = true
+size_m = [0.755, 1.1504, 0.6538]
+height_m = 1.15
+footprint_radius_m = 0.499
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 50
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_oak.glb"
+kit = "kenney"
+bytes = 14644
+measured = true
+size_m = [0.6406, 1.2262, 0.7396]
+height_m = 1.226
+footprint_radius_m = 0.489
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 196
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_oak_dark.glb"
+kit = "kenney"
+bytes = 14648
+measured = true
+size_m = [0.6406, 1.2262, 0.7396]
+height_m = 1.226
+footprint_radius_m = 0.489
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 196
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_oak_fall.glb"
+kit = "kenney"
+bytes = 14640
+measured = true
+size_m = [0.6406, 1.2262, 0.7396]
+height_m = 1.226
+footprint_radius_m = 0.489
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 196
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_palm.glb"
+kit = "kenney"
+bytes = 13616
+measured = true
+size_m = [0.9355, 1.5146, 1.0128]
+height_m = 1.515
+footprint_radius_m = 0.689
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 186
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_palmBend.glb"
+kit = "kenney"
+bytes = 14820
+measured = true
+size_m = [0.9355, 1.3799, 1.0128]
+height_m = 1.38
+footprint_radius_m = 0.689
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 200
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_palmDetailedShort.glb"
+kit = "kenney"
+bytes = 28212
+measured = true
+size_m = [1.4628, 1.124, 1.4628]
+height_m = 1.124
+footprint_radius_m = 1.034
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 336
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_palmDetailedTall.glb"
+kit = "kenney"
+bytes = 28204
+measured = true
+size_m = [1.4628, 1.4235, 1.4628]
+height_m = 1.423
+footprint_radius_m = 1.034
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 336
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_palmShort.glb"
+kit = "kenney"
+bytes = 15596
+measured = true
+size_m = [1.0343, 1.0562, 1.0343]
+height_m = 1.056
+footprint_radius_m = 0.731
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 190
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_palmTall.glb"
+kit = "kenney"
+bytes = 15592
+measured = true
+size_m = [1.0343, 1.3557, 1.0343]
+height_m = 1.356
+footprint_radius_m = 0.731
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 190
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineDefaultA.glb"
+kit = "kenney"
+bytes = 17220
+measured = true
+size_m = [0.532, 1.5458, 0.532]
+height_m = 1.546
+footprint_radius_m = 0.376
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 230
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineDefaultB.glb"
+kit = "kenney"
+bytes = 18180
+measured = true
+size_m = [0.532, 1.5457, 0.532]
+height_m = 1.546
+footprint_radius_m = 0.376
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 246
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineGroundA.glb"
+kit = "kenney"
+bytes = 6704
+measured = true
+size_m = [0.4804, 0.9145, 0.5547]
+height_m = 0.914
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 82
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineGroundB.glb"
+kit = "kenney"
+bytes = 6704
+measured = true
+size_m = [0.4804, 1.042, 0.5547]
+height_m = 1.042
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 82
+materials = 1
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineRoundA.glb"
+kit = "kenney"
+bytes = 14488
+measured = true
+size_m = [0.617, 1.3664, 0.7125]
+height_m = 1.366
+footprint_radius_m = 0.471
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 204
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineRoundB.glb"
+kit = "kenney"
+bytes = 18464
+measured = true
+size_m = [0.5322, 1.1959, 0.6132]
+height_m = 1.196
+footprint_radius_m = 0.406
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 262
+materials = 3
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineRoundC.glb"
+kit = "kenney"
+bytes = 15332
+measured = true
+size_m = [0.4804, 1.2529, 0.5547]
+height_m = 1.253
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 206
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineRoundD.glb"
+kit = "kenney"
+bytes = 13748
+measured = true
+size_m = [0.4804, 1.0817, 0.5547]
+height_m = 1.082
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 170
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineRoundE.glb"
+kit = "kenney"
+bytes = 15308
+measured = true
+size_m = [0.532, 1.2546, 0.532]
+height_m = 1.255
+footprint_radius_m = 0.376
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 198
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineRoundF.glb"
+kit = "kenney"
+bytes = 16264
+measured = true
+size_m = [0.532, 1.2545, 0.532]
+height_m = 1.254
+footprint_radius_m = 0.376
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 214
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineSmallA.glb"
+kit = "kenney"
+bytes = 12820
+measured = true
+size_m = [0.5, 0.9672, 0.5]
+height_m = 0.967
+footprint_radius_m = 0.354
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 164
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineSmallB.glb"
+kit = "kenney"
+bytes = 7816
+measured = true
+size_m = [0.3863, 1.0086, 0.392]
+height_m = 1.009
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 86
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineSmallC.glb"
+kit = "kenney"
+bytes = 5376
+measured = true
+size_m = [0.3863, 1.1231, 0.3919]
+height_m = 1.123
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 54
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineSmallD.glb"
+kit = "kenney"
+bytes = 5368
+measured = true
+size_m = [0.3569, 0.9556, 0.3569]
+height_m = 0.956
+footprint_radius_m = 0.252
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 54
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallA.glb"
+kit = "kenney"
+bytes = 7200
+measured = true
+size_m = [0.3863, 1.5296, 0.392]
+height_m = 1.53
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 78
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallA_detailed.glb"
+kit = "kenney"
+bytes = 10708
+measured = true
+size_m = [0.3863, 1.5296, 0.392]
+height_m = 1.53
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 134
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallB.glb"
+kit = "kenney"
+bytes = 7204
+measured = true
+size_m = [0.3863, 1.9346, 0.392]
+height_m = 1.935
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "cover_high"
+nature = "nature"
+triangles = 78
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallB_detailed.glb"
+kit = "kenney"
+bytes = 12632
+measured = true
+size_m = [0.3863, 1.9346, 0.392]
+height_m = 1.935
+footprint_radius_m = 0.275
+pivot = "base"
+role_native = "cover_high"
+nature = "nature"
+triangles = 166
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallC.glb"
+kit = "kenney"
+bytes = 8080
+measured = true
+size_m = [0.4804, 1.6705, 0.5547]
+height_m = 1.671
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 98
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallC_detailed.glb"
+kit = "kenney"
+bytes = 11588
+measured = true
+size_m = [0.4804, 1.6705, 0.5547]
+height_m = 1.671
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 154
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallD.glb"
+kit = "kenney"
+bytes = 8080
+measured = true
+size_m = [0.4804, 2.0755, 0.5547]
+height_m = 2.075
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "cover_high"
+nature = "nature"
+triangles = 98
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_pineTallD_detailed.glb"
+kit = "kenney"
+bytes = 12548
+measured = true
+size_m = [0.4804, 2.0755, 0.5547]
+height_m = 2.075
+footprint_radius_m = 0.367
+pivot = "base"
+role_native = "cover_high"
+nature = "nature"
+triangles = 170
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_plateau.glb"
+kit = "kenney"
+bytes = 16304
+measured = true
+size_m = [0.6117, 1.2493, 0.6549]
+height_m = 1.249
+footprint_radius_m = 0.448
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 215
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_plateau_dark.glb"
+kit = "kenney"
+bytes = 16308
+measured = true
+size_m = [0.6117, 1.2493, 0.6549]
+height_m = 1.249
+footprint_radius_m = 0.448
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 215
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_plateau_fall.glb"
+kit = "kenney"
+bytes = 16296
+measured = true
+size_m = [0.6117, 1.2493, 0.6549]
+height_m = 1.249
+footprint_radius_m = 0.448
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 215
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_simple.glb"
+kit = "kenney"
+bytes = 6500
+measured = true
+size_m = [0.3546, 1.5194, 0.4095]
+height_m = 1.519
+footprint_radius_m = 0.271
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 62
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_simple_dark.glb"
+kit = "kenney"
+bytes = 6508
+measured = true
+size_m = [0.3546, 1.5194, 0.4095]
+height_m = 1.519
+footprint_radius_m = 0.271
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 62
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_simple_fall.glb"
+kit = "kenney"
+bytes = 6496
+measured = true
+size_m = [0.3546, 1.5194, 0.4095]
+height_m = 1.519
+footprint_radius_m = 0.271
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 62
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_small.glb"
+kit = "kenney"
+bytes = 6500
+measured = true
+size_m = [0.3546, 1.11, 0.4095]
+height_m = 1.11
+footprint_radius_m = 0.271
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 62
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_small_dark.glb"
+kit = "kenney"
+bytes = 11092
+measured = true
+size_m = [0.3546, 1.11, 0.4095]
+height_m = 1.11
+footprint_radius_m = 0.271
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 124
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_small_fall.glb"
+kit = "kenney"
+bytes = 6492
+measured = true
+size_m = [0.3546, 1.11, 0.4095]
+height_m = 1.11
+footprint_radius_m = 0.271
+pivot = "base"
+role_native = "traversal"
+nature = "nature"
+triangles = 62
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_tall.glb"
+kit = "kenney"
+bytes = 7000
+measured = true
+size_m = [0.3996, 1.6877, 0.4614]
+height_m = 1.688
+footprint_radius_m = 0.305
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 72
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_tall_dark.glb"
+kit = "kenney"
+bytes = 7008
+measured = true
+size_m = [0.3996, 1.6877, 0.4614]
+height_m = 1.688
+footprint_radius_m = 0.305
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 72
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_tall_fall.glb"
+kit = "kenney"
+bytes = 12088
+measured = true
+size_m = [0.3996, 1.6877, 0.4614]
+height_m = 1.688
+footprint_radius_m = 0.305
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 144
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_thin.glb"
+kit = "kenney"
+bytes = 17200
+measured = true
+size_m = [0.6804, 1.4903, 0.6165]
+height_m = 1.49
+footprint_radius_m = 0.459
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 228
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_thin_dark.glb"
+kit = "kenney"
+bytes = 32488
+measured = true
+size_m = [0.6804, 1.4903, 0.6165]
+height_m = 1.49
+footprint_radius_m = 0.459
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 456
+materials = 2
+skinned = false
+animations = 0
+
+[[assets]]
+path = "models/kenney/nature/tree_thin_fall.glb"
+kit = "kenney"
+bytes = 17192
+measured = true
+size_m = [0.6804, 1.4903, 0.6165]
+height_m = 1.49
+footprint_radius_m = 0.459
+pivot = "base"
+role_native = "cover_useless"
+nature = "nature"
+triangles = 228
+materials = 2
+skinned = false
+animations = 0
 
 [[assets]]
 path = "models/weapons/ak47.glb"
