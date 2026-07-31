@@ -341,6 +341,7 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         );
         // Story-671 — les DIRECTIONS ARTISTIQUES (palettes de props). Startup :
         // le préchargement des assets de décor lit cette config.
+        app.init_resource::<decor::DecorObstacles>();
         app.add_systems(Startup, decor_palettes::sys_init_decor_palettes);
         app.add_systems(
             Update,

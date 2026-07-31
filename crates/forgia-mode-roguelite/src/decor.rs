@@ -454,12 +454,15 @@ impl DecorSpec {
         match self {
             // Le fond est hors-map et sans collider : il ne bloque personne.
             DecorSpec::Background { .. } => 0.0,
+            // `col_radius_factor` RÉTRÉCIT le collider pour le feel de tir — ce
+            // n'est PAS l'emprise au sol. L'utiliser ici sous-estimait un bâtiment
+            // de 12 m à 1,92 m de rayon (3× trop petit) : il passait le test et le
+            // mob naissait dedans. Mesuré sur le retour du 2026-07-31.
             DecorSpec::Perimeter {
                 target_m,
                 user_scale,
-                col_radius_factor,
                 ..
-            } => 0.5 * target_m * user_scale.max(0.01) * col_radius_factor.max(0.1),
+            } => 0.5 * target_m * user_scale.max(0.01),
             DecorSpec::Loose {
                 target_m,
                 user_scale,
@@ -486,7 +489,74 @@ impl DecorSpec {
     }
 }
 
-/// Story-672 — LES ZONES OÙ AUCUN PROP NE DOIT ATTERRIR.
+/// Story-672 — LA CARTE DES OBSTACLES SOLIDES, publiée dès la PLANIFICATION.
+///
+/// Le décor est instancié étalé sur plusieurs frames (`spawn_budget_per_frame`),
+/// mais les ennemis apparaissent d'un coup au début d'une vague. Interroger les
+/// entités déjà spawnées donnerait donc une liste incomplète et le résultat
+/// dépendrait du timing. On publie les emprises **au moment du plan**, où elles
+/// sont toutes connues et exactes.
+///
+/// C'est ce qui permet d'inverser le sens : le décor se pose dense et cohérent,
+/// et ce sont les points d'apparition qui cherchent une place libre dedans.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct DecorObstacles {
+    /// (centre au sol, rayon d'emprise) de chaque prop SOLIDE.
+    pub discs: Vec<(Vec2, f32)>,
+}
+
+impl DecorObstacles {
+    /// PUR — cette position est-elle libre pour un corps de rayon `body_radius` ?
+    pub fn is_clear(&self, pos: Vec2, body_radius: f32) -> bool {
+        let r = body_radius.max(0.0);
+        !self
+            .discs
+            .iter()
+            .any(|(c, rad)| pos.distance(*c) < rad + r)
+    }
+
+    /// Distance au bord de l'obstacle le plus proche (négatif = à l'intérieur).
+    /// Sert de score pour choisir « le moins mauvais » quand tout est encombré.
+    pub fn clearance(&self, pos: Vec2, body_radius: f32) -> f32 {
+        self.discs
+            .iter()
+            .map(|(c, rad)| pos.distance(*c) - rad - body_radius.max(0.0))
+            .fold(f32::INFINITY, f32::min)
+    }
+
+    /// PUR — cherche un angle LIBRE sur un anneau de rayon `radius`.
+    ///
+    /// Part de `wanted` et balaie l'anneau par pas réguliers. Retourne le premier
+    /// angle libre ; si l'anneau entier est encombré, retourne celui qui maximise
+    /// le dégagement — **jamais rien, jamais l'angle voulu par défaut** : un
+    /// ennemi doit toujours apparaître quelque part, mais au moins au moins pire
+    /// endroit. `tries` bornes le coût (spawn ponctuel, pas un hot path).
+    pub fn clear_angle_on_ring(
+        &self,
+        radius: f32,
+        wanted: f32,
+        body_radius: f32,
+        tries: u32,
+    ) -> f32 {
+        let n = tries.max(1);
+        let step = std::f32::consts::TAU / n as f32;
+        let mut best = (wanted, f32::NEG_INFINITY);
+        for i in 0..n {
+            let a = wanted + step * i as f32;
+            let p = Vec2::new(radius * a.cos(), radius * a.sin());
+            if self.is_clear(p, body_radius) {
+                return a;
+            }
+            let c = self.clearance(p, body_radius);
+            if c > best.1 {
+                best = (a, c);
+            }
+        }
+        best.0
+    }
+}
+
+/// Story-672 — LA ZONE OÙ AUCUN PROP NE DOIT ATTERRIR.
 ///
 /// Symptôme d'origine (2026-07-31, rapporté en jeu) : « je spawne dans un asset
 /// et parfois les mobs sont bloqués dans le décor ». Cause : les anneaux
@@ -500,9 +570,14 @@ impl DecorSpec {
 #[derive(Debug, Clone, Default)]
 pub struct SpawnKeepout {
     /// Disque autour de l'apparition du joueur : (centre au sol, rayon).
+    ///
+    /// **C'est la SEULE zone interdite au décor.** La 1re version réservait aussi
+    /// les anneaux d'apparition ennemis : mesuré, ça interdisait **54 % du rayon
+    /// utile** au solide et vidait les salles — pour un résultat qui ne marchait
+    /// même pas (emprises sous-estimées). Les ennemis, eux, cherchent maintenant
+    /// une place libre DANS le décor (`clear_spawn_angle`), au lieu d'exiger que
+    /// le décor leur cède la moitié de l'arène.
     pub player: (Vec2, f32),
-    /// Anneaux d'apparition ennemis : (rayon, demi-épaisseur interdite).
-    pub enemy_rings: Vec<(f32, f32)>,
 }
 
 impl SpawnKeepout {
@@ -510,49 +585,23 @@ impl SpawnKeepout {
     /// rayons d'anneaux sont lus directement sur la config de composition, donc
     /// changer `ring.tank` dans `roguelite_waves.toml` déplace automatiquement la
     /// zone interdite. Aucune dérive possible.
-    pub fn from_configs(decor: &RogueliteDecorConfig, ring: &crate::wave_comp::RingCfg) -> Self {
-        let half = ring.jitter_m.max(0.0) + decor.keepout_spawn_margin_m.max(0.0);
-        let mut enemy_rings = Vec::with_capacity(8);
-        for base in [ring.tank, ring.runner, ring.sniper, ring.boss] {
-            if base <= 0.0 {
-                continue;
-            }
-            enemy_rings.push((base, half));
-            // La vague 2 élargit ses anneaux — sa bande doit l'être aussi.
-            let w2 = base + ring.wave2_bonus_m;
-            if (w2 - base).abs() > f32::EPSILON {
-                enemy_rings.push((w2, half));
-            }
-        }
+    /// `player_pos` = position RÉELLE du joueur au sol au moment de planifier. Le
+    /// joueur est spawné par `forgia-player`, pas par ce crate : supposer l'origine
+    /// protégeait potentiellement le mauvais endroit — c'est le « j'ai respawn en
+    /// plein sur un asset » du 2026-07-31.
+    pub fn around_player(decor: &RogueliteDecorConfig, player_pos: Vec2) -> Self {
         Self {
-            player: (Vec2::ZERO, decor.keepout_player_m.max(0.0)),
-            enemy_rings,
+            player: (player_pos, decor.keepout_player_m.max(0.0)),
         }
     }
 
-    /// PUR — ce prop atterrit-il dans une zone d'apparition ?
+    /// PUR — ce prop atterrit-il sur le point d'apparition du joueur ?
     ///
-    /// Deux régimes, et la distinction n'est pas cosmétique :
-    ///
-    /// - **Disque du joueur** : on refuse TOUT, collider ou pas. C'est là qu'il
-    ///   ouvre les yeux ; apparaître le nez dans un tonneau, même traversable,
-    ///   est exactement le symptôme rapporté.
-    /// - **Anneaux ennemis** : on ne refuse que les props SOLIDES. Un mob ne peut
-    ///   se coincer que dans un collider ; interdire aussi le semis décoratif
-    ///   condamnerait ~40 % de l'arène (les bandes des trois archétypes, doublées
-    ///   par le bonus de vague 2, se rejoignent presque) et viderait la salle.
-    pub fn blocks(&self, pos: Vec2, prop_radius: f32, solid: bool) -> bool {
-        let r = prop_radius.max(0.0);
-        if pos.distance(self.player.0) < self.player.1 + r {
-            return true;
-        }
-        if !solid {
-            return false;
-        }
-        let d = pos.length();
-        self.enemy_rings
-            .iter()
-            .any(|(radius, half)| (d - radius).abs() < half + r)
+    /// On refuse TOUT autour de lui, collider ou pas : c'est là qu'il ouvre les
+    /// yeux, et apparaître le nez dans un tonneau même traversable est exactement
+    /// le symptôme rapporté. Le rayon du prop entre dans le test.
+    pub fn blocks(&self, pos: Vec2, prop_radius: f32) -> bool {
+        pos.distance(self.player.0) < self.player.1 + prop_radius.max(0.0)
     }
 }
 
@@ -946,8 +995,10 @@ pub fn sys_reconcile_decor(
     // Story-671 — la DA de la salle : `stage_id` courant → palette → props.
     stage_request: Option<Res<forgia_stage::StageLoadRequest>>,
     palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
-    // Story-672 — les anneaux d'apparition ennemis, pour n'y poser aucun prop.
-    comp_cfg: Res<crate::wave_comp::WaveCompConfig>,
+    // Story-672 — position RÉELLE du joueur (spawné par forgia-player) pour
+    // dégager son disque d'apparition, et carte des obstacles pour les ennemis.
+    q_player: Query<&Transform, With<forgia_player::Player>>,
+    mut obstacles: ResMut<DecorObstacles>,
     q_anchors: Query<&AnchorPoint>,
     q_decor: Query<(), With<DecorProp>>,
     mut queue: ResMut<DecorSpawnQueue>,
@@ -985,8 +1036,21 @@ pub fn sys_reconcile_decor(
         .unwrap_or_else(|| crate::decor_palettes::FALLBACK_PALETTE.to_string());
 
     // Planifie tout (RNG only, pas d'instanciation) → le drain spawne par budget.
-    let keepout = SpawnKeepout::from_configs(&cfg, &comp_cfg.ring);
+    let player_pos = q_player
+        .iter()
+        .next()
+        .map(|t| Vec2::new(t.translation.x, t.translation.z))
+        .unwrap_or(Vec2::ZERO);
+    let keepout = SpawnKeepout::around_player(&cfg, player_pos);
     let specs = plan_decor_set(&cfg, assets.for_palette(&palette_id), seed, &keepout);
+    // Story-672 — publie les emprises SOLIDES avant toute instanciation : les
+    // ennemis d'une vague apparaissent d'un coup, ils ne peuvent pas attendre que
+    // la file de décor soit drainée.
+    obstacles.discs = specs
+        .iter()
+        .filter(|s| s.is_solid())
+        .map(|s| (s.ground_pos(), s.footprint_radius()))
+        .collect();
     let count = specs.len();
     queue.pending = specs;
     queue.cursor = 0;
@@ -1405,8 +1469,7 @@ fn plan_decor_set(
     // futur générateur de props en hérite sans rien faire.
     let before = specs.len();
     specs.retain(|spec| {
-        spec.is_background()
-            || !keepout.blocks(spec.ground_pos(), spec.footprint_radius(), spec.is_solid())
+        spec.is_background() || !keepout.blocks(spec.ground_pos(), spec.footprint_radius())
     });
     let rejected = before - specs.len();
     if rejected > 0 {
@@ -1639,7 +1702,7 @@ default = 40.0
             buildings: h(),
         };
         let cfg = RogueliteDecorConfig::default();
-        let ko = SpawnKeepout::from_configs(&cfg, &crate::wave_comp::RingCfg::default());
+        let ko = SpawnKeepout::around_player(&cfg, Vec2::ZERO);
         // Plusieurs graines : le semis est aléatoire, l'invariant ne l'est pas.
         for seed in 0..40u64 {
             let specs = plan_decor_set(&cfg, &assets, seed.wrapping_mul(0x9E37_79B9), &ko);
@@ -1649,7 +1712,7 @@ default = 40.0
                     continue; // hors-map, sans collider
                 }
                 assert!(
-                    !ko.blocks(spec.ground_pos(), spec.footprint_radius(), spec.is_solid()),
+                    !ko.blocks(spec.ground_pos(), spec.footprint_radius()),
                     "graine {seed} : un prop atterrit dans une zone d'apparition                      (pos {:?}, rayon {:.2}, solide {})",
                     spec.ground_pos(),
                     spec.footprint_radius(),
@@ -1660,56 +1723,91 @@ default = 40.0
     }
 
     #[test]
-    fn the_keepout_covers_the_player_disc_and_every_enemy_ring() {
+    fn the_player_disc_is_cleared_wherever_he_actually_stands() {
         let cfg = RogueliteDecorConfig::default();
-        let ring = crate::wave_comp::RingCfg::default();
-        let ko = SpawnKeepout::from_configs(&cfg, &ring);
-
-        // Le joueur apparaît à l'origine : TOUT y est refusé, solide ou non.
-        assert!(ko.blocks(Vec2::ZERO, 0.0, false));
-        assert!(ko.blocks(Vec2::new(cfg.keepout_player_m - 0.1, 0.0), 0.0, false));
-
-        // Chaque anneau d'apparition (vague 1 ET vague 2) refuse le SOLIDE.
-        for base in [ring.tank, ring.runner, ring.sniper] {
-            for r in [base, base + ring.wave2_bonus_m] {
-                assert!(
-                    ko.blocks(Vec2::new(r, 0.0), 0.0, true),
-                    "l'anneau {r} m n'est pas protégé"
-                );
-                assert!(
-                    !ko.blocks(Vec2::new(r, 0.0), 0.0, false),
-                    "le semis traversable doit rester autorisé sur les anneaux,                      sinon ~40 % de l'arène se vide"
-                );
-            }
-        }
-        // Loin de tout anneau, le solide reste autorisé.
-        let far = ring.sniper + ring.wave2_bonus_m + ring.jitter_m
-            + cfg.keepout_spawn_margin_m + 5.0;
+        // Le joueur est spawné par forgia-player : sa position n'est PAS forcément
+        // l'origine. Supposer l'origine protégeait le mauvais endroit — c'est le
+        // « j'ai respawn en plein sur un asset » du 2026-07-31.
+        let p = Vec2::new(17.0, -4.0);
+        let ko = SpawnKeepout::around_player(&cfg, p);
+        assert!(ko.blocks(p, 0.0), "le point exact du joueur est interdit");
+        assert!(ko.blocks(p + Vec2::new(cfg.keepout_player_m - 0.5, 0.0), 0.0));
         assert!(
-            !ko.blocks(Vec2::new(far, 0.0), 0.0, true),
-            "le filtre ne doit pas interdire TOUTE l'arène"
+            !ko.blocks(Vec2::ZERO, 0.0),
+            "l'origine n'est plus protégée si le joueur est ailleurs"
+        );
+        // Et le rayon du prop compte.
+        let edge = p + Vec2::new(cfg.keepout_player_m + 1.0, 0.0);
+        assert!(!ko.blocks(edge, 0.0));
+        assert!(ko.blocks(edge, 3.0), "un gros prop tangent doit être refusé");
+    }
+
+    /// Story-672 v2 — c'est le SPAWN qui cède, plus le décor. On vérifie que la
+    /// recherche d'angle trouve une place libre, et qu'elle en trouve TOUJOURS une.
+    #[test]
+    fn an_enemy_never_spawns_inside_a_solid_prop() {
+        // Un anneau de 25 m encombré d'un gros prop à l'angle 0.
+        let obstacles = DecorObstacles {
+            discs: vec![(Vec2::new(25.0, 0.0), 6.0)],
+        };
+        let body = 0.5;
+        let a = obstacles.clear_angle_on_ring(25.0, 0.0, body, 24);
+        let p = Vec2::new(25.0 * a.cos(), 25.0 * a.sin());
+        assert!(
+            obstacles.is_clear(p, body),
+            "l'angle retenu doit être libre (retenu {a:.2} rad)"
         );
     }
 
-    /// Le rayon du prop compte : un gros prop tangent à un anneau bloque quand
-    /// même. C'est le cas qui produisait « mob né dans le décor ».
     #[test]
-    fn a_large_prop_tangent_to_a_ring_is_still_rejected() {
+    fn a_fully_blocked_ring_still_yields_the_least_bad_angle() {
+        // Anneau entièrement ceinturé : aucune place libre.
+        let mut discs = Vec::new();
+        for i in 0..24 {
+            let a = std::f32::consts::TAU * i as f32 / 24.0;
+            discs.push((Vec2::new(25.0 * a.cos(), 25.0 * a.sin()), 5.0));
+        }
+        // …sauf un trou volontairement plus dégagé.
+        discs[7].1 = 0.2;
+        let obstacles = DecorObstacles { discs };
+        let a = obstacles.clear_angle_on_ring(25.0, 0.0, 0.5, 24);
+        let p = Vec2::new(25.0 * a.cos(), 25.0 * a.sin());
+        let best = obstacles.clearance(p, 0.5);
+        // On ne peut pas exiger « libre », mais on exige « le moins mauvais ».
+        for i in 0..24 {
+            let t = std::f32::consts::TAU * i as f32 / 24.0;
+            let q = Vec2::new(25.0 * t.cos(), 25.0 * t.sin());
+            assert!(
+                obstacles.clearance(q, 0.5) <= best + 1.0e-3,
+                "un meilleur angle existait"
+            );
+        }
+    }
+
+    /// Le décor ne doit PLUS s'interdire la moitié de l'arène : c'est ce qui
+    /// vidait les salles (54 % du rayon utile mesuré le 2026-07-31).
+    #[test]
+    fn the_decor_keeps_its_density_away_from_the_player() {
+        let h = || vec![Handle::<Scene>::default()];
+        let assets = DecorPaletteAssets {
+            landmarks: h(),
+            big: h(),
+            braziers: h(),
+            scatter: h(),
+            walls: h(),
+            wall_corner: h(),
+            rubble: h(),
+            buildings: h(),
+        };
         let cfg = RogueliteDecorConfig::default();
-        let ring = crate::wave_comp::RingCfg::default();
-        let ko = SpawnKeepout::from_configs(&cfg, &ring);
-        // Un point juste hors de la bande du sniper (loin des autres anneaux).
-        let just_outside = ring.sniper + ring.wave2_bonus_m
-            + ring.jitter_m
-            + cfg.keepout_spawn_margin_m
-            + 1.0;
+        let ko = SpawnKeepout::around_player(&cfg, Vec2::ZERO);
+        let with = plan_decor_set(&cfg, &assets, 0xC0FFEE, &ko);
+        let without = plan_decor_set(&cfg, &assets, 0xC0FFEE, &SpawnKeepout::default());
+        let kept = with.len() as f32 / without.len().max(1) as f32;
         assert!(
-            !ko.blocks(Vec2::new(just_outside, 0.0), 0.0, true),
-            "prop ponctuel hors bande : autorisé"
-        );
-        assert!(
-            ko.blocks(Vec2::new(just_outside, 0.0), 4.0, true),
-            "le MÊME point avec un prop de 4 m de rayon doit être refusé — c'est              ce cas qui produisait « mob né dans le décor »"
+            kept > 0.9,
+            "le filtre ne doit écarter qu'une poignée de props près du joueur,              pas vider la salle (gardé {:.0} %)",
+            kept * 100.0
         );
     }
 

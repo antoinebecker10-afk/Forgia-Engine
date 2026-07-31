@@ -43,6 +43,10 @@ use rand_xoshiro::Xoshiro256StarStar;
 // 15s = sweet spot Hadès Chamber transition.
 pub const BREAK_SECS: f32 = 15.0;
 const WAVE_BASE_SEED: u64 = 0xC0FF_EE51_C0BA_1700;
+/// Story-672 — nombre d'angles essayés sur l'anneau avant de retenir le moins
+/// mauvais. 24 = un pas de 15°. Plomberie de placement (spawn ponctuel, pas un
+/// hot path) : ce n'est pas un levier de gameplay.
+const SPAWN_CLEAR_TRIES: u32 = 24;
 
 #[derive(Resource, Debug, Clone)]
 pub struct RogueliteWave {
@@ -118,14 +122,16 @@ pub struct WaveSpawnConfigs<'w> {
 
 impl WaveSpawnConfigs<'_> {
     /// Contexte de spawn pour une vague donnée.
-    pub fn ctx(
-        &self,
+    #[allow(clippy::too_many_arguments)]
+    pub fn ctx<'a>(
+        &'a self,
         wave: u8,
         stage: u8,
         kind: Option<forgia_stage::graph::StageKind>,
         density: f32,
         run_seed: u64,
-    ) -> WaveSpawnCtx<'_> {
+        obstacles: &'a crate::decor::DecorObstacles,
+    ) -> WaveSpawnCtx<'a> {
         WaveSpawnCtx {
             stats: &self.stats,
             defense: &self.defense,
@@ -135,6 +141,7 @@ impl WaveSpawnConfigs<'_> {
             kind,
             density,
             run_seed,
+            obstacles,
         }
     }
 }
@@ -159,6 +166,10 @@ pub struct WaveSpawnCtx<'a> {
     pub density: f32,
     /// Graine de la RUN. Sans elle, les positions étaient les mêmes à chaque run.
     pub run_seed: u64,
+    /// Story-672 — emprises solides du décor de la salle. Un ennemi ne doit JAMAIS
+    /// apparaître dedans : les bots n'ont pas de navmesh, ils poussent contre le
+    /// collider indéfiniment au lieu de le contourner.
+    pub obstacles: &'a crate::decor::DecorObstacles,
 }
 
 /// Spawn N ennemis de la composition wave donnée. Caller : OnEnter scene ou
@@ -218,6 +229,15 @@ pub fn spawn_wave_enemies(
             // Le rayon reste positif quoi qu'il arrive (0.5 m plancher).
             let unit = (yaw_rng.next_u64() as f64 / u64::MAX as f64) as f32 * 2.0 - 1.0;
             let r = (ring_radius + unit * jitter_m).max(0.5);
+            // Story-672 — l'angle voulu peut tomber dans un prop solide. On balaie
+            // l'anneau pour trouver une place libre ; si tout est encombré on prend
+            // le point le plus dégagé. Un ennemi apparaît toujours, jamais dedans.
+            let theta = ctx.obstacles.clear_angle_on_ring(
+                r,
+                theta,
+                stats.capsule_radius,
+                SPAWN_CLEAR_TRIES,
+            );
             let x = r * theta.cos();
             let z = r * theta.sin();
             let y = stats.capsule_half_height + stats.capsule_radius + 0.05;
@@ -357,6 +377,8 @@ pub fn sys_wave_orchestrator(
     mut next_run: ResMut<NextState<crate::run::RunState>>,
     // Story-669 — la graine de RUN pilote enfin le placement des ennemis.
     run_seed: Option<Res<crate::run::RunSeed>>,
+    // Story-672 — emprises du décor : un ennemi ne doit jamais naître dedans.
+    obstacles: Res<crate::decor::DecorObstacles>,
 ) {
     let alive = q_bots.iter().count() as u32;
     wave.bots_alive = alive;
@@ -531,6 +553,7 @@ pub fn sys_wave_orchestrator(
                     wave.room_kind,
                     density,
                     run_seed.as_ref().map(|s| s.seed).unwrap_or(0),
+                    &obstacles,
                 ),
             );
             // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.
@@ -574,6 +597,7 @@ pub fn sys_wave_orchestrator(
                 wave.room_kind,
                 density,
                 run_seed.as_ref().map(|s| s.seed).unwrap_or(0),
+                &obstacles,
             ),
         );
     }
@@ -700,6 +724,7 @@ mod tests {
         mut commands: Commands,
         asset_server: Res<AssetServer>,
         cfgs: WaveSpawnConfigs,
+        obstacles: Res<crate::decor::DecorObstacles>,
         mut spawned: Local<bool>,
     ) {
         if *spawned {
@@ -710,7 +735,7 @@ mod tests {
         spawn_wave_enemies(
             &mut commands,
             &asset_server,
-            &cfgs.ctx(1, 0, Some(forgia_stage::graph::StageKind::Combat), 1.0, 0),
+            &cfgs.ctx(1, 0, Some(forgia_stage::graph::StageKind::Combat), 1.0, 0, &obstacles),
         );
         *spawned = true;
     }
@@ -845,6 +870,7 @@ mod tests {
         // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
+        app.insert_resource(crate::decor::DecorObstacles::default());
         app.add_systems(Update, spawn_first_wave_for_qa);
 
         app.update();
@@ -887,6 +913,7 @@ mod tests {
         // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
+        app.insert_resource(crate::decor::DecorObstacles::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
         app.insert_resource(forgia_stage::graph::RunGraphConfig::default());
@@ -937,6 +964,7 @@ mod tests {
         // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
+        app.insert_resource(crate::decor::DecorObstacles::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
         app.insert_resource(forgia_stage::graph::RunGraphConfig {

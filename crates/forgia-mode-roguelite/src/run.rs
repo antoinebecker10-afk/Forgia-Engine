@@ -714,6 +714,8 @@ pub fn sys_start_run(
     // Story-669 — bundle SystemParam : ce système était à 16 params, le plafond Bevy ;
     // la config de composition n'y serait pas entrée autrement (cf `scalability.md`).
     spawn_cfgs: crate::waves::WaveSpawnConfigs,
+    // Story-672 — emprises du décor : un ennemi ne doit jamais naître dedans.
+    obstacles: Res<crate::decor::DecorObstacles>,
 ) {
     // 2026-05-29 — anti double-spawn : drain TOUS les events mais ne spawn
     // que pour le PREMIER. Le log montrait 2 events StartRunEvent traités
@@ -851,7 +853,7 @@ pub fn sys_start_run(
             let spawned = crate::waves::spawn_wave_enemies(
                 &mut commands,
                 &asset_server,
-                &spawn_cfgs.ctx(1, 0, kind, density, seed),
+                &spawn_cfgs.ctx(1, 0, kind, density, seed, &obstacles),
             );
             info!(
                 "[roguelite] salle 1 — {spawned} ennemis ({:?}, densité ×{:.2})",

@@ -29,64 +29,94 @@ Un prop mal placé ne produit pas un défaut visuel, il produit un défaut de
 
 ---
 
-## 2. L'invariant
+## 2. L'invariant, et le SENS dans lequel on le tient
 
-> **Aucun élément de décor ne doit atterrir dans une zone d'apparition.**
+> **Personne n'apparaît dans un solide.**
 
-Deux régimes, et la distinction n'est pas un détail :
+La question n'est pas *quoi* garantir, c'est **qui cède**. Et la réponse n'est pas
+la même selon l'acteur :
 
-| Zone | Ce qui est refusé | Pourquoi |
+| Acteur | Qui cède | Pourquoi |
 |---|---|---|
-| **Disque d'apparition du joueur** | **TOUT** — collider ou non | C'est là qu'il ouvre les yeux. Apparaître le nez dans un tonneau traversable est exactement le symptôme rapporté. |
-| **Anneaux / points d'apparition ennemis** | **le SOLIDE seulement** | Un mob ne se coince que dans un collider. Interdire aussi le semis décoratif condamnerait ~40 % de l'aire jouable et viderait la salle. |
+| **Joueur** | **le décor** — petit disque interdit autour de sa position réelle | Sa position est imposée (spawn du contrôleur). On dégage juste ce qu'il faut pour qu'il ouvre les yeux au clair. |
+| **Ennemis** | **le spawn** — il cherche une place libre dans le décor | Leur position est LIBRE sur un anneau. C'est à eux de s'adapter, pas au décor de s'effacer. |
 
-Le test d'intersection est **disque contre disque** : `distance < rayon_zone +
-rayon_prop`. Le rayon du prop compte — un gros prop tangent à un anneau bloque
-quand même. C'est précisément le cas qui produisait « mob né dans le décor ».
+### La leçon payée cher
 
----
+La première version réservait aussi les **anneaux d'apparition ennemis** au décor.
+Mesuré : cela interdisait **54 % du rayon utile** aux props solides. Résultat en
+jeu — *« les salles sont assez vides »* — et le bug n'était **même pas corrigé**,
+parce que l'emprise des props était sous-estimée par ailleurs.
 
-## 3. Où l'appliquer : EN SORTIE, jamais dans chaque générateur
-
-**Le filtre se pose une fois, sur la liste finale de props.**
-
-C'est le point le plus important de cette règle. Le décor de Forgia est produit
-par une demi-douzaine de générateurs (périmètre, semis, gravats, salles en L,
-anneau de forge, ceinture de bâtiments, silhouettes de fond), chacun avec ses
-propres rayons. Corriger « le rayon du périmètre » ne corrige que le périmètre :
-au générateur suivant, le défaut revient sous un autre nom.
-
-```rust
-// ✅ un seul point de vérité — tout générateur futur en hérite sans rien faire
-specs.retain(|s| s.is_background() || !keepout.blocks(s.pos(), s.radius(), s.is_solid()));
-
-// ❌ N corrections de rayons qui divergeront
-if ring_radius_min < enemy_ring { ring_radius_min = enemy_ring + 4.0; }
-```
-
-C'est l'application directe de `feedback_derive_ne_patche_pas_la_geometrie` : au
-3ᵉ défaut semblable, on traite **la classe**, pas le symptôme.
+> **Un invariant qui vide la scène n'est pas un invariant, c'est une régression.**
+> Avant de réserver une zone, MESURER la fraction de l'espace qu'elle retire. Si
+> c'est plus de quelques pour cent, c'est le mauvais acteur qui cède.
 
 ---
 
-## 4. Les zones se LISENT, elles ne se recopient pas
+## 3. Le décor d'abord, les spawns ensuite
 
-Les rayons d'apparition ennemis vivent dans `roguelite_waves.toml` (`[ring]`).
-La zone interdite doit les **lire**, pas les dupliquer :
+L'ordre correct :
+
+1. **Le décor se pose**, dense et cohérent, sans se soucier des ennemis.
+2. **Il publie ses emprises solides** (centre, rayon) — au moment du **plan**, pas
+   après instanciation : les props sont instanciés étalés sur plusieurs frames
+   alors qu'une vague apparaît d'un coup. Interroger les entités déjà spawnées
+   donnerait une liste incomplète et un résultat dépendant du timing.
+3. **Chaque spawn cherche une place libre** dedans : on balaie l'anneau par pas
+   réguliers, on prend le premier point libre, et **si tout est encombré on prend
+   le plus dégagé** — jamais rien, jamais le point voulu par défaut.
 
 ```rust
-// ✅ changer ring.tank déplace automatiquement la zone interdite
-SpawnKeepout::from_configs(&decor_cfg, &comp_cfg.ring)
+// ✅ le spawn s'adapte au décor
+let angle = obstacles.clear_angle_on_ring(radius, wanted, body_radius, TRIES);
 
-// ❌ un miroir qui divergera au premier réglage de balance
-const ENEMY_RINGS: &[f32] = &[12.0, 25.0, 50.0];
+// ❌ le décor s'interdit la moitié de l'arène
+if keepout.blocks_ring(pos) { reject_prop(); }
 ```
 
-Si un miroir est inévitable (crates séparées), il faut un **test qui compare les
-deux ensembles** — sinon la dérive est silencieuse et le défaut revient.
+Corollaire : le filtre côté décor reste **en sortie de planification**, une seule
+fois — le décor est produit par une demi-douzaine de générateurs (périmètre,
+semis, gravats, salles en L, anneau de forge, bâtiments), et corriger « le rayon
+du périmètre » ne corrigerait que celui-là.
 
-Ne pas oublier les variantes : un anneau élargi en vague 2 (`wave2_bonus_m`) est
-un anneau de plus à protéger.
+---
+
+## 4. L'emprise, c'est l'emprise — pas le rayon du collider
+
+Le défaut le plus vicieux de la première version : le rayon d'emprise était
+calculé en multipliant la taille cible par `col_radius_factor`, un coefficient qui
+**rétrécit le collider** pour le feel de tir. Un bâtiment de 12 m se déclarait
+**1,92 m** de rayon. Trois fois trop petit : il passait tous les tests, et le mob
+naissait dedans.
+
+> **Une valeur de tuning n'est pas une mesure.** L'emprise au sol se dérive de la
+> taille de l'objet, pas d'un coefficient de gameplay qui se trouve être à portée
+> de main.
+
+Et l'emprise doit être **généreuse** : un prop rejeté à tort coûte un trou dans le
+décor, un prop accepté à tort coûte un joueur qui apparaît dedans. Les deux
+erreurs n'ont pas le même prix.
+
+---
+
+## 4 bis. Les positions se LISENT, elles ne se supposent pas
+
+La position du joueur **n'est pas l'origine** : il est spawné par une autre crate.
+La supposer protégeait le mauvais endroit — c'est exactement le
+« j'ai respawn en plein sur un asset » rapporté.
+
+```rust
+// ✅ on lit où il est vraiment
+let p = q_player.iter().next().map(|t| t.translation.xz())...
+
+// ❌ on suppose
+SpawnKeepout { player: (Vec2::ZERO, r) }
+```
+
+Même principe pour les rayons d'anneaux : les **lire** sur leur config
+(`WaveCompConfig.ring`), jamais les recopier. Si un miroir est inévitable (crates
+séparées), il faut un **test qui compare les deux ensembles**.
 
 ---
 
@@ -109,17 +139,23 @@ l'apparition est garantie et que le reste est ouvert.
 
 ## 6. Checklist avant de livrer un système qui place des objets
 
-- [ ] Les points/zones d'apparition sont-ils **connus** du placeur ? (sinon il ne
-      peut pas les éviter — c'est la cause racine du défaut d'origine)
-- [ ] Le filtre est-il posé **en sortie**, une seule fois, et pas dans chaque
-      générateur ?
+- [ ] **Qui cède ?** Celui dont la position est LIBRE s'adapte ; celui dont la
+      position est imposée fait céder l'autre. Se tromper de sens vide la scène.
+- [ ] **Quelle fraction de l'espace la zone réservée retire-t-elle ?** Le
+      **mesurer**, pas l'estimer. Plus de quelques pour cent = mauvais sens.
 - [ ] Le **rayon de l'objet** entre-t-il dans le test, ou seulement son centre ?
-- [ ] Les zones sont-elles **lues** depuis leur source, ou recopiées ? Si
-      recopiées : y a-t-il un test qui compare ?
-- [ ] Le filtre a-t-il un **test multi-graines** ? Un placement seedé qui passe
-      une fois ne prouve rien.
-- [ ] Le filtre peut-il **tout supprimer** ? Un test doit vérifier qu'il reste du
-      décor — un invariant qui vide la salle est un autre bug.
+- [ ] Ce rayon est-il une **emprise mesurée**, ou un coefficient de tuning attrapé
+      au passage ?
+- [ ] Les positions et rayons sont-ils **lus** depuis leur source, ou supposés /
+      recopiés ? Si recopiés : y a-t-il un test qui compare ?
+- [ ] Les emprises sont-elles publiées **au plan**, ou après instanciation ? Un
+      décor étalé sur N frames n'est pas interrogeable par un spawn instantané.
+- [ ] La recherche de place libre a-t-elle un **repli déterministe** (« le moins
+      mauvais ») ? Elle ne doit jamais rendre « rien », ni le point voulu par défaut.
+- [ ] Y a-t-il un **test multi-graines** ? Un placement seedé qui passe une fois
+      ne prouve rien.
+- [ ] Y a-t-il un test que la scène **n'est pas vidée** ? Un invariant qui
+      supprime tout est un autre bug — et c'est celui qu'on a livré au 1er essai.
 - [ ] Le rejet est-il **observable** (log/compteur) ? Sinon une zone trop large
       vide la salle en silence.
 
