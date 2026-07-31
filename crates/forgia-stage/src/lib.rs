@@ -159,12 +159,24 @@ pub struct StageDef {
 /// que les dimensions sont une propriété du pack asset, pas du gameplay.
 pub fn wall_natural_len_for_kit(kit: &str) -> f32 {
     match kit {
-        // KayKit Dungeon Pack wall.glb mesure environ 1m sur axe principal
-        // (à confirmer empiriquement — sensor `wall_natural_len_used` exposé
-        // pour itération sans rebuild).
-        "kaykit_dungeon" => 1.0,
-        // Medieval Hexagon Castle wall_straight.gltf : 1 hex tile-side, ~4m.
-        "medieval_hexagon" => 4.0,
+        // MESURÉ (story-673, `assets/genomes/asset_registry.toml`) :
+        // dungeon/wall.glb = 4,00 × 1,00 × 4,00 m. L'ancien 1,0 « à confirmer
+        // empiriquement » était faux d'un facteur 4 ; le TOML de crypts_of_anvil
+        // l'avait déjà contourné à la main en passant à 4,0 après un diagnostic
+        // de crash. La mesure confirme le contournement et corrige la source.
+        "kaykit_dungeon" | "kaykit_dungeon_remastered" => 4.0,
+        // MESURÉ : medieval_hexagon/wall_straight.gltf = 2,00 × 0,80 × 1,10 m.
+        // L'ancien 4,0 espaçait les murs du DOUBLE de leur largeur → un trou sur
+        // deux dans l'enceinte.
+        //
+        // ⚠️ DÉFAUT CONNU, non corrigible ici : ce mur ne fait que **1,10 m de
+        // haut** alors que le collider d'enceinte fait `RAMPARTS_WALL_HEIGHT_M`
+        // = 4 m. Les stages qui utilisent ce kit ont donc un mur INVISIBLE de
+        // 2,90 m au-dessus d'une barrière visible. Baisser le collider n'est pas
+        // une option : 1,10 m est SOUS la hauteur de saut du joueur (1,174 m),
+        // l'arène deviendrait franchissable. Il faut un autre kit de remparts
+        // pour ces stages — décision de DA, pas de code.
+        "medieval_hexagon" => 2.0,
         _ => 1.0,
     }
 }

@@ -21,6 +21,8 @@
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
+/// Story-673 — les MESURES d'assets (asset_registry.toml), lues au lieu d'être devinées.
+pub mod asset_metrics;
 pub mod atmosphere;
 pub mod audio;
 pub mod boons_apply;
@@ -342,6 +344,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-671 — les DIRECTIONS ARTISTIQUES (palettes de props). Startup :
         // le préchargement des assets de décor lit cette config.
         app.init_resource::<decor::DecorObstacles>();
+        // Story-673 — mesures d'assets : le décor en dérive ses emprises réelles.
+        app.add_systems(Startup, asset_metrics::sys_init_asset_registry);
         app.add_systems(Startup, decor_palettes::sys_init_decor_palettes);
         app.add_systems(
             Update,

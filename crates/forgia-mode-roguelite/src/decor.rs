@@ -297,16 +297,43 @@ pub struct DecorGenomeWatch {
 /// Handles de scènes GLB préchargés (réutilisés sur toutes les instances).
 /// Handles d'une DA (story-671). C'est l'ex-`DecorAssets` : le planificateur ne
 /// voit toujours qu'un seul jeu de props à la fois, celui de la salle en cours.
+/// Un prop chargé + ses MESURES natives (story-673). Les mesures viennent de
+/// `asset_registry.toml` ; sans elles on retombe sur l'estimation d'avant.
+#[derive(Clone)]
+pub struct DecorAsset {
+    pub scene: Handle<Scene>,
+    /// Emprise au sol NATIVE (m). 0 = inconnue.
+    pub native_footprint_m: f32,
+    /// Plus grande dimension native (m) — ce que la calibration ramène à la
+    /// taille cible. 0 = inconnue.
+    pub native_max_dim_m: f32,
+}
+
+impl DecorAsset {
+    /// Emprise RÉELLE une fois le prop calibré à `target_m`.
+    ///
+    /// Sans mesure : l'ancienne estimation `0,5 × target`. C'est un repli assumé,
+    /// pas un défaut silencieux — le chargement loggue combien d'assets sont sans
+    /// mesure.
+    pub fn footprint_at(&self, target_m: f32) -> f32 {
+        if self.native_max_dim_m > 1.0e-4 && self.native_footprint_m > 0.0 {
+            self.native_footprint_m * (target_m / self.native_max_dim_m)
+        } else {
+            0.5 * target_m
+        }
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct DecorPaletteAssets {
-    pub landmarks: Vec<Handle<Scene>>,
-    pub big: Vec<Handle<Scene>>,
-    pub braziers: Vec<Handle<Scene>>,
-    pub scatter: Vec<Handle<Scene>>,
-    pub walls: Vec<Handle<Scene>>,
-    pub wall_corner: Vec<Handle<Scene>>,
-    pub rubble: Vec<Handle<Scene>>,
-    pub buildings: Vec<Handle<Scene>>,
+    pub landmarks: Vec<DecorAsset>,
+    pub big: Vec<DecorAsset>,
+    pub braziers: Vec<DecorAsset>,
+    pub scatter: Vec<DecorAsset>,
+    pub walls: Vec<DecorAsset>,
+    pub wall_corner: Vec<DecorAsset>,
+    pub rubble: Vec<DecorAsset>,
+    pub buildings: Vec<DecorAsset>,
 }
 
 /// Toutes les DA préchargées, indexées par id de palette (story-671).
@@ -346,6 +373,7 @@ impl DecorAssets {
             ]
             .into_iter()
             .flatten()
+            .map(|a| &a.scene)
         })
     }
 }
@@ -407,6 +435,8 @@ enum DecorSpec {
     /// Prop solide (parent RigidBody + enfant visuel + hull collider + brasero).
     Perimeter {
         handle: Handle<Scene>,
+        /// Emprise au sol RÉELLE (m), mesurée puis calibrée. Story-673.
+        footprint_m: f32,
         name: &'static str,
         pos: Vec3,
         yaw: f32,
@@ -418,6 +448,8 @@ enum DecorSpec {
     /// Petit prop au sol sans collider (scatter / rubble) — diffèrent par le nom.
     Loose {
         handle: Handle<Scene>,
+        /// Emprise au sol RÉELLE (m), mesurée puis calibrée. Story-673.
+        footprint_m: f32,
         name: &'static str,
         pos: Vec3,
         yaw: f32,
@@ -427,6 +459,8 @@ enum DecorSpec {
     /// Segment de mur (coin ou bras de salle en L) — hull collider + obstacle.
     WallPiece {
         handle: Handle<Scene>,
+        /// Emprise au sol RÉELLE (m). Story-673.
+        footprint_m: f32,
         pos: Vec3,
         yaw: f32,
         obstacle_radius: f32,
@@ -454,23 +488,9 @@ impl DecorSpec {
         match self {
             // Le fond est hors-map et sans collider : il ne bloque personne.
             DecorSpec::Background { .. } => 0.0,
-            // `col_radius_factor` RÉTRÉCIT le collider pour le feel de tir — ce
-            // n'est PAS l'emprise au sol. L'utiliser ici sous-estimait un bâtiment
-            // de 12 m à 1,92 m de rayon (3× trop petit) : il passait le test et le
-            // mob naissait dedans. Mesuré sur le retour du 2026-07-31.
-            DecorSpec::Perimeter {
-                target_m,
-                user_scale,
-                ..
-            } => 0.5 * target_m * user_scale.max(0.01),
-            DecorSpec::Loose {
-                target_m,
-                user_scale,
-                ..
-            } => 0.5 * target_m * user_scale.max(0.01),
-            DecorSpec::WallPiece {
-                obstacle_radius, ..
-            } => *obstacle_radius,
+            DecorSpec::Perimeter { footprint_m, .. }
+            | DecorSpec::Loose { footprint_m, .. }
+            | DecorSpec::WallPiece { footprint_m, .. } => *footprint_m,
         }
     }
 
@@ -630,6 +650,7 @@ fn spawn_one(commands: &mut Commands, spec: &DecorSpec) {
             pos,
             yaw,
             target_m,
+            ..
         } => spawn_background_silhouette(commands, handle, name, *pos, *yaw, *target_m),
         DecorSpec::Perimeter {
             handle,
@@ -640,6 +661,7 @@ fn spawn_one(commands: &mut Commands, spec: &DecorSpec) {
             user_scale,
             brazier,
             col_radius_factor,
+            ..
         } => spawn_perimeter_prop(
             commands,
             handle,
@@ -658,6 +680,7 @@ fn spawn_one(commands: &mut Commands, spec: &DecorSpec) {
             yaw,
             user_scale,
             target_m,
+            ..
         } => {
             commands.spawn((
                 decor_markers(*name),
@@ -674,6 +697,7 @@ fn spawn_one(commands: &mut Commands, spec: &DecorSpec) {
             pos,
             yaw,
             obstacle_radius,
+            ..
         } => {
             commands.spawn((
                 decor_markers("Decor_Wall"),
@@ -718,19 +742,24 @@ pub fn sys_load_decor_assets(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
+    metrics: Option<Res<crate::asset_metrics::AssetRegistry>>,
 ) {
-    let load = |paths: &[&str]| -> Vec<Handle<Scene>> {
-        paths
-            .iter()
-            .filter(|p| !p.is_empty())
-            .map(|p| asset_server.load(GltfAssetLabel::Scene(0).from_asset(p.to_string())))
-            .collect()
+    // Story-673 — chaque prop est chargé AVEC ses mesures. C'est ici, et seulement
+    // ici, qu'on dispose à la fois du chemin et du registre : la suite du pipeline
+    // ne manipule plus que des `DecorAsset` porteurs de leur emprise native.
+    let mk = |path: &str| -> DecorAsset {
+        let m = metrics.as_ref().and_then(|r| r.get(path));
+        DecorAsset {
+            scene: asset_server.load(GltfAssetLabel::Scene(0).from_asset(path.to_string())),
+            native_footprint_m: m.map(|m| m.footprint_radius_m).unwrap_or(0.0),
+            native_max_dim_m: m.map(|m| m.max_dim()).unwrap_or(0.0),
+        }
     };
-    let load_owned = |paths: &[String]| -> Vec<Handle<Scene>> {
-        paths
-            .iter()
-            .map(|p| asset_server.load(GltfAssetLabel::Scene(0).from_asset(p.clone())))
-            .collect()
+    let load = |paths: &[&str]| -> Vec<DecorAsset> {
+        paths.iter().filter(|p| !p.is_empty()).map(|p| mk(p)).collect()
+    };
+    let load_owned = |paths: &[String]| -> Vec<DecorAsset> {
+        paths.iter().map(|p| mk(p)).collect()
     };
     // Story-671 — précharge TOUTES les DA déclarées au génome. `Option<Res<..>>`
     // + repli sur un chargement direct : ce système ne dépend d'aucun ordre de
@@ -1098,7 +1127,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-fn pick<'a>(pool: &'a [Handle<Scene>], rng: &mut Xoshiro256StarStar) -> Option<&'a Handle<Scene>> {
+fn pick<'a>(pool: &'a [DecorAsset], rng: &mut Xoshiro256StarStar) -> Option<&'a DecorAsset> {
     if pool.is_empty() {
         return None;
     }
@@ -1238,7 +1267,7 @@ fn plan_decor_set(
         let target = cfg.target_background * (0.7 + rng01(&mut rng) * 0.7);
         if let Some(handle) = pick(&assets.big, &mut rng) {
             specs.push(DecorSpec::Background {
-                handle: handle.clone(),
+                handle: handle.scene.clone(),
                 name: "Decor_Background",
                 pos,
                 yaw,
@@ -1257,7 +1286,7 @@ fn plan_decor_set(
         let yaw = rng01(&mut rng) * TAU;
         if let Some(handle) = pick(&assets.big, &mut rng) {
             specs.push(DecorSpec::Background {
-                handle: handle.clone(),
+                handle: handle.scene.clone(),
                 name: "Decor_GiantPeak",
                 pos,
                 yaw,
@@ -1280,11 +1309,12 @@ fn plan_decor_set(
         let yaw = rng01(&mut rng) * TAU;
         if let Some(handle) = pick(&assets.braziers, &mut rng) {
             specs.push(DecorSpec::Perimeter {
-                handle: handle.clone(),
+                handle: handle.scene.clone(),
                 name: "Decor_ForgeBrazier",
                 pos,
                 yaw,
                 target_m: cfg.target_brazier,
+                footprint_m: handle.footprint_at(cfg.target_brazier),
                 user_scale: 1.0,
                 brazier: true,
                 col_radius_factor: 0.3,
@@ -1298,11 +1328,12 @@ fn plan_decor_set(
         let yaw = rng01(&mut rng) * TAU;
         if let Some(handle) = pick(&assets.landmarks, &mut rng) {
             specs.push(DecorSpec::Perimeter {
-                handle: handle.clone(),
+                handle: handle.scene.clone(),
                 name: "Decor_ForgeMonument",
                 pos,
                 yaw,
                 target_m: cfg.forge_monument_target,
+                footprint_m: handle.footprint_at(cfg.forge_monument_target),
                 user_scale: 1.0,
                 brazier: false,
                 col_radius_factor: 0.16,
@@ -1328,11 +1359,12 @@ fn plan_decor_set(
         let target = cfg.target_building * (0.85 + rng01(&mut rng) * 0.4);
         if let Some(handle) = pick(&assets.buildings, &mut rng) {
             specs.push(DecorSpec::Perimeter {
-                handle: handle.clone(),
+                handle: handle.scene.clone(),
                 name: "Decor_Building",
                 pos,
                 yaw,
                 target_m: target,
+                footprint_m: handle.footprint_at(target),
                 user_scale: 1.0,
                 brazier: false,
                 col_radius_factor: 0.32,
@@ -1394,11 +1426,12 @@ fn plan_decor_set(
             continue;
         };
         specs.push(DecorSpec::Perimeter {
-            handle: handle.clone(),
+            handle: handle.scene.clone(),
             name,
             pos,
             yaw,
             target_m: target,
+                footprint_m: handle.footprint_at(target),
             user_scale: us,
             brazier,
             col_radius_factor: crf,
@@ -1418,12 +1451,13 @@ fn plan_decor_set(
         let us = 0.75 + rng01(&mut rng) * 0.5;
 
         specs.push(DecorSpec::Loose {
-            handle: handle.clone(),
+            handle: handle.scene.clone(),
             name: "Decor_Scatter",
             pos,
             yaw,
             user_scale: us,
             target_m: cfg.target_scatter,
+                footprint_m: handle.footprint_at(cfg.target_scatter),
         });
     }
 
@@ -1455,12 +1489,13 @@ fn plan_decor_set(
         let yaw = rng01(&mut rng) * TAU;
         let us = 0.8 + rng01(&mut rng) * 0.6;
         specs.push(DecorSpec::Loose {
-            handle: handle.clone(),
+            handle: handle.scene.clone(),
             name: "Decor_Rubble",
             pos,
             yaw,
             user_scale: us,
             target_m: cfg.target_rubble,
+                footprint_m: handle.footprint_at(cfg.target_rubble),
         });
     }
 
@@ -1498,7 +1533,15 @@ fn plan_wall_room(
     // Coin au pivot (visuel seulement ; ne consomme PAS de RNG — `first()`).
     if let Some(corner) = assets.wall_corner.first() {
         specs.push(DecorSpec::WallPiece {
-            handle: corner.clone(),
+            handle: corner.scene.clone(),
+            // Les murs sont posés à l'échelle NATIVE (pas de calibration) : leur
+            // emprise mesurée s'applique telle quelle. Repli sur l'ancien rayon
+            // d'obstacle si l'asset n'est pas au registre.
+            footprint_m: if corner.native_footprint_m > 0.0 {
+                corner.native_footprint_m
+            } else {
+                WALL_SEG_W * 0.7
+            },
             pos: origin,
             yaw: yaw0,
             obstacle_radius: WALL_SEG_W * 0.7,
@@ -1530,7 +1573,12 @@ fn plan_wall_arm(
         };
         let p = origin + dir * (s as f32 * WALL_SEG_W);
         specs.push(DecorSpec::WallPiece {
-            handle: handle.clone(),
+            handle: handle.scene.clone(),
+            footprint_m: if handle.native_footprint_m > 0.0 {
+                handle.native_footprint_m
+            } else {
+                WALL_SEG_W * 0.6
+            },
             pos: p,
             yaw,
             obstacle_radius: WALL_SEG_W * 0.6,
@@ -1690,7 +1738,15 @@ default = 40.0
     /// Story-672 — L'INVARIANT : aucun prop dans une zone d'apparition.
     #[test]
     fn no_prop_lands_in_a_spawn_zone() {
-        let h = || vec![Handle::<Scene>::default()];
+        // Assets factices AVEC mesures : 2 m d'emprise native, 4 m de dimension
+        // max — un prop plausible. Le plan ne charge rien, il ne fait que du RNG.
+        let h = || {
+            vec![DecorAsset {
+                scene: Handle::<Scene>::default(),
+                native_footprint_m: 2.0,
+                native_max_dim_m: 4.0,
+            }]
+        };
         let assets = DecorPaletteAssets {
             landmarks: h(),
             big: h(),
@@ -1788,7 +1844,15 @@ default = 40.0
     /// vidait les salles (54 % du rayon utile mesuré le 2026-07-31).
     #[test]
     fn the_decor_keeps_its_density_away_from_the_player() {
-        let h = || vec![Handle::<Scene>::default()];
+        // Assets factices AVEC mesures : 2 m d'emprise native, 4 m de dimension
+        // max — un prop plausible. Le plan ne charge rien, il ne fait que du RNG.
+        let h = || {
+            vec![DecorAsset {
+                scene: Handle::<Scene>::default(),
+                native_footprint_m: 2.0,
+                native_max_dim_m: 4.0,
+            }]
+        };
         let assets = DecorPaletteAssets {
             landmarks: h(),
             big: h(),
@@ -1846,7 +1910,15 @@ default = 40.0
     #[test]
     fn plan_decor_set_deterministic_and_budgetable() {
         // Handles factices (le plan ne touche aucun asset, juste du RNG + clone).
-        let h = || vec![Handle::<Scene>::default()];
+        // Assets factices AVEC mesures : 2 m d'emprise native, 4 m de dimension
+        // max — un prop plausible. Le plan ne charge rien, il ne fait que du RNG.
+        let h = || {
+            vec![DecorAsset {
+                scene: Handle::<Scene>::default(),
+                native_footprint_m: 2.0,
+                native_max_dim_m: 4.0,
+            }]
+        };
         let assets = DecorPaletteAssets {
             landmarks: h(),
             big: h(),

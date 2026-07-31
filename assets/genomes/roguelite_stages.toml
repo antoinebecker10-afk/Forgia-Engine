@@ -55,7 +55,9 @@ anchor_slots = 5
 music_state = "combat_default"
 boss_pad_required = false
 # 2026-05-27 : 1.0 → 4.0 (diag crash 1ère wave, cohérence avec crypts_of_anvil)
-wall_natural_len_m = 4.0
+# MESURÉ (asset_registry) : wall_straight.gltf = 2,00 m de large. Le 4,0
+# précédent espaçait les murs du double de leur largeur → un trou sur deux.
+wall_natural_len_m = 2.0
 # Story-485 — palette modules. Identity "Forge" : plain combat focus, plus de
 # cover bas, double melee pit, pas de sniper perch (distinct du Crypts).
 # Phase 1 fullness (2026-05-26) : counts bumpés 2× pour density homogène.
@@ -95,4 +97,6 @@ ramparts_shape = "hexagonal"
 anchor_slots = 5
 music_state = "combat_default"
 boss_pad_required = false
-wall_natural_len_m = 4.0
+# MESURÉ (asset_registry) : wall_straight.gltf = 2,00 m de large. Le 4,0
+# précédent espaçait les murs du double de leur largeur → un trou sur deux.
+wall_natural_len_m = 2.0
