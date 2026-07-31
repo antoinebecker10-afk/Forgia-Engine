@@ -186,3 +186,25 @@ default = 12.0
 [[genes]]
 id = "decor_spawn_budget_per_frame"
 default = 12.0
+
+# ─── Zones interdites au décor (story-672) ────────────────────────────────────
+# INVARIANT : aucun prop ne doit atterrir là où quelqu'un APPARAÎT. Sinon le
+# joueur spawne dans un rocher et les ennemis naissent coincés dans le décor.
+# Le filtre s'applique en SORTIE de planification, donc il couvre TOUS les
+# générateurs (périmètre, scatter, gravats, salles en L, anneau de forge,
+# bâtiments) — au lieu d'aller corriger chaque rayon un par un.
+
+# Rayon dégagé autour du point d'apparition du joueur (m). Le joueur est un
+# disque de 0,6 m ; 8 m lui laissent de quoi se retourner et voir la salle avant
+# d'être au contact.
+[[genes]]
+id = "decor_keepout_player_m"
+default = 8.0
+
+# Marge ajoutée de part et d'autre des ANNEAUX d'apparition ennemis (m), en plus
+# de leur dispersion (`ring.jitter_m` de roguelite_waves.toml). Un ennemi qui
+# apparaît à 1 m d'un pilier est déjà coincé : il pousse dedans sans jamais
+# l'contourner (les bots n'ont pas de navmesh).
+[[genes]]
+id = "decor_keepout_spawn_margin_m"
+default = 3.5

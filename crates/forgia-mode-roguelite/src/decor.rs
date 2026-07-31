@@ -103,6 +103,9 @@ pub struct RogueliteDecorConfig {
     // Gravats masquant la répétition du sol.
     pub rubble_count: u32,
     pub target_rubble: f32,
+    // Story-672 — zones interdites au décor (voir `SpawnKeepout`).
+    pub keepout_player_m: f32,
+    pub keepout_spawn_margin_m: f32,
     // Fond « Cratère de la Forge » : anneau de falaises volcaniques + pics géants
     // hors-map (ÉNORME, sans collider — pure silhouette à l'horizon).
     pub background_count: u32,
@@ -152,6 +155,8 @@ impl Default for RogueliteDecorConfig {
             room_radius_max: 52.0,
             rubble_count: 34,
             target_rubble: 3.4,
+            keepout_player_m: 8.0,
+            keepout_spawn_margin_m: 3.5,
             // Cratère de fond : crête dense + 2 pics géants dominants.
             background_count: 44,
             background_radius_min: 110.0,
@@ -211,6 +216,10 @@ impl RogueliteDecorConfig {
                 "decor_room_radius_max" => c.room_radius_max = gene.default.clamp(0.0, 500.0),
                 "decor_rubble_count" => c.rubble_count = gene.default.clamp(0.0, 400.0) as u32,
                 "decor_target_rubble" => c.target_rubble = gene.default.clamp(0.3, 20.0),
+                "decor_keepout_player_m" => c.keepout_player_m = gene.default.clamp(0.0, 60.0),
+                "decor_keepout_spawn_margin_m" => {
+                    c.keepout_spawn_margin_m = gene.default.clamp(0.0, 30.0)
+                }
                 "decor_background_count" => {
                     c.background_count = gene.default.clamp(0.0, 200.0) as u32
                 }
@@ -422,6 +431,129 @@ enum DecorSpec {
         yaw: f32,
         obstacle_radius: f32,
     },
+}
+
+/// Rayon d'emprise au sol d'un prop (m), pour le test de zone interdite.
+///
+/// Volontairement GÉNÉREUX : la moitié de la dimension cible, sans tenir compte
+/// de la forme réelle du mesh. Un prop rejeté à tort coûte un trou dans le décor ;
+/// un prop accepté à tort coûte un joueur qui apparaît dedans. Les deux erreurs
+/// n'ont pas le même prix.
+impl DecorSpec {
+    fn ground_pos(&self) -> Vec2 {
+        let p = match self {
+            DecorSpec::Background { pos, .. }
+            | DecorSpec::Perimeter { pos, .. }
+            | DecorSpec::Loose { pos, .. }
+            | DecorSpec::WallPiece { pos, .. } => *pos,
+        };
+        Vec2::new(p.x, p.z)
+    }
+
+    fn footprint_radius(&self) -> f32 {
+        match self {
+            // Le fond est hors-map et sans collider : il ne bloque personne.
+            DecorSpec::Background { .. } => 0.0,
+            DecorSpec::Perimeter {
+                target_m,
+                user_scale,
+                col_radius_factor,
+                ..
+            } => 0.5 * target_m * user_scale.max(0.01) * col_radius_factor.max(0.1),
+            DecorSpec::Loose {
+                target_m,
+                user_scale,
+                ..
+            } => 0.5 * target_m * user_scale.max(0.01),
+            DecorSpec::WallPiece {
+                obstacle_radius, ..
+            } => *obstacle_radius,
+        }
+    }
+
+    /// Le fond n'est jamais filtré : il est hors de l'enceinte par construction.
+    fn is_background(&self) -> bool {
+        matches!(self, DecorSpec::Background { .. })
+    }
+
+    /// Porte-t-il un collider ? C'est le seul critère qui décide si un mob peut
+    /// s'y coincer. `Loose` = semis au sol sans collider, traversable.
+    fn is_solid(&self) -> bool {
+        matches!(
+            self,
+            DecorSpec::Perimeter { .. } | DecorSpec::WallPiece { .. }
+        )
+    }
+}
+
+/// Story-672 — LES ZONES OÙ AUCUN PROP NE DOIT ATTERRIR.
+///
+/// Symptôme d'origine (2026-07-31, rapporté en jeu) : « je spawne dans un asset
+/// et parfois les mobs sont bloqués dans le décor ». Cause : les anneaux
+/// d'apparition ennemis (12 / 25 / 50 m) tombent en plein dans les anneaux de
+/// décor (scatter 12→72 m, périmètre 42→74 m). Les bots n'ayant pas de navmesh,
+/// un ennemi né contre un pilier pousse dedans sans jamais le contourner.
+///
+/// Le filtre s'applique en SORTIE de planification : il couvre donc TOUS les
+/// générateurs de props d'un coup, au lieu d'aller corriger chaque rayon un par
+/// un — c'est la classe du défaut, pas ses symptômes.
+#[derive(Debug, Clone, Default)]
+pub struct SpawnKeepout {
+    /// Disque autour de l'apparition du joueur : (centre au sol, rayon).
+    pub player: (Vec2, f32),
+    /// Anneaux d'apparition ennemis : (rayon, demi-épaisseur interdite).
+    pub enemy_rings: Vec<(f32, f32)>,
+}
+
+impl SpawnKeepout {
+    /// Construit les zones depuis les DEUX génomes concernés. Pas de miroir : les
+    /// rayons d'anneaux sont lus directement sur la config de composition, donc
+    /// changer `ring.tank` dans `roguelite_waves.toml` déplace automatiquement la
+    /// zone interdite. Aucune dérive possible.
+    pub fn from_configs(decor: &RogueliteDecorConfig, ring: &crate::wave_comp::RingCfg) -> Self {
+        let half = ring.jitter_m.max(0.0) + decor.keepout_spawn_margin_m.max(0.0);
+        let mut enemy_rings = Vec::with_capacity(8);
+        for base in [ring.tank, ring.runner, ring.sniper, ring.boss] {
+            if base <= 0.0 {
+                continue;
+            }
+            enemy_rings.push((base, half));
+            // La vague 2 élargit ses anneaux — sa bande doit l'être aussi.
+            let w2 = base + ring.wave2_bonus_m;
+            if (w2 - base).abs() > f32::EPSILON {
+                enemy_rings.push((w2, half));
+            }
+        }
+        Self {
+            player: (Vec2::ZERO, decor.keepout_player_m.max(0.0)),
+            enemy_rings,
+        }
+    }
+
+    /// PUR — ce prop atterrit-il dans une zone d'apparition ?
+    ///
+    /// Deux régimes, et la distinction n'est pas cosmétique :
+    ///
+    /// - **Disque du joueur** : on refuse TOUT, collider ou pas. C'est là qu'il
+    ///   ouvre les yeux ; apparaître le nez dans un tonneau, même traversable,
+    ///   est exactement le symptôme rapporté.
+    /// - **Anneaux ennemis** : on ne refuse que les props SOLIDES. Un mob ne peut
+    ///   se coincer que dans un collider ; interdire aussi le semis décoratif
+    ///   condamnerait ~40 % de l'arène (les bandes des trois archétypes, doublées
+    ///   par le bonus de vague 2, se rejoignent presque) et viderait la salle.
+    pub fn blocks(&self, pos: Vec2, prop_radius: f32, solid: bool) -> bool {
+        let r = prop_radius.max(0.0);
+        if pos.distance(self.player.0) < self.player.1 + r {
+            return true;
+        }
+        if !solid {
+            return false;
+        }
+        let d = pos.length();
+        self.enemy_rings
+            .iter()
+            .any(|(radius, half)| (d - radius).abs() < half + r)
+    }
 }
 
 /// File des props planifiés mais pas encore instanciés. Drainée par budget/frame.
@@ -814,6 +946,8 @@ pub fn sys_reconcile_decor(
     // Story-671 — la DA de la salle : `stage_id` courant → palette → props.
     stage_request: Option<Res<forgia_stage::StageLoadRequest>>,
     palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
+    // Story-672 — les anneaux d'apparition ennemis, pour n'y poser aucun prop.
+    comp_cfg: Res<crate::wave_comp::WaveCompConfig>,
     q_anchors: Query<&AnchorPoint>,
     q_decor: Query<(), With<DecorProp>>,
     mut queue: ResMut<DecorSpawnQueue>,
@@ -851,7 +985,8 @@ pub fn sys_reconcile_decor(
         .unwrap_or_else(|| crate::decor_palettes::FALLBACK_PALETTE.to_string());
 
     // Planifie tout (RNG only, pas d'instanciation) → le drain spawne par budget.
-    let specs = plan_decor_set(&cfg, assets.for_palette(&palette_id), seed);
+    let keepout = SpawnKeepout::from_configs(&cfg, &comp_cfg.ring);
+    let specs = plan_decor_set(&cfg, assets.for_palette(&palette_id), seed, &keepout);
     let count = specs.len();
     queue.pending = specs;
     queue.cursor = 0;
@@ -1014,6 +1149,7 @@ fn plan_decor_set(
     cfg: &RogueliteDecorConfig,
     assets: &DecorPaletteAssets,
     seed: u64,
+    keepout: &SpawnKeepout,
 ) -> Vec<DecorSpec> {
     let mut rng = Xoshiro256StarStar::seed_from_u64(seed ^ 0xDEC0_DEC0_F00D_BEEF);
     let mut specs: Vec<DecorSpec> = Vec::new();
@@ -1264,6 +1400,18 @@ fn plan_decor_set(
         });
     }
 
+    // Story-672 — INVARIANT DE SORTIE : aucun prop dans une zone d'apparition.
+    // Placé ICI et pas dans chaque générateur : un seul point de vérité, et tout
+    // futur générateur de props en hérite sans rien faire.
+    let before = specs.len();
+    specs.retain(|spec| {
+        spec.is_background()
+            || !keepout.blocks(spec.ground_pos(), spec.footprint_radius(), spec.is_solid())
+    });
+    let rejected = before - specs.len();
+    if rejected > 0 {
+        debug!("[decor] {rejected}/{before} props écartés (zone d'apparition)");
+    }
     specs
 }
 
@@ -1476,6 +1624,95 @@ default = 40.0
         );
     }
 
+    /// Story-672 — L'INVARIANT : aucun prop dans une zone d'apparition.
+    #[test]
+    fn no_prop_lands_in_a_spawn_zone() {
+        let h = || vec![Handle::<Scene>::default()];
+        let assets = DecorPaletteAssets {
+            landmarks: h(),
+            big: h(),
+            braziers: h(),
+            scatter: h(),
+            walls: h(),
+            wall_corner: h(),
+            rubble: h(),
+            buildings: h(),
+        };
+        let cfg = RogueliteDecorConfig::default();
+        let ko = SpawnKeepout::from_configs(&cfg, &crate::wave_comp::RingCfg::default());
+        // Plusieurs graines : le semis est aléatoire, l'invariant ne l'est pas.
+        for seed in 0..40u64 {
+            let specs = plan_decor_set(&cfg, &assets, seed.wrapping_mul(0x9E37_79B9), &ko);
+            assert!(!specs.is_empty(), "graine {seed} : le filtre a tout mangé");
+            for spec in &specs {
+                if spec.is_background() {
+                    continue; // hors-map, sans collider
+                }
+                assert!(
+                    !ko.blocks(spec.ground_pos(), spec.footprint_radius(), spec.is_solid()),
+                    "graine {seed} : un prop atterrit dans une zone d'apparition                      (pos {:?}, rayon {:.2}, solide {})",
+                    spec.ground_pos(),
+                    spec.footprint_radius(),
+                    spec.is_solid()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_keepout_covers_the_player_disc_and_every_enemy_ring() {
+        let cfg = RogueliteDecorConfig::default();
+        let ring = crate::wave_comp::RingCfg::default();
+        let ko = SpawnKeepout::from_configs(&cfg, &ring);
+
+        // Le joueur apparaît à l'origine : TOUT y est refusé, solide ou non.
+        assert!(ko.blocks(Vec2::ZERO, 0.0, false));
+        assert!(ko.blocks(Vec2::new(cfg.keepout_player_m - 0.1, 0.0), 0.0, false));
+
+        // Chaque anneau d'apparition (vague 1 ET vague 2) refuse le SOLIDE.
+        for base in [ring.tank, ring.runner, ring.sniper] {
+            for r in [base, base + ring.wave2_bonus_m] {
+                assert!(
+                    ko.blocks(Vec2::new(r, 0.0), 0.0, true),
+                    "l'anneau {r} m n'est pas protégé"
+                );
+                assert!(
+                    !ko.blocks(Vec2::new(r, 0.0), 0.0, false),
+                    "le semis traversable doit rester autorisé sur les anneaux,                      sinon ~40 % de l'arène se vide"
+                );
+            }
+        }
+        // Loin de tout anneau, le solide reste autorisé.
+        let far = ring.sniper + ring.wave2_bonus_m + ring.jitter_m
+            + cfg.keepout_spawn_margin_m + 5.0;
+        assert!(
+            !ko.blocks(Vec2::new(far, 0.0), 0.0, true),
+            "le filtre ne doit pas interdire TOUTE l'arène"
+        );
+    }
+
+    /// Le rayon du prop compte : un gros prop tangent à un anneau bloque quand
+    /// même. C'est le cas qui produisait « mob né dans le décor ».
+    #[test]
+    fn a_large_prop_tangent_to_a_ring_is_still_rejected() {
+        let cfg = RogueliteDecorConfig::default();
+        let ring = crate::wave_comp::RingCfg::default();
+        let ko = SpawnKeepout::from_configs(&cfg, &ring);
+        // Un point juste hors de la bande du sniper (loin des autres anneaux).
+        let just_outside = ring.sniper + ring.wave2_bonus_m
+            + ring.jitter_m
+            + cfg.keepout_spawn_margin_m
+            + 1.0;
+        assert!(
+            !ko.blocks(Vec2::new(just_outside, 0.0), 0.0, true),
+            "prop ponctuel hors bande : autorisé"
+        );
+        assert!(
+            ko.blocks(Vec2::new(just_outside, 0.0), 4.0, true),
+            "le MÊME point avec un prop de 4 m de rayon doit être refusé — c'est              ce cas qui produisait « mob né dans le décor »"
+        );
+    }
+
     #[test]
     fn calibration_scale_normalizes() {
         // scale = target / max_dim * user_scale → un prop natif 8m visé à 4m = 0.5.
@@ -1523,8 +1760,9 @@ default = 40.0
             buildings: h(),
         };
         let cfg = RogueliteDecorConfig::default();
-        let a = plan_decor_set(&cfg, &assets, 0xABCD);
-        let b = plan_decor_set(&cfg, &assets, 0xABCD);
+        let ko = SpawnKeepout::default();
+        let a = plan_decor_set(&cfg, &assets, 0xABCD, &ko);
+        let b = plan_decor_set(&cfg, &assets, 0xABCD, &ko);
         // Même seed → même nombre de props (RNG préservé).
         assert_eq!(a.len(), b.len());
         // Le décor par défaut produit beaucoup de props (sinon pas de freeze à étaler).
