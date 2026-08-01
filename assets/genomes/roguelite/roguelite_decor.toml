@@ -23,10 +23,10 @@ default = 42.0
 id = "decor_ring_radius_max"
 default = 74.0
 
-# Total props sur l'anneau (landmarks + braseros + gros rochers/piliers).
-[[genes]]
-id = "decor_perimeter_count"
-default = 34.0
+# NOTE story-674 — `decor_perimeter_count` et `decor_scatter_count` ont été
+# SUPPRIMÉS : le compte se dérive maintenant de l'aire de l'anneau et de
+# l'espacement visé (`decor_perimeter_spacing_m` / `decor_scatter_spacing_m`,
+# plus bas). Un littéral ne savait pas si la salle faisait 40 ou 90 m.
 
 # Nombre de LANDMARKS (statue / tour) = points focaux hauts. Pris sur le total.
 [[genes]]
@@ -39,10 +39,6 @@ id = "decor_brazier_ratio"
 default = 0.30
 
 # ─── Petits props dispersés au sol (sans collider) ────────────────────────────
-[[genes]]
-id = "decor_scatter_count"
-default = 55.0
-
 [[genes]]
 id = "decor_scatter_radius_min"
 default = 12.0
@@ -161,7 +157,7 @@ default = 18.0
 # ─── Ville-forge (incr.3) : ceinture de bâtiments KayKit Medieval Hexagon ─────
 # Bâtiments rouges (forge, mine, tours, barracks, ruines...) en anneau FACE au
 # centre, dos aux ramparts → skyline de ville. Calibrés à `decor_target_building`.
-# Réduis `decor_perimeter_count` si la ville + les rochers font trop chargé.
+# Augmente `decor_perimeter_spacing_m` si la ville + les rochers font trop chargé.
 [[genes]]
 id = "decor_building_count"
 default = 18.0
@@ -208,3 +204,26 @@ default = 8.0
 [[genes]]
 id = "decor_keepout_spawn_margin_m"
 default = 3.5
+
+# ─── Aménagement dérivé (story-674) ──────────────────────────────────────────
+# Le semis passe du polaire aléatoire au BRUIT BLEU : espacement minimum garanti,
+# plus d'amas ni de trous. Et le COMPTE se dérive de l'aire au lieu d'être un
+# littéral — `covers_expected(aire, espacement)` (forgia-core::layout).
+
+# Espacement minimal entre deux petits props au sol (m).
+[[genes]]
+id = "decor_scatter_spacing_m"
+default = 5.0
+
+# Espacement minimal entre deux props SOLIDES du périmètre (m).
+# Bande sourcée 3-10 m (Watch Dogs, Gears) — cf map-design-patterns §11.
+[[genes]]
+id = "decor_perimeter_spacing_m"
+default = 9.0
+
+# Plafond de props planifiés par salle. Garde-fou de BUDGET DE FRAME, pas de
+# goût : l'aire d'une arène de 90 m rend une dérivation à 5 m très généreuse.
+# Quand le plafond mord, le log le DIT (jamais de troncature silencieuse).
+[[genes]]
+id = "decor_max_props"
+default = 420.0

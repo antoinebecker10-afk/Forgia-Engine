@@ -341,16 +341,10 @@ pub fn cover_bands(heights: &[f32], jump_m: f32, low_m: f32, high_m: f32) -> Cov
     b
 }
 
-/// Nombre d'abris attendu pour une aire, à l'espacement visé.
-///
-/// Espacement sourcé **3–10 m**, 10 m au maximum (Watch Dogs, Gears of War). Le
-/// compte n'est donc pas une opinion : il se dérive de la surface jouable.
-pub fn covers_expected(area_m2: f32, spacing_m: f32) -> f32 {
-    if spacing_m <= 0.0 || area_m2 <= 0.0 {
-        return 0.0;
-    }
-    area_m2 / (spacing_m * spacing_m)
-}
+// Story-674 — `covers_expected` a déménagé dans `forgia-core::layout` : le banc
+// la MESURAIT, le générateur de décor roguelite en a besoin pour DÉRIVER ses
+// comptes. Deux consommateurs = une seule source. Chemin public conservé.
+pub use forgia_core::layout::covers_expected;
 
 pub fn drifted(declared: f32, actual: f32, tolerance: f32) -> bool {
     if actual.abs() < f32::EPSILON {

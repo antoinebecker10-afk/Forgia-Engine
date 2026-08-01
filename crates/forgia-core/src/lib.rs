@@ -8,6 +8,9 @@
 
 use bevy::prelude::*;
 
+/// Story-674 — primitives d'aménagement partagées (bruit bleu, compte d'abris).
+pub mod layout;
+
 pub mod prelude {
     pub use crate::cosmetics::{ArmCosmetics, ArmStyle, ViewmodelForcedVisible};
     pub use crate::fps_feel::FpsFeelMetrics;

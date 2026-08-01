@@ -35,6 +35,7 @@ use bevy::state::state_scoped::DespawnOnExit;
 use bevy_rapier3d::prelude::{Collider, ComputedColliderShape, RigidBody};
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_anchor::{AnchorKind, AnchorPoint};
+use forgia_core::layout::{covers_expected, disc_area, poisson_disk_annulus};
 use forgia_core::prelude::*;
 use forgia_stage::{StageArenaMarker, StageLoadResult};
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
@@ -85,10 +86,8 @@ pub struct RogueliteDecorConfig {
     pub enabled: bool,
     pub ring_radius_min: f32,
     pub ring_radius_max: f32,
-    pub perimeter_count: u32,
     pub landmark_count: u32,
     pub brazier_ratio: f32,
-    pub scatter_count: u32,
     pub scatter_radius_min: f32,
     pub scatter_radius_max: f32,
     pub target_landmark: f32,
@@ -106,6 +105,10 @@ pub struct RogueliteDecorConfig {
     // Story-672 — zones interdites au décor (voir `SpawnKeepout`).
     pub keepout_player_m: f32,
     pub keepout_spawn_margin_m: f32,
+    // Story-674 — aménagement dérivé (bruit bleu + compte depuis l'aire).
+    pub scatter_spacing_m: f32,
+    pub perimeter_spacing_m: f32,
+    pub max_props: u32,
     // Fond « Cratère de la Forge » : anneau de falaises volcaniques + pics géants
     // hors-map (ÉNORME, sans collider — pure silhouette à l'horizon).
     pub background_count: u32,
@@ -139,10 +142,8 @@ impl Default for RogueliteDecorConfig {
             enabled: true,
             ring_radius_min: 42.0,
             ring_radius_max: 74.0,
-            perimeter_count: 34,
             landmark_count: 4,
             brazier_ratio: 0.30,
-            scatter_count: 55,
             scatter_radius_min: 12.0,
             scatter_radius_max: 72.0,
             target_landmark: 16.0,
@@ -157,6 +158,9 @@ impl Default for RogueliteDecorConfig {
             target_rubble: 3.4,
             keepout_player_m: 8.0,
             keepout_spawn_margin_m: 3.5,
+            scatter_spacing_m: 5.0,
+            perimeter_spacing_m: 9.0,
+            max_props: 420,
             // Cratère de fond : crête dense + 2 pics géants dominants.
             background_count: 44,
             background_radius_min: 110.0,
@@ -196,12 +200,8 @@ impl RogueliteDecorConfig {
                 "decor_enabled" => c.enabled = gene.default >= 0.5,
                 "decor_ring_radius_min" => c.ring_radius_min = gene.default.clamp(1.0, 500.0),
                 "decor_ring_radius_max" => c.ring_radius_max = gene.default.clamp(1.0, 500.0),
-                "decor_perimeter_count" => {
-                    c.perimeter_count = gene.default.clamp(0.0, 200.0) as u32
-                }
                 "decor_landmark_count" => c.landmark_count = gene.default.clamp(0.0, 50.0) as u32,
                 "decor_brazier_ratio" => c.brazier_ratio = gene.default.clamp(0.0, 1.0),
-                "decor_scatter_count" => c.scatter_count = gene.default.clamp(0.0, 600.0) as u32,
                 "decor_scatter_radius_min" => c.scatter_radius_min = gene.default.clamp(0.0, 500.0),
                 "decor_scatter_radius_max" => c.scatter_radius_max = gene.default.clamp(0.0, 500.0),
                 "decor_target_landmark" => c.target_landmark = gene.default.clamp(0.5, 50.0),
@@ -217,6 +217,11 @@ impl RogueliteDecorConfig {
                 "decor_rubble_count" => c.rubble_count = gene.default.clamp(0.0, 400.0) as u32,
                 "decor_target_rubble" => c.target_rubble = gene.default.clamp(0.3, 20.0),
                 "decor_keepout_player_m" => c.keepout_player_m = gene.default.clamp(0.0, 60.0),
+                "decor_scatter_spacing_m" => c.scatter_spacing_m = gene.default.clamp(0.5, 40.0),
+                "decor_perimeter_spacing_m" => {
+                    c.perimeter_spacing_m = gene.default.clamp(0.5, 40.0)
+                }
+                "decor_max_props" => c.max_props = gene.default.clamp(0.0, 4000.0) as u32,
                 "decor_keepout_spawn_margin_m" => {
                     c.keepout_spawn_margin_m = gene.default.clamp(0.0, 30.0)
                 }
@@ -727,13 +732,14 @@ pub fn sys_init_decor_genome(mut commands: Commands) {
         ..default()
     });
     info!(
-        "[decor] genome loaded — ring {:.0}-{:.0}m perim={} landmarks={} braziers={:.0}% scatter={}",
+        "[decor] genome loaded — ring {:.0}-{:.0}m espacement perim={:.1}m semis={:.1}m          landmarks={} braziers={:.0}% plafond={} props",
         cfg.ring_radius_min,
         cfg.ring_radius_max,
-        cfg.perimeter_count,
+        cfg.perimeter_spacing_m,
+        cfg.scatter_spacing_m,
         cfg.landmark_count,
         cfg.brazier_ratio * 100.0,
-        cfg.scatter_count
+        cfg.max_props
     );
 }
 
@@ -833,10 +839,10 @@ pub fn sys_hot_reload_decor_genome(
             commands.entity(e).despawn();
         }
         info!(
-            "[decor] HOT-RELOADED — ring {:.0}-{:.0}m perim={} targets L{:.0}/B{:.0}/Br{:.1}/S{:.1} → régénération",
+            "[decor] HOT-RELOADED — ring {:.0}-{:.0}m espacement {:.1}m targets L{:.0}/B{:.0}/Br{:.1}/S{:.1} → régénération",
             new_cfg.ring_radius_min,
             new_cfg.ring_radius_max,
-            new_cfg.perimeter_count,
+            new_cfg.perimeter_spacing_m,
             new_cfg.target_landmark,
             new_cfg.target_big,
             new_cfg.target_brazier,
@@ -1238,6 +1244,49 @@ fn spawn_perimeter_prop(
 /// Préserve EXACTEMENT le stream RNG de l'ancien `spawn_decor_set` (les salles
 /// sont décomposées en pièces via `plan_wall_room`, consommant le RNG à
 /// l'identique) → layout décor inchangé, juste étalé dans le temps.
+/// Semis à BRUIT BLEU dans un anneau, avec un compte DÉRIVÉ et un plafond de
+/// budget qui, quand il mord, le DIT (story-674).
+///
+/// Avant : un littéral (`perimeter_count = 34`) et des angles tirés au hasard —
+/// donc des amas et des trous, et un compte qui ne savait rien de la taille de la
+/// salle. Après : `covers_expected(aire, espacement)` donne l'attendu, Bridson
+/// donne des positions à espacement minimal garanti.
+///
+/// Le plafond ne TRONQUE pas la liste (l'ordre d'insertion de Bridson est une
+/// frontière qui progresse : prendre le préfixe remplirait un secteur et laisserait
+/// le reste nu). Il **sous-échantillonne à pas régulier**, ce qui garde le semis
+/// réparti sur toute l'aire.
+fn plan_ring_points(
+    r_min: f32,
+    r_max: f32,
+    spacing: f32,
+    seed: u64,
+    cap: usize,
+    what: &str,
+) -> Vec<(f32, f32)> {
+    if cap == 0 {
+        return Vec::new();
+    }
+    let pts = poisson_disk_annulus(r_min, r_max, spacing, seed);
+    let derived = pts.len();
+    let lo = r_min.max(0.0);
+    let expected = covers_expected(disc_area(r_max) - disc_area(lo), spacing);
+    if derived <= cap {
+        debug!(
+            "[decor] {what} : {derived} positions à {spacing:.1} m              (aire/espacement² = {expected:.0}, plafond {cap})"
+        );
+        return pts;
+    }
+    warn!(
+        "[decor] {what} : {derived} positions dérivées à {spacing:.1} m          (aire/espacement² = {expected:.0}) mais plafond decor_max_props = {cap} →          {} props NON posés. Salle sous-remplie volontairement (budget de frame).",
+        derived - cap
+    );
+    let stride = derived as f32 / cap as f32;
+    (0..cap)
+        .map(|i| pts[((i as f32 * stride) as usize).min(derived - 1)])
+        .collect()
+}
+
 fn plan_decor_set(
     cfg: &RogueliteDecorConfig,
     assets: &DecorPaletteAssets,
@@ -1373,24 +1422,32 @@ fn plan_decor_set(
     }
 
     // ── Anneau périmétrique ───────────────────────────────────────────────────
-    let n = cfg.perimeter_count.max(1);
-    let step = TAU / n as f32;
-    // Slots des landmarks : répartis ~également autour de l'anneau.
-    let landmark_n = cfg.landmark_count.min(cfg.perimeter_count);
-    let landmark_step = cfg
-        .perimeter_count
+    // Story-674 — c'est la couche qui porte le COUVERT : son compte se dérive de
+    // l'aire de l'anneau (l'ancien littéral 34 ne savait rien de la taille de la
+    // salle), ses positions viennent d'un semis à espacement minimal garanti.
+    // Le périmètre passe en premier sur le budget : c'est du gameplay, pas de
+    // l'habillage.
+    let ring_pts = plan_ring_points(
+        cfg.ring_radius_min,
+        cfg.ring_radius_max,
+        cfg.perimeter_spacing_m,
+        seed ^ 0x9E37_79B9_7F4A_7C15,
+        cfg.max_props as usize,
+        "périmètre",
+    );
+    let n_ring = ring_pts.len();
+    let landmark_n = cfg.landmark_count.min(n_ring as u32);
+    let landmark_step = (n_ring as u32)
         .checked_div(landmark_n)
         .map_or(u32::MAX, |s| s.max(1));
     let mut landmarks_placed = 0u32;
 
-    for i in 0..cfg.perimeter_count {
-        let jitter = (rng01(&mut rng) - 0.5) * step * 0.6;
-        let angle = step * i as f32 + jitter;
-        let radius = lerp(cfg.ring_radius_min, cfg.ring_radius_max, rng01(&mut rng));
-        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+    for (i, (px, pz)) in ring_pts.iter().enumerate() {
+        let i = i as u32;
+        let pos = Vec3::new(*px, 0.0, *pz);
         let yaw = rng01(&mut rng) * TAU;
 
-        let is_landmark = landmarks_placed < landmark_n && i % landmark_step == 0;
+        let is_landmark = landmarks_placed < landmark_n && i.is_multiple_of(landmark_step);
         let roll = rng01(&mut rng);
 
         let (pool, name, target, us, brazier, crf) = if is_landmark {
@@ -1439,14 +1496,24 @@ fn plan_decor_set(
     }
 
     // ── Petits props dispersés au sol (sans collider) ─────────────────────────
-    for _ in 0..cfg.scatter_count {
+    // Story-674 — l'ancien tirage polaire uniforme produisait des amas et des
+    // clairières : c'est ce qui se lisait comme « la salle est vide » alors que le
+    // compte était le bon. Le bruit bleu garantit l'espacement, donc l'occupation.
+    // Le semis prend ce que le périmètre a laissé du budget.
+    let scatter_budget = (cfg.max_props as usize).saturating_sub(n_ring);
+    let scatter_pts = plan_ring_points(
+        cfg.scatter_radius_min,
+        cfg.scatter_radius_max,
+        cfg.scatter_spacing_m,
+        seed ^ 0xC2B2_AE3D_27D4_EB4F,
+        scatter_budget,
+        "semis",
+    );
+    for (px, pz) in scatter_pts {
         let Some(handle) = pick(&assets.scatter, &mut rng) else {
             break;
         };
-        let angle = rng01(&mut rng) * TAU;
-        let t = rng01(&mut rng).sqrt(); // uniforme en surface
-        let radius = lerp(cfg.scatter_radius_min, cfg.scatter_radius_max, t);
-        let pos = Vec3::new(radius * angle.cos(), 0.0, radius * angle.sin());
+        let pos = Vec3::new(px, 0.0, pz);
         let yaw = rng01(&mut rng) * TAU;
         let us = 0.75 + rng01(&mut rng) * 0.5;
 
@@ -1664,7 +1731,7 @@ mod tests {
     fn parse_overrides_and_clamps() {
         let toml = r#"
 [[genes]]
-id = "decor_perimeter_count"
+id = "decor_perimeter_spacing_m"
 default = 999.0
 [[genes]]
 id = "decor_target_landmark"
@@ -1677,7 +1744,7 @@ id = "decor_enabled"
 default = 0.0
 "#;
         let c = RogueliteDecorConfig::parse_toml(toml);
-        assert_eq!(c.perimeter_count, 200);
+        assert_eq!(c.perimeter_spacing_m, 40.0); // clamp
         assert_eq!(c.target_landmark, 50.0); // clamp
         assert_eq!(c.brazier_ratio, 1.0);
         assert!(!c.enabled);
@@ -1939,5 +2006,111 @@ default = 40.0
         assert!(a.len() > 100, "plan trop petit: {}", a.len());
         // Le budget par défaut est bien < total → drainage en plusieurs frames.
         assert!((cfg.spawn_budget_per_frame as usize) < a.len());
+    }
+}
+
+#[cfg(test)]
+mod layout_derivation_tests {
+    use super::*;
+
+    /// Le semis n'est plus un littéral : il DOIT suivre la taille de la salle.
+    /// C'est tout l'objet de la story-674 — 34 props dans une salle de 40 m et
+    /// dans une salle de 90 m, ce n'était pas le même remplissage.
+    #[test]
+    fn the_count_follows_the_room_size() {
+        let small = plan_ring_points(20.0, 35.0, 9.0, 1, 10_000, "t");
+        let big = plan_ring_points(42.0, 74.0, 9.0, 1, 10_000, "t");
+        assert!(
+            big.len() > small.len() * 2,
+            "petite salle {} props, grande {} — la dérivation ne suit pas",
+            small.len(),
+            big.len()
+        );
+    }
+
+    /// Espacement minimal garanti : c'est ce que le tirage polaire ne donnait pas
+    /// (amas + clairières, lus en jeu comme « la salle est vide »).
+    #[test]
+    fn no_two_props_are_closer_than_the_spacing() {
+        for seed in [1u64, 7, 42, 1337, 99_999] {
+            let pts = plan_ring_points(42.0, 74.0, 9.0, seed, 10_000, "t");
+            assert!(!pts.is_empty(), "graine {seed} : anneau vide");
+            for (i, a) in pts.iter().enumerate() {
+                for b in pts.iter().skip(i + 1) {
+                    let d = ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+                    assert!(d >= 9.0 - 1e-2, "graine {seed} : deux props à {d:.2} m");
+                }
+            }
+        }
+    }
+
+    /// Le plafond SOUS-ÉCHANTILLONNE, il ne tronque pas : l'ordre d'insertion de
+    /// Bridson est une frontière qui progresse, un préfixe remplirait un secteur
+    /// et laisserait le reste nu.
+    #[test]
+    fn the_cap_keeps_the_spread_instead_of_filling_one_sector() {
+        let full = plan_ring_points(0.0, 70.0, 5.0, 3, 10_000, "t");
+        let capped = plan_ring_points(0.0, 70.0, 5.0, 3, 40, "t");
+        assert_eq!(capped.len(), 40);
+        assert!(full.len() > 40, "le plafond ne mord pas, test inutile");
+        // Les 4 quadrants doivent rester habités.
+        let quad = |f: &dyn Fn(&(f32, f32)) -> bool| capped.iter().filter(|p| f(p)).count();
+        for (name, f) in [
+            ("NE", &(|p: &(f32, f32)| p.0 >= 0.0 && p.1 >= 0.0) as &dyn Fn(&(f32, f32)) -> bool),
+            ("NO", &(|p: &(f32, f32)| p.0 < 0.0 && p.1 >= 0.0)),
+            ("SE", &(|p: &(f32, f32)| p.0 >= 0.0 && p.1 < 0.0)),
+            ("SO", &(|p: &(f32, f32)| p.0 < 0.0 && p.1 < 0.0)),
+        ] {
+            assert!(quad(f) >= 4, "quadrant {name} quasi vide : {}", quad(f));
+        }
+    }
+
+    /// Un plafond à 0 ne doit pas paniquer — et une salle n'est jamais vidée par
+    /// le mécanisme lui-même (la leçon de story-672).
+    #[test]
+    fn degenerate_budgets_are_safe() {
+        assert!(plan_ring_points(42.0, 74.0, 9.0, 1, 0, "t").is_empty());
+        assert_eq!(plan_ring_points(42.0, 74.0, 9.0, 1, 1, "t").len(), 1);
+    }
+
+    /// CE QUE LA LIVRAISON CHANGE, en chiffres — pour ne pas annoncer « plus
+    /// dense » sans le mesurer.
+    #[test]
+    fn the_delivered_defaults_are_measured_not_claimed() {
+        let cfg = RogueliteDecorConfig::default();
+        let per = plan_ring_points(
+            cfg.ring_radius_min,
+            cfg.ring_radius_max,
+            cfg.perimeter_spacing_m,
+            0xF06,
+            cfg.max_props as usize,
+            "périmètre",
+        );
+        let sc = plan_ring_points(
+            cfg.scatter_radius_min,
+            cfg.scatter_radius_max,
+            cfg.scatter_spacing_m,
+            0xF07,
+            (cfg.max_props as usize).saturating_sub(per.len()),
+            "semis",
+        );
+        // Avant story-674 : 34 périmètre + 55 semis = 89 props posés.
+        assert!(
+            per.len() + sc.len() > 89 * 3,
+            "périmètre {} + semis {} — la densité n'a pas décollé",
+            per.len(),
+            sc.len()
+        );
+        assert!(
+            per.len() + sc.len() <= cfg.max_props as usize,
+            "le plafond de budget de frame doit tenir"
+        );
+        println!(
+            "[story-674] périmètre {} props (avant 34), semis {} (avant 55), total {} (plafond {})",
+            per.len(),
+            sc.len(),
+            per.len() + sc.len(),
+            cfg.max_props
+        );
     }
 }
