@@ -28,6 +28,9 @@ use forgia_ui_lib::theme::display_text;
 // persistées au Startup (présentes dès le menu) et on réutilise les helpers de
 // sections déjà écrits dans `hub.rs` (zéro duplication).
 use forgia_mode_roguelite::hub::{draw_codex_section, section_intro};
+use forgia_mode_roguelite::equipment::{
+    draw_equipment_content, EquipmentConfig, EquipmentMods, EquipmentPanelShown, EquipmentSave,
+};
 use forgia_mode_roguelite::identity::{draw_identity_content, IdentityConfig, IdentitySave};
 use forgia_mode_roguelite::meta_shop::{
     apply_meta_purchase, draw_enclume_panel, MetaShopCatalogue, MetaShopSave,
@@ -152,6 +155,7 @@ impl Plugin for ForgiaUiPlugin {
                     main_menu_ui,
                     sys_menu_enclume,
                     sys_menu_forgeron,
+                    sys_menu_equipement,
                     sys_menu_armes,
                 )
                     .chain(),
@@ -416,21 +420,18 @@ fn main_menu_ui(
             }
         })
         .unwrap_or("Forgeron");
-    let (level, xp, xp_next, frac) = progress
+    // Story-680 cran 1 — le niveau est la SOMME DES RANGS achetés à l'Enclume
+    // (modèle Gunfire Reborn). Plus d'XP « 40 + secondes de run », qui payait le
+    // temps passé et rien d'autre. La barre mesure la part de l'Enclume
+    // réellement débloquée — une information vraie.
+    let (level, remaining, frac) = progress
         .as_ref()
-        .map(|p| {
-            (
-                p.level,
-                p.xp,
-                PlayerProgress::xp_to_next(p.level),
-                p.xp_fraction(),
-            )
-        })
-        .unwrap_or((1, 0, 80, 0.0));
+        .map(|p| (p.level, p.ranks_remaining, p.completion()))
+        .unwrap_or((1, 0, 0.0));
 
     // ── Chrome persistant : bandeau Âmes (droite) + sidebar de navigation (gauche) ──
     draw_hub_souls_chip(ctx, souls_n);
-    draw_hub_nav(ctx, &mut page, name, level, xp, xp_next, frac);
+    draw_hub_nav(ctx, &mut page, name, level, remaining, frac);
 
     // ── Panneau de la section active ──
     // Les sections rendent leur contenu et renvoient une action de navigation
@@ -445,7 +446,12 @@ fn main_menu_ui(
             MenuAction::None
         }
         MenuPage::Talents => {
-            let pts = progress.as_ref().map(|p| p.talent_points).unwrap_or(0);
+            // Story-680 cran 1 — cet écran ANNONÇAIT « Choisis ton style — Feu ·
+            // Givre · Éclair · Poison » et « N point(s) de talent en attente »
+            // alors qu'il n'existait ni arbre, ni style, ni combo, et que RIEN
+            // dans le workspace ne dépensait ces points. Un système vide est
+            // neutre ; un système qui promet ce qu'il ne fait pas est une
+            // déception programmée. On dit donc ce qui est vrai.
             hub_section_panel(
                 ctx,
                 "hub_sec_talents",
@@ -454,15 +460,20 @@ fn main_menu_ui(
                 |ui| {
                     section_intro(
                         ui,
-                        "Arbres de talents",
-                        "Choisis ton style — Feu · Givre · Éclair · Poison — et débloque des \
-                         combos signature en jouant.",
+                        "Ton niveau",
+                        "Ton niveau est la somme de ce que tu as débloqué à l'Enclume.                          Rien à farmer : chaque niveau est un choix que tu as fait.",
                     );
                     ui.add_space(8.0);
+                    ui.label(display_text(format!("Niveau {level}"), 22.0, FORGE_OR));
+                    ui.add_space(4.0);
                     ui.label(display_text(
-                        format!("{pts} point(s) de talent en attente"),
-                        18.0,
-                        FORGE_OR,
+                        if remaining == 0 {
+                            "Enclume complète — tout est débloqué.".to_string()
+                        } else {
+                            format!("{remaining} amélioration(s) t'attendent à l'Enclume.")
+                        },
+                        16.0,
+                        FORGE_CREME,
                     ));
                 },
             );
@@ -579,8 +590,8 @@ fn draw_hub_nav(
     page: &mut MenuPage,
     name: &str,
     level: u32,
-    xp: u32,
-    xp_next: u32,
+    // Rangs encore achetables à l'Enclume (ex-« XP restante »).
+    remaining: u32,
     frac: f32,
 ) {
     egui::Area::new(egui::Id::new("menu_hub_nav"))
@@ -609,7 +620,11 @@ fn draw_hub_nav(
                     ui.add_sized(
                         egui::vec2(200.0, 9.0),
                         egui::ProgressBar::new(frac).fill(FORGE_OR).text(
-                            egui::RichText::new(format!("{xp} / {xp_next} XP"))
+                            egui::RichText::new(if remaining == 0 {
+                                    "COMPLET".to_string()
+                                } else {
+                                    format!("{remaining} À DÉBLOQUER")
+                                })
                                 .size(9.0)
                                 .color(FORGE_CREME),
                         ),
@@ -934,6 +949,61 @@ fn sys_menu_forgeron(
                         ui.add_space(12.0);
                         draw_identity_content(ui, &cfg, &mut save, &mut arm_cosmetics, &mut editing);
                     });
+                });
+        });
+}
+
+/// Équipement au menu-titre, à droite du Forgeron — les pièces d'armure lootées.
+///
+/// C'est ICI que ça doit vivre, et pas au Lobby : le Lobby n'est plus un hub
+/// interactif mais un gate de chargement dont l'overlay `Order::Foreground`
+/// recouvre tout panneau qu'on y dessinerait (cf. `sys_lobby_loading_overlay`).
+/// Un panneau branché là-bas se dessine sans jamais être vu.
+fn sys_menu_equipement(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    page: Res<MenuPage>,
+    cfg: Res<EquipmentConfig>,
+    mut save: ResMut<EquipmentSave>,
+    mods: Res<EquipmentMods>,
+    mut shown: ResMut<EquipmentPanelShown>,
+    rtt: Option<Res<weapon_preview::CharacterPreviewRtt>>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
+        return;
+    }
+    if cfg.slots.is_empty() {
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    // Marqué seulement une fois le panneau RÉELLEMENT dessiné et visible : c'est
+    // ce que le capteur `forgia2_equipment.json` rapporte, il ne doit pas dire
+    // « affiché » pour un panneau caché sous un overlay.
+    shown.0 = true;
+    // Le hero « TON FORGERON » est ancré centre +100 sur 460 de large : la bande
+    // droite de l'écran est libre.
+    let character = rtt.as_ref().map(|r| r.tex_id);
+    egui::Area::new(egui::Id::new("menu_hub_equipement"))
+        .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(-40.0, 0.0))
+        .show(ctx, |ui| {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(22, 18))
+                .show(ui, |ui| {
+                    ui.set_max_width(300.0);
+                    // L'aperçu d'abord : on regarde son personnage AVANT de lire
+                    // des chiffres. C'est lui qui rend une pièce désirable.
+                    if let Some(tex) = character {
+                        ui.vertical_centered(|ui| {
+                            ui.add(egui::Image::new(egui::load::SizedTexture::new(
+                                tex,
+                                egui::vec2(260.0, 260.0),
+                            )));
+                        });
+                        ui.add_space(8.0);
+                    }
+                    draw_equipment_content(ui, &cfg, &mut save, &mods);
                 });
         });
 }

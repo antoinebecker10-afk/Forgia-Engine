@@ -81,6 +81,36 @@ impl MetaUpgrade {
     pub fn max_rank(&self) -> u32 {
         self.costs.len() as u32
     }
+
+    /// Gain effectif au rang `rank` — **rendements décroissants avec plancher**
+    /// (story-680, cran 3, modèle Pom of Power d'Hades).
+    ///
+    /// Avant : `amount × rank`, cinq fois le même gain. Les coûts croissaient
+    /// (`25 / 50 / 85 / 130 / 190`) mais pas le gain — le rang 5 coûtait 7,6×
+    /// le rang 1 pour la même chose. Aucun arbitrage possible : soit on montait
+    /// tout, soit rien.
+    ///
+    /// Maintenant chaque rang supplémentaire rapporte moins, **sans jamais
+    /// tomber à zéro** (Hades : « la chute a un plancher »). Résultat : le
+    /// choix devient « j'approfondis cette ligne, ou j'en ouvre une autre ? ».
+    pub fn total_amount(&self, amount: f32, rank: u32) -> f32 {
+        (1..=rank)
+            .map(|r| amount * Self::rank_falloff(r))
+            .sum::<f32>()
+    }
+
+    /// Facteur du `r`-ième rang. 1,00 · 0,75 · 0,58 · 0,47 · 0,40 → plancher.
+    ///
+    /// Le premier rang vaut plein pot ; le cinquième vaut encore 40 %, jamais
+    /// moins. Un plancher trop bas ferait des rangs décoratifs, et un rang
+    /// décoratif qu'on fait payer est pire qu'un rang absent.
+    fn rank_falloff(r: u32) -> f32 {
+        const FLOOR: f32 = 0.40;
+        if r <= 1 {
+            return 1.0;
+        }
+        (1.0 / (r as f32).sqrt()).max(FLOOR)
+    }
     /// Coût pour passer de `rank` à `rank+1` (None = déjà au max).
     pub fn cost_for_next(&self, rank: u32) -> Option<u32> {
         self.costs.get(rank as usize).copied()
@@ -567,11 +597,43 @@ impl MetaShopSave {
     }
 
     // ── Bonus cumulés (lus au run-start) ──
+    //
+    // Story-680 cran 3 — les rangs passent par `total_amount`, qui applique des
+    // rendements DÉCROISSANTS avec plancher. Avant c'était `amount × rank` :
+    // cinq fois le même gain pour des coûts qui, eux, croissaient de 7,6×.
+
+    /// Story-680 cran 1 — **le niveau du joueur EST la somme de ses rangs.**
+    ///
+    /// Modèle Gunfire Reborn : « le système de niveau tourne autour de la
+    /// dépense d'une monnaie en talents plutôt que de la collecte d'expérience ;
+    /// un talent 2/5 donne 2 niveaux ». Le niveau ne peut donc plus être creux —
+    /// il EST la somme des choix faits, par construction.
+    ///
+    /// Avant : un niveau gagné avec `40 + secondes de run`, des points de talent
+    /// qui s'accumulaient et que RIEN ne dépensait, et un écran qui promettait
+    /// des arbres inexistants.
+    pub fn player_level(&self, cat: &MetaShopCatalogue) -> u32 {
+        let ranks: u32 = cat.upgrades.iter().map(|u| self.rank(&u.id)).sum();
+        let unlocks = self.unlocked_weapons.len().saturating_sub(1) as u32
+            + self.unlocked_boon_tiers.len() as u32;
+        // Niveau 1 au départ : personne ne commence « niveau 0 ».
+        1 + ranks + unlocks
+    }
+
+    /// Rangs restants à acheter — « il te reste N choses à débloquer », qui est
+    /// une information utile, contrairement à « N points en attente » quand rien
+    /// ne les dépense.
+    pub fn ranks_remaining(&self, cat: &MetaShopCatalogue) -> u32 {
+        cat.upgrades
+            .iter()
+            .map(|u| u.max_rank().saturating_sub(self.rank(&u.id)))
+            .sum()
+    }
     pub fn max_hp_bonus(&self, cat: &MetaShopCatalogue) -> f32 {
         cat.upgrades
             .iter()
             .filter_map(|u| match u.effect {
-                MetaEffect::MaxHp(a) => Some(a * self.rank(&u.id) as f32),
+                MetaEffect::MaxHp(a) => Some(u.total_amount(a, self.rank(&u.id))),
                 _ => None,
             })
             .sum()
@@ -581,7 +643,7 @@ impl MetaShopSave {
             .upgrades
             .iter()
             .filter_map(|u| match u.effect {
-                MetaEffect::DamageMul(a) => Some(a * self.rank(&u.id) as f32),
+                MetaEffect::DamageMul(a) => Some(u.total_amount(a, self.rank(&u.id))),
                 _ => None,
             })
             .sum::<f32>()
@@ -590,7 +652,7 @@ impl MetaShopSave {
         cat.upgrades
             .iter()
             .filter_map(|u| match u.effect {
-                MetaEffect::DamageReduction(a) => Some(a * self.rank(&u.id) as f32),
+                MetaEffect::DamageReduction(a) => Some(u.total_amount(a, self.rank(&u.id))),
                 _ => None,
             })
             .sum::<f32>()
@@ -600,7 +662,7 @@ impl MetaShopSave {
         cat.upgrades
             .iter()
             .filter_map(|u| match u.effect {
-                MetaEffect::StartGold(a) => Some(a * self.rank(&u.id)),
+                MetaEffect::StartGold(a) => Some(u.total_amount(a as f32, self.rank(&u.id)) as u32),
                 _ => None,
             })
             .sum()
@@ -1331,18 +1393,68 @@ cost = 7
         assert_eq!(s.best_victory_secs, 600.0);
     }
 
+    /// Story-680 cran 3 — les bonus ne sont plus LINÉAIRES (`amount × rank`),
+    /// ils ont des rendements DÉCROISSANTS. Ce test encodait l'ancien
+    /// comportement ; il vérifie maintenant le nouveau contrat.
     #[test]
-    fn cumulative_bonuses_scale_with_rank() {
+    fn cumulative_bonuses_grow_with_rank_but_with_diminishing_returns() {
         let cat = MetaShopCatalogue::default();
         let mut save = MetaShopSave::default();
         save.ranks.insert("max_hp".into(), 3);
-        save.ranks.insert("damage".into(), 2);
         save.ranks.insert("armor".into(), 1);
-        save.ranks.insert("gold".into(), 2);
-        assert_eq!(save.max_hp_bonus(&cat), 45.0); // 15 × 3
-        assert!((save.damage_mul(&cat) - 1.16).abs() < 1e-5); // 1 + 0.08×2
-        assert!((save.damage_reduction(&cat) - 0.05).abs() < 1e-5); // 0.05×1
-        assert_eq!(save.start_gold(&cat), 100); // 50 × 2
+        // Le rang 1 vaut plein pot : c'est le plancher du contrat.
+        assert!((save.damage_reduction(&cat) - 0.05).abs() < 1e-5);
+        // 3 rangs de PV valent PLUS qu'1 seul, mais MOINS que 3 fois 1.
+        let three = save.max_hp_bonus(&cat);
+        save.ranks.insert("max_hp".into(), 1);
+        let one = save.max_hp_bonus(&cat);
+        assert!(three > one, "monter doit rapporter : {one} → {three}");
+        assert!(
+            three < one * 3.0,
+            "le linéaire est de retour ({three} vs {} attendu strictement moins)",
+            one * 3.0
+        );
+    }
+
+    /// Le gain MARGINAL décroît à chaque rang — mais ne tombe jamais à zéro.
+    /// Un rang décoratif qu'on fait payer est pire qu'un rang absent (Hades :
+    /// « la chute a un plancher »).
+    #[test]
+    fn the_marginal_gain_shrinks_but_never_vanishes() {
+        let cat = MetaShopCatalogue::default();
+        let up = cat
+            .upgrades
+            .iter()
+            .find(|u| u.id == "max_hp")
+            .expect("max_hp existe");
+        let mut prev_marginal = f32::INFINITY;
+        for rank in 1..=up.max_rank() {
+            let marginal = up.total_amount(15.0, rank) - up.total_amount(15.0, rank - 1);
+            assert!(marginal > 0.0, "rang {rank} ne rapporte RIEN — rang décoratif");
+            assert!(
+                marginal <= prev_marginal + 1e-4,
+                "rang {rank} rapporte PLUS que le précédent ({marginal} > {prev_marginal})"
+            );
+            prev_marginal = marginal;
+        }
+        // Plancher : le dernier rang vaut encore au moins 40 % du premier.
+        let first = up.total_amount(15.0, 1);
+        let last = up.total_amount(15.0, up.max_rank()) - up.total_amount(15.0, up.max_rank() - 1);
+        assert!(last >= first * 0.39, "plancher percé : {last} vs {}", first * 0.4);
+    }
+
+    /// Le coût croît fortement (25 → 190, ×7,6) alors que le gain décroît :
+    /// c'est CE rapport qui crée l'arbitrage « j'approfondis ou j'ouvre ailleurs ».
+    #[test]
+    fn deep_ranks_cost_more_and_give_less_which_is_the_whole_point() {
+        let cat = MetaShopCatalogue::default();
+        let up = cat.upgrades.iter().find(|u| u.id == "damage").unwrap();
+        let cost_1 = up.cost_for_next(0).unwrap();
+        let cost_last = up.cost_for_next(up.max_rank() - 1).unwrap();
+        let gain_1 = up.total_amount(0.08, 1);
+        let gain_last = up.total_amount(0.08, up.max_rank()) - up.total_amount(0.08, up.max_rank() - 1);
+        assert!(cost_last > cost_1 * 3, "les coûts doivent vraiment monter");
+        assert!(gain_last < gain_1, "les gains doivent vraiment descendre");
     }
 
     #[test]

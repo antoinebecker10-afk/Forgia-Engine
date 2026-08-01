@@ -1,132 +1,103 @@
-//! progress.rs — Progression JOUEUR (niveau + XP), P4 (design home-hub 2026-06-26).
+//! progress.rs — le NIVEAU du joueur, dérivé de ses choix (story-680, cran 1).
 //!
-//! XP de **participation** gagnée à CHAQUE fin de run, même en défaite (« toute run
-//! paie ») : base fixe + temps de survie. Distincte des Âmes (méta-monnaie de
-//! l'Enclume). Chaque montée de niveau octroie un **point de talent** (dépensé en P5).
+//! ## Ce qui était cassé
 //!
-//! Auto-contenu : save séparée `player_progress_save.toml` (pattern `identity.rs` /
-//! `meta_shop.rs`), courbe simple croissante, persistée à chaque fin de run.
+//! Ce module tenait un niveau, de l'XP et des points de talent. Aucun des trois
+//! ne servait :
+//!
+//! - l'XP valait `40 + durée de la run en secondes` — **aucun terme de
+//!   performance**. Mourir au round 1 ou nettoyer 10 rounds ne changeait que le
+//!   chrono, et la Défaite payait exactement comme la Victoire ;
+//! - pire, ça récompensait la **lenteur**, en contradiction directe avec la
+//!   boucle de rounds (story-677) qui demande de nettoyer dans un budget ;
+//! - les points de talent s'accumulaient et **rien ne les dépensait** — leur
+//!   unique consommateur du workspace les *affichait* ;
+//! - et l'écran promettait « Choisis ton style — Feu · Givre · Éclair · Poison »
+//!   alors qu'il n'existait ni arbre, ni style, ni combo.
+//!
+//! Un système vide serait neutre. Un système qui **annonce** ce qu'il ne fait
+//! pas est une déception programmée.
+//!
+//! ## Le modèle retenu : Gunfire Reborn
+//!
+//! *« Le système de niveau tourne autour de la dépense d'une monnaie en talents
+//! plutôt que de la collecte d'expérience ; un talent 2/5 donne 2 niveaux. »*
+//!
+//! Le niveau **est** la somme des rangs achetés à l'Enclume. Il ne peut donc
+//! plus être creux, par construction : chaque niveau correspond à une décision
+//! prise et à un effet réel en jeu. Il n'y a plus d'XP, plus de courbe, plus de
+//! fichier de sauvegarde à part — la méta-boutique persiste déjà tout.
 
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
-use crate::run::{RunState, RunTimer};
+use crate::meta_shop::{MetaShopCatalogue, MetaShopSave};
 
-const SAVE_FILE: &str = "player_progress_save.toml";
-const SAVE_VERSION: u32 = 1;
-
-/// XP de base versée à chaque run terminée (participation — « toute run paie »).
-/// Balance — à externaliser en genome plus tard (cf `run::SOULS_PER_BOSS`).
-const RUN_BASE_XP: u32 = 40;
-
-/// Progression persistée du joueur : niveau + XP vers le niveau suivant + points de
-/// talent non dépensés (P5). Distincte de `MetaSouls` (méta-monnaie).
-#[derive(Resource, Serialize, Deserialize, Clone, Debug)]
+/// Niveau du joueur — **dérivé**, jamais accumulé.
+///
+/// Ressource de lecture pour l'UI : elle évite que chaque écran recalcule la
+/// somme des rangs de son côté (et finisse par en donner une version différente,
+/// comme le « SALLE 5 / 4 » de story-678).
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct PlayerProgress {
-    pub version: u32,
+    /// Niveau = 1 + rangs achetés + déblocages. Toujours ≥ 1.
     pub level: u32,
-    /// XP accumulée VERS le niveau suivant (pas un total cumulé).
-    pub xp: u32,
-    /// Points de talent non dépensés (1 par niveau ; dépensés en P5).
-    pub talent_points: u32,
+    /// Rangs encore achetables. « Il te reste N choses à débloquer » est une
+    /// information utile, contrairement à « N points en attente » quand rien ne
+    /// les dépense.
+    pub ranks_remaining: u32,
 }
 
-impl Default for PlayerProgress {
-    fn default() -> Self {
+impl PlayerProgress {
+    /// Recalcule depuis la source de vérité. PUR — testable.
+    pub fn derive(save: &MetaShopSave, cat: &MetaShopCatalogue) -> Self {
         Self {
-            version: SAVE_VERSION,
-            level: 1,
-            xp: 0,
-            talent_points: 0,
+            level: save.player_level(cat),
+            ranks_remaining: save.ranks_remaining(cat),
         }
     }
-}
 
-impl PlayerProgress {
-    /// XP requise pour passer du niveau `level` au suivant (courbe douce croissante).
-    pub fn xp_to_next(level: u32) -> u32 {
-        80 + level.saturating_sub(1) * 40
-    }
-
-    /// Ajoute de l'XP et gère les montées de niveau (+1 point de talent par niveau).
-    /// Retourne le nombre de niveaux gagnés (pour le feedback / juice futur).
-    pub fn add_xp(&mut self, amount: u32) -> u32 {
-        self.xp = self.xp.saturating_add(amount);
-        let mut gained = 0;
-        while self.xp >= Self::xp_to_next(self.level) {
-            self.xp -= Self::xp_to_next(self.level);
-            self.level = self.level.saturating_add(1);
-            self.talent_points = self.talent_points.saturating_add(1);
-            gained += 1;
+    /// Fraction \[0,1\] de la progression méta totale — remplace l'ex-barre d'XP.
+    ///
+    /// Elle mesure quelque chose de VRAI : la part de l'Enclume déjà achetée.
+    /// L'ancienne barre mesurait le temps passé en jeu.
+    pub fn completion(&self) -> f32 {
+        let bought = self.level.saturating_sub(1);
+        let total = bought + self.ranks_remaining;
+        if total == 0 {
+            return 1.0;
         }
-        gained
-    }
-
-    /// Fraction [0,1] de la barre d'XP vers le niveau suivant.
-    pub fn xp_fraction(&self) -> f32 {
-        let need = Self::xp_to_next(self.level).max(1);
-        (self.xp as f32 / need as f32).clamp(0.0, 1.0)
+        (bought as f32 / total as f32).clamp(0.0, 1.0)
     }
 }
 
-// ── Persistence (pattern identity/meta_shop) ─────────────────────────────────
-
-impl PlayerProgress {
-    fn save_path() -> PathBuf {
-        crate::persist::save_dir().join(SAVE_FILE)
+/// Synchronise le niveau quand la sauvegarde méta change. Pas de système par
+/// frame : `Changed` suffit, et c'est le seul moment où le niveau peut bouger.
+fn sys_sync_progress(
+    save: Res<MetaShopSave>,
+    cat: Res<MetaShopCatalogue>,
+    mut progress: ResMut<PlayerProgress>,
+) {
+    if !save.is_changed() && !cat.is_changed() && progress.level != 0 {
+        return;
     }
-
-    fn load_or_default() -> Self {
-        crate::persist::load_toml_migrating(SAVE_FILE)
-    }
-
-    fn save(&self) {
-        crate::persist::save_toml_atomic(&Self::save_path(), self, "player-progress");
+    let next = PlayerProgress::derive(&save, &cat);
+    if next != *progress {
+        info!(
+            "[progress] niveau {} ({} rang(s) restant(s), {:.0} % de l'Enclume)",
+            next.level,
+            next.ranks_remaining,
+            next.completion() * 100.0
+        );
+        *progress = next;
     }
 }
-
-// ── Systèmes ─────────────────────────────────────────────────────────────────
-
-/// Startup — charge la progression disque (1×).
-fn sys_load_progress(mut commands: Commands) {
-    let progress = PlayerProgress::load_or_default();
-    info!(
-        "[progress] chargé — niveau {} ({} XP, {} pts talent)",
-        progress.level, progress.xp, progress.talent_points
-    );
-    commands.insert_resource(progress);
-}
-
-/// Fin de run (Defeat/Victory) → XP de participation (base + temps de survie),
-/// même en défaite. Persiste. RunTimer.secs = durée de la run (reset au start).
-fn sys_award_run_xp(mut progress: ResMut<PlayerProgress>, timer: Option<Res<RunTimer>>) {
-    let secs = timer.as_ref().map(|t| t.secs.max(0.0) as u32).unwrap_or(0);
-    let xp = RUN_BASE_XP + secs;
-    let gained = progress.add_xp(xp);
-    progress.save();
-    info!(
-        "[progress] +{xp} XP (run {secs}s) → niveau {} ({} pts talent){}",
-        progress.level,
-        progress.talent_points,
-        if gained > 0 {
-            format!(" — +{gained} niveau(x) !")
-        } else {
-            String::new()
-        }
-    );
-}
-
-// ── Plugin ────────────────────────────────────────────────────────────────────
 
 pub struct PlayerProgressPlugin;
 
 impl Plugin for PlayerProgressPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, sys_load_progress)
-            // XP versée à chaque fin de run (les deux issues — « toute run paie »).
-            .add_systems(OnEnter(RunState::Defeat), sys_award_run_xp)
-            .add_systems(OnEnter(RunState::Victory), sys_award_run_xp);
+        app.init_resource::<PlayerProgress>()
+            .add_systems(Update, sys_sync_progress);
     }
 }
 
@@ -134,44 +105,55 @@ impl Plugin for PlayerProgressPlugin {
 mod tests {
     use super::*;
 
-    #[test]
-    fn default_starts_level_1() {
-        let p = PlayerProgress::default();
-        assert_eq!(p.level, 1);
-        assert_eq!(p.xp, 0);
-        assert_eq!(p.talent_points, 0);
+    fn cat() -> MetaShopCatalogue {
+        MetaShopCatalogue::default()
     }
 
     #[test]
-    fn add_xp_levels_up_and_grants_talent_points() {
-        let mut p = PlayerProgress::default();
-        // Niveau 1→2 requiert 80 XP.
-        let gained = p.add_xp(80);
-        assert_eq!(gained, 1);
-        assert_eq!(p.level, 2);
-        assert_eq!(p.xp, 0);
-        assert_eq!(p.talent_points, 1);
+    fn a_fresh_player_is_level_one_not_zero() {
+        let p = PlayerProgress::derive(&MetaShopSave::default(), &cat());
+        assert_eq!(p.level, 1, "personne ne commence « niveau 0 »");
+        assert!(p.ranks_remaining > 0, "il doit rester des choses à acheter");
+        assert_eq!(p.completion(), 0.0);
     }
 
+    /// LE point du cran 1 : le niveau est la somme des choix, pas du temps passé.
     #[test]
-    fn add_xp_handles_multiple_levels() {
-        let mut p = PlayerProgress::default();
-        // 80 (→2) + 120 (→3) = 200 XP d'un coup → 2 niveaux.
-        let gained = p.add_xp(200);
-        assert_eq!(gained, 2);
-        assert_eq!(p.level, 3);
-        assert_eq!(p.talent_points, 2);
+    fn the_level_is_exactly_the_number_of_ranks_bought() {
+        let c = cat();
+        let mut save = MetaShopSave::default();
+        let base = PlayerProgress::derive(&save, &c).level;
+        save.ranks.insert("max_hp".into(), 3);
+        save.ranks.insert("damage".into(), 2);
+        let p = PlayerProgress::derive(&save, &c);
+        assert_eq!(p.level, base + 5, "3 + 2 rangs = 5 niveaux");
     }
 
+    /// Un niveau ne s'obtient plus en laissant tourner le jeu : sans achat, il
+    /// ne bouge pas, quelle que soit la durée de jeu.
     #[test]
-    fn xp_fraction_in_range() {
-        let mut p = PlayerProgress::default();
-        p.xp = 40; // 40/80 = 0.5
-        assert!((p.xp_fraction() - 0.5).abs() < 1e-3);
+    fn time_played_grants_nothing_anymore() {
+        let c = cat();
+        let mut save = MetaShopSave::default();
+        save.runs_played = 500;
+        save.souls_total = 99_999;
+        assert_eq!(
+            PlayerProgress::derive(&save, &c).level,
+            PlayerProgress::derive(&MetaShopSave::default(), &c).level,
+            "500 runs sans rien acheter = même niveau"
+        );
     }
 
+    /// La barre mesure la part de l'Enclume achetée — quelque chose de vrai.
     #[test]
-    fn xp_curve_increases_with_level() {
-        assert!(PlayerProgress::xp_to_next(2) > PlayerProgress::xp_to_next(1));
+    fn completion_reaches_one_only_when_everything_is_bought() {
+        let c = cat();
+        let mut save = MetaShopSave::default();
+        for u in &c.upgrades {
+            save.ranks.insert(u.id.clone(), u.max_rank());
+        }
+        let p = PlayerProgress::derive(&save, &c);
+        assert_eq!(p.ranks_remaining, 0);
+        assert!((p.completion() - 1.0).abs() < 1e-5);
     }
 }

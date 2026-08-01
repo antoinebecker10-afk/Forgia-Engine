@@ -185,17 +185,14 @@ fn draw_hub_chrome(
         .show(ctx, |ui| {
             chip_frame().show(ui, |ui| {
                 ui.vertical(|ui| {
-                    let (level, xp, xp_next, frac) = progress
+                    // Story-680 cran 1 — la barre ne mesure plus le TEMPS PASSÉ
+                    // (l'XP valait « 40 + secondes de run ») mais la part de
+                    // l'Enclume réellement achetée. Le niveau est la somme des
+                    // rangs, donc chaque cran correspond à une décision prise.
+                    let (level, remaining, frac) = progress
                         .as_ref()
-                        .map(|p| {
-                            (
-                                p.level,
-                                p.xp,
-                                PlayerProgress::xp_to_next(p.level),
-                                p.xp_fraction(),
-                            )
-                        })
-                        .unwrap_or((1, 0, 80, 0.0));
+                        .map(|p| (p.level, p.ranks_remaining, p.completion()))
+                        .unwrap_or((1, 0, 0.0));
                     ui.horizontal(|ui| {
                         ui.label(
                             egui::RichText::new(name)
@@ -213,9 +210,13 @@ fn draw_hub_chrome(
                     ui.add_sized(
                         egui::vec2(180.0, 10.0),
                         egui::ProgressBar::new(frac).fill(FORGE_OR).text(
-                            egui::RichText::new(format!("{xp} / {xp_next} XP"))
-                                .size(10.0)
-                                .color(FORGE_CREME),
+                            egui::RichText::new(if remaining == 0 {
+                                "ENCLUME COMPLÈTE".to_string()
+                            } else {
+                                format!("{remaining} à débloquer")
+                            })
+                            .size(10.0)
+                            .color(FORGE_CREME),
                         ),
                     );
                 });
