@@ -223,7 +223,14 @@ fn track_stage_biome(
     if !stage.is_changed() {
         return;
     }
-    let biome_id = stage.biome.to_ascii_lowercase();
+    // Story-676 — l'UNIVERS du round choisit le ciel quand il en déclare un ;
+    // sinon on retombe sur le biome du stage, comme avant. C'est ce qui permet
+    // au ciel de servir d'horloge de run au lieu de décrire un terrain.
+    let biome_id = if stage.sky_key.is_empty() {
+        stage.biome.to_ascii_lowercase()
+    } else {
+        stage.sky_key.to_ascii_lowercase()
+    };
     if biome_id.is_empty() || biome_id == *last_biome {
         return;
     }

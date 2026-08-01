@@ -36,15 +36,51 @@ pub mod graph;
 pub mod layout;
 pub mod layout_sensor;
 
-/// Paths des 3 GLB du sol fusionné de l'arène — **source unique** (consommée par
-/// le chargement du sol ET par le warmup de pipelines au Lobby, story-664 : le
-/// matériau du sol doit compiler avant le combat, pas au 1er affichage en jeu).
+/// Sol de REPLI de l'arène — celui d'avant story-676, quand c'était le seul.
+///
+/// Depuis story-676 le sol vient de l'ambiance du round
+/// (`StageLoadRequest.floor`) ; cette table reste le repli quand la requête n'en
+/// porte pas, et la garantie qu'une arène a toujours un plancher.
 /// Sans `#SceneN` : chaque consommateur ajoute le label de scène voulu.
 pub const MERGED_FLOOR_GLB: [&str; 3] = [
     "models/kaykit/dungeon/floor.glb",
     "models/kaykit/dungeon/floor_dirt.glb",
     "models/kaykit/dungeon/floor_rocks.glb",
 ];
+
+/// Côté (m) d'une tuile de sol de repli. Le pas RÉEL vient de `FloorTiles`.
+pub const FALLBACK_FLOOR_TILE_SIZE: f32 = 4.0;
+
+/// La palette de sol d'une arène, passée par l'appelant.
+///
+/// `forgia-stage` reste générique : il ne connaît ni les univers du roguelite ni
+/// leur génome. Il reçoit trois chemins et un pas de trame, et pave.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FloorTiles {
+    /// Côté RÉEL de la tuile (m) — l'arène pave à ce pas.
+    pub tile_size_m: f32,
+    /// Exactement 3 : le mélangeur produit un `kind` 0/1/2.
+    pub tiles: [String; 3],
+}
+
+impl Default for FloorTiles {
+    fn default() -> Self {
+        Self {
+            tile_size_m: FALLBACK_FLOOR_TILE_SIZE,
+            tiles: MERGED_FLOOR_GLB.map(str::to_owned),
+        }
+    }
+}
+
+/// Chemins de sol SUPPLÉMENTAIRES à précharger au Lobby.
+///
+/// Le warmup de pipelines tourne dans `forgia-stage`, qui ne sait pas quels
+/// univers la run traversera. L'appelant (mode roguelite) remplit cette
+/// ressource au Startup avec toutes les tuiles de toutes ses ambiances — sinon
+/// le matériau du 2ᵉ univers compilerait au 1er affichage, en plein combat
+/// (c'est le défaut que story-664 avait corrigé pour le sol unique).
+#[derive(Resource, Debug, Default, Clone)]
+pub struct ExtraFloorPreloads(pub Vec<String>);
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -228,6 +264,16 @@ pub struct StageLoadRequest {
     pub stage_id: String,
     /// Seed RNG pour placement anchors (host-authoritative reproductible).
     pub seed: u64,
+    /// Story-676 — palette de sol de l'univers du round. `None` = sol de repli
+    /// (celui d'avant, `MERGED_FLOOR_GLB`) : une arène a TOUJOURS un plancher.
+    pub floor: Option<FloorTiles>,
+    /// Story-676 — clé de ciel de l'univers (`biome_sky.toml`). `None` = le ciel
+    /// suit le biome du stage, comme avant.
+    ///
+    /// Champ SÉPARÉ du biome, exprès : le biome reste ce que le stage déclare,
+    /// et le capteur continue de dire la vérité. Le ciel d'une arène n'est pas
+    /// un fait de terrain, c'est un choix d'univers.
+    pub sky: Option<String>,
 }
 
 /// Resource Result (loader update) — état runtime du stage chargé.
@@ -236,6 +282,8 @@ pub struct StageLoadResult {
     pub state: StageState,
     pub stage_id: String,
     pub biome: String,
+    /// Story-676 — clé de palette de ciel effective. Vide = suivre `biome`.
+    pub sky_key: String,
     pub extent_m: f32,
     pub anchors_placed: u32,
     pub props_spawned: u32,
@@ -375,6 +423,7 @@ impl Plugin for ForgiaStageArenaPlugin {
             .init_resource::<StageArenaTuning>()
             .init_resource::<LayoutResult>()
             // Story-663 — cache des fusions statiques (re-entrée = zéro rebuild).
+            .init_resource::<ExtraFloorPreloads>()
             .init_resource::<floor_merge::MergedStaticCache>()
             .add_systems(Startup, load_stage_genomes)
             .add_systems(
@@ -455,6 +504,7 @@ fn sys_preload_stage_scenes(
     layout_assets: Res<Assets<Genome<authored::ArenaLayoutsGenome>>>,
     asset_server: Res<AssetServer>,
     mut preloads: ResMut<StageScenePreloads>,
+    extra_floors: Res<ExtraFloorPreloads>,
 ) {
     if preloads.ready {
         return;
@@ -467,6 +517,9 @@ fn sys_preload_stage_scenes(
     };
     let mut paths = BTreeSet::new();
     paths.extend(MERGED_FLOOR_GLB.map(str::to_owned));
+    // Tous les sols des univers déclarés par l'appelant : le matériau doit
+    // compiler au Lobby, pas au 1er affichage du 2ᵉ univers (story-676).
+    paths.extend(extra_floors.0.iter().cloned());
     for stage in stages.data.stages.values() {
         paths.insert(ramparts_wall_glb(&stage.ramparts_kit).to_owned());
     }
@@ -977,9 +1030,14 @@ fn spawn_stage_arena_on_request(
     //    1 collider global inchangé.
     // Source unique des paths (consommée aussi par le warmup de pipelines au
     // Lobby, story-664 — les matériaux du sol doivent compiler avant le combat).
-    let scenes: [Handle<Scene>; 3] =
-        MERGED_FLOOR_GLB.map(|p| asset_server.load(format!("{p}#Scene0")));
-    let tiles = floor_merge::plan_floor_tiles(extent, FLOOR_TILE_SIZE);
+    // Story-676 — le sol vient de l'univers du round. Repli explicite sur la
+    // table historique : jamais d'arène sans plancher.
+    let floor = req.floor.clone().unwrap_or_default();
+    let scenes: [Handle<Scene>; 3] = floor
+        .tiles
+        .clone()
+        .map(|p| asset_server.load(format!("{p}#Scene0")));
+    let tiles = floor_merge::plan_floor_tiles(extent, floor.tile_size_m);
     let floor_tiles_planned = tiles.len();
     let floor_instances: Vec<(u8, Transform)> = tiles
         .into_iter()
@@ -1378,6 +1436,7 @@ fn spawn_stage_arena_on_request(
     result.state = StageState::Ready;
     result.stage_id = req.stage_id.clone();
     result.biome = stage_def.biome.clone();
+    result.sky_key = req.sky.clone().unwrap_or_default();
     result.extent_m = extent;
     result.anchors_placed = anchor_stats.total();
     result.props_spawned = props_spawned;

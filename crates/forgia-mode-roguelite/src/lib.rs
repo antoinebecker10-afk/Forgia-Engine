@@ -22,6 +22,7 @@ use bevy::prelude::*;
 use forgia_core::prelude::*;
 
 /// Story-673 — les MESURES d'assets (asset_registry.toml), lues au lieu d'être devinées.
+pub mod ambiances;
 pub mod asset_metrics;
 pub mod atmosphere;
 pub mod audio;
@@ -39,6 +40,7 @@ pub mod enemies;
 pub mod enemy_anim;
 pub mod enemy_rig_debug;
 pub mod enemy_scaling;
+pub mod equipment;
 pub mod forge_shop;
 pub mod ftue;
 pub mod head_hitbox;
@@ -111,6 +113,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-623 Phase E (MVP) — identité joueur : nom + couleur (module isolé,
         // save séparée identity_save.toml, panneau Lobby non-bloquant).
         app.add_plugins(identity::IdentityPlugin);
+        // Équipement : pièces d'armure lootées (rareté = couleur = bonus), portées
+        // depuis l'onglet FORGE. Alimente `EquipmentMods`, composé dans
+        // `PlayerCombatMods` par `boons_apply::sys_recompute_boon_mods`.
+        app.add_plugins(equipment::EquipmentPlugin);
         // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
         // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
         app.init_resource::<load_timing::LoadTimingState>();
@@ -347,6 +353,18 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-673 — mesures d'assets : le décor en dérive ses emprises réelles.
         app.add_systems(Startup, asset_metrics::sys_init_asset_registry);
         app.add_systems(Startup, decor_palettes::sys_init_decor_palettes);
+        // Story-676 — les UNIVERS d'arène (sol + ciel + brouillard + ambiante).
+        // Le sol était une const Rust, le brouillard était volcanique partout.
+        app.add_systems(
+            Startup,
+            (ambiances::sys_init_ambiances, sys_declare_floor_preloads).chain(),
+        );
+        app.add_systems(
+            Update,
+            ambiances::sys_hot_reload_ambiances
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         app.add_systems(
             Update,
             decor_palettes::sys_hot_reload_decor_palettes
@@ -798,4 +816,21 @@ mod tests {
     fn plugin_constructible() {
         let _p = ForgiaModeRoguelitePlugin;
     }
+}
+
+/// Story-676 — déclare à `forgia-stage` TOUTES les tuiles de sol des univers.
+///
+/// Le warmup de pipelines tourne au Lobby, dans une crate qui ne connaît pas nos
+/// ambiances. Sans cette déclaration, le matériau du 2ᵉ univers compilerait au
+/// premier affichage — en plein combat. C'est exactement le défaut que story-664
+/// avait corrigé quand il n'y avait qu'un seul sol.
+fn sys_declare_floor_preloads(
+    cfg: Res<ambiances::AmbiancesConfig>,
+    mut extra: ResMut<forgia_stage::ExtraFloorPreloads>,
+) {
+    extra.0 = cfg.all_floor_paths();
+    info!(
+        "[ambiances] {} tuiles de sol déclarées au préchargement",
+        extra.0.len()
+    );
 }

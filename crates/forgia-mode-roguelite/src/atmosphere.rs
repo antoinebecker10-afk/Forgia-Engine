@@ -11,36 +11,41 @@
 //! `#[require(Camera)]` (override de `GlobalAmbientLight`), champs `color,
 //! brightness, affects_lightmapped_meshes`.
 
+use crate::ambiances::{Ambiance, AmbiancesConfig, CurrentAmbiance};
 use crate::render_quality::RogueliteRenderConfig;
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 use forgia_player::FpsCamera;
 
-// ── Réglages (tunables — me demander pour ajuster ; genome possible plus tard) ──
-/// Couleur de la brume = ce vers quoi le lointain se fond (fumée volcanique).
-const FOG_COLOR: (f32, f32, f32) = (0.30, 0.10, 0.07);
-/// Densité exponentielle : ~1/density ≈ distance de demi-brume. 0.008 → ~125 m :
-/// le cratère/pics (110-205 m) se voilent, la ville (52-76 m) est légèrement
-/// brumeuse, l'aire de combat (0-50 m) reste lisible.
-const FOG_DENSITY: f32 = 0.008;
-/// Halo chaud de la lumière directionnelle perçue à travers la brume.
-const FOG_SUN_COLOR: (f32, f32, f32) = (1.0, 0.55, 0.25);
-/// Lumière ambiante chaude volcanique (teinte tout en orange sombre).
-const AMBIENT_COLOR: (f32, f32, f32) = (1.0, 0.45, 0.22);
-const AMBIENT_BRIGHTNESS: f32 = 300.0;
+// Story-676 — les COULEURS viennent de l'ambiance du round
+// (`roguelite_ambiances.toml`). Avant, elles étaient des consts volcaniques
+// appliquées aux 4 arènes, Hauts Pâturages compris.
+//
+// `roguelite_render.toml` garde la main sur la DENSITÉ et la LUMINOSITÉ : ce
+// sont des réglages de confort/perf transverses, pas d'identité d'univers. Quand
+// il les fournit, ils écrasent ceux de l'ambiance — un joueur qui baisse la brume
+// la baisse partout.
 
-fn volcanic_fog(density: f32) -> DistanceFog {
+/// Halo de la lumière directionnelle perçue à travers la brume. Exposant fixe :
+/// c'est la forme du halo, pas sa couleur — l'identité est portée par les RGB.
+const FOG_SUN_EXPONENT: f32 = 30.0;
+
+fn ambiance_fog(a: &Ambiance, density: f32) -> DistanceFog {
     DistanceFog {
-        color: Color::srgb(FOG_COLOR.0, FOG_COLOR.1, FOG_COLOR.2),
-        directional_light_color: Color::srgb(FOG_SUN_COLOR.0, FOG_SUN_COLOR.1, FOG_SUN_COLOR.2),
-        directional_light_exponent: 30.0,
+        color: Color::srgb(a.fog_rgb[0], a.fog_rgb[1], a.fog_rgb[2]),
+        directional_light_color: Color::srgb(
+            a.fog_sun_rgb[0],
+            a.fog_sun_rgb[1],
+            a.fog_sun_rgb[2],
+        ),
+        directional_light_exponent: FOG_SUN_EXPONENT,
         falloff: FogFalloff::Exponential { density },
     }
 }
 
-fn volcanic_ambient(brightness: f32) -> AmbientLight {
+fn ambiance_ambient(a: &Ambiance, brightness: f32) -> AmbientLight {
     AmbientLight {
-        color: Color::srgb(AMBIENT_COLOR.0, AMBIENT_COLOR.1, AMBIENT_COLOR.2),
+        color: Color::srgb(a.ambient_rgb[0], a.ambient_rgb[1], a.ambient_rgb[2]),
         brightness,
         ..default()
     }
@@ -65,16 +70,27 @@ impl Plugin for RogueliteAtmospherePlugin {
 fn sys_ensure_atmosphere(
     mut commands: Commands,
     cfg: Option<Res<RogueliteRenderConfig>>,
+    amb_cfg: Option<Res<AmbiancesConfig>>,
+    current: Option<Res<CurrentAmbiance>>,
     q_cam: Query<Entity, With<FpsCamera>>,
     q_has_fog: Query<(), (With<FpsCamera>, With<DistanceFog>)>,
 ) {
-    // Atmosphère pilotée par roguelite_render.toml (story-625 Tier 4). Fallback
-    // sur les consts si la config n'est pas encore insérée (ordre Startup).
+    // L'univers du round donne les COULEURS ; `roguelite_render.toml` garde la
+    // densité et la luminosité. Génome absent → forge historique, comme avant.
+    let fallback = Ambiance::forge_ardente();
+    let ambiance: &Ambiance = match (amb_cfg.as_deref(), current.as_deref()) {
+        (Some(cfg), Some(cur)) => cfg.ambiance(&cur.id),
+        _ => &fallback,
+    };
     let (fog_enabled, density, brightness) = match cfg.as_deref() {
         Some(c) => (c.fog_enabled, c.fog_density, c.ambient_brightness),
-        None => (true, FOG_DENSITY, AMBIENT_BRIGHTNESS),
+        None => (true, ambiance.fog_density, ambiance.ambient_brightness),
     };
-    let cfg_changed = cfg.as_ref().map(|c| c.is_changed()).unwrap_or(false);
+    // Ré-appliquer aussi quand l'UNIVERS change : sinon le round 2 garderait la
+    // brume du round 1 (l'insertion n'a lieu que si le composant est absent).
+    let cfg_changed = cfg.as_ref().map(|c| c.is_changed()).unwrap_or(false)
+        || current.as_ref().map(|c| c.is_changed()).unwrap_or(false)
+        || amb_cfg.as_ref().map(|c| c.is_changed()).unwrap_or(false);
     for cam in &q_cam {
         if !fog_enabled {
             commands
@@ -87,7 +103,10 @@ fn sys_ensure_atmosphere(
         if cfg_changed || q_has_fog.get(cam).is_err() {
             commands
                 .entity(cam)
-                .insert((volcanic_fog(density), volcanic_ambient(brightness)));
+                .insert((
+                    ambiance_fog(ambiance, density),
+                    ambiance_ambient(ambiance, brightness),
+                ));
         }
     }
 }

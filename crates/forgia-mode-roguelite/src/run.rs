@@ -182,6 +182,9 @@ pub fn sys_stage_dispatch(
     // `Local` idempotent bloquerait la ré-insertion → arène vide. On la (ré)insère
     // donc si absente, même si le depth n'a pas changé.
     request: Option<Res<forgia_stage::StageLoadRequest>>,
+    // Story-676 — l'univers du round donne le sol ; `CurrentAmbiance` est publié
+    // ici pour que l'atmosphère et le ciel lisent la MÊME résolution.
+    ambiances: Option<Res<crate::ambiances::AmbiancesConfig>>,
     mut last_depth: Local<Option<(u8, bool)>>,
 ) {
     let Some(state) = run_state.as_deref().map(|s| s.get()) else {
@@ -212,13 +215,42 @@ pub fn sys_stage_dispatch(
         .as_ref()
         .map(|s| s.stage_seed(depth))
         .unwrap_or(FALLBACK_SEED);
+    // Story-676 — l'ambiance suit la PROFONDEUR (horloge de run), pas l'identité
+    // de la salle. Génome absent → sol de repli, exactement comme avant.
+    let run_seed_val = run_seed.as_ref().map(|s| s.seed).unwrap_or(FALLBACK_SEED);
+    let (ambiance_id, floor, sky) = match ambiances.as_deref() {
+        Some(cfg) => {
+            let id = cfg.ambiance_id_for_round(u32::from(depth), run_seed_val);
+            let p = cfg.floor_of(id);
+            let tiles: [String; 3] = [
+                p.tiles[0].clone(),
+                p.tiles[1].clone(),
+                p.tiles[2].clone(),
+            ];
+            (
+                id.to_string(),
+                Some(forgia_stage::FloorTiles {
+                    tile_size_m: p.tile_size_m,
+                    tiles,
+                }),
+                Some(cfg.ambiance(id).sky.clone()),
+            )
+        }
+        None => (crate::ambiances::FALLBACK_AMBIANCE.to_string(), None, None),
+    };
     commands.insert_resource(forgia_stage::StageLoadRequest {
         stage_id: stage_id.to_string(),
         seed,
+        floor,
+        sky,
+    });
+    commands.insert_resource(crate::ambiances::CurrentAmbiance {
+        id: ambiance_id.clone(),
+        round: u32::from(depth),
     });
     *last_depth = key;
     info!(
-        "[roguelite] Stage dispatch → '{stage_id}' (depth={depth}, boss={is_boss}, seed={seed:#x})"
+        "[roguelite] Stage dispatch → '{stage_id}' (depth={depth}, boss={is_boss},          univers='{ambiance_id}', seed={seed:#x})"
     );
 }
 
