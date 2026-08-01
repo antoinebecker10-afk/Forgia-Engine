@@ -24,6 +24,7 @@ use forgia_core::prelude::*;
 /// Story-673 — les MESURES d'assets (asset_registry.toml), lues au lieu d'être devinées.
 pub mod ambiances;
 pub mod asset_metrics;
+pub mod avatar;
 pub mod atmosphere;
 pub mod audio;
 pub mod boons_apply;
@@ -118,6 +119,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // depuis l'onglet FORGE. Alimente `EquipmentMods`, composé dans
         // `PlayerCombatMods` par `boons_apply::sys_recompute_boon_mods`.
         app.add_plugins(equipment::EquipmentPlugin);
+        // Montage de l'avatar équipé, partagé par l'aperçu du menu et le Hall.
+        app.add_plugins(avatar::AvatarPlugin);
         // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
         // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
         app.init_resource::<load_timing::LoadTimingState>();
@@ -361,10 +364,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             (ambiances::sys_init_ambiances, sys_declare_floor_preloads).chain(),
         );
         // Story-677 — la boucle de rounds : courbe de menace + mur mesurable.
+        app.init_resource::<rounds::RoundPace>();
         app.add_systems(Startup, rounds::sys_init_rounds);
         app.add_systems(
             Update,
-            (rounds::sys_hot_reload_rounds, rounds::sys_write_rounds_sensor)
+            (
+                rounds::sys_hot_reload_rounds,
+                rounds::sys_track_round_pace,
+                rounds::sys_write_rounds_sensor,
+            )
+                .chain()
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );

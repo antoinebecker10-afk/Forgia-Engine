@@ -106,6 +106,8 @@ pub(crate) fn draw_wave_counter(
     // `RunGraph.boss_depth()` (l'instantané pris au départ de la run). Deux
     // nombres pour la même chose finissent toujours par diverger.
     graph: Option<Res<forgia_stage::graph::RunGraph>>,
+    // Story-679 — le rythme MESURÉ : « tu tiens » / « tu décroches ».
+    pace: Res<crate::rounds::RoundPace>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -127,7 +129,10 @@ pub(crate) fn draw_wave_counter(
     ));
 
     let panel_w = 340.0;
-    let panel_h = 78.0;
+    // Story-679 — une 3e ligne quand la boucle est active : l'indicateur de
+    // rythme. Le panneau grandit avec son contenu au lieu de le rogner.
+    let show_pace = rounds.enabled && !wave.in_break;
+    let panel_h = if show_pace { 102.0 } else { 78.0 };
     let center_x = screen.center().x;
     let top_y = screen.min.y + 18.0;
     let panel_rect = egui::Rect::from_min_size(
@@ -198,6 +203,43 @@ pub(crate) fn draw_wave_counter(
         sub_color,
         1.0,
     );
+
+    // Story-679 — « TU TIENS » / « TU DÉCROCHES », depuis une MESURE.
+    //
+    // Le mur est défini par « la vague se nettoie-t-elle dans le budget ? ». On
+    // affiche donc exactement cette grandeur — le temps de combat écoulé face au
+    // budget — au lieu de la reconstruire depuis un DPS théorique et un facteur
+    // d'efficacité supposé. Aucune estimation ne passe par cet écran.
+    if show_pace {
+        let budget = rounds.round_time_budget_s;
+        let now = crate::rounds::pace_from_elapsed(pace.combat_secs, budget);
+        // La triade HP, pas un 4e code couleur : le joueur lit déjà
+        // vert/jaune/rouge comme « ça va / attention / danger ». Réutiliser son
+        // vocabulaire coûte zéro apprentissage.
+        let color = match now {
+            crate::rounds::Pace::Holding => C_HP_HIGH,
+            crate::rounds::Pace::Pressured => C_HP_MID,
+            crate::rounds::Pace::Falling => C_HP_LOW,
+        };
+        // La tendance ne s'affiche qu'une fois qu'elle veut dire quelque chose —
+        // sur un seul round, « tu décroches » serait du bruit.
+        let trend = pace.trend(budget);
+        let text = match trend {
+            Some(t) if t != now => {
+                format!("{}   ·   3 DERNIERS : {}", now.label(), t.label())
+            }
+            _ => now.label().to_string(),
+        };
+        text_with_outline(
+            &painter,
+            egui::pos2(center_x, top_y + 80.0),
+            egui::Align2::CENTER_CENTER,
+            &text,
+            display_font(15.0),
+            color,
+            1.5,
+        );
+    }
 }
 
 // ─── Compteurs monnaie (top right) — Or + Souls, modèle Gunfire ────────────

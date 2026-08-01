@@ -122,6 +122,13 @@ serait décoratif et la boucle ne serait qu'un compte à rebours.
 - **Le round 255 est un plafond dur** : `wave.stage` est un `u8`. Ce n'est pas un
   choix de design, c'est la représentation. `saturating_add` évite l'overflow et
   le round 255 scelle la run.
+> **Mise à jour story-679** — l'indicateur écran ne dépend plus d'aucune des deux
+> estimations ci-dessous : il affiche le **temps de combat mesuré** face au budget,
+> qui est exactement la grandeur qui définit le mur. Les estimations ne servent plus
+> qu'à *prédire* le mur (`wall_lazy` / `wall_full` du capteur). Et comme le capteur
+> porte maintenant les deux — la prédiction et la mesure — on peut enfin calibrer
+> l'une sur l'autre au lieu de la deviner.
+
 - **`gain_puissance_par_round = 0,34` est une estimation**, pas une mesure. Les
   vraies sources de puissance (boons, équipement story-675, Trempe) n'exposent
   pas de total agrégé. Tant que ce n'est pas mesuré, le mur « en prenant tout »

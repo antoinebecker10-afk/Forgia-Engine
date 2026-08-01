@@ -362,6 +362,120 @@ pub fn sys_hot_reload_rounds(
         cfg.wall_round(0.0)
     );
 }
+// ─── Le rythme MESURÉ ───────────────────────────────────────────────────────
+
+/// Nombre de rounds gardés en mémoire pour lire une TENDANCE.
+///
+/// Trois : deux points donnent une droite, jamais une tendance. Trois permettent
+/// de distinguer « j'ai galéré une fois » de « je décroche ».
+pub const PACE_HISTORY: usize = 3;
+
+/// Où en est le joueur par rapport au mur — la lecture directe, en trois états.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pace {
+    /// Marge confortable : le round se nettoie bien avant le budget.
+    Holding,
+    /// Le budget se consomme : ça passe encore, mais ça se resserre.
+    Pressured,
+    /// Le budget est dépassé — c'est le mur, ici et maintenant.
+    Falling,
+}
+
+impl Pace {
+    /// Libellé écran. Les mots comptent : « TU DÉCROCHES » dit au joueur QUOI
+    /// faire (monter ses perfs), là où un pourcentage ne dit rien.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Pace::Holding => "TU TIENS",
+            Pace::Pressured => "SOUS PRESSION",
+            Pace::Falling => "TU DÉCROCHES",
+        }
+    }
+}
+
+/// Seuil entre « tu tiens » et « sous pression », en fraction du budget.
+///
+/// 0,6 : au-delà de 60 % du budget consommé, il ne reste plus de quoi absorber
+/// un imprévu (une vague qui traîne, une mort évitée de justesse). C'est le
+/// moment utile pour prévenir — prévenir à 99 % ne sert à rien.
+const PRESSURE_THRESHOLD: f32 = 0.6;
+
+/// Décide l'état à partir du temps de combat ÉCOULÉ — pas d'un DPS estimé.
+///
+/// C'est le point important : le mur est défini par « la vague se nettoie-t-elle
+/// dans le budget ? ». On mesure donc exactement cette grandeur, au lieu de la
+/// reconstruire depuis un DPS théorique et un facteur d'efficacité supposé.
+pub fn pace_from_elapsed(elapsed_s: f32, budget_s: f32) -> Pace {
+    if budget_s <= f32::EPSILON {
+        return Pace::Holding;
+    }
+    let ratio = elapsed_s / budget_s;
+    if ratio >= 1.0 {
+        Pace::Falling
+    } else if ratio >= PRESSURE_THRESHOLD {
+        Pace::Pressured
+    } else {
+        Pace::Holding
+    }
+}
+
+/// Temps de combat effectif du round en cours + les derniers rounds nettoyés.
+///
+/// « Effectif » = hors break et hors respiration : le budget porte sur le temps
+/// passé à se battre, pas sur le temps passé à choisir un boon.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct RoundPace {
+    /// Round en cours de chronométrage.
+    pub round: u8,
+    /// Secondes de combat écoulées dans ce round.
+    pub combat_secs: f32,
+    /// Temps de nettoyage des derniers rounds, du plus récent au plus ancien.
+    pub cleared: Vec<f32>,
+}
+
+impl RoundPace {
+    /// Enregistre le round qui vient d'être nettoyé et repart à zéro.
+    pub fn finish_round(&mut self, next_round: u8) {
+        if self.combat_secs > 0.0 {
+            self.cleared.insert(0, self.combat_secs);
+            self.cleared.truncate(PACE_HISTORY);
+        }
+        self.round = next_round;
+        self.combat_secs = 0.0;
+    }
+
+    /// La TENDANCE : le joueur décroche-t-il, ou tient-il le rythme ?
+    ///
+    /// `None` tant qu'on n'a pas assez de points — et c'est important de le
+    /// dire plutôt que d'inventer une tendance sur un seul round.
+    pub fn trend(&self, budget_s: f32) -> Option<Pace> {
+        if self.cleared.len() < PACE_HISTORY || budget_s <= f32::EPSILON {
+            return None;
+        }
+        // Moyenne des temps de nettoyage récents rapportée au budget.
+        let avg = self.cleared.iter().sum::<f32>() / self.cleared.len() as f32;
+        Some(pace_from_elapsed(avg, budget_s))
+    }
+}
+
+/// Chronomètre le temps de combat du round. Ne tourne PAS pendant les breaks ni
+/// les respirations : le budget porte sur le combat, pas sur les temps morts.
+pub fn sys_track_round_pace(
+    time: Res<Time>,
+    cfg: Res<RoundsConfig>,
+    wave: Res<crate::waves::RogueliteWave>,
+    mut pace: ResMut<RoundPace>,
+) {
+    if wave.stage != pace.round {
+        pace.finish_round(wave.stage);
+        return;
+    }
+    if !cfg.enabled || wave.in_break || cfg.is_respite_round(u32::from(wave.stage)) {
+        return;
+    }
+    pace.combat_secs += time.delta_secs();
+}
+
 // ─── Capteur ────────────────────────────────────────────────────────────────
 
 /// Chemin du capteur — `observability-required.md` : une feature qu'on ne voit
@@ -379,6 +493,7 @@ pub fn sys_write_rounds_sensor(
     time: Res<Time<Real>>,
     cfg: Res<RoundsConfig>,
     wave: Res<crate::waves::RogueliteWave>,
+    pace: Res<RoundPace>,
     mut cooldown: Local<f32>,
 ) {
     *cooldown -= time.delta_secs();
@@ -405,7 +520,7 @@ pub fn sys_write_rounds_sensor(
         ("ok", "-")
     };
     let json = format!(
-        r#"{{"id":"roguelite_rounds","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"loop_enabled":{},"round":{round},"is_tier_round":{},"is_respite_round":{},"threat_hp":{:.3},"threat_damage":{:.3},"time_to_clear_lazy_s":{:.1},"time_to_clear_full_s":{:.1},"round_time_budget_s":{:.1},"margin_lazy":{:.3},"margin_full":{:.3},"wall_lazy":{},"wall_full":{}}}"#,
+        r#"{{"id":"roguelite_rounds","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"loop_enabled":{},"round":{round},"is_tier_round":{},"is_respite_round":{},"threat_hp":{:.3},"threat_damage":{:.3},"time_to_clear_lazy_s":{:.1},"time_to_clear_full_s":{:.1},"round_time_budget_s":{:.1},"margin_lazy":{:.3},"margin_full":{:.3},"wall_lazy":{},"wall_full":{},"combat_secs":{:.1},"pace":"{}","pace_trend":"{}","cleared_secs":{:?}}}"#,
         time.elapsed_secs_f64(),
         cfg.enabled,
         cfg.is_tier_round(round),
@@ -419,6 +534,11 @@ pub fn sys_write_rounds_sensor(
         margin_full,
         cfg.wall_round(0.0).map_or(-1i64, i64::from),
         cfg.wall_round(1.0).map_or(-1i64, i64::from),
+        pace.combat_secs,
+        pace_from_elapsed(pace.combat_secs, cfg.round_time_budget_s).label(),
+        pace.trend(cfg.round_time_budget_s)
+            .map_or("indéterminée", Pace::label),
+        pace.cleared,
     );
     let _ = fs::write(SENSOR_PATH, json);
 }
@@ -566,5 +686,78 @@ dps_reference = 0.0
             RoundsConfig::default(),
             "le TOML livré et le miroir Rust ont divergé"
         );
+    }
+}
+
+#[cfg(test)]
+mod pace_tests {
+    use super::*;
+
+    /// Les trois états, aux bornes exactes. Le seuil de pression est à 60 % :
+    /// prévenir à 99 % du budget ne servirait à rien.
+    #[test]
+    fn the_three_states_land_on_their_thresholds() {
+        assert_eq!(pace_from_elapsed(0.0, 90.0), Pace::Holding);
+        assert_eq!(pace_from_elapsed(53.0, 90.0), Pace::Holding);
+        assert_eq!(pace_from_elapsed(54.0, 90.0), Pace::Pressured, "60 % du budget");
+        assert_eq!(pace_from_elapsed(89.0, 90.0), Pace::Pressured);
+        assert_eq!(pace_from_elapsed(90.0, 90.0), Pace::Falling, "au budget = le mur");
+        assert_eq!(pace_from_elapsed(300.0, 90.0), Pace::Falling);
+    }
+
+    /// Un budget nul ne doit pas produire un NaN ni un « tu décroches » permanent.
+    #[test]
+    fn a_zero_budget_does_not_produce_a_permanent_alarm() {
+        assert_eq!(pace_from_elapsed(10.0, 0.0), Pace::Holding);
+    }
+
+    /// La tendance ne se prononce PAS tant qu'elle n'a pas de quoi. Sur un seul
+    /// round, « tu décroches » serait du bruit — et le bruit fait ignorer l'alerte.
+    #[test]
+    fn the_trend_stays_silent_until_it_has_enough_points() {
+        let mut p = RoundPace::default();
+        assert!(p.trend(90.0).is_none(), "aucun round : pas de tendance");
+        for (i, secs) in [30.0f32, 40.0, 50.0].iter().enumerate() {
+            p.combat_secs = *secs;
+            p.finish_round(i as u8 + 1);
+            if i < PACE_HISTORY - 1 {
+                assert!(p.trend(90.0).is_none(), "{} round(s) : trop tôt", i + 1);
+            }
+        }
+        assert_eq!(p.trend(90.0), Some(Pace::Holding), "moyenne 40 s sur 90 = ça tient");
+    }
+
+    /// La tendance suit les DERNIERS rounds, pas toute la run : décrocher
+    /// maintenant doit se voir même après un bon départ.
+    #[test]
+    fn the_trend_forgets_the_old_rounds() {
+        let mut p = RoundPace::default();
+        for (i, secs) in [5.0f32, 5.0, 5.0, 80.0, 85.0, 88.0].iter().enumerate() {
+            p.combat_secs = *secs;
+            p.finish_round(i as u8 + 1);
+        }
+        assert_eq!(p.cleared.len(), PACE_HISTORY, "l'historique est borné");
+        assert_eq!(
+            p.trend(90.0),
+            Some(Pace::Pressured),
+            "3 rounds à ~84 s sur 90 : la tendance doit alerter malgré le bon départ"
+        );
+    }
+
+    /// Un round nettoyé instantanément (respiration, salle vide) ne doit pas
+    /// polluer l'historique d'un faux « 0 s » qui ferait croire que tout va bien.
+    #[test]
+    fn a_zero_second_round_is_not_recorded() {
+        let mut p = RoundPace::default();
+        p.combat_secs = 0.0;
+        p.finish_round(1);
+        assert!(p.cleared.is_empty(), "une respiration n'est pas une performance");
+    }
+
+    /// Les libellés sont le message : ils doivent dire QUOI FAIRE.
+    #[test]
+    fn the_labels_tell_the_player_what_is_happening() {
+        assert_eq!(Pace::Holding.label(), "TU TIENS");
+        assert_eq!(Pace::Falling.label(), "TU DÉCROCHES");
     }
 }
