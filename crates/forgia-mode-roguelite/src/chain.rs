@@ -177,34 +177,49 @@ pub fn pick_chain_targets(
 }
 
 /// Propage les tirs du joueur aux ennemis voisins.
+///
+/// # Lire ET écrire le même message
+///
+/// Ce système consomme `CombatHitEvent` (les impacts d'arme) et en émet
+/// (les rebonds). Bevy refuse `MessageReader<T>` + `MessageWriter<T>` dans le
+/// même système : ce sont un `Res` et un `ResMut` sur la même ressource, et
+/// l'App **panique au démarrage** (`B0002`).
+///
+/// `ParamSet` est la réponse idiomatique : il rend les deux accès exclusifs
+/// dans le temps. On lit tout d'abord (`p0`), on relâche, puis on écrit (`p1`).
+///
+/// Le défaut n'a été trouvé qu'AU LANCEMENT, parce que tous les tests de ce
+/// module portaient sur des fonctions pures. D'où le test d'intégration en bas
+/// de fichier, qui construit une App et fait tourner le planificateur.
 #[allow(clippy::too_many_arguments)]
 pub fn sys_apply_chain(
     cfg: Res<ChainConfig>,
     mods: Res<PlayerCombatMods>,
-    mut events: MessageReader<CombatHitEvent>,
+    mut hits: ParamSet<(MessageReader<CombatHitEvent>, MessageWriter<CombatHitEvent>)>,
     q_player: Query<Entity, With<Player>>,
     q_bots: Query<(Entity, &Transform), With<ArenaBot>>,
     mut q_health: Query<&mut Health>,
-    mut hits_w: MessageWriter<CombatHitEvent>,
     mut stats: ResMut<ChainStats>,
 ) {
     stats.last_jumps = 0;
     let extra = mods.chain_extra_targets;
     if !cfg.enabled || extra == 0 {
         // On DOIT quand même drainer, sinon les événements s'accumulent.
-        events.read().for_each(|_| ());
+        hits.p0().read().for_each(|_| ());
         return;
     }
     let Ok(player) = q_player.single() else {
-        events.read().for_each(|_| ());
+        hits.p0().read().for_each(|_| ());
         return;
     };
     // Un seul relevé de positions par frame — pas une requête par impact.
     let bots: Vec<(Entity, Vec3)> = q_bots.iter().map(|(e, t)| (e, t.translation)).collect();
 
-    // Collecte d'abord : `q_health` est emprunté en mutable dans la boucle, on
-    // ne peut pas lire les événements en même temps.
-    let impacts: Vec<(Entity, Vec3, f32)> = events
+    // Collecte d'abord : l'écriture des rebonds ne peut pas cohabiter avec la
+    // lecture (cf. `ParamSet` ci-dessus), et `q_health` est emprunté en mutable
+    // dans la boucle.
+    let impacts: Vec<(Entity, Vec3, f32)> = hits
+        .p0()
         .read()
         // Seuls les tirs du JOUEUR chaînent, et seulement les tirs d'ARME : un
         // rebond porte `weapon: None`, ce qui l'empêche d'en relancer un autre.
@@ -235,7 +250,7 @@ pub fn sys_apply_chain(
             let before = hp.current;
             hp.current = (hp.current - dmg).max(0.0);
             let killed = before > 0.0 && hp.current <= 0.0;
-            hits_w.write(CombatHitEvent {
+            hits.p1().write(CombatHitEvent {
                 target,
                 attacker: Some(player),
                 damage: dmg,
@@ -389,5 +404,77 @@ mod tests {
             .or_else(|_| fs::read_to_string(format!("../../{GENOME_PATH}")))
             .expect("roguelite_chain.toml introuvable");
         assert_eq!(ChainConfig::parse_toml(&content), ChainConfig::default());
+    }
+    /// LE test qui manquait.
+    ///
+    /// `sys_apply_chain` lit ET écrit `CombatHitEvent`. Bevy refuse
+    /// `MessageReader<T>` + `MessageWriter<T>` dans un même système (`Res` et
+    /// `ResMut` sur la même ressource) et **panique au démarrage de l'App** —
+    /// pas à la compilation.
+    ///
+    /// Tous les autres tests de ce module portent sur des fonctions pures : ils
+    /// ne pouvaient pas l'attraper, et le défaut n'est sorti qu'au lancement du
+    /// jeu. Celui-ci construit une App et fait tourner le planificateur, ce qui
+    /// est la seule façon de valider les accès d'un système.
+    #[test]
+    fn the_system_can_actually_be_scheduled() {
+        let mut app = App::new();
+        app.add_message::<CombatHitEvent>();
+        app.insert_resource(ChainConfig::default());
+        app.insert_resource(PlayerCombatMods::default());
+        app.init_resource::<ChainStats>();
+        app.add_systems(Update, sys_apply_chain);
+        // Panique ici si les accès sont en conflit (B0002).
+        app.update();
+        app.update();
+    }
+
+    /// Sans atout Chaîne, le système doit quand même DRAINER les événements :
+    /// un lecteur qui ne lit pas laisse la file grossir sans fin.
+    #[test]
+    fn events_are_drained_even_when_the_boon_is_absent() {
+        let mut app = App::new();
+        app.add_message::<CombatHitEvent>();
+        app.insert_resource(ChainConfig::default());
+        app.insert_resource(PlayerCombatMods::default()); // chain_extra_targets = 0
+        app.init_resource::<ChainStats>();
+        app.add_systems(Update, sys_apply_chain);
+        for _ in 0..3 {
+            app.world_mut()
+                .resource_mut::<Messages<CombatHitEvent>>()
+                .write(CombatHitEvent {
+                    target: ent(1),
+                    attacker: None,
+                    damage: 10.0,
+                    is_kill: false,
+                    is_headshot: false,
+                    hit_world_pos: Vec3::ZERO,
+                    weapon: None,
+                    body_zone: forgia_damage::HitZone::Body,
+                });
+            app.update();
+        }
+        assert_eq!(app.world().resource::<ChainStats>().jumps_total, 0);
+    }
+    /// PREUVE que le test ci-dessus a des dents.
+    ///
+    /// Affirmer « ce test aurait attrapé le défaut » sans le montrer, c'est
+    /// exactement le capteur qui passe à vide : il rassure sans rien mesurer.
+    /// Ce système reproduit délibérément le conflit d'origine — s'il cesse de
+    /// paniquer, c'est que le harnais ne détecte plus la classe et que
+    /// `the_system_can_actually_be_scheduled` ne prouve plus rien.
+    fn deliberately_conflicting_system(
+        _r: MessageReader<CombatHitEvent>,
+        _w: MessageWriter<CombatHitEvent>,
+    ) {
+    }
+
+    #[test]
+    #[should_panic(expected = "B0002")]
+    fn the_harness_really_detects_the_conflict() {
+        let mut app = App::new();
+        app.add_message::<CombatHitEvent>();
+        app.add_systems(Update, deliberately_conflicting_system);
+        app.update();
     }
 }
