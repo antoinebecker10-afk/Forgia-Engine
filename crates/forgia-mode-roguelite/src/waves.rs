@@ -118,6 +118,9 @@ pub struct WaveSpawnConfigs<'w> {
     pub stats: Res<'w, EnemyStatsConfig>,
     pub defense: Res<'w, DefenseConfig>,
     pub comp: Res<'w, WaveCompConfig>,
+    /// Story-677 — la boucle de rounds. Dans le bundle et pas en param direct :
+    /// `sys_wave_orchestrator` était à 14 params, le plafond Bevy est 16.
+    pub rounds: Res<'w, crate::rounds::RoundsConfig>,
 }
 
 impl WaveSpawnConfigs<'_> {
@@ -392,11 +395,24 @@ pub fn sys_wave_orchestrator(
         return;
     }
 
+    // Story-677 — en BOUCLE DE ROUNDS, il n'y a pas de parcours : les arènes
+    // s'enchaînent, la difficulté monte, et la run s'arrête quand le joueur
+    // tombe. `max_rounds = 0` = infini, donc pas de round de boss (le boss
+    // deviendra un JALON périodique, il n'est pas encore recâblé — cf story).
+    let loop_mode = spawn_cfgs.rounds.enabled;
     // Story-646 — profondeur du boss depuis le graph (fallback config si absent).
-    let boss_stage = graph
-        .as_deref()
-        .map(|g| g.boss_depth())
-        .unwrap_or_else(|| graph_cfg.total_stages.saturating_sub(1));
+    let boss_stage = if loop_mode {
+        if spawn_cfgs.rounds.max_rounds == 0 {
+            u8::MAX
+        } else {
+            spawn_cfgs.rounds.max_rounds.min(u32::from(u8::MAX)) as u8
+        }
+    } else {
+        graph
+            .as_deref()
+            .map(|g| g.boss_depth())
+            .unwrap_or_else(|| graph_cfg.total_stages.saturating_sub(1))
+    };
     let in_boss_stage = wave.stage >= boss_stage;
 
     // Détection de clear — ARMÉE seulement si : bots vus vivants puis tous morts,
@@ -489,11 +505,18 @@ pub fn sys_wave_orchestrator(
                 wave.current_wave += 1;
             } else {
                 // Story-646 R2 — salle nettoyée → SALLE SUIVANTE.
-                let next = wave.stage + 1;
+                // `wave.stage` est un u8 : en boucle infinie, le round 255 est
+                // un plafond DUR de la représentation, pas un choix de design.
+                // `saturating_add` évite l'overflow ; le round 255 déclenche le
+                // boss (boss_stage = u8::MAX) et scelle la run.
+                let next = wave.stage.saturating_add(1);
                 let is_boss = next >= boss_stage;
                 // Inc.2 — portes candidates : kinds des variants du graph au depth
                 // suivant (cap `branching`). Boss = chemin unique, jamais de choix.
-                let choices: Vec<forgia_stage::graph::StageKind> = if is_boss {
+                let choices: Vec<forgia_stage::graph::StageKind> = if is_boss || loop_mode {
+                    // En boucle de rounds : AUCUN choix de porte. C'est ce que
+                    // « on ne branche pas le parcours » veut dire concrètement —
+                    // le graphe n'est pas consulté, les arènes s'enchaînent.
                     Vec::new()
                 } else {
                     graph
@@ -524,9 +547,22 @@ pub fn sys_wave_orchestrator(
                     return;
                 }
                 // Pas de choix possible (boss / graph absent / 1 seul variant) → auto.
-                let budget = node_budget(graph.as_deref(), &graph_cfg, next, 0);
-                advance_to_room(&mut wave, next, is_boss, choices.first().copied(), budget);
-                arm_non_combat_room(&mut wave, &spawn_cfgs.comp, graph_cfg.waves_per_stage);
+                // Story-677 — en boucle, le TYPE de salle vient du rythme déclaré
+                // (respiration tous les N rounds), pas d'un nœud de graphe.
+                let (kind, budget) = if loop_mode {
+                    let k = if spawn_cfgs.rounds.is_respite_round(u32::from(next)) {
+                        Some(forgia_stage::graph::StageKind::Rest)
+                    } else {
+                        Some(forgia_stage::graph::StageKind::Combat)
+                    };
+                    (k, graph_cfg.director_budget_for_depth(next))
+                } else {
+                    (
+                        choices.first().copied(),
+                        node_budget(graph.as_deref(), &graph_cfg, next, 0),
+                    )
+                };
+                advance_to_room(&mut wave, next, is_boss, kind, budget);
                 if is_boss {
                     next_run.set(crate::run::RunState::Boss { stage: wave.stage });
                 } else {
@@ -558,6 +594,14 @@ pub fn sys_wave_orchestrator(
             );
             // Reset gate : la nouvelle wave doit prouver alive>0 avant pouvoir clear.
             wave.seen_alive = false;
+            // ...SAUF si la salle ne spawne rien. Ce reset s'exécutait APRÈS
+            // `arm_non_combat_room` et ANNULAIT son armement : une salle de
+            // repos se retrouvait sans ennemi ET sans `seen_alive`, donc la
+            // détection de clear ne s'armait jamais — la run FIGEAIT dedans.
+            // Le défaut ne se voyait pas tant que le Repos était rare ; la
+            // boucle de rounds en pose un tous les N rounds, et la soak l'a
+            // attrapé. L'armement doit donc venir APRÈS le reset, pas avant.
+            arm_non_combat_room(&mut wave, &spawn_cfgs.comp, graph_cfg.waves_per_stage);
         }
         return;
     }
@@ -870,6 +914,8 @@ mod tests {
         // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
+        // Story-677 — `WaveSpawnConfigs` porte désormais la config de boucle.
+        app.insert_resource(crate::rounds::RoundsConfig::default());
         app.insert_resource(crate::decor::DecorObstacles::default());
         app.add_systems(Update, spawn_first_wave_for_qa);
 
@@ -913,6 +959,8 @@ mod tests {
         // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
+        // Story-677 — `WaveSpawnConfigs` porte désormais la config de boucle.
+        app.insert_resource(crate::rounds::RoundsConfig::default());
         app.insert_resource(crate::decor::DecorObstacles::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
@@ -964,6 +1012,8 @@ mod tests {
         // Story-669 — la composition vient d'une Resource ; le harness QA ne monte
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
+        // Story-677 — `WaveSpawnConfigs` porte désormais la config de boucle.
+        app.insert_resource(crate::rounds::RoundsConfig::default());
         app.insert_resource(crate::decor::DecorObstacles::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
@@ -992,16 +1042,52 @@ mod tests {
         // Plafond : `density.max_factor` (2.5) appliqué à la vague 1 (3T/3R/2S)
         // donne au pire 8+8+5 = 21 ennemis. 32 laisse de la marge sans rien cacher.
         const MAX_BOTS_PER_WAVE: usize = 32;
+        // L'invariant ANTI-FIGE de cette soak : la run doit avancer. Un blocage
+        // se lit ici, quel que soit le type de salle.
+        let mut stage_before = app.world().resource::<RogueliteWave>().stage;
+        let mut advanced = 0u32;
         for room in 0..24 {
             let bots: Vec<Entity> = app
                 .world_mut()
                 .query_filtered::<Entity, With<ArenaBot>>()
                 .iter(app.world())
                 .collect();
-            assert!(
-                !bots.is_empty(),
-                "salle {room}: une vague VIDE figerait la run (seen_alive jamais posé)"
-            );
+            // Story-677 — une salle de RESPIRATION ne spawne rien, par
+            // construction (relâche tous les N rounds). La cadence de frames de
+            // ce test suppose une salle de COMBAT (clear → break → spawn) : sur
+            // une respiration elle ne s'applique pas.
+            //
+            // Ce que le test protège n'est pas affaibli pour autant — il est
+            // RENFORCÉ : au lieu de « il y a des bots », on vérifie plus bas que
+            // la run AVANCE VRAIMENT (`stage` strictement croissant sur toute la
+            // soak). Une salle qui figerait la run bloquerait ce compteur, avec
+            // ou sans bots.
+            let kind = app.world().resource::<RogueliteWave>().room_kind;
+            if bots.is_empty() {
+                assert_eq!(
+                    kind,
+                    Some(forgia_stage::graph::StageKind::Rest),
+                    "salle {room}: vague VIDE dans une salle de COMBAT — la run figerait"
+                );
+                // Le temps n'avance pas tout seul dans une App de test : le
+                // break doit être drainé à la main, exactement comme le fait le
+                // chemin combat plus bas. Sans ça le test accuse la respiration
+                // de figer la run alors que c'est l'horloge qui ne tourne pas.
+                for _ in 0..3 {
+                    app.update();
+                    app.world_mut()
+                        .resource_mut::<RogueliteWave>()
+                        .break_secs_left = 0.0;
+                    app.update();
+                }
+                let after = app.world().resource::<RogueliteWave>().stage;
+                assert!(
+                    after > stage_before,
+                    "salle {room}: la respiration n'a pas fait avancer la run (stage figé à {after})"
+                );
+                stage_before = after;
+                continue;
+            }
             assert!(
                 bots.len() <= MAX_BOTS_PER_WAVE,
                 "salle {room}: effectif non borné ({}) — budget de frame en danger",
@@ -1037,6 +1123,15 @@ mod tests {
             );
             // Arme la vague qui vient d'être créée avant le clear suivant.
             app.update();
+            let after = app.world().resource::<RogueliteWave>().stage;
+            if after > stage_before {
+                advanced += 1;
+                stage_before = after;
+            }
         }
+        assert!(
+            advanced >= 4,
+            "la run n'a avancé que de {advanced} salles en 24 itérations — quelque chose FIGE"
+        );
     }
 }

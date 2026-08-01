@@ -1,0 +1,87 @@
+# roguelite_rounds.toml — la BOUCLE DE ROUNDS (story-677).
+#
+# Des arènes qui s'enchaînent, sans parcours ni carte : round 1, round 2, … La
+# difficulté monte, et elle monte plus vite que ce que le joueur gagne s'il ne
+# fait rien. Passer un round exige de monter ses perfs — c'est le sujet de ce
+# fichier, et c'est MESURÉ, pas espéré (voir `[mur]`).
+#
+# Hot-reload : poll mtime 1 Hz. Miroir exact des `Default` Rust (`rounds.rs`).
+
+[boucle]
+# false → comportement d'avant (le graphe de salles pilote la run).
+enabled = true
+# 0 = rounds infinis. Sinon la run se termine en Victoire à ce round.
+max_rounds = 0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LA COURBE DE MENACE
+# ─────────────────────────────────────────────────────────────────────────────
+# Avant : `1 + round × 0,35`, linéaire. Une droite finit toujours par se faire
+# rattraper par un joueur qui compose ses multiplicateurs — la pression
+# s'évapore vers le round 10.
+#
+# Maintenant : GÉOMÉTRIQUE + PALIERS. La croissance continue tient la pression,
+# les paliers donnent le sursaut qu'on RESSENT (Gunfire Reborn monte par paliers,
+# Risk of Rain 2 en continu — on prend les deux).
+#
+#   menace_pv(r) = pv_par_round^r × palier_pv^floor(r / palier_tous_les)
+
+[menace]
+# Croissance continue de la vie ennemie, par round. 1.16 → round 10 = ×4,4.
+pv_par_round = 1.16
+# Croissance continue des dégâts ennemis. Volontairement plus DOUCE que la vie :
+# un round qui tue en deux balles n'est pas dur, il est injuste. La difficulté
+# doit se payer en temps de tir, pas en un-coup-tu-meurs.
+degats_par_round = 1.07
+# Un palier tous les N rounds.
+palier_tous_les = 3
+# Le sursaut de vie au palier, EN PLUS de la croissance continue.
+palier_pv = 1.22
+# Idem dégâts.
+palier_degats = 1.10
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LE MUR — ce qui rend la montée en perfs OBLIGATOIRE
+# ─────────────────────────────────────────────────────────────────────────────
+# Un round se passe si le joueur nettoie sa vague dans le budget de temps. Le
+# temps pour nettoyer, c'est `points de vie de la vague / DPS du joueur`. La
+# menace monte géométriquement ; si le DPS ne suit pas, ce temps explose et le
+# round devient inclearable. C'est ça, le mur, et il se calcule.
+#
+#   ttk(r) = pv_vague(r) / (dps_base × puissance(r))
+#   mur    = premier r où ttk(r) > budget_temps_round_s
+
+[mur]
+# Budget de temps d'un round (s). Au-delà, l'attrition l'emporte.
+budget_temps_round_s = 90.0
+# DPS de référence du joueur, arme de départ nue. MESURÉ : Pépin = 168 dps
+# (`viewmodel_arena.toml`). Sert à situer le mur, pas à modifier les dégâts.
+dps_reference = 168.0
+# Part du round réellement passée à toucher : on se déplace, on recharge, on
+# vise, les ennemis approchent. Un FPS ne délivre JAMAIS son DPS théorique.
+# Sans ce facteur, le modèle disait qu'un round se nettoie en 8 s et le mur
+# tombait au round 19 — c'est-à-dire jamais ressenti.
+efficacite_tir = 0.35
+# PV totaux d'un round au round 0. MESURÉ sur le contenu réel, pas choisi :
+# une salle enchaîne 2 vagues (`roguelite_waves.toml [base.wave1] / [wave2]`),
+# soit 7 tank × 120 + 7 runner × 35 + 6 sniper × 45 = 1355.
+pv_vague_reference = 1355.0
+# Gain de puissance qu'un round PEUT rapporter (fraction du DPS) si le joueur
+# prend tout : trempe, boon, équipement. Sert à calculer où le mur tombe pour un
+# joueur qui joue bien vs un joueur qui ne prend rien.
+gain_puissance_par_round = 0.34
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LA RÉCOMPENSE
+# ─────────────────────────────────────────────────────────────────────────────
+# Sans récompense garantie, le mur n'est pas franchissable et la boucle n'est
+# pas un jeu, c'est un compte à rebours.
+
+[recompense]
+# Choix de boon offert à la fin de chaque round.
+boon_par_round = 1
+# Un round sur N offre en plus un choix d'équipement.
+equipement_tous_les = 2
+# Un round sur N est un round de RESPIRATION : pas d'ennemis, marchand + soin.
+# Le rythme d'une run a besoin de relâche (map-design-intention §4.1).
+repit_tous_les = 5

@@ -61,6 +61,7 @@ pub mod pipeline_warmup;
 pub mod poi;
 pub mod progress;
 pub mod render_quality;
+pub mod rounds;
 pub mod run;
 pub mod sensor;
 pub mod shockwave;
@@ -358,6 +359,14 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_systems(
             Startup,
             (ambiances::sys_init_ambiances, sys_declare_floor_preloads).chain(),
+        );
+        // Story-677 — la boucle de rounds : courbe de menace + mur mesurable.
+        app.add_systems(Startup, rounds::sys_init_rounds);
+        app.add_systems(
+            Update,
+            (rounds::sys_hot_reload_rounds, rounds::sys_write_rounds_sensor)
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
         );
         app.add_systems(
             Update,
@@ -808,15 +817,6 @@ fn sys_spin_coins(time: Res<Time>, mut q: Query<&mut Transform, With<CoinSpin>>)
 // Story-591 — `auto_start_run_on_enter` retiré : le hub Lobby (L'Enclume des
 // Âmes) démarre la run sur ENTRÉE (meta_shop::sys_meta_shop_input).
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn plugin_constructible() {
-        let _p = ForgiaModeRoguelitePlugin;
-    }
-}
 
 /// Story-676 — déclare à `forgia-stage` TOUTES les tuiles de sol des univers.
 ///
@@ -833,4 +833,13 @@ fn sys_declare_floor_preloads(
         "[ambiances] {} tuiles de sol déclarées au préchargement",
         extra.0.len()
     );
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plugin_constructible() {
+        let _p = ForgiaModeRoguelitePlugin;
+    }
 }

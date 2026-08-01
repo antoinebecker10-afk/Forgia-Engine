@@ -48,9 +48,6 @@ pub const MERGED_FLOOR_GLB: [&str; 3] = [
     "models/kaykit/dungeon/floor_rocks.glb",
 ];
 
-/// Côté (m) d'une tuile de sol de repli. Le pas RÉEL vient de `FloorTiles`.
-pub const FALLBACK_FLOOR_TILE_SIZE: f32 = 4.0;
-
 /// La palette de sol d'une arène, passée par l'appelant.
 ///
 /// `forgia-stage` reste générique : il ne connaît ni les univers du roguelite ni
@@ -66,7 +63,9 @@ pub struct FloorTiles {
 impl Default for FloorTiles {
     fn default() -> Self {
         Self {
-            tile_size_m: FALLBACK_FLOOR_TILE_SIZE,
+            // La const historique reste la source du pas de repli : elle porte
+            // l'invariant « même sol que le mode FPS » (cf sa doc).
+            tile_size_m: FLOOR_TILE_SIZE,
             tiles: MERGED_FLOOR_GLB.map(str::to_owned),
         }
     }

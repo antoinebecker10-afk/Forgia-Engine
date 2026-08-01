@@ -93,6 +93,11 @@ impl EnemyScalingConfig {
     }
 
     /// Multiplicateur de vie/défenses pour une salle : `1 + stage × hp_per_stage`.
+    ///
+    /// ⚠️ Story-677 — chemin de REPLI. Quand `[boucle] enabled = true` dans
+    /// `roguelite_rounds.toml`, c'est `rounds::RoundsConfig::threat()` qui
+    /// s'applique : géométrique + paliers, parce qu'une droite finit toujours
+    /// par se faire rattraper par les multiplicateurs du joueur.
     pub fn hp_mul_for_stage(&self, stage: u8) -> f32 {
         1.0 + f32::from(stage) * self.hp_per_stage
     }
@@ -163,6 +168,12 @@ pub fn sys_hot_reload_enemy_scaling(
 #[allow(clippy::type_complexity)]
 pub fn sys_scale_enemies_by_depth(
     cfg: Res<EnemyScalingConfig>,
+    // Story-677 — quand la boucle de rounds est active, c'est ELLE qui porte la
+    // courbe (géométrique + paliers). Le linéaire de `[scaling]` reste le
+    // chemin d'avant, utilisé si `[boucle] enabled = false`. UNE seule courbe
+    // s'applique à la fois : deux sources de difficulté, c'est une balance
+    // qu'on ne sait plus lire.
+    rounds: Option<Res<crate::rounds::RoundsConfig>>,
     wave: Res<RogueliteWave>,
     mut watch: ResMut<EnemyScalingWatch>,
     mut q: Query<
@@ -178,8 +189,13 @@ pub fn sys_scale_enemies_by_depth(
         return;
     }
     let stage = wave.stage;
-    let hp_mul = cfg.hp_mul_for_stage(stage);
-    let dmg_mul = cfg.damage_mul_for_stage(stage);
+    let (hp_mul, dmg_mul) = match rounds.as_deref() {
+        Some(r) if r.enabled => {
+            let t = r.threat(u32::from(stage));
+            (t.hp, t.damage)
+        }
+        _ => (cfg.hp_mul_for_stage(stage), cfg.damage_mul_for_stage(stage)),
+    };
     watch.last_stage = stage;
     watch.last_hp_mul = hp_mul;
     watch.last_dmg_mul = dmg_mul;
