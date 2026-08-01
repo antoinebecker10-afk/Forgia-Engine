@@ -108,6 +108,9 @@ pub(crate) fn draw_wave_counter(
     graph: Option<Res<forgia_stage::graph::RunGraph>>,
     // Story-679 — le rythme MESURÉ : « tu tiens » / « tu décroches ».
     pace: Res<crate::rounds::RoundPace>,
+    // Story-680 cran 4 — les SYNERGIES de tags. Le mécanisme « 3 tags → un
+    // légendaire » existait depuis story-529 et n'était affiché nulle part.
+    boons: Option<Res<forgia_rpg_data::boons::ActiveBoons>>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -132,7 +135,15 @@ pub(crate) fn draw_wave_counter(
     // Story-679 — une 3e ligne quand la boucle est active : l'indicateur de
     // rythme. Le panneau grandit avec son contenu au lieu de le rogner.
     let show_pace = rounds.enabled && !wave.in_break;
-    let panel_h = if show_pace { 102.0 } else { 78.0 };
+    // Story-680 cran 4 — la ligne des synergies n'apparaît que si une synergie
+    // est ENTAMÉE. Six compteurs à 0/3 en permanence noieraient l'information.
+    let synergies: Vec<(forgia_rpg_data::boons::BoonTag, u32, bool)> = boons
+        .as_deref()
+        .map(|b| b.tag_progress())
+        .unwrap_or_default();
+    let panel_h = 78.0
+        + if show_pace { 24.0 } else { 0.0 }
+        + if synergies.is_empty() { 0.0 } else { 22.0 };
     let center_x = screen.center().x;
     let top_y = screen.min.y + 18.0;
     let panel_rect = egui::Rect::from_min_size(
@@ -238,6 +249,45 @@ pub(crate) fn draw_wave_counter(
             display_font(15.0),
             color,
             1.5,
+        );
+    }
+
+    // Story-680 cran 4 — les SYNERGIES en cours.
+    //
+    // « 3 atouts du même tag → un légendaire de ce tag devient tirable » existe
+    // depuis story-529 et n'apparaissait NULLE PART : zéro référence à
+    // `tag_counts` ou `unlocked_legendary` dans toute l'UI. C'était le seul
+    // levier horizontal du jeu — le seul endroit où un choix en conditionne un
+    // autre — et il était invisible, donc injouable. On le montre.
+    if !synergies.is_empty() {
+        let y = top_y + if show_pace { 100.0 } else { 76.0 };
+        let seuil = forgia_rpg_data::boons::LEGENDARY_TAG_THRESHOLD;
+        let text = synergies
+            .iter()
+            .take(3)
+            .map(|(tag, n, done)| {
+                if *done {
+                    format!("{} ✦", tag.label())
+                } else {
+                    format!("{} {n}/{seuil}", tag.label())
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("   ·   ");
+        // Doré dès qu'une synergie a abouti : c'est un ÉVÉNEMENT, il doit se voir.
+        let col = if synergies.iter().any(|(_, _, done)| *done) {
+            FORGE_OR
+        } else {
+            C_TEXT_MUTED
+        };
+        text_with_outline(
+            &painter,
+            egui::pos2(center_x, y),
+            egui::Align2::CENTER_CENTER,
+            &text,
+            egui::FontId::proportional(13.0),
+            col,
+            1.0,
         );
     }
 }

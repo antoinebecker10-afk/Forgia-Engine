@@ -79,7 +79,10 @@ impl UnlockedBoonTiers {
 /// Tags used for synergy / legendary unlock. New tags can be added freely —
 /// `BoonTag::from_str` falls back to `BoonTag::Other(String)` so the TOML is
 /// forward-compatible.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+// `Copy` (story-680 cran 4) : l'enum est sans données, et l'affichage des
+// synergies en itère les variantes. Le rendre copiable évite des clones inutiles
+// dans une boucle d'UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BoonTag {
     Fire,
@@ -106,6 +109,35 @@ impl BoonTag {
             BoonTag::Other => "other",
         }
     }
+
+    /// Nom affichable en français (story-680 cran 4).
+    ///
+    /// Le mécanisme de synergie « 3 tags identiques → légendaire » existait
+    /// depuis story-529 et n'était affiché NULLE PART — zéro référence à
+    /// `tag_counts` ou `unlocked_legendary` dans toute l'UI. Un joueur ne peut
+    /// pas jouer avec un système qu'il ne voit pas ; c'est ce qui rendait le
+    /// seul levier horizontal du jeu inerte.
+    pub fn label(&self) -> &'static str {
+        match self {
+            BoonTag::Fire => "FEU",
+            BoonTag::Ricochet => "RICOCHET",
+            BoonTag::Knockback => "IMPACT",
+            BoonTag::Chain => "CHAÎNE",
+            BoonTag::Precision => "PRÉCISION",
+            BoonTag::Chaos => "CHAOS",
+            BoonTag::Other => "AUTRE",
+        }
+    }
+
+    /// Tous les tags réels (hors `Other`, qui est un fourre-tout de parsing).
+    pub const ALL: [BoonTag; 6] = [
+        BoonTag::Fire,
+        BoonTag::Ricochet,
+        BoonTag::Knockback,
+        BoonTag::Chain,
+        BoonTag::Precision,
+        BoonTag::Chaos,
+    ];
 }
 
 /// Gameplay effect kinds. Each variant carries its numeric payload (factor,
@@ -270,6 +302,25 @@ impl ActiveBoons {
 
     pub fn tag_count(&self, tag: &BoonTag) -> u32 {
         *self.tag_counts.get(tag.key()).unwrap_or(&0)
+    }
+
+    /// Synergies EN COURS, du plus avancé au moins avancé — PUR, testable.
+    ///
+    /// Story-680 cran 4. Ne renvoie que les tags réellement entamés : afficher
+    /// six compteurs à 0/3 en permanence noierait l'information dans du bruit.
+    /// Le tri met en tête celui qui est sur le point d'aboutir, qui est
+    /// justement celui sur lequel une décision se prend.
+    pub fn tag_progress(&self) -> Vec<(BoonTag, u32, bool)> {
+        let mut v: Vec<(BoonTag, u32, bool)> = BoonTag::ALL
+            .iter()
+            .map(|t| {
+                let n = self.tag_count(t);
+                (*t, n, n >= LEGENDARY_TAG_THRESHOLD)
+            })
+            .filter(|(_, n, _)| *n > 0)
+            .collect();
+        v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.key().cmp(b.0.key())));
+        v
     }
 }
 
@@ -1082,5 +1133,94 @@ effect = { kind = "damage_mul", factor = 1.15 }
             max_common < min_legendary,
             "max Common cost ({max_common}) doit être < min Legendary cost ({min_legendary})"
         );
+    }
+}
+
+#[cfg(test)]
+mod tag_progress_tests {
+    use super::*;
+
+    fn tagged(id: &str, tags: &[BoonTag]) -> BoonDef {
+        BoonDef {
+            id: BoonId(id.into()),
+            name: id.into(),
+            voiceline_preview: String::new(),
+            rarity: BoonRarity::Common,
+            tags: tags.to_vec(),
+            weapon_filter: None,
+            effect: BoonEffectKind::DamageMul { factor: 1.1 },
+            souls_cost: None,
+        }
+    }
+
+    /// Story-680 cran 4 — on n'affiche QUE les synergies entamées. Six
+    /// compteurs à 0/3 en permanence noieraient l'information dans du bruit.
+    #[test]
+    fn untouched_tags_are_not_reported() {
+        let a = ActiveBoons::default();
+        assert!(a.tag_progress().is_empty(), "rien pris = rien à montrer");
+    }
+
+    /// Le tri met en tête la synergie la plus avancée : c'est celle sur
+    /// laquelle une décision se prend au prochain choix.
+    #[test]
+    fn the_closest_synergy_comes_first() {
+        let cat = BoonsCatalogue::default();
+        let mut a = ActiveBoons::default();
+        a.apply(&tagged("x", &[BoonTag::Chaos]), &cat);
+        a.apply(&tagged("y", &[BoonTag::Fire]), &cat);
+        a.apply(&tagged("z", &[BoonTag::Fire]), &cat);
+        let p = a.tag_progress();
+        assert_eq!(p.len(), 2, "deux tags entamés");
+        assert_eq!(p[0].0, BoonTag::Fire, "le plus avancé en tête");
+        assert_eq!(p[0].1, 2);
+        assert!(!p[0].2, "2/3 n'est pas encore abouti");
+    }
+
+    /// Le seuil est le contrat : à 3, la synergie est marquée aboutie — et
+    /// c'est exactement le moment où l'écran doit le crier.
+    #[test]
+    fn reaching_the_threshold_is_flagged() {
+        let cat = BoonsCatalogue::default();
+        let mut a = ActiveBoons::default();
+        for i in 0..LEGENDARY_TAG_THRESHOLD {
+            a.apply(&tagged(&format!("f{i}"), &[BoonTag::Precision]), &cat);
+        }
+        let p = a.tag_progress();
+        assert_eq!(p[0].0, BoonTag::Precision);
+        assert!(p[0].2, "à {LEGENDARY_TAG_THRESHOLD}, la synergie est aboutie");
+    }
+
+    /// Un atout multi-tags fait progresser PLUSIEURS synergies — c'est ce qui
+    /// rend le choix intéressant, et il faut que ça se voie.
+    #[test]
+    fn a_multi_tag_boon_advances_several_synergies() {
+        let cat = BoonsCatalogue::default();
+        let mut a = ActiveBoons::default();
+        a.apply(&tagged("combo", &[BoonTag::Fire, BoonTag::Chain]), &cat);
+        let p = a.tag_progress();
+        assert_eq!(p.len(), 2);
+        assert!(p.iter().all(|(_, n, _)| *n == 1));
+    }
+
+    /// Chaque tag doit avoir un nom lisible : un tag sans libellé s'afficherait
+    /// en clé technique à l'écran.
+    #[test]
+    fn every_tag_has_a_display_label() {
+        for t in BoonTag::ALL {
+            assert!(!t.label().is_empty(), "{t:?} sans libellé");
+            assert_ne!(t.label(), t.key(), "{t:?} affiche sa clé technique");
+        }
+    }
+
+    /// `reset_run` doit vraiment remettre les synergies à zéro — sinon elles
+    /// s'empileraient entre runs (le défaut connu de `ActiveBoons`).
+    #[test]
+    fn a_new_run_starts_with_no_synergy() {
+        let cat = BoonsCatalogue::default();
+        let mut a = ActiveBoons::default();
+        a.apply(&tagged("x", &[BoonTag::Fire]), &cat);
+        a.reset_run();
+        assert!(a.tag_progress().is_empty());
     }
 }
