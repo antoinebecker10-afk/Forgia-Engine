@@ -42,6 +42,53 @@ use forgia_stage::graph::StageKind;
 
 // ─── Wave counter (top center) ───────────────────────────────────────────
 
+/// Libellé de progression de run — PUR, donc testable.
+///
+/// Story-678. Deux défauts corrigés ici :
+///
+/// 1. **« SALLE 5 / 4 »** — le total venait d'une source différente de celle qui
+///    fait avancer les rounds (`RunGraphConfig.total_stages`, rechargeable à
+///    chaud, contre `RunGraph.total_stages`, figé au départ de la run). Deux
+///    nombres pour la même chose finissent toujours par diverger. Le caller ne
+///    passe désormais qu'UN total, résolu à la bonne source.
+/// 2. **Un dénominateur n'a aucun sens en boucle infinie.** Il n'y a pas de fin
+///    à atteindre, il y a une pression qui monte. Afficher « / 4 » racontait une
+///    histoire fausse — c'est ce qui rendait la progression illisible.
+///
+/// Cette fonction ne peut PAS produire un numérateur au-dessus du dénominateur :
+/// c'est vérifié par test, pas par relecture.
+pub(crate) fn run_progress_label(
+    stage: u8,
+    current_wave: u8,
+    waves_per_stage: u8,
+    total_rooms: u8,
+    rounds: &crate::rounds::RoundsConfig,
+) -> String {
+    let round = u32::from(stage);
+    let endless = rounds.enabled && rounds.max_rounds == 0;
+    let progress = if endless {
+        format!("ROUND {}", round + 1)
+    } else {
+        // Garde-fou : le numérateur ne dépasse JAMAIS le dénominateur. Si ça
+        // arrive quand même, c'est la dernière salle — pas « 5 / 4 ».
+        let total = total_rooms.max(1);
+        format!("SALLE {} / {}", (stage + 1).min(total), total)
+    };
+    if !endless && stage + 1 >= total_rooms.max(1) {
+        return format!("{progress}  ·  BOSS");
+    }
+    if rounds.enabled && rounds.is_respite_round(round) {
+        return format!("{progress}  ·  RÉPIT");
+    }
+    if rounds.enabled && rounds.is_tier_round(round) {
+        // Le palier est la marche qu'on RESSENT : le joueur doit savoir qu'il
+        // vient d'en franchir une, sinon le sursaut passe pour de l'arbitraire.
+        return format!("{progress}  ·  PALIER  ·  VAGUE {current_wave} / {waves_per_stage}");
+    }
+    format!("{progress}  ·  VAGUE {current_wave} / {waves_per_stage}")
+}
+
+
 pub(crate) fn draw_wave_counter(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
@@ -50,6 +97,15 @@ pub(crate) fn draw_wave_counter(
     wave: Res<RogueliteWave>,
     // Story-646 R2 — totaux salle/vague depuis le genome (multi-salles).
     graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
+    // Story-678 — la boucle de rounds : c'est ELLE qui dit s'il y a un total, et
+    // c'est elle qui porte la menace du round.
+    rounds: Res<crate::rounds::RoundsConfig>,
+    // La MÊME source que celle qui fait avancer les rounds. Le « 5/4 » venait de
+    // là : le compteur divisait par `RunGraphConfig.total_stages` (le génome,
+    // rechargeable à chaud) alors que l'orchestrateur avance sur
+    // `RunGraph.boss_depth()` (l'instantané pris au départ de la run). Deux
+    // nombres pour la même chose finissent toujours par diverger.
+    graph: Option<Res<forgia_stage::graph::RunGraph>>,
 ) {
     if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
         return;
@@ -80,20 +136,28 @@ pub(crate) fn draw_wave_counter(
     );
     glass_panel(&painter, panel_rect, 10.0);
 
-    // Story-646 R2 — multi-salles : « SALLE s/N · VAGUE w/W » (salle Boss = BOSS).
-    let total_rooms = graph_cfg.total_stages.max(1);
-    let is_boss_room = wave.stage + 1 >= total_rooms;
-    let main_text = if is_boss_room {
-        format!("SALLE {} / {}  ·  BOSS", wave.stage + 1, total_rooms)
+    // Story-678 — le libellé est calculé par une fonction PURE (testable).
+    // Le « SALLE 5 / 4 » vivait dans un appel de dessin : aucun test ne pouvait
+    // l'atteindre. C'est la vraie leçon du défaut, pas le numérateur.
+    let total_rooms = if rounds.enabled {
+        rounds.max_rounds.min(u32::from(u8::MAX)) as u8
     } else {
-        format!(
-            "SALLE {} / {}  ·  VAGUE {} / {}",
-            wave.stage + 1,
-            total_rooms,
-            wave.current_wave,
-            graph_cfg.waves_per_stage,
-        )
+        // La MÊME source que celle qui fait avancer les rounds.
+        graph
+            .as_deref()
+            .map(|g| g.total_stages)
+            .unwrap_or(graph_cfg.total_stages)
+            .max(1)
     };
+    let main_text = run_progress_label(
+        wave.stage,
+        wave.current_wave,
+        graph_cfg.waves_per_stage,
+        total_rooms,
+        &rounds,
+    );
+    let round = u32::from(wave.stage);
+
     text_with_outline(
         &painter,
         egui::pos2(center_x, top_y + 22.0),
@@ -104,14 +168,26 @@ pub(crate) fn draw_wave_counter(
         2.0,
     );
 
-    // Subtext : enemies remaining OU break countdown.
+    // Subtext : ennemis restants / décompte de break — ET LA MENACE.
+    //
+    // C'est la réponse à « on ne comprend pas comment on évolue » : le joueur
+    // voit le multiplicateur de vie ennemie monter round après round. Le contrat
+    // de la boucle devient lisible — la menace monte, à toi de monter aussi.
+    // Sans ce chiffre, la difficulté est réelle mais invisible, donc vécue comme
+    // arbitraire.
     let (sub_text, sub_color) = if wave.in_break {
         (
-            format!("NEXT IN  {:.1}s", wave.break_secs_left.max(0.0)),
+            format!("SUITE DANS  {:.1}s", wave.break_secs_left.max(0.0)),
             C_ACCENT,
         )
+    } else if rounds.enabled {
+        let threat = rounds.threat(round).hp;
+        (
+            format!("ENNEMIS  {}   ·   MENACE  ×{threat:.1}", wave.bots_alive),
+            C_TEXT_MUTED,
+        )
     } else {
-        (format!("ENEMIES  {}", wave.bots_alive), C_TEXT_MUTED)
+        (format!("ENNEMIS  {}", wave.bots_alive), C_TEXT_MUTED)
     };
     text_with_outline(
         &painter,
@@ -2082,5 +2158,83 @@ mod tests {
         let _v = RunResult::Victory;
         let _d = RunResult::Defeat;
         let _a = RunResult::Abort;
+    }
+}
+
+#[cfg(test)]
+mod run_progress_tests {
+    use super::run_progress_label;
+    use crate::rounds::RoundsConfig;
+
+    fn graph_mode() -> RoundsConfig {
+        RoundsConfig {
+            enabled: false,
+            ..RoundsConfig::default()
+        }
+    }
+
+    /// LE défaut rapporté : « j'étais à 5/4 ». Un numérateur au-dessus du
+    /// dénominateur n'est pas un affichage, c'est un mensonge — et il rendait
+    /// la run impossible à suivre.
+    #[test]
+    fn the_room_number_can_never_exceed_the_total() {
+        let cfg = graph_mode();
+        for total in 1u8..=8 {
+            for stage in 0u8..12 {
+                let label = run_progress_label(stage, 1, 2, total, &cfg);
+                assert!(
+                    !label.contains(&format!("SALLE {} / {total}", total + 1)),
+                    "stage {stage}, total {total} → {label}"
+                );
+                // Et au-delà du total, c'est la salle du BOSS, pas un dépassement.
+                if stage + 1 >= total {
+                    assert!(label.contains("BOSS"), "stage {stage}/{total} → {label}");
+                }
+            }
+        }
+    }
+
+    /// En boucle infinie, un dénominateur raconte une histoire fausse : il n'y a
+    /// pas de fin à atteindre. C'est le cœur de « on ne comprend pas comment on
+    /// évolue ».
+    #[test]
+    fn the_endless_loop_shows_no_denominator_at_all() {
+        let cfg = RoundsConfig::default();
+        assert!(cfg.max_rounds == 0, "le défaut livré est bien la boucle infinie");
+        for stage in [0u8, 1, 4, 30, 200] {
+            let label = run_progress_label(stage, 1, 2, 4, &cfg);
+            assert!(!label.contains('/') || label.contains("VAGUE"), "{label}");
+            assert!(!label.contains("SALLE"), "{label}");
+            assert!(label.starts_with(&format!("ROUND {}", u32::from(stage) + 1)), "{label}");
+        }
+    }
+
+    /// Le round affiché commence à 1 — personne ne se situe dans un « round 0 ».
+    #[test]
+    fn rounds_are_numbered_from_one_for_the_player() {
+        let cfg = RoundsConfig::default();
+        assert!(run_progress_label(0, 1, 2, 4, &cfg).starts_with("ROUND 1"));
+    }
+
+    /// Les deux moments qui doivent se LIRE : la respiration et le palier.
+    /// Sans eux, le sursaut de difficulté passe pour de l'arbitraire.
+    #[test]
+    fn the_rhythm_is_readable_on_screen() {
+        let cfg = RoundsConfig::default();
+        let respite = run_progress_label(cfg.respite_every as u8, 1, 2, 4, &cfg);
+        assert!(respite.contains("RÉPIT"), "{respite}");
+        let tier = run_progress_label(cfg.tier_every as u8, 1, 2, 4, &cfg);
+        assert!(tier.contains("PALIER"), "{tier}");
+        // Un round ordinaire ne porte ni l'un ni l'autre.
+        let plain = run_progress_label(1, 1, 2, 4, &cfg);
+        assert!(!plain.contains("RÉPIT") && !plain.contains("PALIER"), "{plain}");
+    }
+
+    /// Hors boucle, l'affichage historique est préservé au caractère près.
+    #[test]
+    fn the_graph_mode_display_is_unchanged() {
+        let cfg = graph_mode();
+        assert_eq!(run_progress_label(0, 1, 2, 4, &cfg), "SALLE 1 / 4  ·  VAGUE 1 / 2");
+        assert_eq!(run_progress_label(3, 1, 2, 4, &cfg), "SALLE 4 / 4  ·  BOSS");
     }
 }
