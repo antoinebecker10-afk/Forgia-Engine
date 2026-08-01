@@ -2,6 +2,15 @@
 # Miroir EXACT de MetaShopCatalogue::default() (meta_shop.rs). Chargé au boot.
 #
 # effect : max_hp | damage_mul | damage_reduction | start_gold
+#
+# ─── Story-680 cran 2 : les FACES exclusives (modèle Miroir de Nuit d'Hades) ───
+# Chaque ligne a deux visages et UN SEUL est actif. Les rangs achetés sont
+# CONSERVÉS quand on permute : on choisit ce qu'ils font, pas combien on en a.
+# La permutation est gratuite et réversible — punir le changement d'avis
+# transforme un choix en peur, et une peur n'est pas une décision.
+#
+# `[upgrades.alt]` doit venir APRÈS `costs` : en TOML, une table avale tout ce
+# qui la suit dans la section.
 # amount : valeur ajoutée PAR RANG (cumul). costs : coût par rang (len = rang max).
 
 [[upgrades]]
@@ -11,6 +20,13 @@ desc = "+15 PV max"
 effect = "max_hp"
 amount = 15.0
 costs = [20, 40, 70, 110, 160]
+# Encaisser plus, ou encaisser mieux ? Les PV rendent les gros coups
+# survivables, la réduction rend l'attrition supportable.
+[upgrades.alt]
+name = "Cuirasse"
+desc = "+4 % de réduction de dégâts (au lieu des PV)"
+effect = "damage_reduction"
+amount = 0.04
 
 [[upgrades]]
 id = "damage"
@@ -19,6 +35,13 @@ desc = "+8% dégâts"
 effect = "damage_mul"
 amount = 0.08
 costs = [25, 50, 85, 130, 190]
+# Frapper plus fort, ou partir plus riche ? La puissance paie tout de suite,
+# l'Or paie en Trempe et en achats — plus fort, mais plus tard.
+[upgrades.alt]
+name = "Fortune"
+desc = "+45 Or de départ (au lieu des dégâts)"
+effect = "start_gold"
+amount = 45.0
 
 [[upgrades]]
 id = "armor"
@@ -27,6 +50,13 @@ desc = "+5% réduction de dégâts"
 effect = "damage_reduction"
 amount = 0.05
 costs = [30, 60, 100, 150]
+# L'armure protège de tout un peu ; les PV donnent une marge brute que rien
+# ne perce.
+[upgrades.alt]
+name = "Endurance"
+desc = "+12 PV max (au lieu de la réduction)"
+effect = "max_hp"
+amount = 12.0
 
 [[upgrades]]
 id = "gold"
@@ -35,6 +65,12 @@ desc = "+50 Or de départ"
 effect = "start_gold"
 amount = 50.0
 costs = [15, 35, 60]
+# Commencer riche, ou commencer fort ?
+[upgrades.alt]
+name = "Étincelle"
+desc = "+6 % de dégâts (au lieu de l'Or)"
+effect = "damage_mul"
+amount = 0.06
 
 # ── Maîtrise d'arme (progression permanente par arme) ──
 # L'arme équipée gagne +1 niveau à CHAQUE run terminée (victoire OU défaite).

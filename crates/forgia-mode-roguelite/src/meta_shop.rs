@@ -75,6 +75,41 @@ pub struct MetaUpgrade {
     pub effect: MetaEffect,
     /// Coût par rang ; `len()` = rang max.
     pub costs: Vec<u32>,
+    /// Story-680 cran 2 — **la face alternative**, modèle Miroir de Nuit d'Hades.
+    ///
+    /// Chaque ligne a deux visages et **un seul est actif**. Les rangs achetés
+    /// sont conservés en permutant : on choisit ce qu'ils FONT, pas combien on
+    /// en a. Hades permet de repermuter librement — pas de punition à changer
+    /// d'avis, sinon le choix devient une peur et plus une décision.
+    ///
+    /// `None` = ligne sans alternative (rétrocompatible).
+    pub alt: Option<MetaFace>,
+}
+
+/// Une face d'amélioration : un nom, une description, un effet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetaFace {
+    pub name: String,
+    pub desc: String,
+    pub effect: MetaEffect,
+}
+
+impl MetaUpgrade {
+    /// La face active : `face == 0` → face principale, `1` → alternative.
+    ///
+    /// Une ligne sans alternative renvoie toujours sa face principale, quelle
+    /// que soit la valeur enregistrée — un save corrompu ne peut pas produire
+    /// une ligne sans effet.
+    pub fn face(&self, face: u8) -> (&str, &str, MetaEffect) {
+        match (face, self.alt.as_ref()) {
+            (0, _) | (_, None) => (&self.name, &self.desc, self.effect),
+            (_, Some(a)) => (&a.name, &a.desc, a.effect),
+        }
+    }
+
+    pub fn has_alt(&self) -> bool {
+        self.alt.is_some()
+    }
 }
 
 impl MetaUpgrade {
@@ -234,6 +269,14 @@ impl Default for MetaShopCatalogue {
                     desc: "+15 PV max".into(),
                     effect: MetaEffect::MaxHp(15.0),
                     costs: vec![20, 40, 70, 110, 160],
+                    // Encaisser plus, ou encaisser mieux ? Les PV rendent les
+                    // gros coups survivables, la réduction rend l'attrition
+                    // supportable. Deux styles, un seul actif.
+                    alt: Some(MetaFace {
+                        name: "Cuirasse".into(),
+                        desc: "+4 % de réduction de dégâts (au lieu des PV)".into(),
+                        effect: MetaEffect::DamageReduction(0.04),
+                    }),
                 },
                 MetaUpgrade {
                     id: "damage".into(),
@@ -241,6 +284,14 @@ impl Default for MetaShopCatalogue {
                     desc: "+8% dégâts".into(),
                     effect: MetaEffect::DamageMul(0.08),
                     costs: vec![25, 50, 85, 130, 190],
+                    // Frapper plus fort, ou partir plus riche ? La puissance
+                    // paie tout de suite, l'or paie en Trempe et en achats —
+                    // plus fort, mais plus tard.
+                    alt: Some(MetaFace {
+                        name: "Fortune".into(),
+                        desc: "+45 Or de départ (au lieu des dégâts)".into(),
+                        effect: MetaEffect::StartGold(45),
+                    }),
                 },
                 MetaUpgrade {
                     id: "armor".into(),
@@ -248,6 +299,13 @@ impl Default for MetaShopCatalogue {
                     desc: "+5% réduction de dégâts".into(),
                     effect: MetaEffect::DamageReduction(0.05),
                     costs: vec![30, 60, 100, 150],
+                    // L'armure protège de tout un peu ; les PV donnent une
+                    // marge brute que rien ne perce.
+                    alt: Some(MetaFace {
+                        name: "Endurance".into(),
+                        desc: "+12 PV max (au lieu de la réduction)".into(),
+                        effect: MetaEffect::MaxHp(12.0),
+                    }),
                 },
                 MetaUpgrade {
                     id: "gold".into(),
@@ -255,6 +313,12 @@ impl Default for MetaShopCatalogue {
                     desc: "+50 Or de départ".into(),
                     effect: MetaEffect::StartGold(50),
                     costs: vec![15, 35, 60],
+                    // Commencer riche, ou commencer fort ?
+                    alt: Some(MetaFace {
+                        name: "Étincelle".into(),
+                        desc: "+6 % de dégâts (au lieu de l'Or)".into(),
+                        effect: MetaEffect::DamageMul(0.06),
+                    }),
                 },
             ],
             // Miroir EXACT des [[weapon_unlocks]] du genome (story-613).
@@ -307,6 +371,17 @@ struct UpgradeToml {
     effect: String,
     amount: f32,
     costs: Vec<u32>,
+    /// Story-680 cran 2 — face alternative exclusive. Absente = ligne simple.
+    #[serde(default)]
+    alt: Option<MetaFaceToml>,
+}
+
+#[derive(Deserialize)]
+struct MetaFaceToml {
+    name: String,
+    desc: String,
+    effect: String,
+    amount: f32,
 }
 
 #[derive(Deserialize)]
@@ -371,6 +446,24 @@ impl MetaShopCatalogue {
                     desc: u.desc,
                     effect,
                     costs: u.costs,
+                    // Une face alternative dont l'effet est inconnu est
+                    // SILENCIEUSEMENT ignorée serait un piège : on la rejette
+                    // en le disant, sinon la ligne perdrait sa moitié sans que
+                    // personne ne le sache.
+                    alt: u.alt.and_then(|a| match MetaEffect::from_key(&a.effect, a.amount) {
+                        Some(effect) => Some(MetaFace {
+                            name: a.name,
+                            desc: a.desc,
+                            effect,
+                        }),
+                        None => {
+                            warn!(
+                                "[meta-shop] face alternative '{}' : effet '{}' inconnu — face IGNORÉE",
+                                a.name, a.effect
+                            );
+                            None
+                        }
+                    }),
                 })
             })
             .collect();
@@ -439,6 +532,10 @@ pub struct MetaShopSave {
     pub version: u32,
     pub souls_total: u32,
     pub ranks: HashMap<String, u32>,
+    /// Story-680 cran 2 — face active par ligne (0 = principale, 1 = alternative).
+    /// Absente = face principale, donc les saves d'avant restent valides.
+    #[serde(default)]
+    pub faces: HashMap<String, u8>,
     /// Armes débloquées en permanence (clés genome). Story-613 — défaut = Pépin seul.
     #[serde(default = "default_unlocked_weapons")]
     pub unlocked_weapons: Vec<String>,
@@ -471,6 +568,7 @@ impl Default for MetaShopSave {
             version: SAVE_VERSION,
             souls_total: 0,
             ranks: HashMap::new(),
+            faces: HashMap::new(),
             unlocked_weapons: default_unlocked_weapons(),
             unlocked_boon_tiers: Vec::new(),
             weapon_levels: HashMap::new(),
@@ -629,43 +727,55 @@ impl MetaShopSave {
             .map(|u| u.max_rank().saturating_sub(self.rank(&u.id)))
             .sum()
     }
-    pub fn max_hp_bonus(&self, cat: &MetaShopCatalogue) -> f32 {
+    /// Face active d'une ligne. Repli sur la face principale : un save qui
+    /// pointe une face inexistante ne doit pas produire une ligne sans effet.
+    pub fn face_of(&self, id: &str) -> u8 {
+        self.faces.get(id).copied().unwrap_or(0)
+    }
+
+    /// Permute la face d'une ligne. Les RANGS SONT CONSERVÉS — on choisit ce
+    /// qu'ils font, pas combien on en a. Hades laisse repermuter librement :
+    /// punir le changement d'avis transforme le choix en peur.
+    pub fn toggle_face(&mut self, id: &str) {
+        let next = 1 - self.face_of(id);
+        self.faces.insert(id.to_string(), next);
+    }
+
+    /// Somme d'un effet sur toutes les lignes, **face active seulement**.
+    fn sum_effect(&self, cat: &MetaShopCatalogue, pick: impl Fn(MetaEffect) -> Option<f32>) -> f32 {
         cat.upgrades
             .iter()
-            .filter_map(|u| match u.effect {
-                MetaEffect::MaxHp(a) => Some(u.total_amount(a, self.rank(&u.id))),
-                _ => None,
+            .filter_map(|u| {
+                let (_, _, effect) = u.face(self.face_of(&u.id));
+                pick(effect).map(|a| u.total_amount(a, self.rank(&u.id)))
             })
             .sum()
+    }
+
+    pub fn max_hp_bonus(&self, cat: &MetaShopCatalogue) -> f32 {
+        self.sum_effect(cat, |e| match e {
+            MetaEffect::MaxHp(a) => Some(a),
+            _ => None,
+        })
     }
     pub fn damage_mul(&self, cat: &MetaShopCatalogue) -> f32 {
-        1.0 + cat
-            .upgrades
-            .iter()
-            .filter_map(|u| match u.effect {
-                MetaEffect::DamageMul(a) => Some(u.total_amount(a, self.rank(&u.id))),
-                _ => None,
-            })
-            .sum::<f32>()
+        1.0 + self.sum_effect(cat, |e| match e {
+            MetaEffect::DamageMul(a) => Some(a),
+            _ => None,
+        })
     }
     pub fn damage_reduction(&self, cat: &MetaShopCatalogue) -> f32 {
-        cat.upgrades
-            .iter()
-            .filter_map(|u| match u.effect {
-                MetaEffect::DamageReduction(a) => Some(u.total_amount(a, self.rank(&u.id))),
-                _ => None,
-            })
-            .sum::<f32>()
-            .min(0.85)
+        self.sum_effect(cat, |e| match e {
+            MetaEffect::DamageReduction(a) => Some(a),
+            _ => None,
+        })
+        .min(0.85)
     }
     pub fn start_gold(&self, cat: &MetaShopCatalogue) -> u32 {
-        cat.upgrades
-            .iter()
-            .filter_map(|u| match u.effect {
-                MetaEffect::StartGold(a) => Some(u.total_amount(a as f32, self.rank(&u.id)) as u32),
-                _ => None,
-            })
-            .sum()
+        self.sum_effect(cat, |e| match e {
+            MetaEffect::StartGold(a) => Some(a as f32),
+            _ => None,
+        }) as u32
     }
 }
 
@@ -896,6 +1006,10 @@ pub enum MetaPurchase {
     Upgrade(usize),
     /// Palier d'atouts `cat.boon_tier_unlocks[i]` (déblocage permanent).
     BoonTier(usize),
+    /// Story-680 cran 2 — permute la face de `cat.upgrades[i]`. GRATUIT et
+    /// réversible : Hades laisse repermuter le Miroir librement, parce que
+    /// punir le changement d'avis transforme un choix en peur.
+    ToggleFace(usize),
 }
 
 /// Applique un achat Enclume : mute `save`/`meta` + sauve sur disque. Logique
@@ -934,6 +1048,23 @@ pub fn apply_meta_purchase(
                 rank + 1,
                 cost,
                 meta.current
+            );
+            true
+        }
+        MetaPurchase::ToggleFace(i) => {
+            let Some(up) = cat.upgrades.get(i) else {
+                return false;
+            };
+            if !up.has_alt() {
+                return false;
+            }
+            save.toggle_face(&up.id);
+            save.save();
+            let (name, desc, _) = up.face(save.face_of(&up.id));
+            info!(
+                "[meta-shop] {} → face « {name} » ({desc}) — {} rang(s) conservé(s)",
+                up.id,
+                save.rank(&up.id)
             );
             true
         }
@@ -987,13 +1118,16 @@ pub fn draw_enclume_panel(
     for (i, up) in cat.upgrades.iter().enumerate() {
         let rank = save.rank(&up.id);
         let max = up.max_rank();
+        // Story-680 cran 2 — la ligne affiche sa FACE ACTIVE. Les rangs sont
+        // partagés entre les deux faces : on choisit ce qu'ils font, pas
+        // combien on en a.
+        let (name, desc, _) = up.face(save.face_of(&up.id));
         match up.cost_for_next(rank) {
             Some(cost) => {
                 let afford = souls >= cost;
                 let btn = egui::Button::new(
                     egui::RichText::new(format!(
-                        "{}   rang {}/{}   ·   {} ◇",
-                        up.name, rank, max, cost
+                        "{name}   rang {rank}/{max}   ·   {cost} ◇"
                     ))
                     .size(16.0)
                     .color(if afford { FORGE_OR } else { C_TEXT_MUTED }),
@@ -1007,7 +1141,7 @@ pub fn draw_enclume_panel(
                 let _ = ui.add_enabled(
                     false,
                     egui::Button::new(
-                        egui::RichText::new(format!("{}   MAX {}/{}", up.name, max, max))
+                        egui::RichText::new(format!("{name}   MAX {max}/{max}"))
                             .size(16.0)
                             .color(C_HP_HIGH),
                     )
@@ -1015,11 +1149,21 @@ pub fn draw_enclume_panel(
                 );
             }
         }
-        ui.label(
-            egui::RichText::new(up.desc.as_str())
-                .size(12.0)
-                .color(C_TEXT_MUTED),
-        );
+        ui.label(egui::RichText::new(desc).size(12.0).color(C_TEXT_MUTED));
+        // Le bouton de permutation nomme l'AUTRE face : le joueur doit voir ce
+        // qu'il abandonne et ce qu'il gagne avant de cliquer, pas après.
+        if up.has_alt() {
+            let (other_name, other_desc, _) = up.face(1 - save.face_of(&up.id));
+            let swap = egui::Button::new(
+                egui::RichText::new(format!("⇄  basculer en « {other_name} » — {other_desc}"))
+                    .size(12.0)
+                    .color(FORGE_TEAL),
+            )
+            .min_size(egui::vec2(440.0, 0.0));
+            if ui.add(swap).clicked() {
+                intent = Some(MetaPurchase::ToggleFace(i));
+            }
+        }
         ui.add_space(6.0);
     }
     // ── Paliers d'atouts (boons) ──
@@ -1594,5 +1738,115 @@ unlocked_weapons = ["pepin"]
 "#;
         let save: MetaShopSave = toml::from_str(old).unwrap();
         assert!(!save.is_boon_tier_unlocked("uncommon"));
+    }
+}
+
+#[cfg(test)]
+mod face_tests {
+    use super::*;
+
+    /// LE point du cran 2 : un choix n'existe que si prendre A INTERDIT B.
+    /// Avant, tout se cumulait — donc aucune décision.
+    #[test]
+    fn only_the_active_face_applies_never_both() {
+        let cat = MetaShopCatalogue::default();
+        let mut save = MetaShopSave::default();
+        save.ranks.insert("max_hp".into(), 3);
+
+        // Face principale : des PV, pas de réduction.
+        let hp_a = save.max_hp_bonus(&cat);
+        let dr_a = save.damage_reduction(&cat);
+        assert!(hp_a > 0.0 && dr_a == 0.0, "face A doit donner SEULEMENT des PV");
+
+        // Face alternative : de la réduction, plus de PV.
+        save.toggle_face("max_hp");
+        let hp_b = save.max_hp_bonus(&cat);
+        let dr_b = save.damage_reduction(&cat);
+        assert!(dr_b > 0.0, "face B doit donner de la réduction");
+        assert!(hp_b < hp_a, "face B ne doit PLUS donner les PV de la face A");
+    }
+
+    /// Permuter conserve les rangs : on choisit ce qu'ils font, pas combien on
+    /// en a. Perdre ses rangs en changeant d'avis rendrait le choix irréversible
+    /// de fait, donc effrayant.
+    #[test]
+    fn swapping_a_face_keeps_the_ranks() {
+        let cat = MetaShopCatalogue::default();
+        let mut save = MetaShopSave::default();
+        save.ranks.insert("damage".into(), 4);
+        save.toggle_face("damage");
+        assert_eq!(save.rank("damage"), 4, "les rangs sont conservés");
+        assert_eq!(save.face_of("damage"), 1);
+        // Et c'est réversible sans coût.
+        save.toggle_face("damage");
+        assert_eq!(save.face_of("damage"), 0);
+        assert_eq!(save.rank("damage"), 4);
+        let _ = cat;
+    }
+
+    /// Le niveau ne doit PAS changer en permutant : permuter n'est pas un achat.
+    #[test]
+    fn swapping_does_not_change_the_player_level() {
+        let cat = MetaShopCatalogue::default();
+        let mut save = MetaShopSave::default();
+        save.ranks.insert("armor".into(), 2);
+        let before = save.player_level(&cat);
+        save.toggle_face("armor");
+        assert_eq!(save.player_level(&cat), before);
+    }
+
+    /// Un save d'avant story-680 n'a pas de champ `faces` : il doit rester
+    /// valide et se comporter comme avant (face principale partout).
+    #[test]
+    fn a_save_from_before_the_feature_still_works() {
+        let cat = MetaShopCatalogue::default();
+        let save = MetaShopSave::default();
+        assert!(save.faces.is_empty());
+        assert_eq!(save.face_of("max_hp"), 0, "repli sur la face principale");
+        let _ = save.max_hp_bonus(&cat);
+    }
+
+    /// Le génome livré doit déclarer les mêmes faces que le miroir Rust —
+    /// sinon le repli change le jeu au lieu de le préserver.
+    #[test]
+    fn the_shipped_genome_declares_the_same_faces_as_the_rust_mirror() {
+        let content = std::fs::read_to_string(GENOME_PATH)
+            .or_else(|_| std::fs::read_to_string(format!("../../{GENOME_PATH}")))
+            .expect("roguelite_meta_shop.toml introuvable");
+        let from_toml = MetaShopCatalogue::parse_toml(&content);
+        let mirror = MetaShopCatalogue::default();
+        assert_eq!(
+            from_toml.upgrades.len(),
+            mirror.upgrades.len(),
+            "le TOML et le miroir n'ont pas le même nombre de lignes"
+        );
+        for (a, b) in from_toml.upgrades.iter().zip(mirror.upgrades.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(
+                a.alt.is_some(),
+                b.alt.is_some(),
+                "ligne '{}' : face alternative présente d'un côté seulement",
+                a.id
+            );
+            assert_eq!(a.alt, b.alt, "ligne '{}' : les faces ont divergé", a.id);
+        }
+    }
+
+    /// Chaque ligne DOIT avoir une alternative : une ligne sans alternative est
+    /// un achat sans décision, ce que cette story existe pour supprimer.
+    #[test]
+    fn every_line_offers_a_real_choice() {
+        for u in &MetaShopCatalogue::default().upgrades {
+            assert!(u.has_alt(), "la ligne '{}' n'offre aucun choix", u.id);
+            let (na, _, ea) = u.face(0);
+            let (nb, _, eb) = u.face(1);
+            assert_ne!(na, nb, "ligne '{}' : les deux faces portent le même nom", u.id);
+            assert_ne!(
+                std::mem::discriminant(&ea),
+                std::mem::discriminant(&eb),
+                "ligne '{}' : les deux faces font la MÊME chose — ce n'est pas un choix",
+                u.id
+            );
+        }
     }
 }
