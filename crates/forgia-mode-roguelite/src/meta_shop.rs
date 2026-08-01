@@ -984,6 +984,25 @@ pub fn sys_meta_shop_input(
         apply_meta_purchase(&cat, &mut save, &mut meta, MetaPurchase::BoonTier(ti));
         return;
     }
+    // Story-681 — F1..F4 : CHANGER DE VOIE. Le choix de face (story-680 cran 2)
+    // n'était offert qu'au clic dans le hub-menu ; au Lobby, il n'existait pas.
+    // Une décision qu'on ne peut pas prendre depuis l'écran où on décide n'est
+    // pas une décision.
+    //
+    // Touches F et non chiffres : les chiffres ACHÈTENT, et confondre « acheter
+    // un rang » avec « changer ce que font mes rangs » coûterait des âmes.
+    let swap = [
+        KeyCode::F1,
+        KeyCode::F2,
+        KeyCode::F3,
+        KeyCode::F4,
+    ]
+    .iter()
+    .position(|k| keys.just_pressed(*k));
+    if let Some(i) = swap {
+        apply_meta_purchase(&cat, &mut save, &mut meta, MetaPurchase::ToggleFace(i));
+        return;
+    }
     // Achat upgrades 1..=4 (même logique partagée).
     let idx = [
         KeyCode::Digit1,
@@ -1027,14 +1046,18 @@ pub fn apply_meta_purchase(
                 return false;
             };
             let rank = save.rank(&up.id);
+            // Story-681 — les logs nomment la FACE ACTIVE, pas la principale :
+            // un diagnostic qui ne dit pas ce que le joueur avait sous les yeux
+            // envoie chercher le défaut au mauvais endroit.
+            let (face_name, _, _) = up.face(save.face_of(&up.id));
             let Some(cost) = up.cost_for_next(rank) else {
-                info!("[meta-shop] {} déjà au rang max", up.name);
+                info!("[meta-shop] {face_name} déjà au rang max");
                 return false;
             };
             if meta.current < cost {
                 info!(
-                    "[meta-shop] pas assez d'âmes pour {} ({}/{})",
-                    up.name, meta.current, cost
+                    "[meta-shop] pas assez d'âmes pour {face_name} ({}/{})",
+                    meta.current, cost
                 );
                 return false;
             }
@@ -1043,10 +1066,8 @@ pub fn apply_meta_purchase(
             save.souls_total = meta.current;
             save.save();
             info!(
-                "[meta-shop] acheté {} rang {} (-{} âmes, reste {})",
-                up.name,
+                "[meta-shop] acheté {face_name} rang {} (-{cost} âmes, reste {})",
                 rank + 1,
-                cost,
                 meta.current
             );
             true
@@ -1237,6 +1258,30 @@ pub fn draw_meta_shop_lobby(
                 .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
+                        // Story-681 — le NIVEAU au Lobby. Depuis story-680, le
+                        // niveau EST la somme des rangs achetés ici : c'est donc
+                        // l'écran où il veut dire quelque chose. L'afficher
+                        // ailleurs sans l'afficher ici serait absurde.
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Niveau {}",
+                                save.player_level(&cat)
+                            ))
+                            .size(26.0)
+                            .strong()
+                            .color(FORGE_OR),
+                        );
+                        let remaining = save.ranks_remaining(&cat);
+                        ui.label(
+                            egui::RichText::new(if remaining == 0 {
+                                "Enclume complète".to_string()
+                            } else {
+                                format!("{remaining} amélioration(s) encore disponible(s)")
+                            })
+                            .size(15.0)
+                            .color(C_TEXT_MUTED),
+                        );
+                        ui.add_space(10.0);
                         ui.label(
                             egui::RichText::new(format!("◇ Âmes : {}", meta.current))
                                 .size(24.0)
@@ -1244,34 +1289,45 @@ pub fn draw_meta_shop_lobby(
                                 .color(FORGE_TEAL),
                         );
                         ui.add_space(16.0);
+                        // Story-681 — le Lobby lisait `up.name` / `up.desc`, donc
+                        // il affichait TOUJOURS la face principale : un joueur
+                        // ayant basculé sur « Cuirasse » voyait quand même
+                        // « Vitalité +15 PV ». Même classe de mensonge que le
+                        // « SALLE 5 / 4 » — deux écrans, une seule vérité.
                         for (i, up) in cat.upgrades.iter().enumerate() {
                             let rank = save.rank(&up.id);
                             let max = up.max_rank();
+                            let (name, desc, _) = up.face(save.face_of(&up.id));
                             let (text, col) = match up.cost_for_next(rank) {
                                 Some(cost) => {
                                     let afford = meta.current >= cost;
                                     (
                                         format!(
-                                            "[{}]  {} — {}  (rang {}/{})  ·  {} âmes",
-                                            i + 1,
-                                            up.name,
-                                            up.desc,
-                                            rank,
-                                            max,
-                                            cost
+                                            "[{}]  {name} — {desc}  (rang {rank}/{max})  ·  {cost} âmes",
+                                            i + 1
                                         ),
                                         if afford { FORGE_OR } else { C_TEXT_MUTED },
                                     )
                                 }
                                 None => (
-                                    format!(
-                                        "[—]  {} — {}  (MAX {}/{})",
-                                        up.name, up.desc, max, max
-                                    ),
+                                    format!("[—]  {name} — {desc}  (MAX {max}/{max})"),
                                     C_HP_HIGH,
                                 ),
                             };
                             ui.label(egui::RichText::new(text).size(19.0).color(col));
+                            // La face alternative est ANNONCÉE : sans ça, le
+                            // choix existerait sans jamais être offert au Lobby.
+                            if up.has_alt() {
+                                let (other, other_desc, _) = up.face(1 - save.face_of(&up.id));
+                                ui.label(
+                                    egui::RichText::new(format!(
+                                        "        ⇄ [F{}]  {other} — {other_desc}",
+                                        i + 1
+                                    ))
+                                    .size(15.0)
+                                    .color(FORGE_TEAL),
+                                );
+                            }
                             ui.add_space(4.0);
                         }
                         // Paliers d'atouts (boons) — story-616 (touches 5/6/7).
@@ -1299,7 +1355,9 @@ pub fn draw_meta_shop_lobby(
                         }
                         ui.add_space(14.0);
                         ui.label(
-                            egui::RichText::new("1-4 stats · 5-7 atouts · ENTRÉE = lancer")
+                            egui::RichText::new(
+                                "1-4 acheter · F1-F4 changer de voie · 5-7 atouts · ENTRÉE = lancer",
+                            )
                                 .size(18.0)
                                 .color(C_TEXT_MUTED),
                         );

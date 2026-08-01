@@ -134,7 +134,16 @@ pub(crate) fn draw_wave_counter(
     let panel_w = 340.0;
     // Story-679 — une 3e ligne quand la boucle est active : l'indicateur de
     // rythme. Le panneau grandit avec son contenu au lieu de le rogner.
-    let show_pace = rounds.enabled && !wave.in_break;
+    // Story-681 — la ligne de rythme reste RÉSERVÉE pendant le break. Avant,
+    // `!wave.in_break` la retirait, et le panneau rétrécissait de 24 px à chaque
+    // fin de vague puis regrandissait : une UI qui pulse à chaque respiration
+    // attire l'œil sur elle-même au lieu du jeu.
+    //
+    // Et l'espace ainsi gardé sert : pendant le break on affiche le temps qu'a
+    // pris le round qu'on vient de finir. C'est exactement le moment où le
+    // joueur choisit sa récompense — lui dire « nettoyé en 43 s / 90 s » à cet
+    // instant relie sa décision à sa performance.
+    let show_pace = rounds.enabled;
     // Story-680 cran 4 — la ligne des synergies n'apparaît que si une synergie
     // est ENTAMÉE. Six compteurs à 0/3 en permanence noieraient l'information.
     let synergies: Vec<(forgia_rpg_data::boons::BoonTag, u32, bool)> = boons
@@ -224,6 +233,24 @@ pub(crate) fn draw_wave_counter(
     if show_pace {
         let budget = rounds.round_time_budget_s;
         let now = crate::rounds::pace_from_elapsed(pace.combat_secs, budget);
+        // Pendant le break : le bilan du round qu'on vient de nettoyer.
+        if wave.in_break {
+            let secs = pace.combat_secs;
+            let col = match now {
+                crate::rounds::Pace::Holding => C_HP_HIGH,
+                crate::rounds::Pace::Pressured => C_HP_MID,
+                crate::rounds::Pace::Falling => C_HP_LOW,
+            };
+            text_with_outline(
+                &painter,
+                egui::pos2(center_x, top_y + 80.0),
+                egui::Align2::CENTER_CENTER,
+                &format!("NETTOYÉ EN  {secs:.0}s / {budget:.0}s"),
+                display_font(15.0),
+                col,
+                1.5,
+            );
+        } else {
         // La triade HP, pas un 4e code couleur : le joueur lit déjà
         // vert/jaune/rouge comme « ça va / attention / danger ». Réutiliser son
         // vocabulaire coûte zéro apprentissage.
@@ -250,6 +277,7 @@ pub(crate) fn draw_wave_counter(
             color,
             1.5,
         );
+        }
     }
 
     // Story-680 cran 4 — les SYNERGIES en cours.
