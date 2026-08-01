@@ -1224,3 +1224,100 @@ mod tag_progress_tests {
         assert!(a.tag_progress().is_empty());
     }
 }
+
+#[cfg(test)]
+mod catalogue_shape_tests {
+    use super::*;
+
+    fn shipped() -> BoonsCatalogue {
+        let p = "assets/genomes/roguelite_boons.toml";
+        let content = std::fs::read_to_string(p)
+            .or_else(|_| std::fs::read_to_string(format!("../../{p}")))
+            .expect("roguelite_boons.toml introuvable");
+        toml::from_str::<BoonsCatalogue>(&content).expect("catalogue d'atouts illisible")
+    }
+
+    /// Story-680 cran 5 — le pool ne doit pas être un mur de statistiques.
+    ///
+    /// L'audit : 18 atouts dont 14 purement numériques, et les 4 « mécaniques »
+    /// (Chaîne, Impact) étaient MORTS — leurs champs étaient calculés et
+    /// personne ne les lisait. Ajouter des atouts « +X % » aurait multiplié le
+    /// même non-choix.
+    #[test]
+    fn a_meaningful_share_of_the_pool_changes_how_you_play() {
+        let cat = shipped();
+        let behavioural = cat
+            .entries
+            .iter()
+            .filter(|b| {
+                matches!(
+                    b.effect,
+                    BoonEffectKind::ChainTargets { .. } | BoonEffectKind::Knockback { .. }
+                )
+            })
+            .count();
+        assert!(
+            behavioural * 3 >= cat.entries.len(),
+            "seulement {behavioural} atouts mécaniques sur {} — le pool reste un mur de stats",
+            cat.entries.len()
+        );
+    }
+
+    /// Deux atouts avec le même id se masqueraient l'un l'autre au tirage.
+    #[test]
+    fn no_duplicate_ids() {
+        let cat = shipped();
+        let mut seen = std::collections::HashSet::new();
+        for b in &cat.entries {
+            assert!(seen.insert(b.id.0.clone()), "id dupliqué : {}", b.id.0);
+        }
+    }
+
+    /// **Chaque tag doit mener quelque part.** Le mécanisme « 3 tags identiques
+    /// → un légendaire de ce tag » n'a de sens que si ce légendaire EXISTE.
+    /// `chain` et `knockback` n'en avaient aucun : construire ces synergies ne
+    /// menait nulle part, ce qui les rendait sans objet.
+    #[test]
+    fn every_tag_leads_to_a_legendary() {
+        let cat = shipped();
+        for tag in BoonTag::ALL {
+            let has_common = cat
+                .entries
+                .iter()
+                .any(|b| b.rarity != BoonRarity::Legendary && b.tags.contains(&tag));
+            if !has_common {
+                continue; // tag non utilisé : rien à promettre
+            }
+            assert!(
+                cat.entries
+                    .iter()
+                    .any(|b| b.rarity == BoonRarity::Legendary && b.tags.contains(&tag)),
+                "le tag {:?} est empilable mais ne mène à AUCUN légendaire",
+                tag
+            );
+        }
+    }
+
+    /// Une synergie doit être ATTEIGNABLE : il faut au moins `threshold` atouts
+    /// non-légendaires portant le tag, sinon on ne peut jamais l'accumuler.
+    #[test]
+    fn every_promised_synergy_is_reachable() {
+        let cat = shipped();
+        for tag in BoonTag::ALL {
+            let n = cat
+                .entries
+                .iter()
+                .filter(|b| b.rarity != BoonRarity::Legendary && b.tags.contains(&tag))
+                .count() as u32;
+            if n == 0 {
+                continue;
+            }
+            assert!(
+                n >= LEGENDARY_TAG_THRESHOLD,
+                "le tag {:?} n'a que {n} atout(s) tirables : la synergie ({}) est INATTEIGNABLE",
+                tag,
+                LEGENDARY_TAG_THRESHOLD
+            );
+        }
+    }
+}

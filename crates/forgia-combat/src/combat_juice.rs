@@ -83,6 +83,11 @@ pub fn sys_apply_hit_knockback(
     mut stats: Option<ResMut<forgia_juice_lib::knockback::KnockbackStats>>,
     q_pos: Query<&GlobalTransform>,
     mut q_kb: Query<&mut forgia_juice_lib::knockback::Knockback>,
+    // Story-680 cran 5 — `PlayerCombatMods.knockback_strength` était calculé par
+    // `boons_apply` et **personne ne le lisait**. Les 2 atouts « Impact » du
+    // catalogue ne faisaient donc RIEN. La poussée ne venait que du génome
+    // d'arme ; les boons n'y contribuaient pas.
+    mods: Option<Res<crate::combat_mods::PlayerCombatMods>>,
 ) {
     use forgia_juice_lib::knockback::{
         accumulate_knockback, displacement_m, knockback_velocity, Knockback,
@@ -100,6 +105,11 @@ pub fn sys_apply_hit_knockback(
             .weapon
             .map(|w| weapon_knockback_mult(w, &tuning))
             .unwrap_or(tuning.mult_default); // None = melee/world → défaut
+        // Les atouts s'ajoutent MULTIPLICATIVEMENT au multiplicateur d'arme :
+        // « Impact » renforce le caractère de l'arme au lieu de l'écraser — une
+        // Boucherie boostée projette encore plus qu'un Pépin boosté.
+        let boon_mult = 1.0 + mods.as_deref().map(|m| m.knockback_strength).unwrap_or(0.0);
+        let weapon_mult = weapon_mult * boon_mult;
         let v = knockback_velocity(dir, &tuning, weapon_mult, ev.is_kill);
         if v == Vec3::ZERO {
             continue;

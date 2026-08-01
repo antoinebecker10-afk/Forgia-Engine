@@ -225,3 +225,130 @@ rarity = "legendary"
 tags = ["fire", "precision", "chaos"]
 souls_cost = 90
 effect = { kind = "heal_on_kill", hp = 10.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Story-680 cran 5 — des atouts qui CHANGENT LA FAÇON DE JOUER
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# L'audit de progression : « cinq systèmes, un seul verbe — multiplier ». Sur les
+# 18 atouts d'origine, 14 étaient des statistiques et les 4 restants (2 Chaîne,
+# 2 Impact) étaient MORTS — `chain_extra_targets` et `knockback_strength` étaient
+# calculés et personne ne les lisait. Les deux exceptions ne fonctionnaient pas.
+#
+# Les deux mécaniques sont réparées (`chain.rs`, `combat_juice.rs`). On les peuple
+# maintenant — et SEULEMENT elles. Ajouter dix atouts « +X % dégâts » aurait
+# multiplié le même non-choix ; ce qu'il manquait, ce sont des décisions.
+#
+# Ces atouts se répondent : la Chaîne récompense de tirer AU MILIEU du groupe,
+# l'Impact récompense de le DISPERSER. Les jouer ensemble demande d'arbitrer,
+# pas d'empiler.
+
+# ── Chaîne (le placement devient une décision) ──────────────────────────────
+
+[[entries]]
+id = "arc_jumeau"
+name = "Arc Jumeau"
+voiceline_preview = "Une balle, deux ennuis."
+rarity = "uncommon"
+tags = ["chain", "precision"]
+souls_cost = 45
+effect = { kind = "chain_targets", count = 1 }
+
+[[entries]]
+id = "orage_de_forge"
+name = "Orage de Forge"
+voiceline_preview = "Ça saute partout !"
+rarity = "rare"
+tags = ["chain", "chaos"]
+souls_cost = 65
+effect = { kind = "chain_targets", count = 2 }
+
+[[entries]]
+id = "fil_rouge"
+name = "Fil Rouge"
+voiceline_preview = "Ils sont tous reliés."
+rarity = "uncommon"
+tags = ["chain", "fire"]
+souls_cost = 45
+effect = { kind = "chain_targets", count = 1 }
+
+# ── Impact (disperser le groupe, gagner de l'espace) ────────────────────────
+
+[[entries]]
+id = "coup_de_bourrasque"
+name = "Coup de Bourrasque"
+voiceline_preview = "Pousse-toi de là."
+rarity = "common"
+tags = ["knockback"]
+souls_cost = 25
+effect = { kind = "knockback", strength = 0.5 }
+
+[[entries]]
+id = "enclume_volante"
+name = "Enclume Volante"
+voiceline_preview = "Envole-toi !"
+rarity = "rare"
+tags = ["knockback", "chaos"]
+souls_cost = 60
+effect = { kind = "knockback", strength = 1.2 }
+
+[[entries]]
+id = "revers_du_forgeron"
+name = "Revers du Forgeron"
+voiceline_preview = "Recule, toi."
+rarity = "uncommon"
+tags = ["knockback", "precision"]
+souls_cost = 40
+effect = { kind = "knockback", strength = 0.8 }
+
+# ── Légendaires de synergie (débloqués à 3 tags identiques) ─────────────────
+# Le mécanisme « 3 tags → légendaire » n'avait de légendaire que pour certains
+# tags. `chain` et `knockback` n'en avaient AUCUN : construire ces synergies ne
+# menait nulle part, ce qui les rendait sans objet.
+
+[[entries]]
+id = "chaine_sans_fin"
+name = "Chaîne sans Fin"
+voiceline_preview = "Ça ne s'arrête plus."
+rarity = "legendary"
+tags = ["chain"]
+souls_cost = 90
+effect = { kind = "chain_targets", count = 3 }
+
+[[entries]]
+id = "marteau_du_ciel"
+name = "Marteau du Ciel"
+voiceline_preview = "Tout le monde dehors !"
+rarity = "legendary"
+tags = ["knockback"]
+souls_cost = 90
+effect = { kind = "knockback", strength = 2.0 }
+
+# ── Ricochet : le tag existait sans mécanique ───────────────────────────────
+# Le tag `ricochet` n'avait que 2 atouts tirables — sa synergie (3 requis) était
+# INATTEIGNABLE, donc le jeu promettait une combinaison impossible à construire.
+# Et il n'existe aucun effet « ricochet » dans le moteur : le tag nommait une
+# fantaisie que rien ne livrait.
+#
+# Or un ricochet, mécaniquement, c'est une balle qui rebondit sur un autre
+# ennemi — c'est-à-dire exactement `chain_targets`. On lui donne donc la
+# mécanique de la chaîne : le tag cesse d'être décoratif, et la synergie devient
+# atteignable. (Trouvé par le test `every_promised_synergy_is_reachable`.)
+
+[[entries]]
+id = "galet_du_ruisseau"
+name = "Galet du Ruisseau"
+voiceline_preview = "Plouf, plouf, plouf."
+rarity = "common"
+tags = ["ricochet"]
+souls_cost = 25
+effect = { kind = "chain_targets", count = 1 }
+
+[[entries]]
+id = "pierre_qui_danse"
+name = "Pierre qui Danse"
+voiceline_preview = "Elle ne s'arrête jamais."
+rarity = "uncommon"
+tags = ["ricochet", "chaos"]
+souls_cost = 45
+effect = { kind = "chain_targets", count = 1 }

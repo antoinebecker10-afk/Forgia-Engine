@@ -30,6 +30,7 @@ pub mod audio;
 pub mod boons_apply;
 pub mod boss_portal;
 pub mod boucherie_rocket;
+pub mod chain;
 pub mod coffre_sensor;
 pub mod decor;
 /// Story-671 — les directions artistiques (palettes de props) en couche definition.
@@ -366,6 +367,17 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-677 — la boucle de rounds : courbe de menace + mur mesurable.
         app.init_resource::<rounds::RoundPace>();
         app.add_systems(Startup, rounds::sys_init_rounds);
+        // Story-680 cran 5 — la CHAÎNE : `chain_extra_targets` était calculé et
+        // jamais lu. Les 2 atouts « Chaîne » du catalogue ne faisaient rien.
+        app.init_resource::<chain::ChainStats>();
+        app.add_systems(Startup, chain::sys_init_chain);
+        app.add_systems(
+            Update,
+            (chain::sys_hot_reload_chain, chain::sys_apply_chain)
+                .chain()
+                .in_set(GameSet::Combat)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         app.add_systems(
             Update,
             (
