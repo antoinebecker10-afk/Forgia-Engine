@@ -117,7 +117,7 @@ impl Default for RingCfg {
         Self {
             tank: 12.0,
             runner: 25.0,
-            sniper: 50.0,
+            sniper: 42.0,
             boss: 12.0,
             wave2_bonus_m: 2.5,
             jitter_m: 2.0,
@@ -658,5 +658,63 @@ mod tests {
             radius(&r2, EnemyArchetype::Tank) > radius(&r1, EnemyArchetype::Tank),
             "vague 2 plus dense → anneaux élargis"
         );
+    }
+}
+
+#[cfg(test)]
+mod ring_reach_tests {
+    use super::*;
+    use crate::enemies::{EnemyStatsConfig, EnemyArchetype};
+
+    /// Story-686 — **un ennemi doit pouvoir VOIR le joueur en apparaissant.**
+    ///
+    /// Constaté en jeu : 8 bots vivants, 0 en poursuite, round jamais nettoyé.
+    /// Cause : l'anneau d'apparition était centré sur l'ORIGINE du monde, pas
+    /// sur le joueur. Ça n'a jamais été un choix — ça marchait parce que le
+    /// joueur apparaissait AUSSI à l'origine. Story-682 l'a déplacé de 12 m pour
+    /// le sortir du puits, et un tank né de l'autre côté se retrouvait à 24 m
+    /// pour 22 m de portée : jamais acquis, Idle à vie.
+    ///
+    /// Ce test pin la relation : le rayon de l'anneau doit rester STRICTEMENT
+    /// sous la portée de détection de l'archétype, jitter compris.
+    #[test]
+    fn every_archetype_spawns_within_its_own_detect_range() {
+        let comp = WaveCompConfig::default();
+        let stats = EnemyStatsConfig::default();
+        let jitter = comp.ring.jitter_m.max(0.0);
+        for (a, ring) in [
+            (EnemyArchetype::Tank, comp.ring.tank),
+            (EnemyArchetype::Runner, comp.ring.runner),
+            (EnemyArchetype::Sniper, comp.ring.sniper),
+        ] {
+            // Pire cas : rayon max (jitter positif) + le bonus de la vague 2.
+            let worst = ring + jitter + comp.ring.wave2_bonus_m;
+            let detect = stats.for_archetype(a).detect_range;
+            assert!(
+                worst < detect,
+                "{a:?} : apparaît jusqu'à {worst:.1} m pour {detect:.1} m de portée — \
+                 il ne verra jamais le joueur et restera Idle"
+            );
+        }
+    }
+
+    /// Et la marge doit être RÉELLE : un archétype qui apparaît à 99 % de sa
+    /// portée perd le joueur au premier pas de côté.
+    #[test]
+    fn the_reach_margin_is_not_razor_thin() {
+        let comp = WaveCompConfig::default();
+        let stats = EnemyStatsConfig::default();
+        for (a, ring) in [
+            (EnemyArchetype::Tank, comp.ring.tank),
+            (EnemyArchetype::Runner, comp.ring.runner),
+            (EnemyArchetype::Sniper, comp.ring.sniper),
+        ] {
+            let detect = stats.for_archetype(a).detect_range;
+            let worst = ring + comp.ring.jitter_m.max(0.0) + comp.ring.wave2_bonus_m;
+            assert!(
+                worst <= detect * 0.95,
+                "{a:?} : {worst:.1} m sur {detect:.1} m de portée — marge trop mince"
+            );
+        }
     }
 }

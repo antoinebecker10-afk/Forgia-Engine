@@ -114,16 +114,34 @@ pub const BOSS_WAVE_COMPOSITION: u8 = 3;
 /// config de composition l'aurait fait déborder. `scalability.md` prescrit
 /// exactement ce remède : « SystemParam bundle quand > 12 params ».
 #[derive(bevy::ecs::system::SystemParam)]
-pub struct WaveSpawnConfigs<'w> {
+pub struct WaveSpawnConfigs<'w, 's> {
     pub stats: Res<'w, EnemyStatsConfig>,
     pub defense: Res<'w, DefenseConfig>,
     pub comp: Res<'w, WaveCompConfig>,
     /// Story-677 — la boucle de rounds. Dans le bundle et pas en param direct :
     /// `sys_wave_orchestrator` était à 14 params, le plafond Bevy est 16.
     pub rounds: Res<'w, crate::rounds::RoundsConfig>,
+    /// Story-686 — la position du JOUEUR, qui centre l'anneau d'apparition.
+    ///
+    /// Dans le bundle et pas en param direct : `sys_start_run` est déjà AU
+    /// plafond de 16. Et c'est sa place — l'anneau fait partie de ce qu'il faut
+    /// pour poser une vague.
+    pub player: Query<'w, 's, &'static Transform, With<forgia_player::Player>>,
 }
 
-impl WaveSpawnConfigs<'_> {
+impl WaveSpawnConfigs<'_, '_> {
+    /// Centre de l'anneau d'apparition = position du joueur, en XZ.
+    ///
+    /// Repli sur l'origine si le joueur n'existe pas encore : c'est le
+    /// comportement d'avant, et il vaut mieux qu'un `panic` au chargement.
+    pub fn ring_center(&self) -> Vec2 {
+        self.player
+            .iter()
+            .next()
+            .map(|t| t.translation.xz())
+            .unwrap_or(Vec2::ZERO)
+    }
+
     /// Contexte de spawn pour une vague donnée.
     #[allow(clippy::too_many_arguments)]
     pub fn ctx<'a>(
@@ -136,6 +154,9 @@ impl WaveSpawnConfigs<'_> {
         obstacles: &'a crate::decor::DecorObstacles,
     ) -> WaveSpawnCtx<'a> {
         WaveSpawnCtx {
+            // Story-686 — lu ICI, une seule fois : les 3 sites d'appel ne
+            // peuvent pas en donner une version différente.
+            ring_center: self.ring_center(),
             stats: &self.stats,
             defense: &self.defense,
             comp: &self.comp,
@@ -167,6 +188,21 @@ pub struct WaveSpawnCtx<'a> {
     pub kind: Option<forgia_stage::graph::StageKind>,
     /// `budget_director(salle) / budget_director(0)`, borné par le genome.
     pub density: f32,
+    /// Story-686 — CENTRE de l'anneau d'apparition : la position du JOUEUR.
+    ///
+    /// L'anneau était centré sur l'origine du monde. Ça n'a jamais été un choix :
+    /// ça marchait parce que le joueur apparaissait AUSSI à l'origine, donc les
+    /// deux coïncidaient. Story-682 a déplacé le spawn joueur de 12 m pour le
+    /// sortir du puits de `forge_sanctum` — et la relation s'est cassée.
+    ///
+    /// Mesuré en jeu : un tank né de l'autre côté du puits se retrouvait à 24 m
+    /// du joueur pour 22 m de portée de détection. Il ne l'acquérait jamais et
+    /// restait Idle à vie. 8 bots vivants, 0 en poursuite, round jamais nettoyé.
+    ///
+    /// Le génome dit « le Tank arrive PRÈS, le Sniper LOIN » — près de QUOI, si
+    /// ce n'est du joueur ? Le rayon a toujours voulu dire « distance au
+    /// joueur » ; il était implémenté en « distance à l'origine ».
+    pub ring_center: Vec2,
     /// Graine de la RUN. Sans elle, les positions étaient les mêmes à chaque run.
     pub run_seed: u64,
     /// Story-672 — emprises solides du décor de la salle. Un ennemi ne doit JAMAIS
@@ -235,14 +271,15 @@ pub fn spawn_wave_enemies(
             // Story-672 — l'angle voulu peut tomber dans un prop solide. On balaie
             // l'anneau pour trouver une place libre ; si tout est encombré on prend
             // le point le plus dégagé. Un ennemi apparaît toujours, jamais dedans.
-            let theta = ctx.obstacles.clear_angle_on_ring(
+            let theta = ctx.obstacles.clear_angle_on_ring_at(
+                ctx.ring_center,
                 r,
                 theta,
                 stats.capsule_radius,
                 SPAWN_CLEAR_TRIES,
             );
-            let x = r * theta.cos();
-            let z = r * theta.sin();
+            let x = ctx.ring_center.x + r * theta.cos();
+            let z = ctx.ring_center.y + r * theta.sin();
             // Story-685 — MÊME source que `foot_offset_m` de l'ArenaBot : le suivi
             // de sol repose sur l'égalité des deux, deux copies divergeraient.
             let y = stats.foot_offset_m();

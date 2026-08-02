@@ -48,7 +48,15 @@ runner = 4
 # Rayon de l'anneau de spawn (m) par archétype — le Tank arrive près, le Sniper loin.
 tank = 12.0
 runner = 25.0
-sniper = 50.0
+# Story-686 — 50 → 42. À 50 m, le pire cas (jitter + bonus vague 2) donnait
+# 54,5 m pour 55 m de portée de détection : une marge de CINQUANTE CENTIMÈTRES.
+# Le moindre écart et le sniper n'acquérait jamais le joueur — il restait Idle à
+# vie, et le round ne se nettoyait pas.
+#
+# Et il ne TIRE qu'à 24 m : depuis 50 m il devait marcher 8,8 s à 3,2 m/s avant
+# de servir à quelque chose. À 42 m c'est 5,6 s, et la marge de détection passe
+# de 1 % à 15 %.
+sniper = 42.0
 boss = 12.0
 # La vague 2 est plus dense : on élargit un peu ses anneaux pour ne pas empiler.
 wave2_bonus_m = 2.5

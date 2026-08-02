@@ -563,12 +563,28 @@ impl DecorObstacles {
         body_radius: f32,
         tries: u32,
     ) -> f32 {
+        self.clear_angle_on_ring_at(Vec2::ZERO, radius, wanted, body_radius, tries)
+    }
+
+    /// Story-686 — même recherche, mais autour d'un CENTRE quelconque.
+    ///
+    /// L'anneau d'apparition est centré sur le JOUEUR, pas sur l'origine du
+    /// monde. Chercher la place libre autour de l'origine alors que les ennemis
+    /// naissent autour du joueur testerait le mauvais endroit.
+    pub fn clear_angle_on_ring_at(
+        &self,
+        center: Vec2,
+        radius: f32,
+        wanted: f32,
+        body_radius: f32,
+        tries: u32,
+    ) -> f32 {
         let n = tries.max(1);
         let step = std::f32::consts::TAU / n as f32;
         let mut best = (wanted, f32::NEG_INFINITY);
         for i in 0..n {
             let a = wanted + step * i as f32;
-            let p = Vec2::new(radius * a.cos(), radius * a.sin());
+            let p = center + Vec2::new(radius * a.cos(), radius * a.sin());
             if self.is_clear(p, body_radius) {
                 return a;
             }
