@@ -227,3 +227,27 @@ default = 9.0
 [[genes]]
 id = "decor_max_props"
 default = 420.0
+
+# ─── Le COUVERT de l'aire de combat (story-688) ──────────────────────────────
+# Les props SOLIDES vivaient tous dans l'anneau 42→74 m : l'aire où l'on se bat
+# n'avait aucun abri. C'est un défaut de COMPOSITION, pas de densité — ajouter
+# des props ne le corrigeait pas, il fallait les mettre au bon endroit.
+#
+# Le rôle se DÉRIVE de la hauteur EN JEU (≥ 1,80 m casse la ligne de vue,
+# map-design-patterns §11) — pas de la hauteur native : le kit hexagon est en
+# miniatures (0,93 m) et le décor le recalibre à 7 m. Filtrer sur le natif
+# conclurait « ces cartes n'ont aucun couvert », ce qui est faux.
+
+# Rayon intérieur de l'anneau de couvert (m). 20 m laisse le centre dégagé —
+# c'est là que tombe le complexe de pièces (36 m de côté) sur les cartes
+# génératives, et le joueur doit pouvoir respirer autour de son apparition.
+[[genes]]
+id = "decor_cover_radius_min_m"
+default = 20.0
+
+# Espacement des abris (m). Bande sourcée 3-10 m (Watch Dogs, Gears of War),
+# 10 m au maximum. 8 m = assez dense pour qu'un repli existe toujours, assez
+# lâche pour qu'on ne joue pas à cache-cache dans une forêt de piliers.
+[[genes]]
+id = "decor_cover_spacing_m"
+default = 8.0

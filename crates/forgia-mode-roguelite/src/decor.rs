@@ -48,6 +48,14 @@ use std::time::SystemTime;
 
 use crate::run::RunSeed;
 
+/// Hauteur à partir de laquelle un prop CASSE la ligne de vue (m).
+///
+/// L'œil du joueur est à 1,70 m et il n'y a PAS d'accroupissement : en dessous,
+/// un obstacle masque le corps sans masquer la vue — il ne sert à rien
+/// (`map-design-patterns.md` §11). Ce n'est pas un réglage, c'est la géométrie
+/// du personnage.
+const SIGHT_BREAK_H_M: f32 = 1.80;
+
 const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_decor.toml";
 const SENSOR_PATH: &str = "forgia2_stage_decor.json";
 const POLL_PERIOD_SEC: f32 = 1.0;
@@ -108,6 +116,9 @@ pub struct RogueliteDecorConfig {
     // Story-674 — aménagement dérivé (bruit bleu + compte depuis l'aire).
     pub scatter_spacing_m: f32,
     pub perimeter_spacing_m: f32,
+    // Story-688 — le COUVERT de l'aire de combat.
+    pub cover_radius_min_m: f32,
+    pub cover_spacing_m: f32,
     pub max_props: u32,
     // Fond « Cratère de la Forge » : anneau de falaises volcaniques + pics géants
     // hors-map (ÉNORME, sans collider — pure silhouette à l'horizon).
@@ -160,6 +171,8 @@ impl Default for RogueliteDecorConfig {
             keepout_spawn_margin_m: 3.5,
             scatter_spacing_m: 5.0,
             perimeter_spacing_m: 9.0,
+            cover_radius_min_m: 20.0,
+            cover_spacing_m: 8.0,
             max_props: 420,
             // Cratère de fond : crête dense + 2 pics géants dominants.
             background_count: 44,
@@ -218,6 +231,11 @@ impl RogueliteDecorConfig {
                 "decor_target_rubble" => c.target_rubble = gene.default.clamp(0.3, 20.0),
                 "decor_keepout_player_m" => c.keepout_player_m = gene.default.clamp(0.0, 60.0),
                 "decor_scatter_spacing_m" => c.scatter_spacing_m = gene.default.clamp(0.5, 40.0),
+                "decor_cover_radius_min_m" => {
+                    c.cover_radius_min_m = gene.default.clamp(0.0, 200.0)
+                }
+                // Bande sourcée 3-10 m (Watch Dogs, Gears) — cf §11.
+                "decor_cover_spacing_m" => c.cover_spacing_m = gene.default.clamp(3.0, 10.0),
                 "decor_perimeter_spacing_m" => {
                     c.perimeter_spacing_m = gene.default.clamp(0.5, 40.0)
                 }
@@ -312,9 +330,29 @@ pub struct DecorAsset {
     /// Plus grande dimension native (m) — ce que la calibration ramène à la
     /// taille cible. 0 = inconnue.
     pub native_max_dim_m: f32,
+    /// Hauteur NATIVE (m). 0 = inconnue.
+    ///
+    /// Story-688 — sert à dériver le RÔLE. Attention : c'est la hauteur EN JEU
+    /// qui décide, pas celle-ci. Le kit hexagon est en miniatures (un bâtiment
+    /// fait 0,93 m nativement) et le décor le recalibre à `target_big` = 7 m.
+    /// Filtrer sur le natif conclurait « aucune de ces cartes n'a de couvert »,
+    /// ce qui est faux — c'est exactement l'erreur des 1,92 m de story-672.
+    pub native_height_m: f32,
 }
 
 impl DecorAsset {
+    /// Hauteur RÉELLE une fois le prop calibré à `target_m`.
+    ///
+    /// C'est elle qui décide du rôle : ≥ 1,80 m casse la ligne de vue, donc
+    /// c'est du COUVERT (`map-design-patterns.md` §11). En dessous, l'objet
+    /// masque le corps sans masquer la vue — il ne sert à rien.
+    pub fn height_at(&self, target_m: f32) -> f32 {
+        if target_m <= 0.0 || self.native_max_dim_m <= 1.0e-4 {
+            return self.native_height_m;
+        }
+        self.native_height_m * (target_m / self.native_max_dim_m)
+    }
+
     /// Emprise RÉELLE une fois le prop calibré à `target_m`.
     ///
     /// Sans mesure : l'ancienne estimation `0,5 × target`. C'est un repli assumé,
@@ -774,6 +812,7 @@ pub fn sys_load_decor_assets(
         DecorAsset {
             scene: asset_server.load(GltfAssetLabel::Scene(0).from_asset(path.to_string())),
             native_footprint_m: m.map(|m| m.footprint_radius_m).unwrap_or(0.0),
+            native_height_m: m.map(|m| m.height_m).unwrap_or(0.0),
             native_max_dim_m: m.map(|m| m.max_dim()).unwrap_or(0.0),
         }
     };
@@ -1437,6 +1476,61 @@ fn plan_decor_set(
         }
     }
 
+    // ── LE COUVERT DE L'AIRE DE COMBAT (story-688) ────────────────────────────
+    //
+    // Tous les props solides vivaient dans l'anneau 42→74 m : là où l'on se bat,
+    // il n'y avait aucun abri. C'était un défaut de COMPOSITION — story-674 a
+    // multiplié la densité par 4,7 sans le corriger, parce qu'ajouter des props
+    // ne sert à rien s'ils ne sont pas au bon endroit.
+    //
+    // Le rôle se DÉRIVE de la hauteur EN JEU : ≥ 1,80 m casse la ligne de vue,
+    // donc c'est du couvert (`map-design-patterns.md` §11). Un prop de la bande
+    // 1,2-1,7 m masque le corps sans masquer la vue — il ne sert à rien, et il
+    // est écarté ici plutôt que posé « au cas où ».
+    let cover_pool: Vec<&DecorAsset> = assets
+        .big
+        .iter()
+        .chain(assets.landmarks.iter())
+        .filter(|a| a.height_at(cfg.target_big) >= SIGHT_BREAK_H_M)
+        .collect();
+    let mut covers_placed = 0usize;
+    if !cover_pool.is_empty() && cfg.cover_radius_min_m < cfg.ring_radius_min {
+        // Le couvert passe EN PREMIER sur le budget : c'est du gameplay, le
+        // périmètre et le semis sont de l'habillage.
+        let pts = plan_ring_points(
+            cfg.cover_radius_min_m,
+            cfg.ring_radius_min,
+            cfg.cover_spacing_m,
+            seed ^ 0xC0FE_5EED_1234_ABCD,
+            cfg.max_props as usize,
+            "couvert",
+        );
+        for (px, pz) in pts {
+            let idx = (rng01(&mut rng) * cover_pool.len() as f32) as usize;
+            let Some(handle) = cover_pool.get(idx.min(cover_pool.len() - 1)) else {
+                break;
+            };
+            specs.push(DecorSpec::Perimeter {
+                handle: handle.scene.clone(),
+                name: "Decor_Cover",
+                pos: Vec3::new(px, 0.0, pz),
+                yaw: rng01(&mut rng) * TAU,
+                target_m: cfg.target_big,
+                footprint_m: handle.footprint_at(cfg.target_big),
+                user_scale: 0.9 + rng01(&mut rng) * 0.2,
+                brazier: false,
+                col_radius_factor: 0.34,
+            });
+            covers_placed += 1;
+        }
+    }
+    if covers_placed == 0 {
+        warn!(
+            "[decor] AUCUN couvert dans l'aire de combat — pool de props ≥ {:.2} m vide              (calibrés à {:.1} m) ou rayons incohérents ({:.0} ≥ {:.0} m).              Les salles seront des stands de tir.",
+            SIGHT_BREAK_H_M, cfg.target_big, cfg.cover_radius_min_m, cfg.ring_radius_min
+        );
+    }
+
     // ── Anneau périmétrique ───────────────────────────────────────────────────
     // Story-674 — c'est la couche qui porte le COUVERT : son compte se dérive de
     // l'aire de l'anneau (l'ancien littéral 34 ne savait rien de la taille de la
@@ -1448,7 +1542,7 @@ fn plan_decor_set(
         cfg.ring_radius_max,
         cfg.perimeter_spacing_m,
         seed ^ 0x9E37_79B9_7F4A_7C15,
-        cfg.max_props as usize,
+        (cfg.max_props as usize).saturating_sub(covers_placed),
         "périmètre",
     );
     let n_ring = ring_pts.len();
@@ -1516,7 +1610,7 @@ fn plan_decor_set(
     // clairières : c'est ce qui se lisait comme « la salle est vide » alors que le
     // compte était le bon. Le bruit bleu garantit l'espacement, donc l'occupation.
     // Le semis prend ce que le périmètre a laissé du budget.
-    let scatter_budget = (cfg.max_props as usize).saturating_sub(n_ring);
+    let scatter_budget = (cfg.max_props as usize).saturating_sub(n_ring + covers_placed);
     let scatter_pts = plan_ring_points(
         cfg.scatter_radius_min,
         cfg.scatter_radius_max,
@@ -1827,6 +1921,7 @@ default = 40.0
             vec![DecorAsset {
                 scene: Handle::<Scene>::default(),
                 native_footprint_m: 2.0,
+                native_height_m: 3.0,
                 native_max_dim_m: 4.0,
             }]
         };
@@ -1933,6 +2028,7 @@ default = 40.0
             vec![DecorAsset {
                 scene: Handle::<Scene>::default(),
                 native_footprint_m: 2.0,
+                native_height_m: 3.0,
                 native_max_dim_m: 4.0,
             }]
         };
@@ -1999,6 +2095,7 @@ default = 40.0
             vec![DecorAsset {
                 scene: Handle::<Scene>::default(),
                 native_footprint_m: 2.0,
+                native_height_m: 3.0,
                 native_max_dim_m: 4.0,
             }]
         };
@@ -2128,5 +2225,103 @@ mod layout_derivation_tests {
             per.len() + sc.len(),
             cfg.max_props
         );
+    }
+}
+
+#[cfg(test)]
+mod cover_composition_tests {
+    use super::*;
+
+    /// Story-688 — **le couvert doit être là où l'on se bat.**
+    ///
+    /// Tous les props solides vivaient dans l'anneau 42→74 m ; l'aire de combat
+    /// n'avait aucun abri. Story-674 a multiplié la densité par 4,7 sans le
+    /// corriger : ajouter des props ne sert à rien s'ils ne sont pas au bon
+    /// endroit. C'est de la COMPOSITION, pas de la densité.
+    #[test]
+    fn cover_is_placed_inside_the_combat_area_not_only_on_the_rim() {
+        let cfg = RogueliteDecorConfig::default();
+        assert!(
+            cfg.cover_radius_min_m < cfg.ring_radius_min,
+            "l'anneau de couvert doit être STRICTEMENT à l'intérieur du périmètre"
+        );
+        let pts = plan_ring_points(
+            cfg.cover_radius_min_m,
+            cfg.ring_radius_min,
+            cfg.cover_spacing_m,
+            7,
+            cfg.max_props as usize,
+            "t",
+        );
+        assert!(!pts.is_empty(), "aucun abri planifié dans l'aire de combat");
+        for (x, z) in &pts {
+            let d = (x * x + z * z).sqrt();
+            assert!(
+                d < cfg.ring_radius_min + 1e-3,
+                "un abri à {d:.1} m est sur le périmètre, pas dans l'aire de combat"
+            );
+        }
+        println!(
+            "[story-688] {} abris entre {:.0} et {:.0} m (espacement {:.0} m)",
+            pts.len(),
+            cfg.cover_radius_min_m,
+            cfg.ring_radius_min,
+            cfg.cover_spacing_m
+        );
+    }
+
+    /// L'espacement doit rester dans la bande SOURCÉE 3-10 m (Watch Dogs,
+    /// Gears of War). Plus serré, c'est une forêt de piliers ; plus lâche, le
+    /// repli n'existe plus.
+    #[test]
+    fn the_cover_spacing_stays_in_the_sourced_band() {
+        let c = RogueliteDecorConfig::default();
+        assert!((3.0..=10.0).contains(&c.cover_spacing_m));
+        let hostile = RogueliteDecorConfig::parse_toml(
+            "[[genes]]
+id = \"decor_cover_spacing_m\"
+default = 99.0
+",
+        );
+        assert!(hostile.cover_spacing_m <= 10.0, "borne haute non appliquée");
+    }
+
+    /// **Le rôle se dérive de la hauteur EN JEU, pas de la native.**
+    ///
+    /// Le kit hexagon est en miniatures : un bâtiment fait 0,93 m nativement et
+    /// le décor le recalibre à `target_big` = 7 m. Filtrer sur le natif
+    /// conclurait « ces cartes n'ont aucun couvert » — c'est exactement l'erreur
+    /// des 1,92 m de story-672, une taille native prise pour une taille de jeu.
+    #[test]
+    fn a_miniature_prop_still_counts_as_cover_once_calibrated() {
+        let mini = DecorAsset {
+            scene: Handle::<Scene>::default(),
+            native_footprint_m: 0.5,
+            native_max_dim_m: 0.93,
+            native_height_m: 0.93,
+        };
+        assert!(
+            mini.height_at(0.0) < SIGHT_BREAK_H_M,
+            "en natif, la miniature ne casse pas la vue"
+        );
+        assert!(
+            mini.height_at(7.0) >= SIGHT_BREAK_H_M,
+            "calibrée à 7 m elle DOIT compter comme couvert ({:.2} m)",
+            mini.height_at(7.0)
+        );
+    }
+
+    /// Un prop de la bande 1,2-1,7 m masque le corps sans masquer la vue : il ne
+    /// doit JAMAIS être retenu comme abri (`map-design-patterns.md` §11).
+    #[test]
+    fn the_useless_height_band_is_never_taken_as_cover() {
+        let useless = DecorAsset {
+            scene: Handle::<Scene>::default(),
+            native_footprint_m: 0.5,
+            native_max_dim_m: 2.0,
+            native_height_m: 1.5,
+        };
+        // Calibré pour rester dans la bande inutile.
+        assert!(useless.height_at(2.0) < SIGHT_BREAK_H_M);
     }
 }
