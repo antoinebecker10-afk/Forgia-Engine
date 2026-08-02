@@ -243,7 +243,9 @@ pub fn spawn_wave_enemies(
             );
             let x = r * theta.cos();
             let z = r * theta.sin();
-            let y = stats.capsule_half_height + stats.capsule_radius + 0.05;
+            // Story-685 — MÊME source que `foot_offset_m` de l'ArenaBot : le suivi
+            // de sol repose sur l'égalité des deux, deux copies divergeraient.
+            let y = stats.foot_offset_m();
 
             // Pattern miroir forgia-mode-fps-arena::wave::spawn_wave_bots:343 :
             // PARENT = Health + TargetCube + RigidBody + ArenaBot (PAS de Collider).

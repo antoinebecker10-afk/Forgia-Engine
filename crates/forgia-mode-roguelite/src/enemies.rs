@@ -47,6 +47,22 @@ impl EnemyArchetype {
 }
 
 /// Stats d'un archetype — data-driven (genome `roguelite_enemies.toml`, hot-reload).
+impl EnemyStats {
+    /// Altitude du CENTRE de la capsule quand les pieds touchent le sol (m).
+    ///
+    /// Story-685 — **source unique**. Cette expression était écrite dans
+    /// `waves.rs` (le `y` de spawn) ET dans `arena_bot()` (l'offset du suivi de
+    /// sol). Deux copies de la même grandeur finissent toujours par diverger :
+    /// le bot s'enterrerait d'un demi-corps ou léviterait, et rien ne dirait
+    /// pourquoi. C'est la même classe de défaut que le « SALLE 5 / 4 ».
+    ///
+    /// Les 5 cm de marge évitent que le collider naisse en contact exact avec
+    /// le sol.
+    pub fn foot_offset_m(&self) -> f32 {
+        self.capsule_half_height + self.capsule_radius + 0.05
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct EnemyStats {
     pub hp: f32,
@@ -190,6 +206,10 @@ impl EnemyStatsConfig {
             attack_cooldown: s.attack_cooldown,
             attack_left: s.warmup_secs,
             stop_distance: s.stop_distance,
+            // Story-685 — MÊME expression que le `y` de spawn (`waves.rs`) :
+            // une seule source, sinon les deux divergent et le bot s'enterre ou
+            // flotte d'un demi-corps.
+            foot_offset_m: s.foot_offset_m(),
             ..ArenaBot::default()
         }
     }
@@ -543,5 +563,51 @@ shoot_jitter_deg = 3.0
         assert_eq!(bs.damage, c.sniper.shoot_damage);
         assert_eq!(bs.range, c.sniper.shoot_range);
         assert!((bs.jitter_rad - c.sniper.shoot_jitter_deg.to_radians()).abs() < 1e-6);
+    }
+}
+
+#[cfg(test)]
+mod foot_offset_tests {
+    use super::*;
+
+    /// Story-685 — l'offset porté par le bot DOIT être celui de son spawn.
+    ///
+    /// Le suivi de sol repose entièrement sur cette égalité : si les deux
+    /// divergent, chaque bot s'enterre d'un demi-corps ou lévite, et rien ne dit
+    /// pourquoi. L'expression est désormais unique (`EnemyStats::foot_offset_m`) ;
+    /// ce test interdit qu'on la recopie ailleurs sans s'en apercevoir.
+    #[test]
+    fn the_bot_carries_exactly_its_spawn_offset() {
+        let cfg = EnemyStatsConfig::default();
+        for a in [
+            EnemyArchetype::Tank,
+            EnemyArchetype::Runner,
+            EnemyArchetype::Sniper,
+            EnemyArchetype::Boss,
+        ] {
+            let s = cfg.for_archetype(a);
+            assert!(
+                (cfg.arena_bot(a).foot_offset_m - s.foot_offset_m()).abs() < 1e-6,
+                "{a:?} : l'offset du bot et celui du spawn ont divergé"
+            );
+        }
+    }
+
+    /// Un offset nul enterrerait le bot ; un offset démesuré le ferait léviter.
+    #[test]
+    fn every_archetype_has_a_plausible_offset() {
+        let cfg = EnemyStatsConfig::default();
+        for a in [
+            EnemyArchetype::Tank,
+            EnemyArchetype::Runner,
+            EnemyArchetype::Sniper,
+            EnemyArchetype::Boss,
+        ] {
+            let o = cfg.for_archetype(a).foot_offset_m();
+            assert!(
+                (0.2..=4.0).contains(&o),
+                "{a:?} : offset {o:.2} m — enterré ou en lévitation"
+            );
+        }
     }
 }

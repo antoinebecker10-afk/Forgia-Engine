@@ -58,6 +58,20 @@ los_lost_grace_secs = 2.0           # ★ Story-464 — grace post-LOS perdu ava
                                      # alert (4s forced Chase post-tir player), comportement
                                      # crédible : bot mémorise 2s, puis Idle si rien ne le ré-alerte.
 
+# ── Suivi de sol (story-685) ─────────────────────────────────────────────────
+# Avant, `bot_tactical_movement` travaillait en XZ pur : un bot restait au Y où
+# il était né, donc il flottait sur le relief et traversait les escaliers. Ces
+# trois gènes lui donnent un sol — c'est la pièce qui bloquait relief, marches
+# et étages d'un seul coup.
+max_step_up_m = 0.45        # ★ MaxStepHeight d'Unreal, la valeur que nos patterns
+                            # de carte citent déjà. Au-delà c'est une paroi : le bot
+                            # la contourne, il n'a ni saut ni grimpe.
+max_step_down_m = 1.2       # descendre est plus facile que gravir — mais borné,
+                            # sinon un bot sortirait de l'arène par un rebord.
+ground_probe_height_m = 1.0 # départ du rayon AU-DESSUS des pieds. Sous
+                            # `max_step_up_m`, une marche montante serait invisible
+                            # (le code re-clampe pour l'empêcher).
+
 # Enemies — 4 personnages Forgia (pas Rex = player RPG)
 # Distribution sur les 5 spawn points. Asset path relative à assets/.
 [[spawn_positions]]

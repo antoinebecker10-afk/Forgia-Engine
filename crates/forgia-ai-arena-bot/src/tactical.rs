@@ -42,6 +42,23 @@ pub struct TacticalTuning {
     pub los_lost_grace_secs: f32,
     /// Période d'écriture sensor `forgia_bot_ai.json` (sec).
     pub sensor_period_secs: f32,
+
+    // ── Suivi de sol (story-685) ────────────────────────────────────────────
+    /// Marche maximale que le bot peut MONTER (m).
+    ///
+    /// 0,45 m = `MaxStepHeight` d'Unreal, la valeur que nos patterns de carte
+    /// citent déjà. Au-delà, c'est une paroi : le bot doit la contourner, pas
+    /// l'escalader — il n'a ni saut ni escalade.
+    pub max_step_up_m: f32,
+    /// Dénivelé maximum que le bot accepte de DESCENDRE en un pas (m).
+    ///
+    /// Plus large que la montée : descendre une marche est toujours plus facile
+    /// que la gravir. Au-delà, c'est un vide — le bot refuse d'avancer plutôt
+    /// que de tomber, faute de quoi il quitterait l'arène par un rebord.
+    pub max_step_down_m: f32,
+    /// Hauteur au-dessus du bot d'où part le rayon vers le sol (m). Doit
+    /// dépasser `max_step_up_m`, sinon une marche montante ne serait jamais vue.
+    pub ground_probe_height_m: f32,
 }
 
 impl Default for TacticalTuning {
@@ -58,6 +75,9 @@ impl Default for TacticalTuning {
             alert_duration_secs: 4.0,
             los_lost_grace_secs: 2.0,
             sensor_period_secs: 1.0,
+            max_step_up_m: 0.45,
+            max_step_down_m: 1.2,
+            ground_probe_height_m: 1.0,
         }
     }
 }
@@ -312,6 +332,41 @@ const BOT_BODY_RADIUS_M: f32 = 0.4;
 /// Marge anti-pénétration : le bord du bot s'arrête à cette distance du mur.
 const COLLIDE_SKIN_M: f32 = 0.08;
 
+/// Décide de l'altitude d'arrivée d'un pas — **PUR**, donc testable.
+///
+/// Story-685. Avant, `bot_tactical_movement` travaillait en XZ pur et il
+/// n'existait ni gravité, ni suivi de sol, ni hauteur de marche dans tout le
+/// crate : un bot restait au Y où il était né. Sur du relief il flottait ou
+/// s'enterrait ; dans un escalier il le traversait. C'est cette pièce absente
+/// qui bloquait relief, escaliers et étages d'un seul coup.
+///
+/// Trois issues, et le refus en fait partie :
+/// - le sol monte de moins que `max_up` → on monte (marche gravie) ;
+/// - il descend de moins que `max_down` → on descend (marche dévalée) ;
+/// - sinon → `None`, le pas est REFUSÉ. Une paroi ne s'escalade pas (le bot n'a
+///   ni saut ni grimpe) et un vide ne se franchit pas : sans ce refus, un bot
+///   sortirait de l'arène par le premier rebord.
+///
+/// `ground_y` à `None` = aucun sol trouvé sous le pas → refus, même raison.
+/// `foot_offset` = distance des pieds au centre du `Transform`. Le raisonnement
+/// se fait sur les PIEDS ; le résultat est réexprimé en centre. Confondre les
+/// deux enterre chaque bot de la hauteur de sa capsule.
+pub fn resolve_step_altitude(
+    current_y: f32,
+    ground_y: Option<f32>,
+    foot_offset: f32,
+    max_up: f32,
+    max_down: f32,
+) -> Option<f32> {
+    let g = ground_y?;
+    let feet = current_y - foot_offset;
+    let delta = g - feet;
+    if delta > max_up || delta < -max_down {
+        return None;
+    }
+    Some(g + foot_offset)
+}
+
 /// Valide un déplacement XZ contre les murs solides. Retourne le déplacement
 /// effectif (clampé à l'impact + slide tangentiel si le couloir est dégagé).
 fn collide_and_slide(
@@ -422,10 +477,54 @@ pub fn bot_tactical_movement(
         // Anti-traversée : clamp/slide le déplacement contre les murs solides
         // (le kinematic ne s'arrête pas tout seul sur du Fixed).
         let safe = collide_and_slide(xf.translation, step, &ctx, bot_entity);
-        xf.translation.x += safe.x;
-        xf.translation.z += safe.z;
-        // Y stays at spawn (pas de jump V2).
+        // Story-685 — SUIVI DE SOL. Le pas est d'abord résolu en XZ, puis on
+        // cherche le sol à l'arrivée. Avant, le commentaire disait « Y stays at
+        // spawn » et c'était exact : un bot restait à son altitude de naissance
+        // pour toujours, donc il flottait sur le relief et traversait les
+        // escaliers. C'est cette pièce qui bloquait relief, marches et étages.
+        let next = Vec3::new(
+            xf.translation.x + safe.x,
+            xf.translation.y,
+            xf.translation.z + safe.z,
+        );
+        let ground = ground_under(next, &ctx, bot_entity, &tuning);
+        // `None` = pas REFUSÉ : paroi trop haute, vide trop profond, ou pas de
+        // sol. Le bot reste sur place plutôt que d'escalader (il n'a ni saut ni
+        // grimpe) ou de sortir de l'arène par un rebord. `bot_separation` et
+        // l'évitement le feront glisser au tick suivant.
+        if let Some(y) = resolve_step_altitude(
+            xf.translation.y,
+            ground,
+            bot.foot_offset_m,
+            tuning.max_step_up_m,
+            tuning.max_step_down_m,
+        ) {
+            xf.translation.x = next.x;
+            xf.translation.z = next.z;
+            xf.translation.y = y;
+        }
     }
+}
+
+/// Altitude du sol sous `pos`, ou `None` si rien n'est trouvé dans la fenêtre.
+///
+/// Le rayon part AU-DESSUS du bot (`ground_probe_height_m`) pour voir une marche
+/// montante : parti de ses pieds, il manquerait toute élévation.
+fn ground_under(
+    pos: Vec3,
+    rapier: &RapierContext,
+    self_entity: Entity,
+    tuning: &TacticalTuning,
+) -> Option<f32> {
+    let pred = |e: Entity| e != self_entity;
+    let filter = QueryFilter::default().exclude_sensors().predicate(&pred);
+    // La sonde part au-dessus des PIEDS, pas du centre : sinon sa portée serait
+    // décalée d'une demi-capsule et une marche montante passerait inaperçue.
+    let from = pos + Vec3::Y * tuning.ground_probe_height_m;
+    let max_toi = tuning.ground_probe_height_m + tuning.max_step_down_m;
+    rapier
+        .cast_ray(from, Vec3::NEG_Y, max_toi, true, filter)
+        .map(|(_, toi)| from.y - toi)
 }
 
 // ─── Separation steering (story-517) ──────────────────────────────────
@@ -558,4 +657,142 @@ pub fn write_bot_ai_sensor(
         tuning.los_lost_grace_secs,
     );
     let _ = forgia_core::sensor_io::enqueue("forgia_bot_ai.json", json);
+}
+
+#[cfg(test)]
+mod ground_follow_tests {
+    use super::*;
+
+    fn t() -> TacticalTuning {
+        TacticalTuning::default()
+    }
+    /// Offset pieds→centre d'un tank : `capsule_half_height + radius + 0.05`.
+    const FOOT: f32 = 0.43 + 0.42 + 0.05;
+
+    /// **LE piège de cette story.** Le `Transform` d'un bot est le CENTRE de sa
+    /// capsule, pas ses pieds. Snapper ce centre sur l'altitude du sol
+    /// enterrerait chaque bot de la hauteur de son corps — un défaut qui passe
+    /// toutes les compilations et se voit au premier bot en jeu.
+    #[test]
+    fn the_bot_stands_on_the_ground_it_does_not_sink_into_it() {
+        let c = t();
+        let y = resolve_step_altitude(FOOT, Some(0.0), FOOT, c.max_step_up_m, c.max_step_down_m)
+            .expect("un sol plat sous les pieds doit être accepté");
+        assert!(
+            (y - FOOT).abs() < 1e-5,
+            "le bot devrait rester à {FOOT:.2} m (pieds au sol), il est à {y:.2}"
+        );
+        assert!(y > 0.0, "un bot posé à l'altitude du SOL est enterré");
+    }
+
+    /// Sol plat, quelle que soit l'altitude : les pieds suivent.
+    #[test]
+    fn flat_ground_keeps_the_feet_on_the_floor() {
+        let c = t();
+        for ground in [-3.0_f32, 0.0, 12.5] {
+            let y = resolve_step_altitude(
+                ground + FOOT,
+                Some(ground),
+                FOOT,
+                c.max_step_up_m,
+                c.max_step_down_m,
+            )
+            .unwrap();
+            assert!((y - (ground + FOOT)).abs() < 1e-5);
+        }
+    }
+
+    /// **Une marche se gravit, une paroi non.** Le bot n'a ni saut ni grimpe :
+    /// au-delà de la hauteur de marche, le pas est REFUSÉ — sinon il escaladerait
+    /// un mur et se retrouverait sur le toit.
+    #[test]
+    fn a_step_is_climbed_but_a_wall_is_refused() {
+        let c = t();
+        let up = c.max_step_up_m;
+        assert!(
+            resolve_step_altitude(FOOT, Some(up - 0.01), FOOT, up, c.max_step_down_m).is_some(),
+            "une marche sous le seuil doit se gravir"
+        );
+        assert_eq!(
+            resolve_step_altitude(FOOT, Some(up + 0.01), FOOT, up, c.max_step_down_m),
+            None,
+            "au-dessus du seuil, c'est une paroi : elle se contourne"
+        );
+        assert_eq!(
+            resolve_step_altitude(FOOT, Some(4.0), FOOT, up, c.max_step_down_m),
+            None,
+            "un mur de 4 m ne s'escalade pas"
+        );
+    }
+
+    /// Descendre est plus facile que monter — mais borné : un vide profond est
+    /// un refus, sinon le bot quitterait l'arène par le premier rebord.
+    #[test]
+    fn going_down_is_easier_than_going_up_but_still_bounded() {
+        let c = t();
+        assert!(
+            c.max_step_down_m > c.max_step_up_m,
+            "descendre doit être plus permissif que gravir"
+        );
+        let d = c.max_step_down_m;
+        assert!(
+            resolve_step_altitude(FOOT, Some(-d + 0.01), FOOT, c.max_step_up_m, d).is_some()
+        );
+        assert_eq!(
+            resolve_step_altitude(FOOT, Some(-d - 0.01), FOOT, c.max_step_up_m, d),
+            None,
+            "au-delà, c'est un vide : le bot ne saute pas dedans"
+        );
+    }
+
+    /// **Pas de sol = pas de pas.** Sans ce refus, un bot avancerait dans le vide
+    /// au bord d'une plateforme et sortirait de l'arène.
+    #[test]
+    fn no_ground_means_no_step() {
+        let c = t();
+        assert_eq!(
+            resolve_step_altitude(FOOT, None, FOOT, c.max_step_up_m, c.max_step_down_m),
+            None
+        );
+    }
+
+    /// La sonde doit partir PLUS HAUT que la marche gravissable : partie trop
+    /// bas, elle ne verrait jamais une élévation et le bot buterait sur une
+    /// marche qu'il pouvait monter.
+    #[test]
+    fn the_probe_starts_above_the_tallest_climbable_step() {
+        let c = t();
+        assert!(
+            c.ground_probe_height_m > c.max_step_up_m,
+            "sonde {:.2} m ≤ marche {:.2} m — une marche montante serait invisible",
+            c.ground_probe_height_m,
+            c.max_step_up_m
+        );
+    }
+
+    /// La hauteur de marche est SOURCÉE : `MaxStepHeight` d'Unreal, la même
+    /// valeur que nos patterns de carte citent déjà. Un pas de plus de 45 cm
+    /// exige une rampe, pas un saut.
+    #[test]
+    fn the_step_height_matches_the_documented_industry_value() {
+        assert!((t().max_step_up_m - 0.45).abs() < 1e-6);
+    }
+
+    /// Un tuning dégénéré ne doit produire ni escalade ni chute infinie.
+    #[test]
+    fn degenerate_limits_never_let_a_bot_climb_or_fall_forever() {
+        assert_eq!(resolve_step_altitude(FOOT, Some(0.5), FOOT, 0.0, 0.0), None);
+        assert_eq!(resolve_step_altitude(FOOT, Some(-0.5), FOOT, 0.0, 0.0), None);
+        // Un sol EXACTEMENT sous les pieds passe toujours, même à limites nulles.
+        let y = resolve_step_altitude(FOOT, Some(0.0), FOOT, 0.0, 0.0).unwrap();
+        assert!((y - FOOT).abs() < 1e-5);
+    }
+
+    /// L'offset par défaut doit rester plausible : un bot au sol, pas enterré ni
+    /// en lévitation, même si son spawn oublie de le renseigner.
+    #[test]
+    fn the_default_foot_offset_is_plausible() {
+        let d = crate::ArenaBot::default().foot_offset_m;
+        assert!((0.3..=2.0).contains(&d), "offset par défaut absurde : {d}");
+    }
 }

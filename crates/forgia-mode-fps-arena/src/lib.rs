@@ -139,6 +139,26 @@ pub struct BotAi {
     /// avoir perdu LOS sur le player. Sans ce gate, bots Chase à travers les murs.
     #[serde(default = "default_los_lost_grace_secs")]
     pub los_lost_grace_secs: f32,
+    // ── Suivi de sol (story-685) ────────────────────────────────────────────
+    /// Marche maximale gravissable par un bot (m). `MaxStepHeight` d'Unreal.
+    #[serde(default = "default_max_step_up_m")]
+    pub max_step_up_m: f32,
+    /// Dénivelé maximum descendu en un pas (m). Au-delà, c'est un vide : refus.
+    #[serde(default = "default_max_step_down_m")]
+    pub max_step_down_m: f32,
+    /// Hauteur de départ du rayon vers le sol (m). Doit dépasser `max_step_up_m`.
+    #[serde(default = "default_ground_probe_height_m")]
+    pub ground_probe_height_m: f32,
+}
+
+fn default_max_step_up_m() -> f32 {
+    0.45
+}
+fn default_max_step_down_m() -> f32 {
+    1.2
+}
+fn default_ground_probe_height_m() -> f32 {
+    1.0
 }
 
 fn default_bot_speed() -> f32 {
@@ -244,6 +264,10 @@ fn default_arena_bots() -> ArenaBotsGenome {
             strafe_amplitude_m: 1.8,
             strafe_freq_hz: 0.9,
             strafe_noise_weight: 0.35,
+            // Story-685 — miroir des `default_*` du TOML.
+            max_step_up_m: 0.45,
+            max_step_down_m: 1.2,
+            ground_probe_height_m: 1.0,
             local_avoid_dist_m: 2.5,
             gunshot_alert_radius_m: 25.0,
             gunshot_alert_los_grace_secs: 0.6,
@@ -409,6 +433,14 @@ fn sync_tactical_tuning_from_genome(
     tuning.gunshot_alert_los_grace_secs = ai.gunshot_alert_los_grace_secs;
     tuning.alert_duration_secs = ai.alert_duration_secs;
     tuning.los_lost_grace_secs = ai.los_lost_grace_secs;
+    // Story-685 — bornes du suivi de sol. Clampées ici : un `max_step_up` plus
+    // grand que la sonde rendrait toute marche montante invisible, et le gène
+    // aurait l'air de marcher tout en ne faisant rien.
+    tuning.max_step_up_m = ai.max_step_up_m.clamp(0.0, 3.0);
+    tuning.max_step_down_m = ai.max_step_down_m.clamp(0.0, 20.0);
+    tuning.ground_probe_height_m = ai
+        .ground_probe_height_m
+        .clamp(tuning.max_step_up_m + 0.05, 10.0);
     info!(
         "[arena-tactical] tuning synced (los_hz {:.1}, strafe_amp {:.2}m, alert_radius {:.1}m)",
         tuning.los_check_hz, tuning.strafe_amplitude_m, tuning.gunshot_alert_radius_m,

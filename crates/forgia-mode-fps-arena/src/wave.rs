@@ -365,6 +365,11 @@ pub fn spawn_wave_bots(
                     // stop_distance = distance d'arrêt en Chase. Bot s'approche jusqu'à
                     // cette distance puis stagne pour tirer. Doit être < shot_range.
                     stop_distance: ai.stop_distance,
+                    // Story-685 — offset pieds→centre. Ces bots posent leur
+                    // pivot au sol (`character_y_offset` du genome les relève),
+                    // donc l'offset est nul ici : les enterrer serait le défaut
+                    // symétrique de celui du roguelite.
+                    foot_offset_m: 0.0,
                     // Story-456 Phase 2-4 — tactical state (init défaut, populated runtime
                     // par tactical::bot_los_check / bot_perception_alert / bot_tactical_movement).
                     has_los: false,

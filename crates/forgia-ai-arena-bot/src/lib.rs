@@ -47,6 +47,13 @@ pub struct ArenaBot {
     /// `bot_los_check` à la transition true→false. Décrémenté chaque frame.
     /// Tant que > 0 : Chase autorisé (last sight memory). Sinon Chase → Idle.
     pub los_lost_grace_left: f32,
+    /// Story-685 — distance des PIEDS au centre du Transform (m).
+    ///
+    /// Le `Transform` d'un bot est le centre de sa capsule, pas ses pieds : il
+    /// spawne à `capsule_half_height + capsule_radius + 0.05`. Snapper ce centre
+    /// sur l'altitude du sol l'enterrerait de ~90 cm. Le suivi de sol pose donc
+    /// `y = sol + foot_offset_m`.
+    pub foot_offset_m: f32,
 }
 
 impl Default for ArenaBot {
@@ -70,6 +77,9 @@ impl Default for ArenaBot {
             // même avant le 1er raycast LOS. Sinon bots gèlent jusqu'à
             // `1/los_check_hz` (~125ms). Resync via TacticalTuning au spawn caller.
             los_lost_grace_left: 2.0,
+            // Valeur plausible pour une capsule d'humanoïde ; les spawns qui
+            // connaissent leur capsule la remplacent par la vraie.
+            foot_offset_m: 0.9,
         }
     }
 }
