@@ -81,7 +81,6 @@ buildings = [
 name = "Le Donjon Oublié"
 landmarks = [
     "models/kaykit/dungeon/column.glb",
-    "models/kaykit/dungeon/banner_blue.glb",
 ]
 big = [
     "models/kaykit/dungeon/column.glb",
@@ -90,9 +89,19 @@ big = [
     "models/kaykit/dungeon/chest_gold.glb",
     "models/kaykit/dungeon/wall_broken.glb",
 ]
+# Story-684 — les bannières ont QUITTÉ ce pool. Elles y étaient plantées debout
+# en plein champ ET calibrées à la taille d'un brasero, alors qu'une tenture de
+# 1,50 × 0,31 m pour 3,20 m de haut n'a de sens que contre une paroi (cf le Hall,
+# où elles sont toujours collées à un mur). Elles vivent désormais dans
+# `wall_props`, posé sur les tronçons de mur des pièces.
 braziers = [
+    "models/kaykit/dungeon/torch.glb",
+]
+wall_props = [
     "models/kaykit/dungeon/banner_red.glb",
+    "models/kaykit/dungeon/banner_blue.glb",
     "models/kaykit/dungeon/banner_yellow.glb",
+    "models/kaykit/dungeon/torch_wall.glb",
 ]
 scatter = [
     "models/kaykit/dungeon/barrel.glb",

@@ -185,6 +185,8 @@ pub fn sys_stage_dispatch(
     // Story-676 — l'univers du round donne le sol ; `CurrentAmbiance` est publié
     // ici pour que l'atmosphère et le ciel lisent la MÊME résolution.
     ambiances: Option<Res<crate::ambiances::AmbiancesConfig>>,
+    // Story-684 — la DA de la salle porte ses décorations murales.
+    palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
     mut last_depth: Local<Option<(u8, bool)>>,
 ) {
     let Some(state) = run_state.as_deref().map(|s| s.get()) else {
@@ -238,11 +240,20 @@ pub fn sys_stage_dispatch(
         }
         None => (crate::ambiances::FALLBACK_AMBIANCE.to_string(), None, None),
     };
+    // Story-684 — les décorations MURALES suivent la DA de la salle. Elles
+    // partent avec la requête, comme le sol : `forgia-stage` pose les murs, il
+    // n'a pas à connaître nos palettes.
+    let wall_props = palettes
+        .as_deref()
+        .and_then(|p| p.palette(p.palette_id_for_stage(stage_id)))
+        .map(|pal| pal.wall_props.clone())
+        .unwrap_or_default();
     commands.insert_resource(forgia_stage::StageLoadRequest {
         stage_id: stage_id.to_string(),
         seed,
         floor,
         sky,
+        wall_props,
     });
     commands.insert_resource(crate::ambiances::CurrentAmbiance {
         id: ambiance_id.clone(),

@@ -37,6 +37,13 @@ pub struct DecorPalette {
     pub landmarks: Vec<String>,
     /// Masses de remplissage du périmètre.
     pub big: Vec<String>,
+    /// Story-684 — décorations MURALES : bannières, tentures, torches murales.
+    /// Accrochées aux tronçons de mur des pièces, jamais posées au sol.
+    ///
+    /// Les bannières étaient dans `landmarks` et `braziers` : une tenture de
+    /// 1,50 × 0,31 m pour 3,20 m de haut se retrouvait plantée debout en plein
+    /// champ. Classement par NOM plutôt que par forme.
+    pub wall_props: Vec<String>,
     /// Éléments porteurs de lumière (brasero) — ou leur équivalent de la DA.
     pub braziers: Vec<String>,
     /// Petits props dispersés au sol, sans collider.
@@ -58,6 +65,9 @@ impl DecorPalette {
         let v = |xs: &[&str]| xs.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
         Self {
             name: "La Crypte de l'Enclume".into(),
+            // Le pack Inferno n'a pas de tenture : pool vide, pas de faux
+            // remplissage. Une palette sans décor mural n'en aura pas.
+            wall_props: Vec::new(),
             landmarks: v(&[
                 "models/environment/inferno/StatueKnight_002.glb",
                 "models/environment/inferno/TowerBig_001.glb",
@@ -355,5 +365,117 @@ casse = "palette_qui_n_existe_pas"
         .map(|s| c.palette_id_for_stage(s))
         .collect();
         assert_eq!(ids.len(), 4, "les 4 stages doivent porter 4 DA distinctes");
+    }
+}
+
+#[cfg(test)]
+mod wall_prop_shape_tests {
+    use super::*;
+    use crate::asset_metrics::AssetRegistry;
+
+    /// Un prop est de FORME MURALE s'il est fin dans un axe ET haut : une
+    /// tenture, un panneau.
+    const THIN_RATIO: f32 = 0.35;
+    /// Épaisseur absolue au-dessus de laquelle un objet **tient debout tout
+    /// seul** (m).
+    ///
+    /// Le ratio seul ne suffit pas : un mur brisé (1,00 × 4,00 × 4,00) et un
+    /// engrenage géant (2,92 × 10,20) sont fins et hauts, et pourtant ils se
+    /// posent très bien au sol. Ce qui les sépare d'une bannière, c'est
+    /// l'ÉPAISSEUR : 31 cm n'offre aucune base — l'objet ne peut pas tenir sans
+    /// être accroché. Un mètre d'épaisseur, si.
+    ///
+    /// Ce n'est pas un seuil abaissé pour repasser au vert : c'est le critère
+    /// physique qui manquait, trouvé parce que le test a signalé deux cas que
+    /// le premier critère classait à tort.
+    const STANDS_ALONE_THICKNESS_M: f32 = 0.5;
+    /// Au-dessus de 1,80 m un objet casse la ligne de vue — il est donc lu comme
+    /// une structure, pas comme un objet posé (`map-design-patterns.md` §11).
+    const TALL_M: f32 = 1.8;
+
+    fn read(rel: &str) -> String {
+        std::fs::read_to_string(rel)
+            .or_else(|_| std::fs::read_to_string(format!("../../{rel}")))
+            .unwrap_or_else(|e| panic!("{rel} illisible : {e}"))
+    }
+
+    /// Story-684 — **une décoration murale ne se plante pas dans l'herbe.**
+    ///
+    /// Les bannières (1,50 × **0,31** m pour 3,20 m de haut) étaient dans
+    /// `landmarks` — donc posées comme points focaux de l'anneau — et dans
+    /// `braziers`, où elles étaient en plus calibrées à la taille d'un brasero.
+    /// Classement par NOM (« c'est un asset dungeon ») au lieu de par forme.
+    ///
+    /// Ce test lit les dimensions MESURÉES et refuse toute forme murale dans un
+    /// pool où les props sont posés debout au sol. Il vaut pour les palettes
+    /// présentes et futures : c'est le correctif de classe, pas le déplacement
+    /// des trois bannières.
+    #[test]
+    fn no_wall_shaped_prop_sits_in_a_free_standing_pool() {
+        let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
+        let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
+
+        let mut measured = 0usize;
+        let mut faults: Vec<String> = Vec::new();
+        for (pid, pal) in &cfg.palettes {
+            // Les pools où un prop est POSÉ AU SOL, debout.
+            for (pool_name, pool) in [
+                ("landmarks", &pal.landmarks),
+                ("big", &pal.big),
+                ("braziers", &pal.braziers),
+                ("scatter", &pal.scatter),
+            ] {
+                for path in pool {
+                    let Some(m) = reg.get(path) else { continue };
+                    measured += 1;
+                    let thin = m.size.x.min(m.size.z);
+                    let wide = m.size.x.max(m.size.z);
+                    if wide <= 0.5 {
+                        continue; // trop petit pour qu'un ratio veuille dire quelque chose
+                    }
+                    if m.height_m >= TALL_M
+                        && thin / wide < THIN_RATIO
+                        && thin < STANDS_ALONE_THICKNESS_M
+                    {
+                        faults.push(format!(
+                            "  '{pid}' / {pool_name} : {} — {:.2} × {:.2} m pour {:.2} m de haut \
+                             (ratio {:.2}) : c'est une TENTURE, elle va dans `wall_props`",
+                            path.rsplit('/').next().unwrap_or(path),
+                            thin,
+                            wide,
+                            m.height_m,
+                            thin / wide
+                        ));
+                    }
+                }
+            }
+        }
+        // « Zéro mesuré n'est pas vert, c'est aveugle » (§13).
+        assert!(measured > 0, "aucun prop mesuré — ce test ne vérifie rien");
+        assert!(
+            faults.is_empty(),
+            "{} décoration(s) murale(s) plantée(s) au sol sur {measured} props mesurés :\n{}",
+            faults.len(),
+            faults.join("\n")
+        );
+    }
+
+    /// Le test ci-dessus a-t-il des dents ? On lui donne le cas exact qui a
+    /// motivé la story : la bannière, telle qu'elle était classée.
+    #[test]
+    fn the_shape_check_really_catches_a_banner() {
+        let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
+        let m = reg
+            .get("models/kaykit/dungeon/banner_blue.glb")
+            .expect("la bannière doit être dans le registre mesuré");
+        let thin = m.size.x.min(m.size.z);
+        let wide = m.size.x.max(m.size.z);
+        assert!(
+            m.height_m >= TALL_M
+                && thin / wide < THIN_RATIO
+                && thin < STANDS_ALONE_THICKNESS_M,
+            "la bannière ({thin:.2} × {wide:.2} × {:.2}) devrait être détectée comme murale",
+            m.height_m
+        );
     }
 }

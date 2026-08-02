@@ -267,6 +267,14 @@ pub struct StageLoadRequest {
     /// Story-676 — palette de sol de l'univers du round. `None` = sol de repli
     /// (celui d'avant, `MERGED_FLOOR_GLB`) : une arène a TOUJOURS un plancher.
     pub floor: Option<FloorTiles>,
+    /// Story-684 — décorations MURALES (bannières, tentures). Elles sont
+    /// accrochées aux murs, jamais posées au sol.
+    ///
+    /// Les bannières traînaient dans les pools `landmarks` et `braziers` du
+    /// décor : une tenture de 1,50 × **0,31** m pour 3,20 m de haut se
+    /// retrouvait plantée debout en plein champ, et même calibrée à la taille
+    /// d'un brasero. Une décoration murale n'a de sens que contre un mur.
+    pub wall_props: Vec<String>,
     /// Story-676 — clé de ciel de l'univers (`biome_sky.toml`). `None` = le ciel
     /// suit le biome du stage, comme avant.
     ///
@@ -1259,6 +1267,65 @@ fn spawn_stage_arena_on_request(
             extent,
             &req.stage_id,
         );
+        // Story-684 — les BANNIÈRES s'accrochent aux murs.
+        //
+        // Elles traînaient dans les pools `landmarks` et `braziers` du décor :
+        // une tenture de 1,50 × 0,31 m pour 3,20 m de haut se retrouvait plantée
+        // debout en plein champ, calibrée à la taille d'un brasero. Classement
+        // par NOM (« c'est un asset dungeon ») plutôt que par forme.
+        //
+        // Ici elles sont posées CONTRE la face d'un tronçon, à mi-hauteur de
+        // mur, tournées vers l'extérieur du tronçon — comme dans le Hall, où
+        // elles sont toujours collées à une paroi.
+        if !req.wall_props.is_empty() {
+            let banner_scenes: Vec<Handle<Scene>> = req
+                .wall_props
+                .iter()
+                .map(|p| asset_server.load(format!("{p}#Scene0")))
+                .collect();
+            let mut rng = req.seed ^ 0xBA44_4E45_5253_0001;
+            let mut banners: Vec<(u8, Transform)> = Vec::new();
+            for seg in &room_plan.walls {
+                // Un tronçon trop court n'accueille pas une tenture de 1,5 m.
+                if seg.len_m < rooms::WALL_MODULE_M {
+                    continue;
+                }
+                // ~1 tronçon sur 3 : une bannière sur chaque mur ferait tapisserie.
+                if !splitmix64(&mut rng).is_multiple_of(3) {
+                    continue;
+                }
+                let idx = (splitmix64(&mut rng) % banner_scenes.len() as u64) as u8;
+                // Côté du mur (une face ou l'autre), décollé de la demi-épaisseur.
+                let side = if splitmix64(&mut rng).is_multiple_of(2) { 1.0 } else { -1.0 };
+                let off = RAMPARTS_WALL_THICKNESS_M * 0.5 + 0.05;
+                let (pos, yaw) = if seg.along_x {
+                    (
+                        Vec3::new(seg.center_x, 0.0, seg.center_z + side * off),
+                        if side > 0.0 { 0.0 } else { std::f32::consts::PI },
+                    )
+                } else {
+                    (
+                        Vec3::new(seg.center_x + side * off, 0.0, seg.center_z),
+                        side * std::f32::consts::FRAC_PI_2,
+                    )
+                };
+                banners.push((
+                    idx,
+                    Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+                ));
+            }
+            if !banners.is_empty() {
+                props_spawned += banners.len() as u32;
+                floor_merge::spawn_static_merge(
+                    &mut commands,
+                    "wall_props",
+                    banners,
+                    banner_scenes,
+                    extent,
+                    &req.stage_id,
+                );
+            }
+        }
         info!(
             "[stage-arena] complexe : {} pièces de {:.0} m, portes {:.0} m, {} tronçons",
             room_plan.room_centers.len(),

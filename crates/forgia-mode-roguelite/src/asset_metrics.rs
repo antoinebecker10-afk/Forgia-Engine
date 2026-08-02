@@ -30,7 +30,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
-const REGISTRY_PATH: &str = "assets/genomes/asset_registry.toml";
+pub(crate) const REGISTRY_PATH: &str = "assets/genomes/asset_registry.toml";
 
 /// Mesures d'un asset, telles que lues dans le fichier.
 #[derive(Debug, Clone, Copy, PartialEq)]
