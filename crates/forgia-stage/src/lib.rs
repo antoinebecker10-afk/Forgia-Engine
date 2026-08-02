@@ -205,13 +205,19 @@ pub fn wall_natural_len_for_kit(kit: &str) -> f32 {
         // L'ancien 4,0 espaçait les murs du DOUBLE de leur largeur → un trou sur
         // deux dans l'enceinte.
         //
-        // ⚠️ DÉFAUT CONNU, non corrigible ici : ce mur ne fait que **1,10 m de
-        // haut** alors que le collider d'enceinte fait `RAMPARTS_WALL_HEIGHT_M`
-        // = 4 m. Les stages qui utilisent ce kit ont donc un mur INVISIBLE de
-        // 2,90 m au-dessus d'une barrière visible. Baisser le collider n'est pas
-        // une option : 1,10 m est SOUS la hauteur de saut du joueur (1,174 m),
-        // l'arène deviendrait franchissable. Il faut un autre kit de remparts
-        // pour ces stages — décision de DA, pas de code.
+        // Story-687 — ce mur ne fait que **1,10 m de haut**, sous la hauteur de
+        // saut du joueur (1,174 m) : les stages medieval avaient un mur
+        // INVISIBLE de 2,90 m au-dessus d'une barrière franchissable.
+        //
+        // Le commentaire d'origine concluait « il faut un autre kit — décision
+        // de DA, pas de code ». Il manquait une option : la MISE À L'ÉCHELLE
+        // UNIFORME. Aucun mur du kit medieval ne dépasse 1,10 m (vérifié sur
+        // les 986 assets mesurés), mais agrandir la barrière d'un facteur
+        // dérivé la porte à 4 m SANS la déformer — ce que l'étirement d'un seul
+        // axe ferait (story-483 : « murs tordus comme des planches »).
+        //
+        // La longueur naturelle reste celle de l'asset ; c'est
+        // `rampart_wall_scale_for_kit` qui la multiplie côté pose.
         "medieval_hexagon" => 2.0,
         _ => 1.0,
     }
@@ -814,6 +820,29 @@ fn now_secs() -> f64 {
 
 /// Mapping `stage_def.ramparts_kit` → GLB path. Centralisé pour évolution
 /// future (registry crate dédié si > 5 kits).
+/// Facteur d'agrandissement UNIFORME du mur d'enceinte, dérivé de sa hauteur.
+///
+/// Story-687 — le collider d'enceinte fait `RAMPARTS_WALL_HEIGHT_M` (4 m). Un
+/// mur dessiné plus bas produit une barrière invisible : on bute sur du vide.
+/// Le facteur ramène donc le VISUEL à la hauteur du collider.
+///
+/// Uniforme, pas axial : étirer un seul axe donne des murs tordus comme des
+/// planches (story-483). Un mur agrandi garde ses proportions.
+pub fn rampart_wall_scale_for_kit(kit: &str) -> f32 {
+    // Hauteurs MESURÉES (`asset_registry.toml`, story-673).
+    let measured_height = match kit {
+        "kaykit_dungeon" | "kaykit_dungeon_remastered" => 4.00,
+        // Le seul « mur » du kit medieval est une clôture de 1,10 m. Aucun autre
+        // asset du kit ne dépasse cette hauteur.
+        "medieval_hexagon" => 1.10,
+        _ => 4.00,
+    };
+    if measured_height <= 0.01 {
+        return 1.0;
+    }
+    RAMPARTS_WALL_HEIGHT_M / measured_height
+}
+
 fn ramparts_wall_glb(kit: &str) -> &'static str {
     match kit {
         "kaykit_dungeon" => "models/kaykit/dungeon/wall.glb",
@@ -1085,10 +1114,14 @@ fn spawn_stage_arena_on_request(
     //    Physics : 1 collider cuboid par segment (6 colliders au total, pas 6*N).
     let wall_glb = ramparts_wall_glb(&stage_def.ramparts_kit);
     // Wall natural length per kit : TOML override > smart default par-kit.
+    // Story-687 — le mur est agrandi UNIFORMÉMENT pour atteindre la hauteur du
+    // collider d'enceinte. Sa longueur de pose suit le même facteur, sinon les
+    // modules se chevaucheraient (facteur > 1) ou laisseraient des trous.
+    let wall_scale = rampart_wall_scale_for_kit(&stage_def.ramparts_kit);
     let wall_len = match stage_def.wall_natural_len_m {
         Some(v) if v > 0.05 => v,
         _ => wall_natural_len_for_kit(&stage_def.ramparts_kit),
-    };
+    } * wall_scale;
     let hex_side_len = extent;
     // 1 collider per segment (midpoint + rotation).
     for (i, (mid, rot)) in ramparts_hex_segment_midpoints(extent)
@@ -1122,7 +1155,14 @@ fn spawn_stage_arena_on_request(
     let wall_scene: Handle<Scene> = asset_server.load(format!("{wall_glb}#Scene0"));
     let wall_instances: Vec<(u8, Transform)> = tiled
         .iter()
-        .map(|(pos, rot)| (0u8, Transform::from_translation(*pos).with_rotation(*rot)))
+        .map(|(pos, rot)| {
+            (
+                0u8,
+                Transform::from_translation(*pos)
+                    .with_rotation(*rot)
+                    .with_scale(Vec3::splat(wall_scale)),
+            )
+        })
         .collect();
     props_spawned += wall_instances.len() as u32;
     floor_merge::spawn_static_merge(
@@ -1134,6 +1174,50 @@ fn spawn_stage_arena_on_request(
         &req.stage_id,
     );
     result.walls_merged_cells = 0;
+
+    // Story-687 — les BANNIÈRES s'accrochent AUSSI aux remparts.
+    //
+    // Régression de story-684 : en les sortant des pools debout je les ai mises
+    // dans `wall_props`, consommé uniquement par les murs de PIÈCES — lesquels
+    // ne sortent pas sur les cartes autorées. Résultat : `crypts_of_anvil` et
+    // `forge_sanctum` n'avaient plus AUCUNE bannière. Elles étaient mal posées,
+    // elles sont devenues absentes : corriger une classe ne doit pas vider la
+    // scène (leçon story-672).
+    //
+    // Les remparts existent sur les 4 cartes, autorées comprises. C'est donc le
+    // support qui rend la décoration murale universelle.
+    if !req.wall_props.is_empty() && !tiled.is_empty() {
+        let banner_scenes: Vec<Handle<Scene>> = req
+            .wall_props
+            .iter()
+            .map(|p| asset_server.load(format!("{p}#Scene0")))
+            .collect();
+        let mut rng = req.seed ^ 0xBA44_4E45_5253_5241;
+        let mut banners: Vec<(u8, Transform)> = Vec::new();
+        for (pos, rot) in &tiled {
+            // ~1 module sur 4 : une bannière sur chaque ferait tapisserie.
+            if !splitmix64(&mut rng).is_multiple_of(4) {
+                continue;
+            }
+            let idx = (splitmix64(&mut rng) % banner_scenes.len() as u64) as u8;
+            // Décollée de la face INTÉRIEURE : le joueur est dans l'enceinte,
+            // une bannière posée à l'extérieur ne se verrait jamais.
+            let inward = (Vec3::ZERO - *pos).with_y(0.0).normalize_or_zero();
+            let p = *pos + inward * (RAMPARTS_WALL_THICKNESS_M * 0.5 + 0.05);
+            banners.push((idx, Transform::from_translation(p).with_rotation(*rot)));
+        }
+        if !banners.is_empty() {
+            props_spawned += banners.len() as u32;
+            floor_merge::spawn_static_merge(
+                &mut commands,
+                "rampart_props",
+                banners,
+                banner_scenes,
+                extent,
+                &req.stage_id,
+            );
+        }
+    }
 
     // 2.5 Coquille AUTHORED (story-625) - composition data-driven depuis
     //     arena_layouts.toml. Si presente, c'est la STRUCTURE de l'arene ; le

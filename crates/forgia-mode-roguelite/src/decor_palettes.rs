@@ -479,3 +479,60 @@ mod wall_prop_shape_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod wall_props_coverage_tests {
+    use super::*;
+    use crate::asset_metrics::AssetRegistry;
+
+    fn read(rel: &str) -> String {
+        std::fs::read_to_string(rel)
+            .or_else(|_| std::fs::read_to_string(format!("../../{rel}")))
+            .unwrap_or_else(|e| panic!("{rel} illisible : {e}"))
+    }
+
+    /// Story-687 — **corriger une classe ne doit pas vider la scène.**
+    ///
+    /// Story-684 a sorti les bannières des pools debout (elles y étaient
+    /// plantées dans l'herbe) et les a mises dans `wall_props`, consommé
+    /// uniquement par les murs de PIÈCES. Or les pièces ne sortent pas sur les
+    /// cartes autorées : `crypts_of_anvil` et `forge_sanctum` se sont retrouvées
+    /// sans AUCUNE bannière. Mal posé est devenu absent.
+    ///
+    /// C'est exactement la leçon de story-672 (« un invariant qui vide la scène
+    /// est une régression »), et ce test l'empêche de se reproduire.
+    #[test]
+    fn every_palette_has_wall_decoration() {
+        let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
+        let empty: Vec<&str> = cfg
+            .palettes
+            .iter()
+            .filter(|(_, p)| p.wall_props.is_empty())
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert!(
+            empty.is_empty(),
+            "palettes sans décor mural : {empty:?} — leurs remparts resteront nus"
+        );
+    }
+
+    /// Et ces décorations doivent EXISTER sur le disque et être mesurées : un
+    /// chemin inventé donne un mur nu, en silence.
+    #[test]
+    fn every_wall_prop_exists_and_is_measured() {
+        let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
+        let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
+        let root = if std::fs::metadata("assets").is_ok() { "assets" } else { "../../assets" };
+        let mut faults = Vec::new();
+        for (id, p) in &cfg.palettes {
+            for path in &p.wall_props {
+                if std::fs::metadata(format!("{root}/{path}")).is_err() {
+                    faults.push(format!("  '{id}' : {path} ABSENT du disque"));
+                } else if reg.get(path).is_none() {
+                    faults.push(format!("  '{id}' : {path} non mesuré"));
+                }
+            }
+        }
+        assert!(faults.is_empty(), "décor mural invalide :\n{}", faults.join("\n"));
+    }
+}

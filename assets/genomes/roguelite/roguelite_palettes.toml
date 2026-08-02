@@ -23,6 +23,11 @@
 # ═══════════════════════════════════════════════════════════════════════════
 [palettes.inferno]
 name = "La Crypte de l'Enclume"
+wall_props = [
+    "models/kaykit/dungeon_remastered/banner_red.gltf.glb",
+    "models/kaykit/dungeon_remastered/banner_brown.gltf.glb",
+    "models/kaykit/dungeon_remastered/banner_yellow.gltf.glb",
+]
 landmarks = [
     "models/environment/inferno/StatueKnight_002.glb",
     "models/environment/inferno/TowerBig_001.glb",
@@ -132,6 +137,11 @@ buildings = []
 # ═══════════════════════════════════════════════════════════════════════════
 [palettes.paturages]
 name = "Les Hauts Pâturages"
+wall_props = [
+    "models/kaykit/dungeon_remastered/banner_green.gltf.glb",
+    "models/kaykit/dungeon_remastered/banner_white.gltf.glb",
+    "models/kaykit/dungeon_remastered/banner_blue.gltf.glb",
+]
 landmarks = [
     "models/kaykit/hexagon/decoration/nature/trees_A_large.gltf",
     "models/kaykit/hexagon/decoration/nature/mountain_A_grass_trees.gltf",
@@ -171,6 +181,11 @@ buildings = []
 # ═══════════════════════════════════════════════════════════════════════════
 [palettes.bourg]
 name = "Le Bourg"
+wall_props = [
+    "models/kaykit/dungeon_remastered/banner_red.gltf.glb",
+    "models/kaykit/dungeon_remastered/banner_white.gltf.glb",
+    "models/kaykit/dungeon_remastered/banner_brown.gltf.glb",
+]
 landmarks = [
     "models/kaykit/hexagon/red/building_church_red.gltf",
     "models/kaykit/hexagon/red/building_castle_red.gltf",
