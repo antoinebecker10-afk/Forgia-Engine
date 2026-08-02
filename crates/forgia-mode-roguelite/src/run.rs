@@ -1018,6 +1018,65 @@ pub fn weapon_to_speaker(w: WeaponType) -> &'static str {
     }
 }
 
+/// Hauteur d'apparition au-dessus du sol de l'arène (m).
+///
+/// Reprend le `y = 2.0` de `forgia-player::spawn_player` : assez bas pour que la
+/// vitesse d'impact ne provoque pas de tunneling, assez haut pour ne pas naître
+/// coincé dans une tuile de sol.
+const ARENA_SPAWN_HEIGHT_M: f32 = 2.0;
+
+/// Story-682 — pose le joueur à l'apparition déclarée par l'arène.
+///
+/// ## Le défaut
+///
+/// Rapporté en jeu : « je spawn dans le puits, donc je suis bloqué ».
+///
+/// `forgia-player::spawn_player` place le joueur à `(0, 2, 0)` **en dur** — et
+/// c'est normal, cette crate ne connaît pas les arènes. Mais **rien** ne le
+/// repositionnait ensuite : chaque stage démarrait à l'origine. Or
+/// `forge_sanctum` pose délibérément un puits solide à `[0,0,0]` (« centre =
+/// puits, combat rapproché autour »).
+///
+/// Deux décisions autorées sur la même coordonnée, aucune ne connaissant
+/// l'autre. C'est la même classe que le « SALLE 5 / 4 » : une grandeur écrite
+/// à deux endroits qui finissent par diverger.
+///
+/// L'ancre `PlayerSpawn` existait déjà mais ne servait que de drapeau « arène
+/// prête » — personne ne s'en servait pour placer qui que ce soit. Ce système
+/// lui donne enfin son sens.
+///
+/// ## Idempotence
+///
+/// Le signal est `Added<AnchorPoint>` : l'arène despawne et recrée son ancre à
+/// chaque chargement (`StageArenaMarker`). C'est donc idempotent PAR
+/// CONSTRUCTION — pas besoin d'une clé à maintenir, qui finirait par mentir.
+///
+/// La cible est mémorisée en attente : l'ancre peut apparaître avant le joueur
+/// (ou l'inverse). Sans ça, l'ordre de spawn déciderait si le snap a lieu, ce
+/// qui est exactement le genre de dépendance au timing qui passe les tests et
+/// casse en jeu.
+pub fn sys_snap_player_to_arena_spawn(
+    q_new_anchors: Query<(&forgia_anchor::AnchorPoint, &GlobalTransform), Added<forgia_anchor::AnchorPoint>>,
+    mut q_player: Query<&mut Transform, With<Player>>,
+    mut pending: Local<Option<Vec3>>,
+) {
+    for (anchor, tf) in &q_new_anchors {
+        if anchor.kind == forgia_anchor::AnchorKind::PlayerSpawn {
+            *pending = Some(tf.translation());
+        }
+    }
+    let Some(target) = *pending else { return };
+    let Ok(mut player_tf) = q_player.single_mut() else {
+        return; // joueur pas encore spawné : on garde la cible pour plus tard
+    };
+    player_tf.translation = Vec3::new(target.x, target.y + ARENA_SPAWN_HEIGHT_M, target.z);
+    *pending = None;
+    info!(
+        "[roguelite] joueur posé à l'apparition de l'arène : ({:.1}, {:.1}, {:.1})",
+        player_tf.translation.x, player_tf.translation.y, player_tf.translation.z
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

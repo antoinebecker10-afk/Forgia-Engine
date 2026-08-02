@@ -29,6 +29,14 @@
 # (story-625) + forge_sanctum « Le Bourg de l'Enclume » (story-660).
 
 [layouts.crypts_of_anvil]
+# Story-682 — OÙ LE JOUEUR APPARAÎT. Défaut trouvé par le test de dégagement,
+# PAS en jeu : un tertre (`Mound_005`, r=2,7 m) est à 1 m de l'origine, où le
+# joueur apparaissait. Même cause que le puits de forge_sanctum, une carte plus
+# loin — c'est pour ça que le correctif est un test et pas un déplacement.
+#
+# (0, 0, 6) : juste au sud de la fosse de mêlée, on la regarde sans y être. Le
+# bloqueur le plus proche est le tertre à 7 m (il en faut 4,5).
+player_spawn = [0.0, 0.0, 6.0]
 suppress_procedural_modules = true
 
 # ── La fosse à mêlée (centrale) ───────────────────────────────────────────────
@@ -237,6 +245,18 @@ section = "fosse_melee"
 
 [layouts.forge_sanctum]
 suppress_procedural_modules = true
+# Story-682 — OÙ LE JOUEUR APPARAÎT.
+#
+# Rapporté en jeu : « je spawn dans le puits, donc je suis bloqué ». Le puits est
+# à [0,0,0] avec `blocker = true` — c'est VOULU (« centre = puits, combat
+# rapproché autour ») — mais l'apparition du joueur était en dur à l'origine
+# pour tous les stages. Deux décisions autorées sur la même coordonnée, aucune
+# ne connaissant l'autre.
+#
+# (0, 0, 12) : plein sud du puits, dos à la place. Le premier regard cadre le
+# puits à 12 m puis le beffroi 40 m derrière — le « weenie » de la carte. Le
+# blocker le plus proche après le puits est un rocher à 12,2 m.
+player_spawn = [0.0, 0.0, 12.0]
 
 # ── Le beffroi (focal point nord — visible de partout) ───────────────────────
 [[layouts.forge_sanctum.pieces]]

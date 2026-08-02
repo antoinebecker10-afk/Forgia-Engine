@@ -60,8 +60,30 @@ pub struct ArenaLayout {
     /// (le procédural reste pour POIs/loot = overlay run-to-run).
     #[serde(default)]
     pub suppress_procedural_modules: bool,
+    /// Story-682 — **où le joueur apparaît** dans cette arène. `None` = origine,
+    /// le comportement d'avant.
+    ///
+    /// L'ancre `PlayerSpawn` était posée en dur à `(0,0,0)` pour TOUS les
+    /// stages, pendant que `forge_sanctum` plaçait délibérément un puits solide
+    /// à `[0,0,0]` (« centre = puits, combat rapproché autour »). Deux décisions
+    /// autorées sur la même coordonnée, aucune ne connaissant l'autre : le
+    /// joueur apparaissait DANS le puits, bloqué.
+    ///
+    /// Une carte qui pose une pièce maîtresse en son centre doit pouvoir dire
+    /// où l'on démarre. C'est le sens de ce champ.
+    #[serde(default)]
+    pub player_spawn: Option<[f32; 3]>,
     #[serde(default)]
     pub pieces: Vec<ArenaPiece>,
+}
+
+impl ArenaLayout {
+    /// Position d'apparition du joueur, repli sur l'origine.
+    pub fn spawn_pos(&self) -> Vec3 {
+        self.player_spawn
+            .map(|p| Vec3::new(p[0], p[1], p[2]))
+            .unwrap_or(Vec3::ZERO)
+    }
 }
 
 /// Genome `arena_layouts.toml` : `[layouts.<stage_id>] ArenaLayout`.

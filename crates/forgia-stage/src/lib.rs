@@ -1193,11 +1193,20 @@ fn spawn_stage_arena_on_request(
     }
 
     // 3. PlayerSpawn anchor (just a marker entity, no visual).
+    //
+    // Story-682 — la position vient de l'AGENCEMENT AUTORÉ quand il en déclare
+    // une. Elle était en dur à `(0,0,0)` pour tous les stages, pendant que
+    // `forge_sanctum` posait délibérément un puits solide à `[0,0,0]` : le
+    // joueur apparaissait DEDANS, bloqué. Une carte qui met une pièce maîtresse
+    // en son centre doit pouvoir dire où l'on démarre.
+    let spawn_pos = authored_layout
+        .map(|l| l.spawn_pos())
+        .unwrap_or(Vec3::ZERO);
     commands.spawn((
         Name::new("StagePlayerSpawn"),
         StageArenaMarker,
         AnchorPoint::new(AnchorKind::PlayerSpawn, 0),
-        Transform::from_xyz(0.0, 0.0, 0.0),
+        Transform::from_translation(spawn_pos),
         GlobalTransform::default(),
     ));
     anchor_stats.record(AnchorKind::PlayerSpawn);

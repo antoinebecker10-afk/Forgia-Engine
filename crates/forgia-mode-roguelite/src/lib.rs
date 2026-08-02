@@ -367,6 +367,14 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-677 — la boucle de rounds : courbe de menace + mur mesurable.
         app.init_resource::<rounds::RoundPace>();
         app.add_systems(Startup, rounds::sys_init_rounds);
+        // Story-682 — le joueur apparaissait TOUJOURS à l'origine, y compris là
+        // où l'arène pose une pièce maîtresse solide (le puits de forge_sanctum).
+        app.add_systems(
+            Update,
+            run::sys_snap_player_to_arena_spawn
+                .in_set(GameSet::Movement)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         // Story-680 cran 5 — la CHAÎNE : `chain_extra_targets` était calculé et
         // jamais lu. Les 2 atouts « Chaîne » du catalogue ne faisaient rien.
         app.init_resource::<chain::ChainStats>();

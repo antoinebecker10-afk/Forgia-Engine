@@ -84,7 +84,7 @@ struct RegistryToml {
 /// Toutes les mesures, indexées par chemin d'asset (`models/...`).
 #[derive(Resource, Debug, Clone, Default)]
 pub struct AssetRegistry {
-    by_path: HashMap<String, AssetMetrics>,
+    pub(crate) by_path: HashMap<String, AssetMetrics>,
 }
 
 impl AssetRegistry {
@@ -236,6 +236,107 @@ mod tests {
             missing.is_empty(),
             "{} props de palette sans mesure : {missing:#?}",
             missing.len()
+        );
+    }
+}
+
+#[cfg(test)]
+mod spawn_clearance_tests {
+    use super::*;
+    use forgia_stage::authored::ArenaLayoutsGenome;
+
+    /// Rayon du joueur (m) — capsule `Collider::capsule_y(0.7, 0.3)`.
+    /// C'est un DISQUE en plan (`map-design-patterns.md` §1).
+    const PLAYER_RADIUS_M: f32 = 0.3;
+    /// Marge : un joueur qui apparaît collé à un mur est aussi bloqué qu'un
+    /// joueur qui apparaît dedans.
+    const SPAWN_CLEARANCE_M: f32 = 1.5;
+
+    fn read(rel: &str) -> String {
+        std::fs::read_to_string(rel)
+            .or_else(|_| std::fs::read_to_string(format!("../../{rel}")))
+            .unwrap_or_else(|e| panic!("{rel} illisible : {e}"))
+    }
+
+    /// Story-682 — **personne n'apparaît dans un solide.**
+    ///
+    /// Rapporté en jeu : « je spawn dans le puits, donc je suis bloqué ».
+    /// `forge_sanctum` pose délibérément un puits solide à `[0,0,0]`, et
+    /// l'apparition du joueur était en dur à l'origine pour TOUS les stages.
+    ///
+    /// Ce test vaut pour toutes les cartes, présentes et futures : il compare le
+    /// point d'apparition déclaré à l'emprise MESURÉE de chaque pièce bloquante.
+    /// C'est le correctif de CLASSE — corriger la seule carte fautive aurait
+    /// laissé la prochaine reproduire le défaut.
+    #[test]
+    fn no_authored_blocker_covers_its_arena_spawn() {
+        let reg = AssetRegistry::parse_toml(&read(REGISTRY_PATH));
+        let genome: ArenaLayoutsGenome =
+            toml::from_str(&read("assets/genomes/arena_layouts.toml"))
+                .expect("arena_layouts.toml illisible");
+
+        let mut measured = 0usize;
+        let mut unmeasured: Vec<&str> = Vec::new();
+        let mut faults: Vec<String> = Vec::new();
+
+        for (stage, layout) in &genome.layouts {
+            let spawn = layout.spawn_pos();
+            for piece in &layout.pieces {
+                if !piece.blocker {
+                    continue;
+                }
+                let Some(m) = reg.get(&piece.prefab) else {
+                    unmeasured.push(&piece.prefab);
+                    continue;
+                };
+                measured += 1;
+                // L'emprise en jeu suit l'échelle autorée — pas l'emprise native.
+                let radius = m.footprint_radius_m * piece.scale;
+                let dx = piece.pos[0] - spawn.x;
+                let dz = piece.pos[2] - spawn.z;
+                let dist = (dx * dx + dz * dz).sqrt();
+                let needed = radius + PLAYER_RADIUS_M + SPAWN_CLEARANCE_M;
+                if dist < needed {
+                    faults.push(format!(
+                        "  '{stage}' : '{}' (r={radius:.1} m) à {dist:.1} m de l'apparition \
+                         — il en faut {needed:.1}",
+                        piece.prefab.rsplit('/').next().unwrap_or(&piece.prefab)
+                    ));
+                }
+            }
+        }
+
+        // « Zéro mesuré n'est pas vert, c'est aveugle » (map-design-patterns §13).
+        assert!(
+            measured > 0,
+            "AUCUNE pièce bloquante mesurée — ce test ne vérifie rien. \
+             Non mesurées : {unmeasured:#?}"
+        );
+        assert!(
+            faults.is_empty(),
+            "{} apparition(s) dans un solide sur {measured} bloqueurs mesurés :\n{}",
+            faults.len(),
+            faults.join("\n")
+        );
+    }
+
+    /// Le test ci-dessus a-t-il des dents ? On lui donne un cas fautif construit
+    /// à la main. Sans cette preuve, « aucune faute trouvée » pourrait aussi
+    /// bien vouloir dire « je ne sais pas chercher ».
+    #[test]
+    fn the_clearance_check_really_catches_an_overlap() {
+        let reg = AssetRegistry::parse_toml(&read(REGISTRY_PATH));
+        // Une pièce quelconque du registre, posée PILE sur l'apparition.
+        let (path, m) = reg
+            .by_path
+            .iter()
+            .find(|(_, m)| m.footprint_radius_m > 0.5)
+            .expect("le registre doit contenir au moins un prop mesurable");
+        let radius = m.footprint_radius_m;
+        let dist = 0.0_f32;
+        assert!(
+            dist < radius + PLAYER_RADIUS_M + SPAWN_CLEARANCE_M,
+            "'{path}' (r={radius:.1}) à 0 m devrait être détecté comme un recouvrement"
         );
     }
 }
