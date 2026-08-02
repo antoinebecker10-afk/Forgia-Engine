@@ -34,6 +34,7 @@ pub mod authored;
 pub mod floor_merge;
 pub mod graph;
 pub mod layout;
+pub mod rooms;
 pub mod layout_sensor;
 
 /// Sol de REPLI de l'arène — celui d'avant story-676, quand c'était le seul.
@@ -1189,6 +1190,81 @@ fn spawn_stage_arena_on_request(
             authored_pieces_spawned,
             authored_sections.len(),
             suppress_procedural
+        );
+    }
+
+    // 2.4 PIÈCES ET COULOIRS (story-683) — le complexe central.
+    //
+    // On ne se bat plus dans un disque nu : un bloc de pièces reliées par des
+    // portes occupe le centre, l'anneau extérieur reste ouvert (forme Gunfire).
+    // TOUT RESTE À PLAT — les bots n'ont ni navmesh ni gravité, mais leur
+    // `collide_and_slide` sait déjà longer un mur et enfiler un couloir.
+    //
+    // Le mur utilisé est celui du kit DUNGEON quel que soit le stage : c'est le
+    // seul mesuré à 4,00 m de haut. `medieval_hexagon/wall_straight` ne fait que
+    // 1,10 m — le joueur saute 1,174 m et passerait par-dessus les cloisons.
+    //
+    // ⚠️ JAMAIS sur une coquille AUTORÉE. `forge_sanctum` pose son marché à
+    // x = 18 m, exactement là où tomberait le mur est du complexe — et son
+    // beffroi, son puits et sa taverne composent une place pensée à la main.
+    // Générer par-dessus, ce serait bulldozer un travail de design pour le
+    // remplacer par une grille. Le complexe est fait pour les stages SANS
+    // agencement autoré ; `suppress_procedural_modules` dit déjà exactement ça.
+    // `suppress_procedural` a déjà été calculé plus haut depuis le même layout —
+    // le relire évite un second emprunt ET une seconde source de vérité.
+    let authored_suppresses = suppress_procedural;
+    let rooms_cfg = rooms::RoomsConfig::load_or_default();
+    let room_plan = if authored_suppresses {
+        rooms::RoomPlan::default()
+    } else {
+        rooms::plan_rooms(extent, req.seed, &rooms_cfg)
+    };
+    if !room_plan.walls.is_empty() {
+        let room_wall_glb = ramparts_wall_glb("kaykit_dungeon");
+        let room_scene: Handle<Scene> = asset_server.load(format!("{room_wall_glb}#Scene0"));
+        let mut room_instances: Vec<(u8, Transform)> = Vec::new();
+        for seg in &room_plan.walls {
+            // Visuel : modules à taille naturelle, fusionnés.
+            for (pos, yaw) in seg.module_poses() {
+                room_instances.push((
+                    0u8,
+                    Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+                ));
+            }
+            // Physique : UN cuboïde par tronçon (pas un par module) — les bots
+            // sondent par raycast, 30 boîtes coûtent bien moins que 120.
+            let half = seg.collider_half_extents(
+                RAMPARTS_WALL_HEIGHT_M,
+                RAMPARTS_WALL_THICKNESS_M,
+            );
+            commands.spawn((
+                Name::new("RoomWallCollider"),
+                StageArenaMarker,
+                Transform::from_xyz(
+                    seg.center_x,
+                    RAMPARTS_WALL_HEIGHT_M * 0.5,
+                    seg.center_z,
+                ),
+                GlobalTransform::default(),
+                RigidBody::Fixed,
+                Collider::cuboid(half.x, half.y, half.z),
+            ));
+        }
+        props_spawned += room_instances.len() as u32;
+        floor_merge::spawn_static_merge(
+            &mut commands,
+            "rooms",
+            room_instances,
+            vec![room_scene],
+            extent,
+            &req.stage_id,
+        );
+        info!(
+            "[stage-arena] complexe : {} pièces de {:.0} m, portes {:.0} m, {} tronçons",
+            room_plan.room_centers.len(),
+            room_plan.cell_m,
+            room_plan.corridor_w_m,
+            room_plan.walls.len()
         );
     }
 
