@@ -30,12 +30,16 @@ use bevy::render::render_resource::{
 use bevy_egui::{egui, EguiContexts, EguiTextureHandle};
 use forgia_assets::GameAssets;
 use forgia_core::prelude::{AppMode, ArmCosmetics, ArmStyle};
+use forgia_mode_roguelite::avatar::{equipped_key, spawn_equipped_avatar};
+use forgia_mode_roguelite::equipment::{EquipmentConfig, EquipmentSave};
 use forgia_mode_roguelite::weapon_select::StartingWeaponChoice;
 
 /// Layer de rendu de l'aperçu ARME (0 = monde, 1 = viewmodel FPS déjà pris).
 const WEAPON_LAYER: usize = 2;
 /// Layer de rendu de l'aperçu BRAS (isolé de l'arme → les 2 caméras ne se voient pas).
 const ARM_LAYER: usize = 3;
+/// Layer de rendu de l'aperçu PERSONNAGE (équipement porté).
+const CHARACTER_LAYER: usize = 4;
 /// Côté de l'image RTT (px). Carré → viewport carré dans le panneau.
 const RTT_SIZE: u32 = 512;
 /// Taille cible (plus grande dimension, m) du sujet après calibrage AABB.
@@ -94,7 +98,11 @@ impl Plugin for WeaponPreviewPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(AppMode::Menu),
-            (sys_spawn_weapon_preview, sys_spawn_arm_preview),
+            (
+                sys_spawn_weapon_preview,
+                sys_spawn_arm_preview,
+                sys_spawn_character_preview,
+            ),
         )
         .add_systems(OnExit(AppMode::Menu), sys_despawn_previews)
         .add_systems(
@@ -103,6 +111,10 @@ impl Plugin for WeaponPreviewPlugin {
                 sys_swap_weapon_preview,
                 sys_clone_arm_materials,
                 sys_retint_arm_materials,
+                // Reconstruire AVANT de propager les layers et de calibrer : les
+                // pièces qui viennent d'apparaître doivent être vues par la
+                // caméra dédiée et entrer dans le cadrage de la même passe.
+                sys_sync_character_pieces,
                 sys_propagate_preview_layers,
                 sys_calibrate_previews,
                 sys_rotate_previews,
@@ -401,13 +413,121 @@ fn apply_arm_style_glb(mat: &mut StandardMaterial, color: [f32; 3], style: ArmSt
     }
 }
 
-// ── Systèmes génériques (arme + bras) ───────────────────────────────────────────
+// ── Aperçu PERSONNAGE (équipement) ──────────────────────────────────────────
+//
+// Le pendant visuel du panneau ÉQUIPEMENT : on voit ce qu'on porte, et la pièce
+// change de couleur avec sa rareté. C'est la convention de couleur héritée de
+// Diablo II / WoW (gris → vert → bleu → violet → or) : elle vaut précisément
+// parce qu'elle se lit SANS texte, donc elle doit se voir sur le personnage, pas
+// seulement sur une pastille d'interface.
+
+/// Ressource de l'aperçu PERSONNAGE : `TextureId` + conteneur corps/pièces.
+#[derive(Resource)]
+pub struct CharacterPreviewRtt {
+    pub tex_id: egui::TextureId,
+    image: Handle<Image>,
+    holder: Entity,
+    /// Équipement actuellement montré — clé de reconstruction.
+    shown: String,
+}
+
+/// OnEnter(Menu) — crée l'aperçu 3D du personnage équipé (layer CHARACTER_LAYER).
+fn sys_spawn_character_preview(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    mut contexts: EguiContexts,
+    existing: Option<Res<CharacterPreviewRtt>>,
+) {
+    if existing.is_some() {
+        return;
+    }
+    let (image, tex_id) = create_rtt_image(&mut images, &mut contexts, "character_preview_rtt");
+    let layer = RenderLayers::layer(CHARACTER_LAYER);
+    spawn_rtt_camera_light(&mut commands, &image, &layer, -3, "CharacterPreviewCamera");
+
+    let pivot = commands
+        .spawn((
+            Transform::default(),
+            Visibility::Inherited,
+            PreviewPivot,
+            PreviewEntity,
+            Name::new("CharacterPreviewPivot"),
+        ))
+        .id();
+    // Conteneur calibré ENSEMBLE (corps + pièces) : le personnage garde son
+    // cadrage quoi qu'on lui mette dessus.
+    let holder = commands
+        .spawn((
+            Transform::from_scale(Vec3::splat(0.001)),
+            Visibility::Inherited,
+            layer,
+            Name::new("CharacterPreviewHolder"),
+            ChildOf(pivot),
+        ))
+        .id();
+
+    commands.insert_resource(CharacterPreviewRtt {
+        tex_id,
+        image,
+        holder,
+        // Volontairement différent de toute clé réelle (même vide) pour forcer la
+        // première construction.
+        shown: "\u{0}jamais construit".to_string(),
+    });
+    info!("[weapon-preview] aperçu 3D personnage spawné (layer {CHARACTER_LAYER})");
+}
+
+/// Reconstruit le personnage quand l'équipement porté change (et une fois au
+/// premier passage). Le corps est toujours là ; chaque pièce équipée s'ajoute
+/// par-dessus, teintée à sa rareté.
+fn sys_sync_character_pieces(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    cfg: Res<EquipmentConfig>,
+    save: Res<EquipmentSave>,
+    rtt: Option<ResMut<CharacterPreviewRtt>>,
+    q_children: Query<&Children>,
+) {
+    let Some(mut rtt) = rtt else {
+        return;
+    };
+    let key = equipped_key(&save);
+    if rtt.shown == key {
+        return;
+    }
+    rtt.shown = key;
+
+    if let Ok(children) = q_children.get(rtt.holder) {
+        for child in children.iter() {
+            commands.entity(child).despawn();
+        }
+    }
+    // Le montage est partagé avec l'avatar du Hall. Le layer de rendu n'est pas
+    // posé ici : `sys_propagate_preview_layers` le pousse depuis le holder à
+    // TOUS ses descendants, pièces neuves comprises.
+    spawn_equipped_avatar(
+        &mut commands,
+        &assets,
+        &cfg,
+        &save,
+        rtt.holder,
+        Transform::default(),
+    );
+    // Re-cadrer : le personnage vient de changer d'emprise.
+    commands.entity(rtt.holder).insert((
+        NeedsPreviewCalibrate,
+        Transform::from_scale(Vec3::splat(0.001)),
+    ));
+}
+
+// ── Systèmes génériques (arme + bras + personnage) ──────────────────────────────
 
 /// Propage le `RenderLayers` de chaque racine d'aperçu à TOUS ses descendants (un
 /// `SceneRoot` GLB ne le fait pas en 0.18). Lit le layer porté par la racine.
 fn sys_propagate_preview_layers(
     weapon: Option<Res<WeaponPreviewRtt>>,
     arm: Option<Res<ArmPreviewRtt>>,
+    character: Option<Res<CharacterPreviewRtt>>,
     q_children: Query<&Children>,
     q_layers: Query<&RenderLayers>,
     mut commands: Commands,
@@ -415,6 +535,7 @@ fn sys_propagate_preview_layers(
     let roots = [
         weapon.as_ref().map(|w| w.scene_entity),
         arm.as_ref().map(|a| a.arm_holder),
+        character.as_ref().map(|c| c.holder),
     ];
     for root in roots.into_iter().flatten() {
         let Ok(target) = q_layers.get(root).cloned() else {
@@ -471,6 +592,7 @@ fn sys_despawn_previews(
     mut commands: Commands,
     weapon: Option<Res<WeaponPreviewRtt>>,
     arm: Option<Res<ArmPreviewRtt>>,
+    character: Option<Res<CharacterPreviewRtt>>,
     q: Query<Entity, With<PreviewEntity>>,
     mut contexts: EguiContexts,
 ) {
@@ -480,11 +602,15 @@ fn sys_despawn_previews(
     if let Some(a) = arm.as_ref() {
         contexts.remove_image(a.image.id());
     }
+    if let Some(c) = character.as_ref() {
+        contexts.remove_image(c.image.id());
+    }
     for e in &q {
         commands.entity(e).despawn();
     }
     commands.remove_resource::<WeaponPreviewRtt>();
     commands.remove_resource::<ArmPreviewRtt>();
+    commands.remove_resource::<CharacterPreviewRtt>();
 }
 
 /// Walk les descendants → `(min, max)` de l'AABB combinée (espace local du root).

@@ -500,13 +500,19 @@ fn mouse_look(
     let Ok((mut player_tf, mut player)) = q_player.single_mut() else {
         return;
     };
-    // WoW pattern (RPG) : mouse_look ne tourne le player QUE si RMB est tenu
-    // (mouselook steer). Sans bouton tenu, la souris bouge librement à l'écran,
-    // le perso reste fixe — comme dans WoW. En FPS mode : comportement standard
-    // toujours actif (cursor locked + cam orientée par mouse motion).
-    let is_rpg = *game_mode.get() == GameMode::Rpg;
+    // WoW pattern : en vue 3ᵉ personne, `mouse_look` ne tourne le player QUE si
+    // RMB est tenu (mouselook steer). Sans bouton tenu la souris bouge librement
+    // à l'écran et le perso reste fixe. En FPS : comportement standard, curseur
+    // capturé en permanence.
+    //
+    // La condition suit la CAMÉRA, pas un mode en particulier : `forgia-camera-
+    // orbit::orbit_cursor_grab` relâche le curseur dès qu'aucun bouton n'est
+    // tenu. Laisser le Hall en branche FPS ferait pivoter le personnage à chaque
+    // déplacement d'un curseur pourtant libre — les deux systèmes se
+    // contrediraient.
+    let third_person = matches!(*game_mode.get(), GameMode::Rpg | GameMode::CastleHub);
     let rmb_held = mouse_buttons.pressed(MouseButton::Right);
-    if is_rpg && !rmb_held {
+    if third_person && !rmb_held {
         // Drain le buffer MouseMotion pour éviter qu'un mouvement accumulé pendant
         // la phase mouse-libre ne snape le perso au moment où l'user re-press RMB.
         for _ in motion.read() {}

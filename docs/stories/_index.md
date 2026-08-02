@@ -18,11 +18,12 @@
 
 > 🚨 **45 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
-## IN_PROGRESS (45)
+## IN_PROGRESS (46)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
 | 442 | Procgen Village V1 | [story-442-procgen-village-v1.md](./story-442-procgen-village-v1.md) |
+| 675 | Personnage Trooper + équipement loot par rareté | [story-675-equipement-trooper-rarete.md](./story-675-equipement-trooper-rarete.md) |
 | 449 | Asset Pack Pipeline | [story-449-asset-pack-pipeline.md](./story-449-asset-pack-pipeline.md) |
 | 450 | Chunk Streaming Foundation | [story-450-chunk-streaming-foundation.md](./story-450-chunk-streaming-foundation.md) |
 | 454 | Anim Debug System V2 (Niveau A — Diagnostic bone-trace) | [story-454-anim-debug-system-niveau-a-diagnostic.md](./story-454-anim-debug-system-niveau-a-diagnostic.md) |

@@ -21,6 +21,10 @@ mod cyber_city;
 /// Hall de Forgia (2026-07-22) — hub social 3D walkable : château importé
 /// (`castle_highlands.glb`), zone neutre sans combat. Entrée debug F10.
 mod castle_hub;
+/// Vue 3ᵉ personne du Hall + avatar portant l'armure débloquée.
+mod castle_avatar;
+/// Inventaire d'armure du Hall (touche I) — même contenu qu'au menu.
+mod castle_equipment_panel;
 /// Sol gazon du Hall de Forgia — terrain reconstruit depuis le Unity Terrain
 /// (heightmap + splatmap chemins pavés + 21k tree-instances). RÉACTIVÉ 2026-07-25 :
 /// orientation calée via `yaw_deg` du tune live `castle_ground_tune.json` (le
@@ -190,6 +194,9 @@ pub fn run_game() -> AppExit {
     // importé). Zone neutre sans combat. Mode self-contained (GameMode::CastleHub),
     // entrée debug F10 depuis le menu. Aucune dépendance à forgia-mode-roguelite.
     app.add_plugins(castle_hub::CastleHubPlugin);
+    // Le Hall se joue à la 3ᵉ personne : on y voit le personnage et son armure.
+    app.add_plugins(castle_avatar::CastleAvatarPlugin);
+    app.add_plugins(castle_equipment_panel::CastleEquipmentPanelPlugin);
     // 7e-ter. Sol/terrain du Hall — RÉACTIVÉ 2026-07-25 : reconstruction du Unity
     // Terrain (heightmap + splatmap chemins pavés + 21k tree-instances). L'orientation
     // (le chemin/la pente doit pointer vers l'AVANT du château) se cale via `yaw_deg`

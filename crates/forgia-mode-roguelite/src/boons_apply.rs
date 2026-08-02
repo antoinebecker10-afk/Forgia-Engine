@@ -37,6 +37,8 @@ pub fn sys_recompute_boon_mods(
     mastery: Res<crate::meta_shop::WeaponMasteryMods>,
     // Story-653 — La Trempe (progression in-run de l'arme), composée comme perm/mastery.
     trempe: Res<crate::trempe::WeaponTrempeState>,
+    // Équipement — pièces d'armure portées (rareté = ampleur du bonus).
+    equip: Res<crate::equipment::EquipmentMods>,
     mut mods: ResMut<PlayerCombatMods>,
     mut heal: ResMut<HealOnKillCumul>,
 ) {
@@ -90,7 +92,16 @@ pub fn sys_recompute_boon_mods(
     new_mods.damage_mul *= mastery.damage_mul;
     // Story-653 — La Trempe (in-run) : multiplicatif, même couche que perm/mastery.
     new_mods.damage_mul *= trempe.damage_mul;
-    new_mods.damage_reduction = (new_mods.damage_reduction + perm.damage_reduction).min(0.85);
+    // Équipement : même couche que perm/mastery/trempe (multiplicatif sur les
+    // multiplicateurs, additif clampé sur les fractions). Le clamp de réduction
+    // est calculé APRÈS l'apport des pièces, sinon un plastron Mythique pourrait
+    // pousser au-delà des 85 % que l'anti-cheese garantit.
+    new_mods.damage_mul *= equip.damage_mul;
+    new_mods.fire_rate_mul *= equip.fire_rate_mul;
+    new_mods.crit_chance = (new_mods.crit_chance + equip.crit_chance).min(1.0);
+    new_mods.headshot_bonus_mul += equip.headshot_bonus_mul;
+    new_mods.damage_reduction =
+        (new_mods.damage_reduction + perm.damage_reduction + equip.damage_reduction).min(0.85);
     // Log seulement au changement (recompute tourne chaque frame désormais).
     let changed = *mods != new_mods || (heal.hp_per_kill - new_heal).abs() > f32::EPSILON;
     *mods = new_mods;

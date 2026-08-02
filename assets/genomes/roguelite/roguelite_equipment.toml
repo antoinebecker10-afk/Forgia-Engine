@@ -1,0 +1,149 @@
+# roguelite_equipment.toml — Équipement du personnage (Trooper), pièces lootées.
+#
+# Modèle : le personnage porte une combinaison de base (toujours visible) et
+# CINQ pièces d'armure qui se lootent. Chaque pièce améliore UNE statistique de
+# combat ; sa RARETÉ — sa couleur — dit de combien.
+#
+# La couleur est le langage du système : on lit la valeur d'une pièce d'un coup
+# d'œil, sans texte. Elle est appliquée en teinte sur le matériau de la pièce,
+# donc visible sur le portrait ET sur les gants en jeu.
+#
+# Source des modèles : `assets/models/characters/trooper/manifest.json`, produit
+# par `tools/blender/build_trooper.py` depuis le pack Sci-Fi Trooper Man v3.
+# Les `model` d'ici doivent correspondre aux `slots` du manifeste.
+
+version = 1
+
+# Le corps de base — toujours porté, jamais lootable. C'est lui qu'on voit quand
+# aucune pièce n'est équipée.
+body_model = "models/characters/trooper/body.gltf"
+
+# ── Raretés ──────────────────────────────────────────────────────────────────
+# `bonus_mul` multiplie le gain de base du slot (`per_tier`).
+# `drop_weight` = poids de tirage (mêmes ordres de grandeur que roguelite_loot).
+
+[[rarities]]
+id = "commun"
+label = "Commun"
+rgb = [0.62, 0.64, 0.68]
+bonus_mul = 1.0
+drop_weight = 60.0
+
+[[rarities]]
+id = "rare"
+label = "Rare"
+rgb = [0.32, 0.74, 0.38]
+bonus_mul = 2.0
+drop_weight = 28.0
+
+[[rarities]]
+id = "epique"
+label = "Épique"
+rgb = [0.28, 0.55, 0.92]
+bonus_mul = 3.0
+drop_weight = 9.0
+
+[[rarities]]
+id = "legendaire"
+label = "Légendaire"
+rgb = [0.64, 0.34, 0.86]
+bonus_mul = 4.0
+drop_weight = 2.5
+
+[[rarities]]
+id = "mythique"
+label = "Mythique"
+rgb = [0.95, 0.72, 0.22]
+bonus_mul = 5.0
+drop_weight = 0.5
+
+# ── Slots ────────────────────────────────────────────────────────────────────
+# `stat` ∈ damage | fire_rate | reduction | crit | headshot
+# `per_tier` = gain au rang Commun. Mythique donne 5× ce gain (bonus_mul).
+#
+# L'association slot → stat est un choix de design, pas une contrainte technique :
+# elle se change ici, sans toucher au code. Set Mythique complet = dégâts ×1.20,
+# cadence ×1.20, 15 % de réduction, 15 % de critique, +0.40 aux tirs à la tête.
+
+[[slots]]
+id = "helmet"
+label = "Casque"
+stat = "headshot"
+stat_label = "Visée"
+per_tier = 0.08
+model = "models/characters/trooper/helmet.gltf"
+
+[[slots]]
+id = "chest"
+label = "Plastron"
+stat = "reduction"
+stat_label = "Blindage"
+per_tier = 0.03
+model = "models/characters/trooper/chest.gltf"
+
+[[slots]]
+id = "gloves"
+label = "Gants"
+stat = "fire_rate"
+stat_label = "Cadence"
+per_tier = 0.04
+model = "models/characters/trooper/gloves.gltf"
+
+[[slots]]
+id = "legs"
+label = "Jambières"
+stat = "damage"
+stat_label = "Puissance"
+per_tier = 0.04
+model = "models/characters/trooper/legs.gltf"
+
+[[slots]]
+id = "boots"
+label = "Bottes"
+stat = "crit"
+stat_label = "Critique"
+per_tier = 0.03
+model = "models/characters/trooper/boots.gltf"
+
+# ── Butin ────────────────────────────────────────────────────────────────────
+
+[drops]
+# Une pièce tombe à chaque étage terminé, plus une garantie à la victoire.
+per_stage = 1
+on_victory = 1
+# Un tirage qui donne une pièce déjà possédée est relancé jusqu'à ce nombre de
+# fois avant d'être abandonné (anti-doublon léger, sans garantir l'inédit).
+reroll_if_owned = 8
+
+# ── Animation de l'avatar ────────────────────────────────────────────────────
+# Même modèle que les ennemis (`roguelite_enemy_anim.toml`, story-636) : les clips
+# se désignent par leur NOM, jamais par leur index. Un index se décale en silence
+# au moindre ré-export ; un nom manquant se signale.
+#
+# Les clips vivent dans `body_model` uniquement — les pièces d'armure partagent
+# son squelette, donc elles n'ont aucune animation à elles.
+
+[animation]
+idle_clip = "idle"
+walk_clip = "walk"
+# Pas encore de clip de course : la marche en tient lieu. À remplacer dès que le
+# `Running` Mixamo est intégré (cf. docs/pipeline/mixamo-trooper.md).
+run_clip = "walk"
+
+# Fondu entre deux clips. Sans lui, le passage repos → marche est une coupure
+# sèche, et c'est ce qui trahit le plus une animation de jeu.
+crossfade_ms = 150
+
+# Seuils de vitesse horizontale (m/s) qui décident du clip.
+walk_speed_min = 0.6
+run_speed_min = 6.0
+
+# 🚨 Plafond anti-téléport. La vitesse est dérivée du déplacement réel : un
+# replacement au spawn produit un pic de plusieurs centaines de m/s et ferait
+# courir le personnage à l'arrêt. Même garde-fou que les ennemis.
+max_sane_speed = 30.0
+
+# Pas de section de cadrage pour l'aperçu 3D : il est rendu hors écran
+# (`forgia_ui::weapon_preview`, comme les bras et les armes) et se cadre TOUT
+# SEUL sur l'emprise réelle du personnage. Un réglage de distance/hauteur ici
+# serait une valeur à maintenir en double avec la géométrie.
