@@ -445,3 +445,63 @@ d'objets :
 - `feedback_antoine_refuse_bases_externes_personnage` (mémoire) — la voie « base
   externe » avait été refusée deux fois ; c'est Antoine qui a désigné ce pack,
   l'exception prévue par ce feedback.
+
+---
+
+## 10. Passe « Puissance » — un nombre pour suivre sa progression (2026-08-02)
+
+**Demande** : « J'aimerais que les avantages (dégâts, visée, etc.) te donnent un
+montant qui te permette de suivre ton évolution. »
+
+**Le problème que ça résout.** Le bilan affiche cinq pourcentages qui portent sur
+des choses différentes (dégâts, cadence, réduction, critique, visée). Ils disent
+le *profil* d'un build, mais rien ne dit si celui d'aujourd'hui vaut mieux que
+celui d'hier — et deux pièces d'emplacements différents restent incomparables.
+
+**La Puissance** = Σ des rangs de rareté portés, sur `slots × rarities` (25 ici).
+`equipment::power_score()`, dérivé du **même** `equipped` que `compute_mods` — pas
+de seconde vérité.
+
+**Pourquoi le RANG et non le gain de statistique** — trois raisons, dans l'ordre :
+
+1. c'est le rang que le joueur progresse : trouver plus rare est le geste du jeu,
+   alors qu'un `per_tier` est une décision de game design ;
+2. un score dérivé des pourcentages **bougerait à chaque rééquilibrage**, sans
+   qu'aucune pièce n'ait changé — le record d'hier deviendrait faux ;
+3. additionner cinq pourcentages hétérogènes ne veut rien dire physiquement.
+
+Le dénominateur se **dérive** du genome (`EquipmentConfig::power_max()`) : ajouter
+un emplacement ou une rareté déplace la cible tout seul.
+
+**Livré**
+
+| Endroit | Ce qu'on voit |
+|---|---|
+| Panneau Forgeron | `PUISSANCE  14 / 25  record 19` + jauge (liseré sombre = record) |
+| Survol d'une pastille | `+3 Puissance` — rend comparables deux emplacements |
+| Carte de butin | `Puissance 12 → 15`, ou `15 → 18 si équipée` quand l'emplacement est déjà rempli |
+| `forgia2_equipment.json` | `power`, `power_max`, `power_record` |
+
+`EquipmentSave.power_record` (scalaire placé **avant** les tables, cf. §Sauvegarde)
+retient le pic : sans lui, retirer une pièce effacerait l'histoire.
+
+## 11. Correction — l'armure ne suivait pas le personnage
+
+**Symptôme rapporté** : « quand je change l'équipement dans le lobby, l'armure ne
+suit pas le personnage » (il tourne, elle reste).
+
+**Fausse piste écartée par lecture** : j'avais supposé qu'un ancien corps
+coexistait une frame avec le neuf pendant la reconstruction. Faux —
+`weapon_preview` despawne et respawne dans la **même file de commandes**, donc
+aucun système n'observe les deux.
+
+**Cause réelle** : `sys_share_body_skeleton` prenait `q_body.iter().next()`, *un*
+corps arbitraire. Deux avatars peuvent vivre en même temps (aperçu du menu et
+avatar du Hall) — les pièces de l'un se rebranchaient alors sur le squelette de
+l'autre. Une fois `SkinnedMesh.joints` pointant ailleurs, la pièce suit un corps
+qui n'est pas le sien : elle reste immobile pendant que le personnage tourne.
+
+**Fix** : appariement par **parent commun** (`HashMap<parent, body>`), avec cache
+des os par corps. Le garde `continue` posé la veille était insuffisant *et*
+nuisible : il affamait le second avatar, dont les pièces n'auraient jamais trouvé
+leur tour. C'est l'appariement qui devait être juste, pas le filtrage.
