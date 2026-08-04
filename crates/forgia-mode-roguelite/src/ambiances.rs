@@ -99,6 +99,44 @@ pub struct Ambiance {
     pub fog_density: f32,
     pub ambient_rgb: [f32; 3],
     pub ambient_brightness: f32,
+    /// Story-689 — CORRECTION COLORIMÉTRIQUE de l'univers.
+    ///
+    /// Le grading était appliqué **par MODE** (`grade_for(GameMode::Roguelite)`),
+    /// pas par ambiance. J'ai fait varier ciel, brouillard et lumière dans
+    /// story-676… et une correction globale s'asseyait par-dessus, ramenant les
+    /// six univers au même rendu chaud-rose. Six variations d'une seule image.
+    ///
+    /// `None` = on garde le grading du mode (comportement d'avant).
+    pub grade: Option<AmbianceGrade>,
+}
+
+/// Correction colorimétrique d'un univers — miroir de `ModeGrade`.
+///
+/// Dupliqué plutôt qu'importé : `forgia-mode-roguelite` ne dépend pas de
+/// `forgia-game` (c'est l'inverse), et une crate de gameplay n'a pas à
+/// connaître le pipeline de rendu pour décrire son ambiance.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(default)]
+pub struct AmbianceGrade {
+    pub exposure: f32,
+    pub temperature: f32,
+    pub tint: f32,
+    pub post_saturation: f32,
+    pub contrast: f32,
+    pub saturation: f32,
+}
+
+impl Default for AmbianceGrade {
+    fn default() -> Self {
+        Self {
+            exposure: 0.0,
+            temperature: 0.0,
+            tint: 0.0,
+            post_saturation: 0.0,
+            contrast: 0.0,
+            saturation: 0.0,
+        }
+    }
 }
 
 impl Default for Ambiance {
@@ -117,8 +155,22 @@ impl Ambiance {
             fog_rgb: [0.30, 0.10, 0.07],
             fog_sun_rgb: [1.00, 0.55, 0.25],
             fog_density: 0.008,
-            ambient_rgb: [1.00, 0.45, 0.22],
-            ambient_brightness: 300.0,
+            // Story-689 — DÉSATURÉE. L'ancienne valeur [1.00, 0.45, 0.22] est
+            // quasiment de l'orange pur : une ambiante saturée multiplie CHAQUE
+            // albédo par la même teinte, donc roche, métal et sol se lisent
+            // pareil. Le sol de pierre grise du kit dungeon apparaissait en
+            // terre cuite vive. La chaleur doit venir de la lumière
+            // DIRECTIONNELLE, pas de l'ambiante.
+            ambient_rgb: [1.00, 0.78, 0.66],
+            ambient_brightness: 260.0,
+            grade: Some(AmbianceGrade {
+                exposure: 0.05,
+                temperature: 0.16,
+                tint: 0.10,
+                post_saturation: 0.10,
+                contrast: 0.05,
+                saturation: 0.05,
+            }),
         }
     }
 
@@ -511,5 +563,67 @@ shuffle_start_by_seed = true
                 a.floor
             );
         }
+    }
+    /// Story-689 — **chaque univers doit avoir sa colorimétrie.**
+    ///
+    /// Sans `grade`, l'ambiance retombe sur celle du MODE — la même pour les
+    /// six. Ciel, brouillard et lumière avaient beau varier, une correction
+    /// globale les ramenait au même rendu chaud-rose : six variations d'une
+    /// seule image. Un univers sans grade est un univers qui ne se distinguera
+    /// pas.
+    #[test]
+    fn every_universe_has_its_own_grading() {
+        let content = fs::read_to_string(GENOME_PATH)
+            .or_else(|_| fs::read_to_string(format!("../../{GENOME_PATH}")))
+            .expect("roguelite_ambiances.toml introuvable");
+        let c = AmbiancesConfig::parse_toml(&content);
+        let sans: Vec<&str> = c
+            .ambiances
+            .iter()
+            .filter(|(_, a)| a.grade.is_none())
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert!(
+            sans.is_empty(),
+            "univers sans colorimétrie propre : {sans:?} — ils se ressembleront"
+        );
+    }
+
+    /// **L'ambiante doit rester PEU SATURÉE.**
+    ///
+    /// Elle multiplie CHAQUE albédo par la même teinte : à [1.00, 0.45, 0.22]
+    /// (l'ancienne forge, quasi orange pur), roche, métal et sol se lisaient
+    /// pareil et le sol de pierre grise apparaissait en terre cuite. La chaleur
+    /// d'un lieu vient de sa lumière DIRECTIONNELLE, pas de son ambiante.
+    #[test]
+    fn no_ambient_light_crushes_material_contrast() {
+        let content = fs::read_to_string(GENOME_PATH)
+            .or_else(|_| fs::read_to_string(format!("../../{GENOME_PATH}")))
+            .expect("génome introuvable");
+        let c = AmbiancesConfig::parse_toml(&content);
+        for (id, a) in &c.ambiances {
+            let hi = a.ambient_rgb.iter().cloned().fold(0.0_f32, f32::max);
+            let lo = a.ambient_rgb.iter().cloned().fold(1.0_f32, f32::min);
+            // Saturation HSV = (max - min) / max.
+            let sat = if hi > 1e-4 { (hi - lo) / hi } else { 0.0 };
+            assert!(
+                sat <= 0.40,
+                "'{id}' : ambiante saturée à {:.0} % {:?} — elle écrasera le                  contraste de matière (l'ancienne forge était à 78 %)",
+                sat * 100.0,
+                a.ambient_rgb
+            );
+        }
+    }
+
+    /// Et le contrôle a des dents : l'ancienne valeur DOIT être rejetée.
+    #[test]
+    fn the_saturation_check_would_have_caught_the_old_forge() {
+        let old = [1.00_f32, 0.45, 0.22];
+        let hi = old.iter().cloned().fold(0.0_f32, f32::max);
+        let lo = old.iter().cloned().fold(1.0_f32, f32::min);
+        assert!(
+            (hi - lo) / hi > 0.40,
+            "l'ancienne ambiante forge aurait dû être détectée comme trop saturée"
+        );
     }
 }

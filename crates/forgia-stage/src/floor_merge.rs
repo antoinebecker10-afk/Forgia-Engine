@@ -97,28 +97,61 @@ pub struct MergedSpawnQueue {
     pub cursor: usize,
 }
 
-/// Plan de tuiles du sol — extrait pur de l'ex-boucle de spawn (même maths :
-/// culling circulaire, centre « propre » 1/3 du rayon, mix dirt/rocks, yaw
-/// déterministe 0/90/180/270° anti-répétition). Testable headless.
+/// Hachage entier stable d'une case de trame — déterministe, sans RNG d'état.
+///
+/// Story-689. Il remplace `(tx + tz) % 3`, qui dessinait des rayures diagonales
+/// régulières, parfaitement visibles sur un sol tuilé.
+fn tile_hash(tx: i32, tz: i32) -> u32 {
+    let mut h = (tx as u32).wrapping_mul(0x9E37_79B1) ^ (tz as u32).wrapping_mul(0x85EB_CA6B);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0xC2B2_AE35);
+    h ^= h >> 13;
+    h
+}
+
+/// Plan de tuiles du sol — culling circulaire, mélange radial bruité, yaw
+/// déterministe 0/90/180/270° anti-répétition. Testable headless.
+///
+/// Story-689 — le mélange était déterministe et CARRÉ : le centre formait un
+/// carré de 48 × 48 m d'une seule et même tuile, et au-delà `(tx+tz) % 3`
+/// dessinait des rayures. Sur une arène ronde, la transition elle-même était
+/// carrée. Voir le corps pour la dérivation.
 pub(crate) fn plan_floor_tiles(extent: f32, tile_size: f32) -> Vec<PendingTile> {
     let tiles_radius = (extent / tile_size).ceil() as i32;
-    let clean_center = (tiles_radius / 3).max(2);
+    // `clean_center` n'est plus utilisé : la transition est désormais continue
+    // et radiale (story-689), plus un seuil carré.
     let mut tiles = Vec::new();
+
     for tx in -tiles_radius..=tiles_radius {
         for tz in -tiles_radius..=tiles_radius {
             let pos = Vec3::new(tx as f32 * tile_size, 0.0, tz as f32 * tile_size);
             if pos.length() > extent {
                 continue; // cull hors arène (cercle inscrivant l'hex)
             }
-            let dist = tx.abs().max(tz.abs());
-            let kind = if dist >= clean_center {
-                if (tx + tz).rem_euclid(3) == 0 {
-                    2 // rocks
-                } else {
-                    1 // dirt
-                }
-            } else {
+            // Story-689 — le mélange était DÉTERMINISTE et CARRÉ.
+            //
+            // `tx.abs().max(tz.abs())` est une distance de Tchebychev : le
+            // centre était un CARRÉ de `clean_center` tuiles entièrement pavé
+            // d'une seule et même tuile — 48 × 48 m d'uniformité sur une arène
+            // de 80 m. Au-delà, `(tx+tz) % 3` dessinait des rayures diagonales
+            // régulières. Et la transition était carrée dans une arène RONDE.
+            //
+            // Maintenant : distance EUCLIDIENNE (l'arène est un disque, sa
+            // transition aussi) et bruit de hachage au lieu d'un motif. La
+            // proportion de variantes croît avec le rayon — le centre reste
+            // plus propre, mais jamais uniforme.
+            let dist = pos.length();
+            let t = (dist / extent.max(1.0e-3)).clamp(0.0, 1.0);
+            let h = tile_hash(tx, tz);
+            // 12 % de variantes au centre, 85 % au bord. Le centre garde sa
+            // lisibilité de combat sans être une dalle vide.
+            let variant_chance = 0.12 + 0.73 * t;
+            let kind = if (h & 0xFFFF) as f32 / 65535.0 >= variant_chance {
                 0 // clean
+            } else if (h >> 16) & 1 == 0 {
+                1 // dirt
+            } else {
+                2 // rocks
             };
             let yaw_q = (tx.wrapping_mul(7) ^ tz.wrapping_mul(13)).rem_euclid(4);
             let yaw = yaw_q as f32 * std::f32::consts::FRAC_PI_2;
@@ -449,14 +482,27 @@ mod tests {
         assert_eq!(plan_floor_tiles(60.0, TILE), plan_floor_tiles(60.0, TILE));
     }
 
+    /// Story-689 — ce test asserait `center.kind == 0`, c'est-à-dire EXACTEMENT
+    /// le défaut : le centre était un carré de 48 × 48 m entièrement pavé de la
+    /// même tuile. Il vérifie maintenant le vrai contrat — le centre reste
+    /// MAJORITAIREMENT propre (lisibilité de combat) sans être uniforme.
     #[test]
-    fn plan_center_is_clean_kind() {
+    fn the_centre_stays_mostly_clean_without_being_uniform() {
         let tiles = plan_floor_tiles(90.0, TILE);
-        let center = tiles
-            .iter()
-            .find(|t| t.pos == Vec3::ZERO)
-            .expect("tuile centrale");
-        assert_eq!(center.kind, 0, "centre = floor.glb propre");
+        let inner: Vec<&PendingTile> =
+            tiles.iter().filter(|t| t.pos.length() <= 20.0).collect();
+        assert!(inner.len() > 20, "échantillon central trop petit");
+        let clean = inner.iter().filter(|t| t.kind == 0).count();
+        let share = clean as f32 / inner.len() as f32;
+        assert!(
+            share >= 0.70,
+            "le centre doit rester majoritairement propre ({:.0} % seulement)",
+            share * 100.0
+        );
+        assert!(
+            share < 1.0,
+            "le centre est UNIFORME — c'est la dalle de 48 m d'avant"
+        );
     }
 
     #[test]
@@ -483,6 +529,112 @@ mod tests {
         for t in plan_floor_tiles(40.0, TILE) {
             let q = t.yaw / std::f32::consts::FRAC_PI_2;
             assert!((q - q.round()).abs() < 1e-5, "yaw non quantifié: {}", t.yaw);
+        }
+    }
+}
+
+#[cfg(test)]
+mod floor_mix_tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// Story-689 — **le centre ne doit plus être une dalle uniforme.**
+    ///
+    /// L'ancien mélange utilisait `tx.abs().max(tz.abs())` — une distance de
+    /// Tchebychev — avec un seuil à `tiles_radius / 3` : sur une arène de 80 m,
+    /// le centre était un CARRÉ de 48 × 48 m entièrement pavé de la même tuile.
+    #[test]
+    fn the_centre_is_not_a_single_uniform_slab() {
+        let tiles = plan_floor_tiles(80.0, 4.0);
+        let inner: Vec<&PendingTile> = tiles.iter().filter(|t| t.pos.length() <= 20.0).collect();
+        assert!(inner.len() > 20, "échantillon central trop petit");
+        let kinds: std::collections::HashSet<u8> = inner.iter().map(|t| t.kind).collect();
+        assert!(
+            kinds.len() >= 2,
+            "le centre n'utilise qu'une seule tuile — c'est la dalle uniforme d'avant"
+        );
+    }
+
+    /// La transition doit être RADIALE : l'arène est un disque, pas un carré.
+    /// Deux tuiles à la même distance du centre doivent avoir la même chance
+    /// d'être une variante, quelle que soit leur direction.
+    #[test]
+    fn the_transition_follows_the_disc_not_a_square() {
+        let tiles = plan_floor_tiles(80.0, 4.0);
+        // Deux couronnes fines, l'une dans l'axe, l'autre en diagonale.
+        let ratio_in = |lo: f32, hi: f32, diagonal: bool| {
+            let sel: Vec<&PendingTile> = tiles
+                .iter()
+                .filter(|t| {
+                    let d = t.pos.length();
+                    if d < lo || d > hi {
+                        return false;
+                    }
+                    let axis = t.pos.x.abs().min(t.pos.z.abs()) < 6.0;
+                    if diagonal { !axis } else { axis }
+                })
+                .collect();
+            if sel.is_empty() {
+                return -1.0;
+            }
+            sel.iter().filter(|t| t.kind != 0).count() as f32 / sel.len() as f32
+        };
+        let axis = ratio_in(40.0, 50.0, false);
+        let diag = ratio_in(40.0, 50.0, true);
+        assert!(axis >= 0.0 && diag >= 0.0, "échantillons vides");
+        assert!(
+            (axis - diag).abs() < 0.30,
+            "à distance égale, l'axe ({axis:.2}) et la diagonale ({diag:.2}) diffèrent — \
+             la transition est encore carrée"
+        );
+    }
+
+    /// La proportion de variantes doit CROÎTRE avec le rayon : le centre plus
+    /// propre (lisibilité de combat), les bords plus sales.
+    #[test]
+    fn variants_grow_with_the_radius() {
+        let tiles = plan_floor_tiles(80.0, 4.0);
+        let share = |lo: f32, hi: f32| {
+            let sel: Vec<&PendingTile> = tiles
+                .iter()
+                .filter(|t| t.pos.length() >= lo && t.pos.length() < hi)
+                .collect();
+            sel.iter().filter(|t| t.kind != 0).count() as f32 / sel.len().max(1) as f32
+        };
+        let c = share(0.0, 20.0);
+        let e = share(55.0, 80.0);
+        assert!(e > c, "les bords ({e:.2}) doivent être plus variés que le centre ({c:.2})");
+        assert!(c > 0.0, "le centre doit tout de même varier un peu");
+    }
+
+    /// Aucune tuile ne doit sortir du disque, et le plan reste déterministe.
+    #[test]
+    fn the_plan_stays_inside_the_disc_and_is_deterministic() {
+        let a = plan_floor_tiles(80.0, 4.0);
+        let b = plan_floor_tiles(80.0, 4.0);
+        assert_eq!(a.len(), b.len());
+        for (x, y) in a.iter().zip(b.iter()) {
+            assert_eq!(x.kind, y.kind);
+        }
+        for t in &a {
+            assert!(t.pos.length() <= 80.0 + 1e-3);
+        }
+    }
+
+    /// Les trois tuiles doivent TOUTES servir — une variante jamais tirée est un
+    /// asset chargé pour rien.
+    #[test]
+    fn all_three_tile_slots_are_actually_used() {
+        let tiles = plan_floor_tiles(80.0, 4.0);
+        let mut count: HashMap<u8, usize> = HashMap::new();
+        for t in &tiles {
+            *count.entry(t.kind).or_default() += 1;
+        }
+        for k in 0..3u8 {
+            assert!(
+                count.get(&k).copied().unwrap_or(0) > 0,
+                "la tuile {k} n'est jamais posée — chargée pour rien"
+            );
         }
     }
 }

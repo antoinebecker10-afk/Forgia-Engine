@@ -69,6 +69,19 @@ tiles = [
 #   arènes est 24,2 m. Le brouillard ne fait donc RIEN au gameplay : il ne sert
 #   que la teinte. C'est assumé, pas ignoré.
 # ambient_brightness : lux de l'ambiante (300 = valeur historique forge).
+#
+# ⚠️ L'AMBIANTE DOIT RESTER PEU SATURÉE (story-689). L'ancienne forge valait
+# [1.00, 0.45, 0.22] — quasiment de l'orange pur. Or une ambiante multiplie
+# CHAQUE albédo par la même teinte : roche, métal et sol finissaient par se lire
+# pareil, et le sol de pierre grise du kit dungeon apparaissait en terre cuite
+# vive. La chaleur d'un lieu doit venir de sa lumière DIRECTIONNELLE, pas de son
+# ambiante — sinon on perd le contraste de matière, qui est ce qui rend une
+# scène lisible.
+#
+# `[ambiances.X.grade]` : la CORRECTION COLORIMÉTRIQUE de l'univers. Elle était
+# appliquée par MODE, donc identique pour les six : ciel, brouillard et lumière
+# avaient beau varier, une même correction les ramenait au même rendu. Six
+# variations d'une seule image. Omettre la section = garder celle du mode.
 
 [ambiances.forge_ardente]
 label = "Forge ardente"
@@ -77,8 +90,16 @@ sky = "volcanic"
 fog_rgb = [0.30, 0.10, 0.07]
 fog_sun_rgb = [1.00, 0.55, 0.25]
 fog_density = 0.008
-ambient_rgb = [1.00, 0.45, 0.22]
-ambient_brightness = 300.0
+ambient_rgb = [1.00, 0.78, 0.66]
+ambient_brightness = 260.0
+[ambiances.forge_ardente.grade]
+exposure = 0.05
+temperature = 0.16
+tint = 0.1
+post_saturation = 0.1
+contrast = 0.05
+saturation = 0.05
+
 
 [ambiances.crypte_suintante]
 label = "Crypte suintante"
@@ -87,8 +108,16 @@ sky = "swamp"
 fog_rgb = [0.10, 0.15, 0.12]
 fog_sun_rgb = [0.60, 0.80, 0.55]
 fog_density = 0.011
-ambient_rgb = [0.45, 0.70, 0.55]
-ambient_brightness = 220.0
+ambient_rgb = [0.72, 0.85, 0.78]
+ambient_brightness = 200.0
+[ambiances.crypte_suintante.grade]
+exposure = 0.02
+temperature = -0.1
+tint = 0.04
+post_saturation = 0.0
+contrast = 0.1
+saturation = -0.05
+
 
 [ambiances.halles_de_bois]
 label = "Halles de bois"
@@ -97,8 +126,16 @@ sky = "plains"
 fog_rgb = [0.28, 0.22, 0.15]
 fog_sun_rgb = [1.00, 0.85, 0.60]
 fog_density = 0.006
-ambient_rgb = [1.00, 0.82, 0.58]
-ambient_brightness = 340.0
+ambient_rgb = [1.00, 0.90, 0.78]
+ambient_brightness = 300.0
+[ambiances.halles_de_bois.grade]
+exposure = 0.06
+temperature = 0.1
+tint = 0.0
+post_saturation = 0.05
+contrast = 0.0
+saturation = 0.02
+
 
 [ambiances.necropole_glacee]
 label = "Nécropole glacée"
@@ -107,8 +144,16 @@ sky = "tundra"
 fog_rgb = [0.16, 0.20, 0.28]
 fog_sun_rgb = [0.70, 0.82, 1.00]
 fog_density = 0.010
-ambient_rgb = [0.62, 0.74, 1.00]
-ambient_brightness = 260.0
+ambient_rgb = [0.80, 0.86, 1.00]
+ambient_brightness = 240.0
+[ambiances.necropole_glacee.grade]
+exposure = 0.0
+temperature = -0.2
+tint = 0.06
+post_saturation = 0.0
+contrast = 0.12
+saturation = -0.1
+
 
 [ambiances.gorges_d_ocre]
 label = "Gorges d'ocre"
@@ -117,8 +162,16 @@ sky = "canyon"
 fog_rgb = [0.32, 0.18, 0.10]
 fog_sun_rgb = [1.00, 0.72, 0.40]
 fog_density = 0.007
-ambient_rgb = [1.00, 0.68, 0.40]
-ambient_brightness = 320.0
+ambient_rgb = [1.00, 0.84, 0.70]
+ambient_brightness = 300.0
+[ambiances.gorges_d_ocre.grade]
+exposure = 0.04
+temperature = 0.12
+tint = -0.04
+post_saturation = 0.08
+contrast = 0.06
+saturation = 0.04
+
 
 [ambiances.cime_de_pierre]
 label = "Cime de pierre"
@@ -127,8 +180,15 @@ sky = "mountain"
 fog_rgb = [0.20, 0.22, 0.28]
 fog_sun_rgb = [0.85, 0.90, 1.00]
 fog_density = 0.009
-ambient_rgb = [0.72, 0.80, 0.95]
-ambient_brightness = 280.0
+ambient_rgb = [0.86, 0.90, 0.98]
+ambient_brightness = 270.0
+[ambiances.cime_de_pierre.grade]
+exposure = 0.02
+temperature = -0.12
+tint = 0.0
+post_saturation = 0.0
+contrast = 0.08
+saturation = -0.04
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LA ROTATION — le ciel comme HORLOGE DE RUN
@@ -140,6 +200,7 @@ ambient_brightness = 280.0
 # `order` est parcouru dans l'ordre, puis **bouclé** : round 6 revient à
 # `order[0]`. La boucle est voulue — les rounds sont infinis, la liste ne l'est
 # pas. Ce qui distingue le 2ᵉ tour du 1ᵉʳ, c'est la difficulté, pas le décor.
+
 
 [rotation]
 order = [

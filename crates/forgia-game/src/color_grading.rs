@@ -249,6 +249,7 @@ fn sys_hot_reload(
 /// Applique le `ColorGrading` du mode courant sur toutes les `Camera3d` quand :
 /// - le mode change (Local last_mode), - le genome a changé (cfg Changed),
 /// - une nouvelle Camera3d apparaît (Added). Mode neutre → reset (default).
+#[allow(clippy::too_many_arguments)]
 fn sys_apply(
     mut commands: Commands,
     cfg: Res<ColorGradingConfig>,
@@ -257,12 +258,44 @@ fn sys_apply(
     mut last_mode: Local<Option<GameMode>>,
     q_cam_all: Query<Entity, With<Camera3d>>,
     q_cam_new: Query<Entity, Added<Camera3d>>,
+    // Story-689 — l'UNIVERS a son propre grading. Sans ça, les six ambiances de
+    // story-676 (ciel, brouillard, lumière tous différents) étaient ramenées au
+    // même rendu chaud-rose par une correction appliquée par MODE : six
+    // variations d'une seule image.
+    amb_cfg: Option<Res<forgia_mode_roguelite::ambiances::AmbiancesConfig>>,
+    current_amb: Option<Res<forgia_mode_roguelite::ambiances::CurrentAmbiance>>,
+    mut last_amb: Local<String>,
 ) {
     let mode = state.get().clone();
-    let cg = cfg.grade_for(&mode).unwrap_or(ModeGrade::NEUTRAL).to_color_grading();
+    // Le grading de l'univers PRIME sur celui du mode ; à défaut on garde le
+    // comportement d'avant.
+    let ambiance_grade = match (amb_cfg.as_deref(), current_amb.as_deref()) {
+        (Some(c), Some(cur)) if mode == GameMode::Roguelite => {
+            c.ambiance(&cur.id).grade.map(|g| ModeGrade {
+                exposure: g.exposure,
+                temperature: g.temperature,
+                tint: g.tint,
+                post_saturation: g.post_saturation,
+                contrast: g.contrast,
+                saturation: g.saturation,
+            })
+        }
+        _ => None,
+    };
+    let cg = ambiance_grade
+        .or_else(|| cfg.grade_for(&mode))
+        .unwrap_or(ModeGrade::NEUTRAL)
+        .to_color_grading();
 
+    // Changer d'univers DOIT ré-appliquer : sinon le round 2 garderait la
+    // colorimétrie du round 1 et la rotation ne se verrait pas.
+    let amb_id = current_amb.as_deref().map(|c| c.id.clone()).unwrap_or_default();
+    let amb_changed = *last_amb != amb_id;
+    if amb_changed {
+        *last_amb = amb_id;
+    }
     let mode_changed = last_mode.as_ref() != Some(&mode);
-    if mode_changed || cfg.is_changed() {
+    if mode_changed || amb_changed || cfg.is_changed() {
         let mut count = 0u32;
         for e in &q_cam_all {
             commands.entity(e).insert(cg.clone());
