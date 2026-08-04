@@ -117,6 +117,36 @@ impl TrempeConfig {
         1.0 + level as f32 * self.damage_per_level
     }
 
+    /// Multiplicateur de la Trempe pour un ENSEMBLE d'armes trempées.
+    ///
+    /// ## Le défaut qu'il corrige
+    ///
+    /// Mesuré en jeu le 2026-08-04 : `or_spent: 219`, `weapons_tempered: 1`, et
+    /// `power.trempe: 1.000`. Antoine avait trempé une arme puis pris une autre
+    /// — **219 Or évaporés**. Le bonus valait celui de l'arme EN MAIN, donc
+    /// changer d'arme le rendait à zéro.
+    ///
+    /// C'est exactement le défaut déjà corrigé sur la maîtrise
+    /// (`MasteryConfig::total_damage_mul`), et pour la même raison : le pilier
+    /// revendiqué du jeu est de **choisir l'arme selon l'ennemi**, comme dans
+    /// DOOM. Un bonus attaché à l'arme tenue punit précisément ce geste.
+    ///
+    /// ## La règle
+    ///
+    /// La somme des niveaux acquis, plafonnée au **même total** qu'avant
+    /// (`level_cap × damage_per_level`). Tremper une arme à fond ou quatre armes
+    /// au quart donne le même bonus ; c'est la RÉPARTITION qui devient libre,
+    /// pas le total. La courbe de difficulté du Livre n'est donc pas touchée.
+    ///
+    /// Corollaire : il n'y a plus d'« arme courante » dans ce calcul, donc la
+    /// désynchronisation qui l'a produit devient impossible.
+    ///
+    /// PUR — testable sans App.
+    pub fn total_damage_mul<'a>(&self, levels: impl IntoIterator<Item = &'a u32>) -> f32 {
+        let somme: u32 = levels.into_iter().copied().sum();
+        self.damage_mul_for_level(somme.min(self.level_cap))
+    }
+
     /// Coût (Or) pour passer de `level` à `level+1` : `cost_base × growth^level`.
     pub fn cost_for_next(&self, level: u32) -> u32 {
         (self.cost_base as f32 * self.cost_growth.powi(level as i32)).round() as u32
@@ -190,7 +220,9 @@ pub fn sys_sync_trempe_current(
 ) {
     let Some(eq) = equipped else { return };
     let w = eq.current;
-    let mul = cfg.damage_mul_for_level(state.level_of(w));
+    // `current` reste suivi — le capteur et l'échoppe l'affichent (quelle arme
+    // on est en train de tremper). Il ne décide simplement plus du bonus.
+    let mul = cfg.total_damage_mul(state.levels.values());
     if state.current != w || (state.damage_mul - mul).abs() > 1e-6 {
         state.current = w;
         state.damage_mul = mul;
@@ -225,8 +257,7 @@ pub fn sys_hot_reload_trempe(
     if new_cfg != *cfg {
         *cfg = new_cfg;
         // Recompose le mul de l'arme courante (le per_level a pu changer).
-        let cur = state.current;
-        state.damage_mul = new_cfg.damage_mul_for_level(state.level_of(cur));
+        state.damage_mul = new_cfg.total_damage_mul(state.levels.values());
         watch.reload_count = watch.reload_count.saturating_add(1);
         info!("[trempe] HOT-RELOADED — damage×{:.2}", state.damage_mul);
     }
@@ -467,5 +498,74 @@ mod tests {
             severity_for_trempe(true, 5, 5).1,
             "Arme trempée au palier max."
         );
+    }
+}
+
+#[cfg(test)]
+mod trempe_totale_tests {
+    use super::*;
+
+    fn cfg() -> TrempeConfig {
+        TrempeConfig::default()
+    }
+
+    /// **LE test de la règle.** Changer d'arme ne doit RIEN coûter.
+    ///
+    /// Le 2026-08-04, `or_spent: 219` / `weapons_tempered: 1` /
+    /// `power.trempe: 1.000` — une arme trempée, une autre en main, 219 Or
+    /// évaporés. Le pilier revendiqué du jeu est de choisir l'arme selon
+    /// l'ennemi ; un bonus attaché à l'arme tenue punit ce geste.
+    #[test]
+    fn switching_weapons_never_costs_a_single_point_of_temper() {
+        let c = cfg();
+        let trempees = [4u32, 0, 0, 0];
+        let avant = c.total_damage_mul(trempees.iter());
+        // L'ensemble n'a pas changé, seule l'arme en main — le bonus non plus.
+        let apres = c.total_damage_mul(trempees.iter());
+        assert!((avant - apres).abs() < 1e-6);
+        assert!(avant > 1.0, "quatre niveaux payés doivent se voir");
+    }
+
+    /// Répartir ou concentrer donne le même bonus : c'est la RÉPARTITION qui
+    /// devient libre, pas le total.
+    #[test]
+    fn spreading_the_temper_pays_exactly_as_much_as_concentrating_it() {
+        let c = cfg();
+        let concentre = c.total_damage_mul([4u32, 0, 0, 0].iter());
+        let reparti = c.total_damage_mul([1u32, 1, 1, 1].iter());
+        assert!((concentre - reparti).abs() < 1e-6);
+    }
+
+    /// Le plafond est INCHANGÉ — sinon la courbe de difficulté du Livre, qui
+    /// est calibrée dessus, se déplacerait en silence.
+    #[test]
+    fn the_ceiling_is_the_same_as_before_the_rule_changed() {
+        let c = cfg();
+        let plafond_avant = c.damage_mul_for_level(c.level_cap);
+        // Quatre armes au maximum ne dépassent pas ce que valait une seule.
+        let quatre_au_max = c.total_damage_mul([c.level_cap; 4].iter());
+        assert!((quatre_au_max - plafond_avant).abs() < 1e-6);
+    }
+
+    /// Rien de trempé = aucun bonus. Le neutre reste neutre.
+    #[test]
+    fn an_untempered_arsenal_grants_nothing() {
+        assert!((cfg().total_damage_mul(std::iter::empty()) - 1.0).abs() < 1e-6);
+        assert!((cfg().total_damage_mul([0u32, 0].iter()) - 1.0).abs() < 1e-6);
+    }
+
+    /// L'état de run remis à neutre ne laisse aucun bonus derrière lui.
+    #[test]
+    fn a_reset_run_starts_from_nothing() {
+        let mut s = WeaponTrempeState {
+            damage_mul: 2.0,
+            or_spent: 219,
+            ..default()
+        };
+        s.levels.insert(WeaponType::ModernAR, 4);
+        s.reset();
+        assert!(s.levels.is_empty());
+        assert!((s.damage_mul - 1.0).abs() < 1e-6);
+        assert_eq!(s.or_spent, 0);
     }
 }

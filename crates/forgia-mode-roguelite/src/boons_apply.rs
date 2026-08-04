@@ -114,7 +114,11 @@ pub struct PowerBreakdown {
     pub perm: f32,
     /// Maîtrise de l'arme équipée — permanent.
     pub mastery: f32,
-    /// La Trempe de l'arme équipée — run.
+    /// La Trempe de l'ARSENAL — run.
+    ///
+    /// C'était « de l'arme équipée » jusqu'au 2026-08-04 : 219 Or dépensés puis
+    /// évaporés au premier changement d'arme, mesuré en jeu. Elle vaut
+    /// désormais la somme des niveaux trempés, plafonnée au même total.
     pub trempe: f32,
     /// Pièces d'équipement portées — run.
     pub equip: f32,
