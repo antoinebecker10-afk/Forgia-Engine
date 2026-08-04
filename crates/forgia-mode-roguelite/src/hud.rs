@@ -64,17 +64,41 @@ pub(crate) fn run_progress_label(
     total_rooms: u8,
     rounds: &crate::rounds::RoundsConfig,
 ) -> String {
-    let round = u32::from(stage);
-    let endless = rounds.enabled && rounds.max_rounds == 0;
-    let progress = if endless {
-        format!("ROUND {}", round + 1)
+    // Le ROUND est le COMBAT en cours, pas l'index d'arène : plusieurs combats
+    // partagent la même arène (`waves_per_stage`). Confondre les deux affichait
+    // « ROUND 1 / 10 » pendant trois combats. Miroir exact de
+    // `RogueliteWave::round`, seule définition de cette grandeur.
+    let round = u32::from(stage) * u32::from(waves_per_stage.max(1)) + u32::from(current_wave);
+    // TROIS modes, pas deux (2026-08-04). Avant, « borné » impliquait « graphe » :
+    // poser `max_rounds = 10` faisait afficher « SALLE 4 / 4 · BOSS » au round 1,
+    // parce que la boucle de rounds et le graphe de salles n'avaient jamais été
+    // mariés. Un chapitre de 10 rounds est borné SANS être un graphe.
+    let loop_mode = rounds.enabled;
+    let endless = loop_mode && rounds.max_rounds == 0;
+    let bounded = loop_mode && rounds.max_rounds > 0;
+
+    // Où tombe le boss : au round `max_rounds` en chapitre borné (`waves.rs` :
+    // `boss_stage = max_rounds`), à la dernière salle en mode graphe.
+    let at_boss = if bounded {
+        round >= rounds.max_rounds
+    } else if !loop_mode {
+        stage + 1 >= total_rooms.max(1)
     } else {
-        // Garde-fou : le numérateur ne dépasse JAMAIS le dénominateur. Si ça
-        // arrive quand même, c'est la dernière salle — pas « 5 / 4 ».
+        false // boucle infinie : il n'y a pas de fin à atteindre
+    };
+
+    // Garde-fou commun aux deux modes bornés : le numérateur ne dépasse JAMAIS le
+    // dénominateur. Si ça arrive, c'est la dernière étape — pas « 11 / 10 ».
+    let progress = if endless {
+        format!("ROUND {round}")
+    } else if bounded {
+        let total = rounds.max_rounds;
+        format!("ROUND {} / {}", round.min(total), total)
+    } else {
         let total = total_rooms.max(1);
         format!("SALLE {} / {}", (stage + 1).min(total), total)
     };
-    if !endless && stage + 1 >= total_rooms.max(1) {
+    if at_boss {
         return format!("{progress}  ·  BOSS");
     }
     if rounds.enabled && rounds.is_respite_round(round) {
@@ -181,7 +205,11 @@ pub(crate) fn draw_wave_counter(
         total_rooms,
         &rounds,
     );
-    let round = u32::from(wave.stage);
+    // La MÊME expression que `enemy_scaling::sys_scale_enemies_by_depth` : la
+    // menace affichée doit être celle qui est appliquée. Lire `wave.stage` ici
+    // affichait la menace de l'ARÈNE pendant que les ennemis portaient celle du
+    // ROUND — l'écran aurait menti d'un facteur trois.
+    let round = wave.round(graph_cfg.waves_per_stage);
 
     text_with_outline(
         &painter,
@@ -206,7 +234,7 @@ pub(crate) fn draw_wave_counter(
             C_ACCENT,
         )
     } else if rounds.enabled {
-        let threat = rounds.threat(round).hp;
+        let threat = rounds.threat(round.saturating_sub(1)).hp;
         (
             format!("ENNEMIS  {}   ·   MENACE  ×{threat:.1}", wave.bots_alive),
             C_TEXT_MUTED,
@@ -569,7 +597,7 @@ pub fn sys_break_look_override(
     blockers.block_look = !look;
     if let Ok(mut opts) = q_cursor.single_mut() {
         if look {
-            opts.grab_mode = bevy::window::CursorGrabMode::Locked;
+            opts.grab_mode = crate::FPS_GRAB_MODE;
             opts.visible = false;
         } else {
             opts.grab_mode = bevy::window::CursorGrabMode::None;
@@ -878,6 +906,84 @@ const PORTAL_KEYS: &[(KeyCode, u8)] = &[
 /// Story-646 Inc.2 — RÉVEILLÉ (était stub depuis le refactor 471..479). Affiche les
 /// portes typées après le clear d'une salle (`RogueliteWave.portal_choices`) et capte
 /// le choix (flèches / 1-4 / clic) dans `portal_pick`, consommé par l'orchestrateur.
+/// Le libellé de la porte : la pièce suivante, ou le boss qui ferme le chapitre.
+///
+/// Pur — testable sans egui. `max_rounds == 0` (boucle infinie) n'a pas de boss,
+/// donc pas de fin à annoncer.
+pub(crate) fn next_room_label(stage: u8, max_rounds: u32, waves_per_stage: u8) -> &'static str {
+    if max_rounds == 0 {
+        return "ENTRER DANS LA PIÈCE SUIVANTE";
+    }
+    let boss_arena = crate::waves::boss_arena_for(max_rounds, waves_per_stage);
+    if u32::from(stage) + 1 >= u32::from(boss_arena) {
+        "AFFRONTER LE BOSS"
+    } else {
+        "ENTRER DANS LA PIÈCE SUIVANTE"
+    }
+}
+
+/// La PORTE (2026-08-04) — on quitte une arène parce qu'on l'a décidé.
+///
+/// Remplace le minuteur qui enchaînait les arènes tout seul : « tant qu'on ne
+/// clique pas, ça n'enchaîne pas ». Le break de 15 s reste, lui, entre deux
+/// combats d'une *même* arène — c'est la fenêtre de prep, pas une transition.
+///
+/// Clavier ET souris : l'overlay de portes met déjà le clavier en priorité (le
+/// curseur est capturé pendant le jeu), donc un bouton seul serait injouable.
+pub(crate) fn draw_next_room_button(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    game_mode: Res<State<GameMode>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    wave: Res<RogueliteWave>,
+    rounds: Res<crate::rounds::RoundsConfig>,
+    graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
+    mut enter_room: MessageWriter<crate::waves::EnterNextRoomRequest>,
+) {
+    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
+        return;
+    }
+    if !wave.awaiting_room_entry {
+        return;
+    }
+    let label = next_room_label(wave.stage, rounds.max_rounds, graph_cfg.waves_per_stage);
+
+    // Raccourci clavier — le curseur est capturé en jeu, la souris ne suffit pas.
+    if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter) {
+        enter_room.write(crate::waves::EnterNextRoomRequest);
+        return;
+    }
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+
+    // Ancré SOUS le compteur de round, comme demandé : la porte appartient à la
+    // progression, pas à un panneau séparé.
+    let mut clicked = false;
+    egui::Area::new(egui::Id::new("forgia_next_room"))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 96.0))
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(VERRE_GLASS)
+                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
+                .corner_radius(egui::CornerRadius::same(14))
+                .inner_margin(14)
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        if ui
+                            .button(display_text(label, 22.0, FORGE_OR).strong())
+                            .clicked()
+                        {
+                            clicked = true;
+                        }
+                        ui.add_space(4.0);
+                        ui.label(display_text("[ ENTRÉE ]", 13.0, C_TEXT_MUTED));
+                    });
+                });
+        });
+    if clicked {
+        enter_room.write(crate::waves::EnterNextRoomRequest);
+    }
+}
+
 pub(crate) fn draw_portal_overlay(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
@@ -1480,6 +1586,7 @@ pub(crate) fn draw_vitals_card(
     app_state: Res<State<AppMode>>,
     q_player: Query<(&DamageHealth, Option<&DefenseLayer>), With<Player>>,
     identity: Option<Res<crate::identity::IdentitySave>>,
+    identity_cfg: Option<Res<crate::identity::IdentityConfig>>,
     progress: Option<Res<crate::progress::PlayerProgress>>,
     equipped: Option<Res<EquippedWeapons>>,
     conf: Option<Res<PepinConfidence>>,
@@ -1528,6 +1635,19 @@ pub(crate) fn draw_vitals_card(
             }
         })
         .unwrap_or("Forgeron");
+    // Couleur du pseudo = celle choisie au Forgeron. Repli sur la teinte claire
+    // par défaut si la config n'est pas chargée.
+    let name_color = match (identity.as_ref(), identity_cfg.as_ref()) {
+        (Some(s), Some(c)) => {
+            let rgb = c.color_rgb(&s.equipped_color);
+            egui::Color32::from_rgb(
+                (rgb[0] * 255.0) as u8,
+                (rgb[1] * 255.0) as u8,
+                (rgb[2] * 255.0) as u8,
+            )
+        }
+        _ => C_TEXT_LIGHT,
+    };
     let level = progress.as_ref().map(|p| p.level).unwrap_or(1);
     let has_shield = defense.is_some_and(|d| d.shield_max > 0.5);
     let has_armor = defense.is_some_and(|d| d.armor_max > 0.5);
@@ -1571,7 +1691,10 @@ pub(crate) fn draw_vitals_card(
         egui::Align2::LEFT_CENTER,
         name,
         display_font(20.0),
-        C_TEXT_LIGHT,
+        // Le pseudo porte la couleur choisie au Forgeron : c'est le seul endroit
+        // en jeu où l'identité du joueur se voit, et la choisir sans jamais la
+        // revoir n'a pas d'intérêt.
+        name_color,
         1.8,
     );
     text_with_outline(
@@ -2182,6 +2305,7 @@ impl Plugin for RogueliteHudPlugin {
             .add_systems(
                 EguiPrimaryContextPass,
                 (
+                    draw_next_room_button,
                     draw_portal_overlay,
                     draw_zone_reward_cards,
                     draw_defeat_overlay,
@@ -2293,6 +2417,20 @@ mod run_progress_tests {
         }
     }
 
+    /// Le label pour un ROUND donné (1-indexé), en dérivant l'arène et la vague
+    /// exactement comme la run le fait.
+    ///
+    /// Ces tests passaient `stage` là où ils voulaient dire « round » — la
+    /// confusion même que `RogueliteWave::round` a supprimée dans le jeu, et qui
+    /// avait survécu ici. Parler en rounds, l'unité du joueur, la rend impossible.
+    fn label_at_round(round: u32, waves_per_stage: u8, cfg: &RoundsConfig) -> String {
+        let wps = u32::from(waves_per_stage.max(1));
+        let zero_based = round.saturating_sub(1);
+        let stage = (zero_based / wps) as u8;
+        let wave = (zero_based % wps + 1) as u8;
+        run_progress_label(stage, wave, waves_per_stage, 4, cfg)
+    }
+
     /// LE défaut rapporté : « j'étais à 5/4 ». Un numérateur au-dessus du
     /// dénominateur n'est pas un affichage, c'est un mensonge — et il rendait
     /// la run impossible à suivre.
@@ -2319,13 +2457,93 @@ mod run_progress_tests {
     /// évolue ».
     #[test]
     fn the_endless_loop_shows_no_denominator_at_all() {
-        let cfg = RoundsConfig::default();
-        assert!(cfg.max_rounds == 0, "le défaut livré est bien la boucle infinie");
-        for stage in [0u8, 1, 4, 30, 200] {
-            let label = run_progress_label(stage, 1, 2, 4, &cfg);
+        // Le défaut livré n'est plus la boucle infinie (2026-08-04 : `max_rounds`
+        // = 10, un chapitre). Ce test porte sur le RENDU du mode infini, pas sur
+        // une valeur par défaut — il construit donc le mode qu'il teste.
+        let cfg = RoundsConfig {
+            max_rounds: 0,
+            ..RoundsConfig::default()
+        };
+        for round in [1u32, 2, 5, 31, 201] {
+            let label = label_at_round(round, 3, &cfg);
             assert!(!label.contains('/') || label.contains("VAGUE"), "{label}");
             assert!(!label.contains("SALLE"), "{label}");
-            assert!(label.starts_with(&format!("ROUND {}", u32::from(stage) + 1)), "{label}");
+            assert!(label.starts_with(&format!("ROUND {round}")), "{label}");
+        }
+    }
+
+    /// Un chapitre borné annonce sa fin — c'est ce qui manquait : il n'existait
+    /// que « boucle infinie » ou « graphe de salles », et poser `max_rounds = 10`
+    /// faisait afficher « SALLE 4 / 4 · BOSS » dès le premier round.
+    #[test]
+    fn a_bounded_chapter_counts_rounds_and_never_says_salle() {
+        let cfg = RoundsConfig {
+            max_rounds: 10,
+            ..RoundsConfig::default()
+        };
+        // `total_rooms = 4` est le total du GRAPHE : il ne doit plus fuiter dans
+        // l'affichage quand c'est la boucle qui porte la structure.
+        for round in 1u32..=9 {
+            let label = label_at_round(round, 3, &cfg);
+            assert!(!label.contains("SALLE"), "{label}");
+            assert!(label.starts_with(&format!("ROUND {round} / 10")), "{label}");
+        }
+    }
+
+    /// Le compteur avance à CHAQUE combat, pas à chaque arène — c'est le défaut
+    /// qui a motivé `RogueliteWave::round` : trois combats affichaient le même
+    /// « ROUND 1 / 10 » pendant que la menace montait par bonds de trois.
+    #[test]
+    fn the_counter_advances_on_every_fight_not_every_arena() {
+        let cfg = RoundsConfig {
+            max_rounds: 10,
+            ..RoundsConfig::default()
+        };
+        // Les trois combats de la PREMIÈRE arène (stage 0, vagues 1→3).
+        let labels: Vec<String> = (1u8..=3)
+            .map(|wave| run_progress_label(0, wave, 3, 4, &cfg))
+            .collect();
+        assert!(labels[0].starts_with("ROUND 1 / 10"), "{}", labels[0]);
+        assert!(labels[1].starts_with("ROUND 2 / 10"), "{}", labels[1]);
+        assert!(labels[2].starts_with("ROUND 3 / 10"), "{}", labels[2]);
+    }
+
+    /// Le boss ferme le chapitre, et le compteur ne déborde jamais son total.
+    #[test]
+    fn the_chapter_boss_lands_on_the_last_round() {
+        let cfg = RoundsConfig {
+            max_rounds: 10,
+            ..RoundsConfig::default()
+        };
+        let neuf = label_at_round(9, 3, &cfg);
+        assert!(!neuf.contains("BOSS"), "le round 9 n'est pas encore le boss : {neuf}");
+        let boss = label_at_round(10, 3, &cfg);
+        assert!(boss.contains("BOSS"), "{boss}");
+        assert!(!boss.contains("11"), "le numérateur ne dépasse pas le total : {boss}");
+    }
+
+    /// La porte annonce ce qu'il y a derrière. Confondre les deux libellés ferait
+    /// entrer le joueur dans un combat de boss en croyant changer de pièce.
+    #[test]
+    fn the_door_announces_the_boss_only_when_the_boss_is_behind_it() {
+        use super::next_room_label;
+        // Chapitre livré : 10 rounds, 3 combats par arène → boss en arène 3.
+        assert_eq!(next_room_label(0, 10, 3), "ENTRER DANS LA PIÈCE SUIVANTE");
+        assert_eq!(next_room_label(1, 10, 3), "ENTRER DANS LA PIÈCE SUIVANTE");
+        assert_eq!(
+            next_room_label(2, 10, 3),
+            "AFFRONTER LE BOSS",
+            "depuis l'arène 2, la porte suivante est celle du boss"
+        );
+    }
+
+    /// En boucle infinie il n'y a pas de boss à annoncer — promettre une fin qui
+    /// n'existe pas est le mensonge que ce HUD s'interdit déjà ailleurs.
+    #[test]
+    fn an_endless_loop_never_promises_a_boss() {
+        use super::next_room_label;
+        for stage in [0u8, 3, 50, 200] {
+            assert_eq!(next_room_label(stage, 0, 3), "ENTRER DANS LA PIÈCE SUIVANTE");
         }
     }
 
@@ -2333,7 +2551,7 @@ mod run_progress_tests {
     #[test]
     fn rounds_are_numbered_from_one_for_the_player() {
         let cfg = RoundsConfig::default();
-        assert!(run_progress_label(0, 1, 2, 4, &cfg).starts_with("ROUND 1"));
+        assert!(label_at_round(1, 3, &cfg).starts_with("ROUND 1"));
     }
 
     /// Les deux moments qui doivent se LIRE : la respiration et le palier.
@@ -2341,12 +2559,12 @@ mod run_progress_tests {
     #[test]
     fn the_rhythm_is_readable_on_screen() {
         let cfg = RoundsConfig::default();
-        let respite = run_progress_label(cfg.respite_every as u8, 1, 2, 4, &cfg);
+        let respite = label_at_round(cfg.respite_every, 3, &cfg);
         assert!(respite.contains("RÉPIT"), "{respite}");
-        let tier = run_progress_label(cfg.tier_every as u8, 1, 2, 4, &cfg);
+        let tier = label_at_round(cfg.tier_every, 3, &cfg);
         assert!(tier.contains("PALIER"), "{tier}");
         // Un round ordinaire ne porte ni l'un ni l'autre.
-        let plain = run_progress_label(1, 1, 2, 4, &cfg);
+        let plain = label_at_round(2, 3, &cfg);
         assert!(!plain.contains("RÉPIT") && !plain.contains("PALIER"), "{plain}");
     }
 

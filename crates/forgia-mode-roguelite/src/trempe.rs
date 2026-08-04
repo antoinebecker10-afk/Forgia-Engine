@@ -71,10 +71,13 @@ pub struct TrempeConfig {
 impl Default for TrempeConfig {
     fn default() -> Self {
         // Miroir EXACT de assets/genomes/roguelite/roguelite_progression.toml.
+        // level_cap 5 → 7 le 2026-08-04 : mesuré en jeu, l'arme était trempée au max
+        // dès le round 1 (219 Or), donc le levier de progression d'une run était mort
+        // pour les neuf rounds suivants. 7 paliers = 478 Or ≈ le revenu d'un chapitre.
         Self {
             enabled: true,
             damage_per_level: 0.15,
-            level_cap: 5,
+            level_cap: 7,
             cost_base: 20,
             cost_growth: 1.4,
         }
@@ -346,7 +349,13 @@ pub fn sys_write_trempe_sensor(
         state.damage_mul,
         weapons_tempered,
         state.or_spent,
-        cfg.cost_for_next(level),
+        // Au plafond il n'y a PAS de palier suivant : afficher son prix théorique
+        // ferait croire à un achat possible. `null` dit « il n'y en a plus ».
+        if level >= cfg.level_cap {
+            "null".to_string()
+        } else {
+            cfg.cost_for_next(level).to_string()
+        },
         watch.reload_count,
     );
     if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {

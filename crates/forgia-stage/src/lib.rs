@@ -975,6 +975,18 @@ fn spawn_stage_arena_on_request(
     prefab_stats: Res<PrefabStats>,
     q_existing: Query<Entity, With<StageArenaMarker>>,
     mut last_processed_id: Local<String>,
+    // 2026-08-04 — la GRAINE du dernier stage bâti, à côté de son id.
+    //
+    // L'idempotence ne tenait que sur `stage_id`. Tant que chaque arène d'une run
+    // portait une DA différente, l'id changeait et l'arène se reconstruisait. Le
+    // jour où un CHAPITRE a donné la même DA à ses quatre arènes, l'id est devenu
+    // constant : l'arène n'était plus jamais rebâtie, et les quatre « salles »
+    // étaient littéralement la même — « certaines arènes sont identiques, juste
+    // un effet visuel différent », rapporté en jeu.
+    //
+    // La graine, elle, varie par profondeur (`RunSeed::stage_seed(depth)`). C'est
+    // donc `(id, graine)` qui identifie une arène, pas l'id seul.
+    mut last_processed_seed: Local<u64>,
     mut layout_params: LayoutParams,
 ) {
     let Some(req) = request else {
@@ -983,14 +995,15 @@ fn spawn_stage_arena_on_request(
     if req.stage_id.is_empty() {
         return;
     }
-    // Idempotent : on ne ré-spawn pas le même stage si déjà Ready.
-    if *last_processed_id == req.stage_id && result.state == StageState::Ready {
+    // Idempotent : on ne ré-spawn pas la même arène si déjà Ready. Une arène,
+    // c'est un stage ET une graine — même décor, plan différent.
+    let meme_arene = *last_processed_id == req.stage_id && *last_processed_seed == req.seed;
+    if meme_arene && result.state == StageState::Ready {
         return;
     }
-    // P2 — Stage transition detection : nouveau stage_id différent du dernier
-    // spawn → cleanup old entities AVANT spawn new. Permet le run loop multi-stage.
-    if !last_processed_id.is_empty() && *last_processed_id != req.stage_id && !q_existing.is_empty()
-    {
+    // P2 — Stage transition detection : arène différente du dernier spawn →
+    // cleanup old entities AVANT spawn new. Permet le run loop multi-stage.
+    if !last_processed_id.is_empty() && !meme_arene && !q_existing.is_empty() {
         let prev = std::mem::take(&mut *last_processed_id);
         let n = despawn_stage_entities(&mut commands, &q_existing, &anchor_stats, &mut result);
         info!(
@@ -1311,6 +1324,16 @@ fn spawn_stage_arena_on_request(
     } else {
         rooms::plan_rooms(extent, req.seed, &rooms_cfg)
     };
+    // 2026-08-04 — les PORTES publiées pour que le décor n'y sème rien.
+    //
+    // Le plan était une variable locale : consommée pour poser les murs, puis
+    // jetée. Le semis de props n'avait donc aucun moyen de savoir où sont les
+    // passages, et il en bouchait — « des props dans un couloir », rapporté en
+    // jeu. On publie la seule chose dont il a besoin, pas le plan entier.
+    commands.insert_resource(rooms::RoomDoors {
+        centers: room_plan.doors.clone(),
+        clearance_m: rooms_cfg.corridor_width_m() * 0.5,
+    });
     if !room_plan.walls.is_empty() {
         let room_wall_glb = ramparts_wall_glb("kaykit_dungeon");
         let room_scene: Handle<Scene> = asset_server.load(format!("{room_wall_glb}#Scene0"));
@@ -1682,6 +1705,7 @@ fn spawn_stage_arena_on_request(
     result.music_state_id = stage_def.music_state.clone().unwrap_or_default();
     result.weather_override = stage_def.weather_override.clone().unwrap_or_default();
     *last_processed_id = req.stage_id.clone();
+    *last_processed_seed = req.seed;
     info!(
         "[stage-arena] Stage '{}' READY: {} props, {} anchors, walls/segment={} wall_len={:.2}m",
         req.stage_id,

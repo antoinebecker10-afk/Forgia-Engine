@@ -31,6 +31,8 @@ pub mod boons_apply;
 pub mod boss_portal;
 pub mod boucherie_rocket;
 pub mod chain;
+/// 2026-08-04 — le sélecteur de chapitres du Lobby (Le Livre).
+pub mod chapters;
 pub mod coffre_sensor;
 pub mod decor;
 /// Story-671 — les directions artistiques (palettes de props) en couche definition.
@@ -61,6 +63,10 @@ pub mod perf_diag;
 pub mod persist;
 pub mod pipeline_warmup;
 pub mod poi;
+/// V0 (2026-08-04) — la puissance réelle du joueur, décomposée par source, face à
+/// la menace du round. Sans elle, le mur de `rounds.rs` se calcule contre une
+/// abstraction posée à la main plutôt que contre ce que le joueur applique.
+pub mod power_sensor;
 pub mod progress;
 pub mod render_quality;
 pub mod rounds;
@@ -80,6 +86,21 @@ pub mod ultimate_vfx;
 pub mod wave_comp;
 pub mod waves;
 pub mod weapon_select;
+
+/// Le mode de capture du curseur qui MARCHE sur la plateforme courante.
+///
+/// winit **ne supporte pas `Locked` sur Windows** : la demande échoue en silence
+/// et la souris sort de la fenêtre. `Confined` la borde au cadre ; le mouse-look
+/// n'en souffre pas, il lit le mouvement brut du périphérique.
+///
+/// ⚠️ DUPLIQUÉ depuis `forgia_ui` (dépendance inverse : `forgia-ui` dépend de ce
+/// crate, pas l'inverse). Sa vraie place est `forgia-core` — à consolider dès
+/// que ce crate est libre. Une constante de plateforme ne dérive pas comme une
+/// valeur de balance, mais deux définitions restent deux définitions.
+#[cfg(target_os = "windows")]
+pub const FPS_GRAB_MODE: bevy::window::CursorGrabMode = bevy::window::CursorGrabMode::Confined;
+#[cfg(not(target_os = "windows"))]
+pub const FPS_GRAB_MODE: bevy::window::CursorGrabMode = bevy::window::CursorGrabMode::Locked;
 
 pub use enemies::{EnemyArchetype, EnemyStats};
 pub use waves::RogueliteWave;
@@ -113,6 +134,12 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-558 Phase 4 — Boons apply : recompute PlayerCombatMods +
         // observer heal_on_kill.
         app.init_resource::<boons_apply::HealOnKillCumul>();
+        // V0 — la décomposition du multiplicateur de dégâts par source, et les
+        // atouts que la composition n'a pas su appliquer. Écrites par
+        // `sys_recompute_boon_mods` lui-même, lues par `power_sensor`.
+        app.init_resource::<boons_apply::PowerBreakdown>();
+        app.init_resource::<power_sensor::PowerPeak>();
+        app.init_resource::<boons_apply::BoonRoutingIssues>();
         // Story-623 Phase E (MVP) — identité joueur : nom + couleur (module isolé,
         // save séparée identity_save.toml, panneau Lobby non-bloquant).
         app.add_plugins(identity::IdentityPlugin);
@@ -122,6 +149,13 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_plugins(equipment::EquipmentPlugin);
         // Montage de l'avatar équipé, partagé par l'aperçu du menu et le Hall.
         app.add_plugins(avatar::AvatarPlugin);
+        // 2026-08-04 — LE LIVRE : le sélecteur de chapitres du Lobby. Gaté sur son
+        // onglet, comme les autres panneaux ; la règle de déblocage vit dans
+        // `meta_shop` et y est testée sans egui.
+        app.add_systems(
+            bevy_egui::EguiPrimaryContextPass,
+            chapters::draw_chapter_select.run_if(crate::hub::on_chapitres_tab),
+        );
         // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
         // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
         app.init_resource::<load_timing::LoadTimingState>();
@@ -190,6 +224,14 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 coffre_sensor::sys_track_coffre_picks.in_set(GameSet::Effects),
                 coffre_sensor::sys_write_coffre_sensor.in_set(GameSet::Sensors),
             ),
+        );
+        // V0 — sensor forgia2_power.json 1 Hz. Gaté sur le mode : hors Roguelite il
+        // n'y a ni Trempe ni round, donc rien à mesurer.
+        app.add_systems(
+            Update,
+            power_sensor::sys_write_power_sensor
+                .in_set(GameSet::Sensors)
+                .run_if(in_state(GameMode::Roguelite)),
         );
         // V7 M3 step 2 — node-driven run loop (StageGraph Slay-the-Spire ratios).
         if !app.is_plugin_added::<forgia_stage::graph::ForgiaStageGraphPlugin>() {
@@ -367,6 +409,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-677 — la boucle de rounds : courbe de menace + mur mesurable.
         app.init_resource::<rounds::RoundPace>();
         app.add_systems(Startup, rounds::sys_init_rounds);
+        // Le rythme repart de zéro à chaque run — sinon le verdict d'un début de
+        // run est calculé sur les temps de la run précédente (2026-08-04).
+        app.add_systems(OnEnter(RunState::Lobby), rounds::sys_reset_round_pace);
         // Story-682 — le joueur apparaissait TOUJOURS à l'origine, y compris là
         // où l'arène pose une pièce maîtresse solide (le puits de forge_sanctum).
         app.add_systems(
@@ -559,6 +604,11 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 status_vfx::sys_attach_shock_vfx,
                 status_vfx::sys_detach_shock_vfx,
                 status_vfx::sys_follow_status_vfx,
+                // 2026-08-04 — la plaque de nom ne trahit plus un ennemi qu'on
+                // ne voit pas : elle suit la ligne de vue déjà calculée par
+                // l'IA. Ici et pas dans la crate de plaques, qui ne connaît ni
+                // l'IA ni la physique (le Hall s'en sert aussi).
+                status_vfx::sys_nameplate_follows_sight,
             )
                 .in_set(GameSet::Effects)
                 .run_if(in_state(GameMode::Roguelite)),
@@ -692,6 +742,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             .add_message::<elements::ReactionEvent>()
             // P3 — telegraph boss enrage (UI banner + camera shake punch).
             .add_message::<waves::BossEnrageTriggeredEvent>()
+            // 2026-08-04 — franchir la porte : le seul déclencheur d'un changement
+            // d'arène en boucle de rounds (plus de minuteur pour ça).
+            .add_message::<waves::EnterNextRoomRequest>()
             .add_systems(OnEnter(GameMode::Roguelite), run::sys_spawn_roguelite_scene)
             // Story-483 V7 P2 — Stage dispatch sur transition RunState
             // (Lobby/InRun/Boss). Insère StageLoadRequest avec stage_id dérivé.

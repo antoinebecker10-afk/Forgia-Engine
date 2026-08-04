@@ -324,13 +324,43 @@ pub fn sys_apply_weapon_choice(
         WeaponType::ModernAR
     };
     eq.current = w;
-    // P3 — bonus de maîtrise, clampé au plafond du genome (anti-progression infinie).
+    // 2026-08-04 — le bonus est le TOTAL, toutes armes confondues : il ne dépend
+    // plus de l'arme choisie. `current` ne sert plus qu'à l'affichage.
     let level = save.weapon_level(vm_key(w));
-    mastery.damage_mul = cat.mastery.damage_mul(level);
+    mastery.damage_mul = cat.mastery.total_damage_mul(&save.weapon_levels);
+    mastery.current = w;
     info!(
         "[weapon-select] run start — arme = {:?} (niv {level}/{}, dmg ×{:.2})",
         w, cat.mastery.max_level, mastery.damage_mul
     );
+}
+
+/// Aligne la maîtrise sur l'arme **actuellement équipée**, chaque frame.
+///
+/// Sans ce système, le bonus restait figé sur l'arme choisie au run-start : changer
+/// d'arme avec Digit1-4 gardait la maîtrise de l'autre. Mesuré en jeu le 2026-08-04
+/// (cf. `WeaponMasteryMods`) — le joueur perdait la progression de l'arme qu'il
+/// tenait réellement, ce qui décourage exactement le changement d'arme que le
+/// matchup élémentaire est censé récompenser.
+///
+/// Miroir exact de `trempe::sys_sync_trempe_current` : même cadence, même coût
+/// (une lecture + une comparaison), même lag ≤ 1 frame avant le recompute des mods.
+pub fn sys_sync_mastery_current(
+    save: Res<MetaShopSave>,
+    cat: Res<MetaShopCatalogue>,
+    mut mastery: ResMut<crate::meta_shop::WeaponMasteryMods>,
+    equipped: Option<Res<EquippedWeapons>>,
+) {
+    let Some(eq) = equipped else { return };
+    let w = eq.current;
+    // Le total ne dépend PAS de `w` — c'est tout l'objet du changement. On le
+    // recalcule quand même chaque frame (coût nul, ≤ 4 entrées) pour que le
+    // niveau gagné en fin de run se voie sans redémarrer.
+    let mul = cat.mastery.total_damage_mul(&save.weapon_levels);
+    if mastery.current != w || (mastery.damage_mul - mul).abs() > 1e-6 {
+        mastery.current = w;
+        mastery.damage_mul = mul;
+    }
 }
 
 /// En run, empêche d'UTILISER une arme verrouillée : le switch Digit2-4
@@ -1261,9 +1291,14 @@ impl Plugin for WeaponSelectPlugin {
         );
         // Story-613 — en run, les armes verrouillées ne sont pas jouables (le switch
         // Digit2-4 est annulé avant le tir). Tourne en Movement (avant Combat).
+        // `sys_sync_mastery_current` suit IMMÉDIATEMENT le garde de loadout : celui-ci
+        // peut ramener `current` sur une arme débloquée, et la maîtrise doit refléter
+        // l'arme retenue, pas celle qui vient d'être annulée. Les deux tournent en
+        // Movement, donc AVANT le recompute des mods (Effects) — pas de lag d'une frame.
         app.add_systems(
             Update,
-            sys_enforce_unlocked_loadout
+            (sys_enforce_unlocked_loadout, sys_sync_mastery_current)
+                .chain()
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
@@ -1327,6 +1362,26 @@ mod tests {
         assert_eq!(vm_key(WeaponType::AssaultRifle), "bourrasque");
         assert_eq!(vm_key(WeaponType::Shotgun), "madame_lenoir");
         assert_eq!(vm_key(WeaponType::RocketLauncher), "boucherie");
+    }
+
+    /// Régression du désync de maîtrise mesuré en jeu le 2026-08-04.
+    ///
+    /// Sauvegarde réelle observée : `pepin` niveau 13 (plafonné à 6 → ×1,20),
+    /// `boucherie` niveau 2 (→ ×1,04). Le bonus appliqué était celui de l'AUTRE
+    /// arme, dans les deux sens. Ce test fixe les deux valeurs : si elles cessaient
+    /// de différer, le désync redeviendrait invisible.
+    #[test]
+    fn deux_armes_de_niveaux_differents_ne_donnent_pas_la_meme_maitrise() {
+        let cat = MetaShopCatalogue::default();
+        let pepin = cat.mastery.damage_mul(13); // plafonné à max_level
+        let boucherie = cat.mastery.damage_mul(2);
+        assert!(
+            (pepin - boucherie).abs() > 1e-6,
+            "sans écart mesurable, un bonus figé sur la mauvaise arme passerait inaperçu"
+        );
+        // Le plafond tient : un niveau 13 ne vaut pas plus qu'un niveau max_level.
+        assert!((pepin - cat.mastery.damage_mul(cat.mastery.max_level)).abs() < 1e-6);
+        assert!(pepin > boucherie, "plus de runs = plus de bonus");
     }
 
     #[test]

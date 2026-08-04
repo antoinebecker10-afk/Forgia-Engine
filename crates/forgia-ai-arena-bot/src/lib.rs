@@ -42,6 +42,10 @@ pub struct ArenaBot {
     pub alerted: bool,
     /// Timer décompte alerted (transition Idle→Chase forced pendant cette durée).
     pub alert_left: f32,
+    /// Temps passé EN POURSUITE sans progresser (s). Voir `unstick_step`.
+    pub stuck_secs: f32,
+    /// Temps restant à longer l'obstacle au lieu de foncer vers la cible (s).
+    pub unstick_left: f32,
     // ── Story-464 — LOS state gating ──────────────────────────────
     /// Temps restant autorisé à Chase post-perte de LOS (sec). Set par
     /// `bot_los_check` à la transition true→false. Décrémenté chaque frame.
@@ -80,6 +84,8 @@ impl Default for ArenaBot {
             // Valeur plausible pour une capsule d'humanoïde ; les spawns qui
             // connaissent leur capsule la remplacent par la vraie.
             foot_offset_m: 0.9,
+            stuck_secs: 0.0,
+            unstick_left: 0.0,
         }
     }
 }

@@ -588,6 +588,9 @@ fn player_movement(
     time: Res<Time>,
     tuning: Res<PlayerMovementTuning>,
     speed_mul: Res<MovementSpeedMultiplier>,
+    // 2026-08-04 — atouts « corps ». `Option` : hors Roguelite la Resource peut
+    // ne pas exister, et le déplacement ne doit pas en dépendre.
+    combat_mods: Option<Res<forgia_combat::combat_mods::PlayerCombatMods>>,
     game_mode: Res<State<GameMode>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     mut mouse_motion: MessageReader<MouseMotion>,
@@ -606,7 +609,12 @@ fn player_movement(
     // Sprint (Shift) : bloqué en ADS (speed_mul < 1.0 = visée, convention CoD).
     let sprinting = action.pressed(&PlayerAction::Sprint) && speed_mul.0 >= 1.0;
     let sprint_mul = if sprinting { tuning.sprint_multiplier } else { 1.0 };
-    let speed = tuning.speed * speed_mul.0 * sprint_mul;
+    // 2026-08-04 — atouts « corps ». Multiplicatif avec l'ADS et le sprint : les
+    // trois sont des raisons INDÉPENDANTES d'aller plus ou moins vite, et les
+    // additionner les ferait s'annuler (viser en sprintant avec un atout ne doit
+    // pas donner la vitesse de base). Absent hors Roguelite → ×1.0, no-op.
+    let boon_mul = combat_mods.map(|m| m.move_speed_mul).unwrap_or(1.0);
+    let speed = tuning.speed * speed_mul.0 * sprint_mul * boon_mul;
     let jump_velocity = tuning.jump_velocity;
     let gravity = tuning.gravity;
     let max_fall_speed = tuning.max_fall_speed;

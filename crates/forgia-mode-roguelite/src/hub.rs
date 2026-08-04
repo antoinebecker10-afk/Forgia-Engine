@@ -36,6 +36,9 @@ pub enum HubTab {
     Forge,
     /// Choix d'arme (wizard `weapon_select`).
     Armes,
+    /// Le Livre — choix du chapitre (`chapters`). Verrouillé chapitre par
+    /// chapitre : on n'entre dans le suivant qu'après avoir battu le précédent.
+    Chapitres,
     /// L'Enclume des Âmes (upgrades permanents, `meta_shop`).
     Enclume,
     /// Arbres de talents — placeholder (gameplay = story suivante).
@@ -53,6 +56,7 @@ impl HubTab {
         match self {
             HubTab::Forge => "⚒ FORGE",
             HubTab::Armes => "🗡 ARMES",
+            HubTab::Chapitres => "📕 LE LIVRE",
             HubTab::Enclume => "🔨 ENCLUME",
             HubTab::Talents => "✦ TALENTS",
             HubTab::Codex => "📖 CODEX",
@@ -66,6 +70,7 @@ impl HubTab {
         match self {
             HubTab::Forge => "TON FORGERON",
             HubTab::Armes => "CHOISIS TON ARME",
+            HubTab::Chapitres => "CHOISIS TON CHAPITRE",
             HubTab::Enclume => "L'ENCLUME DES ÂMES",
             HubTab::Talents => "TALENTS",
             HubTab::Codex => "CODEX · BESTIAIRE",
@@ -86,6 +91,10 @@ pub fn on_forge_tab(hub: Option<Res<HubTab>>) -> bool {
 /// Vrai quand l'onglet ARMES est actif (wizard d'arme).
 pub fn on_armes_tab(hub: Option<Res<HubTab>>) -> bool {
     hub.map(|h| *h == HubTab::Armes).unwrap_or(false)
+}
+/// Vrai quand l'onglet LE LIVRE est actif (sélecteur de chapitre).
+pub fn on_chapitres_tab(hub: Option<Res<HubTab>>) -> bool {
+    hub.map(|h| *h == HubTab::Chapitres).unwrap_or(false)
 }
 /// Vrai quand l'onglet ENCLUME est actif (meta shop).
 pub fn on_enclume_tab(hub: Option<Res<HubTab>>) -> bool {
@@ -237,7 +246,7 @@ fn draw_hub_chrome(
                         // Hub-menu étape 7 : les sections P1 (Talents/Codex/Missions/
                         // Succès) vivent au MENU-titre désormais → le hub Lobby ne
                         // garde que les onglets de configuration de run.
-                        for tab in [HubTab::Forge, HubTab::Armes, HubTab::Enclume] {
+                        for tab in [HubTab::Forge, HubTab::Armes, HubTab::Chapitres, HubTab::Enclume] {
                             let selected = *hub == tab;
                             let resp = ui.add(egui::Button::selectable(
                                 selected,

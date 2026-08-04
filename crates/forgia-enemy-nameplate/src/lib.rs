@@ -57,6 +57,55 @@ pub struct NameplateRoot {
     pub lifetime_left: f32,
 }
 
+/// La plaque est-elle DANS le champ de vision du joueur ?
+///
+/// ## Pourquoi ce drapeau existe
+///
+/// Rapporté en jeu le 2026-08-04 : « je vois leurs noms à travers les assets ».
+/// Ce n'était pas un défaut de rendu — les matériaux sont `unlit` mais testent
+/// bien la profondeur. La plaque flotte **au-dessus** de l'ennemi : elle dépasse
+/// par-dessus le prop qui, lui, cache le mob. Le nom trahit donc une position
+/// qu'on ne devrait pas connaître.
+///
+/// ## Pourquoi c'est un drapeau et pas un raycast d'ici
+///
+/// Cette crate ne connaît ni l'IA ni la physique, et ne doit pas : le Hall s'en
+/// sert aussi. Elle expose donc l'INTENTION, et celui qui sait déjà (l'IA
+/// calcule cette ligne de vue à 8 Hz) l'écrit. Ajouter un raycast par plaque et
+/// par frame paierait une seconde fois ce qui est déjà calculé.
+///
+/// Par défaut **visible** : un appelant qui n'écrit jamais ce drapeau garde
+/// exactement l'ancien comportement.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct NameplateSight {
+    pub visible: bool,
+}
+
+impl Default for NameplateSight {
+    fn default() -> Self {
+        Self { visible: true }
+    }
+}
+
+/// Applique le drapeau de vue à la visibilité de la plaque.
+///
+/// Gardé par `Changed` : à vue stable — le cas courant — ce système ne touche
+/// rien. Il ne tourne qu'aux transitions.
+pub fn sys_apply_nameplate_sight(
+    mut plates: Query<(&NameplateSight, &mut Visibility), (With<NameplateRoot>, Changed<NameplateSight>)>,
+) {
+    for (sight, mut vis) in &mut plates {
+        let voulu = if sight.visible {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *vis != voulu {
+            *vis = voulu;
+        }
+    }
+}
+
 /// Marker (sur le bot) qui demande un nameplate permanent visible tant que
 /// l'entité existe. Sans ce marker, l'ancien comportement spawn-on-hit reste.
 ///
@@ -115,6 +164,7 @@ impl Plugin for ForgiaEnemyNameplatePlugin {
                     update_hp_fill,
                     update_defense_bars,
                     tick_lifetime_and_despawn,
+                    sys_apply_nameplate_sight,
                     sensor_write,
                 )
                     .chain(),
@@ -182,6 +232,7 @@ fn build_nameplate_for(
             // (Mesh3d → Visibility auto) ont besoin d'une chaîne d'ancêtres complète
             // pour l'InheritedVisibility, sinon barres invisibles (classe B0004).
             Visibility::default(),
+            NameplateSight::default(),
             Name::new("EnemyNameplate"),
             ChildOf(target),
         ))
@@ -514,6 +565,7 @@ fn sensor_write(
     mut acc: Local<f32>,
     registry: Res<NameplateRegistry>,
     q: Query<&NameplateRoot>,
+    sight: Query<&NameplateSight>,
 ) {
     *acc += time.delta_secs();
     if *acc < 1.0 {
@@ -534,7 +586,43 @@ fn sensor_write(
         "active_count": active_count,
         "registry_size": registry_size,
         "mean_lifetime_left": mean_lifetime,
+        // Combien de plaques sont TUES parce que le joueur ne voit pas leur
+        // porteur. `hidden == 0` avec des ennemis vivants derrière un décor =
+        // le pilotage par ligne de vue ne tourne pas (il vit dans la crate du
+        // mode, pas ici — cette crate expose le drapeau et rien de plus).
+        "hidden_out_of_sight": sight.iter().filter(|s| !s.visible).count(),
         "status": if active_count == 0 { "idle" } else { "active" },
     });
     let _ = forgia_core::sensor_io::enqueue("forgia_enemy_nameplate.json", payload.to_string());
+}
+
+#[cfg(test)]
+mod sight_tests {
+    use super::*;
+
+    /// Le défaut par défaut est VISIBLE : cette crate sert aussi le Hall, où
+    /// personne n'écrit ce drapeau. Un défaut « caché » ferait disparaître en
+    /// silence toutes les plaques d'un mode qui n'a rien demandé.
+    #[test]
+    fn a_caller_that_never_writes_the_flag_keeps_its_nameplates() {
+        assert!(NameplateSight::default().visible);
+    }
+
+    /// La correspondance drapeau → visibilité, sans moteur.
+    ///
+    /// `Inherited` et non `Visible` : la plaque est ENFANT de l'ennemi, elle
+    /// doit disparaître avec lui. La forcer visible la ferait survivre à un
+    /// porteur devenu invisible.
+    #[test]
+    fn a_hidden_plate_hides_and_a_seen_one_defers_to_its_bearer() {
+        let visibilite = |vu: bool| {
+            if vu {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            }
+        };
+        assert_eq!(visibilite(true), Visibility::Inherited);
+        assert_eq!(visibilite(false), Visibility::Hidden);
+    }
 }

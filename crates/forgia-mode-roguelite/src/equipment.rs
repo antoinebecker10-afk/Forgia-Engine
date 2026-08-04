@@ -18,7 +18,7 @@
 
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy_egui::egui;
+use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_ui_lib::style::HAIR_GOLD_STRONG;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
@@ -63,6 +63,12 @@ pub struct DropRules {
     pub per_stage: u32,
     pub on_victory: u32,
     pub reroll_if_owned: u32,
+    #[serde(default = "default_card_seconds")]
+    pub card_seconds: f32,
+}
+
+fn default_card_seconds() -> f32 {
+    4.0
 }
 
 impl Default for DropRules {
@@ -71,6 +77,7 @@ impl Default for DropRules {
             per_stage: 1,
             on_victory: 1,
             reroll_if_owned: 8,
+            card_seconds: default_card_seconds(),
         }
     }
 }
@@ -111,6 +118,17 @@ pub struct EquipmentConfig {
     /// pièce n'est équipée).
     #[serde(default)]
     pub body_model: String,
+    /// Emplacement dont la rareté teinte les bras du viewmodel — le seul visible
+    /// en combat.
+    #[serde(default)]
+    pub viewmodel_slot: String,
+    /// Bras vus en FPS. Déclarés avec le personnage plutôt que dans le
+    /// préchargeur générique : le choix des bras appartient au personnage.
+    /// Vides = on garde les bras d'origine.
+    #[serde(default)]
+    pub viewmodel_arm_left: String,
+    #[serde(default)]
+    pub viewmodel_arm_right: String,
     #[serde(default)]
     pub rarities: Vec<Rarity>,
     #[serde(default)]
@@ -146,6 +164,23 @@ impl EquipmentConfig {
         self.rarities.iter().position(|r| r.id == id).unwrap_or(0)
     }
 
+    /// Ce que vaut une pièce en points de Puissance : son rang + 1, donc 1 pour
+    /// la plus commune et `rarities.len()` pour la plus rare. Un emplacement vide
+    /// vaut 0 — porter du Commun est déjà un progrès sur ne rien porter.
+    fn power_of(&self, rarity_id: &str) -> u32 {
+        self.rarity(rarity_id)
+            .map(|_| self.rarity_rank(rarity_id) as u32 + 1)
+            .unwrap_or(0)
+    }
+
+    /// La Puissance d'un équipement parfait : tous les emplacements dans la
+    /// rareté la plus haute. C'est le dénominateur du score, et il se DÉRIVE du
+    /// genome — ajouter un emplacement ou une rareté déplace la cible toute
+    /// seule, sans qu'aucun nombre ne soit à corriger ici.
+    pub fn power_max(&self) -> u32 {
+        (self.slots.len() * self.rarities.len()) as u32
+    }
+
     fn color32(&self, rarity_id: &str) -> egui::Color32 {
         let rgb = self.rarity(rarity_id).map(|r| r.rgb).unwrap_or([0.5; 3]);
         egui::Color32::from_rgb(
@@ -172,6 +207,10 @@ pub struct EquipmentSave {
     /// casserait silencieusement le rechargement du save.
     #[serde(default)]
     pub drops_total: u32,
+    /// Meilleure Puissance jamais portée. C'est ce qui transforme le score en
+    /// trace de progression : sans lui, retirer une pièce efface l'histoire.
+    #[serde(default)]
+    pub power_record: u32,
     #[serde(default)]
     pub owned: HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -183,6 +222,7 @@ impl Default for EquipmentSave {
         Self {
             version: SAVE_VERSION,
             drops_total: 0,
+            power_record: 0,
             owned: HashMap::default(),
             equipped: HashMap::default(),
         }
@@ -273,6 +313,48 @@ pub fn compute_mods(cfg: &EquipmentConfig, save: &EquipmentSave) -> EquipmentMod
     mods
 }
 
+/// La **Puissance** : un seul nombre qui dit où en est l'équipement.
+///
+/// Somme des rangs des pièces portées, sur `power_max()`. Elle mesure le RANG et
+/// non le gain de statistique, et c'est délibéré :
+///
+/// - c'est le rang que le joueur progresse — trouver plus rare est le geste du
+///   jeu, alors qu'un dosage de `per_tier` est une décision de game design ;
+/// - un score dérivé des pourcentages bougerait au moindre rééquilibrage, sans
+///   qu'aucune pièce n'ait changé : le record d'hier deviendrait faux ;
+/// - additionner cinq pourcentages qui portent sur des choses différentes
+///   (dégâts, cadence, réduction…) ne veut rien dire physiquement.
+///
+/// Elle ne crée AUCUNE seconde vérité : elle ne pilote rien en combat, elle lit
+/// le même `equipped` que `compute_mods`.
+pub fn power_score(cfg: &EquipmentConfig, save: &EquipmentSave) -> u32 {
+    save.equipped
+        .iter()
+        .filter(|(slot_id, _)| cfg.slot(slot_id).is_some())
+        .map(|(_, rarity_id)| cfg.power_of(rarity_id))
+        .sum()
+}
+
+/// Retient le pic de Puissance. Sans garde `is_changed` sur la lecture ce serait
+/// une écriture de fichier par frame ; avec, un save chargé d'une version
+/// antérieure se voit quand même mesuré à la première frame (la Resource compte
+/// comme changée à son insertion).
+fn sys_track_power_record(cfg: Res<EquipmentConfig>, mut save: ResMut<EquipmentSave>) {
+    if !save.is_changed() {
+        return;
+    }
+    let score = power_score(&cfg, &save);
+    if score > save.power_record {
+        info!(
+            "[equipment] puissance record — {} → {score} / {}",
+            save.power_record,
+            cfg.power_max()
+        );
+        save.power_record = score;
+        save.save();
+    }
+}
+
 fn sys_recompute_equipment_mods(
     cfg: Res<EquipmentConfig>,
     save: Res<EquipmentSave>,
@@ -296,6 +378,65 @@ fn sys_recompute_equipment_mods(
             save.equipped.len()
         );
         *mods = next;
+    }
+}
+
+/// Fait pointer les bras du viewmodel sur ceux du personnage.
+///
+/// `GameAssets` précharge des bras génériques au démarrage ; on les remplace
+/// une fois par ceux déclarés dans le genome. Écrire ici plutôt que dans le
+/// préchargeur garde le choix des bras avec le personnage — et le rend
+/// data-driven au passage : vider les deux champs rend les bras d'origine, sans
+/// toucher au code.
+///
+/// Une seule fois : `forgia_viewmodel::arms::spawn_arms` lit ces handles au
+/// spawn des bras, qui survient en jeu, bien après le démarrage.
+fn sys_point_viewmodel_arms_at_character(
+    cfg: Res<EquipmentConfig>,
+    assets: Res<AssetServer>,
+    mut game_assets: ResMut<forgia_assets::GameAssets>,
+    mut done: Local<bool>,
+) {
+    if *done || cfg.viewmodel_arm_left.is_empty() || cfg.viewmodel_arm_right.is_empty() {
+        return;
+    }
+    *done = true;
+    let scene =
+        |p: &str| assets.load(GltfAssetLabel::Scene(0).from_asset(p.to_string()));
+    game_assets.viewmodel_arm_left = scene(&cfg.viewmodel_arm_left);
+    game_assets.viewmodel_arm_right = scene(&cfg.viewmodel_arm_right);
+    info!("[equipment] bras du viewmodel = ceux du personnage");
+}
+
+/// Publie la teinte des PLAQUES d'armure des bras dans `ArmCosmetics`.
+///
+/// Deux couches distinctes : la rareté teinte l'armure, la couleur d'identité
+/// (écrite par `identity.rs`) teinte la combinaison dessous. On garde ainsi la
+/// cosmétique choisie au Forgeron sans rendre la rareté illisible.
+///
+/// Passer par `ArmCosmetics` plutôt que d'appeler le viewmodel évite une
+/// dépendance de `forgia-viewmodel` vers ce crate : la Resource est déjà le
+/// point de rendez-vous des deux couches.
+fn sys_publish_arm_armor_tint(
+    cfg: Res<EquipmentConfig>,
+    save: Res<EquipmentSave>,
+    mut cosmetics: ResMut<ArmCosmetics>,
+) {
+    if !save.is_changed() && !cfg.is_changed() {
+        return;
+    }
+    let tint = save
+        .equipped
+        .get(&cfg.viewmodel_slot)
+        .and_then(|r| cfg.rarity(r))
+        // Teinte NORMALISÉE : `base_color` multiplie l'albédo, donc une rareté
+        // sombre assombrirait le gantelet au lieu de le colorer.
+        .map(|r| crate::avatar::rarity_tint(r.rgb).to_srgba())
+        .map(|c| [c.red, c.green, c.blue])
+        // Aucune pièce portée : blanc, donc aucune teinte.
+        .unwrap_or([1.0, 1.0, 1.0]);
+    if cosmetics.armor_rgb != tint {
+        cosmetics.armor_rgb = tint;
     }
 }
 
@@ -342,6 +483,29 @@ fn roll_piece(
     last
 }
 
+/// La dernière pièce tombée, à annoncer à l'écran.
+///
+/// Le butin est le geste central du roguelite. Sans cette carte, une pièce tombe
+/// pendant la run et le joueur ne l'apprend qu'en ouvrant un menu — le gain
+/// existe dans les données mais pas dans l'expérience.
+#[derive(Resource, Default)]
+pub struct LootCard {
+    slot: String,
+    rarity: String,
+    /// `None` = rien à montrer.
+    since: Option<f32>,
+    /// Doublon : la pièce était déjà possédée, on le dit plutôt que de faire
+    /// croire à un gain.
+    duplicate: bool,
+    /// Puissance avant / après le butin, et ce qu'elle vaudrait si la pièce était
+    /// portée. Une pièce qui tombe sur un emplacement déjà rempli ne s'équipe pas
+    /// toute seule : sans le troisième nombre, la carte annoncerait « +0 » sur un
+    /// butin qui est pourtant une amélioration.
+    power_before: u32,
+    power_after: u32,
+    power_potential: u32,
+}
+
 /// Étage le plus profond déjà récompensé — évite de re-donner le butin d'un
 /// étage à chaque changement d'état interne.
 #[derive(Resource, Default)]
@@ -357,6 +521,8 @@ fn sys_grant_stage_drops(
     cfg: Res<EquipmentConfig>,
     mut save: ResMut<EquipmentSave>,
     mut mark: ResMut<StageWatermark>,
+    mut card: ResMut<LootCard>,
+    time: Res<Time>,
 ) {
     if !state.is_changed() {
         return;
@@ -387,11 +553,31 @@ fn sys_grant_stage_drops(
         };
         save.drops_total += 1;
         changed = true;
-        if save.grant(&slot, &rarity) {
-            info!("[equipment] butin — {slot} {rarity}");
+        let power_before = power_score(&cfg, &save);
+        let fresh = save.grant(&slot, &rarity);
+        let power_after = power_score(&cfg, &save);
+        // Ce que donnerait la pièce si on l'équipait : le score courant, moins ce
+        // que vaut la pièce actuellement portée sur cet emplacement, plus celle-ci.
+        let worn_now = save
+            .equipped
+            .get(&slot)
+            .map(|id| cfg.power_of(id))
+            .unwrap_or(0);
+        let power_potential = power_after - worn_now + cfg.power_of(&rarity);
+        if fresh {
+            info!("[equipment] butin — {slot} {rarity} (puissance {power_before} → {power_after})");
         } else {
             info!("[equipment] butin — {slot} {rarity} (doublon, rien ajouté)");
         }
+        *card = LootCard {
+            slot: slot.clone(),
+            rarity: rarity.clone(),
+            since: Some(time.elapsed_secs()),
+            duplicate: !fresh,
+            power_before,
+            power_after,
+            power_potential,
+        };
     }
     if changed {
         save.save();
@@ -424,6 +610,58 @@ pub fn draw_equipment_content(
             .size(11.0)
             .weak(),
     );
+    ui.add_space(6.0);
+
+    // La Puissance en tête, en gros : c'est le seul nombre qui se compare d'une
+    // run à l'autre. Les cinq pourcentages du bilan disent le PROFIL du build ;
+    // celui-ci dit s'il vaut mieux que le précédent, ce qu'aucun d'eux ne peut
+    // dire seul.
+    let power = power_score(cfg, save);
+    let power_max = cfg.power_max().max(1);
+    ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new("PUISSANCE")
+                .size(11.0)
+                .weak()
+                .color(HAIR_GOLD_STRONG),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if save.power_record > power {
+                ui.label(
+                    egui::RichText::new(format!("record {}", save.power_record))
+                        .size(11.0)
+                        .weak(),
+                );
+            }
+            ui.label(egui::RichText::new(format!("/ {power_max}")).size(12.0).weak());
+            ui.label(
+                egui::RichText::new(power.to_string())
+                    .size(24.0)
+                    .strong()
+                    .color(HAIR_GOLD_STRONG),
+            );
+        });
+    });
+    // Jauge de collection : le vide à droite est la part encore à trouver, et le
+    // liseré du record dit d'où l'on vient quand on a retiré une pièce.
+    {
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 6.0), egui::Sense::hover());
+        ui.painter()
+            .rect_filled(rect, egui::CornerRadius::same(3), egui::Color32::from_gray(48));
+        if save.power_record > power {
+            let mut mark = rect;
+            mark.set_width(rect.width() * (save.power_record as f32 / power_max as f32).clamp(0.0, 1.0));
+            ui.painter().rect_filled(
+                mark,
+                egui::CornerRadius::same(3),
+                HAIR_GOLD_STRONG.gamma_multiply(0.28),
+            );
+        }
+        let mut filled = rect;
+        filled.set_width(rect.width() * (power as f32 / power_max as f32).clamp(0.0, 1.0));
+        ui.painter()
+            .rect_filled(filled, egui::CornerRadius::same(3), HAIR_GOLD_STRONG);
+    }
     ui.add_space(8.0);
 
     // Le clic est appliqué APRÈS la boucle : muter `save` pendant qu'on itère
@@ -439,6 +677,7 @@ pub fn draw_equipment_content(
             .and_then(|id| cfg.rarity(id))
             .map(|r| slot.per_tier * r.bonus_mul)
             .unwrap_or(0.0);
+        let worn_power = equipped.as_deref().map(|id| cfg.power_of(id)).unwrap_or(0);
 
         // Ligne d'emplacement : un liseré de la couleur portée, le nom, et à
         // droite ce que ça rapporte. La couleur du liseré porte l'information
@@ -516,6 +755,10 @@ pub fn draw_equipment_content(
                 // la pièce, mais ce qu'on GAGNE ou PERD à l'échanger. Sans le
                 // delta, choisir demande un calcul mental.
                 let gain = slot.per_tier * rarity.bonus_mul;
+                // Le delta de Puissance rend comparables deux pièces d'emplacements
+                // DIFFÉRENTS — ce que « Cadence +8 % » contre « Blindage +6 % » ne
+                // permet pas. C'est là que le score unique gagne sa place.
+                let power_delta = cfg.power_of(rarity_id) as i32 - worn_power as i32;
                 let hover = if !has {
                     format!(
                         "{} — pas encore trouvé\n{} +{:.0}% si tu l'obtiens",
@@ -525,14 +768,15 @@ pub fn draw_equipment_content(
                     )
                 } else if selected {
                     format!(
-                        "{} — porté\n{} +{:.0}%\n\nClic pour retirer",
+                        "{} — porté\n{} +{:.0}%\n\nClic pour retirer ({:+} Puissance)",
                         rarity.label,
                         slot.stat_label,
-                        gain * 100.0
+                        gain * 100.0,
+                        -(cfg.power_of(rarity_id) as i32)
                     )
                 } else {
                     format!(
-                        "{} — {} +{:.0}%\n{} {:+.0}% en l'équipant",
+                        "{} — {} +{:.0}%\n{} {:+.0}% en l'équipant\n{power_delta:+} Puissance",
                         rarity.label,
                         slot.stat_label,
                         gain * 100.0,
@@ -571,31 +815,146 @@ pub fn draw_equipment_content(
     ui.add_space(2.0);
     // Bilan : uniquement les statistiques réellement modifiées. Une colonne de
     // « +0 % » n'apprend rien et noie les deux lignes qui comptent.
-    let lines: Vec<String> = [
+    // Bilan en colonnes avec barres : une ligne de texte se lit comme un journal
+    // et ne dit pas OÙ l'on est fort. Les barres montrent d'un coup le profil du
+    // build — donc ce qu'on cherche à la prochaine run. Toutes les statistiques
+    // sont listées, même à zéro : un creux visible est une information.
+    let stats = [
         ("Dégâts", (mods.damage_mul - 1.0) * 100.0),
         ("Cadence", (mods.fire_rate_mul - 1.0) * 100.0),
         ("Blindage", mods.damage_reduction * 100.0),
         ("Critique", mods.crit_chance * 100.0),
         ("Visée", mods.headshot_bonus_mul * 100.0),
-    ]
-    .into_iter()
-    .filter(|(_, v)| v.abs() > 0.05)
-    .map(|(label, v)| format!("{label} +{v:.0}%"))
-    .collect();
-    if lines.is_empty() {
-        ui.label(
-            egui::RichText::new("Aucun bonus actif")
-                .size(12.0)
-                .weak()
-                .italics(),
-        );
-    } else {
-        ui.label(
-            egui::RichText::new(lines.join("   "))
-                .size(12.0)
-                .color(HAIR_GOLD_STRONG),
-        );
+    ];
+    // Échelle commune, dérivée du meilleur : les barres se comparent entre elles
+    // plutôt que contre un maximum arbitraire.
+    let peak = stats.iter().map(|(_, v)| *v).fold(1.0_f32, f32::max);
+    for (label, value) in stats {
+        ui.horizontal(|ui| {
+            ui.add_sized(
+                [72.0, 14.0],
+                egui::Label::new(egui::RichText::new(label).size(11.0)),
+            );
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(120.0, 8.0), egui::Sense::hover());
+            ui.painter().rect_filled(
+                rect,
+                egui::CornerRadius::same(3),
+                egui::Color32::from_gray(48),
+            );
+            if value > 0.05 {
+                let mut filled = rect;
+                filled.set_width(rect.width() * (value / peak).clamp(0.0, 1.0));
+                ui.painter()
+                    .rect_filled(filled, egui::CornerRadius::same(3), HAIR_GOLD_STRONG);
+            }
+            ui.add_space(6.0);
+            let txt = egui::RichText::new(format!("+{value:.0}%")).size(11.0);
+            ui.label(if value > 0.05 {
+                txt.color(HAIR_GOLD_STRONG)
+            } else {
+                txt.weak()
+            });
+        });
     }
+}
+
+/// Annonce la pièce qui vient de tomber, en plein jeu.
+///
+/// Haut-centre : hors du réticule et hors du HUD des coins, donc lisible sans
+/// masquer le combat. Fond à la couleur de la rareté — c'est elle l'information,
+/// le texte ne fait que la confirmer.
+fn draw_loot_card(
+    mut contexts: EguiContexts,
+    cfg: Res<EquipmentConfig>,
+    card: Res<LootCard>,
+    time: Res<Time>,
+) {
+    let Some(since) = card.since else {
+        return;
+    };
+    let age = time.elapsed_secs() - since;
+    if age > cfg.drops.card_seconds {
+        return;
+    }
+    let (Some(slot), Some(rarity)) = (cfg.slot(&card.slot), cfg.rarity(&card.rarity)) else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    // Fondu sur le dernier quart : une carte qui disparaît d'un coup se lit
+    // comme un bug d'affichage.
+    let fade = ((cfg.drops.card_seconds - age) / (cfg.drops.card_seconds * 0.25)).clamp(0.0, 1.0);
+    let alpha = (fade * 255.0) as u8;
+    let col = cfg.color32(&card.rarity);
+    let accent = egui::Color32::from_rgba_unmultiplied(col.r(), col.g(), col.b(), alpha);
+
+    egui::Area::new(egui::Id::new("forgia_loot_card"))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 96.0))
+        .interactable(false)
+        .show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(egui::Color32::from_rgba_unmultiplied(14, 11, 18, alpha.min(220)))
+                .inner_margin(egui::Margin::symmetric(20, 12))
+                .corner_radius(egui::CornerRadius::same(10))
+                .stroke(egui::Stroke::new(2.0, accent))
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new(if card.duplicate {
+                                "DÉJÀ POSSÉDÉ"
+                            } else {
+                                "PIÈCE TROUVÉE"
+                            })
+                            .size(12.0)
+                            .color(egui::Color32::from_rgba_unmultiplied(200, 195, 190, alpha)),
+                        );
+                        ui.label(
+                            egui::RichText::new(format!("{} {}", slot.label, rarity.label))
+                                .size(22.0)
+                                .strong()
+                                .color(accent),
+                        );
+                        if !card.duplicate {
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{} +{:.0}%",
+                                    slot.stat_label,
+                                    slot.per_tier * rarity.bonus_mul * 100.0
+                                ))
+                                .size(14.0)
+                                .color(egui::Color32::from_rgba_unmultiplied(
+                                    230, 225, 220, alpha,
+                                )),
+                            );
+                            // Le pourcentage dit ce que la pièce fait ; la Puissance
+                            // dit où l'on en est. C'est le second qui se retient
+                            // d'une run à l'autre.
+                            let power_line = if card.power_after > card.power_before {
+                                Some(format!(
+                                    "Puissance {} → {}",
+                                    card.power_before, card.power_after
+                                ))
+                            } else if card.power_potential > card.power_after {
+                                Some(format!(
+                                    "Puissance {} → {} si équipée",
+                                    card.power_after, card.power_potential
+                                ))
+                            } else {
+                                None
+                            };
+                            if let Some(line) = power_line {
+                                ui.label(
+                                    egui::RichText::new(line)
+                                        .size(12.0)
+                                        .strong()
+                                        .color(accent),
+                                );
+                            }
+                        }
+                    });
+                });
+        });
 }
 
 // ── Capteur ──────────────────────────────────────────────────────────────────
@@ -636,13 +995,16 @@ fn sys_write_equipment_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"equipment","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"slots_total":{},"rarities_total":{},"owned_total":{},"equipped_total":{},"drops_total":{},"panel_shown":{},"damage_mul":{:.3},"fire_rate_mul":{:.3},"damage_reduction":{:.3},"crit_chance":{:.3},"headshot_bonus_mul":{:.3}}}"#,
+        r#"{{"id":"equipment","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"slots_total":{},"rarities_total":{},"owned_total":{},"equipped_total":{},"drops_total":{},"power":{},"power_max":{},"power_record":{},"panel_shown":{},"damage_mul":{:.3},"fire_rate_mul":{:.3},"damage_reduction":{:.3},"crit_chance":{:.3},"headshot_bonus_mul":{:.3}}}"#,
         time.elapsed_secs(),
         cfg.slots.len(),
         cfg.rarities.len(),
         owned_total,
         save.equipped.len(),
         save.drops_total,
+        power_score(&cfg, &save),
+        cfg.power_max(),
+        save.power_record,
         shown.0,
         mods.damage_mul,
         mods.fire_rate_mul,
@@ -664,11 +1026,24 @@ impl Plugin for EquipmentPlugin {
             .init_resource::<EquipmentMods>()
             .init_resource::<EquipmentPanelShown>()
             .init_resource::<StageWatermark>()
+            .init_resource::<LootCard>()
+            .add_systems(
+                EguiPrimaryContextPass,
+                draw_loot_card.run_if(in_state(GameMode::Roguelite)),
+            )
             // Le recompute tourne PARTOUT, y compris au menu : c'est là qu'on
             // équipe, et le bilan du panneau doit refléter ce qu'on vient de
             // cliquer. Le gater sur Roguelite affichait « aucun bonus actif »
             // avec trois pièces portées — l'écran mentait, comme un capteur.
-            .add_systems(Update, sys_recompute_equipment_mods)
+            .add_systems(
+                Update,
+                (
+                    sys_recompute_equipment_mods,
+                    sys_track_power_record,
+                    sys_publish_arm_armor_tint,
+                    sys_point_viewmodel_arms_at_character,
+                ),
+            )
             // 🚨 Le butin, lui, lit `RunState` — un SubState dont la Resource
             // N'EXISTE PAS hors de `GameMode::Roguelite`. Sans cette garde le
             // système est écarté à chaque frame avec un avertissement.

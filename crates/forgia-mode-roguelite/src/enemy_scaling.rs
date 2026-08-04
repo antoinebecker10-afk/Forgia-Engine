@@ -175,6 +175,13 @@ pub fn sys_scale_enemies_by_depth(
     // qu'on ne sait plus lire.
     rounds: Option<Res<crate::rounds::RoundsConfig>>,
     wave: Res<RogueliteWave>,
+    // 2026-08-04 — la menace monte par ROUND (chaque combat), pas par ARÈNE.
+    // Avec plusieurs combats par arène, indexer sur `stage` faisait monter la
+    // difficulté par bonds pendant que le joueur enchaînait trois combats
+    // identiques : le palier ne tombait plus là où le HUD l'annonçait.
+    graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
+    // 2026-08-04 — le chapitre courant : la marche ENTRE chapitres.
+    chapter: Option<Res<crate::meta_shop::SelectedChapter>>,
     mut watch: ResMut<EnemyScalingWatch>,
     mut q: Query<
         (
@@ -191,9 +198,20 @@ pub fn sys_scale_enemies_by_depth(
     let stage = wave.stage;
     let (hp_mul, dmg_mul) = match rounds.as_deref() {
         Some(r) if r.enabled => {
-            let t = r.threat(u32::from(stage));
+            // Round 1 = référence ×1.0, comme la salle 0 l'était : `threat`
+            // attend un index 0-basé, `round()` rend un compteur 1-basé.
+            // Le CHAPITRE compose par-dessus la montée du round : c'est lui qui
+            // rend le Livre progressif, et c'est la progression permanente qui
+            // doit le combler (la Trempe et les atouts repartent à zéro).
+            let chapitre = chapter.map(|c| c.0).unwrap_or(1);
+            let t = r.threat_at(
+                chapitre,
+                wave.round(graph_cfg.waves_per_stage).saturating_sub(1),
+            );
             (t.hp, t.damage)
         }
+        // Repli hors boucle : le linéaire historique, indexé sur la SALLE — il n'y
+        // a pas de notion de round quand c'est le graphe qui pilote.
         _ => (cfg.hp_mul_for_stage(stage), cfg.damage_mul_for_stage(stage)),
     };
     watch.last_stage = stage;

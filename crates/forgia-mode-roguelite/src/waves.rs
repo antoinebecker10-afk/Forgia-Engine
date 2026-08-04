@@ -58,6 +58,23 @@ pub struct RogueliteWave {
     pub break_secs_left: f32,
     /// True quand on est en train d'attendre le prochain spawn (entre 2 vagues).
     pub in_break: bool,
+    /// 2026-08-04 — le combat est fini ET la prochaine étape est un CHANGEMENT
+    /// D'ARÈNE : on attend que le joueur franchisse la porte.
+    ///
+    /// Le minuteur de break reste la fenêtre de prep entre deux combats d'une
+    /// *même* arène. Changer de pièce, en revanche, ne se fait plus tout seul :
+    /// « tant qu'on ne clique pas, ça n'enchaîne pas ». Lu par le HUD pour
+    /// afficher le bouton, et par l'orchestrateur pour geler le minuteur.
+    pub awaiting_room_entry: bool,
+    /// L'arène courante est celle du BOSS.
+    ///
+    /// Nécessaire parce que `current_wave` y est **surchargé** : il porte
+    /// `BOSS_WAVE_COMPOSITION` (une composition), pas un indice de combat. Sans
+    /// ce drapeau, `round()` lisait ce 3 comme « 3ᵉ combat de l'arène » et
+    /// annonçait le round **12** au lieu de 10 — donc une menace de ×9,29 au
+    /// lieu de ×6,91. Le boss se battait 35 % trop dur, et le HUD n'en montrait
+    /// rien (le compteur est clampé au total). Observé en jeu le 2026-08-04.
+    pub is_boss_arena: bool,
     pub victory_emitted: bool,
     /// Story-603 — true dès que la vague finale (boss) est nettoyée. Ouvre la
     /// porte du socle (`loot_room::sys_reconcile_boss_gate`). Remplace l'ancienne
@@ -93,6 +110,8 @@ impl Default for RogueliteWave {
             bots_alive: 0,
             break_secs_left: 0.0,
             in_break: false,
+            awaiting_room_entry: false,
+            is_boss_arena: false,
             victory_emitted: false,
             boss_defeated: false,
             seen_alive: false,
@@ -104,9 +123,126 @@ impl Default for RogueliteWave {
     }
 }
 
+impl RogueliteWave {
+    /// Le **ROUND** canonique, 1-indexé : le combat en cours depuis le début du
+    /// chapitre, toutes arènes confondues.
+    ///
+    /// ## Pourquoi cette méthode existe (2026-08-04)
+    ///
+    /// `stage` compte les **arènes**, pas les rounds : plusieurs combats se
+    /// déroulent dans la même arène (`waves_per_stage`). Les deux étaient
+    /// confondus, donc le compteur du HUD, les paliers de difficulté et la
+    /// montée de menace lisaient un index d'arène **en croyant lire un round**.
+    /// Avec 3 combats par arène, la menace aurait monté par bonds de trois
+    /// pendant que le compteur affichait « ROUND 1 / 10 » trois fois de suite.
+    ///
+    /// Elle est calculée, jamais stockée : deux nombres pour la même chose
+    /// finissent toujours par diverger — c'est la leçon déjà écrite en tête de
+    /// `hud::run_progress_label`.
+    ///
+    /// ```text
+    /// waves_per_stage = 3
+    /// arène 0 → rounds 1,2,3   arène 1 → 4,5,6   arène 2 → 7,8,9   arène 3 → 10 (boss)
+    /// ```
+    pub fn round(&self, waves_per_stage: u8) -> u32 {
+        let wps = u32::from(waves_per_stage.max(1));
+        // L'arène du boss ne contient qu'UN affrontement, et son `current_wave`
+        // porte une COMPOSITION (`BOSS_WAVE_COMPOSITION`), pas un indice de
+        // combat. Le lire comme un indice gonflait le round — et donc la menace
+        // réellement appliquée aux ennemis.
+        if self.is_boss_arena {
+            return u32::from(self.stage) * wps + 1;
+        }
+        u32::from(self.stage) * wps + u32::from(self.current_wave)
+    }
+}
+
 /// Vague « boss » (branche `_` de `wave_comp::compose`). La salle Boss (story-646)
 /// spawn cette composition directement.
 pub const BOSS_WAVE_COMPOSITION: u8 = 3;
+
+/// Le joueur franchit la porte : on passe à l'arène suivante.
+///
+/// Écrit par le bouton du HUD (« ENTRER DANS LA PIÈCE SUIVANTE » / « AFFRONTER LE
+/// BOSS »), consommé par `sys_wave_orchestrator`. C'est la seule chose qui fait
+/// changer d'arène en boucle de rounds — il n'y a plus de minuteur pour ça.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct EnterNextRoomRequest;
+
+/// Ramène un point d'apparition DANS l'enceinte de l'arène.
+///
+/// ## Pourquoi c'est nécessaire (2026-08-04, rapporté en jeu)
+///
+/// Depuis story-686, l'anneau d'apparition est centré sur le **joueur** — le
+/// correctif était juste : avant, il était centré sur l'origine et les bots
+/// naissaient à l'autre bout de la carte. Mais rien ne borne l'anneau : collé aux
+/// remparts, un rayon de 25 ou 50 m (runner, sniper) déborde **derrière le mur**,
+/// et l'ennemi naît hors de l'arène. « Si je suis proche des murailles, les mobs
+/// spawn en dehors de la map. »
+///
+/// On garde la DIRECTION voulue et on raccourcit le rayon : l'ennemi arrive
+/// toujours d'où l'anneau le voulait, simplement plus près. Le ramener au centre
+/// serait pire — tous les ennemis surgiraient dans le dos du joueur.
+///
+/// `arena_r <= 0` → aucune enceinte connue, on ne touche à rien.
+///
+/// PUR — testable sans App.
+pub fn clamp_into_arena(p: Vec2, arena_r: f32, body_r: f32) -> Vec2 {
+    if arena_r <= 0.0 {
+        return p;
+    }
+    // ⚠️ `arena_extent_m` est le rayon du cercle CIRCONSCRIT : les remparts
+    // hexagonaux y sont INSCRITS, donc leurs murs passent à 0,866 × R au plus
+    // près (l'apothème). Borner au cercle laissait une couronne entre l'apothème
+    // et le rayon où l'on naît DEHORS — « il y a encore des mobs qui spawn
+    // derrière les remparts », rapporté après le premier correctif.
+    //
+    // Le ratio est DÉRIVÉ et déjà nommé dans `forgia_stage::layout`, on le lit
+    // au lieu d'en écrire une seconde copie.
+    let apotheme = arena_r * forgia_stage::layout::HEX_INSCRIBED_RATIO;
+    let limite = (apotheme - body_r.max(0.0)).max(0.5);
+    let d = p.length();
+    if d <= limite || d <= f32::EPSILON {
+        return p;
+    }
+    p * (limite / d)
+}
+
+/// Le gain d'Âmes après application des atouts de **récolte**.
+///
+/// Arrondi au plus proche, et **jamais moins que le gain nu** : un multiplicateur
+/// dégénéré (0, négatif, NaN) ne doit pas pouvoir retirer au joueur ce qu'il
+/// aurait touché sans atout. Un bonus ne peut être qu'un bonus.
+///
+/// PUR — testable sans App.
+pub fn recolte(base: u32, mul: f32) -> u32 {
+    if !mul.is_finite() || mul <= 1.0 {
+        return base;
+    }
+    ((base as f32 * mul).round() as u32).max(base)
+}
+
+/// L'ARÈNE où se tient le boss, dérivée du nombre de ROUNDS d'un chapitre.
+///
+/// Les deux grandeurs ne sont pas dans la même unité : `max_rounds` compte des
+/// combats, une arène en contient `waves_per_stage`. Le boss occupe sa propre
+/// arène, juste après celles qui portent les rounds de combat.
+///
+/// ```text
+/// max_rounds = 10, waves_per_stage = 3
+///   rounds 1..9  → arènes 0,1,2   (⌈9/3⌉ = 3 arènes)
+///   round  10    → arène 3         ← le boss
+/// ```
+///
+/// Pur — testable sans App ni World.
+pub fn boss_arena_for(max_rounds: u32, waves_per_stage: u8) -> u8 {
+    let wps = u32::from(waves_per_stage.max(1));
+    // `max_rounds - 1` = les rounds de COMBAT ; le boss est le dernier round et
+    // n'entre pas dans ce compte. `max_rounds = 1` (chapitre réduit au boss) donne
+    // donc 0 arène de combat et le boss en arène 0.
+    let combat_rounds = max_rounds.saturating_sub(1);
+    combat_rounds.div_ceil(wps).min(u32::from(u8::MAX)) as u8
+}
 
 /// Les 3 configs nécessaires au spawn d'une vague, en un seul `SystemParam`.
 ///
@@ -127,6 +263,13 @@ pub struct WaveSpawnConfigs<'w, 's> {
     /// plafond de 16. Et c'est sa place — l'anneau fait partie de ce qu'il faut
     /// pour poser une vague.
     pub player: Query<'w, 's, &'static Transform, With<forgia_player::Player>>,
+    /// 2026-08-04 — atouts « récolte ». Même raison d'être ici que les autres :
+    /// l'orchestrateur est au plafond de params, et le gain d'Âmes fait partie
+    /// de ce qu'il faut pour clore une vague.
+    pub mods: Res<'w, forgia_combat::combat_mods::PlayerCombatMods>,
+    /// 2026-08-04 — l'enceinte réellement bâtie, pour que l'anneau d'apparition
+    /// ne déborde pas derrière les remparts quand le joueur y est collé.
+    pub stage_result: Option<Res<'w, forgia_stage::StageLoadResult>>,
 }
 
 impl WaveSpawnConfigs<'_, '_> {
@@ -140,6 +283,18 @@ impl WaveSpawnConfigs<'_, '_> {
             .next()
             .map(|t| t.translation.xz())
             .unwrap_or(Vec2::ZERO)
+    }
+
+    /// Rayon de l'enceinte, LU sur ce que l'arène a réellement bâti.
+    ///
+    /// `StageLoadResult.extent_m` est publié par `forgia-stage` au moment où il
+    /// pose l'enceinte : c'est la seule valeur qui ne peut pas diverger de la
+    /// géométrie. Recopier un rayon depuis un génome en serait une seconde, et
+    /// c'est exactement la classe de défaut qu'on passe la journée à supprimer.
+    ///
+    /// Absent (arène pas encore bâtie) → `0` = aucune borne, comportement d'avant.
+    pub fn arena_radius(&self) -> f32 {
+        self.stage_result.as_deref().map(|r| r.extent_m).unwrap_or(0.0)
     }
 
     /// Contexte de spawn pour une vague donnée.
@@ -157,6 +312,7 @@ impl WaveSpawnConfigs<'_, '_> {
             // Story-686 — lu ICI, une seule fois : les 3 sites d'appel ne
             // peuvent pas en donner une version différente.
             ring_center: self.ring_center(),
+            arena_radius: self.arena_radius(),
             stats: &self.stats,
             defense: &self.defense,
             comp: &self.comp,
@@ -203,6 +359,8 @@ pub struct WaveSpawnCtx<'a> {
     /// ce n'est du joueur ? Le rayon a toujours voulu dire « distance au
     /// joueur » ; il était implémenté en « distance à l'origine ».
     pub ring_center: Vec2,
+    /// Rayon de l'enceinte. `0` = inconnue → aucune borne appliquée.
+    pub arena_radius: f32,
     /// Graine de la RUN. Sans elle, les positions étaient les mêmes à chaque run.
     pub run_seed: u64,
     /// Story-672 — emprises solides du décor de la salle. Un ennemi ne doit JAMAIS
@@ -278,8 +436,15 @@ pub fn spawn_wave_enemies(
                 stats.capsule_radius,
                 SPAWN_CLEAR_TRIES,
             );
-            let x = ctx.ring_center.x + r * theta.cos();
-            let z = ctx.ring_center.y + r * theta.sin();
+            // Story-686 posait le centre sur le joueur ; ceci empêche l'anneau
+            // de déborder l'enceinte quand il est collé à un rempart.
+            let voulu = Vec2::new(
+                ctx.ring_center.x + r * theta.cos(),
+                ctx.ring_center.y + r * theta.sin(),
+            );
+            let pose = clamp_into_arena(voulu, ctx.arena_radius, stats.capsule_radius);
+            let x = pose.x;
+            let z = pose.y;
             // Story-685 — MÊME source que `foot_offset_m` de l'ArenaBot : le suivi
             // de sol repose sur l'égalité des deux, deux copies divergeraient.
             let y = stats.foot_offset_m();
@@ -407,6 +572,10 @@ pub fn sys_wave_orchestrator(
     asset_server: Res<AssetServer>,
     q_bots: Query<&ArenaBot>,
     mut open_coffre: MessageWriter<OpenCoffreRequest>,
+    // 2026-08-04 — le franchissement de porte, écrit par le bouton du HUD.
+    mut enter_room: MessageReader<EnterNextRoomRequest>,
+    // 2026-08-04 — en boucle de chapitre, le boss scelle la run ici même.
+    mut end_run: MessageWriter<crate::run::EndRunEvent>,
     // Story-571 — gain de Souls méta en fin de wave/boss (persistant).
     mut meta: ResMut<crate::run::MetaSouls>,
     // Story-640 P0-2 — configs live pour le spawn (stats hot-reload + défense).
@@ -444,7 +613,15 @@ pub fn sys_wave_orchestrator(
         if spawn_cfgs.rounds.max_rounds == 0 {
             u8::MAX
         } else {
-            spawn_cfgs.rounds.max_rounds.min(u32::from(u8::MAX)) as u8
+            // 2026-08-04 — `max_rounds` compte des ROUNDS (combats), `boss_stage`
+            // une ARÈNE. Les confondre plaçait le boss à l'arène 10, soit le
+            // round 31 avec 3 combats par arène.
+            //
+            // Le boss occupe sa PROPRE arène, juste après les rounds de combat :
+            // rounds 1..max_rounds-1 remplissent ⌈(max_rounds-1)/wps⌉ arènes,
+            // et le boss est la suivante. Avec 10 rounds et 3 par arène :
+            // arènes 0,1,2 portent les rounds 1..9, l'arène 3 porte le boss.
+            boss_arena_for(spawn_cfgs.rounds.max_rounds, graph_cfg.waves_per_stage)
         }
     } else {
         graph
@@ -467,8 +644,9 @@ pub fn sys_wave_orchestrator(
         // Vague nettoyée — démarre break ou victory.
         if in_boss_stage {
             // Story-571 — bonus Souls méta pour le boss/finale (persistant).
-            meta.current = meta.current.saturating_add(crate::run::SOULS_PER_BOSS);
-            meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_BOSS);
+            let gain = recolte(crate::run::SOULS_PER_BOSS, spawn_cfgs.mods.loot_gain_mul);
+            meta.current = meta.current.saturating_add(gain);
+            meta.earned_run = meta.earned_run.saturating_add(gain);
             // Story-603 — décision user 2026-06-17 : PLUS d'écran Victoire auto.
             // Tuer le boss ouvre la porte du socle (`loot_room::sys_reconcile_boss_gate`
             // lit `boss_defeated`). `victory_emitted` reste le latch qui stoppe
@@ -477,6 +655,29 @@ pub fn sys_wave_orchestrator(
             // fin de run à brancher plus tard.
             wave.victory_emitted = true;
             wave.boss_defeated = true;
+            // 2026-08-04 — en BOUCLE DE CHAPITRE, le boss EST la fin.
+            //
+            // Story-603 avait retiré l'écran de victoire automatique : tuer le
+            // boss ouvrait la porte du socle, et la victoire n'était scellée
+            // qu'au **retour du parcours** (`loot_room.rs`, portail Retour).
+            // Ce parcours n'existe pas dans un chapitre : on tuait le boss et il
+            // ne se passait plus rien — `boss_defeated: true` mais
+            // `victories_total` figé, observé en jeu.
+            //
+            // Le chemin story-603 reste intact hors boucle (mode graphe) : c'est
+            // `loot_room` qui scelle, comme avant. Ici, la fin de chapitre est le
+            // boss, donc c'est ici qu'on la déclare.
+            if loop_mode {
+                end_run.write(crate::run::EndRunEvent {
+                    result: crate::run::RunResult::Victory,
+                });
+                info!(
+                    "[roguelite] Round {} — BOSS VAINCU : CHAPITRE TERMINÉ (+{} Souls méta)",
+                    wave.round(graph_cfg.waves_per_stage),
+                    crate::run::SOULS_PER_BOSS
+                );
+                return;
+            }
             info!(
                 "[roguelite] Salle boss {} nettoyée — BOSS DEFEATED (+{} Souls méta) → porte du socle s'ouvre",
                 wave.stage + 1,
@@ -507,8 +708,9 @@ pub fn sys_wave_orchestrator(
             return;
         }
         // Story-571 — Souls méta pour une wave régulière nettoyée (persistant).
-        meta.current = meta.current.saturating_add(crate::run::SOULS_PER_WAVE);
-        meta.earned_run = meta.earned_run.saturating_add(crate::run::SOULS_PER_WAVE);
+        let gain = recolte(crate::run::SOULS_PER_WAVE, spawn_cfgs.mods.loot_gain_mul);
+        meta.current = meta.current.saturating_add(gain);
+        meta.earned_run = meta.earned_run.saturating_add(gain);
         wave.in_break = true;
         wave.break_secs_left = BREAK_SECS;
         // Story-558 AC10 (2026-05-29) — HP restauré à 100% à l'entrée break.
@@ -535,7 +737,28 @@ pub fn sys_wave_orchestrator(
     }
 
     if wave.in_break {
-        wave.break_secs_left -= time.delta_secs();
+        // 2026-08-04 — DEUX transitions différentes, deux règles.
+        //
+        // Entre deux combats d'une MÊME arène : le minuteur de 15 s court, c'est
+        // la fenêtre de prep (munitions, soin, Coffre du Forgeron).
+        //
+        // Pour CHANGER d'arène : le minuteur est gelé et on attend que le joueur
+        // franchisse la porte. « Tant qu'on ne clique pas, ça n'enchaîne pas » —
+        // une pièce se quitte parce qu'on l'a décidé, pas parce qu'un compte à
+        // rebours s'est vidé pendant qu'on lisait ses atouts.
+        let arena_change_is_next = wave.current_wave >= graph_cfg.waves_per_stage;
+        if loop_mode && arena_change_is_next {
+            wave.awaiting_room_entry = true;
+            if enter_room.read().next().is_none() {
+                return; // toujours devant la porte
+            }
+            // Porte franchie : le clic VAUT la fin du break, le reste du chemin
+            // (avance d'arène + spawn) est inchangé.
+            wave.awaiting_room_entry = false;
+            wave.break_secs_left = 0.0;
+        } else {
+            wave.break_secs_left -= time.delta_secs();
+        }
         if wave.break_secs_left <= 0.0 {
             wave.in_break = false;
             wave.break_secs_left = 0.0;
@@ -744,6 +967,7 @@ fn advance_to_room(
 ) {
     wave.stage = next;
     wave.seen_alive = false;
+    wave.is_boss_arena = is_boss;
     wave.room_kind = kind;
     // Story-669 — le budget du nœud de graph choisi pilote la densité de la salle.
     wave.room_budget = budget;
@@ -888,6 +1112,221 @@ mod tests {
         assert_eq!(w.current_wave, 1);
     }
 
+    /// La structure décidée le 2026-08-04, round par round. Si cette table change,
+    /// c'est le chapitre entier qui change de forme — elle doit se lire d'un coup.
+    #[test]
+    fn a_chapter_maps_rounds_onto_arenas() {
+        // (arène, vague) → round attendu, avec 3 combats par arène.
+        let cases = [
+            ((0u8, 1u8), 1u32),
+            ((0, 2), 2),
+            ((0, 3), 3), // fin de l'arène 1 → palier + changement de décor
+            ((1, 1), 4),
+            ((1, 3), 6),
+            ((2, 1), 7),
+            ((2, 3), 9),
+            ((3, 1), 10), // l'arène du BOSS
+        ];
+        for ((stage, current_wave), expected) in cases {
+            let w = RogueliteWave {
+                stage,
+                current_wave,
+                ..Default::default()
+            };
+            assert_eq!(w.round(3), expected, "arène {stage}, vague {current_wave}");
+        }
+    }
+
+    /// Le round est un COMBAT, l'arène en contient plusieurs. Les confondre
+    /// faisait afficher « ROUND 1 / 10 » trois fois de suite et montrer la menace
+    /// par bonds de trois.
+    #[test]
+    fn the_round_is_not_the_arena() {
+        let w = RogueliteWave {
+            stage: 2,
+            current_wave: 2,
+            ..Default::default()
+        };
+        assert_eq!(w.round(3), 8);
+        assert_ne!(w.round(3), u32::from(w.stage), "round ≠ index d'arène");
+        // Un seul combat par arène : les deux coïncident, et c'est le seul cas.
+        assert_eq!(
+            RogueliteWave {
+                stage: 5,
+                current_wave: 1,
+                ..Default::default()
+            }
+            .round(1),
+            6
+        );
+    }
+
+    /// `waves_per_stage = 0` serait une division par zéro dans la dérivation.
+    #[test]
+    fn a_zero_wave_arena_is_treated_as_one() {
+        let w = RogueliteWave {
+            stage: 3,
+            current_wave: 1,
+            ..Default::default()
+        };
+        assert_eq!(w.round(0), w.round(1));
+    }
+
+    /// Le boss occupe sa propre arène, juste après les rounds de combat.
+    #[test]
+    fn the_boss_gets_its_own_arena_after_the_combat_rounds() {
+        // La configuration livrée : 10 rounds, 3 par arène.
+        assert_eq!(boss_arena_for(10, 3), 3);
+        // …et le round de cette arène EST le dernier du chapitre.
+        let boss = RogueliteWave {
+            stage: boss_arena_for(10, 3),
+            current_wave: 1,
+            ..Default::default()
+        };
+        assert_eq!(boss.round(3), 10);
+    }
+
+    /// La dérivation ne doit pas se casser sur les configurations voisines : c'est
+    /// un gène, quelqu'un le changera.
+    #[test]
+    fn the_boss_arena_holds_for_other_chapter_shapes() {
+        assert_eq!(boss_arena_for(10, 1), 9, "1 combat par arène → 9 arènes puis le boss");
+        assert_eq!(boss_arena_for(4, 3), 1, "3 combats puis le boss");
+        assert_eq!(boss_arena_for(1, 3), 0, "chapitre réduit au boss");
+        assert_eq!(boss_arena_for(0, 3), 0, "pas de round de combat");
+        assert_eq!(boss_arena_for(11, 3), 4, "10 rounds de combat → 4 arènes");
+    }
+
+    /// **LE test qui interdit un sixième dédoublement du concept « round ».**
+    ///
+    /// Cinq consommateurs ont lu `wave.stage` en croyant lire un round, et chacun
+    /// a été trouvé séparément, en jeu, après coup :
+    ///
+    /// | # | Consommateur | Ce que le défaut produisait |
+    /// |---|---|---|
+    /// | 1 | compteur du HUD | « ROUND 1 / 10 » pendant trois combats |
+    /// | 2 | paliers / répit | la marche ne tombait pas où l'écran l'annonçait |
+    /// | 3 | montée de menace | la difficulté montait par bonds de trois |
+    /// | 4 | menace AFFICHÉE | l'écran annonçait ×1,0 pendant qu'on encaissait ×1,6 |
+    /// | 5 | chrono de rythme | 114 s d'arène comparées à 90 s de budget de COMBAT |
+    ///
+    /// Le cinquième a produit un « TU DÉCROCHES » à un joueur qui était à 40 % du
+    /// budget. C'est la classe entière qui est en cause, pas les occurrences :
+    /// tant qu'une grandeur a deux définitions, on en trouvera une sixième.
+    ///
+    /// Ce test fixe la seule définition. Toute nouvelle lecture doit lui répondre.
+    #[test]
+    fn the_round_has_exactly_one_definition() {
+        let wps = 3u8;
+        // La table de vérité, arène par arène. Aucune autre formule n'a le droit
+        // de produire ces nombres.
+        for stage in 0u8..4 {
+            for wave_idx in 1u8..=wps {
+                let w = RogueliteWave {
+                    stage,
+                    current_wave: wave_idx,
+                    ..Default::default()
+                };
+                let attendu = u32::from(stage) * u32::from(wps) + u32::from(wave_idx);
+                assert_eq!(w.round(wps), attendu, "arène {stage}, combat {wave_idx}");
+                // L'erreur commise cinq fois : prendre l'arène pour le round.
+                if stage > 0 || wave_idx > 1 {
+                    assert_ne!(
+                        w.round(wps),
+                        u32::from(stage),
+                        "arène {stage} confondue avec un round — c'est le défaut de 2026-08-04"
+                    );
+                }
+            }
+        }
+        // Un round est 1-basé : personne n'a jamais joué un « round 0 ».
+        assert_eq!(RogueliteWave::default().round(wps), 1);
+    }
+
+    /// Le boss se bat au round 10, pas au round 12 (2026-08-04, observé en jeu).
+    ///
+    /// `current_wave` est surchargé dans l'arène du boss : il y porte
+    /// `BOSS_WAVE_COMPOSITION` (= 3), une COMPOSITION, pas un indice de combat.
+    /// Lu comme un indice, il donnait `3×3 + 3 = 12` — et la menace appliquée
+    /// aux ennemis passait de ×6,91 à ×9,29. Le combat de boss tournait **35 %
+    /// trop dur**, sans que le HUD le montre (son compteur est clampé au total).
+    #[test]
+    fn the_boss_fights_on_the_last_round_not_past_it() {
+        let boss = RogueliteWave {
+            stage: boss_arena_for(10, 3),
+            current_wave: BOSS_WAVE_COMPOSITION,
+            is_boss_arena: true,
+            ..Default::default()
+        };
+        assert_eq!(boss.round(3), 10, "le boss ferme le chapitre, il ne le dépasse pas");
+
+        // Sans le drapeau, on retombe sur le défaut : la preuve que c'est bien
+        // lui qui sépare « composition » de « indice de combat ».
+        let sans_drapeau = RogueliteWave {
+            is_boss_arena: false,
+            ..boss
+        };
+        assert_eq!(sans_drapeau.round(3), 12, "c'est exactement le défaut observé");
+    }
+
+    /// Et l'arène du boss se marque toute seule en y entrant — personne n'a à
+    /// penser à poser le drapeau.
+    #[test]
+    fn entering_the_boss_arena_marks_it() {
+        let mut w = RogueliteWave::default();
+        advance_to_room(&mut w, 3, true, None, 0);
+        assert!(w.is_boss_arena);
+        assert_eq!(w.round(3), 10);
+        // Et une arène ordinaire ne se marque pas.
+        advance_to_room(&mut w, 1, false, None, 0);
+        assert!(!w.is_boss_arena);
+        assert_eq!(w.round(3), 4);
+    }
+
+    /// Une arène ne se quitte pas toute seule (2026-08-04).
+    ///
+    /// Le minuteur reste la fenêtre de prep ENTRE deux combats d'une même arène ;
+    /// changer de pièce attend le joueur. Ce test fixe la frontière entre les deux
+    /// — c'est elle qui décide si la run avance sur un compte à rebours ou sur une
+    /// décision.
+    #[test]
+    fn the_last_fight_of_an_arena_waits_for_the_player() {
+        let wps = 3u8;
+        // Combats 1 et 2 : ce n'est pas encore une sortie d'arène.
+        for wave in 1u8..wps {
+            let w = RogueliteWave {
+                current_wave: wave,
+                ..Default::default()
+            };
+            assert!(
+                w.current_wave < wps,
+                "combat {wave} : le minuteur enchaîne, on reste dans la pièce"
+            );
+        }
+        // Dernier combat de l'arène : c'est une PORTE.
+        let w = RogueliteWave {
+            current_wave: wps,
+            ..Default::default()
+        };
+        assert!(
+            w.current_wave >= wps,
+            "dernier combat : la suite est un changement d'arène, donc un clic"
+        );
+    }
+
+    /// L'attente est un état LU par le HUD : sans ça, le joueur reste devant une
+    /// porte invisible et croit que la run a planté.
+    #[test]
+    fn waiting_at_the_door_is_observable() {
+        let w = RogueliteWave::default();
+        assert!(!w.awaiting_room_entry, "on ne naît pas devant une porte");
+        let waiting = RogueliteWave {
+            awaiting_room_entry: true,
+            ..Default::default()
+        };
+        assert!(waiting.awaiting_room_entry);
+    }
+
     #[test]
     fn wave_default_state() {
         let w = RogueliteWave::default();
@@ -956,6 +1395,8 @@ mod tests {
         // Story-677 — `WaveSpawnConfigs` porte désormais la config de boucle.
         app.insert_resource(crate::rounds::RoundsConfig::default());
         app.insert_resource(crate::decor::DecorObstacles::default());
+        // 2026-08-04 — les atouts « récolte » vivent dans le bundle de spawn.
+        app.insert_resource(forgia_combat::combat_mods::PlayerCombatMods::default());
         app.add_systems(Update, spawn_first_wave_for_qa);
 
         app.update();
@@ -1001,11 +1442,15 @@ mod tests {
         // Story-677 — `WaveSpawnConfigs` porte désormais la config de boucle.
         app.insert_resource(crate::rounds::RoundsConfig::default());
         app.insert_resource(crate::decor::DecorObstacles::default());
+        // 2026-08-04 — les atouts « récolte » vivent dans le bundle de spawn.
+        app.insert_resource(forgia_combat::combat_mods::PlayerCombatMods::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
         app.insert_resource(forgia_stage::graph::RunGraphConfig::default());
         app.insert_resource(NextState::<crate::run::RunState>::default());
         app.add_message::<OpenCoffreRequest>();
+        app.add_message::<EnterNextRoomRequest>();
+        app.add_message::<crate::run::EndRunEvent>();
         app.add_systems(Update, sys_wave_orchestrator);
 
         let bot = app.world_mut().spawn(ArenaBot::default()).id();
@@ -1052,8 +1497,19 @@ mod tests {
         // pas le plugin (donc pas `sys_init_wave_comp_genome`) : on pose le miroir.
         app.insert_resource(WaveCompConfig::default());
         // Story-677 — `WaveSpawnConfigs` porte désormais la config de boucle.
-        app.insert_resource(crate::rounds::RoundsConfig::default());
+        //
+        // Cette soak traverse 24 salles pour prouver l'ABSENCE DE FUITE sur une
+        // longue run : elle a besoin d'une boucle SANS fin. Depuis le 2026-08-04
+        // le défaut livré est un chapitre borné (`max_rounds = 10`) — la run
+        // s'arrêterait en Victoire au round 10 et le test accuserait la run
+        // d'être figée alors qu'elle est gagnée. On déclare le mode qu'on teste.
+        app.insert_resource(crate::rounds::RoundsConfig {
+            max_rounds: 0,
+            ..crate::rounds::RoundsConfig::default()
+        });
         app.insert_resource(crate::decor::DecorObstacles::default());
+        // 2026-08-04 — les atouts « récolte » vivent dans le bundle de spawn.
+        app.insert_resource(forgia_combat::combat_mods::PlayerCombatMods::default());
         app.insert_resource(RogueliteWave::default());
         app.insert_resource(crate::run::MetaSouls::default());
         app.insert_resource(forgia_stage::graph::RunGraphConfig {
@@ -1066,6 +1522,8 @@ mod tests {
         });
         app.insert_resource(NextState::<crate::run::RunState>::default());
         app.add_message::<OpenCoffreRequest>();
+        app.add_message::<EnterNextRoomRequest>();
+        app.add_message::<crate::run::EndRunEvent>();
         app.add_systems(Update, sys_wave_orchestrator);
         app.add_systems(Update, spawn_first_wave_for_qa);
 
@@ -1118,6 +1576,12 @@ mod tests {
                         .resource_mut::<RogueliteWave>()
                         .break_secs_left = 0.0;
                     app.update();
+                    // Une salle de repos est la dernière d'une arène comme une
+                    // autre : elle débouche sur une PORTE, pas sur un minuteur.
+                    if app.world().resource::<RogueliteWave>().awaiting_room_entry {
+                        app.world_mut().write_message(EnterNextRoomRequest);
+                        app.update();
+                    }
                 }
                 let after = app.world().resource::<RogueliteWave>().stage;
                 assert!(
@@ -1145,6 +1609,18 @@ mod tests {
                 .resource_mut::<RogueliteWave>()
                 .break_secs_left = 0.0;
             app.update();
+            // 2026-08-04 — le dernier combat d'une arène ne s'enchaîne PLUS tout
+            // seul : il attend que le joueur franchisse la porte. Cette soak joue
+            // donc le joueur, sinon elle reste plantée devant et accuse la run
+            // d'être figée alors qu'elle attend, correctement, une décision.
+            if app.world().resource::<RogueliteWave>().awaiting_room_entry {
+                app.world_mut().write_message(EnterNextRoomRequest);
+                app.update();
+                app.world_mut()
+                    .resource_mut::<RogueliteWave>()
+                    .break_secs_left = 0.0;
+                app.update();
+            }
 
             let scene_roots = app
                 .world_mut()
@@ -1172,5 +1648,135 @@ mod tests {
             advanced >= 4,
             "la run n'a avancé que de {advanced} salles en 24 itérations — quelque chose FIGE"
         );
+    }
+}
+
+// ─── Récolte : le gain d'Âmes des atouts (2026-08-04) ────────────────────────
+
+#[cfg(test)]
+mod recolte_tests {
+    use super::*;
+
+    /// Sans atout, le gain est exactement celui d'avant — la famille récolte ne
+    /// doit rien changer par sa seule existence.
+    #[test]
+    fn no_boon_means_the_bare_reward() {
+        assert_eq!(recolte(crate::run::SOULS_PER_WAVE, 1.0), crate::run::SOULS_PER_WAVE);
+        assert_eq!(recolte(crate::run::SOULS_PER_BOSS, 1.0), crate::run::SOULS_PER_BOSS);
+    }
+
+    /// Un atout de récolte rapporte VRAIMENT plus.
+    #[test]
+    fn a_harvest_boon_actually_pays_more() {
+        assert_eq!(recolte(100, 1.20), 120);
+        assert_eq!(recolte(100, 1.55), 155);
+        // Le boss, qui vaut 25, passe à 30 avec +20 %.
+        assert_eq!(recolte(crate::run::SOULS_PER_BOSS, 1.20), 30);
+    }
+
+    /// **Un bonus ne peut être qu'un bonus.** Un multiplicateur dégénéré ne doit
+    /// jamais RETIRER au joueur ce qu'il aurait touché sans atout — c'est le
+    /// genre de régression qu'on ne voit qu'après des heures de jeu.
+    #[test]
+    fn a_degenerate_multiplier_never_takes_anything_away() {
+        for mul in [0.0, -5.0, 0.5, f32::NAN, f32::NEG_INFINITY] {
+            assert_eq!(recolte(25, mul), 25, "mul {mul}");
+        }
+    }
+
+    /// Petites récompenses : +20 % sur 5 Âmes doit arrondir à 6, pas retomber à 5
+    /// par troncature — sinon l'atout serait invisible sur les gains de vague.
+    #[test]
+    fn small_rewards_still_feel_the_boon() {
+        assert_eq!(recolte(5, 1.20), 6);
+        assert_eq!(recolte(5, 1.35), 7);
+    }
+}
+
+// ─── L'anneau d'apparition ne déborde plus l'enceinte (2026-08-04) ───────────
+
+#[cfg(test)]
+mod arena_clamp_tests {
+    use super::*;
+
+    /// Le défaut rapporté : collé au rempart, l'anneau du sniper (50 m) sort de
+    /// l'arène et le mob naît DERRIÈRE le mur.
+    #[test]
+    fn a_spawn_beyond_the_ramparts_is_pulled_back_inside() {
+        let arena = 80.0;
+        // Joueur collé au mur (x = 78), anneau sniper 50 m vers l'extérieur.
+        let voulu = Vec2::new(128.0, 0.0);
+        let pose = clamp_into_arena(voulu, arena, 0.4);
+        assert!(pose.length() <= arena, "dans l'enceinte : {}", pose.length());
+        assert!(pose.length() > 0.0, "et pas ramené au centre");
+    }
+
+    /// La DIRECTION est conservée : l'ennemi arrive d'où l'anneau le voulait,
+    /// simplement plus près. Le ramener au centre le ferait surgir dans le dos.
+    #[test]
+    fn the_direction_is_preserved_only_the_distance_shrinks() {
+        let voulu = Vec2::new(60.0, 60.0);
+        let pose = clamp_into_arena(voulu, 50.0, 0.4);
+        let a = voulu.normalize();
+        let b = pose.normalize();
+        assert!((a.x - b.x).abs() < 1e-4 && (a.y - b.y).abs() < 1e-4, "{a:?} vs {b:?}");
+    }
+
+    /// Un point DÉJÀ dedans n'est pas touché : la borne ne doit pas resserrer
+    /// l'anneau en temps normal, seulement l'empêcher de sortir.
+    #[test]
+    fn a_spawn_already_inside_is_left_alone() {
+        let p = Vec2::new(10.0, -5.0);
+        assert_eq!(clamp_into_arena(p, 80.0, 0.4), p);
+    }
+
+    /// Le RAYON du corps compte : un bot doit tenir entièrement dedans, pas
+    /// affleurer le mur. Ignorer le rayon était le défaut d'origine de
+    /// `spawn-clearance`.
+    #[test]
+    fn the_body_radius_is_part_of_the_bound() {
+        let gros = clamp_into_arena(Vec2::new(200.0, 0.0), 50.0, 5.0);
+        let petit = clamp_into_arena(Vec2::new(200.0, 0.0), 50.0, 0.4);
+        assert!(gros.length() < petit.length(), "le gros s'arrête plus tôt");
+        assert!(gros.length() <= 45.0 + 1e-3);
+    }
+
+    /// Enceinte inconnue (arène pas encore bâtie) → aucune borne. Le
+    /// comportement d'avant, exactement — jamais un spawn au centre par défaut.
+    #[test]
+    fn an_unknown_arena_never_moves_anything() {
+        let p = Vec2::new(999.0, -999.0);
+        assert_eq!(clamp_into_arena(p, 0.0, 0.4), p);
+    }
+}
+
+#[cfg(test)]
+mod arena_hex_tests {
+    use super::*;
+
+    /// Le défaut RESTANT après le premier correctif : borner au cercle
+    /// circonscrit laisse une couronne où l'on naît derrière le mur.
+    ///
+    /// Remparts hexagonaux inscrits → les murs sont à l'APOTHÈME (0,866 R), pas
+    /// au rayon. Un point à 0,95 R en face d'une arête est dehors.
+    #[test]
+    fn the_ring_stops_at_the_wall_not_at_the_circumscribed_circle() {
+        let r = 80.0;
+        let apotheme = r * forgia_stage::layout::HEX_INSCRIBED_RATIO;
+        let dans_la_couronne = Vec2::new(r * 0.95, 0.0);
+        let pose = clamp_into_arena(dans_la_couronne, r, 0.4);
+        assert!(
+            pose.length() <= apotheme,
+            "posé à {} alors que le mur est à {apotheme}",
+            pose.length()
+        );
+    }
+
+    /// …et on ne resserre pas pour autant l'anneau en temps normal : un spawn
+    /// bien à l'intérieur reste intact.
+    #[test]
+    fn a_spawn_well_inside_is_still_untouched() {
+        let p = Vec2::new(20.0, 10.0);
+        assert_eq!(clamp_into_arena(p, 80.0, 0.4), p);
     }
 }

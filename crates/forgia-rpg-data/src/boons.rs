@@ -237,13 +237,49 @@ impl RarityWeights {
 
 /// TOML-loaded catalogue. Resource (init_resource → Default empty) AND Asset
 /// payload (Genome<BoonsCatalogue>). Synced when the asset reloads.
-#[derive(Resource, Default, Debug, Clone, Deserialize, TypePath)]
+#[derive(Resource, Debug, Clone, Deserialize, TypePath)]
 pub struct BoonsCatalogue {
     #[serde(default)]
     pub entries: Vec<BoonDef>,
     /// Poids de tirage par rareté (R3.4) — `#[serde(default)]` backward-compat.
     #[serde(default)]
     pub rarity_weights: RarityWeights,
+    /// 2026-08-04 — **le sac**. Nombre d'atouts DISTINCTS portables.
+    ///
+    /// C'est la leçon de Dicero, et c'est la seule chose qui transforme le Coffre
+    /// en arbitrage : sans plafond, tout ajout est gratuit, donc tout choix est
+    /// bon, donc aucun choix n'est intéressant.
+    ///
+    /// ⚠️ Le plafond porte sur les atouts **distincts**, pas sur le nombre de
+    /// prises. Un doublon AMÉLIORE ce qu'on porte déjà et ne consomme pas de
+    /// place — c'est ce qui empêche le pool de se diluer, et c'est pourquoi le
+    /// 8ᵉ coffre reste aussi intéressant que le 1ᵉʳ.
+    ///
+    /// `0` = illimité (comportement d'avant, pour désactiver la mécanique).
+    #[serde(default = "default_bag_slots")]
+    pub bag_slots: u32,
+}
+
+/// Miroir de `bag_slots` dans `roguelite_boons.toml`.
+///
+/// 6 places : assez pour composer une synergie (le seuil légendaire est à 3 tags
+/// identiques) sans que tout tienne dans le sac. Dicero plafonne à 5.
+fn default_bag_slots() -> u32 {
+    6
+}
+
+impl Default for BoonsCatalogue {
+    fn default() -> Self {
+        // MIROIR du génome, pas le `Default` du type. Le `derive(Default)` donnait
+        // `bag_slots: 0` (= sac illimité) alors que `roguelite_boons.toml` déclare
+        // 6 : un jeu lancé sans génome n'aurait PAS eu la même règle qu'un jeu
+        // lancé avec. Attrapé par `the_shipped_bag_can_hold_a_synergy`.
+        Self {
+            entries: Vec::new(),
+            rarity_weights: RarityWeights::default(),
+            bag_slots: default_bag_slots(),
+        }
+    }
 }
 
 impl BoonsCatalogue {
@@ -279,6 +315,51 @@ impl ActiveBoons {
 
     /// Add a boon to the active set. Recomputes tag counts and legendary
     /// unlocks against the supplied catalogue. Idempotent on legendary unlocks.
+    /// Atouts **distincts** portés — les doublons sont des niveaux, pas des places.
+    pub fn distinct_count(&self) -> usize {
+        let mut vus: Vec<&BoonId> = Vec::with_capacity(self.active.len());
+        for id in &self.active {
+            if !vus.contains(&id) {
+                vus.push(id);
+            }
+        }
+        vus.len()
+    }
+
+    /// Niveau d'un atout : 1 = porté une fois, 2 = amélioré une fois, etc.
+    pub fn level_of(&self, id: &BoonId) -> u32 {
+        self.active.iter().filter(|x| *x == id).count() as u32
+    }
+
+    /// Le sac accepte-t-il cet atout ?
+    ///
+    /// - **déjà porté** → toujours OUI : c'est une amélioration, pas une place
+    /// - **sac non plein** → OUI
+    /// - **sac plein** → NON
+    ///
+    /// `slots = 0` désactive le plafond (comportement d'avant le sac).
+    ///
+    /// PUR — testable sans App.
+    pub fn accepts(&self, id: &BoonId, slots: u32) -> bool {
+        if slots == 0 || self.active.contains(id) {
+            return true;
+        }
+        (self.distinct_count() as u32) < slots
+    }
+
+    /// Prend un atout **si le sac l'accepte**. Retourne `false` si refusé.
+    ///
+    /// C'est la porte d'entrée à utiliser : elle rend la règle du sac impossible
+    /// à contourner par oubli. [`apply`](Self::apply) reste le chemin sans
+    /// plafond, pour les appelants qui n'ont pas de notion de sac.
+    pub fn try_apply(&mut self, def: &BoonDef, catalogue: &BoonsCatalogue, slots: u32) -> bool {
+        if !self.accepts(&def.id, slots) {
+            return false;
+        }
+        self.apply(def, catalogue);
+        true
+    }
+
     pub fn apply(&mut self, def: &BoonDef, catalogue: &BoonsCatalogue) {
         self.active.push(def.id.clone());
         for tag in &def.tags {
@@ -447,6 +528,11 @@ pub fn roll_candidates_weighted(
     let mut pool: Vec<&BoonDef> = eligible_pool(catalogue, active, tiers)
         .into_iter()
         .filter(|b| w.weight(b.rarity) > 0)
+        // 2026-08-04 — LE SAC. Quand il est plein, le Coffre ne propose plus que
+        // ce qu'on porte DÉJÀ : le choix devient « lequel j'améliore » au lieu de
+        // « qu'est-ce que j'ajoute ». Proposer une carte que le sac refuserait
+        // serait pire qu'inutile — le joueur la paierait sans rien recevoir.
+        .filter(|b| active.accepts(&b.id, catalogue.bag_slots))
         .collect();
     let mut out: Vec<BoonId> = Vec::with_capacity(count);
     while out.len() < count && !pool.is_empty() {
@@ -730,6 +816,8 @@ mod tests {
     fn ac5_three_identical_tags_unlock_legendary() {
         let legendary = def("legend_fire", BoonRarity::Legendary, &[BoonTag::Fire]);
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![legendary.clone()],
         };
@@ -751,6 +839,8 @@ mod tests {
     fn legendary_unlock_is_idempotent() {
         let legendary = def("legend_chaos", BoonRarity::Legendary, &[BoonTag::Chaos]);
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![legendary],
         };
@@ -771,6 +861,8 @@ mod tests {
         let legendary_fire = def("lf", BoonRarity::Legendary, &[BoonTag::Fire]);
         let legendary_chaos = def("lc", BoonRarity::Legendary, &[BoonTag::Chaos]);
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![legendary_fire, legendary_chaos],
         };
@@ -852,6 +944,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
         // Pool : c1 (common, poids 100) puis r1 (rare, poids 18). Total 118.
         // roll < 100 → c1 ; 100 ≤ roll < 118 → r1 (marche cumulative).
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
@@ -869,6 +963,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
     #[test]
     fn weighted_roll_zero_weight_excludes_rarity() {
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights { legendary: 0, ..Default::default() },
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
@@ -891,6 +987,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
         let w = RarityWeights::default();
         assert!(w.common > w.uncommon && w.uncommon > w.rare && w.rare > w.legendary);
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: w,
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
@@ -907,6 +1005,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
     #[test]
     fn roll_excludes_locked_legendaries() {
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
@@ -927,6 +1027,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
     fn roll_includes_unlocked_legendaries() {
         let leg = def("l1", BoonRarity::Legendary, &[BoonTag::Fire]);
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
@@ -946,6 +1048,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
     #[test]
     fn roll_no_duplicates() {
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("a", BoonRarity::Common, &[]),
@@ -965,6 +1069,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
     #[test]
     fn roll_returns_short_when_pool_smaller() {
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![def("only", BoonRarity::Common, &[])],
         };
@@ -985,6 +1091,8 @@ effect = { kind = "damage_mul", factor = 1.15 }
     fn roll_tier_gate_excludes_locked_tiers() {
         // Story-616 — gating méta des paliers (Common toujours, autres déblocables).
         let cat = BoonsCatalogue {
+            // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
+            bag_slots: 0,
             rarity_weights: RarityWeights::default(),
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
@@ -1319,5 +1427,121 @@ mod catalogue_shape_tests {
                 LEGENDARY_TAG_THRESHOLD
             );
         }
+    }
+}
+
+// ─── Le sac : la leçon de Dicero (2026-08-04) ────────────────────────────────
+
+#[cfg(test)]
+mod bag_tests {
+    use super::*;
+
+    fn def(id: &str, tags: &[BoonTag]) -> BoonDef {
+        BoonDef {
+            id: BoonId(id.into()),
+            name: id.into(),
+            voiceline_preview: String::new(),
+            effect: BoonEffectKind::DamageMul { factor: 1.1 },
+            tags: tags.to_vec(),
+            rarity: BoonRarity::Common,
+            weapon_filter: None,
+            souls_cost: None,
+        }
+    }
+
+    fn cat_with(entries: Vec<BoonDef>, slots: u32) -> BoonsCatalogue {
+        BoonsCatalogue { entries, rarity_weights: RarityWeights::default(), bag_slots: slots }
+    }
+
+    /// **LE test du sac.** Une fois plein, on n'ajoute plus rien de NOUVEAU —
+    /// c'est ce qui transforme le Coffre en arbitrage. Sans plafond, tout ajout
+    /// est gratuit, donc tout choix est bon, donc aucun choix n'est intéressant.
+    #[test]
+    fn a_full_bag_refuses_a_new_boon() {
+        let slots = 3;
+        let cat = cat_with(vec![], slots);
+        let mut a = ActiveBoons::default();
+        for i in 0..slots {
+            assert!(a.try_apply(&def(&format!("b{i}"), &[]), &cat, slots), "place {i}");
+        }
+        assert_eq!(a.distinct_count(), slots as usize);
+        assert!(!a.try_apply(&def("de_trop", &[]), &cat, slots), "le sac est plein");
+        assert_eq!(a.distinct_count(), slots as usize, "et rien n'a été ajouté");
+    }
+
+    /// Un DOUBLON améliore : il passe toujours, même sac plein, et ne consomme
+    /// pas de place. C'est ce qui empêche le pool de se diluer — le 8ᵉ coffre
+    /// reste aussi intéressant que le 1ᵉʳ.
+    #[test]
+    fn a_duplicate_upgrades_and_never_costs_a_slot() {
+        let slots = 2;
+        let cat = cat_with(vec![], slots);
+        let mut a = ActiveBoons::default();
+        a.try_apply(&def("x", &[]), &cat, slots);
+        a.try_apply(&def("y", &[]), &cat, slots);
+        assert!(!a.accepts(&BoonId("z".into()), slots), "plein pour du neuf");
+        // …mais pas pour ce qu'on porte déjà.
+        assert!(a.try_apply(&def("x", &[]), &cat, slots));
+        assert!(a.try_apply(&def("x", &[]), &cat, slots));
+        assert_eq!(a.level_of(&BoonId("x".into())), 3, "niveau 3");
+        assert_eq!(a.distinct_count(), 2, "toujours 2 places occupées");
+    }
+
+    /// Le Coffre ne doit JAMAIS proposer ce que le sac refuserait : le joueur
+    /// paierait une carte sans rien recevoir.
+    #[test]
+    fn a_full_bag_is_only_offered_what_it_already_carries() {
+        let slots = 2;
+        let cat = cat_with(
+            vec![def("porte_a", &[]), def("porte_b", &[]), def("inconnu", &[])],
+            slots,
+        );
+        let mut a = ActiveBoons::default();
+        a.try_apply(&def("porte_a", &[]), &cat, slots);
+        a.try_apply(&def("porte_b", &[]), &cat, slots);
+        let tirage = roll_candidates_weighted(&cat, &a, &UnlockedBoonTiers::all(), 3, |n| n - 1);
+        assert!(!tirage.is_empty(), "le Coffre propose encore quelque chose");
+        for id in &tirage {
+            assert!(
+                a.accepts(id, slots),
+                "« {} » serait refusé par le sac et n'a rien à faire dans le tirage",
+                id.0
+            );
+        }
+    }
+
+    /// Les doublons font toujours progresser la SYNERGIE : améliorer un atout
+    /// « feu » rapproche du légendaire feu, sinon remplir son sac fermerait la
+    /// seule voie horizontale du jeu.
+    #[test]
+    fn upgrading_still_feeds_the_synergy() {
+        let slots = 1;
+        let cat = cat_with(vec![], slots);
+        let mut a = ActiveBoons::default();
+        for _ in 0..LEGENDARY_TAG_THRESHOLD {
+            a.try_apply(&def("braise", &[BoonTag::Fire]), &cat, slots);
+        }
+        assert_eq!(a.tag_count(&BoonTag::Fire), LEGENDARY_TAG_THRESHOLD);
+        assert_eq!(a.distinct_count(), 1, "un seul atout, mais niveau 3");
+    }
+
+    /// `bag_slots = 0` rend le comportement d'avant, exactement : c'est la porte
+    /// de sortie si la mécanique déplaît en playtest.
+    #[test]
+    fn zero_slots_restores_the_previous_behaviour() {
+        let cat = cat_with(vec![], 0);
+        let mut a = ActiveBoons::default();
+        for i in 0..50 {
+            assert!(a.try_apply(&def(&format!("b{i}"), &[]), &cat, 0));
+        }
+        assert_eq!(a.distinct_count(), 50);
+    }
+
+    /// Le génome livré déclare bien un sac, et il est assez grand pour qu'une
+    /// synergie (3 tags identiques) soit composable sans le remplir entièrement.
+    #[test]
+    fn the_shipped_bag_can_hold_a_synergy() {
+        let cat = BoonsCatalogue::default();
+        assert!(cat.bag_slots >= LEGENDARY_TAG_THRESHOLD, "{}", cat.bag_slots);
     }
 }

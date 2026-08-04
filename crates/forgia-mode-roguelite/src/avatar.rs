@@ -185,8 +185,8 @@ pub struct AvatarBody;
 /// à la frame de leur spawn, et rien ne garantit que le corps arrive en premier.
 fn sys_share_body_skeleton(
     mut commands: Commands,
-    q_body: Query<Entity, With<AvatarBody>>,
-    q_pieces: Query<Entity, With<AvatarNeedsSkeletonShare>>,
+    q_body: Query<(Entity, &ChildOf), With<AvatarBody>>,
+    q_pieces: Query<(Entity, &ChildOf), With<AvatarNeedsSkeletonShare>>,
     q_children: Query<&Children>,
     q_name: Query<&Name>,
     mut q_skin: Query<&mut SkinnedMesh>,
@@ -194,28 +194,46 @@ fn sys_share_body_skeleton(
     if q_pieces.is_empty() {
         return;
     }
-    // Os du corps indexés par nom, pris depuis SON maillage skinné : c'est la
+    // 🚨 Chaque pièce se branche sur le corps de SON avatar, apparié par parent
+    // commun. Deux avatars peuvent vivre en même temps — l'aperçu du menu et
+    // celui du Hall — et prendre « le premier corps venu » branchait les pièces
+    // de l'un sur le squelette de l'autre : l'armure restait plantée pendant que
+    // le personnage tournait. Un simple garde ne suffisait pas non plus, il
+    // affamait le second avatar, dont les pièces n'auraient jamais trouvé leur
+    // tour. C'est l'appariement qui doit être juste, pas le filtrage.
+    let bodies: HashMap<Entity, Entity> = q_body.iter().map(|(e, p)| (p.parent(), e)).collect();
+    if bodies.is_empty() {
+        return;
+    }
+    // Os indexés par nom, pris depuis le maillage skinné du corps : c'est la
     // seule liste dont on soit sûr qu'elle contienne les joints, et eux seuls.
-    let Some(body) = q_body.iter().next() else {
-        return;
-    };
-    let mut body_bones: HashMap<String, Entity> = HashMap::default();
-    for d in q_children.iter_descendants(body) {
-        let Ok(skin) = q_skin.get(d) else {
-            continue;
-        };
-        for joint in &skin.joints {
-            if let Ok(name) = q_name.get(*joint) {
-                body_bones.insert(name.to_string(), *joint);
-            }
-        }
-        break;
-    }
-    if body_bones.is_empty() {
-        return;
-    }
+    // Le cache évite de la reconstruire pour chaque pièce du même avatar.
+    let mut bones_of: HashMap<Entity, HashMap<String, Entity>> = HashMap::default();
 
-    for piece in &q_pieces {
+    for (piece, piece_parent) in &q_pieces {
+        let Some(&body) = bodies.get(&piece_parent.parent()) else {
+            continue; // son corps n'est pas encore là — on repassera
+        };
+        if !bones_of.contains_key(&body) {
+            let mut map: HashMap<String, Entity> = HashMap::default();
+            for d in q_children.iter_descendants(body) {
+                let Ok(skin) = q_skin.get(d) else {
+                    continue;
+                };
+                for joint in &skin.joints {
+                    if let Ok(name) = q_name.get(*joint) {
+                        map.insert(name.to_string(), *joint);
+                    }
+                }
+                break;
+            }
+            bones_of.insert(body, map);
+        }
+        let body_bones = &bones_of[&body];
+        if body_bones.is_empty() {
+            continue; // scène du corps pas encore peuplée
+        }
+
         let mut found = None;
         for d in q_children.iter_descendants(piece) {
             if let Ok(skin) = q_skin.get(d) {

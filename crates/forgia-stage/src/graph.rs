@@ -252,7 +252,10 @@ impl Default for RunGraphConfig {
             branching: 2,
             director_credits_base: 2.0,
             director_credits_stage_mult: 1.25,
-            waves_per_stage: 2,
+            // 3 combats par arène (2026-08-04) : un chapitre de 10 rounds tient
+            // alors en 4 arènes — le décor change aux rounds 3, 6 et 9, pile là
+            // où tombent les paliers de difficulté. Le joueur VOIT la marche.
+            waves_per_stage: 3,
         }
     }
 }

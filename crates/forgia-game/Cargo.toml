@@ -20,6 +20,9 @@ profile-tracy = ["bevy/trace_tracy"]
 # Inclut les spans Tracy et profile chaque allocation système. Diagnostic
 # ponctuel uniquement : ne pas l'utiliser pour statuer sur les FPS de ship.
 profile-tracy-memory = ["bevy/trace_tracy_memory"]
+# Inspection runtime par agent via le Bevy Remote Protocol. Strictement opt-in :
+# aucun serveur HTTP n'est compilé ni ouvert dans un lancement normal.
+dev-brp = ["bevy/bevy_remote"]
 
 [dependencies]
 bevy = { workspace = true }

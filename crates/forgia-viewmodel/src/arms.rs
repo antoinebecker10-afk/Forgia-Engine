@@ -126,6 +126,20 @@ pub struct ArmGlbMaterial(pub Handle<StandardMaterial>);
 /// matériau du GLB (l'asset est PARTAGÉ entre les 2 mains — muter l'original
 /// teinterait tout usage du GLB) puis applique la cosmétique courante.
 /// Event-driven : zéro coût par-frame (pas de scan global des matériaux).
+/// Distingue les plaques d'armure de la combinaison, **par la texture** et non
+/// par l'ordre des matériaux.
+///
+/// L'ordre des primitives d'un glTF n'est garanti par rien : s'y fier ferait
+/// intervertir les deux teintes au prochain ré-export, en silence. Le nom du
+/// fichier d'albédo, lui, porte le sens.
+fn is_armor_material(m: &StandardMaterial) -> bool {
+    m.base_color_texture
+        .as_ref()
+        .and_then(|h| h.path())
+        .map(|p| p.path().to_string_lossy().contains("_armor_"))
+        .unwrap_or(false)
+}
+
 pub fn on_arm_scene_ready(
     event: On<SceneInstanceReady>,
     children: Query<&Children>,
@@ -142,11 +156,20 @@ pub fn on_arm_scene_ready(
         let Some(mut m) = materials.get(&mat_handle.0).cloned() else {
             continue; // matériau pas encore chargé — laisser l'original
         };
-        apply_arm_style_glb(&mut m, cosmetics.color, cosmetics.style);
+        // Deux couches : les PLAQUES prennent la rareté, la combinaison prend la
+        // couleur d'identité. Le bras du Trooper porte les deux matériaux.
+        if is_armor_material(&m) {
+            m.base_color = Color::srgb(
+                cosmetics.armor_rgb[0],
+                cosmetics.armor_rgb[1],
+                cosmetics.armor_rgb[2],
+            );
+        } else {
+            apply_arm_style_glb(&mut m, cosmetics.color, cosmetics.style);
+        }
         let h = materials.add(m);
         commands.entity(desc).insert(MeshMaterial3d(h.clone()));
-        // GLB bras mono-matériau → 1 handle par main suffit.
-        commands.entity(root).insert(ArmGlbMaterial(h));
+        commands.entity(desc).insert(ArmGlbMaterial(h));
     }
 }
 
@@ -172,7 +195,17 @@ pub fn sync_arm_cosmetics(
     }
     for h in &q_glb {
         if let Some(m) = materials.get_mut(&h.0) {
-            apply_arm_style_glb(m, cosmetics.color, cosmetics.style);
+            // Même partage qu'au scene-ready : plaques ← rareté, combinaison ←
+            // couleur d'identité. Les deux doivent suivre un changement live.
+            if is_armor_material(m) {
+                m.base_color = Color::srgb(
+                    cosmetics.armor_rgb[0],
+                    cosmetics.armor_rgb[1],
+                    cosmetics.armor_rgb[2],
+                );
+            } else {
+                apply_arm_style_glb(m, cosmetics.color, cosmetics.style);
+            }
         }
     }
 }

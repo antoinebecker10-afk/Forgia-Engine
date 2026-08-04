@@ -40,7 +40,7 @@
 //!   extérieur reste ouvert. C'est la forme Gunfire — une structure bâtie dans
 //!   un espace plus large — et ça préserve les anneaux d'apparition existants.
 
-use bevy::prelude::Vec3;
+use bevy::prelude::{Resource, Vec3};
 
 pub(crate) const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_rooms.toml";
 use serde::Deserialize;
@@ -199,6 +199,17 @@ pub struct WallSeg {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RoomPlan {
     pub walls: Vec<WallSeg>,
+    /// 2026-08-04 — **centres des portes** (x, z), au sol.
+    ///
+    /// L'information existait déjà — un mur troué EST une porte, et son centre
+    /// est le point qu'on lui passe — mais elle était jetée aussitôt calculée.
+    /// Publiée, elle permet au décor de ne rien semer en travers du passage :
+    /// « des props dans un couloir », rapporté en jeu le 2026-08-04.
+    ///
+    /// Contient les portes intérieures (entre pièces) ET les quatre entrées du
+    /// complexe : boucher une entrée coupe le complexe de l'anneau extérieur,
+    /// ce qui est pire encore.
+    pub doors: Vec<(f32, f32)>,
     /// Centre de chaque pièce (utile pour y placer du décor ou des arrivées).
     pub room_centers: Vec<(f32, f32)>,
     pub cell_m: f32,
@@ -294,6 +305,39 @@ fn pick_open_edges(n: u32, seed: u64, extra_loops: f32) -> Vec<Edge> {
 /// Le complexe est CENTRÉ sur l'origine et n'occupe que le milieu de l'arène :
 /// l'anneau extérieur reste ouvert. C'est la forme Gunfire (une structure bâtie
 /// dans un espace plus large) et ça préserve les anneaux d'apparition existants.
+/// Les PORTES du complexe, publiées pour ceux qui doivent les laisser libres.
+///
+/// Le semis de décor est le premier concerné : c'est en ignorant les passages
+/// qu'il en bouchait. Resource plutôt que plan complet — le décor n'a pas besoin
+/// de connaître les murs, seulement ce qu'il ne doit pas obstruer.
+///
+/// Vide (`centers` vide) sur un stage à agencement autoré : il n'y a pas de
+/// complexe procédural, donc pas de porte à protéger.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct RoomDoors {
+    /// Centres au sol (x, z).
+    pub centers: Vec<(f32, f32)>,
+    /// Rayon à garder libre autour de chaque centre.
+    ///
+    /// Demi-largeur de porte : un prop dont le CENTRE tombe hors de ce disque
+    /// peut encore déborder, d'où le rayon du prop ajouté à la comparaison côté
+    /// décor. Réserver plus serait dégager la pièce entière — l'erreur que
+    /// `spawn-clearance.md` documente comme « un invariant qui vide la scène ».
+    pub clearance_m: f32,
+}
+
+impl RoomDoors {
+    /// Un prop de rayon `prop_r` posé en `(x, z)` boucherait-il une porte ?
+    ///
+    /// PUR — testable sans App.
+    pub fn blocks_a_door(&self, x: f32, z: f32, prop_r: f32) -> bool {
+        let seuil = self.clearance_m + prop_r;
+        self.centers
+            .iter()
+            .any(|(dx, dz)| (x - dx).powi(2) + (z - dz).powi(2) < seuil * seuil)
+    }
+}
+
 pub fn plan_rooms(extent_m: f32, seed: u64, cfg: &RoomsConfig) -> RoomPlan {
     if !cfg.enabled || !cfg.fits_in(extent_m) {
         return RoomPlan::default();
@@ -308,8 +352,14 @@ pub fn plan_rooms(extent_m: f32, seed: u64, cfg: &RoomsConfig) -> RoomPlan {
     let is_open = |a: u32, b: u32| open.iter().any(|e| e.a == a.min(b) && e.b == a.max(b));
 
     let mut walls = Vec::new();
+    let mut doors: Vec<(f32, f32)> = Vec::new();
     // Un mur troué = deux tronçons de part et d'autre de la porte, centrée.
+    // Le centre du mur EST le centre de la porte : on l'enregistre là, à la
+    // source, plutôt que de le reconstruire ailleurs en devinant les trous.
     let mut push_wall = |cx: f32, cz: f32, len: f32, along_x: bool, holed: bool| {
+        if holed {
+            doors.push((cx, cz));
+        }
         if !holed {
             walls.push(WallSeg {
                 center_x: cx,
@@ -376,6 +426,7 @@ pub fn plan_rooms(extent_m: f32, seed: u64, cfg: &RoomsConfig) -> RoomPlan {
 
     RoomPlan {
         walls,
+        doors,
         room_centers,
         cell_m: cell,
         corridor_w_m: door,
@@ -682,5 +733,91 @@ corridor_modules = {requested}
         // Le complexe (36 m) doit laisser un anneau ouvert généreux dans une
         // arène de 80 m de rayon.
         assert!(c.complex_size_m() < 80.0, "le complexe mangerait toute l'arène");
+    }
+}
+
+// ─── Les portes publiées : de quoi ne plus les boucher (2026-08-04) ──────────
+
+#[cfg(test)]
+mod door_tests {
+    use super::*;
+
+    fn plan() -> RoomPlan {
+        plan_rooms(200.0, 42, &RoomsConfig::default())
+    }
+
+    /// Un complexe SANS porte est un complexe injouable : chaque pièce serait
+    /// close. Si ce test tombe à zéro, ce n'est pas « pas de porte », c'est un
+    /// capteur aveugle (`map-design-patterns.md` §13).
+    #[test]
+    fn a_complex_always_publishes_its_doors() {
+        let p = plan();
+        assert!(!p.walls.is_empty(), "le complexe existe");
+        assert!(
+            p.doors.len() >= 4,
+            "au moins les 4 entrées du complexe, trouvé {}",
+            p.doors.len()
+        );
+    }
+
+    /// Les portes tombent bien SUR les lignes de mur : une porte ailleurs serait
+    /// un trou dans le vide, et le décor protégerait la mauvaise zone.
+    #[test]
+    fn every_door_sits_on_a_wall_line() {
+        let p = plan();
+        let cfg = RoomsConfig::default();
+        let demi = cfg.complex_size_m() / 2.0;
+        for (x, z) in &p.doors {
+            assert!(
+                x.abs() <= demi + 0.01 && z.abs() <= demi + 0.01,
+                "porte hors du complexe : ({x}, {z})"
+            );
+        }
+    }
+
+    /// Un prop posé PILE sur une porte la bouche ; le même prop à l'écart ne la
+    /// bouche pas. C'est tout ce que le décor a besoin de savoir.
+    #[test]
+    fn a_prop_on_a_door_blocks_it_and_one_aside_does_not() {
+        let p = plan();
+        let d = RoomDoors {
+            centers: p.doors.clone(),
+            clearance_m: p.corridor_w_m * 0.5,
+        };
+        let (dx, dz) = d.centers[0];
+        assert!(d.blocks_a_door(dx, dz, 0.5), "pile dessus");
+        // Loin de TOUTES les portes — pas seulement de la première. Les portes
+        // sont espacées d'une cellule (~12 m) : se décaler d'une largeur de
+        // couloir pose simplement sur la voisine. C'est le complexe entier qu'il
+        // faut quitter pour être sûr, et c'est là que vivent la plupart des props
+        // (l'anneau extérieur).
+        let dehors = p.cell_m * 10.0;
+        assert!(
+            !d.blocks_a_door(dehors, dehors, 0.5),
+            "hors du complexe : aucune porte à boucher"
+        );
+    }
+
+    /// Le RAYON du prop compte : un gros prop bouche depuis plus loin qu'un petit.
+    /// Ignorer le rayon était le défaut d'origine de `spawn-clearance`.
+    #[test]
+    fn a_bigger_prop_blocks_from_further_away() {
+        let p = plan();
+        let d = RoomDoors {
+            centers: p.doors.clone(),
+            clearance_m: p.corridor_w_m * 0.5,
+        };
+        let (dx, dz) = d.centers[0];
+        let dist = d.clearance_m + 1.0;
+        assert!(!d.blocks_a_door(dx + dist, dz, 0.5), "petit prop : passe");
+        assert!(d.blocks_a_door(dx + dist, dz, 3.0), "gros prop : bouche");
+    }
+
+    /// Aucune porte déclarée (stage autoré) → rien n'est jamais bloqué. Le
+    /// comportement d'avant, exactement.
+    #[test]
+    fn no_doors_means_nothing_is_ever_blocked() {
+        let d = RoomDoors::default();
+        assert!(!d.blocks_a_door(0.0, 0.0, 99.0));
     }
 }

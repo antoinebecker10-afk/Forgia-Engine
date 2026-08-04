@@ -236,15 +236,24 @@ pub mod cosmetics {
     /// forgia-core (DAG-libre) pour éviter un cycle de dépendances.
     #[derive(Resource, Debug, Clone, Copy, PartialEq)]
     pub struct ArmCosmetics {
-        /// Teinte (sRGB) appliquée à la peau/aux gants.
+        /// Teinte (sRGB) appliquée à la peau / à la combinaison.
         pub color: [f32; 3],
         pub style: ArmStyle,
+        /// Teinte des PLAQUES d'armure — la rareté des gants équipés.
+        ///
+        /// Deux couches distinctes plutôt qu'une : la rareté doit se lire sur
+        /// l'armure sans effacer la couleur d'identité choisie au Forgeron. Le
+        /// personnage porte les deux, comme sur l'asset qui les sépare déjà en
+        /// deux jeux de matériaux. Blanc = aucune pièce équipée, donc aucune
+        /// teinte (le blanc est neutre : `base_color` multiplie l'albédo).
+        pub armor_rgb: [f32; 3],
     }
     impl Default for ArmCosmetics {
         fn default() -> Self {
             Self {
                 color: [0.93, 0.73, 0.57],
                 style: ArmStyle::Peau,
+                armor_rgb: [1.0, 1.0, 1.0],
             }
         }
     }

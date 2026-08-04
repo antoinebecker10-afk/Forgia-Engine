@@ -2,8 +2,8 @@
 //!
 //! Deux aperçus RTT indépendants, chacun sur son propre layer isolé :
 //! - **Arme** (onglet Armes) : le GLB d'arme sélectionné, tourne.
-//! - **Bras** (onglet Forgeron) : les 2 bras GLB du forgeron, teintés à la couleur/
-//!   style choisis (`ArmCosmetics`), tournent.
+//! - **Personnage** (onglet Forgeron) : le corps + les pièces portées, teintées
+//!   à leur rareté, tourne.
 //!
 //! Au menu-titre il n'y a pas de scène 3D (Camera2d + fond vidéo egui) : une
 //! Camera3d classique passerait derrière le fond opaque ou devant les panneaux.
@@ -18,7 +18,7 @@
 //! - clear **opaque** sombre ; lumière DÉDIÉE sur le layer.
 //!
 //! Cycle : spawn OnEnter(Menu), despawn OnExit(Menu). Swap arme sur
-//! `StartingWeaponChoice`, teinte bras sur `ArmCosmetics`.
+//! `StartingWeaponChoice`, reconstruction du personnage sur `EquipmentSave`.
 
 use bevy::camera::primitives::Aabb;
 use bevy::camera::visibility::RenderLayers;
@@ -29,15 +29,15 @@ use bevy::render::render_resource::{
 };
 use bevy_egui::{egui, EguiContexts, EguiTextureHandle};
 use forgia_assets::GameAssets;
-use forgia_core::prelude::{AppMode, ArmCosmetics, ArmStyle};
+use forgia_core::prelude::AppMode;
 use forgia_mode_roguelite::avatar::{equipped_key, spawn_equipped_avatar};
 use forgia_mode_roguelite::equipment::{EquipmentConfig, EquipmentSave};
 use forgia_mode_roguelite::weapon_select::StartingWeaponChoice;
 
 /// Layer de rendu de l'aperçu ARME (0 = monde, 1 = viewmodel FPS déjà pris).
 const WEAPON_LAYER: usize = 2;
-/// Layer de rendu de l'aperçu BRAS (isolé de l'arme → les 2 caméras ne se voient pas).
-const ARM_LAYER: usize = 3;
+// Le layer 3 était celui de l'aperçu des BRAS, retiré : l'aperçu du personnage
+// montre déjà les bras, et les deux se superposaient à l'origine.
 /// Layer de rendu de l'aperçu PERSONNAGE (équipement porté).
 const CHARACTER_LAYER: usize = 4;
 /// Côté de l'image RTT (px). Carré → viewport carré dans le panneau.
@@ -64,15 +64,6 @@ pub struct WeaponPreviewRtt {
     shown_idx: usize,
 }
 
-/// Ressource de l'aperçu BRAS : `TextureId` (affiché par `sys_menu_forgeron`) +
-/// conteneur des 2 bras (calibré ensemble).
-#[derive(Resource)]
-pub struct ArmPreviewRtt {
-    pub tex_id: egui::TextureId,
-    image: Handle<Image>,
-    arm_holder: Entity,
-}
-
 /// Marqueur des entités racines d'un aperçu (caméra / lumière / pivot) — despawn
 /// récursif au départ du menu (les scènes cascadent via le pivot).
 #[derive(Component)]
@@ -86,11 +77,6 @@ struct PreviewPivot;
 #[derive(Component)]
 struct NeedsPreviewCalibrate;
 
-/// Matériau CLONÉ d'un mesh de bras (l'asset GLB est partagé — muter l'original
-/// teinterait tout usage) → teinte/style live via `sys_retint_arm_materials`.
-#[derive(Component)]
-struct ArmPreviewMat(Handle<StandardMaterial>);
-
 /// Plugin : câble le cycle de vie des deux aperçus RTT sur `AppMode::Menu`.
 pub struct WeaponPreviewPlugin;
 
@@ -100,7 +86,6 @@ impl Plugin for WeaponPreviewPlugin {
             OnEnter(AppMode::Menu),
             (
                 sys_spawn_weapon_preview,
-                sys_spawn_arm_preview,
                 sys_spawn_character_preview,
             ),
         )
@@ -109,8 +94,6 @@ impl Plugin for WeaponPreviewPlugin {
             Update,
             (
                 sys_swap_weapon_preview,
-                sys_clone_arm_materials,
-                sys_retint_arm_materials,
                 // Reconstruire AVANT de propager les layers et de calibrer : les
                 // pièces qui viennent d'apparaître doivent être vues par la
                 // caméra dédiée et entrer dans le cadrage de la même passe.
@@ -268,151 +251,6 @@ fn sys_swap_weapon_preview(
     }
 }
 
-// ── Aperçu BRAS ──────────────────────────────────────────────────────────────
-
-/// OnEnter(Menu) — crée l'aperçu 3D des 2 bras du forgeron (layer ARM_LAYER),
-/// depuis les handles préchargés `GameAssets` (pas de `load()` ad-hoc / hardcode).
-fn sys_spawn_arm_preview(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    mut contexts: EguiContexts,
-    assets: Res<GameAssets>,
-    existing: Option<Res<ArmPreviewRtt>>,
-) {
-    if existing.is_some() {
-        return;
-    }
-    let (image, tex_id) = create_rtt_image(&mut images, &mut contexts, "arm_preview_rtt");
-    let layer = RenderLayers::layer(ARM_LAYER);
-    spawn_rtt_camera_light(&mut commands, &image, &layer, -2, "ArmPreviewCamera");
-
-    let pivot = commands
-        .spawn((
-            Transform::default(),
-            Visibility::Inherited,
-            PreviewPivot,
-            PreviewEntity,
-            Name::new("ArmPreviewPivot"),
-        ))
-        .id();
-    // Conteneur des 2 bras : calibré ENSEMBLE (AABB combinée) → tourne autour du
-    // centre du duo.
-    let arm_holder = commands
-        .spawn((
-            Transform::from_scale(Vec3::splat(0.001)),
-            Visibility::Inherited,
-            layer.clone(),
-            NeedsPreviewCalibrate,
-            Name::new("ArmPreviewHolder"),
-            ChildOf(pivot),
-        ))
-        .id();
-    for (handle, name) in [
-        (assets.viewmodel_arm_right.clone(), "ArmPreviewR"),
-        (assets.viewmodel_arm_left.clone(), "ArmPreviewL"),
-    ] {
-        commands.spawn((
-            SceneRoot(handle),
-            Transform::default(),
-            Visibility::Inherited,
-            layer.clone(),
-            Name::new(name),
-            ChildOf(arm_holder),
-        ));
-    }
-
-    commands.insert_resource(ArmPreviewRtt {
-        tex_id,
-        image,
-        arm_holder,
-    });
-    info!("[weapon-preview] aperçu 3D bras spawné (layer {ARM_LAYER})");
-}
-
-/// Clone (une fois par mesh) le matériau des bras + le teinte à la cosmétique
-/// courante. Cloner car l'asset GLB est partagé (miroir `arms::on_arm_scene_ready`).
-/// Réplique locale forcée : `arms.rs` est verrouillé (édition parallèle, bras Lenoir).
-fn sys_clone_arm_materials(
-    rtt: Option<Res<ArmPreviewRtt>>,
-    cosmetics: Res<ArmCosmetics>,
-    q_children: Query<&Children>,
-    q_mat: Query<&MeshMaterial3d<StandardMaterial>>,
-    q_cloned: Query<(), With<ArmPreviewMat>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut commands: Commands,
-) {
-    let Some(rtt) = rtt else {
-        return;
-    };
-    let mut stack = vec![rtt.arm_holder];
-    while let Some(e) = stack.pop() {
-        if q_cloned.get(e).is_err() {
-            if let Ok(mm) = q_mat.get(e) {
-                if let Some(src) = materials.get(&mm.0) {
-                    let mut clone = src.clone();
-                    apply_arm_style_glb(&mut clone, cosmetics.color, cosmetics.style);
-                    let handle = materials.add(clone);
-                    commands
-                        .entity(e)
-                        .insert((MeshMaterial3d(handle.clone()), ArmPreviewMat(handle)));
-                }
-            }
-        }
-        if let Ok(children) = q_children.get(e) {
-            stack.extend(children.iter());
-        }
-    }
-}
-
-/// Re-teinte les matériaux clonés des bras quand `ArmCosmetics` change (choix Forge).
-fn sys_retint_arm_materials(
-    cosmetics: Res<ArmCosmetics>,
-    q: Query<&ArmPreviewMat>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    if !cosmetics.is_changed() {
-        return;
-    }
-    for m in &q {
-        if let Some(mat) = materials.get_mut(&m.0) {
-            apply_arm_style_glb(mat, cosmetics.color, cosmetics.style);
-        }
-    }
-}
-
-/// Teinte GLB : la couleur devient une TEINTE normalisée (préserve la luminosité)
-/// + variations metallic/roughness/emissive par style. Réplique locale de
-///
-/// `forgia_viewmodel::arms::apply_arm_style_glb` (crate verrouillée, cf ci-dessus).
-fn apply_arm_style_glb(mat: &mut StandardMaterial, color: [f32; 3], style: ArmStyle) {
-    let [r, g, b] = color;
-    let max = r.max(g).max(b).max(1e-3);
-    let (tr, tg, tb) = (r / max, g / max, b / max);
-    match style {
-        ArmStyle::Peau => {
-            mat.base_color = Color::srgb(tr, tg, tb);
-            mat.metallic = 0.0;
-            mat.perceptual_roughness = 0.9;
-            mat.reflectance = 0.35;
-            mat.emissive = LinearRgba::BLACK;
-        }
-        ArmStyle::Gantelet => {
-            mat.base_color = Color::srgb(tr * 0.85, tg * 0.85, tb * 0.9);
-            mat.metallic = 0.85;
-            mat.perceptual_roughness = 0.38;
-            mat.reflectance = 0.6;
-            mat.emissive = LinearRgba::BLACK;
-        }
-        ArmStyle::Cyber => {
-            mat.base_color = Color::srgb(tr * 0.35, tg * 0.35, tb * 0.4);
-            mat.metallic = 0.4;
-            mat.perceptual_roughness = 0.3;
-            mat.reflectance = 0.5;
-            mat.emissive = LinearRgba::rgb(r * 1.4, g * 1.4, b * 1.4);
-        }
-    }
-}
-
 // ── Aperçu PERSONNAGE (équipement) ──────────────────────────────────────────
 //
 // Le pendant visuel du panneau ÉQUIPEMENT : on voit ce qu'on porte, et la pièce
@@ -526,7 +364,6 @@ fn sys_sync_character_pieces(
 /// `SceneRoot` GLB ne le fait pas en 0.18). Lit le layer porté par la racine.
 fn sys_propagate_preview_layers(
     weapon: Option<Res<WeaponPreviewRtt>>,
-    arm: Option<Res<ArmPreviewRtt>>,
     character: Option<Res<CharacterPreviewRtt>>,
     q_children: Query<&Children>,
     q_layers: Query<&RenderLayers>,
@@ -534,7 +371,6 @@ fn sys_propagate_preview_layers(
 ) {
     let roots = [
         weapon.as_ref().map(|w| w.scene_entity),
-        arm.as_ref().map(|a| a.arm_holder),
         character.as_ref().map(|c| c.holder),
     ];
     for root in roots.into_iter().flatten() {
@@ -591,16 +427,12 @@ fn sys_rotate_previews(time: Res<Time>, mut q: Query<&mut Transform, With<Previe
 fn sys_despawn_previews(
     mut commands: Commands,
     weapon: Option<Res<WeaponPreviewRtt>>,
-    arm: Option<Res<ArmPreviewRtt>>,
     character: Option<Res<CharacterPreviewRtt>>,
     q: Query<Entity, With<PreviewEntity>>,
     mut contexts: EguiContexts,
 ) {
     if let Some(w) = weapon.as_ref() {
         contexts.remove_image(w.image.id());
-    }
-    if let Some(a) = arm.as_ref() {
-        contexts.remove_image(a.image.id());
     }
     if let Some(c) = character.as_ref() {
         contexts.remove_image(c.image.id());
@@ -609,7 +441,6 @@ fn sys_despawn_previews(
         commands.entity(e).despawn();
     }
     commands.remove_resource::<WeaponPreviewRtt>();
-    commands.remove_resource::<ArmPreviewRtt>();
     commands.remove_resource::<CharacterPreviewRtt>();
 }
 

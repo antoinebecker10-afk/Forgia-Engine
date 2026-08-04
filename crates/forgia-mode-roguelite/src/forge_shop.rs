@@ -108,7 +108,7 @@ pub fn sys_forge_shop_cursor(
         blockers.block_look = false;
         blockers.block_fire = false;
         if let Ok(mut o) = q_cursor.single_mut() {
-            o.grab_mode = CursorGrabMode::Locked;
+            o.grab_mode = crate::FPS_GRAB_MODE;
             o.visible = false;
         }
         *was_open = false;

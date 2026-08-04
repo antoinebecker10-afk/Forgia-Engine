@@ -657,6 +657,16 @@ pub struct SpawnKeepout {
     /// une place libre DANS le décor (`clear_spawn_angle`), au lieu d'exiger que
     /// le décor leur cède la moitié de l'arène.
     pub player: (Vec2, f32),
+    /// 2026-08-04 — les PORTES du complexe de pièces.
+    ///
+    /// Le semis les ignorait complètement : `decor.rs` ne mentionnait ni pièce ni
+    /// couloir, et ce champ-ci se documentait comme « la SEULE zone interdite ».
+    /// Résultat rapporté en jeu : des props en travers des passages.
+    ///
+    /// On ne réserve QUE les portes, pas le complexe : dégager les pièces entières
+    /// coûterait 5,7 % de l'arène et les rendrait nues — l'erreur que
+    /// `spawn-clearance.md` documente comme « un invariant qui vide la scène ».
+    pub doors: forgia_stage::rooms::RoomDoors,
 }
 
 impl SpawnKeepout {
@@ -671,6 +681,22 @@ impl SpawnKeepout {
     pub fn around_player(decor: &RogueliteDecorConfig, player_pos: Vec2) -> Self {
         Self {
             player: (player_pos, decor.keepout_player_m.max(0.0)),
+            doors: forgia_stage::rooms::RoomDoors::default(),
+        }
+    }
+
+    /// Idem, plus les PORTES du complexe de pièces à laisser franchissables.
+    ///
+    /// Séparé de `around_player` pour que les appelants sans complexe (stages
+    /// autorés, tests) gardent le comportement d'avant sans rien passer.
+    pub fn around_player_and_doors(
+        decor: &RogueliteDecorConfig,
+        player_pos: Vec2,
+        doors: forgia_stage::rooms::RoomDoors,
+    ) -> Self {
+        Self {
+            player: (player_pos, decor.keepout_player_m.max(0.0)),
+            doors,
         }
     }
 
@@ -680,7 +706,11 @@ impl SpawnKeepout {
     /// yeux, et apparaître le nez dans un tonneau même traversable est exactement
     /// le symptôme rapporté. Le rayon du prop entre dans le test.
     pub fn blocks(&self, pos: Vec2, prop_radius: f32) -> bool {
-        pos.distance(self.player.0) < self.player.1 + prop_radius.max(0.0)
+        let r = prop_radius.max(0.0);
+        pos.distance(self.player.0) < self.player.1 + r
+            // Une porte bouchée coupe une pièce du reste du complexe : c'est pire
+            // qu'un prop mal placé, c'est un chemin qui disparaît.
+            || self.doors.blocks_a_door(pos.x, pos.y, r)
     }
 }
 
@@ -1085,6 +1115,12 @@ pub fn sys_reconcile_decor(
     // Story-671 — la DA de la salle : `stage_id` courant → palette → props.
     stage_request: Option<Res<forgia_stage::StageLoadRequest>>,
     palettes: Option<Res<crate::decor_palettes::DecorPalettesConfig>>,
+    // 2026-08-04 — le chapitre courant : c'est LUI qui porte la direction
+    // artistique du Livre. `Option` parce que ce système tourne aussi là où la
+    // notion de chapitre n'existe pas.
+    chapter: Option<Res<crate::meta_shop::SelectedChapter>>,
+    // 2026-08-04 — les portes du complexe, publiées par `forgia-stage`.
+    doors: Option<Res<forgia_stage::rooms::RoomDoors>>,
     // Story-672 — position RÉELLE du joueur (spawné par forgia-player) pour
     // dégager son disque d'apparition, et carte des obstacles pour les ennemis.
     q_player: Query<&Transform, With<forgia_player::Player>>,
@@ -1120,9 +1156,13 @@ pub fn sys_reconcile_decor(
         .as_ref()
         .map(|r| r.stage_id.clone())
         .unwrap_or_default();
+    // 2026-08-04 — c'est le CHAPITRE qui décide de l'habillage, la salle ne sert
+    // plus que de repli. Un chapitre garde sa direction artistique sur ses quatre
+    // arènes ; sans ça on retraversait quatre univers en dix rounds.
+    let chapitre = chapter.map(|c| c.0).unwrap_or(1);
     let palette_id = palettes
         .as_ref()
-        .map(|c| c.palette_id_for_stage(&stage_id).to_string())
+        .map(|c| c.palette_id_for(chapitre, &stage_id).to_string())
         .unwrap_or_else(|| crate::decor_palettes::FALLBACK_PALETTE.to_string());
 
     // Planifie tout (RNG only, pas d'instanciation) → le drain spawne par budget.
@@ -1131,7 +1171,13 @@ pub fn sys_reconcile_decor(
         .next()
         .map(|t| Vec2::new(t.translation.x, t.translation.z))
         .unwrap_or(Vec2::ZERO);
-    let keepout = SpawnKeepout::around_player(&cfg, player_pos);
+    // 2026-08-04 — le semis connaît enfin les portes. `Option` : un stage autoré
+    // n'a pas de complexe procédural, donc pas de porte à protéger.
+    let keepout = SpawnKeepout::around_player_and_doors(
+        &cfg,
+        player_pos,
+        doors.map(|d| d.clone()).unwrap_or_default(),
+    );
     let specs = plan_decor_set(&cfg, assets.for_palette(&palette_id), seed, &keepout);
     // Story-672 — publie les emprises SOLIDES avant toute instanciation : les
     // ennemis d'une vague apparaissent d'un coup, ils ne peuvent pas attendre que

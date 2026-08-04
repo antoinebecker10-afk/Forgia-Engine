@@ -105,12 +105,36 @@ pub struct RogueliteRunMarker;
 ///
 /// Le boss garde `crypts_of_anvil` : c'est la seule salle du génome avec
 /// `boss_pad_required = true`.
-pub fn stage_id_for_depth(depth: u8, is_boss: bool, run_seed: u64) -> &'static str {
+pub fn stage_id_for_depth(_depth: u8, is_boss: bool, run_seed: u64) -> &'static str {
     if is_boss {
         return BOSS_STAGE_ID;
     }
-    stage_sequence(run_seed, depth.saturating_add(1))
-        .get(depth as usize)
+    chapter_stage_id(run_seed)
+}
+
+/// La salle — donc la DIRECTION ARTISTIQUE — d'un CHAPITRE. Constante sur toute
+/// la run, tirée de la graine.
+///
+/// ## Renverse une décision de story-671 (2026-08-04)
+///
+/// Story-671 tirait une salle **différente par profondeur**, explicitement « pour
+/// que l'habillage change en même temps que la géométrie ». C'était juste quand
+/// une run était une poignée de salles. Depuis que le chapitre fait 4 arènes, ça
+/// faisait traverser **quatre directions artistiques en dix rounds** — et un
+/// univers qui change toutes les trois minutes n'est plus un univers.
+///
+/// La règle est maintenant l'inverse, et c'est la règle du jeu :
+/// **une DA par chapitre** ; ce sont la géométrie (grille de pièces regénérée) et
+/// le semis de props qui varient d'une arène à l'autre. Le changement de DA
+/// marque le passage au chapitre SUIVANT — il ne vaut que parce qu'il est rare.
+///
+/// Réutilise `stage_sequence` pour ne pas dupliquer le tirage seedé : un chapitre
+/// est simplement une séquence de longueur 1.
+///
+/// PUR — testable sans App.
+pub fn chapter_stage_id(run_seed: u64) -> &'static str {
+    stage_sequence(run_seed, 1)
+        .first()
         .copied()
         .unwrap_or(BOSS_STAGE_ID)
 }
@@ -134,9 +158,13 @@ const STAGE_POOL: &[&str] = &[
 /// run, dans le même ordre. Le joueur voyait la même chose à la 1re et à la 50e.
 ///
 /// Maintenant : une permutation seedée, **sans deux salles identiques
-/// consécutives**. Deux runs ne visitent plus le même donjon dans le même ordre,
-/// et comme chaque salle porte sa propre DA (`roguelite_palettes.toml`), l'habillage
-/// change en même temps que la géométrie.
+/// consécutives**. Deux runs ne visitent plus le même donjon dans le même ordre.
+///
+/// ⚠️ 2026-08-04 — cette fonction ne pilote plus les ARÈNES d'un chapitre : elles
+/// partagent désormais une seule DA (cf. [`chapter_stage_id`], qui l'appelle avec
+/// `count = 1`). Elle reste la primitive de tirage seedé, et c'est elle qui
+/// donnera l'ordre des CHAPITRES d'un Livre — l'échelle à laquelle « jamais deux
+/// identiques d'affilée » veut encore dire quelque chose.
 ///
 /// PUR — testable sans App.
 pub fn stage_sequence(run_seed: u64, count: u8) -> Vec<&'static str> {
@@ -1141,6 +1169,52 @@ mod tests {
     /// dérive impossible : ajouter une salle au TOML sans l'ajouter au pool (ou
     /// l'inverse) casse le build, au lieu de produire une salle jamais tirée ou
     /// une requête de stage inexistant.
+    /// **Une DA par chapitre** — la règle de 2026-08-04, qui renverse story-671.
+    ///
+    /// Un chapitre fait 4 arènes ; si chacune changeait d'habillage, on
+    /// traverserait quatre univers en dix rounds et aucun ne serait un univers.
+    #[test]
+    fn every_arena_of_a_chapter_wears_the_same_art_direction() {
+        for seed in [1u64, 42, 7_777, u64::MAX / 3] {
+            let da = stage_id_for_depth(0, false, seed);
+            for depth in 0u8..3 {
+                assert_eq!(
+                    stage_id_for_depth(depth, false, seed),
+                    da,
+                    "graine {seed}, arène {depth} : la DA doit tenir tout le chapitre"
+                );
+            }
+        }
+    }
+
+    /// …et elle CHANGE d'un chapitre à l'autre, sinon le passage au suivant ne se
+    /// verrait pas. Test sur un échantillon de graines : on exige de la variété,
+    /// pas que deux graines voisines diffèrent (ce serait exiger du hasard parfait).
+    #[test]
+    fn different_chapters_do_not_all_wear_the_same_art_direction() {
+        let vus: std::collections::HashSet<&str> = (0u64..64)
+            .map(|s| chapter_stage_id(s.wrapping_mul(0x9E37_79B9_7F4A_7C15)))
+            .collect();
+        assert!(
+            vus.len() >= 2,
+            "toutes les graines donnent la même DA — le changement de chapitre serait invisible"
+        );
+    }
+
+    /// Le seul endroit où la règle cède, et il est ASSUMÉ : la salle du boss est
+    /// la seule à porter `boss_pad_required`, donc le dernier round d'un chapitre
+    /// dont la DA n'est pas `crypts_of_anvil` change d'habillage.
+    ///
+    /// C'est lisible comme « on entre dans l'antre » — mais c'est une exception,
+    /// pas la règle, et elle doit rester visible ici plutôt que d'être découverte
+    /// en jeu.
+    #[test]
+    fn the_boss_arena_is_the_one_documented_exception() {
+        for seed in [1u64, 42, 7_777] {
+            assert_eq!(stage_id_for_depth(3, true, seed), BOSS_STAGE_ID);
+        }
+    }
+
     #[test]
     fn the_stage_pool_mirrors_the_genome() {
         const P: &str = "assets/genomes/roguelite_stages.toml";

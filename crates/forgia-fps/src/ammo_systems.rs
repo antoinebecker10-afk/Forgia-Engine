@@ -72,10 +72,15 @@ impl AmmoCtx<'_> {
 // ─── System : sync genome → slots ──────────────────────────────────────────
 
 /// Extrait l'`AmmoConfig` d'un `ViewmodelGenomeEntry`.
-fn config_from_entry(e: &ViewmodelGenomeEntry) -> AmmoConfig {
+fn config_from_entry(e: &ViewmodelGenomeEntry, mag_mul: f32) -> AmmoConfig {
+    // 2026-08-04 — le bonus de chargeur s'applique ICI, à la conversion
+    // génome → config, et non dans le génome lui-même : celui-ci est la source
+    // de vérité de l'arme, pas de la run. `max(1)` garantit qu'aucun réglage ne
+    // peut produire un chargeur vide (une arme injouable).
+    let grossi = |n: u32| ((n as f32 * mag_mul).round() as u32).max(1);
     AmmoConfig {
-        mag_size: e.mag_size,
-        reserve_max: e.reserve_max,
+        mag_size: grossi(e.mag_size),
+        reserve_max: grossi(e.reserve_max),
         reload_time_secs: e.reload_time_secs,
         reload_kind: ReloadKind::from_genome_str(&e.reload_kind),
         infinite_ammo: e.infinite_ammo,
@@ -93,8 +98,13 @@ pub fn sync_ammo_slots_from_genome(
     handle: Option<Res<ViewmodelGenomeHandle>>,
     assets: Res<Assets<Genome<ViewmodelGenome>>>,
     mut equipped: ResMut<EquippedWeapons>,
+    // 2026-08-04 — atouts d'ENTRETIEN : chargeur et réserve agrandis. Relu à
+    // chaque sync, donc un atout pris en cours de run s'applique au prochain
+    // hot-reload de génome comme à la prochaine arme équipée.
+    mods: Option<Res<forgia_combat::combat_mods::PlayerCombatMods>>,
     mut ammo_events: MessageWriter<AmmoChanged>,
 ) {
+    let mag_mul = mods.map(|m| m.mag_size_mul).unwrap_or(1.0);
     let Some(handle) = handle else { return };
     let mut should_sync = false;
     for ev in events.read() {
@@ -121,7 +131,7 @@ pub fn sync_ammo_slots_from_genome(
             );
             continue;
         };
-        let cfg = config_from_entry(entry);
+        let cfg = config_from_entry(entry, mag_mul);
         sync_ammo_slot_from_config(&mut equipped.slots, weapon, cfg, &mut ammo_events);
         info!(
             "[ammo-sync] {:?} → mag={} reserve_max={} reload={:.2}s kind={:?} infinite={}",
@@ -143,16 +153,19 @@ pub fn sync_ammo_slots_from_genome(
 pub fn reload_key_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut equipped: ResMut<EquippedWeapons>,
+    // 2026-08-04 — les atouts d'ENTRETIEN accélèrent le rechargement.
+    mods: Option<Res<forgia_combat::combat_mods::PlayerCombatMods>>,
     mut events: MessageWriter<AmmoChanged>,
 ) {
     if !keys.just_pressed(KeyCode::KeyR) {
         return;
     }
+    let vitesse = mods.map(|m| m.reload_speed_mul).unwrap_or(1.0);
     let weapon = equipped.current;
     let Some(slot) = equipped.slots.get_mut(&weapon) else {
         return;
     };
-    if slot.try_start_reload() {
+    if slot.try_start_reload_at_speed(vitesse) {
         let snap = AmmoChanged::snapshot(weapon, slot, AmmoChangeKind::Reload { transferred: 0 });
         events.write(snap);
     }

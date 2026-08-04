@@ -33,6 +33,21 @@
 # ── Poids de tirage par rareté (R3.4, story-645) ────────────────────────
 # Un Common sort souvent, un Legendary est un ÉVÉNEMENT. Poids 0 = jamais tiré.
 # Hot-reload. Miroir de RarityWeights::default() (boons.rs).
+# ── LE SAC (2026-08-04) — la leçon de Dicero ────────────────────────────────
+# Nombre d'atouts DISTINCTS portables. C'est la seule chose qui transforme le
+# Coffre en arbitrage : sans plafond, tout ajout est gratuit, donc tout choix est
+# bon, donc aucun choix n'est intéressant.
+#
+# ⚠️ Le plafond porte sur les atouts DISTINCTS, pas sur le nombre de prises. Un
+# doublon AMÉLIORE ce qu'on porte déjà et ne consomme pas de place — c'est ce qui
+# empêche le pool de se diluer, et pourquoi le 8e coffre reste aussi intéressant
+# que le 1er.
+#
+# 6 places : assez pour composer une synergie (seuil légendaire = 3 tags
+# identiques) sans que tout tienne dans le sac. Dicero plafonne à 5.
+# 0 = illimité (désactive la mécanique, comportement d'avant).
+bag_slots = 6
+
 [rarity_weights]
 common = 100
 uncommon = 45
@@ -352,3 +367,108 @@ rarity = "uncommon"
 tags = ["ricochet", "chaos"]
 souls_cost = 45
 effect = { kind = "chain_targets", count = 1 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FAMILLE « ENTRETIEN » (2026-08-04) — les atouts qui RENFORCENT le pilier
+#
+# Toutes les armes sont vivantes et le choix vient de l'ennemi (matchup
+# élémentaire, jusqu'à ×2,0). Un atout qui buffe UNE arme casse ce pilier : il
+# bat le bon matchup partout et le joueur cesse de changer d'arme.
+#
+# Ceux-ci ne buffent aucune arme. Ils allongent le temps qu'on peut passer sur
+# LA BONNE — c'est le moteur de DOOM Eternal, où la rareté des munitions FORCE
+# la rotation. Ils sont donc la seule famille d'atouts d'arme qui serve le
+# pilier au lieu de l'éroder.
+#
+# ⚠️ Dosés MODESTEMENT et fréquents, jamais rares et énormes : en donner trop
+# supprime la rotation au lieu de la servir. Il y a un optimum, pas une
+# monotonie.
+#
+# `flat_bonus` additif : deux atouts +25 % donnent +50 %, pas ×1,56. Plus
+# lisible, et une pile de doublons n'explose pas.
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[entries]]
+id = "mains_promptes"
+name = "Mains Promptes"
+voiceline_preview = "Tes doigts vont plus vite que ta tête !"
+rarity = "common"
+tags = ["precision"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "reload_speed", amount = 0.25 }
+
+[[entries]]
+id = "poches_profondes"
+name = "Poches Profondes"
+voiceline_preview = "Y'en a encore plein là-dedans."
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "mag_size", amount = 0.20 }
+
+[[entries]]
+id = "gestes_du_forgeron"
+name = "Gestes du Forgeron"
+voiceline_preview = "Recharge comme on bat le fer : sans regarder."
+rarity = "uncommon"
+tags = ["precision", "fire"]
+souls_cost = 40
+effect = { kind = "flat_bonus", stat = "reload_speed", amount = 0.45 }
+
+[[entries]]
+id = "besace_sans_fond"
+name = "Besace sans Fond"
+voiceline_preview = "Elle pèse rien et elle est jamais vide."
+rarity = "uncommon"
+tags = ["chaos", "ricochet"]
+souls_cost = 40
+effect = { kind = "flat_bonus", stat = "mag_size", amount = 0.40 }
+
+# ── FAMILLE « CORPS » — neutre pour le pilier, axe de build indépendant ──────
+# Elle n'attache rien à une arme, donc elle ne crée aucune raison d'en préférer
+# une. C'est ce qui la rend sûre.
+#
+# ⚠️ PAS de double saut ici. Les bots n'ont ni navmesh ni gravité : un joueur qui
+# saute plus haut devient inatteignable (spawn-clearance.md §5). Ce n'est pas un
+# atout, c'est un chantier IA.
+
+[[entries]]
+id = "pas_du_furet"
+name = "Pas du Furet"
+voiceline_preview = "Tes jambes ont décidé d'aller plus vite."
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "move_speed", amount = 0.10 }
+
+[[entries]]
+id = "souffle_du_coureur"
+name = "Souffle du Coureur"
+voiceline_preview = "Tu ne t'arrêtes plus. Jamais."
+rarity = "uncommon"
+tags = ["chaos", "precision"]
+souls_cost = 40
+effect = { kind = "flat_bonus", stat = "move_speed", amount = 0.18 }
+
+# ── FAMILLE « RÉCOLTE » — à doser BAS ───────────────────────────────────────
+# Elle se multiplie avec elle-même : plus d'Âmes achète plus d'atouts, qui
+# rapportent plus d'Âmes. C'est le snowball classique — d'où des valeurs basses
+# et une rareté élevée, contrairement à l'entretien qui est fréquent et modeste.
+
+[[entries]]
+id = "doigts_crochus"
+name = "Doigts Crochus"
+voiceline_preview = "Tout ce qui traîne finit dans ta poche."
+rarity = "uncommon"
+tags = ["ricochet"]
+souls_cost = 45
+effect = { kind = "flat_bonus", stat = "loot_gain", amount = 0.20 }
+
+[[entries]]
+id = "appetit_de_lenclume"
+name = "Appétit de l'Enclume"
+voiceline_preview = "L'Enclume a faim, et elle mange bien."
+rarity = "rare"
+tags = ["chaos", "fire"]
+souls_cost = 65
+effect = { kind = "flat_bonus", stat = "loot_gain", amount = 0.35 }

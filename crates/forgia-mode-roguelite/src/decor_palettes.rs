@@ -125,6 +125,16 @@ pub struct DecorPalettesConfig {
     pub palettes: HashMap<String, DecorPalette>,
     /// `stage_id` → id de palette. Absent = `FALLBACK_PALETTE`.
     pub stage_palette: HashMap<String, String>,
+    /// 2026-08-04 — **numéro de chapitre → id de palette**.
+    ///
+    /// C'est la table du Livre : un chapitre = une direction artistique, et elle
+    /// tient du round 1 au round 10. Elle a la PRIORITÉ sur `stage_palette` : en
+    /// boucle de chapitre, c'est le chapitre qui décide de l'habillage, pas la
+    /// salle traversée — sinon on retraverserait quatre univers en dix rounds.
+    ///
+    /// Les clés sont les numéros écrits en toutes lettres (`1`, `2`, …) ; TOML
+    /// les rend comme des chaînes.
+    pub chapter_palette: HashMap<String, String>,
 }
 
 impl Default for DecorPalettesConfig {
@@ -135,6 +145,9 @@ impl Default for DecorPalettesConfig {
             palettes,
             // Sans génome, tous les stages portent la DA historique.
             stage_palette: HashMap::new(),
+            // …et aucun chapitre ne déclare la sienne, donc le repli par stage
+            // s'applique : le comportement d'avant le Livre, exactement.
+            chapter_palette: HashMap::new(),
         }
     }
 }
@@ -186,6 +199,28 @@ impl DecorPalettesConfig {
             .map(String::as_str)
             .filter(|id| self.palettes.contains_key(*id))
             .unwrap_or(FALLBACK_PALETTE)
+    }
+
+    /// Id de palette d'un CHAPITRE. `None` si le chapitre n'en déclare pas —
+    /// l'appelant retombe alors sur la table par stage.
+    ///
+    /// Filtre sur les palettes réellement déclarées : pointer un id inexistant
+    /// donnerait une salle vide, et une salle vide ne se voit qu'en jeu.
+    pub fn palette_id_for_chapter(&self, chapter: u32) -> Option<&str> {
+        self.chapter_palette
+            .get(&chapter.to_string())
+            .map(String::as_str)
+            .filter(|id| self.palettes.contains_key(*id))
+    }
+
+    /// La palette à HABILLER : le chapitre d'abord, la salle en repli.
+    ///
+    /// L'ordre EST la règle du Livre — un chapitre garde sa direction artistique
+    /// sur ses quatre arènes, et ce sont la géométrie et le semis qui changent
+    /// d'une pièce à l'autre.
+    pub fn palette_id_for(&self, chapter: u32, stage_id: &str) -> &str {
+        self.palette_id_for_chapter(chapter)
+            .unwrap_or_else(|| self.palette_id_for_stage(stage_id))
     }
 
     pub fn palette(&self, id: &str) -> Option<&DecorPalette> {
@@ -534,5 +569,71 @@ mod wall_props_coverage_tests {
             }
         }
         assert!(faults.is_empty(), "décor mural invalide :\n{}", faults.join("\n"));
+    }
+}
+
+// ─── La table du Livre (2026-08-04) ──────────────────────────────────────────
+
+#[cfg(test)]
+mod chapter_palette_tests {
+    use super::*;
+
+    fn shipped() -> DecorPalettesConfig {
+        let content = std::fs::read_to_string(GENOME_PATH)
+            .or_else(|_| std::fs::read_to_string(format!("../../{GENOME_PATH}")))
+            .expect("roguelite_palettes.toml introuvable");
+        DecorPalettesConfig::parse_toml(&content)
+    }
+
+    /// Dix chapitres, dix directions artistiques — et elles doivent être
+    /// DIFFÉRENTES, sinon la table est déclarative sans effet et deux chapitres
+    /// se ressemblent au point qu'on ne voit pas qu'on a changé de livre.
+    #[test]
+    fn the_ten_chapters_wear_ten_distinct_art_directions() {
+        let cfg = shipped();
+        let mut vues = std::collections::HashSet::new();
+        for chapitre in 1..=crate::meta_shop::CHAPTERS_PER_BOOK {
+            let id = cfg
+                .palette_id_for_chapter(chapitre)
+                .unwrap_or_else(|| panic!("chapitre {chapitre} sans direction artistique"));
+            assert!(
+                vues.insert(id.to_string()),
+                "chapitre {chapitre} réutilise la DA « {id} » — le changement de chapitre serait invisible"
+            );
+        }
+        assert_eq!(vues.len(), crate::meta_shop::CHAPTERS_PER_BOOK as usize);
+    }
+
+    /// Le chapitre PRIME sur la salle : c'est toute la règle du Livre. Une arène
+    /// traversée au chapitre 6 porte la DA du chapitre 6, pas celle de sa salle.
+    #[test]
+    fn the_chapter_wins_over_the_stage() {
+        let cfg = shipped();
+        let par_chapitre = cfg.palette_id_for_chapter(6).unwrap();
+        assert_eq!(cfg.palette_id_for(6, "crypts_of_anvil"), par_chapitre);
+        assert_eq!(cfg.palette_id_for(6, "hauts_paturages"), par_chapitre);
+    }
+
+    /// Un chapitre non déclaré retombe sur la table par stage — jamais sur une
+    /// salle vide. C'est le comportement d'avant le Livre, préservé.
+    #[test]
+    fn an_undeclared_chapter_falls_back_to_the_stage_table() {
+        let cfg = shipped();
+        assert!(cfg.palette_id_for_chapter(99).is_none());
+        assert_eq!(
+            cfg.palette_id_for(99, "crypts_of_anvil"),
+            cfg.palette_id_for_stage("crypts_of_anvil")
+        );
+    }
+
+    /// Un id de palette inconnu ne doit PAS produire une salle vide : il est
+    /// ignoré au profit du repli. Une faute de frappe se voit en test, pas en jeu.
+    #[test]
+    fn a_typo_in_the_table_never_empties_a_room() {
+        let mut cfg = DecorPalettesConfig::default();
+        cfg.chapter_palette
+            .insert("3".to_string(), "palette_qui_nexiste_pas".to_string());
+        assert!(cfg.palette_id_for_chapter(3).is_none());
+        assert_eq!(cfg.palette_id_for(3, "inconnu"), FALLBACK_PALETTE);
     }
 }

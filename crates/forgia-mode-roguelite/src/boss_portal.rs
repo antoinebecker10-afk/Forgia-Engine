@@ -468,6 +468,8 @@ pub(crate) fn sys_reconcile_boss_gate(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     wave: Res<RogueliteWave>,
+    // 2026-08-04 — la boucle de chapitre n'a PAS de parcours post-boss.
+    rounds: Option<Res<crate::rounds::RoundsConfig>>,
     mut gate: ResMut<BossGate>,
     q_anchor: Query<(&AnchorPoint, &Transform)>,
     q_named: Query<(Entity, &Name)>,
@@ -480,6 +482,21 @@ pub(crate) fn sys_reconcile_boss_gate(
     // Fallback durci : sommet AABB du dais si le raycast ne résout jamais.
     q_gt_aabb: Query<(&GlobalTransform, &Aabb)>,
 ) {
+    // 2026-08-04 — EN BOUCLE DE CHAPITRE, PAS DE PORTE.
+    //
+    // Cette porte est la pièce centrale du modèle story-603 : tuer le boss ouvre
+    // le socle, on traverse un parcours, et un portail Retour scelle la victoire.
+    // Le chapitre a remplacé ce modèle — le boss SCELLE la run directement
+    // (`waves.rs`, émission de `EndRunEvent(Victory)`).
+    //
+    // Sans ce garde, l'arche restait plantée au-dessus du dais central pendant
+    // toute la run, promettant un parcours qui n'existe plus. Rapporté en jeu :
+    // « le portail apparaît au-dessus du puits alors qu'on n'en a pas besoin ».
+    //
+    // Le chemin story-603 reste intact hors boucle (mode graphe).
+    if rounds.is_some_and(|r| r.enabled) {
+        return;
+    }
     // 1. Centre du dais = ancre MeleePit (suit le seed) ; sinon garde la place
     //    actuelle ; sinon repli central (1re frame, avant chargement du stage).
     let anchor_pos = q_anchor

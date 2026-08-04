@@ -18,6 +18,18 @@ version = 1
 # aucune pièce n'est équipée.
 body_model = "models/characters/trooper/body.gltf"
 
+# L'emplacement dont la rareté teinte les BRAS du viewmodel FPS — c'est le seul
+# qu'on voie en combat. Le changer ici suffit si un jour les brassards passent
+# sur un autre slot.
+viewmodel_slot = "gloves"
+
+# Les bras vus en FPS, découpés du MÊME corps que l'avatar 3ᵉ personne. Ils sont
+# déclarés ICI et non dans le préchargeur générique d'assets : le choix des bras
+# appartient au personnage, pas à une liste de fichiers du moteur. Les vider
+# rend les bras d'origine.
+viewmodel_arm_left = "models/characters/trooper/viewmodel_arm_l.gltf"
+viewmodel_arm_right = "models/characters/trooper/viewmodel_arm_r.gltf"
+
 # ── Raretés ──────────────────────────────────────────────────────────────────
 # `bonus_mul` multiplie le gain de base du slot (`per_tier`).
 # `drop_weight` = poids de tirage (mêmes ordres de grandeur que roguelite_loot).
@@ -114,6 +126,10 @@ on_victory = 1
 # Un tirage qui donne une pièce déjà possédée est relancé jusqu'à ce nombre de
 # fois avant d'être abandonné (anti-doublon léger, sans garantir l'inédit).
 reroll_if_owned = 8
+# Durée d'affichage de la carte de butin, en secondes. C'est le geste central du
+# genre : sans elle, une pièce tombe et le joueur ne l'apprend qu'en ouvrant un
+# menu. Assez long pour être lu en plein combat, assez court pour ne pas gêner.
+card_seconds = 4.0
 
 # ── Animation de l'avatar ────────────────────────────────────────────────────
 # Même modèle que les ennemis (`roguelite_enemy_anim.toml`, story-636) : les clips

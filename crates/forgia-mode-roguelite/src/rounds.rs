@@ -8,8 +8,12 @@
 //!
 //! L'ancien scaling était **linéaire** : `1 + round × 0,35`. Une droite finit
 //! toujours par se faire rattraper par un joueur qui compose ses multiplicateurs
-//! — la trempe seule vaut ×2,01 (5 paliers × +15 % multiplicatifs), et elle
-//! rattrape un ×1,35/round vers le round 3. Passé là, la pression s'évapore.
+//! — la trempe seule vaut ×2,05 au plafond (7 paliers **additifs** : `1 + 7×0,15`),
+//! et elle rattrape un ×1,35/round vers le round 3. Passé là, la pression s'évapore.
+//!
+//! ⚠️ Corrigé le 2026-08-04 : ce commentaire annonçait « ×2,01 (5 paliers × +15 %
+//! multiplicatifs) ». La trempe est **additive** entre paliers, et son plafond est
+//! passé à 7. Le chiffre faux avait déjà été propagé dans un document d'audit.
 //!
 //! Maintenant : **géométrique + paliers**. La croissance continue tient la
 //! pression sur toute la montée ; les paliers donnent le sursaut qu'on ressent.
@@ -68,6 +72,8 @@ struct MenaceToml {
     palier_tous_les: Option<u32>,
     palier_pv: Option<f32>,
     palier_degats: Option<f32>,
+    palier_chapitre_pv: Option<f32>,
+    palier_chapitre_degats: Option<f32>,
 }
 
 #[derive(Deserialize, Default)]
@@ -105,6 +111,13 @@ pub struct RoundsConfig {
     pub tier_every: u32,
     pub tier_hp_step: f32,
     pub tier_damage_step: f32,
+    /// Croissance de la menace par CHAPITRE — ce qui rend le Livre progressif.
+    ///
+    /// Borné par le plafond de progression PERMANENTE : au-delà, le dernier
+    /// chapitre serait infranchissable même équipé à fond. Gardé par
+    /// `the_last_chapter_stays_within_reach_of_a_maxed_account`.
+    pub chapter_hp_step: f32,
+    pub chapter_damage_step: f32,
     pub round_time_budget_s: f32,
     pub dps_reference: f32,
     /// Part du round réellement passée à toucher. Un FPS ne délivre jamais son
@@ -122,12 +135,19 @@ impl Default for RoundsConfig {
         // Miroir EXACT de assets/genomes/roguelite/roguelite_rounds.toml.
         Self {
             enabled: true,
-            max_rounds: 0,
+            // 10 = un chapitre (2026-08-04) : le boss tombe à ce round et la run
+            // se termine en Victoire. À 0, `Victory` était inatteignable — on ne
+            // pouvait que perdre, ce qui fait un mode survie, pas un roguelite.
+            max_rounds: 10,
             hp_growth: 1.16,
             damage_growth: 1.07,
             tier_every: 3,
             tier_hp_step: 1.22,
             tier_damage_step: 1.10,
+            // 1.08^9 = ×2.00 au chapitre 10, sous le plafond ×2.42 de la
+            // progression permanente. Dérivé, cf. le génome.
+            chapter_hp_step: 1.08,
+            chapter_damage_step: 1.04,
             round_time_budget_s: 90.0,
             dps_reference: 168.0,
             fire_uptime: 0.35,
@@ -175,6 +195,17 @@ impl RoundsConfig {
                 .palier_degats
                 .unwrap_or(d.tier_damage_step)
                 .clamp(1.0, 5.0),
+            // ≥ 1.0 : un chapitre plus tardif ne peut pas être plus FACILE.
+            chapter_hp_step: t
+                .menace
+                .palier_chapitre_pv
+                .unwrap_or(d.chapter_hp_step)
+                .clamp(1.0, 3.0),
+            chapter_damage_step: t
+                .menace
+                .palier_chapitre_degats
+                .unwrap_or(d.chapter_damage_step)
+                .clamp(1.0, 3.0),
             round_time_budget_s: t
                 .mur
                 .budget_temps_round_s
@@ -228,6 +259,26 @@ impl RoundsConfig {
     /// La menace d'un round : croissance continue × sursaut de palier.
     ///
     /// Round 0 = ×1,0, toujours — c'est la référence de calibration de tout le reste.
+    /// La menace d'un round **dans un chapitre donné** (chapitre 1-indexé).
+    ///
+    /// Deux échelles se composent : la montée DANS le chapitre (continue +
+    /// paliers) et la marche ENTRE les chapitres. La seconde est ce que la
+    /// progression permanente doit combler — elle seule traverse les runs.
+    ///
+    /// `chapter <= 1` rend exactement `threat(round)` : le premier chapitre EST
+    /// la référence de calibration, comme le round 0 l'est dans un chapitre.
+    pub fn threat_at(&self, chapter: u32, round: u32) -> Threat {
+        let base = self.threat(round);
+        if !self.enabled || chapter <= 1 {
+            return base;
+        }
+        let n = (chapter - 1) as i32;
+        Threat {
+            hp: base.hp * self.chapter_hp_step.powi(n),
+            damage: base.damage * self.chapter_damage_step.powi(n),
+        }
+    }
+
     pub fn threat(&self, round: u32) -> Threat {
         if !self.enabled {
             return Threat {
@@ -273,14 +324,31 @@ impl RoundsConfig {
         1.0 + self.power_gain_per_round * uptake.clamp(0.0, 1.0) * round as f32
     }
 
-    /// Temps estimé pour nettoyer la vague du round `r` (s).
+    /// Temps estimé pour nettoyer la vague du round `r` (s), selon le MODÈLE.
     pub fn time_to_clear(&self, round: u32, uptake: f32) -> f32 {
+        self.time_to_clear_at_power(round, self.player_power(round, uptake))
+    }
+
+    /// Idem, mais à partir d'une puissance **mesurée** au lieu du modèle.
+    ///
+    /// `player_power` est une droite `1 + gain × round` calibrée à la main, qui
+    /// suppose un joueur à ×1,0 au round 0. C'est faux dès qu'un compte a de la
+    /// méta : l'Enclume, la maîtrise et la Trempe composent un socle bien au-dessus
+    /// de 1 avant le premier tir. Le capteur `forgia2_power.json` sait ce qui est
+    /// réellement appliqué ; il passe par ici pour que les deux verdicts partagent
+    /// le même dénominateur au lieu de diverger (`map-design-patterns.md` §14).
+    pub fn time_to_clear_at_power(&self, round: u32, power: f32) -> f32 {
         let wave_hp = self.wave_hp_reference * self.threat(round).hp;
-        let dps = self.dps_reference * self.fire_uptime * self.player_power(round, uptake);
+        let dps = self.dps_reference * self.fire_uptime * power;
         if dps <= f32::EPSILON {
             return f32::INFINITY;
         }
         wave_hp / dps
+    }
+
+    /// Marge du round à puissance mesurée. Négatif = le mur est franchi.
+    pub fn margin_at_power(&self, round: u32, power: f32) -> f32 {
+        1.0 - self.time_to_clear_at_power(round, power) / self.round_time_budget_s.max(f32::EPSILON)
     }
 
     /// **Le mur** : premier round dont la vague ne se nettoie plus dans le budget.
@@ -425,8 +493,14 @@ pub fn pace_from_elapsed(elapsed_s: f32, budget_s: f32) -> Pace {
 /// passé à se battre, pas sur le temps passé à choisir un boon.
 #[derive(Resource, Debug, Clone, Default)]
 pub struct RoundPace {
-    /// Round en cours de chronométrage.
-    pub round: u8,
+    /// Round en cours de chronométrage — le **combat**, pas l'arène.
+    ///
+    /// 2026-08-04 : c'était `wave.stage`, donc une ARÈNE. Le chrono accumulait
+    /// les trois combats d'une pièce et comparait ce total à un budget PAR
+    /// COMBAT : 114 s mesurées contre 90 s de budget, verdict « TU DÉCROCHES »
+    /// — alors que chaque combat prenait 38 s, soit 40 % du budget. L'écran
+    /// annonçait un décrochage à un joueur qui était large.
+    pub round: u32,
     /// Secondes de combat écoulées dans ce round.
     pub combat_secs: f32,
     /// Temps de nettoyage des derniers rounds, du plus récent au plus ancien.
@@ -435,7 +509,7 @@ pub struct RoundPace {
 
 impl RoundPace {
     /// Enregistre le round qui vient d'être nettoyé et repart à zéro.
-    pub fn finish_round(&mut self, next_round: u8) {
+    pub fn finish_round(&mut self, next_round: u32) {
         if self.combat_secs > 0.0 {
             self.cleared.insert(0, self.combat_secs);
             self.cleared.truncate(PACE_HISTORY);
@@ -464,16 +538,28 @@ pub fn sys_track_round_pace(
     time: Res<Time>,
     cfg: Res<RoundsConfig>,
     wave: Res<crate::waves::RogueliteWave>,
+    // Le round est le COMBAT ; il faut donc savoir combien il y en a par arène.
+    graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
     mut pace: ResMut<RoundPace>,
 ) {
-    if wave.stage != pace.round {
-        pace.finish_round(wave.stage);
+    let round = wave.round(graph_cfg.waves_per_stage);
+    if round != pace.round {
+        pace.finish_round(round);
         return;
     }
-    if !cfg.enabled || wave.in_break || cfg.is_respite_round(u32::from(wave.stage)) {
+    if !cfg.enabled || wave.in_break || cfg.is_respite_round(round) {
         return;
     }
     pace.combat_secs += time.delta_secs();
+}
+
+/// Départ de run : le rythme repart de zéro.
+///
+/// Sans ça, `cleared` gardait les temps de la run PRÉCÉDENTE — observé le
+/// 2026-08-04 : trois rounds « nettoyés » de 114 s affichés 3 secondes après le
+/// début d'une run neuve. Un verdict de rythme calculé sur la run d'avant.
+pub fn sys_reset_round_pace(mut pace: ResMut<RoundPace>) {
+    *pace = RoundPace::default();
 }
 
 // ─── Capteur ────────────────────────────────────────────────────────────────
@@ -493,6 +579,7 @@ pub fn sys_write_rounds_sensor(
     time: Res<Time<Real>>,
     cfg: Res<RoundsConfig>,
     wave: Res<crate::waves::RogueliteWave>,
+    graph_cfg: Res<forgia_stage::graph::RunGraphConfig>,
     pace: Res<RoundPace>,
     mut cooldown: Local<f32>,
 ) {
@@ -501,7 +588,11 @@ pub fn sys_write_rounds_sensor(
         return;
     }
     *cooldown = SENSOR_PERIOD_SEC;
-    let round = u32::from(wave.stage);
+    // Le ROUND affiché est le combat (1-basé) ; `threat` et les marges attendent
+    // un index 0-basé — même conversion que `enemy_scaling` et que le HUD, pour
+    // que les trois annoncent le même chiffre.
+    let round_1based = wave.round(graph_cfg.waves_per_stage);
+    let round = round_1based.saturating_sub(1);
     let t = cfg.threat(round);
     // On ne connaît pas la part de récompenses réellement prise : on encadre.
     let margin_lazy = cfg.margin(round, 0.0);
@@ -520,11 +611,13 @@ pub fn sys_write_rounds_sensor(
         ("ok", "-")
     };
     let json = format!(
-        r#"{{"id":"roguelite_rounds","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"loop_enabled":{},"round":{round},"is_tier_round":{},"is_respite_round":{},"threat_hp":{:.3},"threat_damage":{:.3},"time_to_clear_lazy_s":{:.1},"time_to_clear_full_s":{:.1},"round_time_budget_s":{:.1},"margin_lazy":{:.3},"margin_full":{:.3},"wall_lazy":{},"wall_full":{},"combat_secs":{:.1},"pace":"{}","pace_trend":"{}","cleared_secs":{:?}}}"#,
+        r#"{{"id":"roguelite_rounds","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"loop_enabled":{},"round":{round_1based},"is_tier_round":{},"is_respite_round":{},"threat_hp":{:.3},"threat_damage":{:.3},"time_to_clear_lazy_s":{:.1},"time_to_clear_full_s":{:.1},"round_time_budget_s":{:.1},"margin_lazy":{:.3},"margin_full":{:.3},"wall_lazy":{},"wall_full":{},"combat_secs":{:.1},"pace":"{}","pace_trend":"{}","cleared_secs":{:?}}}"#,
         time.elapsed_secs_f64(),
         cfg.enabled,
-        cfg.is_tier_round(round),
-        cfg.is_respite_round(round),
+        // Le rythme (palier, répit) se compte en rounds AFFICHÉS — c'est ce que
+        // le HUD montre au joueur, et les deux doivent tomber sur le même round.
+        cfg.is_tier_round(round_1based),
+        cfg.is_respite_round(round_1based),
         t.hp,
         t.damage,
         cfg.time_to_clear(round, 0.0),
@@ -719,7 +812,7 @@ mod pace_tests {
         assert!(p.trend(90.0).is_none(), "aucun round : pas de tendance");
         for (i, secs) in [30.0f32, 40.0, 50.0].iter().enumerate() {
             p.combat_secs = *secs;
-            p.finish_round(i as u8 + 1);
+            p.finish_round(i as u32 + 1);
             if i < PACE_HISTORY - 1 {
                 assert!(p.trend(90.0).is_none(), "{} round(s) : trop tôt", i + 1);
             }
@@ -734,7 +827,7 @@ mod pace_tests {
         let mut p = RoundPace::default();
         for (i, secs) in [5.0f32, 5.0, 5.0, 80.0, 85.0, 88.0].iter().enumerate() {
             p.combat_secs = *secs;
-            p.finish_round(i as u8 + 1);
+            p.finish_round(i as u32 + 1);
         }
         assert_eq!(p.cleared.len(), PACE_HISTORY, "l'historique est borné");
         assert_eq!(
@@ -759,5 +852,86 @@ mod pace_tests {
     fn the_labels_tell_the_player_what_is_happening() {
         assert_eq!(Pace::Holding.label(), "TU TIENS");
         assert_eq!(Pace::Falling.label(), "TU DÉCROCHES");
+    }
+}
+
+// ─── Le palier de chapitre et son plafond (2026-08-04) ───────────────────────
+
+#[cfg(test)]
+mod chapter_step_tests {
+    use super::*;
+    use crate::meta_shop::CHAPTERS_PER_BOOK;
+
+    /// Tout ce qu'un compte MAXÉ peut apporter au dernier chapitre, en DPS.
+    ///
+    /// Enclume ×1.40 (5 rangs × +8 %) · maîtrise ×1.20 (5 niveaux × +4 %) ·
+    /// jambières mythiques ×1.20 (seul slot à donner des dégâts, 0.04 × 5) ·
+    /// gants mythiques ×1.20 (cadence, qui multiplie le DPS aussi).
+    ///
+    /// Ce n'est pas une opinion : chaque facteur est lu dans son génome.
+    const PERMANENT_PROGRESSION_CEILING: f32 = 1.40 * 1.20 * 1.20 * 1.20;
+
+    /// **LE garde-fou du Livre.** Si le dernier chapitre monte plus haut que ce
+    /// qu'un compte maxé peut apporter, il devient infranchissable *quoi que le
+    /// joueur fasse* — et une difficulté qu'aucun investissement ne rattrape
+    /// n'est pas de la difficulté, c'est un mur.
+    ///
+    /// Monter `palier_chapitre_pv` sans monter le plafond casse le build. C'est
+    /// exactement ce qu'on veut : la valeur est dérivée, pas choisie.
+    #[test]
+    fn the_last_chapter_stays_within_reach_of_a_maxed_account() {
+        let cfg = RoundsConfig::default();
+        let dernier = cfg.chapter_hp_step.powi(CHAPTERS_PER_BOOK as i32 - 1);
+        assert!(
+            dernier <= PERMANENT_PROGRESSION_CEILING,
+            "chapitre {CHAPTERS_PER_BOOK} à ×{dernier:.2} contre un plafond de \
+             progression permanente de ×{PERMANENT_PROGRESSION_CEILING:.2} — \
+             infranchissable même équipé à fond"
+        );
+        // …et il doit rester une marge : un joueur maxé doit être DEVANT, pas
+        // exactement à égalité, sinon le dernier chapitre se joue au pixel.
+        assert!(
+            dernier <= PERMANENT_PROGRESSION_CEILING * 0.9,
+            "moins de 10 % de marge au dernier chapitre (×{dernier:.2})"
+        );
+    }
+
+    /// Le premier chapitre EST la référence : sans ça, aucun autre chiffre du
+    /// génome ne veut dire ce qu'il dit.
+    #[test]
+    fn the_first_chapter_is_the_calibration_reference() {
+        let cfg = RoundsConfig::default();
+        for round in [0u32, 3, 9] {
+            assert_eq!(cfg.threat_at(1, round), cfg.threat(round));
+            // Chapitre 0 (valeur défensive) se lit comme le premier.
+            assert_eq!(cfg.threat_at(0, round), cfg.threat(round));
+        }
+    }
+
+    /// Un chapitre plus tardif n'est JAMAIS plus facile — et l'écart est celui
+    /// que le génome déclare, pas un autre.
+    #[test]
+    fn each_chapter_starts_harder_than_the_one_before() {
+        let cfg = RoundsConfig::default();
+        let mut precedent = cfg.threat_at(1, 0).hp;
+        for chapitre in 2..=CHAPTERS_PER_BOOK {
+            let hp = cfg.threat_at(chapitre, 0).hp;
+            assert!(hp > precedent, "chapitre {chapitre} pas plus dur que le précédent");
+            assert!(
+                (hp / precedent - cfg.chapter_hp_step).abs() < 1e-4,
+                "l'écart entre chapitres doit être celui du génome"
+            );
+            precedent = hp;
+        }
+    }
+
+    /// Les dégâts montent plus DOUCEMENT que la vie — un chapitre qui tue en
+    /// deux balles n'est pas dur, il est injuste (même parti qu'au round).
+    #[test]
+    fn damage_climbs_gentler_than_health_across_the_book() {
+        let cfg = RoundsConfig::default();
+        assert!(cfg.chapter_damage_step < cfg.chapter_hp_step);
+        let dernier = cfg.threat_at(CHAPTERS_PER_BOOK, 0);
+        assert!(dernier.damage < dernier.hp);
     }
 }

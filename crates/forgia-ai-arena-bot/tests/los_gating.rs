@@ -91,3 +91,45 @@ fn spawn_grace_allows_initial_chase() {
     // À distance Chase, le bot peut Chase dès spawn même sans 1er LOS check.
     assert_eq!(decide_bot_state(&bot, 10.0), BotState::Chase);
 }
+
+// ─── 2026-08-04 — voir n'est pas tirer ───────────────────────────────────────
+
+use forgia_ai_arena_bot::tactical::sight_range;
+
+/// Le défaut rapporté en jeu : « les mobs ne me traquent pas alors que je suis
+/// dans leur zone d'aggro ».
+///
+/// La perception était bornée par la portée de l'ARME. Un grunt de mêlée
+/// (portée ~3 m) devenait aveugle dès 3 m, alors que sa zone d'aggro fait 25 m —
+/// donc `has_los = false`, donc `Idle`, donc jamais de poursuite.
+#[test]
+fn a_melee_bot_sees_far_beyond_its_weapon_reach() {
+    let arme_de_melee = 3.0;
+    let zone_daggro = 25.0;
+    assert_eq!(sight_range(arme_de_melee, zone_daggro), 25.0);
+    assert!(
+        sight_range(arme_de_melee, zone_daggro) > arme_de_melee,
+        "sinon le bot est aveugle dès qu'il n'est plus au contact"
+    );
+}
+
+/// Un tireur à longue portée voit au moins aussi loin qu'il tire : sinon il
+/// tirerait sur ce qu'il ne voit pas.
+#[test]
+fn a_sniper_never_sees_less_far_than_it_shoots() {
+    assert_eq!(sight_range(60.0, 25.0), 60.0);
+}
+
+/// Et le bot voit bien la distance où il était aveugle, avec les valeurs par
+/// défaut réelles du composant.
+#[test]
+fn the_reported_blind_spot_is_closed() {
+    let bot = ArenaBot::default(); // detect_range = 25
+    let portee_melee = 3.0;
+    let distance_rapportee = 10.0; // « je suis dans leur zone » — et il ne bougeait pas
+    assert!(distance_rapportee > portee_melee, "hors de portée d'arme…");
+    assert!(
+        distance_rapportee <= sight_range(portee_melee, bot.detect_range),
+        "…mais DANS la vue : le bot doit percevoir, donc poursuivre"
+    );
+}

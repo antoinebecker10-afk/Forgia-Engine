@@ -178,6 +178,20 @@ impl AmmoSlot {
     /// Démarre un reload si pas déjà en cours et si utile (mag non plein + reserve > 0).
     /// Retourne true si reload effectivement démarré.
     pub fn try_start_reload(&mut self) -> bool {
+        self.try_start_reload_at_speed(1.0)
+    }
+
+    /// Idem, mais à une vitesse de rechargement donnée (`> 1` = plus rapide).
+    ///
+    /// 2026-08-04 — les atouts d'**entretien** passent par ici. Le multiplicateur
+    /// n'est PAS écrit dans `config` : celui-ci est le miroir du génome et se
+    /// fait réécrire à chaque hot-reload, ce qui effacerait le bonus en silence.
+    /// Il s'applique au moment où le timer démarre, là où il est observable.
+    ///
+    /// Borné à `0.1` en bas : une vitesse nulle ou négative gèlerait le
+    /// rechargement pour toujours, et un atout ne doit jamais pouvoir casser
+    /// l'arme qu'il améliore.
+    pub fn try_start_reload_at_speed(&mut self, speed_mul: f32) -> bool {
         if self.config.infinite_ammo {
             return false;
         }
@@ -191,7 +205,7 @@ impl AmmoSlot {
             return false; // pas de munition en réserve
         }
         self.reload_state = ReloadState::Reloading {
-            remaining_secs: self.config.reload_time_secs,
+            remaining_secs: self.config.reload_time_secs / speed_mul.max(0.1),
             kind: self.config.reload_kind,
         };
         true
@@ -529,5 +543,78 @@ mod tests {
         );
         // Unknown → Mag fallback (warn).
         assert_eq!(ReloadKind::from_genome_str("foobar"), ReloadKind::Mag);
+    }
+}
+
+// ─── Entretien : la vitesse de rechargement (2026-08-04) ─────────────────────
+
+#[cfg(test)]
+mod reload_speed_tests {
+    use super::*;
+
+    fn slot_vide() -> AmmoSlot {
+        let mut s = AmmoSlot::default();
+        s.current_mag = 0;
+        s.reserve = 100;
+        s
+    }
+
+    fn restant(s: &AmmoSlot) -> f32 {
+        match s.reload_state {
+            ReloadState::Reloading { remaining_secs, .. } => remaining_secs,
+            ReloadState::Idle => f32::NAN,
+        }
+    }
+
+    /// Un atout d'entretien raccourcit VRAIMENT le rechargement.
+    #[test]
+    fn a_maintenance_boon_actually_shortens_the_reload() {
+        let mut nu = slot_vide();
+        assert!(nu.try_start_reload());
+        let mut boosté = slot_vide();
+        assert!(boosté.try_start_reload_at_speed(1.5));
+        assert!(
+            restant(&boosté) < restant(&nu),
+            "{} devrait être < {}",
+            restant(&boosté),
+            restant(&nu)
+        );
+        // +50 % de vitesse = deux tiers du temps.
+        assert!((restant(&boosté) - restant(&nu) / 1.5).abs() < 1e-4);
+    }
+
+    /// Sans atout, rien ne change : `try_start_reload` reste l'ancien comportement.
+    #[test]
+    fn no_boon_means_the_previous_behaviour_exactly() {
+        let mut a = slot_vide();
+        let mut b = slot_vide();
+        a.try_start_reload();
+        b.try_start_reload_at_speed(1.0);
+        assert_eq!(restant(&a), restant(&b));
+        assert_eq!(restant(&a), a.config.reload_time_secs);
+    }
+
+    /// Un atout ne doit JAMAIS pouvoir casser l'arme qu'il améliore : une vitesse
+    /// nulle ou négative gèlerait le rechargement pour toujours.
+    #[test]
+    fn a_degenerate_speed_can_never_freeze_the_weapon() {
+        for vitesse in [0.0, -3.0, f32::MIN] {
+            let mut s = slot_vide();
+            assert!(s.try_start_reload_at_speed(vitesse));
+            let r = restant(&s);
+            assert!(r.is_finite() && r > 0.0, "vitesse {vitesse} → {r}");
+            // Borné : au pire 10× le temps nominal, jamais l'infini.
+            assert!(r <= s.config.reload_time_secs * 10.0 + 1e-3);
+        }
+    }
+
+    /// Le bonus n'écrit PAS dans `config` — sinon le prochain hot-reload de
+    /// génome l'effacerait en silence.
+    #[test]
+    fn the_boon_never_writes_into_the_genome_mirror() {
+        let mut s = slot_vide();
+        let avant = s.config.reload_time_secs;
+        s.try_start_reload_at_speed(3.0);
+        assert_eq!(s.config.reload_time_secs, avant);
     }
 }

@@ -218,6 +218,9 @@ profile-tracy = ["forgia-game/profile-tracy"]
 # Capture d'allocations Tracy. À réserver aux investigations mémoire : le coût
 # d'instrumentation fausse les mesures de frame time normales.
 profile-tracy-memory = ["forgia-game/profile-tracy-memory"]
+# Pont de diagnostic Bevy Remote Protocol. Désactivé par défaut : il ne doit
+# jamais exposer un build joueur ni modifier ses performances.
+dev-brp = ["forgia-game/dev-brp"]
 
 [[bin]]
 name = "forgia"

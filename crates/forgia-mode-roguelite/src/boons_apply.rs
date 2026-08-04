@@ -4,13 +4,20 @@
 //! globale `PlayerCombatMods` (forgia-combat) consommée par forgia-fps fire
 //! system. Heal-on-kill géré séparément via DeathEvent observer.
 //!
-//! Scope Phase 4 (3 effets sur 7) :
-//! - `DamageMul { factor }` → `combat_mods.damage_mul *= factor` (cumul multiplicatif)
-//! - `FireRateMul { factor }` → `combat_mods.fire_rate_mul *= factor`
-//! - `HealOnKill { hp }` → cumul stack, appliqué via observer
+//! Les 7 effets sont routés : `DamageMul` et `FireRateMul` (multiplicatifs),
+//! `HealOnKill` (cumul, appliqué via observer), `DamageReduction` et `Knockback`
+//! (additifs), `ChainTargets` (saturating), `FlatBonus` (routage par nom de stat).
 //!
-//! Reportés Phase 4b (besoin hit_ctx + crit roll + hitscan chain mod) :
-//! - `DamageReduction`, `ChainTargets`, `Knockback`, `FlatBonus` (crit/headshot)
+//! ## Le silence de `FlatBonus` (2026-08-04)
+//!
+//! `FlatBonus { stat }` route par **chaîne de caractères**. Une stat non reconnue
+//! ne produisait qu'un `debug!` : l'atout s'affichait au Coffre, le joueur le payait
+//! en Âmes, et il ne faisait **rien** — sans bruit, et en compilant. C'est le retour
+//! du bug « boons inertes » du 2026-06-28 sous une autre forme.
+//!
+//! Désormais toute stat inconnue atterrit dans [`BoonRoutingIssues`], est loguée en
+//! `error!` **une seule fois** (le recompute tourne chaque frame — un log par frame
+//! serait pire que le silence), et remonte dans `forgia2_power.json`.
 
 use bevy::prelude::*;
 use forgia_combat::combat_juice::CombatHitEvent;
@@ -18,12 +25,125 @@ use forgia_combat::combat_mods::PlayerCombatMods;
 use forgia_combat::Health as EnemyHealth;
 use forgia_damage::{DamageChannel, DeathEvent, DefenseLayer, Health, HealthGuard};
 use forgia_player::Player;
-use forgia_rpg_data::boons::{ActiveBoons, BoonEffectKind, BoonsCatalogue};
+use forgia_rpg_data::boons::{ActiveBoons, BoonDef, BoonEffectKind, BoonsCatalogue};
 
 /// Cumul des effets HealOnKill actifs (somme des `hp` per kill).
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct HealOnKillCumul {
     pub hp_per_kill: f32,
+}
+
+/// Plafond de dégâts d'un atout **filtré par arme** (`weapon_filter` renseigné).
+///
+/// L'écart de matchup élémentaire va de ×1.0 à **×2.0** (`roguelite_elements.toml`,
+/// `armor_pierce` contre un Tank). Un bonus attaché à UNE arme au-delà de ce plafond
+/// bat le bon matchup partout : le joueur cesse de changer d'arme, et le pilier
+/// « toutes les armes vivantes, le choix vient de l'ennemi » disparaît — non par un
+/// bug, mais par optimisation rationnelle.
+///
+/// Les atouts **universels** (`weapon_filter` absent) ne sont pas concernés : ils ne
+/// créent aucune raison de préférer une arme à une autre.
+pub const WEAPON_FILTERED_DAMAGE_CAP: f32 = 1.3;
+
+/// `false` si l'atout favorise UNE arme au-delà de [`WEAPON_FILTERED_DAMAGE_CAP`].
+/// Pur — testable sans App ni World.
+pub fn weapon_filtered_bonus_is_within_cap(def: &BoonDef) -> bool {
+    let Some(filter) = def.weapon_filter.as_ref() else {
+        return true; // universel : hors sujet
+    };
+    if filter.is_empty() {
+        return true;
+    }
+    match &def.effect {
+        BoonEffectKind::DamageMul { factor } => *factor <= WEAPON_FILTERED_DAMAGE_CAP,
+        _ => true,
+    }
+}
+
+/// Ce que la composition n'a PAS su appliquer. Un atout qui atterrit ici est payé
+/// par le joueur et sans effet — c'est un défaut, pas une curiosité.
+///
+/// Accumulé sur la run (jamais vidé par frame, sinon le log se répéterait 60×/s),
+/// remis à zéro au démarrage d'une run par [`sys_reset_boon_mods`].
+#[derive(Resource, Default, Debug, Clone)]
+pub struct BoonRoutingIssues {
+    /// Noms de stats `FlatBonus` rencontrés et routés nulle part.
+    pub unknown_stats: Vec<String>,
+    /// Ids d'atouts filtrés par arme qui dépassent [`WEAPON_FILTERED_DAMAGE_CAP`].
+    pub over_cap_boons: Vec<String>,
+}
+
+impl BoonRoutingIssues {
+    /// `true` si c'est la PREMIÈRE fois qu'on voit cette stat (→ loguer maintenant).
+    fn note_unknown_stat(&mut self, stat: &str) -> bool {
+        if self.unknown_stats.iter().any(|s| s == stat) {
+            return false;
+        }
+        self.unknown_stats.push(stat.to_string());
+        true
+    }
+
+    fn note_over_cap(&mut self, id: &str) -> bool {
+        if self.over_cap_boons.iter().any(|s| s == id) {
+            return false;
+        }
+        self.over_cap_boons.push(id.to_string());
+        true
+    }
+
+    pub fn is_clean(&self) -> bool {
+        self.unknown_stats.is_empty() && self.over_cap_boons.is_empty()
+    }
+}
+
+/// Décomposition du multiplicateur de dégâts **par source** (V0).
+///
+/// Cinq systèmes alimentent `PlayerCombatMods.damage_mul` et le modèle de
+/// difficulté (`rounds.rs`) ne connaît d'eux qu'un seul chiffre agrégé posé à la
+/// main (`gain_puissance_par_round`). Sans cette décomposition, le mur est calculé
+/// contre une abstraction plutôt que contre la puissance réelle du joueur.
+///
+/// **Écrite par le compositeur lui-même**, pas recalculée par le capteur : un
+/// capteur qui refait le calcul finit toujours par diverger de la vérité qu'il
+/// prétend mesurer (`map-design-patterns.md` §14 — pas de source auto-référente).
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub struct PowerBreakdown {
+    /// Produit des `DamageMul` des atouts actifs (run).
+    pub boons: f32,
+    /// L'Enclume des Âmes — permanent.
+    pub perm: f32,
+    /// Maîtrise de l'arme équipée — permanent.
+    pub mastery: f32,
+    /// La Trempe de l'arme équipée — run.
+    pub trempe: f32,
+    /// Pièces d'équipement portées — run.
+    pub equip: f32,
+    /// Ce que le fire path applique réellement (= produit des cinq).
+    pub total: f32,
+    /// Nombre d'atouts actifs, tous effets confondus.
+    pub boon_count: u32,
+    /// Parmi eux, ceux qui portent réellement un `DamageMul`.
+    ///
+    /// Sans ce compte, `boons = 1.000` avec `boon_count = 2` est **ambigu** : on ne
+    /// distingue pas « deux atouts qui ne font pas de dégâts » (normal — cadence,
+    /// soin, crit) de « deux atouts inertes » (défaut). Un zéro qu'on ne peut pas
+    /// interpréter n'est pas vert, il est aveugle (`map-design-patterns.md` §13).
+    pub boon_damage_count: u32,
+}
+
+impl Default for PowerBreakdown {
+    fn default() -> Self {
+        Self {
+            boons: 1.0,
+            perm: 1.0,
+            mastery: 1.0,
+            trempe: 1.0,
+            equip: 1.0,
+            total: 1.0,
+            boon_count: 0,
+            boon_damage_count: 0,
+        }
+    }
 }
 
 /// Recompute `PlayerCombatMods` + `HealOnKillCumul` quand `ActiveBoons` change.
@@ -41,6 +161,11 @@ pub fn sys_recompute_boon_mods(
     equip: Res<crate::equipment::EquipmentMods>,
     mut mods: ResMut<PlayerCombatMods>,
     mut heal: ResMut<HealOnKillCumul>,
+    // V0 — la décomposition par source, écrite ici pour qu'aucun capteur n'ait à
+    // la recalculer (et donc à diverger).
+    mut breakdown: ResMut<PowerBreakdown>,
+    // Ce que la composition n'a pas su appliquer — jamais silencieux.
+    mut issues: ResMut<BoonRoutingIssues>,
 ) {
     // Fix 2026-06-28 — PLUS de garde `is_changed` : la détection de changement sur
     // ActiveBoons ratait les picks en runtime (boons inertes — crit/damage jamais
@@ -51,12 +176,28 @@ pub fn sys_recompute_boon_mods(
     // uniquement quand le résultat change (pas de spam every-frame).
     let mut new_mods = PlayerCombatMods::default();
     let mut new_heal = 0.0_f32;
+    let mut boon_damage_count = 0_u32;
     for id in &active.active {
         let Some(def) = catalogue.find(id) else {
             continue;
         };
+        // Un atout filtré par arme qui dépasse le plafond bat le matchup élémentaire
+        // partout : il ne casse rien mécaniquement, il supprime une DÉCISION.
+        // Détecté ici parce que le catalogue est hot-reloadable — un test seul ne
+        // verrait pas une édition TOML faite pendant que le jeu tourne.
+        if !weapon_filtered_bonus_is_within_cap(def) && issues.note_over_cap(&def.id.0) {
+            error!(
+                "[boons] « {} » favorise une arme au-delà de ×{WEAPON_FILTERED_DAMAGE_CAP} — \
+                 il bat le matchup élémentaire (max ×2.0) partout, donc le joueur cessera \
+                 de changer d'arme. Baisse le facteur, ou retire le weapon_filter.",
+                def.name
+            );
+        }
         match &def.effect {
-            BoonEffectKind::DamageMul { factor } => new_mods.damage_mul *= factor,
+            BoonEffectKind::DamageMul { factor } => {
+                new_mods.damage_mul *= factor;
+                boon_damage_count += 1;
+            }
             BoonEffectKind::FireRateMul { factor } => new_mods.fire_rate_mul *= factor,
             BoonEffectKind::HealOnKill { hp } => new_heal += hp,
             // Story-558 Phase 4b (2026-05-29) — cumul des 4 effets restants.
@@ -78,13 +219,42 @@ pub fn sys_recompute_boon_mods(
                 "headshot_mul" => {
                     new_mods.headshot_bonus_mul += amount;
                 }
+                // 2026-08-04 — la famille ENTRETIEN. Additifs entre eux (deux
+                // atouts +25 % donnent +50 %, pas ×1,56) : c'est plus lisible
+                // pour le joueur, et ça évite qu'une pile de doublons explose.
+                "reload_speed" => {
+                    new_mods.reload_speed_mul += amount;
+                }
+                "mag_size" => {
+                    new_mods.mag_size_mul += amount;
+                }
+                // Famille CORPS — neutre pour le pilier (n'attache rien à une arme).
+                "move_speed" => {
+                    new_mods.move_speed_mul += amount;
+                }
+                // Famille RÉCOLTE — se multiplie avec elle-même, doser bas.
+                "loot_gain" => {
+                    new_mods.loot_gain_mul += amount;
+                }
                 _ => {
-                    // Stat inconnue — log au debug, pas warn (TOML peut évoluer).
-                    debug!("[boons] flat_bonus stat unknown: {stat}");
+                    // Stat routée nulle part = atout INERTE, payé en Âmes, et qui
+                    // compile. `error!` UNE fois (ce système tourne chaque frame),
+                    // puis la trace vit dans le capteur.
+                    if issues.note_unknown_stat(stat) {
+                        error!(
+                            "[boons] « {} » porte flat_bonus stat=\"{stat}\" qui n'est routée \
+                             nulle part : l'atout est INERTE et le joueur le paie. Ajoute la \
+                             branche dans sys_recompute_boon_mods, ou corrige le TOML.",
+                            def.name
+                        );
+                    }
                 }
             },
         }
     }
+    // V0 — la part des ATOUTS seuls, capturée avant que les quatre autres sources
+    // ne s'y composent. C'est le seul endroit où elle est isolable.
+    let boons_only = new_mods.damage_mul;
     // Story-591 — compose les bonus PERMANENTS (méta) par-dessus les boons,
     // AVANT l'overwrite (sinon sys_recompute les écraserait à chaque boon).
     new_mods.damage_mul *= perm.damage_mul;
@@ -102,6 +272,21 @@ pub fn sys_recompute_boon_mods(
     new_mods.headshot_bonus_mul += equip.headshot_bonus_mul;
     new_mods.damage_reduction =
         (new_mods.damage_reduction + perm.damage_reduction + equip.damage_reduction).min(0.85);
+    // V0 — la décomposition. `total` est relu depuis `new_mods` et non recomposé :
+    // c'est exactement ce que le fire path appliquera, pas une reconstruction.
+    let new_breakdown = PowerBreakdown {
+        boons: boons_only,
+        perm: perm.damage_mul,
+        mastery: mastery.damage_mul,
+        trempe: trempe.damage_mul,
+        equip: equip.damage_mul,
+        total: new_mods.damage_mul,
+        boon_count: active.active.len() as u32,
+        boon_damage_count,
+    };
+    if *breakdown != new_breakdown {
+        *breakdown = new_breakdown;
+    }
     // Log seulement au changement (recompute tourne chaque frame désormais).
     let changed = *mods != new_mods || (heal.hp_per_kill - new_heal).abs() > f32::EPSILON;
     *mods = new_mods;
@@ -259,9 +444,18 @@ pub fn sys_apply_chain_targets(
 
 /// OnExit Roguelite — reset Mods + heal cumul à neutre.
 /// Évite que les boons d'une run Roguelite polluent Arena/RPG.
-pub fn sys_reset_boon_mods(mut mods: ResMut<PlayerCombatMods>, mut heal: ResMut<HealOnKillCumul>) {
+pub fn sys_reset_boon_mods(
+    mut mods: ResMut<PlayerCombatMods>,
+    mut heal: ResMut<HealOnKillCumul>,
+    mut breakdown: ResMut<PowerBreakdown>,
+    mut issues: ResMut<BoonRoutingIssues>,
+) {
     mods.reset();
     heal.hp_per_kill = 0.0;
+    *breakdown = PowerBreakdown::default();
+    // Les défauts de routage se re-signalent à la run suivante : un catalogue
+    // hot-reloadé entre deux runs peut en introduire comme en corriger.
+    *issues = BoonRoutingIssues::default();
 }
 
 /// Observer DeathEvent — si target = enemy Roguelite (a `EnemyArchetype`),
@@ -366,5 +560,149 @@ mod tests {
         }
         assert_eq!(mods.damage_mul, 1.0);
         assert_eq!(mods.fire_rate_mul, 1.0);
+    }
+
+    // ── Le plafond des atouts filtrés par arme ───────────────────────────────
+    // Ces tests encodent une règle de DESIGN, pas un comportement du code actuel :
+    // `weapon_filter` n'est lu nulle part aujourd'hui, donc tous les atouts sont
+    // universels. Ils existent pour que le jour où quelqu'un le câble, la limite
+    // soit déjà là — et pas redécouverte en playtest.
+
+    fn filtered(id: &str, effect: BoonEffectKind, weapons: &[&str]) -> BoonDef {
+        BoonDef {
+            weapon_filter: Some(weapons.iter().map(|s| (*s).to_string()).collect()),
+            ..def(id, effect)
+        }
+    }
+
+    #[test]
+    fn un_atout_universel_nest_pas_plafonne() {
+        // Un ×2 pour TOUTES les armes ne crée aucune raison d'en préférer une :
+        // il n'entre pas en concurrence avec le matchup élémentaire.
+        let d = def("puissant", BoonEffectKind::DamageMul { factor: 2.0 });
+        assert!(weapon_filtered_bonus_is_within_cap(&d));
+    }
+
+    #[test]
+    fn un_atout_darme_sous_le_plafond_passe() {
+        let d = filtered(
+            "pepin_affute",
+            BoonEffectKind::DamageMul { factor: 1.25 },
+            &["pepin"],
+        );
+        assert!(weapon_filtered_bonus_is_within_cap(&d));
+    }
+
+    #[test]
+    fn un_atout_darme_qui_bat_le_matchup_est_refuse() {
+        // ×2.0 filtré = exactement l'écart max du matchup (armor_pierce vs Tank).
+        // Le joueur garderait cette arme même face à l'ennemi qui la contre.
+        let d = filtered(
+            "pepin_devastateur",
+            BoonEffectKind::DamageMul { factor: 2.0 },
+            &["pepin"],
+        );
+        assert!(!weapon_filtered_bonus_is_within_cap(&d));
+    }
+
+    #[test]
+    fn le_plafond_ne_concerne_que_les_degats() {
+        // Cadence, soin, chaîne : ils ne pèsent pas dans l'arbitrage de matchup,
+        // qui se joue en dégâts. Les plafonner brimerait sans rien protéger.
+        let d = filtered(
+            "pepin_rapide",
+            BoonEffectKind::FireRateMul { factor: 3.0 },
+            &["pepin"],
+        );
+        assert!(weapon_filtered_bonus_is_within_cap(&d));
+    }
+
+    #[test]
+    fn un_filtre_vide_vaut_universel() {
+        let d = filtered("bizarre", BoonEffectKind::DamageMul { factor: 2.0 }, &[]);
+        assert!(weapon_filtered_bonus_is_within_cap(&d));
+    }
+
+    // ── Le silence de FlatBonus ──────────────────────────────────────────────
+
+    #[test]
+    fn une_stat_inconnue_ne_se_signale_quune_fois() {
+        // Le recompute tourne CHAQUE FRAME : sans ce dédoublonnage, l'alerte
+        // deviendrait 60 lignes/seconde, donc illisible, donc ignorée.
+        let mut issues = BoonRoutingIssues::default();
+        assert!(issues.note_unknown_stat("reload_speed"), "1re fois → on loggue");
+        assert!(
+            !issues.note_unknown_stat("reload_speed"),
+            "2e fois → silencieux, mais la trace reste"
+        );
+        assert_eq!(issues.unknown_stats, vec!["reload_speed".to_string()]);
+        assert!(!issues.is_clean());
+    }
+
+    #[test]
+    fn des_stats_inconnues_distinctes_se_signalent_chacune() {
+        let mut issues = BoonRoutingIssues::default();
+        assert!(issues.note_unknown_stat("reload_speed"));
+        assert!(issues.note_unknown_stat("ammo_capacity"));
+        assert_eq!(issues.unknown_stats.len(), 2);
+    }
+
+    #[test]
+    fn un_catalogue_sain_ne_produit_aucun_defaut() {
+        let issues = BoonRoutingIssues::default();
+        assert!(issues.is_clean());
+    }
+
+    // ── La décomposition ─────────────────────────────────────────────────────
+
+    #[test]
+    fn la_decomposition_part_neutre() {
+        let b = PowerBreakdown::default();
+        assert_eq!(b.total, 1.0);
+        assert_eq!(b.boons, 1.0);
+        assert_eq!(b.boon_count, 0);
+        assert_eq!(b.boon_damage_count, 0);
+    }
+
+    #[test]
+    fn des_atouts_sans_degats_ne_se_lisent_pas_comme_des_atouts_inertes() {
+        // Le cas mesuré le 2026-08-04 : 2 atouts actifs, `boons` à 1.000. Avec le
+        // seul `boon_count`, impossible de dire si c'est normal ou cassé.
+        let sains = PowerBreakdown {
+            boon_count: 2,
+            boon_damage_count: 0, // 2 atouts, aucun de dégâts → 1.000 est CORRECT
+            ..Default::default()
+        };
+        assert_eq!(sains.boons, 1.0);
+        assert_eq!(sains.boon_damage_count, 0, "rien à appliquer, rien d'anormal");
+
+        let suspect = PowerBreakdown {
+            boon_count: 2,
+            boon_damage_count: 2, // 2 atouts de dégâts mais `boons` neutre → défaut
+            ..Default::default()
+        };
+        assert!(
+            suspect.boon_damage_count > 0 && suspect.boons == 1.0,
+            "ce cas-là mérite une alerte, l'autre non — les deux compteurs les séparent"
+        );
+    }
+
+    #[test]
+    fn le_total_est_le_produit_des_cinq_sources() {
+        // C'est l'invariant que le capteur publie : si ce produit cesse d'égaler
+        // `total`, c'est qu'une 6e source s'est branchée sans être décomposée —
+        // et le modèle de difficulté ne la verrait pas.
+        let b = PowerBreakdown {
+            boons: 1.15,
+            perm: 1.40,
+            mastery: 1.20,
+            trempe: 2.01,
+            equip: 1.10,
+            total: 1.15 * 1.40 * 1.20 * 2.01 * 1.10,
+            boon_count: 1,
+            boon_damage_count: 1,
+        };
+        let produit = b.boons * b.perm * b.mastery * b.trempe * b.equip;
+        assert!((b.total - produit).abs() < 1e-4);
     }
 }

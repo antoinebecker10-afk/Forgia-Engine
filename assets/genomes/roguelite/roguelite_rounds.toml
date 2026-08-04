@@ -10,8 +10,34 @@
 [boucle]
 # false → comportement d'avant (le graphe de salles pilote la run).
 enabled = true
-# 0 = rounds infinis. Sinon la run se termine en Victoire à ce round.
-max_rounds = 0
+
+# 0 = rounds infinis. Sinon le boss tombe à ce round et la run se termine en
+# Victoire (`waves.rs` : `boss_stage = max_rounds`).
+#
+# ── 10 = UN CHAPITRE (2026-08-04) ────────────────────────────────────────────
+# La run EST un chapitre ; le Livre est la campagne qui en enchaîne cinq, chacun
+# avec sa direction artistique. À 0, l'état `Victory` était inatteignable : on ne
+# pouvait que perdre, et un roguelite sans victoire est un mode survie.
+#
+# Pourquoi 10 et pas 50 (le Livre entier) : mesuré à ~54 s par round, dix rounds
+# font ~9 min de combat, ~15 min avec les boutiques et le loot — le format de
+# Dicero. Une run de 50 rounds ferait 75 min, et mourir au round 48 serait
+# hostile, pas difficile.
+#
+# ⚠️ Ce n'était PAS un simple réglage : « borné » impliquait « graphe » dans
+# l'UI. `hud::run_progress_label` n'avait que deux modes (boucle infinie →
+# « ROUND N », graphe → « SALLE 4 / 4 »), donc poser 10 affichait
+# « SALLE 4 / 4 · BOSS » dès le premier round. Un TROISIÈME mode a été ajouté :
+# rounds bornés, « ROUND 3 / 10 », boss au dernier. C'était le symptôme concret
+# de « la boucle de rounds et le graphe de salles n'ont jamais été mariés ».
+#
+# La courbe de menace ci-dessous n'a PAS eu besoin de bouger : avec
+# `palier_tous_les = 3`, les paliers tombent aux rounds 3, 6 et 9, puis le boss
+# au 10 — trois marches ressenties, puis l'affrontement. Et les deux murs
+# encadrent la cible : un joueur qui ne prend rien tombe au round 7 (il ne voit
+# jamais le boss), un joueur qui prend tout tient jusqu'au 15 (il le bat).
+#
+max_rounds = 10
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LA COURBE DE MENACE
@@ -39,6 +65,44 @@ palier_tous_les = 3
 palier_pv = 1.22
 # Idem dégâts.
 palier_degats = 1.10
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LE PALIER DE CHAPITRE — ce qui rend le Livre progressif (2026-08-04)
+# ─────────────────────────────────────────────────────────────────────────────
+# La menace ci-dessus monte DANS un chapitre. Celle-ci monte ENTRE les chapitres :
+# le chapitre N démarre plus haut que le N−1, et c'est la progression PERMANENTE
+# (Enclume, maîtrise, équipement) qui doit combler l'écart — la Trempe et les
+# atouts, eux, repartent à zéro à chaque run.
+#
+# ── La valeur est DÉRIVÉE d'un plafond, pas choisie ──────────────────────────
+# Tout ce qu'un compte maxé peut apporter au chapitre 10 :
+#
+#   Enclume « Puissance »   ×1.40   (5 rangs × +8 %)
+#   Maîtrise d'arme         ×1.20   (5 niveaux effectifs × +4 %)
+#   Jambières mythiques     ×1.20   (seul slot à donner des DÉGÂTS : 0.04 × 5)
+#   Gants mythiques         ×1.20   (cadence — multiplie le DPS aussi)
+#   ────────────────────────────────
+#   PLAFOND                 ×2.42
+#
+# Au-delà, le dernier chapitre serait infranchissable MÊME équipé à fond.
+# 1.08^9 = ×2.00 au chapitre 10 : il reste ~20 % de marge, donc un joueur maxé
+# est légèrement devant — c'est juste, il a aussi progressé en habileté. Un
+# joueur qui n'a rien investi affronte le chapitre 10 à puissance de chapitre 1
+# et se heurte au mur bien avant : c'est exactement l'intention.
+#
+# ⚠️ Un test (`the_last_chapter_stays_within_reach_of_a_maxed_account`) refuse
+# toute valeur qui ferait dépasser ce plafond. Le monter ici sans monter le
+# plafond casse le build — c'est voulu.
+#
+# ⚠️ La face « Puissance » de l'Enclume est EXCLUSIVE avec « Fortune » (+Or).
+# Un joueur qui reste sur Fortune plafonne à ×1.73 et perd la marge. C'est un
+# vrai choix, mais il resserre le Livre.
+#
+# Croissance de la vie ennemie par CHAPITRE. 1.08 → chapitre 10 = ×2.00.
+palier_chapitre_pv = 1.08
+# Idem dégâts, volontairement plus douce (même raison qu'au round : un chapitre
+# qui tue en deux balles n'est pas dur, il est injuste). 1.04 → ×1.42 au 10.
+palier_chapitre_degats = 1.04
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LE MUR — ce qui rend la montée en perfs OBLIGATOIRE

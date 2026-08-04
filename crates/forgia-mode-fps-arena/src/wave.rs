@@ -355,6 +355,10 @@ pub fn spawn_wave_bots(
                 // Visibility::default() supprimé — fourni par #[require(Visibility)] sur TargetCube.
                 Health::new(hp),
                 ArenaBot {
+                    // Le chien de garde de désenlisement démarre à zéro : c'est
+                    // le déplacement qui le nourrit, jamais la naissance.
+                    stuck_secs: 0.0,
+                    unstick_left: 0.0,
                     state: forgia_ai_arena_bot::BotState::Idle,
                     // Story-456 Phase 1 — speed depuis genome (était 0.0 hardcoded V2 baseline).
                     speed: ai.speed,

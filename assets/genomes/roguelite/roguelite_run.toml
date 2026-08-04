@@ -38,6 +38,16 @@ default = 2.0
 layer = "roguelite"
 
 # story-646 R2 — vagues par salle COMBAT (la salle Boss = 1 vague boss).
+#
+# 2026-08-04 : 2 → 3. C'est ce nombre qui découpe un chapitre en ARÈNES — un
+# chapitre de 10 rounds tient en 4 arènes (rounds 1-3, 4-6, 7-9, puis le boss),
+# donc le décor change aux rounds 3, 6 et 9, pile là où tombent les paliers de
+# difficulté (`roguelite_rounds.toml [menace] palier_tous_les = 3`).
+#
+# ⚠️ Une ARÈNE n'est pas un ROUND : le round est le COMBAT, et il y en a trois
+# par arène. Le compteur du HUD, les paliers et la menace lisent tous
+# `RogueliteWave::round`, jamais `stage`. Changer cette valeur change donc le
+# nombre d'arènes d'un chapitre, PAS son nombre de rounds (`max_rounds`).
 [[genes]]
 id = "roguelite_waves_per_stage"
 label = "Vagues par salle"
@@ -45,7 +55,7 @@ chromosome = "Run"
 target = "Value"
 min = 1.0
 max = 5.0
-default = 2.0
+default = 3.0
 layer = "roguelite"
 
 # === Difficulty Director (RoR2 pattern) ===

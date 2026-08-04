@@ -12,6 +12,8 @@
 
 use bevy::image::{ImagePlugin, ImageSamplerDescriptor};
 use bevy::prelude::*;
+#[cfg(feature = "dev-brp")]
+use bevy::remote::{http::RemoteHttpPlugin, RemotePlugin};
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
 
@@ -84,6 +86,12 @@ pub fn run_game() -> AppExit {
                 },
             }),
     );
+
+    // Pont d'inspection ECS pour les agents de développement. La feature est
+    // absente des builds normaux et release : le port BRP 15702 n'est donc
+    // jamais ouvert par défaut.
+    #[cfg(feature = "dev-brp")]
+    app.add_plugins((RemotePlugin::default(), RemoteHttpPlugin::default()));
 
     // 2. Forgia Core (init_state nécessite StatesPlugin déjà chargé)
     app.add_plugins(ForgiaCorePlugin);

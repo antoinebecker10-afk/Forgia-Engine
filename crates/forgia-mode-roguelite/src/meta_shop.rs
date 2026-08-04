@@ -238,6 +238,39 @@ impl MasteryConfig {
     pub fn effective_level(&self, stored: u32) -> u32 {
         stored.min(self.max_level.max(1))
     }
+
+    /// Le bonus de maîtrise **TOTAL**, toutes armes confondues.
+    ///
+    /// ## Pourquoi ce n'est plus « l'arme équipée » (2026-08-04)
+    ///
+    /// Le bonus valait celui de l'arme en main. Passer de Pépin (niveau 6, ×1,20)
+    /// à Boucherie (niveau 2, ×1,04) coûtait **13 % de dégâts** — quand la table
+    /// de matchup élémentaire, elle, rend au mieux ×2,0 et seulement contre le
+    /// bon archétype. Le jeu PUNISSAIT donc précisément le geste qu'il prétend
+    /// récompenser : changer d'arme selon l'ennemi.
+    ///
+    /// Maintenant : la somme des niveaux acquis, plafonnée au **même total**.
+    /// Monter une arme à fond ou quatre armes à un quart donne le même bonus, et
+    /// changer d'arme en plein combat ne coûte plus rien — le bonus ne dépend
+    /// plus de ce qu'on tient.
+    ///
+    /// Le plafond est inchangé (`max_level - 1` niveaux × `damage_per_level`),
+    /// donc la courbe de difficulté du Livre n'est pas touchée : c'est la
+    /// RÉPARTITION qui devient libre, pas le total.
+    ///
+    /// Effet de bord heureux : la désynchronisation corrigée plus tôt (maîtrise
+    /// figée sur l'arme du wizard) devient **impossible** — il n'y a plus d'arme
+    /// courante dans ce calcul.
+    ///
+    /// PUR — testable sans App.
+    pub fn total_damage_mul(&self, weapon_levels: &HashMap<String, u32>) -> f32 {
+        let acquis: u32 = weapon_levels
+            .values()
+            .map(|lvl| self.effective_level(*lvl).saturating_sub(1))
+            .sum();
+        let plafond = self.max_level.saturating_sub(1);
+        1.0 + acquis.min(plafond) as f32 * self.damage_per_level
+    }
 }
 
 #[derive(Resource, Clone, Debug)]
@@ -555,6 +588,69 @@ pub struct MetaShopSave {
     /// R3.3 — total de victoires.
     #[serde(default)]
     pub victories: u32,
+    /// 2026-08-04 — **chapitres terminés**, 1-indexé (0 = aucun).
+    ///
+    /// Le Livre s'ouvre chapitre par chapitre : on ne peut entrer dans le
+    /// suivant qu'après avoir battu le boss du précédent. `#[serde(default)]` :
+    /// les sauvegardes antérieures repartent à 0 sans migration.
+    #[serde(default)]
+    pub chapters_cleared: u32,
+}
+
+/// Nombre de chapitres d'un Livre.
+///
+/// 10 pour l'instant (décision du 2026-08-04). C'est la longueur de la campagne,
+/// pas celle d'une run : une run EST un chapitre.
+pub const CHAPTERS_PER_BOOK: u32 = 10;
+
+/// Le chapitre `chapter` (1-indexé) est-il jouable ?
+///
+/// Règle : on peut rejouer tout ce qu'on a déjà fini, plus **exactement un**
+/// chapitre d'avance — le premier non battu. Pas de saut.
+///
+/// PUR — testable sans App.
+pub fn chapter_unlocked(chapter: u32, chapters_cleared: u32) -> bool {
+    chapter >= 1 && chapter <= CHAPTERS_PER_BOOK && chapter <= chapters_cleared + 1
+}
+
+/// Le chapitre le plus avancé qu'on puisse lancer — celui que le Lobby propose
+/// par défaut.
+pub fn furthest_playable_chapter(chapters_cleared: u32) -> u32 {
+    (chapters_cleared + 1).min(CHAPTERS_PER_BOOK)
+}
+
+/// Enregistre qu'un chapitre vient d'être battu.
+///
+/// **Ne recule jamais** : rejouer le chapitre 3 alors qu'on a fini le 7 ne doit
+/// pas re-verrouiller les quatre suivants. C'est un maximum, pas un curseur.
+///
+/// PUR — testable sans App.
+pub fn record_chapter_cleared(save: &mut MetaShopSave, chapter: u32) {
+    if chapter == 0 || chapter > CHAPTERS_PER_BOOK {
+        return;
+    }
+    save.chapters_cleared = save.chapters_cleared.max(chapter);
+}
+
+/// Le chapitre choisi au Lobby pour la run à venir (1-indexé).
+///
+/// Borné à ce que la sauvegarde autorise : une valeur héritée d'une session
+/// précédente ne doit pas ouvrir un chapitre verrouillé.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SelectedChapter(pub u32);
+
+impl Default for SelectedChapter {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+impl SelectedChapter {
+    /// Ramène la sélection dans ce que la progression autorise.
+    pub fn clamped(self, chapters_cleared: u32) -> u32 {
+        self.0
+            .clamp(1, furthest_playable_chapter(chapters_cleared))
+    }
 }
 
 /// Pépin = arme de départ : toujours débloquée (story-613).
@@ -575,7 +671,66 @@ impl Default for MetaShopSave {
             best_victory_secs: 0.0,
             runs_played: 0,
             victories: 0,
+            chapters_cleared: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod chapter_tests {
+    use super::*;
+
+    /// La règle de ton Livre : on rejoue ce qu'on a fini, plus UN chapitre
+    /// d'avance. Jamais de saut.
+    #[test]
+    fn a_fresh_save_opens_only_the_first_chapter() {
+        assert!(chapter_unlocked(1, 0));
+        assert!(!chapter_unlocked(2, 0), "on ne saute pas le premier boss");
+        assert_eq!(furthest_playable_chapter(0), 1);
+    }
+
+    #[test]
+    fn beating_a_boss_opens_exactly_the_next_chapter() {
+        let mut save = MetaShopSave::default();
+        record_chapter_cleared(&mut save, 1);
+        assert!(chapter_unlocked(2, save.chapters_cleared));
+        assert!(!chapter_unlocked(3, save.chapters_cleared), "un seul cran");
+        assert_eq!(furthest_playable_chapter(save.chapters_cleared), 2);
+    }
+
+    /// Rejouer un chapitre déjà battu ne doit RIEN re-verrouiller — sinon on
+    /// punirait le joueur de revenir farmer, ce qui est exactement l'usage.
+    #[test]
+    fn replaying_an_old_chapter_never_takes_progress_away() {
+        let mut save = MetaShopSave::default();
+        record_chapter_cleared(&mut save, 7);
+        record_chapter_cleared(&mut save, 3);
+        assert_eq!(save.chapters_cleared, 7);
+        assert!(chapter_unlocked(8, save.chapters_cleared));
+    }
+
+    #[test]
+    fn the_book_stops_at_its_last_chapter() {
+        let mut save = MetaShopSave::default();
+        record_chapter_cleared(&mut save, CHAPTERS_PER_BOOK);
+        assert!(chapter_unlocked(CHAPTERS_PER_BOOK, save.chapters_cleared));
+        assert!(!chapter_unlocked(CHAPTERS_PER_BOOK + 1, save.chapters_cleared));
+        assert_eq!(
+            furthest_playable_chapter(save.chapters_cleared),
+            CHAPTERS_PER_BOOK
+        );
+        // Un chapitre hors Livre ne s'enregistre pas.
+        record_chapter_cleared(&mut save, 99);
+        assert_eq!(save.chapters_cleared, CHAPTERS_PER_BOOK);
+    }
+
+    /// Une sélection héritée d'une session précédente ne doit pas ouvrir un
+    /// chapitre verrouillé — le Lobby borne, il ne fait pas confiance.
+    #[test]
+    fn a_stale_selection_cannot_unlock_anything() {
+        assert_eq!(SelectedChapter(9).clamped(0), 1);
+        assert_eq!(SelectedChapter(9).clamped(4), 5);
+        assert_eq!(SelectedChapter(0).clamped(4), 1, "pas de chapitre 0");
     }
 }
 
@@ -608,12 +763,25 @@ pub struct LastRunStats {
 pub fn sys_record_run_stats(
     run_state: Res<State<RunState>>,
     timer: Res<crate::run::RunTimer>,
+    // 2026-08-04 — quel chapitre vient d'être joué : c'est LUI qu'on débloque.
+    chapter: Res<SelectedChapter>,
     mut save: ResMut<MetaShopSave>,
     mut last: ResMut<LastRunStats>,
 ) {
     let victory = matches!(run_state.get(), RunState::Victory);
     last.secs = timer.secs;
     last.new_best = record_run_result(&mut save, timer.secs, victory);
+    // Une victoire ouvre le chapitre suivant. On enregistre le chapitre JOUÉ,
+    // pas « le suivant » : `record_chapter_cleared` prend un maximum, donc
+    // rejouer un chapitre déjà battu ne re-verrouille rien.
+    if victory {
+        let joue = chapter.clamped(save.chapters_cleared);
+        record_chapter_cleared(&mut save, joue);
+        info!(
+            "[meta-shop] CHAPITRE {joue} terminé — {} / {CHAPTERS_PER_BOOK} ouverts",
+            furthest_playable_chapter(save.chapters_cleared)
+        );
+    }
     info!(
         "[meta-shop] run #{} — {} en {:.0}s{} (victoires {}, record {:.0}s)",
         save.runs_played,
@@ -797,16 +965,34 @@ impl Default for PermanentPlayerMods {
 }
 
 /// Bonus de dégâts issu du NIVEAU de maîtrise de l'arme équipée (P3). Recalculé au
-/// run-start (`sys_apply_weapon_choice`) ; composé dans `PlayerCombatMods.damage_mul`
-/// par `boons_apply` (en plus des boons per-run et des mods méta permanents).
+/// run-start (`sys_apply_weapon_choice`) puis **réaligné sur l'arme équipée** à
+/// chaque frame par `weapon_select::sys_sync_mastery_current` ; composé dans
+/// `PlayerCombatMods.damage_mul` par `boons_apply`.
+///
+/// ## Pourquoi le resync existe (2026-08-04)
+///
+/// Avant, ce bonus n'était calculé qu'au **run-start** : changer d'arme en jeu
+/// (Digit1-4) gardait la maîtrise de l'arme de départ. Mesuré sur une run réelle
+/// via `forgia2_power.json` : arme Boucherie (niveau 2) portant le ×1,20 de Pépin,
+/// puis arme Pépin (niveau 13, plafonné) ne touchant que le ×1,04 de Boucherie —
+/// parfaitement inversé. Le défaut coupait dans les deux sens, et il punissait
+/// précisément le geste que le jeu veut encourager : changer d'arme selon l'ennemi.
+///
+/// La Trempe faisait déjà ce resync (`trempe::sys_sync_trempe_current`) ; les deux
+/// progressions d'arme se comportent désormais pareil.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct WeaponMasteryMods {
     pub damage_mul: f32,
+    /// Arme dont `damage_mul` reflète le niveau (cohérence affichage/recompute).
+    pub current: forgia_combat::weapons::WeaponType,
 }
 
 impl Default for WeaponMasteryMods {
     fn default() -> Self {
-        Self { damage_mul: 1.0 }
+        Self {
+            damage_mul: 1.0,
+            current: forgia_combat::weapons::WeaponType::default(),
+        }
     }
 }
 
@@ -1376,6 +1562,10 @@ impl Plugin for MetaShopPlugin {
         app.init_resource::<MetaShopCatalogue>();
         app.init_resource::<PermanentPlayerMods>();
         app.init_resource::<WeaponMasteryMods>();
+        // 2026-08-04 — le chapitre choisi au Lobby. Sans cette ligne,
+        // `sys_record_run_stats` échoue à la validation de ses paramètres en fin
+        // de run : une Resource non enregistrée ne se voit qu'au runtime.
+        app.init_resource::<SelectedChapter>();
         // Charge le disque une fois au boot (écrase les Default).
         app.add_systems(Startup, sys_load_meta_shop);
         // Hub Lobby : achats + lancement.
@@ -1906,5 +2096,84 @@ mod face_tests {
                 u.id
             );
         }
+    }
+}
+
+// ─── La maîtrise ne dépend plus de l'arme en main (2026-08-04) ───────────────
+
+#[cfg(test)]
+mod mastery_total_tests {
+    use super::*;
+
+    fn cat() -> MetaShopCatalogue {
+        MetaShopCatalogue::default()
+    }
+
+    fn levels(pairs: &[(&str, u32)]) -> HashMap<String, u32> {
+        pairs.iter().map(|(k, v)| ((*k).to_string(), *v)).collect()
+    }
+
+    /// **LE test de la règle.** Changer d'arme ne doit RIEN coûter — sinon le jeu
+    /// punit le geste que la table de matchup récompense, et le joueur optimal
+    /// ignore le matchup.
+    #[test]
+    fn switching_weapons_costs_nothing() {
+        let c = cat();
+        let save = levels(&[("pepin", 6), ("boucherie", 2)]);
+        // Le bonus est le même quelle que soit l'arme en main : il n'en dépend
+        // plus du tout. C'est ça, la correction.
+        let bonus = c.mastery.total_damage_mul(&save);
+        assert!(bonus > 1.0, "il y a bien un bonus à avoir");
+        // Avant, ces deux lectures différaient de 13 points de pourcentage.
+        let ancien_pepin = c.mastery.damage_mul(6);
+        let ancien_boucherie = c.mastery.damage_mul(2);
+        assert!(
+            (ancien_pepin - ancien_boucherie).abs() > 0.1,
+            "le défaut d'origine : 13 % d'écart selon l'arme tenue"
+        );
+    }
+
+    /// Monter UNE arme à fond ou QUATRE armes à un quart donne le même total.
+    /// La répartition devient libre ; le plafond, lui, ne bouge pas.
+    #[test]
+    fn spreading_across_weapons_is_as_good_as_focusing() {
+        let c = cat();
+        let concentre = c.mastery.total_damage_mul(&levels(&[("pepin", 6)]));
+        let etale = c.mastery.total_damage_mul(&levels(&[
+            ("pepin", 3),
+            ("bourrasque", 2),
+            ("madame_lenoir", 2),
+            ("boucherie", 2),
+        ]));
+        // 5 niveaux acquis d'un côté, 2+1+1+1 = 5 de l'autre.
+        assert!((concentre - etale).abs() < 1e-5, "{concentre} vs {etale}");
+    }
+
+    /// Le plafond est INCHANGÉ : la courbe de difficulté du Livre s'appuie dessus
+    /// (`the_last_chapter_stays_within_reach_of_a_maxed_account` compte ×1,20).
+    #[test]
+    fn the_ceiling_is_untouched_by_the_new_distribution() {
+        let c = cat();
+        let attendu = 1.0 + (c.mastery.max_level - 1) as f32 * c.mastery.damage_per_level;
+        // Quatre armes au plafond ne donnent pas quatre fois le bonus.
+        let toutes_max = c.mastery.total_damage_mul(&levels(&[
+            ("pepin", 99),
+            ("bourrasque", 99),
+            ("madame_lenoir", 99),
+            ("boucherie", 99),
+        ]));
+        assert!((toutes_max - attendu).abs() < 1e-5, "{toutes_max} vs {attendu}");
+        assert!((c.mastery.damage_mul(c.mastery.max_level) - attendu).abs() < 1e-5);
+    }
+
+    /// Une sauvegarde neuve n'a aucun bonus, et une sauvegarde legacy au-dessus du
+    /// plafond ne le dépasse pas (le clamp est à la LECTURE, jamais à l'écriture).
+    #[test]
+    fn a_fresh_save_has_no_bonus_and_a_legacy_one_stays_capped() {
+        let c = cat();
+        assert_eq!(c.mastery.total_damage_mul(&HashMap::new()), 1.0);
+        let legacy = c.mastery.total_damage_mul(&levels(&[("pepin", 13)]));
+        let plafond = 1.0 + (c.mastery.max_level - 1) as f32 * c.mastery.damage_per_level;
+        assert!((legacy - plafond).abs() < 1e-5, "niveau 13 borné au plafond");
     }
 }

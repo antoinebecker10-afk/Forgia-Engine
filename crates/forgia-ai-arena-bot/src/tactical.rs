@@ -59,6 +59,18 @@ pub struct TacticalTuning {
     /// Hauteur au-dessus du bot d'où part le rayon vers le sol (m). Doit
     /// dépasser `max_step_up_m`, sinon une marche montante ne serait jamais vue.
     pub ground_probe_height_m: f32,
+    /// Fraction du pas VOULU en dessous de laquelle on considère qu'un bot
+    /// n'avance pas. Il ne suffit pas de tester « déplacement nul » : un bot
+    /// qui rabote un mur en glissant avance encore un peu tout en tournant en
+    /// rond. Le seuil est donc RELATIF à sa vitesse, pas absolu.
+    pub stuck_progress_frac: f32,
+    /// Durée de non-progression, EN POURSUITE, avant de déclencher la sortie.
+    /// Assez long pour ne pas se déclencher sur un frôlement de mur, assez
+    /// court pour qu'un joueur ne voie pas un ennemi planté.
+    pub stuck_after_secs: f32,
+    /// Durée pendant laquelle le bot longe l'obstacle au lieu de foncer vers sa
+    /// cible. Il ne se téléporte JAMAIS : on ne change que sa direction.
+    pub unstick_secs: f32,
 }
 
 impl Default for TacticalTuning {
@@ -78,6 +90,9 @@ impl Default for TacticalTuning {
             max_step_up_m: 0.45,
             max_step_down_m: 1.2,
             ground_probe_height_m: 1.0,
+            stuck_progress_frac: 0.25,
+            stuck_after_secs: 0.7,
+            unstick_secs: 0.9,
         }
     }
 }
@@ -94,9 +109,29 @@ pub struct BotAiSensor {
     pub bots_attacking: u32,
     pub los_checks_session: u32,
     pub alerts_triggered_session: u32,
+    /// Nombre de désenlisements DÉCLENCHÉS depuis le lancement.
+    ///
+    /// Cumulé, et non instantané : les deux premiers compteurs
+    /// (`bots_unsticking` / `bots_stalling`) valent 0 dès qu'il ne reste aucun
+    /// bot vivant, donc une lecture faite après une run ne peut pas dire si le
+    /// chien de garde a servi. Un compteur qui ne sait répondre à sa propre
+    /// question est aveugle, pas vert.
+    pub unstick_triggered_session: u32,
 }
 
 // ─── Phase 2 — LOS check ───────────────────────────────────────────────
+
+/// Jusqu'où un bot PERÇOIT sa cible — sa vue, pas la portée de son arme.
+///
+/// Un bot doit pouvoir voir (donc poursuivre) bien plus loin qu'il ne peut
+/// frapper : c'est toute la différence entre un ennemi de mêlée qui charge et un
+/// ennemi de mêlée qui reste planté. Le tir garde sa propre borne
+/// (`bot_shoot_at_target`), donc élargir la vue ne fait tirer personne plus loin.
+///
+/// PUR — testable sans App.
+pub fn sight_range(shoot_range: f32, detect_range: f32) -> f32 {
+    shoot_range.max(detect_range)
+}
 
 /// Raycast bot.shoulder → player.torso à `los_check_hz`. Set `has_los` + `los_grace_left`.
 /// Filter exclut le bot lui-même via predicate (anti self-hit).
@@ -151,7 +186,21 @@ pub fn bot_los_check(
         );
         let to_target = aim_at - origin;
         let dist = to_target.length();
-        if dist < 0.5 || dist > config.range {
+        // 2026-08-04 — VOIR n'est pas TIRER.
+        //
+        // Cette borne était `config.range`, la portée de l'ARME. Un bot de mêlée
+        // l'a à ~3 m : au-delà, `has_los` retombait à false sans même lancer le
+        // rayon. Or `decide_bot_state` exige `has_los` pour passer en `Chase`,
+        // et la zone d'aggro (`detect_range`) vaut 25 m. Résultat : un mob de
+        // mêlée était AVEUGLE par construction dès 3 m, donc `Idle`, donc il ne
+        // poursuivait jamais — « les mobs ne me traquent pas alors que je suis
+        // dans leur zone d'aggro », rapporté en jeu.
+        //
+        // Le tir n'est pas élargi pour autant : `bot_shoot_at_target` porte son
+        // PROPRE garde `dist > config.range` (lib.rs). Les deux concepts sont
+        // désormais séparés — la perception porte jusqu'où le bot voit, l'arme
+        // jusqu'où elle atteint.
+        if dist < 0.5 || dist > sight_range(config.range, bot.detect_range) {
             bot.has_los = false;
             continue;
         }
@@ -436,6 +485,7 @@ pub fn bot_tactical_movement(
     rapier: ReadRapierContext,
     tuning: Res<TacticalTuning>,
     time: Res<Time>,
+    mut sensor: ResMut<BotAiSensor>,
 ) {
     let Some(target_tf) = targets.iter().next() else {
         return;
@@ -465,14 +515,21 @@ pub fn bot_tactical_movement(
         let strafe = compute_strafe_offset(&mut bot, fwd_dir, &tuning, dt);
         let desired = (fwd_dir + strafe.normalize_or_zero() * 0.4).normalize_or_zero();
         // Phase 3 obstacle avoidance.
-        let final_dir = pick_avoid_direction(
-            xf.translation,
-            desired,
-            &ctx,
-            bot_entity,
-            tuning.local_avoid_dist_m,
-        )
-        .unwrap_or(fwd_dir); // fallback forward simple si tous bloqués
+        // En sortie d'obstacle on LONGE au lieu de foncer : l'évitement local a
+        // déjà échoué (son repli est `fwd_dir`, c'est-à-dire droit dans le mur).
+        let final_dir = if bot.unstick_left > 0.0 {
+            let cote = unstick_side(bot.strafe_noise_seed);
+            Vec3::new(-fwd_dir.z, 0.0, fwd_dir.x).normalize_or_zero() * cote
+        } else {
+            pick_avoid_direction(
+                xf.translation,
+                desired,
+                &ctx,
+                bot_entity,
+                tuning.local_avoid_dist_m,
+            )
+            .unwrap_or(fwd_dir) // fallback forward simple si tous bloqués
+        };
         let step = final_dir * bot.speed * dt;
         // Anti-traversée : clamp/slide le déplacement contre les murs solides
         // (le kinematic ne s'arrête pas tout seul sur du Fixed).
@@ -492,6 +549,7 @@ pub fn bot_tactical_movement(
         // sol. Le bot reste sur place plutôt que d'escalader (il n'a ni saut ni
         // grimpe) ou de sortir de l'arène par un rebord. `bot_separation` et
         // l'évitement le feront glisser au tick suivant.
+        let avant = xf.translation;
         if let Some(y) = resolve_step_altitude(
             xf.translation.y,
             ground,
@@ -503,6 +561,116 @@ pub fn bot_tactical_movement(
             xf.translation.z = next.z;
             xf.translation.y = y;
         }
+        // Ce qu'il a RÉELLEMENT parcouru, pas ce qu'il visait. Un pas refusé en
+        // altitude vaut zéro ici — c'est justement un des deux chemins qui
+        // laissaient un bot planté sans que rien ne le voie.
+        let parcouru = (xf.translation - avant).with_y(0.0).length();
+        let etat = unstick_step(
+            StuckState {
+                stuck_secs: bot.stuck_secs,
+                unstick_left: bot.unstick_left,
+            },
+            parcouru,
+            bot.speed * dt,
+            dt,
+            &tuning,
+        );
+        // Front montant seulement : on compte les DÉCLENCHEMENTS, pas les
+        // frames passées en sortie — sinon le nombre dirait la durée.
+        if etat.is_escaping() && bot.unstick_left <= 0.0 {
+            sensor.unstick_triggered_session = sensor.unstick_triggered_session.saturating_add(1);
+        }
+        bot.stuck_secs = etat.stuck_secs;
+        bot.unstick_left = etat.unstick_left;
+    }
+}
+
+// ─── Chien de garde de désenlisement ─────────────────────────────────────────
+
+/// L'état d'enlisement d'un bot, isolé pour être décidable sans moteur.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct StuckState {
+    /// Temps cumulé en poursuite sans progresser (s).
+    pub stuck_secs: f32,
+    /// Temps restant à longer l'obstacle (s). > 0 ⇒ on ne fonce plus.
+    pub unstick_left: f32,
+}
+
+impl StuckState {
+    /// Le bot longe-t-il actuellement un obstacle ?
+    #[inline]
+    pub fn is_escaping(self) -> bool {
+        self.unstick_left > 0.0
+    }
+}
+
+/// Fait avancer l'état d'enlisement d'un pas.
+///
+/// ## Pourquoi ce chien de garde existe
+///
+/// Les bots de Forgia n'ont **pas de navmesh** : ils vont vers leur cible en
+/// ligne droite. Deux chemins les laissent immobiles pour toujours —
+/// `collide_and_slide` qui rend un pas nul contre un prop, et
+/// `resolve_step_altitude` qui refuse le pas (paroi trop haute, vide). Dans les
+/// deux cas, rien ne les rattrapait : « certains mobs se bloquent à cause des
+/// décors et donc arrêtent de me suivre », rapporté en jeu le 2026-08-04.
+///
+/// C'est le manque explicitement nommé par `spawn-clearance.md` §5, qui
+/// interdisait de prétendre que « ça n'arrive jamais » tant qu'il manquait.
+///
+/// ## Ce qu'il ne fait PAS
+///
+/// Il ne **téléporte** pas et ne repositionne pas : il change une DIRECTION. Un
+/// bot désenlisé longe l'obstacle et reste soumis à la collision — corriger un
+/// blocage en traversant le décor échangerait un défaut contre un pire.
+///
+/// Le seuil est **relatif** à la vitesse voulue, pas absolu : un bot qui rabote
+/// un mur avance encore un peu tout en tournant en rond, et un seuil absolu ne
+/// le verrait jamais.
+pub fn unstick_step(
+    mut state: StuckState,
+    moved_m: f32,
+    wanted_m: f32,
+    dt: f32,
+    tuning: &TacticalTuning,
+) -> StuckState {
+    if state.unstick_left > 0.0 {
+        state.unstick_left = (state.unstick_left - dt).max(0.0);
+        // La fenêtre de sortie se termine sur une ardoise nette : sinon le bot
+        // re-déclenche immédiatement et reste en sortie perpétuelle, sans
+        // jamais retenter d'aller vers sa cible.
+        if state.unstick_left == 0.0 {
+            state.stuck_secs = 0.0;
+        }
+        return state;
+    }
+    // Un pas voulu nul (bot à l'arrêt, cible atteinte) n'est pas un enlisement.
+    if wanted_m <= f32::EPSILON {
+        state.stuck_secs = 0.0;
+        return state;
+    }
+    if moved_m < wanted_m * tuning.stuck_progress_frac {
+        state.stuck_secs += dt;
+        if state.stuck_secs >= tuning.stuck_after_secs {
+            state.unstick_left = tuning.unstick_secs;
+        }
+    } else {
+        state.stuck_secs = 0.0;
+    }
+    state
+}
+
+/// Le côté vers lequel un bot longe l'obstacle, dérivé de sa graine.
+///
+/// Dérivé et non tiré : deux bots coincés au même endroit doivent pouvoir
+/// partir de deux côtés, sinon un paquet entier longe le même mur dans le même
+/// sens et reste groupé contre lui.
+#[inline]
+pub fn unstick_side(seed: u32) -> f32 {
+    if seed & 1 == 0 {
+        1.0
+    } else {
+        -1.0
     }
 }
 
@@ -613,6 +781,12 @@ pub fn write_bot_ai_sensor(
     let mut alerted = 0u32;
     let mut chasing = 0u32;
     let mut attacking = 0u32;
+    // Combien longent un obstacle MAINTENANT, et combien sont en train de
+    // s'enliser sans avoir encore déclenché. Sans ces deux nombres, un bot
+    // planté dans le décor redevient invisible — c'est ainsi qu'il a fallu une
+    // partie pour le voir.
+    let mut unsticking = 0u32;
+    let mut stalling = 0u32;
     for bot in &bots {
         if bot.state == BotState::Dead {
             continue;
@@ -629,6 +803,11 @@ pub fn write_bot_ai_sensor(
         if bot.alerted {
             alerted += 1;
         }
+        if bot.unstick_left > 0.0 {
+            unsticking += 1;
+        } else if bot.stuck_secs > 0.0 {
+            stalling += 1;
+        }
         match bot.state {
             BotState::Chase => chasing += 1,
             BotState::Attack => attacking += 1,
@@ -641,7 +820,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -649,6 +828,9 @@ pub fn write_bot_ai_sensor(
         alerted,
         chasing,
         attacking,
+        unsticking,
+        stalling,
+        sensor.unstick_triggered_session,
         sensor.los_checks_session,
         sensor.alerts_triggered_session,
         tuning.los_check_hz,
@@ -794,5 +976,95 @@ mod ground_follow_tests {
     fn the_default_foot_offset_is_plausible() {
         let d = crate::ArenaBot::default().foot_offset_m;
         assert!((0.3..=2.0).contains(&d), "offset par défaut absurde : {d}");
+    }
+}
+
+#[cfg(test)]
+mod unstick_tests {
+    use super::*;
+
+    const DT: f32 = 1.0 / 60.0;
+
+    fn t() -> TacticalTuning {
+        TacticalTuning::default()
+    }
+
+    /// Fait tourner `n` pas avec une progression donnée, et rend l'état final.
+    fn courir(mut s: StuckState, parcouru: f32, voulu: f32, n: u32) -> StuckState {
+        let tu = t();
+        for _ in 0..n {
+            s = unstick_step(s, parcouru, voulu, DT, &tu);
+        }
+        s
+    }
+
+    /// Un bot qui avance normalement ne doit JAMAIS partir en sortie
+    /// d'obstacle — sinon on casse la poursuite qu'on prétend réparer.
+    #[test]
+    fn a_bot_that_advances_is_never_pulled_off_its_target() {
+        let s = courir(StuckState::default(), 0.05, 0.05, 600);
+        assert!(!s.is_escaping());
+        assert_eq!(s.stuck_secs, 0.0);
+    }
+
+    /// Le cas rapporté en jeu : bloqué contre un décor, pas nul, il doit finir
+    /// par longer l'obstacle.
+    #[test]
+    fn a_bot_pinned_against_scenery_eventually_slides_along_it() {
+        let tu = t();
+        let pas = (tu.stuck_after_secs / DT).ceil() as u32 + 1;
+        let s = courir(StuckState::default(), 0.0, 0.05, pas);
+        assert!(s.is_escaping(), "toujours planté après {:.2} s", tu.stuck_after_secs);
+    }
+
+    /// Le piège du seuil ABSOLU : un bot qui rabote un mur avance encore un
+    /// peu tout en tournant en rond. Le seuil étant relatif, il est vu.
+    #[test]
+    fn grazing_a_wall_still_counts_as_stuck() {
+        let tu = t();
+        let voulu = 0.05;
+        let rabote = voulu * tu.stuck_progress_frac * 0.5;
+        let pas = (tu.stuck_after_secs / DT).ceil() as u32 + 1;
+        assert!(courir(StuckState::default(), rabote, voulu, pas).is_escaping());
+    }
+
+    /// La sortie se TERMINE, et sur une ardoise nette : sans ça le bot
+    /// re-déclenche au pas suivant et ne revient jamais vers sa cible.
+    #[test]
+    fn the_escape_ends_and_clears_the_slate() {
+        let tu = t();
+        let mut s = StuckState {
+            stuck_secs: tu.stuck_after_secs,
+            unstick_left: tu.unstick_secs,
+        };
+        let pas = (tu.unstick_secs / DT).ceil() as u32 + 1;
+        s = courir(s, 0.0, 0.05, pas);
+        assert!(!s.is_escaping(), "sortie perpétuelle");
+        assert_eq!(s.stuck_secs, 0.0, "ardoise non remise à zéro");
+    }
+
+    /// Un bot à l'arrêt (cible atteinte, vitesse nulle) n'est pas enlisé.
+    #[test]
+    fn standing_still_on_purpose_is_not_being_stuck() {
+        let s = courir(StuckState::default(), 0.0, 0.0, 600);
+        assert!(!s.is_escaping());
+    }
+
+    /// Deux bots coincés au même mur doivent pouvoir partir de deux côtés,
+    /// sinon le paquet longe le mur groupé et reste collé ensemble.
+    #[test]
+    fn two_bots_do_not_all_slide_the_same_way() {
+        let cotes: Vec<f32> = (0..8).map(unstick_side).collect();
+        assert!(cotes.contains(&1.0) && cotes.contains(&-1.0));
+    }
+
+    /// Les réglages doivent être cohérents entre eux : une fenêtre de sortie
+    /// plus courte qu'un pas ne servirait à rien.
+    #[test]
+    fn the_escape_window_lasts_longer_than_a_single_frame() {
+        let tu = t();
+        assert!(tu.unstick_secs > DT * 4.0);
+        assert!(tu.stuck_after_secs > 0.0);
+        assert!(tu.stuck_progress_frac > 0.0 && tu.stuck_progress_frac < 1.0);
     }
 }

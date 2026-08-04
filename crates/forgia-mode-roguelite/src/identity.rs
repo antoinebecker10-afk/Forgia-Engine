@@ -97,7 +97,8 @@ impl IdentityConfig {
         }
     }
 
-    fn color_rgb(&self, id: &str) -> [f32; 3] {
+    /// Teinte d'un preset. Publique : le HUD en jeu colore le pseudo avec.
+    pub fn color_rgb(&self, id: &str) -> [f32; 3] {
         self.colors
             .iter()
             .find(|c| c.id == id)
@@ -321,48 +322,25 @@ pub fn draw_identity_content(
             }
             if resp.on_hover_text(&c.label).clicked() {
                 save.equipped_color = c.id.clone();
-                save.save();
-            }
-        }
-    });
-
-    // ── Cosmétique des BRAS procéduraux (couleur + style, P3) ──
-    ui.add_space(10.0);
-    ui.separator();
-    ui.label(egui::RichText::new("Bras — couleur :").size(13.0));
-    ui.horizontal_wrapped(|ui| {
-        let unlocked = save.unlocked_colors.clone();
-        let cur = save.arm_color.clone();
-        for c in &cfg.colors {
-            if !unlocked.contains(&c.id) {
-                continue;
-            }
-            let col = egui::Color32::from_rgb(
-                (c.rgb[0] * 255.0) as u8,
-                (c.rgb[1] * 255.0) as u8,
-                (c.rgb[2] * 255.0) as u8,
-            );
-            let selected = c.id == cur;
-            let size = if selected { 30.0 } else { 24.0 };
-            let (r, resp) =
-                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
-            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
-            if selected {
-                ui.painter().rect_stroke(
-                    r,
-                    egui::CornerRadius::same(5),
-                    egui::Stroke::new(2.5, egui::Color32::WHITE),
-                    egui::StrokeKind::Outside,
-                );
-            }
-            if resp.on_hover_text(&c.label).clicked() {
+                // La combinaison des bras suit la couleur du joueur : une seule
+                // décision de couleur, appliquée partout où elle a du sens.
                 save.arm_color = c.id.clone();
                 arm_cosmetics.color = c.rgb;
                 save.save();
             }
         }
     });
-    ui.add_space(6.0);
+
+    // ── Cosmétique des BRAS ──
+    //
+    // Le sélecteur « Bras — couleur » a été RETIRÉ : les bras du viewmodel sont
+    // désormais ceux du personnage, dont les plaques prennent la rareté de
+    // l'équipement (`ArmCosmetics.armor_rgb`). Un second choix de couleur ne
+    // pilotait plus rien de distinct — deux réglages pour une seule chose.
+    // La combinaison suit donc la couleur du joueur, celle qui porte déjà son
+    // identité.
+    ui.add_space(10.0);
+    ui.separator();
     ui.label(egui::RichText::new("Bras — style :").size(13.0));
     ui.horizontal_wrapped(|ui| {
         for style in [ArmStyle::Peau, ArmStyle::Gantelet, ArmStyle::Cyber] {

@@ -27,13 +27,15 @@ use forgia_ui_lib::theme::display_text;
 // `forgia-ui` → `forgia-mode-roguelite` dep existe (pas de cycle) → on lit les Res
 // persistées au Startup (présentes dès le menu) et on réutilise les helpers de
 // sections déjà écrits dans `hub.rs` (zéro duplication).
+use forgia_mode_roguelite::chapters::chapter_select_content;
+use forgia_mode_roguelite::decor_palettes::DecorPalettesConfig;
 use forgia_mode_roguelite::hub::{draw_codex_section, section_intro};
 use forgia_mode_roguelite::equipment::{
     draw_equipment_content, EquipmentConfig, EquipmentMods, EquipmentPanelShown, EquipmentSave,
 };
 use forgia_mode_roguelite::identity::{draw_identity_content, IdentityConfig, IdentitySave};
 use forgia_mode_roguelite::meta_shop::{
-    apply_meta_purchase, draw_enclume_panel, MetaShopCatalogue, MetaShopSave,
+    apply_meta_purchase, draw_enclume_panel, MetaShopCatalogue, MetaShopSave, SelectedChapter,
 };
 use forgia_mode_roguelite::elements::ElementConfig;
 use forgia_mode_roguelite::pipeline_warmup::WarmupState;
@@ -61,7 +63,7 @@ use menu_video::MenuVideoState;
 
 /// Aperçus 3D (arme + bras) au hub-menu (render-to-texture). Story-menu-hub étape 5b.
 mod weapon_preview;
-use weapon_preview::{ArmPreviewRtt, WeaponPreviewPlugin, WeaponPreviewRtt};
+use weapon_preview::{WeaponPreviewPlugin, WeaponPreviewRtt};
 
 pub struct ForgiaUiPlugin;
 
@@ -153,9 +155,9 @@ impl Plugin for ForgiaUiPlugin {
                 EguiPrimaryContextPass,
                 (
                     main_menu_ui,
+                    sys_menu_livre,
                     sys_menu_enclume,
                     sys_menu_forgeron,
-                    sys_menu_equipement,
                     sys_menu_armes,
                 )
                     .chain(),
@@ -279,13 +281,19 @@ enum MenuPage {
     // Pour rouvrir l'onglet : restaurer la variante ici, son `nav_label`, son
     // `section_title`, son bras de `draw_page` et `draw_arena_test_section`
     // (voir l'historique git de ce fichier).
+    /// Le Livre — les dix chapitres, leurs verrous, celui qu'on va jouer.
+    ///
+    /// Sa place est ICI et pas au Lobby : le Lobby est un gate de chargement
+    /// traversé par le démarrage automatique, le hub est au menu.
+    Livre,
     Options,
 }
 
 impl MenuPage {
     /// Ordre de la sidebar de navigation (Accueil en tête, Options en pied).
-    const NAV: [MenuPage; 10] = [
+    const NAV: [MenuPage; 11] = [
         MenuPage::Root,
+        MenuPage::Livre,
         MenuPage::Forgeron,
         MenuPage::Armes,
         MenuPage::Talents,
@@ -307,6 +315,7 @@ impl MenuPage {
     fn nav_label(self) -> &'static str {
         match self {
             MenuPage::Root => "⌂  Accueil",
+            MenuPage::Livre => "📕  Le Livre",
             MenuPage::Forgeron => "⚒  Forgeron",
             MenuPage::Armes => "🗡  Armes",
             MenuPage::Talents => "✦  Talents",
@@ -323,6 +332,7 @@ impl MenuPage {
     fn section_title(self) -> &'static str {
         match self {
             MenuPage::Root => "FORGIA",
+            MenuPage::Livre => "LE LIVRE",
             MenuPage::Forgeron => "TON FORGERON",
             MenuPage::Armes => "TES ARMES",
             MenuPage::Talents => "TALENTS",
@@ -525,7 +535,9 @@ fn main_menu_ui(
         }
         // Forgeron / Armes / Enclume : panneaux interactifs dessinés par leurs
         // systèmes dédiés (`sys_menu_forgeron` / `sys_menu_armes` / `sys_menu_enclume`).
-        MenuPage::Forgeron | MenuPage::Armes | MenuPage::Enclume => MenuAction::None,
+        MenuPage::Forgeron | MenuPage::Armes | MenuPage::Enclume | MenuPage::Livre => {
+            MenuAction::None
+        }
         MenuPage::Options => {
             draw_options_page(ctx, &mut page, &mut settings);
             MenuAction::None
@@ -880,11 +892,59 @@ fn sys_menu_enclume(
         apply_meta_purchase(&cat, &mut save, &mut meta, purchase);
     }
 }
+/// Le Livre au menu — les dix chapitres et le choix de celui qu'on joue.
+///
+/// ## Pourquoi un système à part
+///
+/// `main_menu_ui` frôle le plafond de 16 paramètres de Bevy ; y ajouter le
+/// génome de palettes et la sélection le ferait déborder. Même motif que
+/// `sys_menu_forgeron` : le contenu vit dans `forgia-mode-roguelite`, seul le
+/// branchement est ici.
+///
+/// Les deux Resources sont optionnelles : le menu s'affiche même si le plugin
+/// roguelite n'a pas encore posé les siennes — on montre alors rien plutôt que
+/// de paniquer.
+fn sys_menu_livre(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    page: Res<MenuPage>,
+    save: Option<Res<MetaShopSave>>,
+    palettes: Option<Res<DecorPalettesConfig>>,
+    selected: Option<ResMut<SelectedChapter>>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Livre {
+        return;
+    }
+    let (Some(save), Some(mut selected)) = (save, selected) else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let palettes_ref = palettes.as_deref();
+    hub_section_panel(
+        ctx,
+        "hub_sec_livre",
+        MenuPage::Livre.section_title(),
+        620.0,
+        |ui| {
+            chapter_select_content(ui, &save, palettes_ref, &mut selected);
+        },
+    );
+}
 
-/// Section Forgeron au menu-titre — identité (nom + couleurs + bras) avec un
-/// **avatar statique** (disque de la couleur équipée) à la place de l'aperçu 3D
-/// du Lobby (pas de scène 3D au menu). Réutilise `draw_identity_content` de
-/// forgia-mode-roguelite (zéro duplication). Système séparé (params + Local).
+
+/// Section Forgeron au menu-titre — **un seul panneau** : le personnage à
+/// gauche, son identité et son équipement à droite.
+///
+/// Les deux panneaux séparés (identité au centre, équipement à droite)
+/// montraient deux aperçus 3D concurrents pour un même personnage. Celui des
+/// bras superposait le gauche et le droit — tous deux ont désormais leur poignet
+/// à l'origine — d'où la « main déformée » signalée. On garde l'aperçu du
+/// personnage entier : il montre déjà les bras, et c'est lui qu'on vient voir.
+///
+/// Le contenu reste dans `draw_identity_content` / `draw_equipment_content`,
+/// partagés avec le panneau I du Hall — zéro duplication.
 fn sys_menu_forgeron(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
@@ -893,7 +953,11 @@ fn sys_menu_forgeron(
     mut save: ResMut<IdentitySave>,
     mut arm_cosmetics: ResMut<ArmCosmetics>,
     mut editing: Local<bool>,
-    rtt: Option<Res<ArmPreviewRtt>>,
+    eq_cfg: Res<EquipmentConfig>,
+    mut eq_save: ResMut<EquipmentSave>,
+    eq_mods: Res<EquipmentMods>,
+    mut eq_shown: ResMut<EquipmentPanelShown>,
+    rtt: Option<Res<weapon_preview::CharacterPreviewRtt>>,
 ) {
     if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
         return;
@@ -901,9 +965,13 @@ fn sys_menu_forgeron(
     let Ok(ctx) = contexts.ctx_mut() else {
         return;
     };
-    // Aperçu 3D des bras (image RTT, l'arme tourne). Fallback = disque de la couleur
-    // équipée si le RTT n'a pas encore spawné (lu dans les presets, données pub).
-    let arm_image = rtt.as_ref().map(|r| r.tex_id);
+    // Posé seulement une fois le panneau RÉELLEMENT dessiné : le capteur ne doit
+    // pas annoncer « affiché » pour quelque chose d'invisible.
+    eq_shown.0 = true;
+
+    let character = rtt.as_ref().map(|r| r.tex_id);
+    // Repli quand le rendu hors écran n'a pas encore spawné : la pastille de la
+    // couleur portée, pour que la place ne soit jamais vide.
     let rgb = cfg
         .colors
         .iter()
@@ -915,95 +983,67 @@ fn sys_menu_forgeron(
         (rgb[1] * 255.0) as u8,
         (rgb[2] * 255.0) as u8,
     );
+
     egui::Area::new(egui::Id::new("menu_hub_forgeron"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(60.0, 0.0))
         .show(ctx, |ui| {
             glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(40, 28))
+                .inner_margin(egui::Margin::symmetric(34, 24))
                 .show(ui, |ui| {
-                    ui.set_max_width(460.0);
+                    ui.set_max_width(880.0);
                     ui.vertical_centered(|ui| {
                         ui.label(display_text("TON FORGERON", 38.0, FORGE_OR).strong());
-                        ui.add_space(12.0);
-                        // Aperçu 3D des bras (RTT) OU disque couleur en fallback.
-                        match arm_image {
-                            Some(tex) => {
-                                ui.add(egui::Image::new(egui::load::SizedTexture::new(
-                                    tex,
-                                    egui::vec2(210.0, 210.0),
-                                )));
-                            }
-                            None => {
-                                let (r, _) = ui.allocate_exact_size(
-                                    egui::vec2(96.0, 96.0),
-                                    egui::Sense::hover(),
-                                );
-                                ui.painter().circle_filled(r.center(), 46.0, disc_col);
-                                ui.painter().circle_stroke(
-                                    r.center(),
-                                    46.0,
-                                    egui::Stroke::new(2.5, HAIR_GOLD_STRONG),
-                                );
-                            }
-                        }
-                        ui.add_space(12.0);
-                        draw_identity_content(ui, &cfg, &mut save, &mut arm_cosmetics, &mut editing);
                     });
-                });
-        });
-}
-
-/// Équipement au menu-titre, à droite du Forgeron — les pièces d'armure lootées.
-///
-/// C'est ICI que ça doit vivre, et pas au Lobby : le Lobby n'est plus un hub
-/// interactif mais un gate de chargement dont l'overlay `Order::Foreground`
-/// recouvre tout panneau qu'on y dessinerait (cf. `sys_lobby_loading_overlay`).
-/// Un panneau branché là-bas se dessine sans jamais être vu.
-fn sys_menu_equipement(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
-    cfg: Res<EquipmentConfig>,
-    mut save: ResMut<EquipmentSave>,
-    mods: Res<EquipmentMods>,
-    mut shown: ResMut<EquipmentPanelShown>,
-    rtt: Option<Res<weapon_preview::CharacterPreviewRtt>>,
-) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
-        return;
-    }
-    if cfg.slots.is_empty() {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
-    // Marqué seulement une fois le panneau RÉELLEMENT dessiné et visible : c'est
-    // ce que le capteur `forgia2_equipment.json` rapporte, il ne doit pas dire
-    // « affiché » pour un panneau caché sous un overlay.
-    shown.0 = true;
-    // Le hero « TON FORGERON » est ancré centre +100 sur 460 de large : la bande
-    // droite de l'écran est libre.
-    let character = rtt.as_ref().map(|r| r.tex_id);
-    egui::Area::new(egui::Id::new("menu_hub_equipement"))
-        .anchor(egui::Align2::RIGHT_CENTER, egui::vec2(-40.0, 0.0))
-        .show(ctx, |ui| {
-            glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(22, 18))
-                .show(ui, |ui| {
-                    ui.set_max_width(300.0);
-                    // L'aperçu d'abord : on regarde son personnage AVANT de lire
-                    // des chiffres. C'est lui qui rend une pièce désirable.
-                    if let Some(tex) = character {
-                        ui.vertical_centered(|ui| {
-                            ui.add(egui::Image::new(egui::load::SizedTexture::new(
-                                tex,
-                                egui::vec2(260.0, 260.0),
-                            )));
+                    ui.add_space(14.0);
+                    ui.horizontal_top(|ui| {
+                        // ── Colonne gauche : le personnage ──
+                        ui.vertical(|ui| {
+                            ui.set_min_width(330.0);
+                            match character {
+                                Some(tex) => {
+                                    ui.add(egui::Image::new(egui::load::SizedTexture::new(
+                                        tex,
+                                        egui::vec2(330.0, 380.0),
+                                    )));
+                                }
+                                None => {
+                                    let (r, _) = ui.allocate_exact_size(
+                                        egui::vec2(330.0, 380.0),
+                                        egui::Sense::hover(),
+                                    );
+                                    ui.painter().circle_filled(r.center(), 60.0, disc_col);
+                                    ui.painter().circle_stroke(
+                                        r.center(),
+                                        60.0,
+                                        egui::Stroke::new(2.5, HAIR_GOLD_STRONG),
+                                    );
+                                }
+                            }
                         });
-                        ui.add_space(8.0);
-                    }
-                    draw_equipment_content(ui, &cfg, &mut save, &mods);
+                        ui.add_space(26.0);
+                        // ── Colonne droite : qui il est, puis ce qu'il porte ──
+                        ui.vertical(|ui| {
+                            ui.set_min_width(440.0);
+                            draw_identity_content(
+                                ui,
+                                &cfg,
+                                &mut save,
+                                &mut arm_cosmetics,
+                                &mut editing,
+                            );
+                            if !eq_cfg.slots.is_empty() {
+                                ui.add_space(12.0);
+                                ui.separator();
+                                ui.add_space(8.0);
+                                draw_equipment_content(
+                                    ui,
+                                    &eq_cfg,
+                                    &mut eq_save,
+                                    &eq_mods,
+                                );
+                            }
+                        });
+                    });
                 });
         });
 }
@@ -1135,7 +1175,7 @@ fn escape_handler(
                 info!("[forgia-ui] ESC pressed (Paused → InGame)");
                 next_app.set(AppMode::InGame);
                 if let Ok(mut opts) = q_cursor.single_mut() {
-                    opts.grab_mode = CursorGrabMode::Locked;
+                    opts.grab_mode = FPS_GRAB_MODE;
                     opts.visible = false;
                 }
             }
@@ -1165,10 +1205,30 @@ fn resume_time(mut virtual_time: ResMut<Time<Virtual>>) {
     info!("[forgia-ui] Time<Virtual> resumed");
 }
 
-/// Lock cursor au centre + invisible quand on entre InGame (pour mouse_look).
+/// Le mode de capture du curseur qui MARCHE sur la plateforme courante.
+///
+/// ## Pourquoi ce n'est pas `Locked` partout (2026-08-04)
+///
+/// winit **ne supporte pas `Locked` sur Windows** : la demande échoue, et comme
+/// rien ne remonte l'erreur côté jeu, la souris sortait simplement de la fenêtre.
+/// Rapporté deux fois en playtest — « la souris ne doit jamais pouvoir sortir de
+/// l'écran ».
+///
+/// `Confined` est le mode supporté sur Windows : le curseur est borné au cadre.
+/// Le mouse-look n'en souffre pas, il lit le mouvement **brut** du périphérique,
+/// qui continue d'arriver même curseur collé à un bord.
+///
+/// macOS / Wayland / X11 gardent `Locked` (verrouillage au centre), plus précis
+/// là où il existe.
+#[cfg(target_os = "windows")]
+const FPS_GRAB_MODE: CursorGrabMode = CursorGrabMode::Confined;
+#[cfg(not(target_os = "windows"))]
+const FPS_GRAB_MODE: CursorGrabMode = CursorGrabMode::Locked;
+
+/// Capture le curseur + invisible quand on entre InGame (pour mouse_look).
 fn grab_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
     if let Ok(mut opts) = q.single_mut() {
-        opts.grab_mode = CursorGrabMode::Locked;
+        opts.grab_mode = FPS_GRAB_MODE;
         opts.visible = false;
         info!("[forgia-ui] Cursor grabbed (Locked + invisible)");
     } else {
@@ -1230,7 +1290,7 @@ fn sys_sync_cursor_with_coffre(
             blockers.block_fire = true;
             info!("[forgia-ui] Modal (coffre/portail) OPEN — cursor released, look+fire blocked");
         } else {
-            opts.grab_mode = CursorGrabMode::Locked;
+            opts.grab_mode = FPS_GRAB_MODE;
             opts.visible = false;
             blockers.block_look = false;
             blockers.block_fire = false;
@@ -1258,7 +1318,7 @@ fn sys_regrab_cursor_on_focus(
         return;
     }
     if let Ok(mut opts) = q_cursor.single_mut() {
-        opts.grab_mode = CursorGrabMode::Locked;
+        opts.grab_mode = FPS_GRAB_MODE;
         opts.visible = false;
         info!("[forgia-ui] focus regagné — curseur re-grabbed (anti alt-tab)");
     }

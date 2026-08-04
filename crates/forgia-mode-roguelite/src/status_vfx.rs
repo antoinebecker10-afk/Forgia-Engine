@@ -40,6 +40,7 @@
 //! panache au-dessus = visibles.
 
 use bevy::prelude::*;
+use forgia_enemy_nameplate::{NameplateRoot, NameplateSight};
 use bevy_hanabi::{EffectAsset, EffectSpawner};
 use forgia_effects::prelude::{EffectMaterial, ParticleEffect, WeaponVfxEffects};
 use forgia_enemy_nameplate::{EnemyNameplate, NameplateRegistry};
@@ -619,6 +620,50 @@ pub fn sys_detach_shock_vfx(
         }
         if let Ok(mut e) = commands.get_entity(enemy) {
             e.remove::<ShockVfxAttached>();
+        }
+    }
+}
+
+
+// ─── Plaques de nom gouvernées par la ligne de vue ───────────────────────────
+
+/// Ferme les plaques de nom des ennemis que le joueur ne voit pas.
+///
+/// ## Le défaut
+///
+/// « Je vois leurs noms à travers les assets », rapporté en jeu le 2026-08-04.
+/// La plaque flotte au-dessus de la tête : elle dépasse par-dessus le prop qui
+/// cache le mob, et trahit une position qu'on ne devrait pas connaître.
+///
+/// ## Pourquoi ce système vit ICI
+///
+/// `forgia-enemy-nameplate` ne connaît ni l'IA ni la physique — et ne doit pas,
+/// le Hall s'en sert aussi. Elle expose un drapeau ; cette crate, qui connaît
+/// les deux, l'écrit. La ligne de vue est **déjà** calculée à 8 Hz par l'IA :
+/// la relire coûte une comparaison, un raycast par plaque et par frame la
+/// paierait une seconde fois.
+///
+/// ## La fenêtre de grâce compte
+///
+/// On lit `has_los || los_lost_grace_left > 0` et non `has_los` seul : à 8 Hz,
+/// une vue qui clignote ferait clignoter la plaque. La grâce de l'IA (2 s) lui
+/// sert aussi d'amortisseur.
+pub fn sys_nameplate_follows_sight(
+    bots: Query<&forgia_ai_arena_bot::ArenaBot>,
+    mut plates: Query<(&NameplateRoot, &mut NameplateSight)>,
+) {
+    for (root, mut sight) in &mut plates {
+        // Une plaque dont la cible n'est pas un bot d'arène (PNJ du Hall,
+        // boss scénarisé) est laissée VISIBLE : ce système restreint, il
+        // n'impose rien à ce qu'il ne connaît pas.
+        let Ok(bot) = bots.get(root.target) else {
+            continue;
+        };
+        let vu = bot.has_los || bot.los_lost_grace_left > 0.0;
+        // Écriture gardée : `NameplateSight` est lu via `Changed`, écrire à
+        // l'identique réveillerait le système d'application chaque frame.
+        if sight.visible != vu {
+            sight.visible = vu;
         }
     }
 }
