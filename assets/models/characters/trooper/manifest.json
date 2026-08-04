@@ -17,10 +17,10 @@
       "tris": 5526,
       "hides": []
     },
-    "gloves": {
-      "file": "gloves.gltf",
-      "mesh": "trooper_gloves",
-      "tris": 1164,
+    "helmet": {
+      "file": "helmet.gltf",
+      "mesh": "trooper_helmet",
+      "tris": 2626,
       "hides": []
     },
     "legs": {
@@ -29,10 +29,10 @@
       "tris": 3448,
       "hides": []
     },
-    "helmet": {
-      "file": "helmet.gltf",
-      "mesh": "trooper_helmet",
-      "tris": 2626,
+    "gloves": {
+      "file": "gloves.gltf",
+      "mesh": "trooper_gloves",
+      "tris": 1164,
       "hides": []
     },
     "boots": {
@@ -41,5 +41,10 @@
       "tris": 1216,
       "hides": []
     }
+  },
+  "viewmodel": {
+    "left": "viewmodel_arm_l.gltf",
+    "right": "viewmodel_arm_r.gltf",
+    "note": "statique, pose de préhension cuite — le placement des poignets reste au code"
   }
 }

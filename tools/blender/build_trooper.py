@@ -16,6 +16,7 @@ où `<src_assets_dir>` est l'arborescence `Assets/Sci-FI_Trooper_Man_v.3` extrai
 du .unitypackage (cf. `tools/unity/unpack_unitypackage.ps1`).
 """
 
+import bmesh
 import bpy
 import json
 import math
@@ -378,6 +379,196 @@ def build_clips(armature):
     return actions
 
 
+# ── Bras de viewmodel ────────────────────────────────────────────────────────
+#
+# Le viewmodel FPS n'a pas besoin d'un bras animé : il lui faut une main à un
+# poignet, que le code place déjà en dérivant la position de l'arme équipée. On
+# CUIT donc l'avant-bras + la main dans une pose de préhension et on exporte du
+# statique — le mécanisme de placement par-arme reste intact.
+#
+# 🚨 Ne pas prendre `upperarm` : un viewmodel montre l'avant-bras, pas l'épaule.
+
+VIEWMODEL_BONES = (
+    "lowerarm",
+    "hand_",
+    "index_",
+    "middle_",
+    "ring_",
+    "pinky_",
+    "thumb_",
+)
+
+# Flexion des phalanges pour refermer la main sur une crosse. La 1re phalange
+# plie le moins, la 2e le plus : c'est ce dégradé qui fait une main et non une
+# pince.
+GRIP_CURL_DEG = (38.0, 55.0, 45.0)
+GRIP_THUMB_DEG = 26.0
+
+
+def _is_side(bone, side):
+    """Côté d'un os, quelle que soit la convention de nommage du rig.
+
+    🚨 Ce rig en mélange DEUX : `lowerarm_l` (suffixe) et `l_forearm_Muscle`
+    (préfixe). Ne tester que le suffixe écarte tous les os musculaires — et donc
+    la chair de l'avant-bras qu'ils portent, qui disparaît du viewmodel.
+    """
+    return bone.endswith(f"_{side}") or bone.startswith(f"{side}_")
+
+
+def _dominant_bone(vertex, gname):
+    """Nom de l'os qui porte le plus de poids sur ce vertex."""
+    best, bw = "", 0.0
+    for g in vertex.groups:
+        if g.weight > bw:
+            best, bw = gname.get(g.group, ""), g.weight
+    return best
+
+
+def pose_grip(armature):
+    """Referme les doigts. Poses en repère ARMATURE, comme les clips."""
+    for side in ("l", "r"):
+        for finger in ("index", "middle", "ring", "pinky"):
+            for i, deg in enumerate(GRIP_CURL_DEG, start=1):
+                if pb := _bone(armature, f"{finger}_0{i}_{side}"):
+                    _pose_rot(pb, "X", math.radians(deg))
+        for i in (1, 2, 3):
+            if pb := _bone(armature, f"thumb_0{i}_{side}"):
+                _pose_rot(pb, "X", math.radians(GRIP_THUMB_DEG))
+
+
+def _isolate_side(src, side):
+    """Copie de `src` réduite à l'avant-bras + la main du côté demandé.
+
+    Rend `None` si rien ne subsiste : une pièce qui ne couvre pas les mains (le
+    casque, les bottes) ne doit pas produire un objet vide.
+    """
+    dup = src.copy()
+    dup.data = src.data.copy()
+    bpy.context.scene.collection.objects.link(dup)
+    gname = {g.index: g.name for g in dup.vertex_groups}
+    drop = set()
+    for v in dup.data.vertices:
+        bone = _dominant_bone(v, gname)
+        if not (any(p in bone for p in VIEWMODEL_BONES) and _is_side(bone, side)):
+            drop.add(v.index)
+    if len(drop) == len(dup.data.vertices):
+        bpy.data.objects.remove(dup, do_unlink=True)
+        return None
+
+    # 🚨 Découpe par bmesh, pas par opérateur. `bpy.ops.mesh.delete` dépend du
+    # MODE de sélection actif (vertex/arête/face) : selon le maillage il emporte
+    # tout ou rien, en silence. Ici la géométrie supprimée est désignée
+    # explicitement.
+    bm = bmesh.new()
+    bm.from_mesh(dup.data)
+    bm.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.verts[i] for i in drop], context="VERTS")
+    bm.to_mesh(dup.data)
+    bm.free()
+    tris = sum(len(p.vertices) - 2 for p in dup.data.polygons)
+    print(f"[viewmodel] {src.name} côté {side} : {tris} tris isolés")
+    if tris == 0:
+        bpy.data.objects.remove(dup, do_unlink=True)
+        return None
+    return dup
+
+
+def _normalize_viewmodel_arm(obj, armature, side):
+    """Met le bras dans la convention attendue par le viewmodel.
+
+    🚨 Découpé tel quel, le maillage garde ses coordonnées DANS le personnage :
+    son origine est à plus d'un mètre de lui, et le code — qui place l'objet au
+    poignet — envoie la main au loin. Mesuré : origine à 1,25 m, taille 0,25 m
+    contre 2,0 pour l'asset de référence.
+
+    Deux corrections, dérivées du squelette : poignet à l'ORIGINE, et avant-bras
+    sur l'axe **+Z de Blender** (qui devient +Y en glTF, l'axe que
+    `position_hands` aligne du coude vers le poignet).
+
+    🚨 **Aucune mise à l'échelle.** `ViewmodelArmsTuning::glb_scale` documente la
+    convention : « mesh baked en mètres réels ; 1.0 = taille physique ». Le bras
+    découpé fait 0,25 m, ce qui EST sa taille physique. Le normaliser sur
+    l'emprise de l'ancien asset (±1) le rendait 8× trop gros — celui-ci suit une
+    autre convention interne, ce n'est pas une référence de taille.
+    """
+    bones = armature.data.bones
+    wrist_b, elbow_b = bones.get(f"hand_{side}"), bones.get(f"lowerarm_{side}")
+    if not (wrist_b and elbow_b):
+        print(f"[ALERTE] bras {side} : os poignet/coude introuvables, pas de normalisation")
+        return
+    # 🚨 Les vertices vivent en repère OBJET, la position des os se calcule en
+    # repère MONDE. Translater les uns par les autres laisse le maillage à côté.
+    # On cuit d'abord la transformation de l'objet dans sa donnée : les deux
+    # repères coïncident ensuite.
+    obj.data.transform(obj.matrix_world)
+    obj.matrix_world = mathutils.Matrix.Identity(4)
+
+    m = armature.matrix_world
+    wrist = m @ wrist_b.head_local
+    elbow = m @ elbow_b.head_local
+    axis = (wrist - elbow).normalized()
+
+    to_origin = mathutils.Matrix.Translation(-wrist)
+    align = axis.rotation_difference(mathutils.Vector((0.0, 0.0, 1.0))).to_matrix().to_4x4()
+    obj.data.transform(align @ to_origin)
+    obj.matrix_world = mathutils.Matrix.Identity(4)
+
+
+def export_viewmodel_arms(body, gloves, armature, out_dir):
+    """Cuit avant-bras + main (corps ET gant) dans la pose de préhension et
+    exporte un fichier STATIQUE par côté.
+
+    Statique volontairement : le viewmodel dérive déjà la position des poignets
+    de l'arme équipée, il n'a ni squelette ni animation à piloter.
+    """
+    pose_grip(armature)
+    bpy.context.view_layer.update()
+
+    for side in ("l", "r"):
+        parts = [p for p in (_isolate_side(body, side), _isolate_side(gloves, side)) if p]
+        if not parts:
+            print(f"[ALERTE] bras {side} : aucune géométrie isolée")
+            continue
+        # Cuire la pose : appliquer le modificateur d'armature fige les doigts
+        # refermés dans le maillage, ce qui permet d'exporter sans squelette.
+        for p in parts:
+            bpy.ops.object.select_all(action="DESELECT")
+            p.select_set(True)
+            bpy.context.view_layer.objects.active = p
+            for mod in list(p.modifiers):
+                if mod.type == "ARMATURE":
+                    bpy.ops.object.modifier_apply(modifier=mod.name)
+        bpy.ops.object.select_all(action="DESELECT")
+        for p in parts:
+            p.select_set(True)
+        bpy.context.view_layer.objects.active = parts[0]
+        if len(parts) > 1:
+            bpy.ops.object.join()
+        arm_obj = bpy.context.view_layer.objects.active
+        arm_obj.name = f"trooper_viewmodel_arm_{side}"
+        arm_obj.data.name = arm_obj.name
+        _normalize_viewmodel_arm(arm_obj, armature, side)
+        tris = sum(len(p.vertices) - 2 for p in arm_obj.data.polygons)
+
+        path = os.path.join(out_dir, f"viewmodel_arm_{side}.gltf")
+        bpy.ops.object.select_all(action="DESELECT")
+        arm_obj.select_set(True)
+        bpy.context.view_layer.objects.active = arm_obj
+        bpy.ops.export_scene.gltf(
+            filepath=path,
+            export_format="GLTF_SEPARATE",
+            use_selection=True,
+            export_tangents=True,
+            export_animations=False,
+            export_skins=False,
+            export_yup=True,
+            export_keep_originals=True,
+        )
+        print(f"[viewmodel] bras {side} : {tris} tris -> {os.path.basename(path)}")
+        bpy.data.objects.remove(arm_obj, do_unlink=True)
+    _clear_pose(armature)
+
+
 def export_part(objs, armature, path, with_anim):
     """Exporte une sélection + l'armature en glTF à fichiers externes.
 
@@ -480,6 +671,15 @@ def main():
             # pièce n'a besoin de masquer un sous-mesh, contrairement au nain.
             "hides": [],
         }
+
+    # Bras de viewmodel, dérivés du MÊME corps : ce qu'on voit en FPS est
+    # littéralement le personnage qu'on voit à la 3ᵉ personne.
+    export_viewmodel_arms(body, slots.get("gloves"), armature, out_dir)
+    manifest["viewmodel"] = {
+        "left": "viewmodel_arm_l.gltf",
+        "right": "viewmodel_arm_r.gltf",
+        "note": "statique, pose de préhension cuite — le placement des poignets reste au code",
+    }
 
     mpath = os.path.join(out_dir, "manifest.json")
     with open(mpath, "w", encoding="utf-8") as f:
