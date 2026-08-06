@@ -231,9 +231,7 @@ impl RogueliteDecorConfig {
                 "decor_target_rubble" => c.target_rubble = gene.default.clamp(0.3, 20.0),
                 "decor_keepout_player_m" => c.keepout_player_m = gene.default.clamp(0.0, 60.0),
                 "decor_scatter_spacing_m" => c.scatter_spacing_m = gene.default.clamp(0.5, 40.0),
-                "decor_cover_radius_min_m" => {
-                    c.cover_radius_min_m = gene.default.clamp(0.0, 200.0)
-                }
+                "decor_cover_radius_min_m" => c.cover_radius_min_m = gene.default.clamp(0.0, 200.0),
                 // Bande sourcée 3-10 m (Watch Dogs, Gears) — cf §11.
                 "decor_cover_spacing_m" => c.cover_spacing_m = gene.default.clamp(3.0, 10.0),
                 "decor_perimeter_spacing_m" => {
@@ -480,6 +478,10 @@ enum DecorSpec {
         handle: Handle<Scene>,
         /// Emprise au sol RÉELLE (m), mesurée puis calibrée. Story-673.
         footprint_m: f32,
+        /// Hauteur EN JEU (m), une fois calibré à `target_m`. Story-690 — c'est
+        /// elle qui décide si le prop est un abri (≥ 1,80 m) ou un obstacle
+        /// décoratif, et le capteur d'arène ne peut pas la deviner après coup.
+        height_m: f32,
         name: &'static str,
         pos: Vec3,
         yaw: f32,
@@ -504,6 +506,9 @@ enum DecorSpec {
         handle: Handle<Scene>,
         /// Emprise au sol RÉELLE (m). Story-673.
         footprint_m: f32,
+        /// Hauteur EN JEU (m). Story-690 — les murs sont posés à l'échelle
+        /// native, donc c'est leur hauteur mesurée telle quelle.
+        height_m: f32,
         pos: Vec3,
         yaw: f32,
         obstacle_radius: f32,
@@ -542,6 +547,20 @@ impl DecorSpec {
         matches!(self, DecorSpec::Background { .. })
     }
 
+    /// Hauteur en jeu (m) — 0 pour ce qui ne bloque rien.
+    ///
+    /// Story-690 : c'est elle qui fait la différence entre un abri et un caillou,
+    /// et elle n'est connue qu'ICI, au plan, quand l'asset et sa taille cible
+    /// sont encore en main.
+    fn height_m(&self) -> f32 {
+        match self {
+            DecorSpec::Perimeter { height_m, .. } | DecorSpec::WallPiece { height_m, .. } => {
+                *height_m
+            }
+            DecorSpec::Background { .. } | DecorSpec::Loose { .. } => 0.0,
+        }
+    }
+
     /// Porte-t-il un collider ? C'est le seul critère qui décide si un mob peut
     /// s'y coincer. `Loose` = semis au sol sans collider, traversable.
     fn is_solid(&self) -> bool {
@@ -572,10 +591,7 @@ impl DecorObstacles {
     /// PUR — cette position est-elle libre pour un corps de rayon `body_radius` ?
     pub fn is_clear(&self, pos: Vec2, body_radius: f32) -> bool {
         let r = body_radius.max(0.0);
-        !self
-            .discs
-            .iter()
-            .any(|(c, rad)| pos.distance(*c) < rad + r)
+        !self.discs.iter().any(|(c, rad)| pos.distance(*c) < rad + r)
     }
 
     /// Distance au bord de l'obstacle le plus proche (négatif = à l'intérieur).
@@ -847,11 +863,14 @@ pub fn sys_load_decor_assets(
         }
     };
     let load = |paths: &[&str]| -> Vec<DecorAsset> {
-        paths.iter().filter(|p| !p.is_empty()).map(|p| mk(p)).collect()
+        paths
+            .iter()
+            .filter(|p| !p.is_empty())
+            .map(|p| mk(p))
+            .collect()
     };
-    let load_owned = |paths: &[String]| -> Vec<DecorAsset> {
-        paths.iter().map(|p| mk(p)).collect()
-    };
+    let load_owned =
+        |paths: &[String]| -> Vec<DecorAsset> { paths.iter().map(|p| mk(p)).collect() };
     // Story-671 — précharge TOUTES les DA déclarées au génome. `Option<Res<..>>`
     // + repli sur un chargement direct : ce système ne dépend d'aucun ordre de
     // Startup (les `insert_resource` d'un autre système ne sont pas encore
@@ -1125,6 +1144,9 @@ pub fn sys_reconcile_decor(
     // dégager son disque d'apparition, et carte des obstacles pour les ennemis.
     q_player: Query<&Transform, With<forgia_player::Player>>,
     mut obstacles: ResMut<DecorObstacles>,
+    // Story-690 — la mesure commune de l'arène, définie par `forgia-stage`.
+    // `Option` : ce système tourne aussi là où le plugin de stage est absent.
+    mut geometry: Option<ResMut<forgia_stage::ArenaGeometry>>,
     q_anchors: Query<&AnchorPoint>,
     q_decor: Query<(), With<DecorProp>>,
     mut queue: ResMut<DecorSpawnQueue>,
@@ -1187,6 +1209,25 @@ pub fn sys_reconcile_decor(
         .filter(|s| s.is_solid())
         .map(|s| (s.ground_pos(), s.footprint_radius()))
         .collect();
+    // Story-690 — le décor DÉPOSE sa géométrie dans la mesure commune. Il porte
+    // l'essentiel du couvert de l'arène ; sans lui le capteur ne voyait que les
+    // murs et concluait « aucun abri » sur des cartes qui en ont des dizaines.
+    //
+    // Le `Background` (hors-map) et le `Loose` (sans collider) sont exclus par
+    // `is_solid()` : compter une falaise à 165 m comme un abri fausserait tout.
+    if let Some(geometry) = geometry.as_mut() {
+        geometry
+            .discs
+            .extend(specs.iter().filter(|s| s.is_solid()).map(|s| {
+                let p = s.ground_pos();
+                forgia_core::layout::SolidDisc {
+                    x: p.x,
+                    z: p.y,
+                    r: s.footprint_radius(),
+                    h: s.height_m(),
+                }
+            }));
+    }
     let count = specs.len();
     queue.pending = specs;
     queue.cursor = 0;
@@ -1465,6 +1506,7 @@ fn plan_decor_set(
                 yaw,
                 target_m: cfg.target_brazier,
                 footprint_m: handle.footprint_at(cfg.target_brazier),
+                height_m: handle.height_at(cfg.target_brazier),
                 user_scale: 1.0,
                 brazier: true,
                 col_radius_factor: 0.3,
@@ -1484,6 +1526,7 @@ fn plan_decor_set(
                 yaw,
                 target_m: cfg.forge_monument_target,
                 footprint_m: handle.footprint_at(cfg.forge_monument_target),
+                height_m: handle.height_at(cfg.forge_monument_target),
                 user_scale: 1.0,
                 brazier: false,
                 col_radius_factor: 0.16,
@@ -1515,6 +1558,7 @@ fn plan_decor_set(
                 yaw,
                 target_m: target,
                 footprint_m: handle.footprint_at(target),
+                height_m: handle.height_at(target),
                 user_scale: 1.0,
                 brazier: false,
                 col_radius_factor: 0.32,
@@ -1563,6 +1607,7 @@ fn plan_decor_set(
                 yaw: rng01(&mut rng) * TAU,
                 target_m: cfg.target_big,
                 footprint_m: handle.footprint_at(cfg.target_big),
+                height_m: handle.height_at(cfg.target_big),
                 user_scale: 0.9 + rng01(&mut rng) * 0.2,
                 brazier: false,
                 col_radius_factor: 0.34,
@@ -1644,7 +1689,8 @@ fn plan_decor_set(
             pos,
             yaw,
             target_m: target,
-                footprint_m: handle.footprint_at(target),
+            footprint_m: handle.footprint_at(target),
+            height_m: handle.height_at(target),
             user_scale: us,
             brazier,
             col_radius_factor: crf,
@@ -1680,7 +1726,7 @@ fn plan_decor_set(
             yaw,
             user_scale: us,
             target_m: cfg.target_scatter,
-                footprint_m: handle.footprint_at(cfg.target_scatter),
+            footprint_m: handle.footprint_at(cfg.target_scatter),
         });
     }
 
@@ -1718,7 +1764,7 @@ fn plan_decor_set(
             yaw,
             user_scale: us,
             target_m: cfg.target_rubble,
-                footprint_m: handle.footprint_at(cfg.target_rubble),
+            footprint_m: handle.footprint_at(cfg.target_rubble),
         });
     }
 
@@ -1765,6 +1811,8 @@ fn plan_wall_room(
             } else {
                 WALL_SEG_W * 0.7
             },
+            // Posé à l'échelle NATIVE : sa hauteur mesurée s'applique telle quelle.
+            height_m: corner.native_height_m,
             pos: origin,
             yaw: yaw0,
             obstacle_radius: WALL_SEG_W * 0.7,
@@ -1802,6 +1850,7 @@ fn plan_wall_arm(
             } else {
                 WALL_SEG_W * 0.6
             },
+            height_m: handle.native_height_m,
             pos: p,
             yaw,
             obstacle_radius: WALL_SEG_W * 0.6,
@@ -2019,7 +2068,10 @@ default = 40.0
         // Et le rayon du prop compte.
         let edge = p + Vec2::new(cfg.keepout_player_m + 1.0, 0.0);
         assert!(!ko.blocks(edge, 0.0));
-        assert!(ko.blocks(edge, 3.0), "un gros prop tangent doit être refusé");
+        assert!(
+            ko.blocks(edge, 3.0),
+            "un gros prop tangent doit être refusé"
+        );
     }
 
     /// Story-672 v2 — c'est le SPAWN qui cède, plus le décor. On vérifie que la
@@ -2215,7 +2267,10 @@ mod layout_derivation_tests {
         // Les 4 quadrants doivent rester habités.
         let quad = |f: &dyn Fn(&(f32, f32)) -> bool| capped.iter().filter(|p| f(p)).count();
         for (name, f) in [
-            ("NE", &(|p: &(f32, f32)| p.0 >= 0.0 && p.1 >= 0.0) as &dyn Fn(&(f32, f32)) -> bool),
+            (
+                "NE",
+                &(|p: &(f32, f32)| p.0 >= 0.0 && p.1 >= 0.0) as &dyn Fn(&(f32, f32)) -> bool,
+            ),
             ("NO", &(|p: &(f32, f32)| p.0 < 0.0 && p.1 >= 0.0)),
             ("SE", &(|p: &(f32, f32)| p.0 >= 0.0 && p.1 < 0.0)),
             ("SO", &(|p: &(f32, f32)| p.0 < 0.0 && p.1 < 0.0)),
