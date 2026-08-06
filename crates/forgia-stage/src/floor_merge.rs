@@ -60,7 +60,11 @@ pub struct PendingStaticMerge {
     pub instances: Vec<(u8, Transform)>,
     /// Scènes GLB sources (sondes + fallback).
     pub scenes: Vec<Handle<Scene>>,
-    /// Clé de cache (`label:extent_dm`) : le plan est déterministe par extent.
+    /// Clé de cache **dérivée du contenu** — cf [`content_cache_key`].
+    ///
+    /// Elle valait `label:extent_dm`, sur l'hypothèse que le plan était
+    /// déterministe par extent. Trois labels l'ont démentie ; le round 2
+    /// affichait les murs du round 1 par-dessus les colliders du round 2.
     pub cache_key: String,
     /// Stage propriétaire (fix QA-663 #1) : si le `StageLoadRequest` courant a
     /// changé, ce plan est périmé → jeté sans spawner (sinon un cache-hit la
@@ -161,6 +165,91 @@ pub(crate) fn plan_floor_tiles(extent: f32, tile_size: f32) -> Vec<PendingTile> 
     tiles
 }
 
+// ─── La clé de cache se DÉRIVE du contenu (story-690b) ──────────────────────
+
+/// FNV-1a 64 bits — stable entre exécutions, sans dépendance.
+///
+/// Surtout pas `DefaultHasher` : `RandomState` change de graine à chaque
+/// processus, et une clé de cache qui change au lancement n'est pas une clé.
+fn fnv1a(bytes: &[u8], mut h: u64) -> u64 {
+    for b in bytes {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0000_0100_0000_01B3);
+    }
+    h
+}
+
+/// Clé de cache **dérivée de ce qu'on s'apprête à fusionner** : les poses et les
+/// scènes sources.
+///
+/// ## Pourquoi, et ce que ça corrige
+///
+/// La clé était `label:extent_dm`, sur l'hypothèse — écrite noir sur blanc — que
+/// « le plan est déterministe par extent ». Elle était vraie pour les deux seuls
+/// labels d'origine (`floor`, remparts). Trois choses l'ont périmée sans que
+/// personne ne le voie :
+///
+/// - **`rooms`** (story-683) vient de `plan_rooms(extent, **graine**, cfg)`, et
+///   la graine change à chaque round. Les colliders suivaient le nouveau
+///   labyrinthe pendant que le cache redessinait celui du round précédent :
+///   **des murs invisibles, et des murs traversables** — rapporté en jeu au
+///   round 2.
+/// - **`floor`** reçoit ses tuiles de l'ambiance du round (story-676). Le ciel
+///   changeait d'univers, le sol rejouait le précédent.
+/// - **deux salles de même extent** (`forge_sanctum` et `donjon_oublie`, 80 m)
+///   partageaient `walls:800` : la première chargée imposait son kit à l'autre.
+///
+/// ## Pourquoi le CONTENU et pas « extent + graine »
+///
+/// Ajouter la graine aurait remis la clé à jour de ce qu'on sait aujourd'hui, et
+/// le prochain label qui dépendra d'autre chose la repérimerait en silence — la
+/// classe resterait ouverte. Dérivée du contenu, la clé est juste **par
+/// construction** : même géométrie → même mesh, géométrie différente → rebuild,
+/// sans liste de dépendances à tenir.
+///
+/// Les `f32` sont hachés sur leurs BITS : deux plans issus du même code
+/// déterministe sont bit-identiques. `-0.0` et `0.0` ont des bits différents, ce
+/// qui peut coûter un rebuild inutile — jamais un cache-hit erroné. L'erreur ne
+/// peut pencher que du côté sûr.
+fn content_cache_key(
+    label: &str,
+    instances: &[(u8, Transform)],
+    scenes: &[Handle<Scene>],
+) -> String {
+    let mut h = fnv1a(label.as_bytes(), 0xCBF2_9CE4_8422_2325);
+    for s in scenes {
+        // Le CHEMIN, pas l'id de handle : deux chargements du même GLB doivent
+        // donner la même clé, sinon le cache ne servirait jamais.
+        match s.path() {
+            Some(p) => h = fnv1a(p.to_string().as_bytes(), h),
+            // Handle sans chemin (scène générée) : rien ne permet de dire que
+            // deux d'entre eux portent le même contenu. On hache l'identité du
+            // handle — la clé cesse alors d'être partageable, donc ce lot se
+            // reconstruit. Le seul risque est de ne pas réutiliser, jamais de
+            // réutiliser à tort.
+            None => h = fnv1a(format!("{:?}", s.id()).as_bytes(), h),
+        }
+    }
+    for (kind, tf) in instances {
+        h = fnv1a(&[*kind], h);
+        for v in [
+            tf.translation.x,
+            tf.translation.y,
+            tf.translation.z,
+            tf.rotation.x,
+            tf.rotation.y,
+            tf.rotation.z,
+            tf.rotation.w,
+            tf.scale.x,
+            tf.scale.y,
+            tf.scale.z,
+        ] {
+            h = fnv1a(&v.to_bits().to_le_bytes(), h);
+        }
+    }
+    format!("{label}:{h:016x}")
+}
+
 /// Spawne le plan + les sondes d'un lot statique à fusionner. Appelé par
 /// `spawn_stage_arena_on_request` (sol Inc.1, murs Inc.2).
 pub(crate) fn spawn_static_merge(
@@ -168,7 +257,6 @@ pub(crate) fn spawn_static_merge(
     label: &'static str,
     instances: Vec<(u8, Transform)>,
     scenes: Vec<Handle<Scene>>,
-    extent: f32,
     stage_id: &str,
 ) {
     for idx in 0..scenes.len() as u8 {
@@ -186,6 +274,7 @@ pub(crate) fn spawn_static_merge(
             ));
         }
     }
+    let cache_key = content_cache_key(label, &instances, &scenes);
     commands.spawn((
         Name::new(format!("PendingStaticMerge_{label}_{stage_id}")),
         StageArenaMarker,
@@ -193,7 +282,7 @@ pub(crate) fn spawn_static_merge(
             label,
             instances,
             scenes,
-            cache_key: format!("{label}:{}", (extent * 10.0).round() as u32),
+            cache_key,
             stage_id: stage_id.to_string(),
             elapsed_secs: 0.0,
         },
@@ -266,6 +355,16 @@ pub fn sys_build_merged_static(
 
         // ── Cache hit : re-spawn (étalé) des meshes déjà fusionnés ───────────
         if let Some(cached) = cache.by_key.get(&pending.cache_key) {
+            // Story-690b — le cache devient OBSERVABLE. Un hit sur un plan qui
+            // a changé était précisément le bug (murs du round précédent
+            // redessinés sur les colliders du round courant) : si ça recommence,
+            // la ligne le dit au lieu de le taire.
+            info!(
+                "[stage-arena] fusion '{}' : cache HIT ({} meshes, clé {})",
+                pending.label,
+                cached.len(),
+                pending.cache_key
+            );
             commands.spawn((
                 Name::new(format!("MergedSpawnQueue_{}", pending.label)),
                 StageArenaMarker,
@@ -482,6 +581,105 @@ mod tests {
         assert_eq!(plan_floor_tiles(60.0, TILE), plan_floor_tiles(60.0, TILE));
     }
 
+    // ── La clé de cache dérive du contenu (story-690b) ───────────────────────
+    //
+    // Le défaut d'origine, rapporté en jeu au round 2 : la clé valait
+    // `label:extent`, donc deux plans DIFFÉRENTS de même extent la partageaient.
+    // Le cache redessinait les murs du round précédent par-dessus les colliders
+    // du round courant — murs invisibles d'un côté, traversables de l'autre.
+
+    fn pose(x: f32, z: f32) -> (u8, Transform) {
+        (0, Transform::from_xyz(x, 0.0, z))
+    }
+
+    #[test]
+    fn two_different_layouts_never_share_a_key() {
+        // C'EST le test qui aurait attrapé le bug : même label, même extent,
+        // murs ailleurs.
+        let a = content_cache_key("rooms", &[pose(0.0, 0.0), pose(4.0, 0.0)], &[]);
+        let b = content_cache_key("rooms", &[pose(0.0, 0.0), pose(8.0, 0.0)], &[]);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn the_same_layout_still_hits_the_cache() {
+        // Le cache doit continuer de servir : c'est sa raison d'être (zéro
+        // rebuild à la ré-entrée dans une salle identique).
+        let plan = [pose(0.0, 0.0), pose(4.0, 0.0), pose(8.0, 0.0)];
+        assert_eq!(
+            content_cache_key("floor", &plan, &[]),
+            content_cache_key("floor", &plan, &[])
+        );
+    }
+
+    #[test]
+    fn a_different_count_of_walls_changes_the_key() {
+        let short = [pose(0.0, 0.0), pose(4.0, 0.0)];
+        let long = [pose(0.0, 0.0), pose(4.0, 0.0), pose(8.0, 0.0)];
+        assert_ne!(
+            content_cache_key("rooms", &short, &[]),
+            content_cache_key("rooms", &long, &[])
+        );
+    }
+
+    #[test]
+    fn rotation_alone_changes_the_key() {
+        // Deux murs au même point mais orientés différemment ne donnent pas le
+        // même mesh — l'un barre le nord, l'autre l'est.
+        let flat = [(0u8, Transform::from_xyz(0.0, 0.0, 0.0))];
+        let turned = [(
+            0u8,
+            Transform::from_xyz(0.0, 0.0, 0.0)
+                .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
+        )];
+        assert_ne!(
+            content_cache_key("rooms", &flat, &[]),
+            content_cache_key("rooms", &turned, &[])
+        );
+    }
+
+    #[test]
+    fn the_tile_kind_changes_the_key() {
+        // Le sol reçoit ses tuiles de l'ambiance du round : deux univers ne
+        // doivent pas partager un mesh (le ciel changeait, le sol non).
+        let clean = [(0u8, Transform::IDENTITY)];
+        let rocks = [(2u8, Transform::IDENTITY)];
+        assert_ne!(
+            content_cache_key("floor", &clean, &[]),
+            content_cache_key("floor", &rocks, &[])
+        );
+    }
+
+    #[test]
+    fn two_labels_with_identical_poses_stay_separate() {
+        let plan = [pose(1.0, 2.0)];
+        assert_ne!(
+            content_cache_key("floor", &plan, &[]),
+            content_cache_key("rooms", &plan, &[])
+        );
+    }
+
+    #[test]
+    fn an_empty_plan_has_a_key_of_its_own() {
+        // Ne doit pas collisionner avec un plan non vide du même label.
+        assert_ne!(
+            content_cache_key("rooms", &[], &[]),
+            content_cache_key("rooms", &[pose(0.0, 0.0)], &[])
+        );
+    }
+
+    #[test]
+    fn the_key_is_stable_across_calls_within_a_process() {
+        // Garde-fou anti-`DefaultHasher` : une clé re-tirée doit être la MÊME.
+        // Une clé qui change de graine au lancement n'est pas une clé.
+        let plan = [pose(3.0, 7.0)];
+        let first = content_cache_key("walls", &plan, &[]);
+        for _ in 0..5 {
+            assert_eq!(content_cache_key("walls", &plan, &[]), first);
+        }
+        assert!(first.starts_with("walls:"), "label lisible en log : {first}");
+    }
+
     /// Story-689 — ce test asserait `center.kind == 0`, c'est-à-dire EXACTEMENT
     /// le défaut : le centre était un carré de 48 × 48 m entièrement pavé de la
     /// même tuile. Il vérifie maintenant le vrai contrat — le centre reste
@@ -489,8 +687,7 @@ mod tests {
     #[test]
     fn the_centre_stays_mostly_clean_without_being_uniform() {
         let tiles = plan_floor_tiles(90.0, TILE);
-        let inner: Vec<&PendingTile> =
-            tiles.iter().filter(|t| t.pos.length() <= 20.0).collect();
+        let inner: Vec<&PendingTile> = tiles.iter().filter(|t| t.pos.length() <= 20.0).collect();
         assert!(inner.len() > 20, "échantillon central trop petit");
         let clean = inner.iter().filter(|t| t.kind == 0).count();
         let share = clean as f32 / inner.len() as f32;
@@ -571,7 +768,11 @@ mod floor_mix_tests {
                         return false;
                     }
                     let axis = t.pos.x.abs().min(t.pos.z.abs()) < 6.0;
-                    if diagonal { !axis } else { axis }
+                    if diagonal {
+                        !axis
+                    } else {
+                        axis
+                    }
                 })
                 .collect();
             if sel.is_empty() {
@@ -603,7 +804,10 @@ mod floor_mix_tests {
         };
         let c = share(0.0, 20.0);
         let e = share(55.0, 80.0);
-        assert!(e > c, "les bords ({e:.2}) doivent être plus variés que le centre ({c:.2})");
+        assert!(
+            e > c,
+            "les bords ({e:.2}) doivent être plus variés que le centre ({c:.2})"
+        );
         assert!(c > 0.0, "le centre doit tout de même varier un peu");
     }
 

@@ -118,7 +118,11 @@ impl RoomsConfig {
         Self {
             enabled: t.rooms.enabled.unwrap_or(d.enabled),
             // ≥ 2 : une grille 1×1 n'a ni pièce ni couloir.
-            rooms_per_side: t.rooms.rooms_per_side.unwrap_or(d.rooms_per_side).clamp(2, 8),
+            rooms_per_side: t
+                .rooms
+                .rooms_per_side
+                .unwrap_or(d.rooms_per_side)
+                .clamp(2, 8),
             // La PARITÉ est imposée, pas subie : un mur troué se pave en
             // `(cell - porte) / 2` de chaque côté, et ce demi-tronçon doit être
             // un nombre ENTIER de modules. Sinon le dernier module déborde dans
@@ -126,7 +130,10 @@ impl RoomsConfig {
             // combler est exclu : story-483 a montré que ça donne des murs
             // tordus comme des planches.
             corridor_modules: Self::snap_corridor_parity(
-                t.rooms.corridor_modules.unwrap_or(d.corridor_modules).clamp(1, 4),
+                t.rooms
+                    .corridor_modules
+                    .unwrap_or(d.corridor_modules)
+                    .clamp(1, 4),
                 d.cell_modules(),
             ),
             extra_loops: t.rooms.extra_loops.unwrap_or(d.extra_loops).clamp(0.0, 1.0),
@@ -286,7 +293,10 @@ fn pick_open_edges(n: u32, seed: u64, extra_loops: f32) -> Vec<Edge> {
     let mut open = Vec::new();
     let mut rest = Vec::new();
     for e in edges {
-        let (ra, rb) = (find(&mut parent, e.a as usize), find(&mut parent, e.b as usize));
+        let (ra, rb) = (
+            find(&mut parent, e.a as usize),
+            find(&mut parent, e.b as usize),
+        );
         if ra != rb {
             parent[ra] = rb;
             open.push(e);
@@ -534,7 +544,9 @@ mod tests {
                     *deg.entry(*a).or_default() += 1;
                     *deg.entry(*b).or_default() += 1;
                 }
-                (0..n * n).filter(|c| deg.get(c).copied().unwrap_or(0) <= 1).count()
+                (0..n * n)
+                    .filter(|c| deg.get(c).copied().unwrap_or(0) <= 1)
+                    .count()
             };
             let without = count_dead_ends(0.0);
             let with = count_dead_ends(0.5);
@@ -551,7 +563,9 @@ mod tests {
             *deg.entry(*b).or_default() += 1;
         }
         assert_eq!(
-            (0..n * n).filter(|c| deg.get(c).copied().unwrap_or(0) <= 1).count(),
+            (0..n * n)
+                .filter(|c| deg.get(c).copied().unwrap_or(0) <= 1)
+                .count(),
             0,
             "à extra_loops = 1, aucune pièce ne doit avoir une seule sortie"
         );
@@ -606,7 +620,10 @@ mod tests {
         let c = RoomsConfig::default();
         // Nos arènes font 80 et 90 m de rayon.
         for extent in [80.0_f32, 90.0] {
-            assert!(c.fits_in(extent), "le complexe ne tient pas dans {extent} m");
+            assert!(
+                c.fits_in(extent),
+                "le complexe ne tient pas dans {extent} m"
+            );
             let plan = plan_rooms(extent, 7, &c);
             assert!(!plan.walls.is_empty());
             for w in &plan.walls {
@@ -646,7 +663,10 @@ mod tests {
         let a = plan_rooms(80.0, 1, &c);
         let b = plan_rooms(80.0, 2, &c);
         assert_ne!(a.walls, b.walls, "deux graines, un seul complexe");
-        assert_eq!(a.room_centers, b.room_centers, "la trame, elle, ne bouge pas");
+        assert_eq!(
+            a.room_centers, b.room_centers,
+            "la trame, elle, ne bouge pas"
+        );
     }
 
     /// Un génome hostile ne doit pas produire une grille dégénérée.
@@ -655,7 +675,10 @@ mod tests {
         let c = RoomsConfig::parse_toml(
             "[rooms]\nrooms_per_side = 0\ncorridor_modules = 99\nextra_loops = 5.0\n",
         );
-        assert!(c.rooms_per_side >= 2, "une grille 1x1 n'a ni pièce ni couloir");
+        assert!(
+            c.rooms_per_side >= 2,
+            "une grille 1x1 n'a ni pièce ni couloir"
+        );
         assert!(c.corridor_modules <= 4);
         assert!(c.extra_loops <= 1.0);
     }
@@ -709,7 +732,10 @@ corridor_modules = {requested}
                 "porte demandée {requested}, obtenue {} — élargie en douce",
                 c.corridor_modules
             );
-            assert!(c.corridor_modules >= 1, "une porte de 0 module n'est plus une porte");
+            assert!(
+                c.corridor_modules >= 1,
+                "une porte de 0 module n'est plus une porte"
+            );
         }
     }
 
@@ -732,7 +758,10 @@ corridor_modules = {requested}
         assert_eq!(plan.room_centers.len(), 9);
         // Le complexe (36 m) doit laisser un anneau ouvert généreux dans une
         // arène de 80 m de rayon.
-        assert!(c.complex_size_m() < 80.0, "le complexe mangerait toute l'arène");
+        assert!(
+            c.complex_size_m() < 80.0,
+            "le complexe mangerait toute l'arène"
+        );
     }
 }
 

@@ -34,8 +34,8 @@ pub mod authored;
 pub mod floor_merge;
 pub mod graph;
 pub mod layout;
-pub mod rooms;
 pub mod layout_sensor;
+pub mod rooms;
 
 /// Sol de REPLI de l'arène — celui d'avant story-676, quand c'était le seul.
 ///
@@ -358,6 +358,76 @@ pub struct StageScenePreloads {
 // propre `LevelModulesHandles` Resource. Phase 5 read directement via
 // `Res<LevelModulesHandles>` + `Res<Assets<Genome<LevelModulesGenome>>>`.
 
+// ─── ArenaGeometry — la géométrie RÉELLEMENT posée (story-690) ──────────────
+
+/// Ce qui occupe l'arène, quel que soit le générateur qui l'a posé.
+///
+/// **Pourquoi cette ressource existe.** Le capteur d'arène ne lisait que
+/// [`LayoutResult::placements`], rempli par le seul solveur de modules — lequel
+/// ne produit rien : les deux cartes autorées le coupent
+/// (`suppress_procedural_modules`) et les deux autres n'ont pas de palette. Il
+/// se déclarait donc « ok » avec toutes ses métriques à zéro. C'est le capteur
+/// aveugle que `map-design-patterns.md` §13 interdit : *« zéro mesuré n'est pas
+/// vert, c'est aveugle »*.
+///
+/// Quatre producteurs y déposent leur géométrie, aucun ne se connaît :
+///
+/// | Producteur | Quand | Ce qu'il dépose |
+/// |---|---|---|
+/// | murs de pièces (`rooms`) | au bâti du stage | tronçons |
+/// | modules (`layout::place_modules`) | au bâti du stage | disques |
+/// | pièces autorées | à l'arrivée du GLB (async) | disques **mesurés** |
+/// | décor (mode roguelite) | après planification | disques |
+///
+/// L'ordre n'a pas d'importance : [`Self::reset`] au bâti, puis chacun ajoute.
+/// Le mode roguelite dépose depuis une autre crate — même sens de dépendance
+/// que `ExtraFloorPreloads`, `forgia-stage` n'a pas à connaître son décor.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct ArenaGeometry {
+    pub stage_id: String,
+    /// La graine du bâti — deux arènes de même `stage_id` en diffèrent.
+    pub seed: u64,
+    /// Rayon jouable (m) = apothème de l'hexagone, `0,866 · extent`. C'est LUI
+    /// qui borne les portées, pas l'extent : un rayon lancé vers un sommet
+    /// sortirait de l'enceinte.
+    pub playable_radius_m: f32,
+    /// Où le joueur apparaît — le point depuis lequel les portées se mesurent.
+    /// **Lu**, jamais supposé (`spawn-clearance.md` §4 bis).
+    pub player_spawn: (f32, f32),
+    pub discs: Vec<forgia_core::layout::SolidDisc>,
+    pub segs: Vec<forgia_core::layout::SolidSeg>,
+    /// Pièces autorées dont le GLB n'est pas encore arrivé. Tant que ce compteur
+    /// n'est pas nul, l'échantillon est INCOMPLET et le capteur doit le dire —
+    /// une mesure prise à mi-chargement conclurait « aucun couvert ».
+    pub authored_pending: u32,
+}
+
+impl ArenaGeometry {
+    /// Vide la géométrie pour un nouveau bâti. Appelé une fois, au spawn.
+    pub fn reset(&mut self, stage_id: &str, seed: u64, playable_radius_m: f32) {
+        self.stage_id.clear();
+        self.stage_id.push_str(stage_id);
+        self.seed = seed;
+        self.playable_radius_m = playable_radius_m;
+        self.player_spawn = (0.0, 0.0);
+        // `clear()` garde la capacité : une arène en repose ~400, on ne
+        // réalloue pas à chaque round.
+        self.discs.clear();
+        self.segs.clear();
+        self.authored_pending = 0;
+    }
+
+    /// Les solides qui cassent la ligne de vue — les seuls qui sont du couvert.
+    pub fn covers(&self) -> impl Iterator<Item = &forgia_core::layout::SolidDisc> {
+        self.discs.iter().filter(|d| d.breaks_sight())
+    }
+
+    /// Taille de l'échantillon. **Zéro = aveugle**, et le capteur le dit.
+    pub fn measured(&self) -> usize {
+        self.discs.len() + self.segs.len()
+    }
+}
+
 // ─── LayoutResult Resource (story-485 phase 5) ──────────────────────────────
 
 /// État runtime du dernier placement de modules. Mis à jour par
@@ -394,6 +464,8 @@ pub struct LayoutParams<'w> {
     /// Story-625 - assets des layouts authored (lookup par stage_id via le
     /// handle `StageGenomeHandles::arena_layouts`).
     pub arena_assets: Res<'w, Assets<Genome<authored::ArenaLayoutsGenome>>>,
+    /// Story-690 — la géométrie posée, remplie au fil de l'assemblage.
+    pub geometry: ResMut<'w, ArenaGeometry>,
 }
 
 // ─── Marker Component ───────────────────────────────────────────────────────
@@ -436,6 +508,9 @@ impl Plugin for ForgiaStageArenaPlugin {
             .init_resource::<StageScenePreloads>()
             .init_resource::<StageArenaTuning>()
             .init_resource::<LayoutResult>()
+            // Story-690 — la géométrie réellement posée, alimentée par tous les
+            // générateurs et lue par le capteur.
+            .init_resource::<ArenaGeometry>()
             // Story-663 — cache des fusions statiques (re-entrée = zéro rebuild).
             .init_resource::<ExtraFloorPreloads>()
             .init_resource::<floor_merge::MergedStaticCache>()
@@ -1005,7 +1080,13 @@ fn spawn_stage_arena_on_request(
     // cleanup old entities AVANT spawn new. Permet le run loop multi-stage.
     if !last_processed_id.is_empty() && !meme_arene && !q_existing.is_empty() {
         let prev = std::mem::take(&mut *last_processed_id);
-        let n = despawn_stage_entities(&mut commands, &q_existing, &anchor_stats, &mut result);
+        let n = despawn_stage_entities(
+            &mut commands,
+            &q_existing,
+            &anchor_stats,
+            &mut result,
+            &mut layout_params.geometry,
+        );
         info!(
             "[stage-arena] Stage transition '{}' → '{}' : despawned {} entities",
             prev, req.stage_id, n
@@ -1063,6 +1144,13 @@ fn spawn_stage_arena_on_request(
     let extent = stage_def.arena_extent_m;
     let mut props_spawned: u32 = 0;
 
+    // Story-690 — on repart d'une géométrie VIDE pour ce bâti. Le rayon jouable
+    // est l'apothème de l'hexagone, pas l'extent : un rayon lancé vers un sommet
+    // sortirait de l'enceinte, et une portée mesurée hors les murs est fausse.
+    layout_params
+        .geometry
+        .reset(&req.stage_id, req.seed, layout::HEX_INSCRIBED_RATIO * extent);
+
     // Glow d'ambiance cartoon biome-tuné (un PointLight chaud shadowless par POI
     // + BossPad). Calculé une fois, réutilisé dans les boucles ci-dessous.
     let (glow_color, glow_intensity, glow_range) = biome_ambiance_glow(&stage_def.biome);
@@ -1103,7 +1191,6 @@ fn spawn_stage_arena_on_request(
         "floor",
         floor_instances,
         scenes.to_vec(),
-        extent,
         &req.stage_id,
     );
     result.floor_merged_cells = 0;
@@ -1183,7 +1270,6 @@ fn spawn_stage_arena_on_request(
         "walls",
         wall_instances,
         vec![wall_scene],
-        extent,
         &req.stage_id,
     );
     result.walls_merged_cells = 0;
@@ -1226,7 +1312,6 @@ fn spawn_stage_arena_on_request(
                 "rampart_props",
                 banners,
                 banner_scenes,
-                extent,
                 &req.stage_id,
             );
         }
@@ -1280,8 +1365,16 @@ fn spawn_stage_arena_on_request(
                 anchor_stats.record(kind);
             }
             // Collider differe pour pieces walkable/blocker (perchoir, etc.).
+            //
+            // Story-690 — c'est AUSSI la seule mesure honnête de leur emprise :
+            // le TOML ne déclare pas de taille, et la redéclarer serait « une
+            // grandeur écrite deux fois ». Le collider est l'emprise, donc
+            // `sys_collide_authored_pieces` publiera la géométrie quand le GLB
+            // sera arrivé. En attendant, on COMPTE ce qu'on attend : sans ça,
+            // une mesure prise à mi-chargement conclurait « aucun couvert ».
             if piece.walkable || piece.blocker {
                 commands.entity(e).insert(authored::AuthoredNeedsCollider);
+                layout_params.geometry.authored_pending += 1;
             }
             if !piece.section.is_empty() {
                 authored_sections.insert(piece.section.clone());
@@ -1348,18 +1441,30 @@ fn spawn_stage_arena_on_request(
             }
             // Physique : UN cuboïde par tronçon (pas un par module) — les bots
             // sondent par raycast, 30 boîtes coûtent bien moins que 120.
-            let half = seg.collider_half_extents(
-                RAMPARTS_WALL_HEIGHT_M,
-                RAMPARTS_WALL_THICKNESS_M,
-            );
+            let half = seg.collider_half_extents(RAMPARTS_WALL_HEIGHT_M, RAMPARTS_WALL_THICKNESS_M);
+            // Story-690 — le tronçon entre dans la géométrie mesurée. Un mur est
+            // un SEGMENT : le réduire à un disque le rendrait soit troué, soit
+            // démesuré.
+            {
+                let half_len = seg.len_m * 0.5;
+                let (dx, dz) = if seg.along_x {
+                    (half_len, 0.0)
+                } else {
+                    (0.0, half_len)
+                };
+                layout_params.geometry.segs.push(forgia_core::layout::SolidSeg {
+                    x0: seg.center_x - dx,
+                    z0: seg.center_z - dz,
+                    x1: seg.center_x + dx,
+                    z1: seg.center_z + dz,
+                    half_thick_m: RAMPARTS_WALL_THICKNESS_M * 0.5,
+                    h: RAMPARTS_WALL_HEIGHT_M,
+                });
+            }
             commands.spawn((
                 Name::new("RoomWallCollider"),
                 StageArenaMarker,
-                Transform::from_xyz(
-                    seg.center_x,
-                    RAMPARTS_WALL_HEIGHT_M * 0.5,
-                    seg.center_z,
-                ),
+                Transform::from_xyz(seg.center_x, RAMPARTS_WALL_HEIGHT_M * 0.5, seg.center_z),
                 GlobalTransform::default(),
                 RigidBody::Fixed,
                 Collider::cuboid(half.x, half.y, half.z),
@@ -1371,7 +1476,6 @@ fn spawn_stage_arena_on_request(
             "rooms",
             room_instances,
             vec![room_scene],
-            extent,
             &req.stage_id,
         );
         // Story-684 — les BANNIÈRES s'accrochent aux murs.
@@ -1403,12 +1507,20 @@ fn spawn_stage_arena_on_request(
                 }
                 let idx = (splitmix64(&mut rng) % banner_scenes.len() as u64) as u8;
                 // Côté du mur (une face ou l'autre), décollé de la demi-épaisseur.
-                let side = if splitmix64(&mut rng).is_multiple_of(2) { 1.0 } else { -1.0 };
+                let side = if splitmix64(&mut rng).is_multiple_of(2) {
+                    1.0
+                } else {
+                    -1.0
+                };
                 let off = RAMPARTS_WALL_THICKNESS_M * 0.5 + 0.05;
                 let (pos, yaw) = if seg.along_x {
                     (
                         Vec3::new(seg.center_x, 0.0, seg.center_z + side * off),
-                        if side > 0.0 { 0.0 } else { std::f32::consts::PI },
+                        if side > 0.0 {
+                            0.0
+                        } else {
+                            std::f32::consts::PI
+                        },
                     )
                 } else {
                     (
@@ -1428,7 +1540,6 @@ fn spawn_stage_arena_on_request(
                     "wall_props",
                     banners,
                     banner_scenes,
-                    extent,
                     &req.stage_id,
                 );
             }
@@ -1449,9 +1560,11 @@ fn spawn_stage_arena_on_request(
     // `forge_sanctum` posait délibérément un puits solide à `[0,0,0]` : le
     // joueur apparaissait DEDANS, bloqué. Une carte qui met une pièce maîtresse
     // en son centre doit pouvoir dire où l'on démarre.
-    let spawn_pos = authored_layout
-        .map(|l| l.spawn_pos())
-        .unwrap_or(Vec3::ZERO);
+    let spawn_pos = authored_layout.map(|l| l.spawn_pos()).unwrap_or(Vec3::ZERO);
+    // Story-690 — c'est depuis CE point que les portées se mesurent. Il était
+    // écrit deux fois : ici, et en dur à `Vec3::ZERO` dans l'appel au solveur
+    // plus bas. Une seule source, lue par les deux.
+    layout_params.geometry.player_spawn = (spawn_pos.x, spawn_pos.z);
     commands.spawn((
         Name::new("StagePlayerSpawn"),
         StageArenaMarker,
@@ -1622,6 +1735,18 @@ fn spawn_stage_arena_on_request(
             ));
             anchor_stats.record(placement.anchor_kind);
             props_spawned += 1;
+            // Story-690 — le module entre dans la géométrie mesurée. Sa hauteur
+            // vient de `HeightClass::height_m()`, la même que le solveur utilise
+            // pour décider s'il casse une ligne de vue : pas de second barème.
+            layout_params
+                .geometry
+                .discs
+                .push(forgia_core::layout::SolidDisc {
+                    x: placement.position.x,
+                    z: placement.position.z,
+                    r: def.footprint_radius_m,
+                    h: placement.height_class.height_m(),
+                });
         }
         info!(
             "[stage-arena] Modules placed: {}/{} (skipped={}) palette={:?}",
@@ -1724,6 +1849,7 @@ pub fn despawn_stage_entities(
     query: &Query<Entity, With<StageArenaMarker>>,
     stats: &AnchorStats,
     result: &mut StageLoadResult,
+    geometry: &mut ArenaGeometry,
 ) -> u32 {
     let mut n = 0u32;
     for e in query.iter() {
@@ -1732,6 +1858,14 @@ pub fn despawn_stage_entities(
     }
     forgia_anchor::reset_anchor_stats(stats);
     *result = StageLoadResult::default();
+    // Story-690 — la géométrie MEURT avec l'arène qu'elle décrit.
+    //
+    // Trouvé à la première lecture runtime : `forgia2_stage.json` annonçait
+    // `state: idle` pendant que le capteur de géométrie affirmait encore mesurer
+    // `forge_sanctum`. Une mesure qui survit à son objet est exactement le
+    // capteur menteur que cette story corrige — il n'allait pas commencer par en
+    // être un.
+    geometry.reset("", 0, 0.0);
     n
 }
 
@@ -1743,8 +1877,9 @@ pub fn cleanup_stage_arena(
     q: Query<Entity, With<StageArenaMarker>>,
     stats: Res<AnchorStats>,
     mut result: ResMut<StageLoadResult>,
+    mut geometry: ResMut<ArenaGeometry>,
 ) {
-    let n = despawn_stage_entities(&mut commands, &q, &stats, &mut result);
+    let n = despawn_stage_entities(&mut commands, &q, &stats, &mut result, &mut geometry);
     // Story-600 (re-appliqué 2026-06-17) : retirer NOTRE propre requête de spawn —
     // sinon le système ungated `spawn_stage_arena_on_request` la revoit à la frame
     // suivante (state reset ≠ Ready) et RE-spawne le stage Roguelite dans le mode

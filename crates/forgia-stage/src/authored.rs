@@ -11,6 +11,7 @@
 //! Hot-reload Shift+F12 natif (genome via AssetServer). **0 coordonnée arène en
 //! dur dans le Rust** — tout vit dans le TOML.
 
+use bevy::camera::primitives::MeshAabb;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{Collider, ComputedColliderShape};
 use forgia_anchor::AnchorKind;
@@ -133,13 +134,73 @@ fn collect_mesh_descendants(
 /// (Collider sans RigidBody = statique, marchable, épouse le visuel — même
 /// pattern que `boss_portal::solidify_dais`). Idempotent : retire le marqueur
 /// quand tous les meshes sont chargés + collidérés.
+/// Story-690 — l'emprise d'une pièce autorée se MESURE ici, ou nulle part.
+///
+/// Le TOML ne déclare aucune taille (et bien lui en prend : la redéclarer serait
+/// « une grandeur écrite deux fois », et un coefficient de tuning attrapé au
+/// passage sous-estimerait l'emprise d'un facteur trois —
+/// `spawn-clearance.md` §4). La seule vérité est le mesh, une fois arrivé.
+///
+/// Rayon = demi-diagonale XZ de l'AABB monde. **Généreux, assumé** : un abri
+/// compté trop large fausse une statistique, un abri compté trop étroit fait
+/// conclure « pas de couvert » sur une carte qui en a.
+fn world_footprint(
+    root: Entity,
+    mesh_ents: &[Entity],
+    q_mesh: &Query<&Mesh3d>,
+    q_gt: &Query<&GlobalTransform>,
+    meshes: &Assets<Mesh>,
+) -> Option<forgia_core::layout::SolidDisc> {
+    let mut lo = Vec3::splat(f32::INFINITY);
+    let mut hi = Vec3::splat(f32::NEG_INFINITY);
+    for &e in mesh_ents {
+        let (Ok(m3d), Ok(gt)) = (q_mesh.get(e), q_gt.get(e)) else {
+            continue;
+        };
+        let Some(aabb) = meshes.get(&m3d.0).and_then(|m| m.compute_aabb()) else {
+            continue;
+        };
+        let c: Vec3 = aabb.center.into();
+        let h: Vec3 = aabb.half_extents.into();
+        // Les 8 sommets transformés — l'AABB d'un mesh tourné n'est pas
+        // l'AABB tournée, et une pièce autorée porte un yaw.
+        for sx in [-1.0_f32, 1.0] {
+            for sy in [-1.0_f32, 1.0] {
+                for sz in [-1.0_f32, 1.0] {
+                    let p = gt.transform_point(c + Vec3::new(h.x * sx, h.y * sy, h.z * sz));
+                    lo = lo.min(p);
+                    hi = hi.max(p);
+                }
+            }
+        }
+    }
+    if !lo.x.is_finite() || !hi.x.is_finite() {
+        return None;
+    }
+    let center_x = (lo.x + hi.x) * 0.5;
+    let center_z = (lo.z + hi.z) * 0.5;
+    let half_x = (hi.x - lo.x) * 0.5;
+    let half_z = (hi.z - lo.z) * 0.5;
+    let _ = root;
+    Some(forgia_core::layout::SolidDisc {
+        x: center_x,
+        z: center_z,
+        r: (half_x * half_x + half_z * half_z).sqrt(),
+        // Hauteur AU-DESSUS DU SOL, pas épaisseur : une dalle posée à 3 m n'est
+        // pas un abri de 0,2 m, elle masque la vue jusqu'à 3,2 m.
+        h: hi.y.max(0.0),
+    })
+}
+
 pub fn sys_collide_authored_pieces(
     mut commands: Commands,
     q_pieces: Query<Entity, With<AuthoredNeedsCollider>>,
     q_children: Query<&Children>,
     q_mesh: Query<&Mesh3d>,
+    q_gt: Query<&GlobalTransform>,
     q_has_col: Query<(), With<Collider>>,
     meshes: Res<Assets<Mesh>>,
+    mut geometry: ResMut<crate::ArenaGeometry>,
 ) {
     for root in &q_pieces {
         let mut mesh_ents = Vec::new();
@@ -167,6 +228,12 @@ pub fn sys_collide_authored_pieces(
                 }
             }
         }
+        // Story-690 — la pièce est mesurée UNE fois, au même moment que son
+        // collider : les deux décrivent le même solide.
+        if let Some(disc) = world_footprint(root, &mesh_ents, &q_mesh, &q_gt, &meshes) {
+            geometry.discs.push(disc);
+        }
+        geometry.authored_pending = geometry.authored_pending.saturating_sub(1);
         commands.entity(root).remove::<AuthoredNeedsCollider>();
     }
 }
