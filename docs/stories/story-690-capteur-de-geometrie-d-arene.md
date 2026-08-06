@@ -1,6 +1,6 @@
 # story-690 — Le capteur d'arène mesure enfin la géométrie posée
 
-**Statut** : IN_PROGRESS (livré, runtime en cours de validation)
+**Statut** : DONE (2026-08-06 — livré et validé en jeu)
 **Date** : 2026-08-06
 **Niveau BMAD** : Standard (5 fichiers)
 **Related** : story-485 (solveur de layout), story-625 (coquilles autorées), story-674
@@ -142,8 +142,18 @@ arène.
 - [x] 13 tests purs (`forgia-core::layout`) + 12 (`layout_sensor`), 0 warning clippy
 - [x] **Lecture runtime** : `forge_sanctum` mesuré (ci-dessous)
 - [x] La géométrie meurt avec l'arène (défaut trouvé à cette lecture)
-- [ ] Lecture des 3 autres arènes (un chapitre = un seul `stage_id`)
-- [ ] Les constats qu'il révèle sont consignés (pistes 1 à 6 de l'audit)
+- [x] **Le symptôme d'origine a disparu en jeu** — plus de collider de mur sans
+      mur au round 2 (validé par Antoine, 2026-08-06)
+
+### Ouvert — usage de l'outil, pas livraison manquante
+
+- Lecture des 3 autres arènes (un chapitre = un seul `stage_id`, il faut
+  plusieurs runs). `donjon_oublie` et `hauts_paturages` sont les plus
+  intéressantes : ce sont les seules à avoir le complexe de pièces.
+- **La question que la mesure pose et ne tranche pas** : 13 abris sur
+  166 solides — vrai manque de couvert, ou pool calibré trop plat ? Elle se
+  tranche manette en main, dans la bande 20-42 m.
+- Pistes 1 à 6 de l'audit du 2026-08-06.
 
 ---
 
@@ -236,9 +246,8 @@ Tests : 8 nouveaux dans `floor_merge` — dont
 `two_different_layouts_never_share_a_key`, celui qui aurait attrapé le bug, et
 `the_same_layout_still_hits_the_cache`, qui garantit qu'on n'a pas tué le cache.
 
-**Non validé runtime** : le round 1 se bâtit normalement (`floor` 1257→91,
-`walls` 66→20, `rampart_props` 15→13, clés de contenu distinctes) ; atteindre le
-round 2 demande de jouer.
+**✅ Validé en jeu le 2026-08-06** : plus de collider de mur sans mur au round 2.
+Le symptôme d'origine — celui qui a déclenché l'investigation — a disparu.
 
 ## Fichiers
 
