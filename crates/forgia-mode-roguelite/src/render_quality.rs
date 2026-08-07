@@ -62,6 +62,17 @@ pub struct RogueliteRenderConfig {
     pub fog_enabled: bool,
     pub fog_density: f32,
     pub ambient_brightness: f32,
+    /// Story-678 Phase 5 — le fond du menu est-il l'arène du chapitre atteint ?
+    ///
+    /// `false` = le hub retombe sur son fond vidéo. C'est la soupape : le
+    /// diorama charge des GLB et rend une passe RTT au menu ; si ça coûte trop
+    /// cher sur une machine, on le coupe SANS rebuild.
+    pub ui_backdrop_enabled: bool,
+    /// Hauteur (px) de l'image du fond de menu ; la largeur suit le 16:9.
+    ///
+    /// C'est le budget GPU du fond, borné en data. 720 p suffit : l'image est
+    /// floutée par la brume et couverte aux deux tiers par les panneaux.
+    pub ui_backdrop_height_px: u32,
 }
 
 impl Default for RogueliteRenderConfig {
@@ -77,6 +88,8 @@ impl Default for RogueliteRenderConfig {
             fog_enabled: true,
             fog_density: 0.008,
             ambient_brightness: 300.0,
+            ui_backdrop_enabled: true,
+            ui_backdrop_height_px: 720,
         }
     }
 }
@@ -102,6 +115,13 @@ impl RogueliteRenderConfig {
                 "roguelite_fog_density" => c.fog_density = gene.default.clamp(0.0, 0.1),
                 "roguelite_ambient_brightness" => {
                     c.ambient_brightness = gene.default.clamp(0.0, 2000.0);
+                }
+                "ui_backdrop_enabled" => c.ui_backdrop_enabled = gene.default >= 0.5,
+                "ui_backdrop_height_px" => {
+                    // Borné : sous 240 p le fond est une bouillie. Plafond monté
+                    // à 1440 (story-692) : le clamp à 1080 interdisait de corriger
+                    // le flou ×2 des écrans 1440p même en le demandant en data.
+                    c.ui_backdrop_height_px = gene.default.clamp(240.0, 1440.0) as u32;
                 }
                 _ => {}
             }

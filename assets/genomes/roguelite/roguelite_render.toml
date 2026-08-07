@@ -53,3 +53,21 @@ default = 0.008  # ~1/density ≈ distance de demi-brume (0.008 → ~125 m)
 [[genes]]
 id = "roguelite_ambient_brightness"
 default = 300.0  # lumière ambiante chaude (teinte volcanique)
+
+# ── Fond du menu = l'arène du chapitre atteint (story-678 Phase 5) ───────────
+# Le hub ne montre plus une vidéo de branding : il montre l'univers où le joueur
+# en est, bâti avec les props de sa palette de chapitre, son personnage équipé
+# debout dedans. Diorama RTT (aucune passe fullscreen — celles-ci tombent sous
+# DX12), caméra en dérive lente.
+#
+# Si ça coûte trop cher sur une machine : mettre 0.0 → retour au fond vidéo,
+# SANS rebuild. État runtime dans forgia2_menu_hub.json (backdrop_props).
+[[genes]]
+id = "ui_backdrop_enabled"
+default = 1.0   # 1 = arène du chapitre, 0 = fond vidéo
+
+[[genes]]
+id = "ui_backdrop_height_px"
+default = 720.0 # largeur suivie sur l'aspect REEL de la fenetre (story-692).
+                # Borné 240..1440 — monter à 1080-1440 sur ecran 1440p si le
+                # fond parait flou ; au-dela, la brume efface ce qu'on paie.
