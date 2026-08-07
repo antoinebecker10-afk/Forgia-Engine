@@ -19,32 +19,34 @@ use forgia_core::prelude::*;
 use forgia_input::prelude::InputBlockers;
 use forgia_ui_lib::pause_menu::{draw_settings_controls, save_user_settings, UserSettings};
 use forgia_ui_lib::style::{
-    cartoon_btn, glass_btn, glass_frame_hero, C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR,
-    FORGE_PANEL, HAIR_GOLD_STRONG,
+    cartoon_btn, glass_btn, glass_frame_hero, C_PRIMARY, C_TEXT_MUTED, FORGE_AME, FORGE_CREME,
+    FORGE_ECLAT, FORGE_OR, FORGE_PANEL, HAIR_GOLD_STRONG,
 };
 use forgia_ui_lib::theme::display_text;
 // Hub-menu (story-menu-hub) : le menu-titre devient le hub roguelite complet.
 // `forgia-ui` → `forgia-mode-roguelite` dep existe (pas de cycle) → on lit les Res
 // persistées au Startup (présentes dès le menu) et on réutilise les helpers de
 // sections déjà écrits dans `hub.rs` (zéro duplication).
-use forgia_mode_roguelite::chapters::chapter_select_content;
+use forgia_mode_roguelite::chapters::{chapter_da_name, chapter_select_content};
 use forgia_mode_roguelite::decor_palettes::DecorPalettesConfig;
-use forgia_mode_roguelite::hub::{draw_codex_section, section_intro};
+use forgia_mode_roguelite::elements::ElementConfig;
 use forgia_mode_roguelite::equipment::{
-    draw_equipment_content, EquipmentConfig, EquipmentMods, EquipmentPanelShown, EquipmentSave,
+    power_score, EquipmentConfig, EquipmentMods, EquipmentPanelShown, EquipmentSave,
 };
+use forgia_mode_roguelite::hub::{draw_codex_section, section_intro};
 use forgia_mode_roguelite::identity::{draw_identity_content, IdentityConfig, IdentitySave};
 use forgia_mode_roguelite::meta_shop::{
-    apply_meta_purchase, draw_enclume_panel, MetaShopCatalogue, MetaShopSave, SelectedChapter,
+    apply_meta_purchase, chapter_unlocked, draw_enclume_panel, MetaShopCatalogue, MetaShopSave,
+    SelectedChapter, CHAPTERS_PER_BOOK,
 };
-use forgia_mode_roguelite::elements::ElementConfig;
+use forgia_mode_roguelite::rounds::RoundsConfig;
 use forgia_mode_roguelite::pipeline_warmup::WarmupState;
 use forgia_mode_roguelite::progress::PlayerProgress;
 use forgia_mode_roguelite::run::MetaSouls;
-use forgia_mode_roguelite::StartRunEvent;
 use forgia_mode_roguelite::weapon_select::{
     draw_weapon_menu_panel, StartingWeaponChoice, WeaponCards,
 };
+use forgia_mode_roguelite::StartRunEvent;
 // Re-exports backward compat (déplacés vers crates atomiques 2026-05-16)
 pub use forgia_crosshair::CrosshairMode;
 pub use forgia_effects::hitmarker::HitmarkerState;
@@ -57,8 +59,19 @@ pub mod prelude {
     pub use forgia_effects::hitmarker::HitmarkerState;
 }
 
+/// Fond du menu = l'arène du chapitre atteint (diorama RTT). Story-678 Phase 5.
+mod arena_backdrop;
+/// Icônes des deux monnaies (Âmes / Éclats) — story-678.
+mod currency_icons;
+/// Silhouettes des cinq types d'équipement, tracées en egui — story-678.
+mod slot_glyph;
 /// Fond vidéo du menu (frames webp pré-extraites → cache LRU egui). Porté V1.
+/// Reste le REPLI quand `ui_backdrop_enabled = 0` ou que le diorama n'a rien posé.
+mod gamepad_nav;
+mod menu_hub_sensor;
 mod menu_video;
+use arena_backdrop::{ArenaBackdropPlugin, ArenaBackdropRtt};
+use currency_icons::{CurrencyIcons, CurrencyIconsPlugin, CURRENCY_ICON, CURRENCY_ICON_SMALL};
 use menu_video::MenuVideoState;
 
 /// Aperçus 3D (arme + bras) au hub-menu (render-to-texture). Story-menu-hub étape 5b.
@@ -83,16 +96,46 @@ impl Plugin for ForgiaUiPlugin {
         if !app.is_plugin_added::<WeaponPreviewPlugin>() {
             app.add_plugins(WeaponPreviewPlugin);
         }
+        // Fond d'arène du menu (RTT). APRÈS l'aperçu personnage : sa caméra rend
+        // le layer du personnage, qui doit donc exister.
+        if !app.is_plugin_added::<ArenaBackdropPlugin>() {
+            app.add_plugins(ArenaBackdropPlugin);
+        }
+        if !app.is_plugin_added::<CurrencyIconsPlugin>() {
+            app.add_plugins(CurrencyIconsPlugin);
+        }
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
         // Anti-trap V1 : éviter le frame où aucune caméra n'existe (ESC bug).
         app.init_resource::<MenuPage>()
+            .init_resource::<HubBadges>()
+            .init_resource::<gamepad_nav::LastInputKind>()
+            // Story-678 Phase 6 — manette : traduction en événements clavier
+            // egui, injectée entre ProcessInput et BeginPass (hook documenté).
+            .add_systems(
+                PreUpdate,
+                gamepad_nav::sys_gamepad_menu_nav
+                    .after(bevy_egui::EguiPreUpdateSet::ProcessInput)
+                    .before(bevy_egui::EguiPreUpdateSet::BeginPass),
+            )
+            .add_systems(Update, gamepad_nav::sys_track_input_kind)
+            .init_resource::<menu_hub_sensor::MenuHubSensorState>()
+            .add_systems(
+                Update,
+                menu_hub_sensor::sys_write_menu_hub_sensor.in_set(GameSet::Sensors),
+            )
+            .add_systems(OnEnter(AppMode::Menu), gamepad_nav::sys_style_gamepad_focus)
             .add_systems(Startup, (spawn_menu_camera_permanent, menu_video::setup_menu_video))
             // Fond vidéo menu : tick (avance frame) + sensor (forgia2_menu_video.json).
             .add_systems(
                 Update,
                 (menu_video::menu_video_tick, menu_video::menu_video_sensor),
             )
+            // Story-678 Phase 2 — miroir UserSettings → mémoire egui, chaque
+            // frame et sans garde is_changed (leçon « boons inertes ») : les
+            // impulsions de boutons vivent aussi in-game (coffre, pause).
+            // Phase 4 — pastilles de la sidebar (état réel, marquage « vu »).
+            .add_systems(Update, (sys_mirror_ui_motion, sys_hub_badges))
             // Menu titre : curseur libre + reset à la page racine à chaque retour menu.
             .add_systems(OnEnter(AppMode::Menu), (release_cursor, reset_menu_page))
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
@@ -154,10 +197,14 @@ impl Plugin for ForgiaUiPlugin {
             .add_systems(
                 EguiPrimaryContextPass,
                 (
+                    sys_publish_viewport_h,
                     main_menu_ui,
+                    sys_menu_root_dashboard,
+                    gamepad_nav::sys_menu_gamepad_hints,
                     sys_menu_livre,
                     sys_menu_enclume,
                     sys_menu_forgeron,
+                    sys_menu_marketplace,
                     sys_menu_armes,
                 )
                     .chain(),
@@ -262,7 +309,7 @@ fn spawn_menu_camera_permanent(mut commands: Commands, q: Query<Entity, With<Men
 ///
 /// `Root` = accueil (titre FORGIA + CONTINUER/NOUVELLE PARTIE). Les autres = les
 /// sections du hub, navigables depuis la sidebar verre sans lancer de run.
-#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
 enum MenuPage {
     #[default]
     Root,
@@ -286,16 +333,32 @@ enum MenuPage {
     /// Sa place est ICI et pas au Lobby : le Lobby est un gate de chargement
     /// traversé par le démarrage automatique, le hub est au menu.
     Livre,
+    /// Le MARKETPLACE — décors, couleurs, bras, musique (story-678).
+    ///
+    /// Hors sidebar comme Forgeron et Livre : on y entre depuis le Forgeron,
+    /// qui est la page « qui je suis ». Elle a son propre système parce qu'une
+    /// page riche tient mal sous le plafond de 16 paramètres Bevy quand elle
+    /// partage le sien.
+    Marketplace,
+    /// **Le SAC** — les pièces d'armure possédées (story-678).
+    Sac,
     Options,
 }
 
 impl MenuPage {
     /// Ordre de la sidebar de navigation (Accueil en tête, Options en pied).
+    // Livre + Forgeron RETIRÉS de la sidebar (2026-08-05, story-678) : leur
+    // contenu vit sur l'ACCUEIL (écran de préparation, modèle Dicero!). Les
+    // pages existent toujours — Forgeron via « Personnaliser », Livre absorbé
+    // par le carrousel de chapitres.
     const NAV: [MenuPage; 11] = [
         MenuPage::Root,
-        MenuPage::Livre,
-        MenuPage::Forgeron,
         MenuPage::Armes,
+        // Story-678 — le Sac et le Marketplace montent dans la barre : ce sont
+        // les deux écrans où l'on PREND quelque chose, ils ne doivent pas être
+        // enfouis derrière la page Forgeron.
+        MenuPage::Sac,
+        MenuPage::Marketplace,
         MenuPage::Talents,
         MenuPage::Enclume,
         MenuPage::Codex,
@@ -314,16 +377,18 @@ impl MenuPage {
     /// Libellé de l'onglet dans la sidebar (icône + nom court).
     fn nav_label(self) -> &'static str {
         match self {
-            MenuPage::Root => "⌂  Accueil",
+            MenuPage::Root => "🏠  Accueil",
             MenuPage::Livre => "📕  Le Livre",
             MenuPage::Forgeron => "⚒  Forgeron",
             MenuPage::Armes => "🗡  Armes",
-            MenuPage::Talents => "✦  Talents",
+            MenuPage::Talents => "✨  Talents",
             MenuPage::Enclume => "🔨  Enclume",
             MenuPage::Codex => "📖  Codex",
             MenuPage::Missions => "🎯  Missions",
             MenuPage::Succes => "🏆  Succès",
             MenuPage::Stats => "📊  Stats",
+            MenuPage::Marketplace => "💰  Marketplace",
+            MenuPage::Sac => "🎒  Sac",
             MenuPage::Options => "⚙  Options",
         }
     }
@@ -341,6 +406,8 @@ impl MenuPage {
             MenuPage::Missions => "MISSIONS",
             MenuPage::Succes => "HAUTS FAITS",
             MenuPage::Stats => "STATISTIQUES",
+            MenuPage::Marketplace => "MARKETPLACE",
+            MenuPage::Sac => "TON SAC",
             MenuPage::Options => "OPTIONS",
         }
     }
@@ -349,6 +416,46 @@ impl MenuPage {
 /// Revient à la page racine du menu à chaque entrée dans le menu (retour jeu→menu).
 fn reset_menu_page(mut page: ResMut<MenuPage>) {
     *page = MenuPage::Root;
+}
+
+/// Story-678 Phase 2 — pousse le toggle motion persisté (UserSettings) vers la
+/// mémoire egui où vivent les helpers (`forgia_ui_lib::motion`). Un insert de
+/// bool par frame : idempotent, trop bon marché pour mériter une garde.
+fn sys_mirror_ui_motion(
+    mut contexts: EguiContexts,
+    settings: Option<Res<forgia_ui_lib::pause_menu::UserSettings>>,
+) {
+    let Some(settings) = settings else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    forgia_ui_lib::motion::set_motion_enabled(ctx, settings.ui_motion_enabled);
+}
+
+/// Hauteur logique de la fenêtre, publiée dans la mémoire egui.
+///
+/// La hauteur vient de la SOURCE (`Window` côté Bevy) plutôt que d'une API de
+/// contexte egui, dont la valeur dépend des panels déjà posés cette frame.
+///
+/// ⚠️ Ce n'est PAS ce qui coupait les pages à mi-écran — cf. `set_max_height`
+/// dans `hub_section_panel`. Trois correctifs successifs ont visé cette mesure
+/// alors que le limiteur était ailleurs ; c'est une sonde, pas un raisonnement,
+/// qui l'a montré.
+fn sys_publish_viewport_h(
+    mut contexts: EguiContexts,
+    q_win: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    mut last: Local<f32>,
+) {
+    let Ok(win) = q_win.single() else { return };
+    let h = win.height();
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+    if (h - *last).abs() > 1.0 {
+        info!("[hub] hauteur de fenêtre = {h:.0}");
+        *last = h;
+    }
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new("forgia_viewport_h"), h));
 }
 
 fn main_menu_ui(
@@ -365,6 +472,12 @@ fn main_menu_ui(
     meta_save: Option<Res<MetaShopSave>>,
     progress: Option<Res<PlayerProgress>>,
     identity: Option<Res<IdentitySave>>,
+    // Story-678 Phase 4 — pastilles calculées par `sys_hub_badges`.
+    badges: Res<HubBadges>,
+    // Story-678 Phase 5 — le fond d'arène du chapitre atteint (diorama RTT).
+    backdrop: Option<Res<ArenaBackdropRtt>>,
+    // Story-678 — icônes des monnaies (absentes tant qu'egui n'a pas de contexte).
+    icons: Option<Res<CurrencyIcons>>,
     mut last_state: Local<Option<AppMode>>,
 ) {
     let current = app_state.get().clone();
@@ -376,12 +489,34 @@ fn main_menu_ui(
         return;
     }
 
+    // ── Quel fond ? ──
+    // Story-678 Phase 5 — l'arène du chapitre atteint remplace la vidéo de
+    // branding. On ne bascule QUE si le diorama a réellement posé des props :
+    // une palette vide donnerait un écran nu, et le repli vidéo vaut mieux
+    // qu'un fond noir. Le capteur publie ce compte.
+    let arena_bg = backdrop
+        .as_deref()
+        .filter(|b| b.is_showing())
+        .map(|b| b.tex_id);
     // Fond vidéo : maintient le cache LRU + preroll, renvoie le TextureId de la
     // frame courante. None → fallback fond sombre uni (preroll en cours / asset
     // absent). Calculé AVANT `ctx_mut` (libère le &mut EguiContexts).
-    let bg_id = video
-        .as_deref_mut()
-        .and_then(|v| menu_video::ensure_menu_video_frame(&mut contexts, v, &asset_server));
+    //
+    // Sous l'arène, le pipeline vidéo est GELÉ (story-691) : le tick n'avance
+    // plus la frame et on ne touche plus au cache — les 8 frames restent en
+    // VRAM et `prerolled` reste vrai, donc couper `ui_backdrop_enabled` à chaud
+    // réaffiche la vidéo immédiatement, sans re-preroll ni décodage à vide.
+    let video_bg = if arena_bg.is_some() {
+        None
+    } else {
+        video
+            .as_deref_mut()
+            .and_then(|v| menu_video::ensure_menu_video_frame(&mut contexts, v, &asset_server))
+    };
+    let bg_id = arena_bg.or(video_bg);
+    // Le scrim s'adapte : sur l'arène il épargne le tiers droit (le personnage
+    // y est), sur la vidéo il reste le dégradé vertical d'origine.
+    let bg_is_arena = arena_bg.is_some();
 
     let Ok(ctx) = contexts.ctx_mut() else {
         warn!("[forgia-ui] main_menu_ui: egui ctx not found (no Camera2d?)");
@@ -401,25 +536,43 @@ fn main_menu_ui(
                     egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                     egui::Color32::WHITE,
                 );
+                // Scrim : assied l'UI sans éteindre le fond.
+                //
+                // Sur l'ARÈNE il devient DIAGONAL — dense à gauche, où vivent
+                // la carte de chapitre et son texte ; presque nul à droite, où
+                // le personnage se tient. Un dégradé purement vertical
+                // (celui de la vidéo) noyait le personnage dans le même voile
+                // que le texte, alors qu'il est le sujet de ce côté-là.
                 let mut scrim = egui::Mesh::default();
-                let top = egui::Color32::from_black_alpha(40);
-                let bottom = egui::Color32::from_black_alpha(170);
-                scrim.colored_vertex(rect.left_top(), top);
-                scrim.colored_vertex(rect.right_top(), top);
-                scrim.colored_vertex(rect.right_bottom(), bottom);
-                scrim.colored_vertex(rect.left_bottom(), bottom);
+                let (lt, rt, rb, lb) = if bg_is_arena {
+                    (
+                        egui::Color32::from_black_alpha(130),
+                        egui::Color32::from_black_alpha(25),
+                        egui::Color32::from_black_alpha(85),
+                        egui::Color32::from_black_alpha(185),
+                    )
+                } else {
+                    let top = egui::Color32::from_black_alpha(40);
+                    let bottom = egui::Color32::from_black_alpha(170);
+                    (top, top, bottom, bottom)
+                };
+                scrim.colored_vertex(rect.left_top(), lt);
+                scrim.colored_vertex(rect.right_top(), rt);
+                scrim.colored_vertex(rect.right_bottom(), rb);
+                scrim.colored_vertex(rect.left_bottom(), lb);
                 scrim.add_triangle(0, 1, 2);
                 scrim.add_triangle(0, 2, 3);
                 ui.painter().add(egui::Shape::mesh(scrim));
             }
+            // Story-678 — le fantôme plein écran de l'avatar a été remplacé par
+            // le portrait CADRÉ de l'écran de préparation (le personnage géant
+            // débordait du cadre, retour utilisateur 2026-08-05). Le portrait
+            // vit dans `sys_menu_root_dashboard` (colonne droite).
         });
 
     // ── Données persistées (chargées au Startup → lisibles dès le menu) ──
     let souls_n = meta_save.as_ref().map(|s| s.souls_total).unwrap_or(0);
-    // « A déjà joué » = méta persistée (Âmes / upgrades / armes au-delà de Pépin).
-    let has_save = meta_save
-        .as_ref()
-        .is_some_and(|s| s.souls_total > 0 || !s.ranks.is_empty() || s.unlocked_weapons.len() > 1);
+    let shards_n = meta_save.as_ref().map(|s| s.shards_total).unwrap_or(0);
     let name = identity
         .as_ref()
         .map(|i| {
@@ -439,20 +592,30 @@ fn main_menu_ui(
         .map(|p| (p.level, p.ranks_remaining, p.completion()))
         .unwrap_or((1, 0, 0.0));
 
-    // ── Chrome persistant : bandeau Âmes (droite) + sidebar de navigation (gauche) ──
-    draw_hub_souls_chip(ctx, souls_n);
-    draw_hub_nav(ctx, &mut page, name, level, remaining, frac);
+    // ── Chrome persistant du haut d'écran ──
+    // Il se lit de gauche à droite comme une phrase : QUI je suis · OÙ je vais ·
+    // CE QUE j'ai. Les trois vivent sur la même bande depuis que la navigation
+    // est passée à l'horizontale.
+    draw_hub_smith_chip(ctx, name, level, remaining, frac);
+    draw_hub_nav(ctx, &mut page, *badges);
+    draw_hub_souls_chip(ctx, souls_n, shards_n, icons.as_deref());
 
     // ── Panneau de la section active ──
     // Les sections rendent leur contenu et renvoient une action de navigation
     // d'état (lancer une run / quitter) que l'on applique ici — évite de passer
     // NextState/MessageWriter dans chaque helper.
     let action = match *page {
-        MenuPage::Root => draw_root_landing(ctx, has_save),
+        MenuPage::Root => draw_root_landing(ctx),
         MenuPage::Codex => {
-            hub_section_panel(ctx, "hub_sec_codex", MenuPage::Codex.section_title(), 720.0, |ui| {
-                draw_codex_section(ui);
-            });
+            hub_section_panel(
+                ctx,
+                "hub_sec_codex",
+                MenuPage::Codex.section_title(),
+                720.0,
+                |ui| {
+                    draw_codex_section(ui);
+                },
+            );
             MenuAction::None
         }
         MenuPage::Talents => {
@@ -490,6 +653,8 @@ fn main_menu_ui(
             MenuAction::None
         }
         MenuPage::Missions => {
+            // Même doctrine que Talents (story-680 cran 1) : ces deux pages
+            // promettaient des Âmes et des titres qu'aucun système ne verse.
             hub_section_panel(
                 ctx,
                 "hub_sec_missions",
@@ -499,8 +664,9 @@ fn main_menu_ui(
                     section_intro(
                         ui,
                         "Missions",
-                        "Des défis quotidiens & hebdomadaires. Accomplis-les pour gagner des Âmes \
-                         et débloquer des titres.",
+                        "Rien à accomplir pour l'instant — les défis quotidiens et \
+                         hebdomadaires n'existent pas encore. Quand ils arriveront, \
+                         c'est ici qu'ils t'attendront.",
                     );
                 },
             );
@@ -516,8 +682,8 @@ fn main_menu_ui(
                     section_intro(
                         ui,
                         "Hauts faits",
-                        "Repousse tes limites — chaque haut fait débloqué rapporte des Âmes et un \
-                         titre à porter.",
+                        "Aucun haut fait n'est encore suivi. Cette page s'ouvrira \
+                         quand tes exploits seront comptés.",
                     );
                 },
             );
@@ -535,9 +701,12 @@ fn main_menu_ui(
         }
         // Forgeron / Armes / Enclume : panneaux interactifs dessinés par leurs
         // systèmes dédiés (`sys_menu_forgeron` / `sys_menu_armes` / `sys_menu_enclume`).
-        MenuPage::Forgeron | MenuPage::Armes | MenuPage::Enclume | MenuPage::Livre => {
-            MenuAction::None
-        }
+        MenuPage::Forgeron
+        | MenuPage::Armes
+        | MenuPage::Enclume
+        | MenuPage::Livre
+        | MenuPage::Marketplace
+        | MenuPage::Sac => MenuAction::None,
         MenuPage::Options => {
             draw_options_page(ctx, &mut page, &mut settings);
             MenuAction::None
@@ -570,6 +739,22 @@ enum MenuAction {
 // l'historique git de ce fichier ; la restaurer suffit à rouvrir le banc.
 // Rien n'a été touché côté moteur.
 
+/// Hauteur réservée en haut de l'écran par le chrome du hub (barre de
+/// navigation horizontale + chips d'état qui l'encadrent).
+///
+/// **Source unique.** La barre, les chips et TOUTES les pages s'y réfèrent :
+/// une page qui recopierait sa propre marge finirait par passer sous la barre
+/// le jour où celle-ci change de taille (`feedback_une_grandeur_ecrite_deux_fois`).
+const HUB_TOP_BAR_H: f32 = 84.0;
+
+/// Respiration entre le chrome du haut et le contenu de la page.
+const HUB_CONTENT_GAP: f32 = 18.0;
+
+/// Ordonnée du haut de tout contenu de page.
+fn hub_content_top() -> f32 {
+    HUB_TOP_BAR_H + HUB_CONTENT_GAP
+}
+
 /// Cadre « chip » cohérent avec le hub (verre aubergine + liseré or).
 fn hub_chip_frame() -> egui::Frame {
     egui::Frame::new()
@@ -579,76 +764,129 @@ fn hub_chip_frame() -> egui::Frame {
         .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
 }
 
-/// Bandeau Âmes (méta persistante) — haut-droite du hub-menu.
-fn draw_hub_souls_chip(ctx: &egui::Context, souls_n: u32) {
+/// Bandeau des deux monnaies — haut-droite du hub-menu.
+///
+/// Story-678 : les **Éclats** (cosmétique) sont affichés SOUS les Âmes
+/// (puissance). Les montrer ensemble est le seul moyen de faire comprendre
+/// qu'elles ne se remplacent pas — une seule ligne « 1729 » laisserait croire
+/// qu'un achat au Marketplace coûte des rangs d'Enclume.
+fn draw_hub_souls_chip(
+    ctx: &egui::Context,
+    souls_n: u32,
+    shards: u32,
+    icons: Option<&CurrencyIcons>,
+) {
+    let (i_souls, i_shards) = icons.map_or((None, None), |i| (i.souls, i.shards));
     egui::Area::new(egui::Id::new("menu_hub_souls"))
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-24.0, 18.0))
         .show(ctx, |ui| {
             hub_chip_frame().show(ui, |ui| {
+                ui.vertical(|ui| {
+                    // Largeur réservée : sans elle le chip se dimensionne sur son
+                    // contenu, et l'ajout de l'icône a fait passer « 1852 Âmes »
+                    // à la ligne (vu à l'inspection). Assez large pour 5 chiffres
+                    // + le mot + l'icône.
+                    ui.set_min_width(150.0);
+                    ui.horizontal(|ui| {
+                        CurrencyIcons::show(ui, i_souls, CURRENCY_ICON);
+                        ui.label(
+                            // FORGE_AME et pas FORGE_OR : l'or est la couleur
+                            // des pièces de run — le texte suit le saphir.
+                            egui::RichText::new(format!("{souls_n}  Âmes"))
+                                .size(20.0)
+                                .color(FORGE_AME)
+                                .strong(),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        CurrencyIcons::show(ui, i_shards, CURRENCY_ICON_SMALL);
+                        ui.label(
+                            // FORGE_ECLAT et pas C_PRIMARY : celui-ci est un
+                            // alias de FORGE_OR, les deux monnaies sortaient
+                            // dans le même or.
+                            egui::RichText::new(format!("{shards}  Éclats"))
+                                .size(15.0)
+                                .color(FORGE_ECLAT)
+                                .strong(),
+                        );
+                    });
+                });
+            });
+        });
+}
+
+/// Chip forgeron (haut-GAUCHE) : nom + niveau + avancement de l'Enclume.
+///
+/// Il vivait en tête de la sidebar verticale. La barre de navigation est passée
+/// à l'horizontale (2026-08-06) et ne peut plus porter trois lignes de texte :
+/// l'identité prend donc son propre chip, en miroir du chip Âmes à droite. Le
+/// haut de l'écran se lit alors comme un bandeau : QUI je suis · OÙ je vais ·
+/// CE QUE j'ai.
+fn draw_hub_smith_chip(ctx: &egui::Context, name: &str, level: u32, remaining: u32, frac: f32) {
+    egui::Area::new(egui::Id::new("menu_hub_smith"))
+        .anchor(egui::Align2::LEFT_TOP, egui::vec2(24.0, 18.0))
+        .show(ctx, |ui| {
+            hub_chip_frame().show(ui, |ui| {
+                ui.set_min_width(180.0);
                 ui.label(
-                    egui::RichText::new(format!("◇ {souls_n}  Âmes"))
-                        .size(20.0)
-                        .color(FORGE_OR)
+                    egui::RichText::new(name)
+                        .size(17.0)
+                        .color(FORGE_CREME)
                         .strong(),
+                );
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(format!("Niveau {level}"))
+                            .size(12.0)
+                            .color(C_TEXT_MUTED),
+                    );
+                });
+                ui.add_space(3.0);
+                // 14 px de haut, pas 8 : la barre porte un texte de 9 px, et
+                // une barre plus basse que son propre libellé le coupe en deux
+                // (vu à l'inspection du 2026-08-06).
+                ui.add_sized(
+                    egui::vec2(180.0, 14.0),
+                    egui::ProgressBar::new(frac).fill(FORGE_OR).text(
+                        egui::RichText::new(if remaining == 0 {
+                            "COMPLET".to_string()
+                        } else {
+                            format!("{remaining} À DÉBLOQUER")
+                        })
+                        .size(10.0)
+                        // Texte SOMBRE : il est posé sur le remplissage doré de
+                        // la barre, et le crème d'origine s'y noyait.
+                        .color(egui::Color32::from_rgb(40, 26, 10))
+                        .strong(),
+                    ),
                 );
             });
         });
 }
 
-/// Sidebar de navigation (gauche) : en-tête forgeron (nom + niveau + XP) puis les
-/// onglets des sections. `page` est muté au clic.
-fn draw_hub_nav(
-    ctx: &egui::Context,
-    page: &mut MenuPage,
-    name: &str,
-    level: u32,
-    // Rangs encore achetables à l'Enclume (ex-« XP restante »).
-    remaining: u32,
-    frac: f32,
-) {
+/// Barre de navigation HORIZONTALE, centrée en haut. `page` est muté au clic.
+///
+/// Elle était verticale à gauche et mangeait 228 px de large sur toute la
+/// hauteur — dont l'écran de préparation avait besoin pour respirer, et qui
+/// obligeait chaque page à se décaler de +100 px pour ne pas passer dessous.
+/// À l'horizontale elle coûte [`HUB_TOP_BAR_H`] px de haut, une seule fois, et
+/// les pages retrouvent le centre de l'écran.
+fn draw_hub_nav(ctx: &egui::Context, page: &mut MenuPage, badges: HubBadges) {
     egui::Area::new(egui::Id::new("menu_hub_nav"))
-        .anchor(egui::Align2::LEFT_CENTER, egui::vec2(24.0, 0.0))
+        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 18.0))
         .show(ctx, |ui| {
             egui::Frame::new()
                 .fill(FORGE_PANEL)
-                .inner_margin(egui::Margin::symmetric(12, 14))
+                .inner_margin(egui::Margin::symmetric(10, 8))
                 .corner_radius(egui::CornerRadius::same(14))
                 .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
-                    ui.set_min_width(204.0);
-                    // En-tête forgeron.
-                    ui.label(
-                        egui::RichText::new(name)
-                            .size(18.0)
-                            .color(FORGE_CREME)
-                            .strong(),
-                    );
-                    ui.label(
-                        egui::RichText::new(format!("Niveau {level}"))
-                            .size(13.0)
-                            .color(C_TEXT_MUTED),
-                    );
-                    ui.add_space(4.0);
-                    ui.add_sized(
-                        egui::vec2(200.0, 9.0),
-                        egui::ProgressBar::new(frac).fill(FORGE_OR).text(
-                            egui::RichText::new(if remaining == 0 {
-                                    "COMPLET".to_string()
-                                } else {
-                                    format!("{remaining} À DÉBLOQUER")
-                                })
-                                .size(9.0)
-                                .color(FORGE_CREME),
-                        ),
-                    );
-                    ui.add_space(10.0);
-                    ui.separator();
-                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
                     // Onglets.
                     for tab in MenuPage::NAV {
                         let selected = *page == tab;
                         let resp = ui.add_sized(
-                            egui::vec2(200.0, 30.0),
+                            egui::vec2(tab_width(tab.nav_label()), 34.0),
                             egui::Button::selectable(
                                 selected,
                                 egui::RichText::new(tab.nav_label())
@@ -657,17 +895,68 @@ fn draw_hub_nav(
                                     .strong(),
                             ),
                         );
+                        // La sidebar est dessinée avec des `Button::selectable`
+                        // bruts, donc hors des helpers de style qui sonnent —
+                        // elle était MUETTE au survol (retour en jeu 2026-08-05).
+                        // Seul le survol est instrumenté : le clic joue déjà son
+                        // `Tab` plus bas.
+                        forgia_ui_lib::ui_sfx::instrument_hover(&resp);
+                        // Story-678 Phase 4 — pastille dorée : quelque chose
+                        // t'attend derrière cet onglet (état réel, jamais décoratif).
+                        //
+                        // Seule l'Enclume est encore concernée ICI : Livre et
+                        // Forgeron ont quitté la sidebar avec la refonte Dicero,
+                        // et leurs pastilles vivent désormais sur les blocs de
+                        // l'Accueil qui ont repris leur contenu (carrousel du
+                        // Livre, bouton « Personnaliser »). Les tester ici était
+                        // du code mort — donc deux signaux calculés que rien
+                        // n'affichait.
+                        let dot = matches!(tab, MenuPage::Enclume) && badges.enclume;
+                        if dot {
+                            ui.painter().circle_filled(
+                                egui::pos2(resp.rect.right() - 10.0, resp.rect.center().y),
+                                4.0,
+                                C_PRIMARY,
+                            );
+                        }
                         if resp.clicked() {
+                            if *page != tab {
+                                forgia_ui_lib::ui_sfx::push_ui_sfx(
+                                    &resp.ctx,
+                                    forgia_ui_lib::ui_sfx::UiSfxKind::Tab,
+                                );
+                            }
                             *page = tab;
                         }
                         ui.add_space(3.0);
                     }
+                    });
                 });
         });
 }
 
+/// Largeur d'un onglet de la barre horizontale, dérivée de son libellé.
+///
+/// Une largeur fixe (les 200 px de la sidebar) donnait une barre de 1 800 px
+/// pour neuf onglets — plus large que l'écran. On dimensionne donc au texte,
+/// avec un plancher pour que les libellés courts restent cliquables.
+fn tab_width(label: &str) -> f32 {
+    /// Largeur moyenne d'un caractère de la fonte d'UI à 16 px, mesurée sur les
+    /// libellés existants. Approximation assumée : egui recentre le texte, un
+    /// écart de quelques pixels ne se voit pas.
+    const CHAR_W: f32 = 9.0;
+    const PADDING: f32 = 22.0;
+    const MIN_W: f32 = 84.0;
+    (label.chars().count() as f32 * CHAR_W + PADDING).max(MIN_W)
+}
+
 /// Panneau de section centré (verre + liseré or) — chrome commun aux sections
-/// data du hub. Décalé à droite pour ne pas passer sous la sidebar.
+/// data du hub.
+///
+/// Ancré en HAUT depuis le passage de la nav à l'horizontale : centré
+/// verticalement, une page haute remontait sous la barre. Il part donc sous
+/// [`hub_content_top`] et descend — la seule ancre qui garantit qu'aucune
+/// section ne passe derrière le chrome, quelle que soit sa hauteur.
 fn hub_section_panel(
     ctx: &egui::Context,
     id: &'static str,
@@ -675,80 +964,102 @@ fn hub_section_panel(
     max_width: f32,
     add_contents: impl FnOnce(&mut egui::Ui),
 ) {
+    // Story-678 Phase 2 — entrée de section en fondu + glissement (150 ms).
+    // La clé = l'id de section : naviguer relance l'anim, re-render non.
+    let (opacity, slide) = forgia_ui_lib::motion::section_enter_anim(ctx, id);
+    // ── Plafond de hauteur + défilement (audit 2026-08-06, bloquant n°2) ──
+    // Une `Area` dont le contenu dépasse l'écran est REMONTÉE par egui : le
+    // titre passait par-dessus la barre de navigation, et le panneau invisible
+    // MANGEAIT ses clics — depuis Options, la moitié des onglets ne répondait
+    // plus. Le contenu défile désormais dans le panneau ; le panneau, lui, ne
+    // dépasse jamais.
+    // ⚠ viewport_rect, PAS content_rect : le fond vidéo du menu est un
+    // CentralPanel qui CONSOMME l'espace du contexte — content_rect mesurait
+    // ce qui restait APRÈS lui, et le panneau s'arrêtait à mi-écran (vu le
+    // 2026-08-06, « plus adapté à la taille de mon écran »). Les Areas
+    // flottent au-dessus des panels : c'est bien le viewport qui fait foi.
+    let ecran_h = ctx
+        .data(|d| d.get_temp::<f32>(egui::Id::new("forgia_viewport_h")))
+        .unwrap_or(1080.0);
+    let max_h = (ecran_h - hub_content_top() - 24.0).max(220.0);
+    // Réserve du chrome interne : titre (40 px) + respirations + marges du cadre.
+    let scroll_h = max_h - 130.0;
     egui::Area::new(egui::Id::new(id))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .anchor(
+            egui::Align2::CENTER_TOP,
+            egui::vec2(slide, hub_content_top()),
+        )
         .show(ctx, |ui| {
+            ui.set_opacity(opacity);
+            // 🚨 LA LIGNE QUI MANQUAIT (mesurée le 2026-08-07, sonde ci-dessous).
+            //
+            // Une `Area` egui ne devine pas la place qu'on veut lui laisser :
+            // elle crée son `Ui` avec un `max_rect` de 400 px de haut, quoi
+            // qu'on calcule par ailleurs. Mon plafond de 824 n'était donc
+            // JAMAIS atteint — trois correctifs successifs (content_rect,
+            // viewport_rect, hauteur de fenêtre Bevy) ont réparé un chiffre
+            // qui n'a jamais été le limiteur. `set_max_height` assigne le
+            // `max_rect` : il ÉLARGIT autant qu'il restreint.
+            ui.set_max_height(max_h);
             glass_frame_hero()
                 .inner_margin(egui::Margin::symmetric(40, 30))
                 .show(ui, |ui| {
                     ui.set_max_width(max_width);
                     ui.vertical_centered(|ui| {
                         ui.label(display_text(title, 40.0, FORGE_OR).strong());
-                        ui.add_space(16.0);
-                        add_contents(ui);
                     });
+                    ui.add_space(16.0);
+                    egui::ScrollArea::vertical()
+                        .max_height(scroll_h)
+                        .show(ui, |ui| {
+                            ui.set_max_width(max_width);
+                            ui.vertical_centered(|ui| add_contents(ui));
+                        });
                 });
         });
 }
 
-/// Accueil (page racine) : titre FORGIA + CONTINUER / NOUVELLE PARTIE / QUITTER
-/// (+ démos moteur en dev). Renvoie l'action de lancement/quit à appliquer.
-fn draw_root_landing(ctx: &egui::Context, has_save: bool) -> MenuAction {
-    let mut action = MenuAction::None;
+/// Accueil (page racine) : le titre de l'enseigne. Tout le reste (carrousel de
+/// chapitre, dernière run, boutons de départ, équipement) est dessiné par
+/// `sys_menu_root_dashboard`, et le personnage vit dans le FOND
+/// (`arena_backdrop`), plus dans une carte.
+///
+/// Le titre était centré en haut ; la barre de navigation horizontale occupe
+/// désormais cette place. Il passe donc à gauche, en tête de la colonne de
+/// préparation qu'il coiffe — et il cesse d'être une bannière posée sur rien.
+/// NOUVELLE PARTIE a fusionné avec CONTINUER ; les démos moteur RPG/Cyber
+/// restent hors menu (2026-07-22), Hall de Forgia est dans la carte.
+fn draw_root_landing(ctx: &egui::Context) -> MenuAction {
+    let (opacity, slide) = forgia_ui_lib::motion::section_enter_anim(ctx, "menu_hub_root");
     egui::Area::new(egui::Id::new("menu_hub_root"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+        .anchor(
+            egui::Align2::LEFT_TOP,
+            egui::vec2(ROOT_COL_X + slide, hub_content_top()),
+        )
         .show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.heading(display_text("FORGIA", 84.0, C_PRIMARY).strong());
-                ui.add_space(8.0);
+            ui.set_opacity(opacity);
+            ui.vertical(|ui| {
+                ui.heading(display_text("FORGIA", 64.0, C_PRIMARY).strong());
                 ui.label(
                     egui::RichText::new("ROGUELITE")
-                        .size(22.0)
+                        .size(19.0)
                         .color(FORGE_CREME)
                         .strong(),
                 );
-                ui.add_space(40.0);
-
-                // CONTINUER — grisé tant qu'aucune partie n'a laissé de méta.
-                let mut continue_clicked = false;
-                ui.add_enabled_ui(has_save, |ui| {
-                    continue_clicked = cartoon_btn(ui, "▶  CONTINUER", FORGE_OR).clicked();
-                });
-                if continue_clicked {
-                    action = MenuAction::Launch(GameMode::Roguelite);
-                }
-                ui.add_space(16.0);
-
-                // NOUVELLE PARTIE — CTA or quand pas de save, sinon verre (Continuer prime).
-                let nouvelle = if has_save {
-                    glass_btn(ui, "✦  NOUVELLE PARTIE")
-                } else {
-                    cartoon_btn(ui, "✦  NOUVELLE PARTIE", FORGE_OR)
-                };
-                if nouvelle.clicked() {
-                    action = MenuAction::Launch(GameMode::Roguelite);
-                }
-                ui.add_space(16.0);
-
-                // Hall de Forgia — hub social 3D walkable (château importé). Zone
-                // neutre, point de rassemblement (multijoueur à terme). C'est une
-                // feature du jeu, pas une démo dev → toujours visible.
-                if glass_btn(ui, "🏰  Hall de Forgia").clicked() {
-                    action = MenuAction::Launch(GameMode::CastleHub);
-                }
-                ui.add_space(8.0);
-
-                if glass_btn(ui, "✕  QUITTER").clicked() {
-                    action = MenuAction::Quit;
-                }
-                // Démos moteur RPG / Cyber City retirées du menu roguelite (2026-07-22,
-                // demande user « roguelite pur »). Modes conservés dans le code
-                // (GameMode::Rpg/CyberCity + plugins) → récupérables en re-câblant un
-                // bouton ici. Hall de Forgia (CastleHub) gardé (feature du jeu).
             });
         });
-    action
+    MenuAction::None
 }
+
+/// Abscisse de la colonne de préparation (carte de chapitre + titre).
+///
+/// Source unique : le titre, la carte et le panneau d'équipement s'y réfèrent.
+/// Le personnage se tient dans le tiers droit du FOND — cette colonne occupe
+/// donc la gauche, et rien ne doit venir la chevaucher.
+const ROOT_COL_X: f32 = 56.0;
+
+/// Hauteur du bloc-titre, au-dessus de la carte de chapitre.
+const ROOT_TITLE_H: f32 = 104.0;
 
 /// Section Stats — synthèse de la méta-progression (records + compteurs de runs).
 fn draw_stats_section(ui: &mut egui::Ui, save: Option<&MetaShopSave>, level: u32) {
@@ -814,100 +1125,426 @@ fn draw_options_page(
     page: &mut ResMut<MenuPage>,
     settings: &mut ResMut<UserSettings>,
 ) {
-    egui::Area::new(egui::Id::new("menu_hub_options"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
-        .show(ctx, |ui| {
-            glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(40, 26))
-                .show(ui, |ui| {
-                    ui.set_max_width(520.0);
-                    ui.vertical_centered(|ui| {
-                        ui.label(display_text("OPTIONS", 44.0, FORGE_OR).strong());
-                    });
-                    ui.add_space(14.0);
-                    // Anti-crash : bypass + set_changed() SEULEMENT si un contrôle
-                    // change (sinon apply_window_settings boucle → resize → race wgpu).
-                    let dirty = draw_settings_controls(ui, settings.bypass_change_detection());
-                    if dirty {
-                        settings.set_changed();
-                    }
-                    ui.add_space(16.0);
-                    ui.horizontal(|ui| {
-                        if glass_btn(ui, "💾 Sauvegarder").clicked() {
-                            save_user_settings(settings.bypass_change_detection());
-                        }
-                        ui.add_space(12.0);
-                        if glass_btn(ui, "← Retour").clicked() {
-                            **page = MenuPage::Root;
-                        }
-                    });
-                });
-        });
+    // Story-678 — chrome commun. Sauvegarde IMMÉDIATE au changement : un
+    // réglage qu'on perd en quittant est un réglage cassé.
+    let mut retour = false;
+    hub_section_panel(
+        ctx,
+        "hub_sec_options",
+        MenuPage::Options.section_title(),
+        680.0,
+        |ui| {
+            if draw_settings_controls(ui, settings) {
+                save_user_settings(settings);
+            }
+            ui.add_space(14.0);
+            if glass_btn(ui, "‹  Retour").clicked() {
+                retour = true;
+            }
+        },
+    );
+    if retour {
+        **page = MenuPage::Root;
+    }
 }
 
-/// Section Enclume au menu-titre — méta-shop en **cartes cliquables** (souris).
-/// Système séparé (garde `main_menu_ui` sous la limite de params) gaté
-/// `AppMode::Menu` + onglet `Enclume`. Réutilise le rendu (`draw_enclume_panel`) et
-/// la logique d'achat (`apply_meta_purchase`) de forgia-mode-roguelite — zéro
-/// duplication. Solde = `MetaSouls.current` (chargé au Startup, comme au Lobby).
-fn sys_menu_enclume(
-    mut contexts: EguiContexts,
+/// Pastilles « quelque chose t'attend » du hub (story-678 Phase 4) — pilotées
+/// par l'état RÉEL, jamais décoratives.
+///
+/// Reconstruites après l'incident de découpe du 2026-08-06 (une édition par
+/// script a remplacé un span trop large ; ce fichier n'était pas commité).
+#[derive(Resource, Clone, Copy, Default, PartialEq)]
+struct HubBadges {
+    /// Au moins un achat possible à l'Enclume avec les Âmes courantes.
+    enclume: bool,
+    /// Une pièce d'armure ramassée depuis la dernière visite de la fiche.
+    forgeron: bool,
+    /// Un chapitre battu que le Livre n'a pas encore montré.
+    livre: bool,
+}
+
+/// Calcule les pastilles, et éteint celle de la fiche quand on la VISITE :
+/// « vu » = la page a été ouverte. Écritures gardées — pas de churn à vide.
+fn sys_hub_badges(
     app_state: Res<State<AppMode>>,
     page: Res<MenuPage>,
-    cat: Res<MetaShopCatalogue>,
-    mut save: ResMut<MetaShopSave>,
-    mut meta: ResMut<MetaSouls>,
+    cat: Option<Res<MetaShopCatalogue>>,
+    souls: Option<Res<MetaSouls>>,
+    meta: Option<Res<MetaShopSave>>,
+    mut eq_save: Option<ResMut<EquipmentSave>>,
+    mut badges: ResMut<HubBadges>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Enclume {
+    if *app_state.get() != AppMode::Menu {
         return;
     }
+    if let Some(eq) = eq_save.as_deref_mut() {
+        if matches!(*page, MenuPage::Forgeron | MenuPage::Sac) {
+            let total = eq.owned_total();
+            if eq.seen_owned_total != total {
+                eq.seen_owned_total = total;
+                // Sans écriture disque, le marquage ne survit pas à la session :
+                // la pastille éteinte se rallume au lancement suivant. Écriture
+                // rare — une fois par visite qui découvre de nouvelles pièces.
+                eq.save();
+            }
+        }
+    }
+    let next = HubBadges {
+        enclume: match (cat.as_deref(), meta.as_deref(), souls.as_deref()) {
+            (Some(c), Some(m), Some(s)) => {
+                forgia_mode_roguelite::meta_shop::enclume_affordable(c, m, s.current)
+            }
+            _ => false,
+        },
+        forgeron: eq_save
+            .as_deref()
+            .map(|e| e.owned_total() > e.seen_owned_total)
+            .unwrap_or(false),
+        livre: meta
+            .as_deref()
+            .map(|m| m.chapters_cleared > m.seen_chapters_cleared)
+            .unwrap_or(false),
+    };
+    if *badges != next {
+        *badges = next;
+    }
+}
+
+/// Story-678 Phase 3 — le tableau de bord de l'accueil : carte « CHAPITRE EN
+/// COURS » (carrousel du Livre), bandeau « DERNIÈRE RUN » (gelé par
+/// `sys_record_run_stats` aux deux sorties de run), boutons de départ, et le
+/// panneau d'équipement (bas-droite).
+///
+/// Système à part (même motif que `sys_menu_livre`) : `main_menu_ui` frôle le
+/// plafond de 16 paramètres Bevy. Toutes les Resources roguelite sont
+/// optionnelles — l'accueil s'affiche même sans elles.
+#[allow(clippy::too_many_arguments)]
+fn sys_menu_root_dashboard(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    mut page: ResMut<MenuPage>,
+    // `ResMut` : actionner le carrousel vaut « j'ai vu les nouveaux chapitres »
+    // et éteint la pastille du Livre (cf. `sys_hub_badges`).
+    save: Option<ResMut<MetaShopSave>>,
+    mut selected: Option<ResMut<SelectedChapter>>,
+    palettes: Option<Res<DecorPalettesConfig>>,
+    rounds_cfg: Option<Res<RoundsConfig>>,
+    equip_cfg: Option<Res<EquipmentConfig>>,
+    equip_save: Option<Res<EquipmentSave>>,
+    badges: Res<HubBadges>,
+    mut next_app: ResMut<NextState<AppMode>>,
+    mut next_game: ResMut<NextState<GameMode>>,
+    mut exit: MessageWriter<AppExit>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Root {
+        return;
+    }
+    let Some(mut save) = save else {
+        return;
+    };
     let Ok(ctx) = contexts.ctx_mut() else {
         return;
     };
-    let souls = meta.current;
-    let mut intent = None;
-    egui::Area::new(egui::Id::new("menu_hub_enclume"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
+    let chapitre = selected
+        .as_deref()
+        .map(|s| s.clamped(save.chapters_cleared))
+        .unwrap_or(1);
+    let da = chapter_da_name(palettes.as_deref(), chapitre);
+    let menace = rounds_cfg
+        .map(|c| c.threat_at(chapitre, 0).hp)
+        .unwrap_or(1.0);
+
+    // Sorties de l'UI, appliquées APRÈS les closures (emprunts propres).
+    let mut new_chap = chapitre;
+    let mut action = MenuAction::None;
+    let mut goto_forgeron = false;
+    let mut goto_livre = false;
+    let mut carrousel_actionne = false;
+
+    let (opacity, slide) = forgia_ui_lib::motion::section_enter_anim(ctx, "menu_hub_root");
+
+    // ── Colonne GAUCHE : LE LIVRE (carrousel) + dernière run + départ ──
+    // Sous le bloc-titre, alignée sur la même abscisse : l'écran se lit en deux
+    // temps — ce que je prépare à gauche, qui je suis à droite (dans le décor).
+    egui::Area::new(egui::Id::new("menu_hub_root_dashboard"))
+        .anchor(
+            egui::Align2::LEFT_TOP,
+            egui::vec2(ROOT_COL_X + slide, hub_content_top() + ROOT_TITLE_H),
+        )
         .show(ctx, |ui| {
+            ui.set_opacity(opacity);
             glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(40, 28))
+                .inner_margin(egui::Margin::symmetric(28, 22))
                 .show(ui, |ui| {
-                    ui.set_max_width(560.0);
+                    ui.set_width(340.0);
                     ui.vertical_centered(|ui| {
-                        ui.label(display_text("L'ENCLUME DES ÂMES", 38.0, FORGE_OR).strong());
+                        // Pastille « un chapitre s'est ouvert » — posée sur le
+                        // titre du bloc, qui est aussi la PORTE de la page Livre
+                        // complète (même modèle que « Personnaliser » → Forgeron :
+                        // hors barre de nav, accessible depuis le bloc de
+                        // l'Accueil qui a repris son contenu — sans ce clic, la
+                        // vue d'ensemble des chapitres était orpheline).
+                        let titre = ui
+                            .add(
+                                egui::Label::new(display_text("LE LIVRE", 18.0, FORGE_OR))
+                                    .sense(egui::Sense::click()),
+                            )
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .on_hover_text("Ouvrir le Livre — tous les chapitres");
+                        forgia_ui_lib::ui_sfx::instrument_hover(&titre);
+                        if titre.clicked() {
+                            goto_livre = true;
+                        }
+                        if badges.livre {
+                            ui.painter().circle_filled(
+                                egui::pos2(titre.rect.right() + 12.0, titre.rect.center().y),
+                                5.0,
+                                C_PRIMARY,
+                            );
+                        }
                         ui.add_space(6.0);
+                        // Carrousel ‹ CHAPITRE N › — borné aux chapitres ouverts.
+                        ui.horizontal(|ui| {
+                            let w = ui.available_width();
+                            let side = 36.0;
+                            let prev_ok = chapitre > 1;
+                            let next_ok =
+                                chapter_unlocked(chapitre + 1, save.chapters_cleared);
+                            ui.add_space((w - 340.0).max(0.0) / 2.0);
+                            let prev = ui.add_enabled(
+                                prev_ok,
+                                egui::Button::new(
+                                    egui::RichText::new("<").size(24.0).color(FORGE_OR),
+                                )
+                                .fill(FORGE_PANEL)
+                                .min_size(egui::vec2(side, side)),
+                            );
+                            ui.add_space(8.0);
+                            ui.add_sized(
+                                egui::vec2(220.0, side),
+                                egui::Label::new(
+                                    display_text(format!("CHAPITRE {chapitre}"), 28.0, FORGE_OR)
+                                        .strong(),
+                                ),
+                            );
+                            ui.add_space(8.0);
+                            let next = ui.add_enabled(
+                                next_ok,
+                                egui::Button::new(
+                                    egui::RichText::new(">").size(24.0).color(FORGE_OR),
+                                )
+                                .fill(FORGE_PANEL)
+                                .min_size(egui::vec2(side, side)),
+                            );
+                            if prev.clicked() {
+                                new_chap = chapitre - 1;
+                            }
+                            if next.clicked() {
+                                new_chap = chapitre + 1;
+                            }
+                            // Feuilleter le Livre, c'est l'avoir consulté : la
+                            // pastille « nouveau chapitre » s'éteint ici, et
+                            // nulle part ailleurs sur cet écran (cf. le pourquoi
+                            // dans `sys_hub_badges`).
+                            if prev.clicked() || next.clicked() {
+                                carrousel_actionne = true;
+                            }
+                        });
+                        if !da.is_empty() {
+                            ui.label(egui::RichText::new(da).size(15.0).color(FORGE_CREME));
+                        }
+                        ui.add_space(4.0);
                         ui.label(
-                            egui::RichText::new("Dépense tes Âmes en améliorations permanentes.")
+                            egui::RichText::new(format!("Menace ×{menace:.2}"))
                                 .size(13.0)
                                 .color(C_TEXT_MUTED),
                         );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{} / {} chapitres battus",
+                                save.chapters_cleared, CHAPTERS_PER_BOOK
+                            ))
+                            .size(13.0)
+                            .color(C_TEXT_MUTED),
+                        );
+                        // ── Bandeau DERNIÈRE RUN ──
+                        if let Some(run) = &save.last_run {
+                            ui.add_space(12.0);
+                            ui.separator();
+                            ui.add_space(6.0);
+                            ui.label(display_text("DERNIÈRE RUN", 16.0, FORGE_OR));
+                            let (verdict, couleur) = if run.victory {
+                                ("Victoire", FORGE_OR)
+                            } else {
+                                ("Défaite", C_TEXT_MUTED)
+                            };
+                            let mins = (run.duration_secs / 60.0) as u32;
+                            let secs = (run.duration_secs % 60.0) as u32;
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Chapitre {} — {verdict} · round {} · {mins}:{secs:02}",
+                                    run.chapter, run.rounds_reached
+                                ))
+                                .size(13.0)
+                                .color(couleur),
+                            );
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "+{} Âmes rapportées",
+                                    run.souls_earned
+                                ))
+                                .size(13.0)
+                                .color(FORGE_CREME),
+                            );
+                            if run.new_best {
+                                ui.label(
+                                    egui::RichText::new("NOUVEAU RECORD !")
+                                        .size(13.0)
+                                        .color(FORGE_OR)
+                                        .strong(),
+                                );
+                            }
+                        }
+                        // ── Boutons de départ (tout sur l'écran, modèle Dicero) ──
                         ui.add_space(14.0);
-                        intent = draw_enclume_panel(ui, &cat, &save, souls);
+                        ui.separator();
+                        ui.add_space(10.0);
+                        if cartoon_btn(ui, "▶  CONTINUER", FORGE_OR).clicked() {
+                            action = MenuAction::Launch(GameMode::Roguelite);
+                        }
+                        ui.add_space(8.0);
+                        if glass_btn(ui, "🏰  Hall de Forgia").clicked() {
+                            action = MenuAction::Launch(GameMode::CastleHub);
+                        }
+                        ui.add_space(8.0);
+                        if glass_btn(ui, "QUITTER").clicked() {
+                            action = MenuAction::Quit;
+                        }
                     });
                 });
         });
-    // Applique l'achat cliqué (mute save/souls + sauve). Le `&save` du rendu est
-    // relâché à la fermeture de l'Area, donc l'emprunt `&mut save` est libre ici.
-    if let Some(purchase) = intent {
-        apply_meta_purchase(&cat, &mut save, &mut meta, purchase);
+
+    // ── Colonne DROITE : ce que porte le personnage ──
+    //
+    // Le portrait en carte a disparu : le personnage est DANS le décor du fond,
+    // à droite de l'écran (`arena_backdrop`). Ne reste ici que ce qu'une image
+    // ne dit pas : le score de puissance et la liste des pièces avec leur
+    // rareté. Ancré en BAS à droite pour laisser le buste dégagé au-dessus.
+    egui::Area::new(egui::Id::new("menu_hub_root_gear"))
+        .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-56.0 - slide, -48.0))
+        .show(ctx, |ui| {
+            ui.set_opacity(opacity);
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(22, 16))
+                .show(ui, |ui| {
+                    ui.set_width(290.0);
+                    ui.vertical_centered(|ui| {
+                        if let (Some(cfg), Some(esave)) =
+                            (equip_cfg.as_deref(), equip_save.as_deref())
+                        {
+                            let score = power_score(cfg, esave);
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Puissance {score}  ·  record {}",
+                                    esave.power_record
+                                ))
+                                .size(14.0)
+                                .color(FORGE_CREME),
+                            );
+                            ui.add_space(8.0);
+                            ui.separator();
+                            ui.add_space(6.0);
+                            // Pièces portées : pastille couleur rareté + emplacement.
+                            for slot in &cfg.slots {
+                                let equipped = esave.equipped.get(&slot.id);
+                                let (col, texte) = match equipped {
+                                    Some(rid) => {
+                                        let rgb =
+                                            cfg.rarity(rid).map(|r| r.rgb).unwrap_or([0.5; 3]);
+                                        (
+                                            egui::Color32::from_rgb(
+                                                (rgb[0] * 255.0) as u8,
+                                                (rgb[1] * 255.0) as u8,
+                                                (rgb[2] * 255.0) as u8,
+                                            ),
+                                            format!(
+                                                "{} — {}",
+                                                slot.label,
+                                                cfg.rarity(rid)
+                                                    .map(|r| r.label.as_str())
+                                                    .unwrap_or(rid)
+                                            ),
+                                        )
+                                    }
+                                    None => (
+                                        egui::Color32::from_gray(90),
+                                        format!("{} — vide", slot.label),
+                                    ),
+                                };
+                                ui.horizontal(|ui| {
+                                    let (dot, _) = ui.allocate_exact_size(
+                                        egui::vec2(14.0, 14.0),
+                                        egui::Sense::hover(),
+                                    );
+                                    ui.painter().circle_filled(dot.center(), 5.0, col);
+                                    ui.label(
+                                        egui::RichText::new(texte).size(13.0).color(FORGE_CREME),
+                                    );
+                                });
+                            }
+                        }
+                        ui.add_space(10.0);
+                        // Pastille « une pièce que tu n'as jamais regardée » —
+                        // sur le bouton qui mène à la fiche.
+                        let perso = glass_btn(ui, "⚒  Personnaliser");
+                        if badges.forgeron {
+                            ui.painter().circle_filled(
+                                egui::pos2(perso.rect.right() - 12.0, perso.rect.center().y),
+                                5.0,
+                                C_PRIMARY,
+                            );
+                        }
+                        if perso.clicked() {
+                            goto_forgeron = true;
+                        }
+                    });
+                });
+        });
+
+    // ── Application des sorties ──
+    if new_chap != chapitre {
+        if let Some(sel) = selected.as_deref_mut() {
+            sel.0 = new_chap;
+        }
+    }
+    if carrousel_actionne && save.seen_chapters_cleared != save.chapters_cleared {
+        save.seen_chapters_cleared = save.chapters_cleared;
+        save.save();
+    }
+    if goto_forgeron {
+        *page = MenuPage::Forgeron;
+    }
+    if goto_livre {
+        *page = MenuPage::Livre;
+    }
+    match action {
+        MenuAction::Launch(mode) => {
+            next_game.set(mode);
+            next_app.set(AppMode::InGame);
+        }
+        MenuAction::Quit => {
+            exit.write(AppExit::Success);
+        }
+        MenuAction::None => {}
     }
 }
-/// Le Livre au menu — les dix chapitres et le choix de celui qu'on joue.
-///
-/// ## Pourquoi un système à part
-///
-/// `main_menu_ui` frôle le plafond de 16 paramètres de Bevy ; y ajouter le
-/// génome de palettes et la sélection le ferait déborder. Même motif que
-/// `sys_menu_forgeron` : le contenu vit dans `forgia-mode-roguelite`, seul le
-/// branchement est ici.
-///
-/// Les deux Resources sont optionnelles : le menu s'affiche même si le plugin
-/// roguelite n'a pas encore posé les siennes — on montre alors rien plutôt que
-/// de paniquer.
+
+/// Le LIVRE en page pleine — la même `chapter_select_content` que le carrousel
+/// de l'accueil, pour la vue d'ensemble des dix chapitres.
 fn sys_menu_livre(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
+    mut page: ResMut<MenuPage>,
     save: Option<Res<MetaShopSave>>,
     palettes: Option<Res<DecorPalettesConfig>>,
     selected: Option<ResMut<SelectedChapter>>,
@@ -921,45 +1558,101 @@ fn sys_menu_livre(
     let Ok(ctx) = contexts.ctx_mut() else {
         return;
     };
-    let palettes_ref = palettes.as_deref();
+    let mut retour = false;
     hub_section_panel(
         ctx,
         "hub_sec_livre",
         MenuPage::Livre.section_title(),
-        620.0,
+        640.0,
         |ui| {
-            chapter_select_content(ui, &save, palettes_ref, &mut selected);
+            chapter_select_content(ui, &save, palettes.as_deref(), &mut selected);
+            ui.add_space(12.0);
+            if glass_btn(ui, "‹  Retour").clicked() {
+                retour = true;
+            }
         },
     );
+    if retour {
+        *page = MenuPage::Root;
+    }
 }
 
-
-/// Section Forgeron au menu-titre — **un seul panneau** : le personnage à
-/// gauche, son identité et son équipement à droite.
-///
-/// Les deux panneaux séparés (identité au centre, équipement à droite)
-/// montraient deux aperçus 3D concurrents pour un même personnage. Celui des
-/// bras superposait le gauche et le droit — tous deux ont désormais leur poignet
-/// à l'origine — d'où la « main déformée » signalée. On garde l'aperçu du
-/// personnage entier : il montre déjà les bras, et c'est lui qu'on vient voir.
-///
-/// Le contenu reste dans `draw_identity_content` / `draw_equipment_content`,
-/// partagés avec le panneau I du Hall — zéro duplication.
-fn sys_menu_forgeron(
+/// L'ENCLUME au menu — les cartes cliquables de `draw_enclume_panel`, l'achat
+/// appliqué par `apply_meta_purchase` (une seule règle de dépense).
+fn sys_menu_enclume(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
     page: Res<MenuPage>,
+    cat: Option<Res<MetaShopCatalogue>>,
+    save: Option<ResMut<MetaShopSave>>,
+    meta: Option<ResMut<MetaSouls>>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Enclume {
+        return;
+    }
+    let (Some(cat), Some(mut save), Some(mut meta)) = (cat, save, meta) else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+    let souls = meta.current;
+    let mut purchase = None;
+    hub_section_panel(
+        ctx,
+        "hub_sec_enclume",
+        MenuPage::Enclume.section_title(),
+        640.0,
+        |ui| {
+            ui.label(
+                egui::RichText::new("Dépense tes Âmes en améliorations permanentes.")
+                    .size(16.0)
+                    .color(FORGE_CREME),
+            );
+            ui.add_space(10.0);
+            purchase = draw_enclume_panel(ui, &cat, &save, souls);
+        },
+    );
+    if let Some(p) = purchase {
+        let ok = apply_meta_purchase(&cat, &mut save, &mut meta, p);
+        forgia_ui_lib::ui_sfx::push_ui_sfx(
+            ctx,
+            if ok {
+                forgia_ui_lib::ui_sfx::UiSfxKind::Buy
+            } else {
+                forgia_ui_lib::ui_sfx::UiSfxKind::Denied
+            },
+        );
+    }
+}
+
+/// LA FICHE — le personnage encadré par ses emplacements, le sac en grille à
+/// côté, les caractéristiques dessous (structure de la référence « Classic RPG
+/// UI », dans notre DA). « Sac » et « Forgeron » ouvrent ce MÊME écran : la
+/// fiche et l'inventaire se regardent, les séparer obligerait à mémoriser ce
+/// qu'on porte en changeant d'onglet.
+#[allow(clippy::too_many_arguments)]
+fn sys_menu_forgeron(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    mut page: ResMut<MenuPage>,
     cfg: Res<IdentityConfig>,
     mut save: ResMut<IdentitySave>,
     mut arm_cosmetics: ResMut<ArmCosmetics>,
     mut editing: Local<bool>,
     eq_cfg: Res<EquipmentConfig>,
     mut eq_save: ResMut<EquipmentSave>,
+    // Le bloc CARACTÉRISTIQUES lit les bonus agrégés du build.
     eq_mods: Res<EquipmentMods>,
+    // La case choisie d'un simple clic (emplacement, rareté) — le double-clic
+    // équipe. `Local` : c'est un état d'écran, rien à faire en Resource.
+    mut selection: Local<Option<(String, String)>>,
     mut eq_shown: ResMut<EquipmentPanelShown>,
     rtt: Option<Res<weapon_preview::CharacterPreviewRtt>>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
+    if *app_state.get() != AppMode::Menu
+        || !matches!(*page, MenuPage::Forgeron | MenuPage::Sac)
+    {
         return;
     }
     let Ok(ctx) = contexts.ctx_mut() else {
@@ -984,68 +1677,759 @@ fn sys_menu_forgeron(
         (rgb[2] * 255.0) as u8,
     );
 
-    egui::Area::new(egui::Id::new("menu_hub_forgeron"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(60.0, 0.0))
-        .show(ctx, |ui| {
-            glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(34, 24))
-                .show(ui, |ui| {
-                    ui.set_max_width(880.0);
-                    ui.vertical_centered(|ui| {
-                        ui.label(display_text("TON FORGERON", 38.0, FORGE_OR).strong());
-                    });
-                    ui.add_space(14.0);
-                    ui.horizontal_top(|ui| {
-                        // ── Colonne gauche : le personnage ──
-                        ui.vertical(|ui| {
-                            ui.set_min_width(330.0);
-                            match character {
-                                Some(tex) => {
-                                    ui.add(egui::Image::new(egui::load::SizedTexture::new(
-                                        tex,
-                                        egui::vec2(330.0, 380.0),
-                                    )));
-                                }
-                                None => {
-                                    let (r, _) = ui.allocate_exact_size(
-                                        egui::vec2(330.0, 380.0),
-                                        egui::Sense::hover(),
-                                    );
-                                    ui.painter().circle_filled(r.center(), 60.0, disc_col);
-                                    ui.painter().circle_stroke(
-                                        r.center(),
-                                        60.0,
-                                        egui::Stroke::new(2.5, HAIR_GOLD_STRONG),
-                                    );
-                                }
-                            }
-                        });
-                        ui.add_space(26.0);
-                        // ── Colonne droite : qui il est, puis ce qu'il porte ──
-                        ui.vertical(|ui| {
-                            ui.set_min_width(440.0);
-                            draw_identity_content(
-                                ui,
-                                &cfg,
-                                &mut save,
-                                &mut arm_cosmetics,
-                                &mut editing,
-                            );
-                            if !eq_cfg.slots.is_empty() {
-                                ui.add_space(12.0);
-                                ui.separator();
-                                ui.add_space(8.0);
-                                draw_equipment_content(
-                                    ui,
-                                    &eq_cfg,
-                                    &mut eq_save,
-                                    &eq_mods,
-                                );
-                            }
-                        });
+    // Story-678 — chrome commun (titre/marges/transition standard). Le titre
+    // suit l'onglet d'entrée : même écran, mais « TON SAC » quand on vient
+    // pour l'inventaire.
+    let titre = if *page == MenuPage::Sac {
+        MenuPage::Sac.section_title()
+    } else {
+        MenuPage::Forgeron.section_title()
+    };
+    let mut back = false;
+    let mut goto_decors = false;
+    // Clic sur un emplacement de la poupée → SÉLECTIONNE sa pièce dans le sac
+    // (surbrillance or). Même écran, donc pas de navigation : on guide l'œil.
+    let mut choisir_slot: Option<String> = None;
+    let mut pose: Option<(String, Option<String>)> = None;
+    hub_section_panel(ctx, "hub_sec_forgeron", titre, 1000.0, |ui| {
+        // ── La fiche, structurée d'après la référence « Classic RPG UI » :
+        // le personnage ENCADRÉ par ses cellules d'équipement, l'inventaire en
+        // grille à côté, les caractéristiques dessous. Chaque colonne a une
+        // largeur FIXE : un `vertical_centered` lâché dans l'horizontal
+        // réclamait toute la largeur restante et poussait le sac hors de
+        // l'écran, écrasé en colonne de lettres (audit 2026-08-06, bloquant n°1).
+        ui.horizontal_top(|ui| {
+            // ── Haut du corps, collé au personnage ──
+            ui.vertical(|ui| {
+                ui.set_min_width(PAPERDOLL_COL_W);
+                ui.set_max_width(PAPERDOLL_COL_W);
+                for (i, slot) in eq_cfg.slots.iter().enumerate() {
+                    if i % 2 != 0 {
+                        continue;
+                    }
+                    if paperdoll_slot(ui, &eq_cfg, &eq_save, slot) {
+                        choisir_slot = Some(slot.id.clone());
+                    }
+                }
+            });
+            ui.add_space(6.0);
+            // ── Le personnage ──
+            ui.vertical(|ui| {
+                ui.set_min_width(280.0);
+                ui.set_max_width(280.0);
+                match character {
+                    Some(tex) => {
+                        ui.add(egui::Image::new(egui::load::SizedTexture::new(
+                            tex,
+                            egui::vec2(280.0, 340.0),
+                        )));
+                    }
+                    None => {
+                        let (r, _) = ui.allocate_exact_size(
+                            egui::vec2(280.0, 340.0),
+                            egui::Sense::hover(),
+                        );
+                        ui.painter().circle_filled(r.center(), 60.0, disc_col);
+                        ui.painter().circle_stroke(
+                            r.center(),
+                            60.0,
+                            egui::Stroke::new(2.5, HAIR_GOLD_STRONG),
+                        );
+                    }
+                }
+                ui.vertical_centered(|ui| {
+                    let p = power_score(&eq_cfg, &eq_save);
+                    ui.label(display_text(format!("Puissance {p}"), 22.0, FORGE_OR).strong());
+                    if eq_save.power_record > p {
+                        ui.label(
+                            egui::RichText::new(format!("record {}", eq_save.power_record))
+                                .size(12.0)
+                                .color(C_TEXT_MUTED),
+                        );
+                    }
+                });
+            });
+            ui.add_space(6.0);
+            // ── Bas du corps ──
+            ui.vertical(|ui| {
+                ui.set_min_width(PAPERDOLL_COL_W);
+                ui.set_max_width(PAPERDOLL_COL_W);
+                for (i, slot) in eq_cfg.slots.iter().enumerate() {
+                    if i % 2 == 0 {
+                        continue;
+                    }
+                    if paperdoll_slot(ui, &eq_cfg, &eq_save, slot) {
+                        choisir_slot = Some(slot.id.clone());
+                    }
+                }
+            });
+            ui.add_space(12.0);
+            ui.separator();
+            ui.add_space(12.0);
+            // ── LE SAC, à côté de la fiche ──
+            if let Some(a) = draw_sac(ui, &eq_cfg, &eq_save, &mut selection) {
+                pose = Some(a);
+            }
+        });
+
+        // ── CARACTÉRISTIQUES — le bloc « Characteristic » de la référence ──
+        // La seule vue qui dit le PROFIL du build (où portent les bonus), là où
+        // la Puissance n'en dit que la somme.
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            let stats: [(&str, f32); 5] = [
+                ("Dégâts", (eq_mods.damage_mul - 1.0) * 100.0),
+                ("Cadence", (eq_mods.fire_rate_mul - 1.0) * 100.0),
+                ("Blindage", eq_mods.damage_reduction * 100.0),
+                ("Critique", eq_mods.crit_chance * 100.0),
+                ("Visée", (eq_mods.headshot_bonus_mul - 1.0) * 100.0),
+            ];
+            for (nom, valeur) in stats {
+                ui.vertical(|ui| {
+                    ui.set_min_width(120.0);
+                    ui.label(egui::RichText::new(nom).size(11.0).color(C_TEXT_MUTED));
+                    let txt = egui::RichText::new(format!("+{valeur:.0}%")).size(16.0).strong();
+                    ui.label(if valeur > 0.05 {
+                        txt.color(FORGE_OR)
+                    } else {
+                        txt.color(C_TEXT_MUTED)
                     });
                 });
+            }
         });
+
+        // ── Qui il est : nom, couleur, bras ──
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(8.0);
+        draw_identity_content(ui, &cfg, &mut save, &mut arm_cosmetics, &mut editing);
+        ui.add_space(12.0);
+        ui.horizontal(|ui| {
+            if glass_btn(ui, "‹  Retour").clicked() {
+                back = true;
+            }
+            // Le Marketplace est cosmétique : sa porte est sur la page
+            // « qui je suis », en plus de la barre de navigation.
+            if glass_btn(ui, "💰  Marketplace").clicked() {
+                goto_decors = true;
+            }
+        });
+    });
+    if back {
+        *page = MenuPage::Root;
+    }
+    if goto_decors {
+        *page = MenuPage::Marketplace;
+    }
+    if let Some(slot_id) = choisir_slot {
+        // La pièce montrée en priorité : celle qu'on porte, sinon la meilleure
+        // possédée, sinon la première de l'échelle — jamais rien.
+        let rarity = eq_save
+            .equipped
+            .get(&slot_id)
+            .cloned()
+            .or_else(|| {
+                eq_save.owned.get(&slot_id).and_then(|v| {
+                    v.iter()
+                        .max_by_key(|r| eq_cfg.rarity_rank(r))
+                        .cloned()
+                })
+            })
+            .or_else(|| eq_cfg.rarities.first().map(|r| r.id.clone()));
+        if let Some(r) = rarity {
+            *selection = Some((slot_id, r));
+        }
+    }
+    if let Some((slot_id, rarity)) = pose {
+        match rarity {
+            Some(r) => {
+                eq_save.equipped.insert(slot_id, r);
+                forgia_ui_lib::ui_sfx::push_ui_sfx(ctx, forgia_ui_lib::ui_sfx::UiSfxKind::Buy);
+            }
+            None => {
+                eq_save.equipped.remove(&slot_id);
+                forgia_ui_lib::ui_sfx::push_ui_sfx(ctx, forgia_ui_lib::ui_sfx::UiSfxKind::Tab);
+            }
+        }
+        // 🚨 PERSISTER ICI, et NE PAS toucher `power_record`.
+        //
+        // Confirmé par l'audit du 2026-08-07 : `sys_track_power_record` est le
+        // seul écrivain du disque pour cette sauvegarde, et sa condition est
+        // « score > power_record ». En rehaussant le record moi-même juste
+        // avant, je DÉSARMAIS son déclencheur : équiper au menu n'écrivait
+        // jamais rien, et le choix était perdu au relancement. Équiper une
+        // pièce MOINS bonne ne déclenchait rien non plus.
+        //
+        // Le suivi du record reste sa responsabilité — mutation + écriture
+        // explicites ici, calcul du pic là-bas. Même classe que le défaut
+        // « achat sans effet » côté Âmes : un garde d'autosave qui ne pousse
+        // que les gains ne persiste pas les changements.
+        eq_save.save();
+    }
+}
+
+/// Colonnes du Marketplace — fixes, pour que les lignes s'alignent.
+const DECOR_NAME_W: f32 = 290.0;
+const DECOR_ACTION_W: f32 = 210.0;
+const DECOR_ROW_H: f32 = 28.0;
+
+/// Le MARKETPLACE — tout ce qui se porte et ne se joue pas (story-678).
+///
+/// Quatre familles sous un même toit : décors du menu, couleur du forgeron,
+/// bras (ceux qu'on voit à chaque tir), musique du hub. Un onglet par famille,
+/// une seule règle de possession (`cosmetics::OwnedCosmetics`).
+///
+/// ## Pourquoi ce n'est pas l'Enclume
+///
+/// L'Enclume vend de la PUISSANCE, en Âmes. Mêler du cosmétique à ses rangs
+/// forcerait un arbitrage « je tape plus fort » contre « c'est plus joli » dans
+/// la même liste — le pire endroit pour ce choix. Le Marketplace a donc sa
+/// propre monnaie, les **Éclats**, gagnés à la profondeur atteinte.
+///
+/// ## Ce qui est possédé
+///
+/// Chaque famille est possédée dans le stock qui lui sert déjà ailleurs (les
+/// couleurs dans `unlocked_colors`, que le panneau Forgeron filtre et que le
+/// boot fait respecter). Le catalogue le sait ; cette page ne fait que
+/// l'afficher.
+fn sys_menu_marketplace(
+    mut contexts: EguiContexts,
+    app_state: Res<State<AppMode>>,
+    mut page: ResMut<MenuPage>,
+    mut tab: Local<usize>,
+    catalogue: Option<Res<forgia_mode_roguelite::cosmetics::CosmeticsConfig>>,
+    mut identity: Option<ResMut<IdentitySave>>,
+    mut meta_save: Option<ResMut<MetaShopSave>>,
+    icons: Option<Res<CurrencyIcons>>,
+) {
+    use forgia_mode_roguelite::cosmetics::{self, CosmeticKind, CosmeticSource, OwnedCosmetics};
+
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Marketplace {
+        return;
+    }
+    let (Some(catalogue), Some(identity), Some(save)) =
+        (catalogue.as_deref(), identity.as_mut(), meta_save.as_mut())
+    else {
+        return;
+    };
+    let Ok(ctx) = contexts.ctx_mut() else {
+        return;
+    };
+
+    let famille = CosmeticKind::ALL[(*tab).min(CosmeticKind::ALL.len() - 1)];
+    let eclats = save.shards_total;
+    let icone_eclat = icons.as_deref().and_then(|i| i.shards);
+
+    // Instantané de la famille courante : (id, libellé, possédé, porté, prix,
+    // chapitre requis). Pris AVANT de dessiner pour libérer l'emprunt sur
+    // `identity`, que les actions muteront après la closure.
+    let lignes: Vec<(String, String, bool, bool, Option<u32>, u32)> = {
+        let owned = OwnedCosmetics {
+            chapters_cleared: save.chapters_cleared,
+            identity,
+        };
+        catalogue
+            .of_kind(famille, &owned)
+            .into_iter()
+            .map(|(c, possede)| {
+                let chapitre = match c.source {
+                    CosmeticSource::Chapter(n) => n,
+                    _ => 0,
+                };
+                (
+                    c.id.clone(),
+                    c.label.clone(),
+                    possede,
+                    cosmetics::is_equipped(identity, c),
+                    c.source.price(),
+                    chapitre,
+                )
+            })
+            .collect()
+    };
+    let possedes = lignes.iter().filter(|l| l.2).count();
+
+    let mut equiper: Option<String> = None;
+    let mut acheter: Option<(String, u32)> = None;
+    let mut retour = false;
+    let mut nouvel_onglet: Option<usize> = None;
+
+    hub_section_panel(
+        ctx,
+        "hub_sec_marketplace",
+        MenuPage::Marketplace.section_title(),
+        820.0,
+        |ui| {
+            // Bourse — dite en tête, parce que c'est ce qui décide de ce qu'on
+            // peut faire sur cette page.
+            ui.horizontal(|ui| {
+                CurrencyIcons::show(ui, icone_eclat, CURRENCY_ICON);
+                ui.label(
+                    egui::RichText::new(format!("{eclats}  Éclats"))
+                        .size(22.0)
+                        .color(FORGE_ECLAT)
+                        .strong(),
+                );
+            });
+            ui.label(
+                egui::RichText::new("Gagnés en descendant loin dans un chapitre.")
+                    .size(13.0)
+                    .color(C_TEXT_MUTED),
+            );
+            ui.add_space(12.0);
+
+            // Onglets de famille.
+            ui.horizontal(|ui| {
+                for (i, k) in CosmeticKind::ALL.iter().enumerate() {
+                    let actif = *k == famille;
+                    let resp = ui.add_sized(
+                        egui::vec2(150.0, 30.0),
+                        egui::Button::selectable(
+                            actif,
+                            egui::RichText::new(k.tab_label())
+                                .size(15.0)
+                                .color(if actif { C_PRIMARY } else { FORGE_CREME })
+                                .strong(),
+                        ),
+                    );
+                    forgia_ui_lib::ui_sfx::instrument_hover(&resp);
+                    if resp.clicked() && !actif {
+                        nouvel_onglet = Some(i);
+                        forgia_ui_lib::ui_sfx::push_ui_sfx(
+                            &resp.ctx,
+                            forgia_ui_lib::ui_sfx::UiSfxKind::Tab,
+                        );
+                    }
+                }
+            });
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new(famille.tab_help())
+                    .size(14.0)
+                    .color(FORGE_CREME),
+            );
+            ui.label(
+                egui::RichText::new(format!("{possedes} / {} débloqués", lignes.len()))
+                    .size(13.0)
+                    .color(C_TEXT_MUTED),
+            );
+            ui.add_space(12.0);
+
+            for (id, label, possede, porte, prix, chapitre) in &lignes {
+                ui.horizontal(|ui| {
+                    // Pastille d'état : porté (or plein), possédé (or creux),
+                    // verrouillé (gris). Se lit sans lire le texte.
+                    let (dot, _) =
+                        ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+                    let centre = dot.center();
+                    if *porte {
+                        ui.painter().circle_filled(centre, 6.0, FORGE_OR);
+                    } else if *possede {
+                        ui.painter()
+                            .circle_stroke(centre, 6.0, egui::Stroke::new(2.0, FORGE_OR));
+                    } else {
+                        ui.painter()
+                            .circle_filled(centre, 5.0, egui::Color32::from_gray(80));
+                    }
+
+                    ui.add_sized(
+                        egui::vec2(DECOR_NAME_W, DECOR_ROW_H),
+                        egui::Label::new(
+                            egui::RichText::new(label)
+                                .size(16.0)
+                                .color(if *possede { FORGE_CREME } else { C_TEXT_MUTED }),
+                        )
+                        .halign(egui::Align::LEFT),
+                    );
+
+                    if *porte {
+                        ui.add_sized(
+                            egui::vec2(DECOR_ACTION_W, DECOR_ROW_H),
+                            egui::Label::new(
+                                egui::RichText::new("PORTÉ")
+                                    .size(13.0)
+                                    .color(FORGE_OR)
+                                    .strong(),
+                            ),
+                        );
+                    } else if *possede {
+                        let resp = ui.add_sized(
+                            egui::vec2(DECOR_ACTION_W, DECOR_ROW_H),
+                            egui::Button::new(
+                                egui::RichText::new("Porter")
+                                    .size(14.0)
+                                    .color(FORGE_OR)
+                                    .strong(),
+                            )
+                            .fill(FORGE_PANEL),
+                        );
+                        forgia_ui_lib::ui_sfx::instrument_hover(&resp);
+                        if resp.clicked() {
+                            equiper = Some(id.clone());
+                        }
+                    } else if let Some(p) = prix {
+                        // Verrouillé mais achetable. Le bouton est DÉSACTIVÉ,
+                        // pas caché, quand la bourse ne suit pas — « trop cher »
+                        // et « inerte » ne doivent jamais se ressembler.
+                        let assez = eclats >= *p;
+                        let resp = ui
+                            .add_enabled_ui(assez, |ui| {
+                                ui.add_sized(
+                                    egui::vec2(DECOR_ACTION_W, DECOR_ROW_H),
+                                    egui::Button::new(
+                                        egui::RichText::new(format!("Débloquer — {p}"))
+                                            .size(14.0)
+                                            .color(if assez { FORGE_ECLAT } else { C_TEXT_MUTED }),
+                                    )
+                                    .fill(FORGE_PANEL),
+                                )
+                            })
+                            .inner;
+                        forgia_ui_lib::ui_sfx::instrument_hover(&resp);
+                        if resp.clicked() {
+                            acheter = Some((id.clone(), *p));
+                        }
+                        if !assez {
+                            ui.label(
+                                egui::RichText::new(format!("il te manque {}", p - eclats))
+                                    .size(12.0)
+                                    .color(C_TEXT_MUTED),
+                            );
+                        }
+                    } else {
+                        let texte = if *chapitre > 0 {
+                            format!("Bats le chapitre {chapitre}")
+                        } else {
+                            "Haut fait".to_string()
+                        };
+                        ui.add_sized(
+                            egui::vec2(DECOR_ACTION_W, DECOR_ROW_H),
+                            egui::Label::new(
+                                egui::RichText::new(texte).size(13.0).color(C_TEXT_MUTED),
+                            ),
+                        );
+                    }
+                });
+                ui.add_space(5.0);
+            }
+
+            ui.add_space(10.0);
+            if glass_btn(ui, "‹  Retour").clicked() {
+                retour = true;
+            }
+        },
+    );
+
+    if let Some(i) = nouvel_onglet {
+        *tab = i;
+    }
+    if let Some(id) = equiper {
+        if let Some(c) = catalogue.get(&id) {
+            cosmetics::equip(identity, c);
+        }
+    }
+    if let Some((id, prix)) = acheter {
+        // Ordre voulu : possession → débit → déblocage. Débloquer avant de
+        // débiter obligerait à défaire un déblocage déjà écrit sur le disque si
+        // la bourse ne suivait pas.
+        //
+        // Les Éclats n'ont PAS de miroir vif (contrairement aux Âmes) : une
+        // seule vérité, `shards_total`. C'est le miroir des Âmes qui avait
+        // produit le défaut « achat sans effet ».
+        let paye = match catalogue.get(&id) {
+            Some(c)
+                if save.shards_total >= prix && cosmetics::grant_and_equip(identity, c) =>
+            {
+                save.shards_total -= prix;
+                save.save();
+                true
+            }
+            _ => false,
+        };
+        let son = if paye {
+            forgia_ui_lib::ui_sfx::UiSfxKind::Unlock
+        } else {
+            forgia_ui_lib::ui_sfx::UiSfxKind::Denied
+        };
+        forgia_ui_lib::ui_sfx::push_ui_sfx(ctx, son);
+    }
+    if retour {
+        *page = MenuPage::Forgeron;
+    }
+}
+
+
+/// Largeur d'une colonne d'emplacements de la poupée.
+const PAPERDOLL_COL_W: f32 = 96.0;
+/// Côté du cadre d'un emplacement.
+const PAPERDOLL_SLOT: f32 = 64.0;
+
+/// Un emplacement de la poupée : la cellule (silhouette du type à la couleur de
+/// la rareté portée), son nom dessous. Rend `true` au clic — l'appelant met la
+/// pièce en surbrillance dans le sac.
+///
+/// Cellule VERTICALE compacte, comme la référence « Classic RPG UI » : les
+/// colonnes se collent au personnage au lieu d'étaler un libellé à côté.
+fn paperdoll_slot(
+    ui: &mut egui::Ui,
+    cfg: &EquipmentConfig,
+    save: &EquipmentSave,
+    slot: &forgia_mode_roguelite::equipment::SlotDef,
+) -> bool {
+    let porte = save.equipped.get(&slot.id);
+    let col = porte
+        .map(|id| cfg.color32(id))
+        .unwrap_or(egui::Color32::from_gray(70));
+    let mut clique = false;
+
+    ui.vertical_centered(|ui| {
+        let (rect, resp) = ui.allocate_exact_size(
+            egui::vec2(PAPERDOLL_SLOT, PAPERDOLL_SLOT),
+            egui::Sense::click(),
+        );
+        let p = ui.painter();
+        p.rect_filled(
+            rect,
+            egui::CornerRadius::same(10),
+            egui::Color32::from_black_alpha(120),
+        );
+        // La SILHOUETTE du type, à la couleur de la rareté portée. Un
+        // emplacement vide la garde, éteinte — la place se lit même libre.
+        slot_glyph::draw(
+            p,
+            rect.shrink(10.0),
+            &slot.id,
+            if porte.is_some() {
+                col
+            } else {
+                col.gamma_multiply(0.35)
+            },
+        );
+        p.rect_stroke(
+            rect,
+            egui::CornerRadius::same(10),
+            egui::Stroke::new(if resp.hovered() { 2.5 } else { 1.5 }, col),
+            egui::StrokeKind::Inside,
+        );
+        let bulle = match porte {
+            Some(id) => format!(
+                "{} — {}
+{} +{:.0}%
+
+Clic : voir dans le sac",
+                slot.label,
+                cfg.rarity(id).map(|r| r.label.as_str()).unwrap_or(id),
+                slot.stat_label,
+                cfg.rarity(id)
+                    .map(|r| slot.per_tier * r.bonus_mul * 100.0)
+                    .unwrap_or(0.0)
+            ),
+            None => format!(
+                "{} — vide
+{}
+
+Clic : voir dans le sac",
+                slot.label, slot.stat_label
+            ),
+        };
+        if resp.on_hover_text(bulle).clicked() {
+            clique = true;
+        }
+        ui.label(
+            egui::RichText::new(&slot.label)
+                .size(12.0)
+                .strong()
+                .color(if porte.is_some() {
+                    FORGE_CREME
+                } else {
+                    C_TEXT_MUTED
+                }),
+        );
+        ui.label(
+            egui::RichText::new(match porte {
+                Some(id) => cfg
+                    .rarity(id)
+                    .map(|r| r.label.clone())
+                    .unwrap_or_else(|| id.clone()),
+                None => "vide".to_string(),
+            })
+            .size(10.0)
+            .color(col),
+        );
+    });
+    ui.add_space(8.0);
+    clique
+}
+
+/// Côté d'une case du sac.
+const SAC_CASE: f32 = 52.0;
+
+/// **LE SAC**, dessiné À CÔTÉ de la poupée (story-678, 2026-08-06).
+///
+/// Pas une page à part : la fiche de personnage et l'inventaire se regardent,
+/// c'est tout l'intérêt. On voit ce qu'on porte et ce qu'on pourrait porter dans
+/// le même écran — la convention Diablo, et la raison pour laquelle on n'a pas
+/// à mémoriser ce qu'on portait en ouvrant un autre onglet.
+///
+/// **Double-clic pour équiper.** Le simple clic SÉLECTIONNE (et affiche la
+/// comparaison) : sur une grille dense, un clic qui équipe transforme le moindre
+/// survol maladroit en changement de build.
+///
+/// Rend l'action à appliquer, `None` si rien n'a été demandé. La mutation est
+/// faite par l'appelant : muter la sauvegarde pendant qu'on itère dessus
+/// emprunterait deux fois la même donnée.
+fn draw_sac(
+    ui: &mut egui::Ui,
+    cfg: &EquipmentConfig,
+    save: &EquipmentSave,
+    selection: &mut Option<(String, String)>,
+) -> Option<(String, Option<String>)> {
+    let mut action = None;
+    let possedees: usize = cfg
+        .slots
+        .iter()
+        .map(|s| save.owned.get(&s.id).map_or(0, |v| v.len()))
+        .sum();
+    let total = cfg.slots.len() * cfg.rarities.len();
+
+    ui.vertical(|ui| {
+        ui.label(display_text("LE SAC", 22.0, FORGE_OR).strong());
+        ui.label(
+            egui::RichText::new(format!("{possedees} / {total} pièces trouvées"))
+                .size(12.0)
+                .color(C_TEXT_MUTED),
+        );
+        ui.label(
+            egui::RichText::new("Double-clic pour équiper.")
+                .size(12.0)
+                .color(C_TEXT_MUTED),
+        );
+        ui.add_space(10.0);
+
+        for slot in &cfg.slots {
+            let porte = save.equipped.get(&slot.id).cloned();
+            let porte_gain = porte
+                .as_deref()
+                .and_then(|id| cfg.rarity(id))
+                .map(|r| slot.per_tier * r.bonus_mul)
+                .unwrap_or(0.0);
+            let porte_power = porte.as_deref().map(|id| cfg.power_of(id)).unwrap_or(0);
+
+            ui.label(
+                egui::RichText::new(format!("{}  ·  {}", slot.label, slot.stat_label))
+                    .size(12.0)
+                    .color(C_TEXT_MUTED),
+            );
+            ui.horizontal(|ui| {
+                for rarity in &cfg.rarities {
+                    let a_soi = save
+                        .owned
+                        .get(&slot.id)
+                        .is_some_and(|v| v.iter().any(|r| r == &rarity.id));
+                    let sur_soi = porte.as_deref() == Some(rarity.id.as_str());
+                    let choisie = selection.as_ref()
+                        == Some(&(slot.id.clone(), rarity.id.clone()));
+                    let sense = if a_soi {
+                        egui::Sense::click()
+                    } else {
+                        egui::Sense::hover()
+                    };
+                    let (rect, resp) =
+                        ui.allocate_exact_size(egui::vec2(SAC_CASE, SAC_CASE), sense);
+                    let col = cfg.color32(&rarity.id);
+
+                    // Le fond dit la POSSESSION, la silhouette dit le TYPE, sa
+                    // couleur dit la RARETÉ. Trois informations, aucun mot.
+                    ui.painter().rect_filled(
+                        rect,
+                        egui::CornerRadius::same(8),
+                        if a_soi {
+                            egui::Color32::from_black_alpha(150)
+                        } else {
+                            egui::Color32::from_black_alpha(70)
+                        },
+                    );
+                    slot_glyph::draw(
+                        ui.painter(),
+                        rect.shrink(9.0),
+                        &slot.id,
+                        if a_soi {
+                            col
+                        } else {
+                            // Non trouvée : la place est réservée et la couleur
+                            // annoncée, mais l'absence se lit sans comparer deux
+                            // listes.
+                            col.gamma_multiply(0.22)
+                        },
+                    );
+                    if sur_soi {
+                        ui.painter().rect_stroke(
+                            rect,
+                            egui::CornerRadius::same(8),
+                            egui::Stroke::new(2.5, egui::Color32::WHITE),
+                            egui::StrokeKind::Outside,
+                        );
+                    } else if choisie {
+                        ui.painter().rect_stroke(
+                            rect,
+                            egui::CornerRadius::same(8),
+                            egui::Stroke::new(2.0, FORGE_OR),
+                            egui::StrokeKind::Outside,
+                        );
+                    }
+
+                    let gain = slot.per_tier * rarity.bonus_mul;
+                    let delta = cfg.power_of(&rarity.id) as i32 - porte_power as i32;
+                    let bulle = if !a_soi {
+                        format!(
+                            "{} — {}\npas encore trouvée\n{} +{:.0}% si tu l'obtiens",
+                            slot.label,
+                            rarity.label,
+                            slot.stat_label,
+                            gain * 100.0
+                        )
+                    } else if sur_soi {
+                        format!(
+                            "{} — {}\nPORTÉE · {} +{:.0}%\n\nDouble-clic pour la retirer ({:+} Puissance)",
+                            slot.label,
+                            rarity.label,
+                            slot.stat_label,
+                            gain * 100.0,
+                            -(cfg.power_of(&rarity.id) as i32)
+                        )
+                    } else {
+                        format!(
+                            "{} — {}\n{} +{:.0}%  ({:+.0}% vs portée)\n{delta:+} Puissance\n\nDouble-clic pour l'équiper",
+                            slot.label,
+                            rarity.label,
+                            slot.stat_label,
+                            gain * 100.0,
+                            (gain - porte_gain) * 100.0
+                        )
+                    };
+                    let resp = resp.on_hover_text(bulle);
+                    if resp.clicked() {
+                        *selection = Some((slot.id.clone(), rarity.id.clone()));
+                    }
+                    if resp.double_clicked() {
+                        action = Some((
+                            slot.id.clone(),
+                            if sur_soi {
+                                None
+                            } else {
+                                Some(rarity.id.clone())
+                            },
+                        ));
+                    }
+                    ui.add_space(4.0);
+                }
+            });
+            ui.add_space(8.0);
+        }
+    });
+    action
 }
 
 /// Section Armes au menu-titre — carte d'arme (stats / élément / matchup +
@@ -1072,30 +2456,26 @@ fn sys_menu_armes(
     };
     // Image RTT de l'aperçu 3D (None si le plugin n'a pas encore spawné la caméra).
     let weapon_image = rtt.as_ref().map(|r| r.tex_id);
-    egui::Area::new(egui::Id::new("menu_hub_armes"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(100.0, 0.0))
-        .show(ctx, |ui| {
-            glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(36, 24))
-                .show(ui, |ui| {
-                    ui.set_max_width(500.0);
-                    ui.vertical_centered(|ui| {
-                        ui.label(display_text("TES ARMES", 36.0, FORGE_OR).strong());
-                        ui.add_space(10.0);
-                        draw_weapon_menu_panel(
-                            ui,
-                            &mut choice,
-                            &cards,
-                            &elem_cfg,
-                            &mut save,
-                            &cat,
-                            &mut meta,
-                            weapon_image,
-                            220.0,
-                        );
-                    });
-                });
-        });
+    // Story-678 — chrome commun (titre/marges/transition standard).
+    hub_section_panel(
+        ctx,
+        "hub_sec_armes",
+        MenuPage::Armes.section_title(),
+        500.0,
+        |ui| {
+            draw_weapon_menu_panel(
+                ui,
+                &mut choice,
+                &cards,
+                &elem_cfg,
+                &mut save,
+                &cat,
+                &mut meta,
+                weapon_image,
+                220.0,
+            );
+        },
+    );
 }
 
 /// Overlay PAUSED legacy (remplacé story-455 Phase G par forgia-ui-pause-menu cliquable).

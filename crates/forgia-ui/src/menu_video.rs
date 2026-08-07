@@ -119,14 +119,19 @@ pub fn setup_menu_video(mut commands: Commands, asset_server: Res<AssetServer>) 
         Some(n) if n > 0 => (n, format!("scan {}", primary_dir.display())),
         _ => match count_webp(&secondary_dir) {
             Some(n) if n > 0 => (n, format!("scan {}", secondary_dir.display())),
-            _ => (MENU_VIDEO_FRAME_COUNT_FALLBACK, "compile-time fallback".to_string()),
+            _ => (
+                MENU_VIDEO_FRAME_COUNT_FALLBACK,
+                "compile-time fallback".to_string(),
+            ),
         },
     };
 
     info!("[menu-video] {frame_count} frames ({source})");
 
-    // Sensor one-shot (observability-required §1).
-    let _ = std::fs::write(
+    // Sensor one-shot (observability-required §1) — via la file async comme
+    // tous les capteurs (story-691 : c'était le dernier `std::fs::write`
+    // synchrone du hub, une I/O bloquante sur le thread de jeu).
+    let _ = forgia_core::sensor_io::enqueue(
         SENSOR_MENU_VIDEO_PATH,
         build_menu_video_sensor_json(MenuVideoSensorView {
             ts: 0.0,
@@ -158,12 +163,23 @@ pub fn setup_menu_video(mut commands: Commands, asset_server: Res<AssetServer>) 
 /// Avance `current_frame` au rythme [`MENU_VIDEO_FPS`] quand on est dans le menu
 /// et que le preroll est terminé. Utilise `Time<Real>` (wall-clock) : robuste
 /// même si `Time<Virtual>` est pausé (leçon V1, bug "vidéo figée frame 73").
+///
+/// GELÉ quand le diorama d'arène couvre l'écran (story-691) : avancer la frame
+/// force `ensure_menu_video_frame` à décoder ~24 WebP 1280×720/s et à uploader
+/// leurs textures — pour une image que personne ne voit sous le fond opaque.
+/// Figer la frame fige la fenêtre du cache : les 8 frames en VRAM restent
+/// valides et `prerolled` reste vrai, donc couper `ui_backdrop_enabled` à chaud
+/// réaffiche la vidéo immédiatement, sans re-preroll.
 pub fn menu_video_tick(
     time: Res<Time<bevy::time::Real>>,
     app_state: Res<State<AppMode>>,
+    backdrop: Option<Res<crate::arena_backdrop::ArenaBackdropRtt>>,
     video: Option<ResMut<MenuVideoState>>,
 ) {
     if *app_state.get() != AppMode::Menu {
+        return;
+    }
+    if backdrop.as_deref().is_some_and(|b| b.is_showing()) {
         return;
     }
     let Some(mut video) = video else { return };
@@ -273,7 +289,7 @@ pub fn menu_video_sensor(
         menu_active,
         time_accumulator: video.time_accumulator,
     });
-    let _ = std::fs::write(SENSOR_MENU_VIDEO_PATH, json);
+    let _ = forgia_core::sensor_io::enqueue(SENSOR_MENU_VIDEO_PATH, json);
 }
 
 /// Vue sérialisable du sensor (testable sans World Bevy).

@@ -7,23 +7,22 @@
 
 | Statut | Nombre |
 | --- | --- |
-| IN_PROGRESS | 45 |
-| REVIEW | 53 |
-| BLOCKED | 4 |
+| IN_PROGRESS | 46 |
+| REVIEW | 58 |
+| BLOCKED | 5 |
 | DRAFT | 34 |
 | UNKNOWN | 10 |
-| DONE | 44 |
+| DONE | 45 |
 | CANCELLED | 1 |
-| **Total** | **191** |
+| **Total** | **199** |
 
-> 🚨 **45 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
+> 🚨 **46 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
 ## IN_PROGRESS (46)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
 | 442 | Procgen Village V1 | [story-442-procgen-village-v1.md](./story-442-procgen-village-v1.md) |
-| 675 | Personnage Trooper + équipement loot par rareté | [story-675-equipement-trooper-rarete.md](./story-675-equipement-trooper-rarete.md) |
 | 449 | Asset Pack Pipeline | [story-449-asset-pack-pipeline.md](./story-449-asset-pack-pipeline.md) |
 | 450 | Chunk Streaming Foundation | [story-450-chunk-streaming-foundation.md](./story-450-chunk-streaming-foundation.md) |
 | 454 | Anim Debug System V2 (Niveau A — Diagnostic bone-trace) | [story-454-anim-debug-system-niveau-a-diagnostic.md](./story-454-anim-debug-system-niveau-a-diagnostic.md) |
@@ -68,8 +67,9 @@
 | 658 | Scaling ennemi par profondeur de salle (la pression) | [story-658-enemy-scaling-by-depth.md](./story-658-enemy-scaling-by-depth.md) |
 | 661 | Story 661 — Bras viewmodel GLB cartoon (remplace les poings procéduraux) | [story-661-bras-viewmodel-glb-cartoon.md](./story-661-bras-viewmodel-glb-cartoon.md) |
 | 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
+| 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
 
-## REVIEW (53)
+## REVIEW (58)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -127,9 +127,12 @@
 | 665 | Éditeur in-game du Hall (lot 1 : props) | [story-665-editeur-hall-props.md](./story-665-editeur-hall-props.md) |
 | 667 | Arena Test : le banc de blockout d'arène | [story-667-arena-test-blockout-bench.md](./story-667-arena-test-blockout-bench.md) |
 | 668 | Vague 0 : remettre les invariants de la boucle roguelite debout | [story-668-vague0-invariants-boucle-roguelite.md](./story-668-vague0-invariants-boucle-roguelite.md) |
-| 669 | La composition de vague redevient une dérivation (salle + porte + graine) | [story-669-composition-de-vague-derivee.md](./story-669-composition-de-vague-derivee.md) |
+| 669 | La composition de vague redevient une dérivation | [story-669-composition-de-vague-derivee.md](./story-669-composition-de-vague-derivee.md) |
+| 674 | L'aménagement se DÉRIVE : bruit bleu + compte depuis l'aire | [story-674-amenagement-derive-bruit-bleu.md](./story-674-amenagement-derive-bruit-bleu.md) |
+| 675 | Personnage Trooper + équipement loot par rareté | [story-675-equipement-trooper-rarete.md](./story-675-equipement-trooper-rarete.md) |
+| 677 | La boucle de rounds et son mur | [story-677-boucle-de-rounds-et-mur.md](./story-677-boucle-de-rounds-et-mur.md) |
 
-## BLOCKED (4)
+## BLOCKED (5)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -137,6 +140,7 @@
 | 481 | Skeleton Template Declarative Bone Class (suite story-480) | [story-481-skeleton-template-declarative-class.md](./story-481-skeleton-template-declarative-class.md) |
 | 597 | Roguefight UI Modernization, Phases C & D (suite de story-596) | [story-597-roguefight-ui-phase-c-d.md](./story-597-roguefight-ui-phase-c-d.md) |
 | 623 | Parcours joueur Roguelite : Identité + Progression + Onboarding | [story-623-roguelite-player-journey-identity-progression-onboarding.md](./story-623-roguelite-player-journey-identity-progression-onboarding.md) |
+| 679 | Manette au menu : valider ce qui a été livré sans manette | [story-679-manette-menu-validation.md](./story-679-manette-menu-validation.md) |
 
 ## DRAFT (34)
 
@@ -192,7 +196,7 @@
 | 609 | `cargo xtask gene-search` (introspection genome cross-pack) | [story-609-xtask-gene-search.md](./story-609-xtask-gene-search.md) |
 | 654 | Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut | [story-654-nameplate-v2-plaques-icones.md](./story-654-nameplate-v2-plaques-icones.md) |
 
-## DONE (44)
+## DONE (45)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -240,10 +244,12 @@
 | 641 | P0-3 : moteur de réactions générique + Element::Shock (Électrique) | [story-641-p0-3-reactions-engine-shock-element.md](./story-641-p0-3-reactions-engine-shock-element.md) |
 | 645 | R3 : sceller la boucle (Victory + maîtrise + best-run + boons pondérés) | [story-645-r3-seal-the-loop.md](./story-645-r3-seal-the-loop.md) |
 | 664 | Warmup des pipelines PBR au Lobby (anti-freeze « tourner la caméra ») | [story-664-pipeline-warmup-pbr-lobby.md](./story-664-pipeline-warmup-pbr-lobby.md) |
+| 690 | Le capteur d'arène mesure enfin la géométrie posée | [story-690-capteur-de-geometrie-d-arene.md](./story-690-capteur-de-geometrie-d-arene.md) |
 
 ## CANCELLED (1)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
 | 630 | Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity) | [story-630-taa-orbit-camera.md](./story-630-taa-orbit-camera.md) |
+| 691 | Hub menu : quick-wins perf (P1 audit 2026-08-07) — VALIDÉ EN JEU | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
 

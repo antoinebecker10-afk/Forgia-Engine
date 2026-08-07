@@ -39,13 +39,28 @@ const WEAPON_LAYER: usize = 2;
 // Le layer 3 était celui de l'aperçu des BRAS, retiré : l'aperçu du personnage
 // montre déjà les bras, et les deux se superposaient à l'origine.
 /// Layer de rendu de l'aperçu PERSONNAGE (équipement porté).
-const CHARACTER_LAYER: usize = 4;
+///
+/// Public dans la crate depuis story-678 Phase 5 : le fond d'arène du menu
+/// rend CE layer en plus du sien, pour montrer **le même** personnage sans en
+/// spawner un second. Dupliquer l'avatar rebrancherait les pièces sur un
+/// squelette arbitraire (cf. `reference_shared_skeleton_avatar_pairing`).
+pub(crate) const CHARACTER_LAYER: usize = 4;
 /// Côté de l'image RTT (px). Carré → viewport carré dans le panneau.
 const RTT_SIZE: u32 = 512;
 /// Taille cible (plus grande dimension, m) du sujet après calibrage AABB.
-const PREVIEW_TARGET: f32 = 1.15;
-/// Vitesse de rotation turntable (rad/s).
+///
+/// Public dans la crate depuis story-678 Phase 5 : le diorama du fond doit
+/// bâtir son décor À L'ÉCHELLE de ce personnage — c'est lui l'unité de mesure
+/// de la scène, pas le mètre.
+pub(crate) const PREVIEW_TARGET: f32 = 1.15;
+/// Vitesse de rotation turntable (rad/s) — un tour en ~9 s.
 const PREVIEW_SPIN: f32 = 0.7;
+/// Le personnage tourne cinq fois plus lentement que l'arme (~45 s le tour).
+///
+/// L'aperçu d'arme est le sujet unique de son panneau : il gagne à tourner.
+/// L'avatar, lui, occupe le coin d'un écran de préparation qu'on lit pendant
+/// qu'on choisit son chapitre — au rythme de l'arme, il tirait l'œil en continu.
+const CHARACTER_SPIN_FACTOR: f32 = 0.2;
 
 /// Les slots du choix d'arme et les handles préchargés ont le même ordre.
 /// Le modulo conserve le comportement précédent si un choix persistant est
@@ -69,11 +84,34 @@ pub struct WeaponPreviewRtt {
 #[derive(Component)]
 struct PreviewEntity;
 
-/// Pivot rotatif (tourne autour de Y). Un par aperçu (arme + bras).
+/// Pivot rotatif (tourne autour de Y). Un par aperçu (arme + personnage).
+///
+/// La vitesse vit SUR le composant : les deux aperçus partagent ce marqueur et
+/// tournaient donc au même rythme, alors qu'ils ne jouent pas le même rôle à
+/// l'écran (cf. `CHARACTER_SPIN_FACTOR`).
 #[derive(Component)]
-struct PreviewPivot;
+struct PreviewPivot {
+    /// rad/s autour de Y.
+    spin: f32,
+}
 
 /// Calibrage AABB en attente (recentrage + mise à l'échelle) — ré-armé au swap.
+///
+/// 🚨 DÉFAUT CONNU, non corrigé (2026-08-05). L'aperçu du personnage est
+/// INSTABLE d'un lancement à l'autre — quatre lancements, trois résultats :
+/// personnage entier mais pièces désalignées · cadré sur les seules jambes ·
+/// panneau vide (deux fois). Le sujet est fait de SIX scènes glTF (le corps et
+/// ses cinq pièces) qui se peuplent sur des frames différentes, et ce calibrage
+/// se fige sur la première venue — donc sur un sous-ensemble arbitraire.
+///
+/// Faire CONVERGER le calibrage (recalculer tant que l'étendue bouge, refermer
+/// sur une mesure stable) n'a rien changé : le panneau restait vide AVANT comme
+/// APRÈS le retrait de cette tentative. La course au chargement explique la
+/// variabilité, mais elle n'explique pas à elle seule le panneau vide.
+///
+/// À reprendre par la MESURE (journaliser `extent`/`scale` et le compte de
+/// descendants porteurs d'`Aabb` à chaque passe), pas par raisonnement : deux
+/// hypothèses ont déjà été réfutées par l'observation.
 #[derive(Component)]
 struct NeedsPreviewCalibrate;
 
@@ -84,10 +122,7 @@ impl Plugin for WeaponPreviewPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(AppMode::Menu),
-            (
-                sys_spawn_weapon_preview,
-                sys_spawn_character_preview,
-            ),
+            (sys_spawn_weapon_preview, sys_spawn_character_preview),
         )
         .add_systems(OnExit(AppMode::Menu), sys_despawn_previews)
         .add_systems(
@@ -101,6 +136,7 @@ impl Plugin for WeaponPreviewPlugin {
                 sys_propagate_preview_layers,
                 sys_calibrate_previews,
                 sys_rotate_previews,
+                sys_gate_preview_cameras,
             )
                 .chain()
                 .run_if(in_state(AppMode::Menu)),
@@ -110,15 +146,20 @@ impl Plugin for WeaponPreviewPlugin {
 
 // ── Création de l'image RTT (partagée arme/bras) ────────────────────────────────
 
-/// Crée une image render-target carrée + l'enregistre auprès d'egui (une fois).
-fn create_rtt_image(
+/// Crée une image render-target + l'enregistre auprès d'egui (une fois).
+///
+/// `width`/`height` séparés : les aperçus sont carrés (viewport carré dans leur
+/// panneau), le fond d'arène est au format de l'écran.
+pub(crate) fn create_rtt_image(
     images: &mut Assets<Image>,
     contexts: &mut EguiContexts,
     label: &'static str,
+    width: u32,
+    height: u32,
 ) -> (Handle<Image>, egui::TextureId) {
     let size = Extent3d {
-        width: RTT_SIZE,
-        height: RTT_SIZE,
+        width,
+        height,
         depth_or_array_layers: 1,
     };
     let mut image = Image {
@@ -143,28 +184,59 @@ fn create_rtt_image(
     (handle, tex_id)
 }
 
+/// Caméra de l'aperçu ARME — pour la couper hors de la page Armes (story-691).
+#[derive(Component)]
+struct WeaponPreviewCam;
+/// Caméra de l'aperçu PERSONNAGE — coupée hors Forgeron/Sac (story-691).
+#[derive(Component)]
+struct CharacterPreviewCam;
+
+/// Frames de grâce à l'entrée du menu pendant lesquelles les DEUX caméras
+/// d'aperçu restent actives, quelle que soit la page.
+///
+/// Le premier rendu réel compile les pipelines PBR de ces vues — un warmup en
+/// `Visibility::Hidden` ne le fait PAS (`reference_pbr_pipeline_warmup_frustum_trap`).
+/// Sans cette grâce, la première ouverture de la page Armes/Forgeron paierait
+/// la compilation en hitch visible ; ici elle se paie sous l'anim d'entrée du
+/// menu, où personne ne la voit.
+#[derive(Resource)]
+struct PreviewCamWarmup(u8);
+const PREVIEW_CAM_WARMUP_FRAMES: u8 = 5;
+
 /// Spawn caméra RTT (order négatif, cible = image, clear opaque sombre) + lumière
-/// dédiée, sur le layer donné. Les entités portent `PreviewEntity`.
+/// dédiée, sur le layer donné. Les entités portent `PreviewEntity`. Rend
+/// l'`Entity` de la caméra pour que l'appelant y pose son marqueur de gate.
 fn spawn_rtt_camera_light(
     commands: &mut Commands,
     image: &Handle<Image>,
     layer: &RenderLayers,
     order: isize,
     name: &'static str,
-) {
-    commands.spawn((
-        Camera3d::default(),
-        Camera {
-            order,
-            clear_color: ClearColorConfig::Custom(Color::srgba(0.06, 0.05, 0.09, 1.0)),
-            ..default()
-        },
-        RenderTarget::Image(image.clone().into()),
-        Transform::from_xyz(0.0, 0.15, 1.7).looking_at(Vec3::ZERO, Vec3::Y),
-        layer.clone(),
-        PreviewEntity,
-        Name::new(name),
-    ));
+) -> Entity {
+    // Fond STUDIO opaque pour les deux aperçus (audit 2026-08-06). Le clear
+    // transparent de l'aperçu personnage n'a jamais fonctionné — le tonemapping
+    // force alpha=1 dans egui — et depuis la refonte Dicero le portrait est
+    // CADRÉ, donc un fond sombre assorti aux panneaux est le comportement
+    // voulu, pas un pis-aller.
+    let clear = ClearColorConfig::Custom(Color::srgba(0.06, 0.05, 0.09, 1.0));
+    let cam = commands
+        .spawn((
+            Camera3d::default(),
+            Camera {
+                order,
+                clear_color: clear,
+                ..default()
+            },
+            RenderTarget::Image(image.clone().into()),
+            Transform::from_xyz(0.0, 0.15, 1.7).looking_at(Vec3::ZERO, Vec3::Y),
+            layer.clone(),
+            PreviewEntity,
+            // Exclut ces caméras du grading d'univers — leur fond ressortait rose
+            // ambiance au lieu du sombre studio (cf. `color_grading::sys_apply`).
+            forgia_core::prelude::UiStudioCamera,
+            Name::new(name),
+        ))
+        .id();
     commands.spawn((
         DirectionalLight {
             illuminance: 6000.0,
@@ -175,6 +247,7 @@ fn spawn_rtt_camera_light(
         layer.clone(),
         PreviewEntity,
     ));
+    cam
 }
 
 // ── Aperçu ARME ────────────────────────────────────────────────────────────────
@@ -191,15 +264,23 @@ fn sys_spawn_weapon_preview(
     if existing.is_some() {
         return;
     }
-    let (image, tex_id) = create_rtt_image(&mut images, &mut contexts, "weapon_preview_rtt");
+    let (image, tex_id) = create_rtt_image(
+        &mut images,
+        &mut contexts,
+        "weapon_preview_rtt",
+        RTT_SIZE,
+        RTT_SIZE,
+    );
     let layer = RenderLayers::layer(WEAPON_LAYER);
-    spawn_rtt_camera_light(&mut commands, &image, &layer, -1, "WeaponPreviewCamera");
+    let cam = spawn_rtt_camera_light(&mut commands, &image, &layer, -1, "WeaponPreviewCamera");
+    commands.entity(cam).insert(WeaponPreviewCam);
+    commands.insert_resource(PreviewCamWarmup(PREVIEW_CAM_WARMUP_FRAMES));
 
     let pivot = commands
         .spawn((
             Transform::default(),
             Visibility::Inherited,
-            PreviewPivot,
+            PreviewPivot { spin: PREVIEW_SPIN },
             PreviewEntity,
             Name::new("WeaponPreviewPivot"),
         ))
@@ -265,6 +346,19 @@ pub struct CharacterPreviewRtt {
     pub tex_id: egui::TextureId,
     image: Handle<Image>,
     holder: Entity,
+    /// Ce que la dernière construction a RÉELLEMENT créé (corps + pièces).
+    ///
+    /// 🚨 On ne nettoie pas via les `Children` du holder. Mesuré le 2026-08-06 :
+    /// le balayage retirait tantôt 6 entités, tantôt 5, alors que l'avatar en
+    /// compte toujours 6 (un corps, cinq pièces). La pièce oubliée survivait à
+    /// la reconstruction, gardait ses os branchés sur le corps DÉTRUIT — donc
+    /// sans transform — et restait figée dans le monde pendant que le nouveau
+    /// corps tournait. C'est le « l'armure ne tourne plus » rapporté en jeu.
+    ///
+    /// `Children` est une relation dérivée : s'en servir pour détruire, c'est
+    /// faire confiance à un miroir. On garde donc la liste de ce qu'on a spawné
+    /// — `spawn_equipped_avatar` la rend déjà, elle était jetée.
+    parts: Vec<Entity>,
     /// Équipement actuellement montré — clé de reconstruction.
     shown: String,
 }
@@ -279,15 +373,24 @@ fn sys_spawn_character_preview(
     if existing.is_some() {
         return;
     }
-    let (image, tex_id) = create_rtt_image(&mut images, &mut contexts, "character_preview_rtt");
+    let (image, tex_id) = create_rtt_image(
+        &mut images,
+        &mut contexts,
+        "character_preview_rtt",
+        RTT_SIZE,
+        RTT_SIZE,
+    );
     let layer = RenderLayers::layer(CHARACTER_LAYER);
-    spawn_rtt_camera_light(&mut commands, &image, &layer, -3, "CharacterPreviewCamera");
+    let cam = spawn_rtt_camera_light(&mut commands, &image, &layer, -3, "CharacterPreviewCamera");
+    commands.entity(cam).insert(CharacterPreviewCam);
 
     let pivot = commands
         .spawn((
             Transform::default(),
             Visibility::Inherited,
-            PreviewPivot,
+            PreviewPivot {
+                spin: PREVIEW_SPIN * CHARACTER_SPIN_FACTOR,
+            },
             PreviewEntity,
             Name::new("CharacterPreviewPivot"),
         ))
@@ -308,6 +411,7 @@ fn sys_spawn_character_preview(
         tex_id,
         image,
         holder,
+        parts: Vec::new(),
         // Volontairement différent de toute clé réelle (même vide) pour forcer la
         // première construction.
         shown: "\u{0}jamais construit".to_string(),
@@ -324,7 +428,6 @@ fn sys_sync_character_pieces(
     cfg: Res<EquipmentConfig>,
     save: Res<EquipmentSave>,
     rtt: Option<ResMut<CharacterPreviewRtt>>,
-    q_children: Query<&Children>,
 ) {
     let Some(mut rtt) = rtt else {
         return;
@@ -335,24 +438,35 @@ fn sys_sync_character_pieces(
     }
     rtt.shown = key;
 
-    if let Ok(children) = q_children.get(rtt.holder) {
-        for child in children.iter() {
-            commands.entity(child).despawn();
+    // On détruit EXACTEMENT ce qu'on avait créé (cf. `CharacterPreviewRtt::parts`).
+    // `try_despawn` et non `despawn` : une pièce peut déjà être partie par une
+    // autre voie, et ce nettoyage ne doit jamais faire tomber le jeu.
+    let holder = rtt.holder;
+    let previous: Vec<Entity> = std::mem::take(&mut rtt.parts);
+    let removed = previous.len();
+    for part in previous {
+        if let Ok(mut ec) = commands.get_entity(part) {
+            ec.try_despawn();
         }
     }
+    // Trace de RECONSTRUCTION (une ligne par changement d'équipement, jamais par
+    // frame). Le compte DOIT être stable d'une reconstruction à l'autre : c'est
+    // son alternance 6/5 qui a révélé les pièces fantômes.
+    info!("[character-preview] reconstruction : {removed} entité(s) retirée(s)");
     // Le montage est partagé avec l'avatar du Hall. Le layer de rendu n'est pas
     // posé ici : `sys_propagate_preview_layers` le pousse depuis le holder à
     // TOUS ses descendants, pièces neuves comprises.
-    spawn_equipped_avatar(
+    rtt.parts = spawn_equipped_avatar(
         &mut commands,
         &assets,
         &cfg,
         &save,
-        rtt.holder,
+        holder,
         Transform::default(),
     );
-    // Re-cadrer : le personnage vient de changer d'emprise.
-    commands.entity(rtt.holder).insert((
+    // Re-cadrer : le personnage vient de changer d'emprise. Le calibrage repart
+    // à zéro et convergera au fil de l'arrivée des six scènes.
+    commands.entity(holder).insert((
         NeedsPreviewCalibrate,
         Transform::from_scale(Vec3::splat(0.001)),
     ));
@@ -414,11 +528,50 @@ fn sys_calibrate_previews(
     }
 }
 
-/// Rotation turntable de tous les pivots d'aperçu (arme + bras).
-fn sys_rotate_previews(time: Res<Time>, mut q: Query<&mut Transform, With<PreviewPivot>>) {
-    let dr = PREVIEW_SPIN * time.delta_secs();
-    for mut tf in &mut q {
-        tf.rotate_y(dr);
+/// Rotation turntable des aperçus, chacun à SA vitesse (arme + personnage).
+///
+/// `Time<Real>` et pas `Time` : anti-trap CLAUDE.md §6 « UI/menu = Real » — le
+/// fond d'arène fait déjà ce choix pour la même raison (le menu ne doit pas se
+/// figer si le temps virtuel est en pause).
+fn sys_rotate_previews(
+    time: Res<Time<bevy::time::Real>>,
+    mut q: Query<(&mut Transform, &PreviewPivot)>,
+) {
+    let dt = time.delta_secs();
+    for (mut tf, pivot) in &mut q {
+        tf.rotate_y(pivot.spin * dt);
+    }
+}
+
+/// Coupe les caméras d'aperçu hors de LEUR page (story-691) : sur l'Accueil —
+/// la page la plus fréquentée — le GPU payait chaque frame deux passes 3D 512²
+/// pour deux textures que personne n'affichait. Le personnage du FOND, lui,
+/// reste rendu par la caméra du diorama (`arena_backdrop`), pas par celles-ci.
+fn sys_gate_preview_cameras(
+    page: Res<crate::MenuPage>,
+    warmup: Option<ResMut<PreviewCamWarmup>>,
+    mut q_weapon: Query<&mut Camera, (With<WeaponPreviewCam>, Without<CharacterPreviewCam>)>,
+    mut q_char: Query<&mut Camera, With<CharacterPreviewCam>>,
+) {
+    // Grâce de warmup : laisser les deux vues rendre quelques frames pour
+    // compiler leurs pipelines pendant l'entrée du menu (cf. PreviewCamWarmup).
+    if let Some(mut w) = warmup {
+        if w.0 > 0 {
+            w.0 -= 1;
+            return;
+        }
+    }
+    let weapon_on = matches!(*page, crate::MenuPage::Armes);
+    let char_on = matches!(*page, crate::MenuPage::Forgeron | crate::MenuPage::Sac);
+    for mut cam in &mut q_weapon {
+        if cam.is_active != weapon_on {
+            cam.is_active = weapon_on;
+        }
+    }
+    for mut cam in &mut q_char {
+        if cam.is_active != char_on {
+            cam.is_active = char_on;
+        }
     }
 }
 
