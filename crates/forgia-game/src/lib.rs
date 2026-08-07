@@ -17,59 +17,86 @@ use bevy::remote::{http::RemoteHttpPlugin, RemotePlugin};
 use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::*;
 
-/// Démo perf moteur (2026-06-15) — "Cyber City démo" : charge un GLB lourd +
-/// flycam libre pour stress-tester le rendu. Entrée via le menu principal.
-mod cyber_city;
-/// Hall de Forgia (2026-07-22) — hub social 3D walkable : château importé
-/// (`castle_highlands.glb`), zone neutre sans combat. Entrée debug F10.
-mod castle_hub;
-/// Vue 3ᵉ personne du Hall + avatar portant l'armure débloquée.
-mod castle_avatar;
-/// Inventaire d'armure du Hall (touche I) — même contenu qu'au menu.
-mod castle_equipment_panel;
-/// Sol gazon du Hall de Forgia — terrain reconstruit depuis le Unity Terrain
-/// (heightmap + splatmap chemins pavés + 21k tree-instances). RÉACTIVÉ 2026-07-25 :
-/// orientation calée via `yaw_deg` du tune live `castle_ground_tune.json` (le
-/// chemin pointe vers l'AVANT du château). Détail : reference_castle_terrain_unity_reconstruction.
-mod castle_ground;
-/// Bougies allumées + éclairage du Hall (2026-07-26) — les lumières et particules
-/// du pack Unity ont été perdues à l'import (elles ne portent pas de mesh) : ce
-/// module rend les ~300 bougeoirs vivants et remplace l'ambiante à 900, qui
-/// compensait leur absence en aplatissant tout le modelé.
-mod castle_flames;
-/// Instances écartées par la reconstruction du château (2026-07-26) — les prefabs
-/// composites (`_static`, `_lit`, `_comp`) n'avaient pas de FBX 1:1 et sont tombés
-/// en silence : 50 bannières murales manquaient alors que leur mesh était chargé.
-mod castle_props;
-/// Éclairage par image du Hall (2026-07-26) — Forgia n'en avait aucun, d'où l'aspect
-/// « pierre mouillée » : une surface PBR sans environnement à réfléchir tombe sur un
-/// reflet plat. La cubemap vient des 27 sondes d'intérieur cuites par le créateur.
-mod castle_envmap;
-/// Lumière cuite du créateur (2026-07-26) — 11 atlas portant 2 rebonds et une
-/// occlusion ambiante. C'est le seul apport de lumière **indirecte** du Hall :
-/// aucun éclairage temps réel ne produit de rebond.
-mod castle_lightmaps;
-/// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
-/// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
-mod color_grading;
 /// Banc de blockout d'arène (story-667, 2026-07-27) — l'étape « greybox » du
 /// process de level design, isolée du Roguelite. Géométrie grise pilotée par
 /// `assets/genomes/arena_test.toml`, grille au sol à l'échelle des metrics joueur
 /// mesurées. On joue la forme avant de l'habiller.
 mod arena_test;
+/// Vue 3ᵉ personne du Hall + avatar portant l'armure débloquée.
+mod castle_avatar;
+/// Éclairage par image du Hall (2026-07-26) — Forgia n'en avait aucun, d'où l'aspect
+/// « pierre mouillée » : une surface PBR sans environnement à réfléchir tombe sur un
+/// reflet plat. La cubemap vient des 27 sondes d'intérieur cuites par le créateur.
+mod castle_envmap;
+/// Inventaire d'armure du Hall (touche I) — même contenu qu'au menu.
+mod castle_equipment_panel;
+/// Bougies allumées + éclairage du Hall (2026-07-26) — les lumières et particules
+/// du pack Unity ont été perdues à l'import (elles ne portent pas de mesh) : ce
+/// module rend les ~300 bougeoirs vivants et remplace l'ambiante à 900, qui
+/// compensait leur absence en aplatissant tout le modelé.
+mod castle_flames;
+/// Sol gazon du Hall de Forgia — terrain reconstruit depuis le Unity Terrain
+/// (heightmap + splatmap chemins pavés + 21k tree-instances). RÉACTIVÉ 2026-07-25 :
+/// orientation calée via `yaw_deg` du tune live `castle_ground_tune.json` (le
+/// chemin pointe vers l'AVANT du château). Détail : reference_castle_terrain_unity_reconstruction.
+mod castle_ground;
+/// Hall de Forgia (2026-07-22) — hub social 3D walkable : château importé
+/// (`castle_highlands.glb`), zone neutre sans combat. Entrée debug F10.
+mod castle_hub;
+/// Lumière cuite du créateur (2026-07-26) — 11 atlas portant 2 rebonds et une
+/// occlusion ambiante. C'est le seul apport de lumière **indirecte** du Hall :
+/// aucun éclairage temps réel ne produit de rebond.
+mod castle_lightmaps;
+/// Instances écartées par la reconstruction du château (2026-07-26) — les prefabs
+/// composites (`_static`, `_lit`, `_comp`) n'avaient pas de FBX 1:1 et sont tombés
+/// en silence : 50 bannières murales manquaient alors que leur mesh était chargé.
+mod castle_props;
+/// Color grading filmique par GameMode (story-602) — mood par mode (chaud/froid/
+/// saturation), hot-reload genome. Orthogonal au tonemapping (composant distinct).
+mod color_grading;
+/// Démo perf moteur (2026-06-15) — "Cyber City démo" : charge un GLB lourd +
+/// flycam libre pour stress-tester le rendu. Entrée via le menu principal.
+mod cyber_city;
 
 /// Build the App with all Forgia plugins wired, then run it. Returns `AppExit`.
 pub fn run_game() -> AppExit {
+    // Plusieurs lecteurs historiques utilisent encore `assets/...` ou
+    // `config/...` via std::fs. Normaliser une seule fois le CWD rend le binaire
+    // lançable depuis Explorer, target/debug ou un outil externe, tandis que
+    // AssetPlugin reçoit toujours le chemin absolu canonique ci-dessous.
+    let asset_root = forgia_core::asset_paths::asset_root();
+    let runtime_root = forgia_core::asset_paths::runtime_root();
+    if let Err(error) = std::env::set_current_dir(&runtime_root) {
+        eprintln!(
+            "[forgia-game] impossible de fixer le répertoire runtime {}: {error}",
+            runtime_root.display()
+        );
+    }
+
     let mut app = App::new();
 
     // 1. Bevy DefaultPlugins EN PREMIER (fournit StatesPlugin requis par ForgiaCorePlugin)
     app.add_plugins(
         DefaultPlugins
+            .set(AssetPlugin {
+                file_path: asset_root.to_string_lossy().into_owned(),
+                ..default()
+            })
             .set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Forgia V2".to_string(),
-                    resolution: (1920u32, 1080u32).into(),
-                    ..default()
+                primary_window: Some({
+                    // Story-692 — le mode fenêtre vient des settings AVANT la
+                    // création de la fenêtre : le défaut Windowed en dur
+                    // flashait une fenêtre 1920×1080 (clampée à 1009 par l'OS)
+                    // à chaque boot, le temps qu'`apply_window_settings`
+                    // rattrape le choix du joueur. Défaut sans TOML =
+                    // borderless, la cible officielle.
+                    let (mode, w, h) = forgia_ui_lib::pause_menu::initial_window_config();
+                    Window {
+                        title: "Forgia V2".to_string(),
+                        resolution: (w, h).into(),
+                        mode,
+                        ..default()
+                    }
                 }),
                 ..default()
             })
