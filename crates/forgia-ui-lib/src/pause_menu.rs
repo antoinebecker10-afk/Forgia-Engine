@@ -13,16 +13,16 @@
 //! Remplace l'ancien `paused_overlay_ui` de `forgia-ui` (keyboard-only).
 //! L'ancien handler ESC/Q reste dans `forgia-ui` pour la transition state.
 
-use bevy::prelude::*;
+use crate::style::*;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::ScreenSpaceAmbientOcclusion;
+use bevy::prelude::*;
 use bevy::render::view::Msaa;
 use bevy::window::{MonitorSelection, PresentMode, PrimaryWindow, WindowMode};
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
-use forgia_audio::UserMasterVolume;
+use forgia_audio::{UserAudioVolumes, UserMasterVolume};
 use forgia_core::prelude::*;
 use forgia_player::{CameraFov, FpsCamera, MouseLookTuning};
-use crate::style::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -77,8 +77,18 @@ pub struct UserSettings {
     /// à tous les canaux kira (story-595, M2-B1 : « volume » n'existait nulle part).
     #[serde(default = "default_master_volume")]
     pub master_volume: f32,
-    /// "windowed" | "borderless". Défaut = "windowed" : miroir EXACT du
-    /// comportement pré-595 (WindowPlugin 1920×1080 sans mode) — zéro régression.
+    #[serde(default = "default_music_volume")]
+    pub music_volume: f32,
+    #[serde(default = "default_sfx_volume")]
+    pub sfx_volume: f32,
+    #[serde(default = "default_voice_volume")]
+    pub voice_volume: f32,
+    #[serde(default = "default_ambience_volume")]
+    pub ambience_volume: f32,
+    /// "windowed" | "borderless". Défaut = "borderless" depuis story-692 : la
+    /// cible officielle (build-stack.md « 1920x1080 borderless ») — le défaut
+    /// Windowed historique donnait une fenêtre que l'OS clampe à 1009 px de
+    /// haut, jamais le 1080 du design. Un TOML explicite garde son choix.
     #[serde(default = "default_window_mode")]
     pub window_mode: String,
     #[serde(default = "default_window_width")]
@@ -97,6 +107,11 @@ pub struct UserSettings {
     /// Story-599 inc.3 — VSync (true = `PresentMode::AutoVsync`, false = `AutoNoVsync`). Défaut on.
     #[serde(default = "default_vsync")]
     pub vsync: bool,
+    /// Story-678 Phase 2 — animations d'interface (transitions de sections,
+    /// impulsions de boutons). Toggle accessibilité, miroité chaque frame vers
+    /// `motion::set_motion_enabled`. Défaut on.
+    #[serde(default = "default_ui_motion")]
+    pub ui_motion_enabled: bool,
 }
 
 fn default_sensor_period() -> f32 {
@@ -105,8 +120,20 @@ fn default_sensor_period() -> f32 {
 fn default_master_volume() -> f32 {
     1.0
 }
+fn default_music_volume() -> f32 {
+    0.75
+}
+fn default_sfx_volume() -> f32 {
+    1.0
+}
+fn default_voice_volume() -> f32 {
+    1.0
+}
+fn default_ambience_volume() -> f32 {
+    0.8
+}
 fn default_window_mode() -> String {
-    "windowed".to_string()
+    "borderless".to_string()
 }
 fn default_window_width() -> u32 {
     1920
@@ -123,6 +150,9 @@ fn default_msaa_samples() -> u32 {
 fn default_vsync() -> bool {
     true
 }
+fn default_ui_motion() -> bool {
+    true
+}
 
 impl Default for UserSettings {
     fn default() -> Self {
@@ -131,12 +161,17 @@ impl Default for UserSettings {
             fov_deg: 90.0,
             sensor_period_secs: 1.0,
             master_volume: 1.0,
-            window_mode: "windowed".to_string(),
+            music_volume: default_music_volume(),
+            sfx_volume: default_sfx_volume(),
+            voice_volume: default_voice_volume(),
+            ambience_volume: default_ambience_volume(),
+            window_mode: default_window_mode(),
             window_width: 1920,
             window_height: 1080,
             tonemapping: "tony".to_string(),
             msaa_samples: 4,
             vsync: true,
+            ui_motion_enabled: true,
         }
     }
 }
@@ -155,33 +190,61 @@ pub struct PauseMenuSensor {
 /// uniquement. Le système `apply_settings_to_tuning` propage via `Changed<UserSettings>`.
 /// Élimine la race init Startup non déterministe avec `init_resource::<MouseLookTuning>`.
 pub fn load_user_settings_at_boot(mut settings: ResMut<UserSettings>) {
-    // Chemin canonique %APPDATA%, puis migration depuis l'ancien assets/ (lu
-    // une fois ; le prochain Save écrira le canonique).
-    let canonical = settings_path();
-    let (content, source) = match fs::read_to_string(&canonical) {
-        Ok(c) => (Some(c), canonical.display().to_string()),
-        Err(_) => match fs::read_to_string(LEGACY_SETTINGS_PATH) {
-            Ok(c) => (Some(c), format!("{LEGACY_SETTINGS_PATH} (legacy, migration au prochain Save)")),
-            Err(_) => (None, String::new()),
-        },
-    };
-    match content {
-        Some(content) => match toml::from_str::<UserSettings>(&content) {
-            Ok(loaded) => {
-                *settings = loaded;
-                info!(
-                    "[pause-menu] settings chargés depuis {source} (sensibilité {:.4}, fov {:.0}°, volume {:.0}%)",
-                    settings.mouse_sensitivity,
-                    settings.fov_deg,
-                    settings.master_volume * 100.0
-                );
-            }
-            Err(e) => warn!("[pause-menu] user_settings.toml parse error: {e}"),
-        },
+    match read_user_settings_from_disk() {
+        Some((loaded, source)) => {
+            *settings = loaded;
+            info!(
+                "[pause-menu] settings chargés depuis {source} (sensibilité {:.4}, fov {:.0}°, volume {:.0}%)",
+                settings.mouse_sensitivity,
+                settings.fov_deg,
+                settings.master_volume * 100.0
+            );
+        }
         None => {
             info!("[pause-menu] aucun user_settings.toml — défauts");
         }
     }
+}
+
+/// Lit `user_settings.toml` sur le disque, SANS ECS — la lecture unique que
+/// partagent le boot Bevy (`load_user_settings_at_boot`) et la création de la
+/// fenêtre initiale (story-692 : `forgia-game` lit le mode fenêtre AVANT de
+/// bâtir la `Window`, sinon chaque lancement borderless flashe une fenêtre
+/// 1920×1080 le temps qu'`apply_window_settings` rattrape). Chemin canonique
+/// %APPDATA%, puis migration depuis l'ancien assets/ (le prochain Save écrira
+/// le canonique). Rend aussi la source, pour les logs.
+pub fn read_user_settings_from_disk() -> Option<(UserSettings, String)> {
+    let canonical = settings_path();
+    let (content, source) = match fs::read_to_string(&canonical) {
+        Ok(c) => (c, canonical.display().to_string()),
+        Err(_) => match fs::read_to_string(LEGACY_SETTINGS_PATH) {
+            Ok(c) => (
+                c,
+                format!("{LEGACY_SETTINGS_PATH} (legacy, migration au prochain Save)"),
+            ),
+            Err(_) => return None,
+        },
+    };
+    match toml::from_str::<UserSettings>(&content) {
+        Ok(loaded) => Some((loaded, source)),
+        Err(e) => {
+            warn!("[pause-menu] user_settings.toml parse error: {e}");
+            None
+        }
+    }
+}
+
+/// Le triplet (mode, largeur, hauteur) de la fenêtre INITIALE, dérivé des
+/// settings disque — ou des défauts s'il n'y en a pas (story-692).
+pub fn initial_window_config() -> (WindowMode, u32, u32) {
+    let s = read_user_settings_from_disk()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
+    let mode = match s.window_mode.as_str() {
+        "windowed" => WindowMode::Windowed,
+        _ => WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+    };
+    (mode, s.window_width, s.window_height)
 }
 
 /// Propage `UserSettings.master_volume` → `forgia_audio::UserMasterVolume`
@@ -189,12 +252,20 @@ pub fn load_user_settings_at_boot(mut settings: ResMut<UserSettings>) {
 pub fn apply_settings_to_volume(
     settings: Res<UserSettings>,
     mut volume: ResMut<UserMasterVolume>,
+    mut mix: ResMut<UserAudioVolumes>,
     mut applied_once: Local<bool>,
 ) {
     if !settings.is_changed() && *applied_once {
         return;
     }
     volume.0 = settings.master_volume.clamp(0.0, 1.0);
+    *mix = UserAudioVolumes {
+        master: volume.0,
+        music: settings.music_volume.clamp(0.0, 1.0),
+        sfx: settings.sfx_volume.clamp(0.0, 1.0),
+        voice: settings.voice_volume.clamp(0.0, 1.0),
+        ambience: settings.ambience_volume.clamp(0.0, 1.0),
+    };
     *applied_once = true;
 }
 
@@ -501,11 +572,37 @@ pub fn draw_settings_controls(ui: &mut egui::Ui, settings: &mut UserSettings) ->
     }
     ui.add_space(10.0);
 
+    for (label, value) in [
+        ("Musique", &mut settings.music_volume),
+        ("Effets sonores", &mut settings.sfx_volume),
+        ("Voix", &mut settings.voice_volume),
+        ("Ambiance", &mut settings.ambience_volume),
+    ] {
+        ui.label(egui::RichText::new(label).size(14.0));
+        let mut pct = *value * 100.0;
+        if ui
+            .add(
+                egui::Slider::new(&mut pct, 0.0..=100.0)
+                    .fixed_decimals(0)
+                    .suffix(" %"),
+            )
+            .changed()
+        {
+            *value = (pct / 100.0).clamp(0.0, 1.0);
+            dirty = true;
+        }
+    }
+    ui.add_space(10.0);
+
     // Story-595 (M2-B1) : volume principal — applique en LIVE (canaux kira).
     ui.label(egui::RichText::new("Volume principal").size(16.0));
     let mut vol_pct = settings.master_volume * 100.0;
     if ui
-        .add(egui::Slider::new(&mut vol_pct, 0.0..=100.0).fixed_decimals(0).suffix(" %"))
+        .add(
+            egui::Slider::new(&mut vol_pct, 0.0..=100.0)
+                .fixed_decimals(0)
+                .suffix(" %"),
+        )
         .changed()
     {
         settings.master_volume = (vol_pct / 100.0).clamp(0.0, 1.0);
@@ -591,6 +688,23 @@ pub fn draw_settings_controls(ui: &mut egui::Ui, settings: &mut UserSettings) ->
     });
     ui.add_space(10.0);
 
+    // Story-678 Phase 2 — accessibilité : le motion d'interface se coupe.
+    // Le miroir vers la mémoire egui est immédiat (même frame), la persistance
+    // passe par le même « Sauvegarder » que le reste.
+    let mut motion = settings.ui_motion_enabled;
+    if ui
+        .checkbox(
+            &mut motion,
+            egui::RichText::new("Animations du menu (transitions, impulsions)").size(16.0),
+        )
+        .changed()
+    {
+        settings.ui_motion_enabled = motion;
+        crate::motion::set_motion_enabled(ui.ctx(), motion);
+        dirty = true;
+    }
+    ui.add_space(10.0);
+
     // Story-595 : touches affichées (lecture seule — réassignation = post-ship).
     ui.collapsing(egui::RichText::new("Touches (AZERTY)").size(16.0), |ui| {
         ui.label(
@@ -654,7 +768,10 @@ fn draw_settings(
                 "save_failed".to_string()
             };
             if saved {
-                info!("[pause-menu] settings sauvés → {}", settings_path().display());
+                info!(
+                    "[pause-menu] settings sauvés → {}",
+                    settings_path().display()
+                );
             }
         }
         if ui
@@ -804,7 +921,13 @@ mod tests {
         // Story-599 inc.3 : vsync absent du TOML legacy → défaut on.
         assert!(s.vsync, "défaut VSync = on");
         assert_eq!(s.master_volume, 1.0, "défaut volume = plein");
-        assert_eq!(s.window_mode, "windowed", "défaut = comportement pré-595");
+        assert_eq!(s.music_volume, 0.75);
+        assert_eq!(s.sfx_volume, 1.0);
+        assert_eq!(s.voice_volume, 1.0);
+        assert_eq!(s.ambience_volume, 0.8);
+        // Story-692 : le défaut est la cible officielle (borderless) — le
+        // Windowed pré-595 donnait une fenêtre clampée à 1009 px par l'OS.
+        assert_eq!(s.window_mode, "borderless", "défaut = cible officielle");
         assert_eq!((s.window_width, s.window_height), (1920, 1080));
     }
 
@@ -812,7 +935,10 @@ mod tests {
     fn tonemapping_str_mapping_and_fallback() {
         assert_eq!(tonemapping_from_str("aces"), Tonemapping::AcesFitted);
         assert_eq!(tonemapping_from_str("agx"), Tonemapping::AgX);
-        assert_eq!(tonemapping_from_str("reinhard"), Tonemapping::ReinhardLuminance);
+        assert_eq!(
+            tonemapping_from_str("reinhard"),
+            Tonemapping::ReinhardLuminance
+        );
         assert_eq!(tonemapping_from_str("none"), Tonemapping::None);
         assert_eq!(tonemapping_from_str("tony"), Tonemapping::TonyMcMapface);
         // Inconnu → fallback Forgia (TonyMcMapface), jamais un panic.
@@ -823,12 +949,14 @@ mod tests {
     fn settings_roundtrip_toml() {
         let s = UserSettings {
             master_volume: 0.35,
+            music_volume: 0.4,
             window_mode: "borderless".to_string(),
             ..Default::default()
         };
         let toml_str = toml::to_string_pretty(&s).expect("serialize");
         let back: UserSettings = toml::from_str(&toml_str).expect("deserialize");
         assert_eq!(back.master_volume, 0.35);
+        assert_eq!(back.music_volume, 0.4);
         assert_eq!(back.window_mode, "borderless");
     }
 
@@ -838,7 +966,10 @@ mod tests {
     fn settings_path_is_under_appdata_when_available() {
         if std::env::var_os("APPDATA").is_some() {
             let p = settings_path();
-            assert!(p.ends_with("Forgia\\user_settings.toml") || p.ends_with("Forgia/user_settings.toml"));
+            assert!(
+                p.ends_with("Forgia\\user_settings.toml")
+                    || p.ends_with("Forgia/user_settings.toml")
+            );
             assert!(!p.starts_with("assets"));
         }
     }
