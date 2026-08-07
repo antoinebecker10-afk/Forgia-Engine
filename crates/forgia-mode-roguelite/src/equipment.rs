@@ -160,14 +160,14 @@ impl EquipmentConfig {
     }
 
     /// Rang d'une rareté (0 = la plus commune) — sert à trier l'affichage.
-    fn rarity_rank(&self, id: &str) -> usize {
+    pub fn rarity_rank(&self, id: &str) -> usize {
         self.rarities.iter().position(|r| r.id == id).unwrap_or(0)
     }
 
     /// Ce que vaut une pièce en points de Puissance : son rang + 1, donc 1 pour
     /// la plus commune et `rarities.len()` pour la plus rare. Un emplacement vide
     /// vaut 0 — porter du Commun est déjà un progrès sur ne rien porter.
-    fn power_of(&self, rarity_id: &str) -> u32 {
+    pub fn power_of(&self, rarity_id: &str) -> u32 {
         self.rarity(rarity_id)
             .map(|_| self.rarity_rank(rarity_id) as u32 + 1)
             .unwrap_or(0)
@@ -181,7 +181,7 @@ impl EquipmentConfig {
         (self.slots.len() * self.rarities.len()) as u32
     }
 
-    fn color32(&self, rarity_id: &str) -> egui::Color32 {
+    pub fn color32(&self, rarity_id: &str) -> egui::Color32 {
         let rgb = self.rarity(rarity_id).map(|r| r.rgb).unwrap_or([0.5; 3]);
         egui::Color32::from_rgb(
             (rgb[0] * 255.0) as u8,
@@ -211,6 +211,11 @@ pub struct EquipmentSave {
     /// trace de progression : sans lui, retirer une pièce efface l'histoire.
     #[serde(default)]
     pub power_record: u32,
+    /// Story-678 Phase 4 — total de pièces possédées la dernière fois que la
+    /// page Forgeron a été OUVERTE (pastille « nouvelle pièce »). Scalaire :
+    /// DOIT rester avant les tables (cf. 🚨 ci-dessus).
+    #[serde(default)]
+    pub seen_owned_total: u32,
     #[serde(default)]
     pub owned: HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -223,6 +228,7 @@ impl Default for EquipmentSave {
             version: SAVE_VERSION,
             drops_total: 0,
             power_record: 0,
+            seen_owned_total: 0,
             owned: HashMap::default(),
             equipped: HashMap::default(),
         }
@@ -230,6 +236,11 @@ impl Default for EquipmentSave {
 }
 
 impl EquipmentSave {
+    /// Total de pièces possédées, tous slots confondus (pastille Forgeron).
+    pub fn owned_total(&self) -> u32 {
+        self.owned.values().map(|v| v.len() as u32).sum()
+    }
+
     fn save_path() -> PathBuf {
         crate::persist::save_dir().join(SAVE_FILE)
     }
@@ -238,7 +249,13 @@ impl EquipmentSave {
         crate::persist::load_toml_migrating(SAVE_FILE)
     }
 
-    fn save(&self) {
+    /// Écrit la sauvegarde d'équipement sur le disque.
+    ///
+    /// 🚨 PUBLIC depuis le 2026-08-07 : `sys_track_power_record` était le SEUL
+    /// appelant, et il n'écrit que sur un NOUVEAU RECORD. Équiper au menu ne
+    /// touchait donc jamais le disque — le choix était perdu au relancement,
+    /// sans le moindre signe. Tout site qui mute `equipped` doit persister.
+    pub fn save(&self) {
         crate::persist::save_toml_atomic(&Self::save_path(), self, "equipment");
     }
 
@@ -401,8 +418,7 @@ fn sys_point_viewmodel_arms_at_character(
         return;
     }
     *done = true;
-    let scene =
-        |p: &str| assets.load(GltfAssetLabel::Scene(0).from_asset(p.to_string()));
+    let scene = |p: &str| assets.load(GltfAssetLabel::Scene(0).from_asset(p.to_string()));
     game_assets.viewmodel_arm_left = scene(&cfg.viewmodel_arm_left);
     game_assets.viewmodel_arm_right = scene(&cfg.viewmodel_arm_right);
     info!("[equipment] bras du viewmodel = ceux du personnage");
@@ -633,7 +649,11 @@ pub fn draw_equipment_content(
                         .weak(),
                 );
             }
-            ui.label(egui::RichText::new(format!("/ {power_max}")).size(12.0).weak());
+            ui.label(
+                egui::RichText::new(format!("/ {power_max}"))
+                    .size(12.0)
+                    .weak(),
+            );
             ui.label(
                 egui::RichText::new(power.to_string())
                     .size(24.0)
@@ -645,12 +665,18 @@ pub fn draw_equipment_content(
     // Jauge de collection : le vide à droite est la part encore à trouver, et le
     // liseré du record dit d'où l'on vient quand on a retiré une pièce.
     {
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 6.0), egui::Sense::hover());
-        ui.painter()
-            .rect_filled(rect, egui::CornerRadius::same(3), egui::Color32::from_gray(48));
+        let (rect, _) =
+            ui.allocate_exact_size(egui::vec2(ui.available_width(), 6.0), egui::Sense::hover());
+        ui.painter().rect_filled(
+            rect,
+            egui::CornerRadius::same(3),
+            egui::Color32::from_gray(48),
+        );
         if save.power_record > power {
             let mut mark = rect;
-            mark.set_width(rect.width() * (save.power_record as f32 / power_max as f32).clamp(0.0, 1.0));
+            mark.set_width(
+                rect.width() * (save.power_record as f32 / power_max as f32).clamp(0.0, 1.0),
+            );
             ui.painter().rect_filled(
                 mark,
                 egui::CornerRadius::same(3),
@@ -732,7 +758,8 @@ pub fn draw_equipment_content(
                 let (rect, resp) = ui.allocate_exact_size(egui::vec2(size, size), sense);
                 let col = cfg.color32(rarity_id);
                 if has {
-                    ui.painter().rect_filled(rect, egui::CornerRadius::same(4), col);
+                    ui.painter()
+                        .rect_filled(rect, egui::CornerRadius::same(4), col);
                 } else {
                     // Contour seul : la place est réservée, la couleur annoncée,
                     // mais l'absence se lit sans avoir à comparer deux listes.
@@ -894,7 +921,12 @@ fn draw_loot_card(
         .interactable(false)
         .show(ctx, |ui| {
             egui::Frame::new()
-                .fill(egui::Color32::from_rgba_unmultiplied(14, 11, 18, alpha.min(220)))
+                .fill(egui::Color32::from_rgba_unmultiplied(
+                    14,
+                    11,
+                    18,
+                    alpha.min(220),
+                ))
                 .inner_margin(egui::Margin::symmetric(20, 12))
                 .corner_radius(egui::CornerRadius::same(10))
                 .stroke(egui::Stroke::new(2.0, accent))
@@ -923,9 +955,7 @@ fn draw_loot_card(
                                     slot.per_tier * rarity.bonus_mul * 100.0
                                 ))
                                 .size(14.0)
-                                .color(egui::Color32::from_rgba_unmultiplied(
-                                    230, 225, 220, alpha,
-                                )),
+                                .color(egui::Color32::from_rgba_unmultiplied(230, 225, 220, alpha)),
                             );
                             // Le pourcentage dit ce que la pièce fait ; la Puissance
                             // dit où l'on en est. C'est le second qui se retient
@@ -945,10 +975,7 @@ fn draw_loot_card(
                             };
                             if let Some(line) = power_line {
                                 ui.label(
-                                    egui::RichText::new(line)
-                                        .size(12.0)
-                                        .strong()
-                                        .color(accent),
+                                    egui::RichText::new(line).size(12.0).strong().color(accent),
                                 );
                             }
                         }
@@ -1086,7 +1113,10 @@ mod tests {
     fn every_model_exists_on_disk() {
         let c = cfg();
         let assets = std::path::Path::new("../../assets");
-        assert!(!c.body_model.is_empty(), "le corps de base doit être déclaré");
+        assert!(
+            !c.body_model.is_empty(),
+            "le corps de base doit être déclaré"
+        );
         assert!(
             assets.join(&c.body_model).exists(),
             "corps absent : {}",
