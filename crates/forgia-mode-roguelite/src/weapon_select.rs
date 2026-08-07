@@ -35,7 +35,7 @@ use std::time::SystemTime;
 use crate::element_vfx::ElementVfxAssets;
 use crate::elements::{Element, ElementConfig};
 use crate::enemies::EnemyArchetype;
-use crate::meta_shop::{MetaShopCatalogue, MetaShopSave};
+use crate::meta_shop::{unlock_weapon_paid, MetaShopCatalogue, MetaShopSave};
 use crate::run::{weapon_to_speaker, MetaSouls, RunState};
 
 const VIEWMODEL_GENOME_PATH: &str = "assets/genomes/viewmodel_arena.toml";
@@ -412,17 +412,13 @@ pub fn sys_weapon_unlock_input(
     let Some(unlock) = cat.weapon_unlock(key) else {
         return; // pas déblocable (Pépin / inconnue)
     };
-    if meta.current < unlock.cost {
+    if !unlock_weapon_paid(&mut save, &mut meta, key, unlock.cost) {
         info!(
             "[weapon-select] pas assez d'Âmes pour {} ({}/{})",
             unlock.name, meta.current, unlock.cost
         );
         return;
     }
-    meta.current -= unlock.cost;
-    save.unlock_weapon(key);
-    save.souls_total = meta.current;
-    save.save();
     info!(
         "[weapon-select] ARME DÉBLOQUÉE : {} (-{} Âmes, reste {})",
         unlock.name, unlock.cost, meta.current
@@ -572,7 +568,8 @@ pub fn draw_weapon_select(
                                         // Niveau EFFECTIF : un save antérieur au plafond
                                         // stocke 13 ; afficher « 13/6 » serait illisible.
                                         // Bonus dérivé de la même source que le runtime.
-                                        let lvl = cat.mastery.effective_level(save.weapon_level(key));
+                                        let lvl =
+                                            cat.mastery.effective_level(save.weapon_level(key));
                                         let bonus = (cat.mastery.damage_mul(lvl) - 1.0) * 100.0;
                                         let cap = cat.mastery.max_level;
                                         ui.label(
@@ -751,10 +748,9 @@ pub fn draw_weapon_select(
                                                         .clicked();
                                                 });
                                                 if unlock_clicked {
-                                                    meta.current -= u.cost;
-                                                    save.unlock_weapon(key);
-                                                    save.souls_total = meta.current;
-                                                    save.save();
+                                                    unlock_weapon_paid(
+                                                        &mut save, &mut meta, key, u.cost,
+                                                    );
                                                 }
                                                 if !afford {
                                                     ui.label(
@@ -823,12 +819,13 @@ pub fn draw_weapon_menu_panel(
                 )));
             }
             None => {
-                let (r, _) = ui.allocate_exact_size(
-                    egui::vec2(image_size, image_size),
-                    egui::Sense::hover(),
+                let (r, _) = ui
+                    .allocate_exact_size(egui::vec2(image_size, image_size), egui::Sense::hover());
+                ui.painter().rect_filled(
+                    r,
+                    egui::CornerRadius::same(8),
+                    egui::Color32::from_black_alpha(120),
                 );
-                ui.painter()
-                    .rect_filled(r, egui::CornerRadius::same(8), egui::Color32::from_black_alpha(120));
                 ui.painter().text(
                     r.center(),
                     egui::Align2::CENTER_CENTER,
@@ -955,14 +952,24 @@ pub fn draw_weapon_menu_panel(
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             let prev = ui
-                .add(egui::Button::new(egui::RichText::new("‹").size(28.0).strong()).min_size(egui::vec2(56.0, 40.0)))
+                .add(
+                    egui::Button::new(egui::RichText::new("‹").size(28.0).strong())
+                        .min_size(egui::vec2(56.0, 40.0)),
+                )
                 .on_hover_text("Arme précédente")
                 .clicked();
             ui.add_space(8.0);
-            ui.label(egui::RichText::new("Changer d'arme").size(15.0).color(C_TEXT_MUTED));
+            ui.label(
+                egui::RichText::new("Changer d'arme")
+                    .size(15.0)
+                    .color(C_TEXT_MUTED),
+            );
             ui.add_space(8.0);
             let next = ui
-                .add(egui::Button::new(egui::RichText::new("›").size(28.0).strong()).min_size(egui::vec2(56.0, 40.0)))
+                .add(
+                    egui::Button::new(egui::RichText::new("›").size(28.0).strong())
+                        .min_size(egui::vec2(56.0, 40.0)),
+                )
                 .on_hover_text("Arme suivante")
                 .clicked();
             if prev {
@@ -992,10 +999,7 @@ pub fn draw_weapon_menu_panel(
                         .clicked();
                 });
                 if unlock_clicked {
-                    meta.current -= u.cost;
-                    save.unlock_weapon(key);
-                    save.souls_total = meta.current;
-                    save.save();
+                    unlock_weapon_paid(save, meta, key, u.cost);
                 }
                 if !afford {
                     ui.label(

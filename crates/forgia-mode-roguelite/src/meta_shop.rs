@@ -24,7 +24,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_core::prelude::*;
 use forgia_ui_lib::style::{
-    C_HP_HIGH, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL, HAIR_GOLD_STRONG,
+    C_HP_HIGH, C_TEXT_MUTED, FORGE_AME, FORGE_OR, FORGE_PANEL, FORGE_TEAL, HAIR_GOLD_STRONG,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -564,6 +564,18 @@ impl MetaShopCatalogue {
 pub struct MetaShopSave {
     pub version: u32,
     pub souls_total: u32,
+    /// Story-678 — les ÉCLATS, monnaie **cosmétique**, séparée des Âmes.
+    ///
+    /// Décision du 2026-08-06 : un cosmétique payé en Âmes est un rang
+    /// d'Enclume non acheté, et la courbe de puissance est en cours de
+    /// recalibrage. Deux monnaies = deux lectures qui ne se brouillent pas.
+    ///
+    /// Contrairement aux Âmes, il n'y a PAS de miroir vif : les Éclats ne se
+    /// dépensent qu'au menu, jamais en run. Une seule vérité, donc aucun risque
+    /// de désynchronisation (c'est ce miroir qui a produit « l'achat sans
+    /// effet » côté Âmes).
+    #[serde(default)]
+    pub shards_total: u32,
     pub ranks: HashMap<String, u32>,
     /// Story-680 cran 2 — face active par ligne (0 = principale, 1 = alternative).
     /// Absente = face principale, donc les saves d'avant restent valides.
@@ -595,6 +607,50 @@ pub struct MetaShopSave {
     /// les sauvegardes antérieures repartent à 0 sans migration.
     #[serde(default)]
     pub chapters_cleared: u32,
+    /// Story-678 Phase 3 — résumé de la DERNIÈRE run, affiché par le tableau
+    /// de bord de l'accueil. `None` = aucune run terminée depuis la feature.
+    #[serde(default)]
+    pub last_run: Option<LastRunSummary>,
+    /// Story-678 Phase 4 — valeur de `chapters_cleared` la dernière fois que la
+    /// page Livre a été OUVERTE. `chapters_cleared > seen` = pastille sur l'onglet.
+    #[serde(default)]
+    pub seen_chapters_cleared: u32,
+}
+
+/// Story-678 Phase 4 — y a-t-il AU MOINS un achat possible à l'Enclume avec
+/// `souls` ? Pilote la pastille de l'onglet — elle doit dire vrai, jamais
+/// « peut-être » (un badge menteur éduque le joueur à l'ignorer).
+pub fn enclume_affordable(cat: &MetaShopCatalogue, save: &MetaShopSave, souls: u32) -> bool {
+    let upgrade = cat
+        .upgrades
+        .iter()
+        .any(|u| u.cost_for_next(save.rank(&u.id)).is_some_and(|c| c <= souls));
+    let weapon = cat
+        .weapon_unlocks
+        .iter()
+        .any(|w| !save.unlocked_weapons.iter().any(|k| k == &w.key) && w.cost <= souls);
+    let tier = cat
+        .boon_tier_unlocks
+        .iter()
+        .any(|t| !save.unlocked_boon_tiers.iter().any(|k| k == &t.key) && t.cost <= souls);
+    upgrade || weapon || tier
+}
+
+/// Ce que l'accueil raconte de la dernière run (bandeau « DERNIÈRE RUN »).
+/// Écrit UNIQUEMENT par [`sys_record_run_stats`] — une seule définition de la
+/// grandeur, aux deux sorties de run (Defeat ET Victory).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default)]
+pub struct LastRunSummary {
+    /// Chapitre joué (1-indexé).
+    pub chapter: u32,
+    pub victory: bool,
+    /// Round canonique atteint (`RogueliteWave::round`, 1..=10).
+    pub rounds_reached: u32,
+    pub duration_secs: f32,
+    /// Âmes rapportées par cette run (`MetaSouls::earned_run` au moment du gel).
+    pub souls_earned: u32,
+    /// La run a battu le record de meilleure victoire.
+    pub new_best: bool,
 }
 
 /// Nombre de chapitres d'un Livre.
@@ -648,8 +704,7 @@ impl Default for SelectedChapter {
 impl SelectedChapter {
     /// Ramène la sélection dans ce que la progression autorise.
     pub fn clamped(self, chapters_cleared: u32) -> u32 {
-        self.0
-            .clamp(1, furthest_playable_chapter(chapters_cleared))
+        self.0.clamp(1, furthest_playable_chapter(chapters_cleared))
     }
 }
 
@@ -663,6 +718,7 @@ impl Default for MetaShopSave {
         Self {
             version: SAVE_VERSION,
             souls_total: 0,
+            shards_total: 0,
             ranks: HashMap::new(),
             faces: HashMap::new(),
             unlocked_weapons: default_unlocked_weapons(),
@@ -672,6 +728,8 @@ impl Default for MetaShopSave {
             runs_played: 0,
             victories: 0,
             chapters_cleared: 0,
+            last_run: None,
+            seen_chapters_cleared: 0,
         }
     }
 }
@@ -714,7 +772,10 @@ mod chapter_tests {
         let mut save = MetaShopSave::default();
         record_chapter_cleared(&mut save, CHAPTERS_PER_BOOK);
         assert!(chapter_unlocked(CHAPTERS_PER_BOOK, save.chapters_cleared));
-        assert!(!chapter_unlocked(CHAPTERS_PER_BOOK + 1, save.chapters_cleared));
+        assert!(!chapter_unlocked(
+            CHAPTERS_PER_BOOK + 1,
+            save.chapters_cleared
+        ));
         assert_eq!(
             furthest_playable_chapter(save.chapters_cleared),
             CHAPTERS_PER_BOOK
@@ -767,6 +828,13 @@ pub fn sys_record_run_stats(
     chapter: Res<SelectedChapter>,
     mut save: ResMut<MetaShopSave>,
     mut last: ResMut<LastRunStats>,
+    // Story-678 Phase 3 — le round atteint et les Âmes de la run, pour le
+    // bandeau de l'accueil. Optionnels : le gel doit survivre à leur absence.
+    wave: Option<Res<crate::waves::RogueliteWave>>,
+    graph_cfg: Option<Res<forgia_stage::graph::RunGraphConfig>>,
+    meta: Option<Res<crate::run::MetaSouls>>,
+    // Story-678 — le barème des Éclats (monnaie cosmétique).
+    cosmetics: Option<Res<crate::cosmetics::CosmeticsConfig>>,
 ) {
     let victory = matches!(run_state.get(), RunState::Victory);
     last.secs = timer.secs;
@@ -795,6 +863,42 @@ pub fn sys_record_run_stats(
         save.victories,
         save.best_victory_secs,
     );
+    // Story-678 Phase 3 — le bandeau « DERNIÈRE RUN » de l'accueil. Gelé ICI et
+    // nulle part ailleurs : même source que les compteurs, mêmes deux sorties.
+    let rounds_reached = wave
+        .as_deref()
+        .zip(graph_cfg.as_deref())
+        .map(|(w, g)| w.round(g.waves_per_stage))
+        .unwrap_or(0);
+    save.last_run = Some(LastRunSummary {
+        chapter: chapter.clamped(save.chapters_cleared),
+        victory,
+        rounds_reached,
+        duration_secs: timer.secs,
+        souls_earned: meta.as_deref().map(|m| m.earned_run).unwrap_or(0),
+        new_best: last.new_best,
+    });
+
+    // Story-678 — les ÉCLATS de la run. Ici et nulle part ailleurs : c'est la
+    // seule fonction qui voit les DEUX sorties de run (mort et victoire) et qui
+    // connaît déjà le round atteint. Un second site de gain divergerait.
+    //
+    // Le barème vit dans le génome des cosmétiques (`[shards]`) : il récompense
+    // la PROFONDEUR, jamais le temps passé — un revenu au temps paierait le
+    // farm passif.
+    let gagnes = cosmetics
+        .as_deref()
+        .map(|c| c.shards)
+        .unwrap_or_default()
+        .earned(rounds_reached, victory);
+    if gagnes > 0 {
+        save.shards_total = save.shards_total.saturating_add(gagnes);
+        info!(
+            "[cosmetics] +{gagnes} Éclats (round {rounds_reached}{}) — total {}",
+            if victory { ", chapitre bouclé" } else { "" },
+            save.shards_total
+        );
+    }
 }
 
 impl MetaShopSave {
@@ -1010,6 +1114,14 @@ pub fn sys_load_meta_shop(mut commands: Commands, mut meta: ResMut<MetaSouls>) {
         save.ranks.len(),
         cat.upgrades.len()
     );
+    // 2026-08-05 — le carrousel de l'accueil s'ouvre sur le chapitre le plus
+    // avancé JOUABLE. `SelectedChapter` ne vit qu'en mémoire (`Default` = 1) et
+    // `clamped()` ne borne qu'en HAUT : sans cette ligne, un joueur à 6/10
+    // retrouvait « CHAPITRE 1 » à chaque démarrage, et le bouton CONTINUER
+    // relançait un chapitre déjà battu. Le mot doit dire ce qu'il fait.
+    commands.insert_resource(SelectedChapter(furthest_playable_chapter(
+        save.chapters_cleared,
+    )));
     commands.insert_resource(save);
     commands.insert_resource(cat);
 }
@@ -1177,14 +1289,9 @@ pub fn sys_meta_shop_input(
     //
     // Touches F et non chiffres : les chiffres ACHÈTENT, et confondre « acheter
     // un rang » avec « changer ce que font mes rangs » coûterait des âmes.
-    let swap = [
-        KeyCode::F1,
-        KeyCode::F2,
-        KeyCode::F3,
-        KeyCode::F4,
-    ]
-    .iter()
-    .position(|k| keys.just_pressed(*k));
+    let swap = [KeyCode::F1, KeyCode::F2, KeyCode::F3, KeyCode::F4]
+        .iter()
+        .position(|k| keys.just_pressed(*k));
     if let Some(i) = swap {
         apply_meta_purchase(&cat, &mut save, &mut meta, MetaPurchase::ToggleFace(i));
         return;
@@ -1220,6 +1327,62 @@ pub enum MetaPurchase {
 /// Applique un achat Enclume : mute `save`/`meta` + sauve sur disque. Logique
 /// PARTAGÉE entre le clavier (Lobby) et le clic (hub-menu). Retourne `true` si
 /// l'achat a bien eu lieu (assez d'âmes + pas déjà max/débloqué).
+/// **Dépenser des Âmes — la seule façon.** Rend `false` si la bourse ne suit pas.
+///
+/// Une dépense, c'est TROIS écritures indissociables : le solde vif
+/// (`MetaSouls.current`), son miroir persisté (`MetaShopSave.souls_total`) et
+/// l'écriture disque. En oublier une ne se voit pas tout de suite : l'autosave
+/// porte le garde `if meta.current <= save.souls_total { return }` — il ne
+/// pousse que les GAINS. Une dépense qui ne met pas `souls_total` à jour n'est
+/// donc jamais persistée, le compteur affiché (qui lit le miroir) ne bouge pas,
+/// et les Âmes reviennent au relancement. C'est exactement le défaut rapporté
+/// sur la galerie de décors le 2026-08-06 : « achat sans effet ».
+///
+/// Le geste était déjà écrit deux fois dans `apply_meta_purchase` ; la galerie
+/// en aurait fait un troisième site. Une grandeur écrite N fois finit toujours
+/// par diverger (`feedback_une_grandeur_ecrite_deux_fois`).
+pub fn spend_souls(save: &mut MetaShopSave, meta: &mut MetaSouls, cost: u32) -> bool {
+    if !debit_souls(save, meta, cost) {
+        return false;
+    }
+    save.save();
+    true
+}
+
+/// Débloque une arme CONTRE des Âmes — le seul chemin d'achat d'arme.
+///
+/// Même contrat que [`spend_souls`], PLUS le déblocage : solde vif, miroir,
+/// arme et disque partent ensemble, en UNE écriture. Rend `false` si la
+/// bourse ne suit pas. Trois sites de `weapon_select` recopiaient ce geste à
+/// la main — c'est la classe « une grandeur écrite N fois » que le doc de
+/// [`spend_souls`] documente ; ce helper la referme.
+pub fn unlock_weapon_paid(
+    save: &mut MetaShopSave,
+    meta: &mut MetaSouls,
+    key: &str,
+    cost: u32,
+) -> bool {
+    if !debit_souls(save, meta, cost) {
+        return false;
+    }
+    save.unlock_weapon(key);
+    save.save();
+    true
+}
+
+/// PUR — les deux soldes bougent ENSEMBLE, ou aucun ne bouge.
+///
+/// Séparé de l'écriture disque pour être testable : un test de
+/// [`spend_souls`] écrirait dans la vraie sauvegarde du joueur.
+fn debit_souls(save: &mut MetaShopSave, meta: &mut MetaSouls, cost: u32) -> bool {
+    if meta.current < cost {
+        return false;
+    }
+    meta.current -= cost;
+    save.souls_total = meta.current;
+    true
+}
+
 pub fn apply_meta_purchase(
     cat: &MetaShopCatalogue,
     save: &mut MetaShopSave,
@@ -1247,10 +1410,8 @@ pub fn apply_meta_purchase(
                 );
                 return false;
             }
-            meta.current -= cost;
             *save.ranks.entry(up.id.clone()).or_insert(0) += 1;
-            save.souls_total = meta.current;
-            save.save();
+            spend_souls(save, meta, cost);
             info!(
                 "[meta-shop] acheté {face_name} rang {} (-{cost} âmes, reste {})",
                 rank + 1,
@@ -1290,10 +1451,8 @@ pub fn apply_meta_purchase(
                 );
                 return false;
             }
-            meta.current -= bt.cost;
             save.unlock_boon_tier(&bt.key);
-            save.souls_total = meta.current;
-            save.save();
+            spend_souls(save, meta, bt.cost);
             info!(
                 "[meta-shop] palier d'atouts débloqué : {} (-{} âmes, reste {})",
                 bt.name, bt.cost, meta.current
@@ -1315,10 +1474,13 @@ pub fn draw_enclume_panel(
 ) -> Option<MetaPurchase> {
     let mut intent = None;
     ui.label(
+        // FORGE_AME comme le chip du haut : une monnaie = une couleur, partout
+        // (l'audit 2026-08-07 relevait deux soldes d'Âmes côte à côte, l'un or
+        // l'autre teal — le joueur voyait deux monnaies là où il n'y en a une).
         egui::RichText::new(format!("◇ {souls}  Âmes"))
             .size(22.0)
             .strong()
-            .color(FORGE_TEAL),
+            .color(FORGE_AME),
     );
     ui.add_space(12.0);
     // ── Améliorations de stat (cliquables si abordables) ──
@@ -1333,11 +1495,9 @@ pub fn draw_enclume_panel(
             Some(cost) => {
                 let afford = souls >= cost;
                 let btn = egui::Button::new(
-                    egui::RichText::new(format!(
-                        "{name}   rang {rank}/{max}   ·   {cost} ◇"
-                    ))
-                    .size(16.0)
-                    .color(if afford { FORGE_OR } else { C_TEXT_MUTED }),
+                    egui::RichText::new(format!("{name}   rang {rank}/{max}   ·   {cost} ◇"))
+                        .size(16.0)
+                        .color(if afford { FORGE_OR } else { C_TEXT_MUTED }),
                 )
                 .min_size(egui::vec2(440.0, 0.0));
                 if ui.add_enabled(afford, btn).clicked() {
@@ -1682,7 +1842,8 @@ mod tests {
 
     #[test]
     fn mastery_comes_from_the_genome_and_falls_back_when_absent() {
-        let with = MetaShopCatalogue::parse_toml("[mastery]\nmax_level = 3\ndamage_per_level = 0.1");
+        let with =
+            MetaShopCatalogue::parse_toml("[mastery]\nmax_level = 3\ndamage_per_level = 0.1");
         assert_eq!(with.mastery.max_level, 3);
         assert!((with.mastery.damage_mul(3) - 1.20).abs() < 1e-6);
 
@@ -1725,7 +1886,11 @@ cost = 7
             MasteryConfig::DEFAULT_DAMAGE_PER_LEVEL,
             "le champ absent prend le défaut, il ne fait pas échouer le parse"
         );
-        assert_eq!(cat.upgrades[0].costs, vec![10, 20], "les coûts sont bien lus");
+        assert_eq!(
+            cat.upgrades[0].costs,
+            vec![10, 20],
+            "les coûts sont bien lus"
+        );
         assert_eq!(
             cat.weapon_unlock("bourrasque").map(|w| w.cost),
             Some(7),
@@ -1753,7 +1918,10 @@ cost = 7
         );
 
         let nan = MasteryConfig::from_genome(6, f32::NAN);
-        assert_eq!(nan.damage_per_level, MasteryConfig::DEFAULT_DAMAGE_PER_LEVEL);
+        assert_eq!(
+            nan.damage_per_level,
+            MasteryConfig::DEFAULT_DAMAGE_PER_LEVEL
+        );
     }
 
     // ── record_run_result (R3.3, story-645) ──
@@ -1822,7 +1990,10 @@ cost = 7
         let mut prev_marginal = f32::INFINITY;
         for rank in 1..=up.max_rank() {
             let marginal = up.total_amount(15.0, rank) - up.total_amount(15.0, rank - 1);
-            assert!(marginal > 0.0, "rang {rank} ne rapporte RIEN — rang décoratif");
+            assert!(
+                marginal > 0.0,
+                "rang {rank} ne rapporte RIEN — rang décoratif"
+            );
             assert!(
                 marginal <= prev_marginal + 1e-4,
                 "rang {rank} rapporte PLUS que le précédent ({marginal} > {prev_marginal})"
@@ -1832,7 +2003,11 @@ cost = 7
         // Plancher : le dernier rang vaut encore au moins 40 % du premier.
         let first = up.total_amount(15.0, 1);
         let last = up.total_amount(15.0, up.max_rank()) - up.total_amount(15.0, up.max_rank() - 1);
-        assert!(last >= first * 0.39, "plancher percé : {last} vs {}", first * 0.4);
+        assert!(
+            last >= first * 0.39,
+            "plancher percé : {last} vs {}",
+            first * 0.4
+        );
     }
 
     /// Le coût croît fortement (25 → 190, ×7,6) alors que le gain décroît :
@@ -1844,7 +2019,8 @@ cost = 7
         let cost_1 = up.cost_for_next(0).unwrap();
         let cost_last = up.cost_for_next(up.max_rank() - 1).unwrap();
         let gain_1 = up.total_amount(0.08, 1);
-        let gain_last = up.total_amount(0.08, up.max_rank()) - up.total_amount(0.08, up.max_rank() - 1);
+        let gain_last =
+            up.total_amount(0.08, up.max_rank()) - up.total_amount(0.08, up.max_rank() - 1);
         assert!(cost_last > cost_1 * 3, "les coûts doivent vraiment monter");
         assert!(gain_last < gain_1, "les gains doivent vraiment descendre");
     }
@@ -1884,6 +2060,37 @@ cost = 7
             c.upgrades.len(),
             MetaShopCatalogue::default().upgrades.len()
         );
+    }
+
+    #[test]
+    fn une_depense_bouge_le_solde_et_son_miroir_persiste() {
+        // Le défaut du 2026-08-06 (« achat sans effet ») : la galerie de décors
+        // décrémentait `MetaSouls.current` sans toucher `souls_total`. Or
+        // l'autosave ne pousse que les GAINS (`if meta.current <= souls_total
+        // { return }`) — la dépense n'était donc jamais persistée, le compteur
+        // affiché (qui lit le miroir) ne bougeait pas, et les Âmes revenaient au
+        // relancement. Les deux DOIVENT bouger ensemble.
+        let mut save = MetaShopSave::default();
+        let mut meta = MetaSouls::default();
+        meta.current = 1000;
+        save.souls_total = 1000;
+
+        assert!(debit_souls(&mut save, &mut meta, 300));
+        assert_eq!(meta.current, 700);
+        assert_eq!(
+            save.souls_total, 700,
+            "le miroir persisté doit suivre, sinon l'autosave ne sauvera jamais la dépense"
+        );
+
+        // Bourse insuffisante : RIEN ne bouge, ni l'un ni l'autre.
+        assert!(!debit_souls(&mut save, &mut meta, 701));
+        assert_eq!(meta.current, 700);
+        assert_eq!(save.souls_total, 700);
+
+        // Le solde exact passe (pas de `<` de trop qui interdirait le dernier achat).
+        assert!(debit_souls(&mut save, &mut meta, 700));
+        assert_eq!(meta.current, 0);
+        assert_eq!(save.souls_total, 0);
     }
 
     #[test]
@@ -2004,14 +2211,20 @@ mod face_tests {
         // Face principale : des PV, pas de réduction.
         let hp_a = save.max_hp_bonus(&cat);
         let dr_a = save.damage_reduction(&cat);
-        assert!(hp_a > 0.0 && dr_a == 0.0, "face A doit donner SEULEMENT des PV");
+        assert!(
+            hp_a > 0.0 && dr_a == 0.0,
+            "face A doit donner SEULEMENT des PV"
+        );
 
         // Face alternative : de la réduction, plus de PV.
         save.toggle_face("max_hp");
         let hp_b = save.max_hp_bonus(&cat);
         let dr_b = save.damage_reduction(&cat);
         assert!(dr_b > 0.0, "face B doit donner de la réduction");
-        assert!(hp_b < hp_a, "face B ne doit PLUS donner les PV de la face A");
+        assert!(
+            hp_b < hp_a,
+            "face B ne doit PLUS donner les PV de la face A"
+        );
     }
 
     /// Permuter conserve les rangs : on choisit ce qu'ils font, pas combien on
@@ -2088,7 +2301,11 @@ mod face_tests {
             assert!(u.has_alt(), "la ligne '{}' n'offre aucun choix", u.id);
             let (na, _, ea) = u.face(0);
             let (nb, _, eb) = u.face(1);
-            assert_ne!(na, nb, "ligne '{}' : les deux faces portent le même nom", u.id);
+            assert_ne!(
+                na, nb,
+                "ligne '{}' : les deux faces portent le même nom",
+                u.id
+            );
             assert_ne!(
                 std::mem::discriminant(&ea),
                 std::mem::discriminant(&eb),
@@ -2162,7 +2379,10 @@ mod mastery_total_tests {
             ("madame_lenoir", 99),
             ("boucherie", 99),
         ]));
-        assert!((toutes_max - attendu).abs() < 1e-5, "{toutes_max} vs {attendu}");
+        assert!(
+            (toutes_max - attendu).abs() < 1e-5,
+            "{toutes_max} vs {attendu}"
+        );
         assert!((c.mastery.damage_mul(c.mastery.max_level) - attendu).abs() < 1e-5);
     }
 
@@ -2174,6 +2394,9 @@ mod mastery_total_tests {
         assert_eq!(c.mastery.total_damage_mul(&HashMap::new()), 1.0);
         let legacy = c.mastery.total_damage_mul(&levels(&[("pepin", 13)]));
         let plafond = 1.0 + (c.mastery.max_level - 1) as f32 * c.mastery.damage_per_level;
-        assert!((legacy - plafond).abs() < 1e-5, "niveau 13 borné au plafond");
+        assert!(
+            (legacy - plafond).abs() < 1e-5,
+            "niveau 13 borné au plafond"
+        );
     }
 }
