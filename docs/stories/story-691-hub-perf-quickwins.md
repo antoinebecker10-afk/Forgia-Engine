@@ -1,9 +1,8 @@
 # story-691 — Hub menu : quick-wins perf (P1 de l'audit 2026-08-07)
 
-**Statut** : VALIDÉ EN JEU (Antoine, 2026-08-08 : « ça m'a l'air bien » + capteurs
-concordants — `current_frame` figé sur 5 s sous le diorama, 6 pages naviguées sans
-trou noir). Passage DONE au prochain commit : le story-gate G1 exige que ce fichier
-soit tracké git, et l'arbre porte du travail d'autres sessions (commits par crate).
+**Statut** : ✅ DONE 2026-08-08 — validé en jeu par Antoine (« ça m'a l'air bien » +
+capteurs concordants : `current_frame` figé sur 5 s sous le diorama, 6 pages
+naviguées sans trou noir), commité, `xtask story-gate --story 691` PASS.
 
 ## Auto-QA (2026-08-08)
 
