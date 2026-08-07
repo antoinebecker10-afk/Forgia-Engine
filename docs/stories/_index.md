@@ -251,5 +251,6 @@
 | ID | Titre | Fichier |
 | --- | --- | --- |
 | 630 | Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity) | [story-630-taa-orbit-camera.md](./story-630-taa-orbit-camera.md) |
-| 691 | Hub menu : quick-wins perf (P1 audit 2026-08-07) — VALIDÉ EN JEU | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
+| 691 | Hub menu : quick-wins perf (P1 audit 2026-08-07) — DONE | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
+| 692 | Hub menu : responsive — échelle globale, borderless, backdrop aspect réel — DONE | [story-692-hub-responsive.md](./story-692-hub-responsive.md) |
 

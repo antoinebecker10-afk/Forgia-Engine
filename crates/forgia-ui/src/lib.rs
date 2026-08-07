@@ -135,7 +135,12 @@ impl Plugin for ForgiaUiPlugin {
             // frame et sans garde is_changed (leçon « boons inertes ») : les
             // impulsions de boutons vivent aussi in-game (coffre, pause).
             // Phase 4 — pastilles de la sidebar (état réel, marquage « vu »).
-            .add_systems(Update, (sys_mirror_ui_motion, sys_hub_badges))
+            // Story-692 — l'échelle globale tourne PARTOUT (le HUD in-game vit
+            // sur la même toile 1080p que le hub) : compare-and-write, coût nul.
+            .add_systems(
+                Update,
+                (sys_mirror_ui_motion, sys_hub_badges, sys_apply_ui_scale),
+            )
             // Menu titre : curseur libre + reset à la page racine à chaque retour menu.
             .add_systems(OnEnter(AppMode::Menu), (release_cursor, reset_menu_page))
             .add_systems(OnEnter(AppMode::InGame), grab_cursor)
@@ -434,10 +439,50 @@ fn sys_mirror_ui_motion(
     forgia_ui_lib::motion::set_motion_enabled(ctx, settings.ui_motion_enabled);
 }
 
-/// Hauteur logique de la fenêtre, publiée dans la mémoire egui.
+/// Hauteur de référence du design : toute l'UI egui du jeu est dessinée comme
+/// si la fenêtre faisait 1080 points de haut (story-692). Les px absolus des
+/// layouts existants sont donc des POINTS de cette toile, plus des pixels.
+const UI_REFERENCE_HEIGHT: f32 = 1080.0;
+/// Bornes du facteur d'échelle — sous 0.65 le texte passe sous les planchers
+/// de lisibilité (XAG : 18 px @1080p), au-delà de 1.6 la nav ne tient plus.
+const UI_SCALE_MIN: f32 = 0.65;
+const UI_SCALE_MAX: f32 = 1.6;
+
+/// Le facteur d'échelle pour une hauteur de fenêtre donnée — SOURCE UNIQUE :
+/// `sys_apply_ui_scale` l'applique, `sys_publish_viewport_h` le déduit. Écrit
+/// deux fois, les plafonds de scroll et l'échelle réelle divergeraient.
+fn ui_scale_for(window_h: f32) -> f32 {
+    (window_h / UI_REFERENCE_HEIGHT).clamp(UI_SCALE_MIN, UI_SCALE_MAX)
+}
+
+/// Applique l'échelle globale au contexte egui (story-692).
+///
+/// AVANT : le hub était une maquette 1080p en px absolus — au preset 1280×720
+/// offert dans les Options, la nav (~1330 px intrinsèques) débordait de l'écran
+/// et recouvrait les deux chips ; à Windows 125 % pareil. Plutôt que de réécrire
+/// ~148 littéraux, UN multiplicateur (`EguiContextSettings.scale_factor`
+/// compose avec le scale OS) ramène toute fenêtre à la toile 1080p. Vaut aussi
+/// pour le HUD in-game : même contexte, même toile.
+fn sys_apply_ui_scale(
+    q_win: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    mut q_egui: Query<&mut bevy_egui::EguiContextSettings>,
+) {
+    let Ok(win) = q_win.single() else { return };
+    let scale = ui_scale_for(win.height());
+    for mut s in &mut q_egui {
+        if (s.scale_factor - scale).abs() > 1e-4 {
+            s.scale_factor = scale;
+        }
+    }
+}
+
+/// Hauteur utile en POINTS egui, publiée dans la mémoire egui.
 ///
 /// La hauteur vient de la SOURCE (`Window` côté Bevy) plutôt que d'une API de
-/// contexte egui, dont la valeur dépend des panels déjà posés cette frame.
+/// contexte egui, dont la valeur dépend des panels déjà posés cette frame —
+/// puis se convertit en points via `ui_scale_for` (story-692) : depuis que
+/// l'échelle globale existe, les consommateurs (`hub_section_panel`) raisonnent
+/// en points de la toile 1080, pas en pixels logiques de la fenêtre.
 ///
 /// ⚠️ Ce n'est PAS ce qui coupait les pages à mi-écran — cf. `set_max_height`
 /// dans `hub_section_panel`. Trois correctifs successifs ont visé cette mesure
@@ -449,10 +494,10 @@ fn sys_publish_viewport_h(
     mut last: Local<f32>,
 ) {
     let Ok(win) = q_win.single() else { return };
-    let h = win.height();
+    let h = win.height() / ui_scale_for(win.height());
     let Ok(ctx) = contexts.ctx_mut() else { return };
     if (h - *last).abs() > 1.0 {
-        info!("[hub] hauteur de fenêtre = {h:.0}");
+        info!("[hub] hauteur utile = {h:.0} points");
         *last = h;
     }
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("forgia_viewport_h"), h));
@@ -883,17 +928,29 @@ fn draw_hub_nav(ctx: &egui::Context, page: &mut MenuPage, badges: HubBadges) {
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                     // Onglets.
+                    let mut first = true;
                     for tab in MenuPage::NAV {
+                        // Espace ENTRE les onglets seulement : un espace traînant
+                        // après le dernier décalait la barre de 3 px hors de son
+                        // axe CENTER_TOP (rapporté « pas parfaitement centré »).
+                        if !first {
+                            ui.add_space(3.0);
+                        }
+                        first = false;
                         let selected = *page == tab;
                         let resp = ui.add_sized(
-                            egui::vec2(tab_width(tab.nav_label()), 34.0),
+                            egui::vec2(tab_width(ui, tab.nav_label()), 34.0),
                             egui::Button::selectable(
                                 selected,
                                 egui::RichText::new(tab.nav_label())
                                     .size(16.0)
                                     .color(if selected { C_PRIMARY } else { FORGE_CREME })
                                     .strong(),
-                            ),
+                            )
+                            // Jamais de retour à la ligne dans un onglet — même
+                            // règle que le titre FORGIA (un libellé wrappé dans
+                            // un bouton de 34 px de haut est illisible).
+                            .wrap_mode(egui::TextWrapMode::Extend),
                         );
                         // La sidebar est dessinée avec des `Button::selectable`
                         // bruts, donc hors des helpers de style qui sonnent —
@@ -928,26 +985,33 @@ fn draw_hub_nav(ctx: &egui::Context, page: &mut MenuPage, badges: HubBadges) {
                             }
                             *page = tab;
                         }
-                        ui.add_space(3.0);
                     }
                     });
                 });
         });
 }
 
-/// Largeur d'un onglet de la barre horizontale, dérivée de son libellé.
+/// Largeur d'un onglet de la barre horizontale, MESURÉE sur son libellé.
 ///
 /// Une largeur fixe (les 200 px de la sidebar) donnait une barre de 1 800 px
-/// pour neuf onglets — plus large que l'écran. On dimensionne donc au texte,
-/// avec un plancher pour que les libellés courts restent cliquables.
-fn tab_width(label: &str) -> f32 {
-    /// Largeur moyenne d'un caractère de la fonte d'UI à 16 px, mesurée sur les
-    /// libellés existants. Approximation assumée : egui recentre le texte, un
-    /// écart de quelques pixels ne se voit pas.
-    const CHAR_W: f32 = 9.0;
+/// pour neuf onglets — plus large que l'écran. Et l'approximation qui a suivi
+/// (`CHAR_W = 9.0` × nombre de caractères) comptait un emoji comme un « i » et
+/// cassait en silence au premier changement de fonte (audit 2026-08-07). On
+/// mesure donc le galley RÉEL, au même corps que le rendu, avec un plancher
+/// pour que les libellés courts restent cliquables.
+fn tab_width(ui: &egui::Ui, label: &str) -> f32 {
     const PADDING: f32 = 22.0;
     const MIN_W: f32 = 84.0;
-    (label.chars().count() as f32 * CHAR_W + PADDING).max(MIN_W)
+    let text_w = ui.fonts_mut(|f| {
+        f.layout_no_wrap(
+            label.to_string(),
+            egui::FontId::proportional(16.0),
+            egui::Color32::WHITE,
+        )
+        .size()
+        .x
+    });
+    (text_w + PADDING).max(MIN_W)
 }
 
 /// Panneau de section centré (verre + liseré or) — chrome commun aux sections
@@ -1038,13 +1102,22 @@ fn draw_root_landing(ctx: &egui::Context) -> MenuAction {
         )
         .show(ctx, |ui| {
             ui.set_opacity(opacity);
-            ui.vertical(|ui| {
-                ui.heading(display_text("FORGIA", 64.0, C_PRIMARY).strong());
-                ui.label(
-                    egui::RichText::new("ROGUELITE")
-                        .size(19.0)
-                        .color(FORGE_CREME)
-                        .strong(),
+            // Même axe que la carte en dessous (emprise totale), et `extend()` :
+            // un titre qui wrappe (« FORGI / A ») déborde de ROOT_TITLE_H et
+            // passe sous la carte — il ne doit JAMAIS revenir à la ligne.
+            ui.set_width(ROOT_CARD_INNER_W + 2.0 * ROOT_CARD_MARGIN_X);
+            ui.vertical_centered(|ui| {
+                ui.add(
+                    egui::Label::new(display_text("FORGIA", 64.0, C_PRIMARY).strong()).extend(),
+                );
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new("ROGUELITE")
+                            .size(19.0)
+                            .color(FORGE_CREME)
+                            .strong(),
+                    )
+                    .extend(),
                 );
             });
         });
@@ -1060,6 +1133,15 @@ const ROOT_COL_X: f32 = 56.0;
 
 /// Hauteur du bloc-titre, au-dessus de la carte de chapitre.
 const ROOT_TITLE_H: f32 = 104.0;
+
+/// Largeur intérieure de la carte de l'Accueil, et sa marge horizontale.
+///
+/// Grandeurs COUPLÉES : le titre FORGIA se centre sur l'emprise totale de la
+/// carte (`inner + 2×margin`) pour partager son axe — deux littéraux séparés
+/// avaient déjà donné un titre décalé de la carte qu'il coiffe (rapporté en
+/// jeu le 2026-08-08).
+const ROOT_CARD_INNER_W: f32 = 340.0;
+const ROOT_CARD_MARGIN_X: f32 = 28.0;
 
 /// Section Stats — synthèse de la méta-progression (records + compteurs de runs).
 fn draw_stats_section(ui: &mut egui::Ui, save: Option<&MetaShopSave>, level: u32) {
@@ -1274,9 +1356,9 @@ fn sys_menu_root_dashboard(
         .show(ctx, |ui| {
             ui.set_opacity(opacity);
             glass_frame_hero()
-                .inner_margin(egui::Margin::symmetric(28, 22))
+                .inner_margin(egui::Margin::symmetric(ROOT_CARD_MARGIN_X as i8, 22))
                 .show(ui, |ui| {
-                    ui.set_width(340.0);
+                    ui.set_width(ROOT_CARD_INNER_W);
                     ui.vertical_centered(|ui| {
                         // Pastille « un chapitre s'est ouvert » — posée sur le
                         // titre du bloc, qui est aussi la PORTE de la page Livre
@@ -1310,7 +1392,7 @@ fn sys_menu_root_dashboard(
                             let prev_ok = chapitre > 1;
                             let next_ok =
                                 chapter_unlocked(chapitre + 1, save.chapters_cleared);
-                            ui.add_space((w - 340.0).max(0.0) / 2.0);
+                            ui.add_space((w - ROOT_CARD_INNER_W).max(0.0) / 2.0);
                             let prev = ui.add_enabled(
                                 prev_ok,
                                 egui::Button::new(

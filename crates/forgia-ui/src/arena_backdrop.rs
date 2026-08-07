@@ -70,8 +70,24 @@ const ARENA_LAYER: usize = 5;
 /// Sert d'étalon : c'est ce qui relie les unités du diorama aux mètres du génome.
 const PLAYER_HEIGHT_M: f32 = 2.0;
 
-/// Format du fond = format de l'écran cible (1920×1080).
-const BACKDROP_ASPECT: f32 = 16.0 / 9.0;
+/// Format de REPLI du fond quand la fenêtre est illisible (16:9, l'écran
+/// cible). Depuis story-692 le format réel vient de la fenêtre : figé à 16:9,
+/// l'image était étirée de ~+31 % en 21:9 et le personnage — le sujet de
+/// l'écran — devenait visiblement déformé.
+const BACKDROP_FALLBACK_ASPECT: f32 = 16.0 / 9.0;
+
+/// Frames de stabilité exigées avant de reconstruire le RTT après un resize :
+/// un drag de bord de fenêtre change la taille CHAQUE frame, et recréer une
+/// image render-target par frame est le genre de rafale qui a déjà produit des
+/// races wgpu fatales côté fenêtre (cf. `apply_window_settings`).
+const RESIZE_STABLE_FRAMES: u8 = 30;
+
+/// L'aspect voulu du fond — celui de la fenêtre, source unique partagée par le
+/// spawn et la reconstruction sur resize.
+fn window_aspect(win: Option<&Window>) -> f32 {
+    win.map(|w| w.width() / w.height().max(1.0))
+        .unwrap_or(BACKDROP_FALLBACK_ASPECT)
+}
 
 /// Ordre de la caméra RTT du fond — avant les aperçus (-1 arme, -3 personnage)
 /// et avant la caméra du menu, pour que l'image soit prête au pass egui.
@@ -134,16 +150,18 @@ fn camera_distance() -> f32 {
     visible_height / (2.0 * (BACKDROP_FOV_Y * 0.5).tan())
 }
 
-/// Largeur visible à la distance de la caméra.
-fn visible_width() -> f32 {
+/// Largeur visible à la distance de la caméra, pour l'aspect DONNÉ (story-692 :
+/// l'aspect vient de la fenêtre — figé à 16:9, le personnage glissait de son
+/// tiers dès que l'écran n'était pas 16:9).
+fn visible_width(aspect: f32) -> f32 {
     let visible_height = PREVIEW_TARGET / CHARACTER_SCREEN_FRACTION;
-    visible_height * BACKDROP_ASPECT
+    visible_height * aspect
 }
 
 /// De combien décaler la visée pour que le personnage (à l'origine) tombe à
 /// [`CHARACTER_SCREEN_X`] dans l'image. Positif = on vise à gauche de lui.
-fn aim_offset_x() -> f32 {
-    (CHARACTER_SCREEN_X - 0.5) * visible_width()
+fn aim_offset_x(aspect: f32) -> f32 {
+    (CHARACTER_SCREEN_X - 0.5) * visible_width(aspect)
 }
 
 /// Niveau du sol : le calibrage AABB centre le personnage sur l'origine, donc
@@ -272,6 +290,7 @@ impl Plugin for ArenaBackdropPlugin {
                 (
                     // Rebâtir AVANT de propager/calibrer : les props qui viennent
                     // d'apparaître doivent être vus et cadrés dans la même passe.
+                    sys_resize_backdrop_on_window,
                     sys_rebuild_backdrop_on_change,
                     sys_propagate_backdrop_layers,
                     sys_calibrate_backdrop_props,
@@ -294,15 +313,17 @@ fn sys_spawn_arena_backdrop(
     mut contexts: EguiContexts,
     render_cfg: Option<Res<RogueliteRenderConfig>>,
     existing: Option<Res<ArenaBackdropRtt>>,
+    q_win: Query<&Window, With<bevy::window::PrimaryWindow>>,
 ) {
     if existing.is_some() {
         return;
     }
+    let aspect = window_aspect(q_win.single().ok());
     let height = render_cfg
         .as_deref()
         .map(|c| c.ui_backdrop_height_px)
         .unwrap_or(RogueliteRenderConfig::default().ui_backdrop_height_px);
-    let width = ((height as f32) * BACKDROP_ASPECT).round() as u32;
+    let width = ((height as f32) * aspect).round() as u32;
     let (image, tex_id) = create_rtt_image(
         &mut images,
         &mut contexts,
@@ -315,7 +336,7 @@ fn sys_spawn_arena_backdrop(
     // l'autre, sans dupliquer d'avatar.
     let layers = RenderLayers::from_layers(&[ARENA_LAYER, CHARACTER_LAYER]);
     let d = camera_distance();
-    let aim = aim_offset_x();
+    let aim = aim_offset_x(aspect);
     let eye_y = ground_y() + PREVIEW_TARGET * 0.62;
     let camera = commands
         .spawn((
@@ -328,7 +349,7 @@ fn sys_spawn_arena_backdrop(
             },
             Projection::Perspective(PerspectiveProjection {
                 fov: BACKDROP_FOV_Y,
-                aspect_ratio: BACKDROP_ASPECT,
+                aspect_ratio: aspect,
                 ..default()
             }),
             RenderTarget::Image(image.clone().into()),
@@ -359,6 +380,70 @@ fn sys_spawn_arena_backdrop(
         props_spawned: 0,
     });
     info!("[arena-backdrop] fond d'arène spawné ({width}×{height}, layer {ARENA_LAYER})");
+}
+
+/// Reconstruit l'IMAGE du fond quand l'aspect de la fenêtre change (story-692).
+///
+/// L'image RTT était créée une fois au spawn, au format 16:9 — un resize en
+/// cours de session (fenêtre resizable, bascule borderless↔fenêtré) laissait
+/// une image étirée pour toujours. Seul l'ASPECT déclenche : la hauteur du RTT
+/// est un budget GPU du génome, pas une propriété de la fenêtre. L'aspect bâti
+/// est DÉRIVÉ de l'image elle-même — un champ miroir aurait fini par mentir.
+fn sys_resize_backdrop_on_window(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    mut contexts: EguiContexts,
+    render_cfg: Option<Res<RogueliteRenderConfig>>,
+    rtt: Option<ResMut<ArenaBackdropRtt>>,
+    q_win: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    mut q_proj: Query<&mut Projection>,
+    mut stable: Local<(f32, u8)>,
+) {
+    let Some(mut rtt) = rtt else { return };
+    let Ok(win) = q_win.single() else { return };
+    let aspect_now = window_aspect(Some(win));
+    if (stable.0 - aspect_now).abs() > 1e-3 {
+        *stable = (aspect_now, 0);
+        return;
+    }
+    if stable.1 < RESIZE_STABLE_FRAMES {
+        stable.1 += 1;
+        return;
+    }
+    let built_aspect = images
+        .get(&rtt.image)
+        .map(|img| {
+            let s = img.size();
+            s.x as f32 / (s.y.max(1)) as f32
+        })
+        .unwrap_or(BACKDROP_FALLBACK_ASPECT);
+    if (built_aspect - aspect_now).abs() < 0.02 {
+        return;
+    }
+    contexts.remove_image(rtt.image.id());
+    let height = render_cfg
+        .as_deref()
+        .map(|c| c.ui_backdrop_height_px)
+        .unwrap_or(RogueliteRenderConfig::default().ui_backdrop_height_px);
+    let width = (((height as f32) * aspect_now).round() as u32).max(16);
+    let (image, tex_id) = create_rtt_image(
+        &mut images,
+        &mut contexts,
+        "arena_backdrop_rtt",
+        width,
+        height,
+    );
+    if let Ok(mut ec) = commands.get_entity(rtt.camera) {
+        ec.insert(RenderTarget::Image(image.clone().into()));
+    }
+    if let Ok(mut proj) = q_proj.get_mut(rtt.camera) {
+        if let Projection::Perspective(p) = &mut *proj {
+            p.aspect_ratio = aspect_now;
+        }
+    }
+    rtt.image = image;
+    rtt.tex_id = tex_id;
+    info!("[arena-backdrop] RTT reconstruit {width}×{height} (aspect {aspect_now:.2})");
 }
 
 /// Rebâtit le diorama quand le joueur change de décor — ou quand un génome
@@ -783,6 +868,7 @@ fn sys_calibrate_backdrop_props(
 fn sys_drift_backdrop_camera(
     time: Res<Time<bevy::time::Real>>,
     rtt: Option<Res<ArenaBackdropRtt>>,
+    q_win: Query<&Window, With<bevy::window::PrimaryWindow>>,
     mut q_tf: Query<&mut Transform>,
 ) {
     let Some(rtt) = rtt else {
@@ -791,11 +877,12 @@ fn sys_drift_backdrop_camera(
     let Ok(mut tf) = q_tf.get_mut(rtt.camera) else {
         return;
     };
+    let aspect = window_aspect(q_win.single().ok());
     let t = time.elapsed_secs();
-    let amp = visible_width() * DRIFT_AMPLITUDE;
+    let amp = visible_width(aspect) * DRIFT_AMPLITUDE;
     let dx = (t * std::f32::consts::TAU / DRIFT_PERIOD_X).sin() * amp;
     let dy = (t * std::f32::consts::TAU / DRIFT_PERIOD_Y).sin() * amp * 0.5;
-    let base_x = -aim_offset_x();
+    let base_x = -aim_offset_x(aspect);
     let eye_y = ground_y() + PREVIEW_TARGET * 0.62;
     tf.translation = Vec3::new(base_x + dx, eye_y + dy, camera_distance());
     // La visée suit le même décalage : le personnage garde son tiers pendant
@@ -920,22 +1007,28 @@ mod tests {
 
     #[test]
     fn le_personnage_tombe_dans_le_tiers_droit() {
-        // La visée est décalée à GAUCHE, donc le sujet à l'origine part à droite.
-        assert!(aim_offset_x() > 0.0);
-        // Et il reste DANS le cadre : son décalage est sous la demi-largeur.
-        assert!(aim_offset_x() < visible_width() * 0.5);
+        // Vrai pour TOUTE fenêtre supportée (story-692 : l'aspect vient de la
+        // fenêtre) — du 4:3 à l'ultrawide 21:9.
+        for aspect in [4.0 / 3.0, 16.0 / 10.0, BACKDROP_FALLBACK_ASPECT, 21.0 / 9.0] {
+            // La visée est décalée à GAUCHE, donc le sujet à l'origine part à droite.
+            assert!(aim_offset_x(aspect) > 0.0);
+            // Et il reste DANS le cadre : son décalage est sous la demi-largeur.
+            assert!(aim_offset_x(aspect) < visible_width(aspect) * 0.5);
+        }
     }
 
     #[test]
     fn la_derive_ne_sort_jamais_le_personnage_de_son_tiers() {
         // Pire cas des deux sinus : l'amplitude cumulée doit rester petite
-        // devant la marge qui sépare le personnage du bord.
-        let marge = visible_width() * 0.5 - aim_offset_x();
-        let derive = visible_width() * DRIFT_AMPLITUDE;
-        assert!(
-            derive < marge,
-            "la dérive ({derive}) déborderait la marge ({marge})"
-        );
+        // devant la marge qui sépare le personnage du bord — à tout aspect.
+        for aspect in [4.0 / 3.0, BACKDROP_FALLBACK_ASPECT, 21.0 / 9.0] {
+            let marge = visible_width(aspect) * 0.5 - aim_offset_x(aspect);
+            let derive = visible_width(aspect) * DRIFT_AMPLITUDE;
+            assert!(
+                derive < marge,
+                "la dérive ({derive}) déborderait la marge ({marge}) à l'aspect {aspect}"
+            );
+        }
     }
 
     #[test]
