@@ -252,6 +252,26 @@ pub const HAIR_GOLD_STRONG: Color32 = Color32::from_rgba_premultiplied(130, 105,
 /// Braise — chaleur / accents chauds secondaires.
 pub const FORGE_EMBER: Color32 = Color32::from_rgb(232, 83, 28);
 
+/// **Éclats** — la monnaie COSMÉTIQUE (story-678).
+///
+/// Sa propre couleur, et pas [`C_PRIMARY`] : celui-ci est un **alias de
+/// [`FORGE_OR`]**, donc les deux monnaies s'affichaient dans un or identique et
+/// rien ne les distinguait. Ni [`ELEM_PERFO`], le seul autre violet : c'est la
+/// couleur de l'élément Perforant, et lui faire porter aussi une monnaie
+/// brouillerait les deux sens.
+///
+/// Accordée à l'icône de gemme (`assets/ui/icons/currency_shards.png`).
+pub const FORGE_ECLAT: Color32 = Color32::from_rgb(200, 122, 246);
+
+/// **Âmes** — la monnaie de PUISSANCE (contrepartie de [`FORGE_ECLAT`]).
+///
+/// Plus [`FORGE_OR`] : l'or est la couleur des pièces ramassées en run, et
+/// l'icône des Âmes était elle-même une pièce d'or du même pack — deux
+/// monnaies dans le même métal, un joueur qui croit dépenser l'une en
+/// dépensant l'autre (rapporté en jeu le 2026-08-07). Bleu saphir, accordé à
+/// l'icône taillée en diamant (`assets/ui/icons/currency_souls.png`).
+pub const FORGE_AME: Color32 = Color32::from_rgb(105, 163, 248);
+
 /// Élément Feu (orange braise).
 pub const ELEM_FEU: Color32 = Color32::from_rgb(255, 122, 60);
 /// Élément Électrique (cyan).
@@ -348,32 +368,62 @@ pub fn ease_out_back(t: f32) -> f32 {
     1.0 + C3 * x * x * x + C1 * x * x
 }
 
+/// Plancher d'une taille de police ANIMÉE, en pixels.
+///
+/// 🚨 `FontId::proportional(0.0)` fait paniquer epaint — « Bad px_scale_factor:
+/// 0 », `font.rs:152` — et le panic remonte jusqu'à `Main::run_main` : le jeu
+/// entier meurt. Or [`ease_out_back`] vaut **exactement 0 en t=0**, ce que son
+/// propre test asserte : toute taille de la forme `base * ease_out_back(t)`
+/// traverse donc zéro à la frame de naissance du widget.
+///
+/// Le crash est intermittent — il faut que la frame de spawn soit aussi une
+/// frame de dessin — donc il sort en playtest et jamais en test unitaire.
+///
+/// Cette protection existait déjà, écrite à la main dans la bannière d'enrage du
+/// boss ; le pop de kill l'avait manquée et a planté le jeu en jeu réel
+/// (2026-08-06). Une grandeur protégée à un seul endroit n'est pas protégée :
+/// tout appelant qui anime une taille de police passe désormais par ici.
+pub fn anim_font_px(px: f32) -> f32 {
+    /// Une police d'1 px est invisible mais légale — on préserve l'animation
+    /// (le pop part bien de « rien ») sans jamais atteindre le zéro interdit.
+    const MIN_FONT_PX: f32 = 1.0;
+    if px.is_finite() {
+        px.max(MIN_FONT_PX)
+    } else {
+        MIN_FONT_PX
+    }
+}
+
 /// Bouton cartoon Forge : display font, texte charbon, stroke charbon 4px,
 /// coins 14, 280×52. Extrait du Defeat overlay (story-558 Phase 7) pour
 /// réutilisation Victory / menu principal / Enclume.
 pub fn cartoon_btn(ui: &mut egui::Ui, label: &str, fill: Color32) -> egui::Response {
-    ui.add(
-        egui::Button::new(
-            crate::theme::display_text(label, 22.0, FORGE_CHARBON).strong(),
-        )
-        .fill(fill)
-        .stroke(Stroke::new(4.0, FORGE_CHARBON))
-        .corner_radius(egui::CornerRadius::same(14))
-        .min_size(egui::vec2(280.0, 52.0)),
-    )
+    let response = ui.add(
+        egui::Button::new(crate::theme::display_text(label, 22.0, FORGE_CHARBON).strong())
+            .fill(fill)
+            .stroke(Stroke::new(4.0, FORGE_CHARBON))
+            .corner_radius(egui::CornerRadius::same(14))
+            .min_size(egui::vec2(280.0, 52.0)),
+    );
+    crate::ui_sfx::instrument_button(&response);
+    crate::motion::click_pulse(&response, FORGE_OR);
+    response
 }
 
 /// Bouton « verre sombre » (secondaire) : fond aubergine + liseré or + texte
 /// crème. Pendant sombre de [`cartoon_btn`] — celui-ci reste pour les CTA or.
 /// DA « Verre & Braise » : remplace les boutons bois clair des menus/overlays.
 pub fn glass_btn(ui: &mut egui::Ui, label: &str) -> egui::Response {
-    ui.add(
+    let response = ui.add(
         egui::Button::new(crate::theme::display_text(label, 22.0, FORGE_CREME))
             .fill(FORGE_PANEL)
             .stroke(Stroke::new(1.5, HAIR_GOLD_STRONG))
             .corner_radius(egui::CornerRadius::same(14))
             .min_size(egui::vec2(280.0, 52.0)),
-    )
+    );
+    crate::ui_sfx::instrument_button(&response);
+    crate::motion::click_pulse(&response, HAIR_GOLD_STRONG);
+    response
 }
 
 /// Frame modal cartoon « bois + or » (pattern Defeat/Coffre, bible v1).
@@ -422,4 +472,42 @@ pub fn glass_panel(painter: &egui::Painter, rect: Rect, corner: f32) {
         Stroke::new(1.5, HAIR_GOLD_STRONG),
         egui::StrokeKind::Inside,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// L'invariant qui a coûté un crash en jeu : une taille de police animée ne
+    /// doit JAMAIS atteindre zéro, sur aucune valeur de la course.
+    ///
+    /// On le teste sur la composition réelle (`base * ease_out_back(t)`) et pas
+    /// seulement sur le plancher : c'est la COMPOSITION qui plantait, et
+    /// `ease_out_back(0) == 0` était déjà asserté ailleurs sans que le lien soit
+    /// fait avec epaint.
+    #[test]
+    fn an_animated_font_size_never_reaches_the_forbidden_zero() {
+        // Le cas exact du crash : frame de naissance du pop de kill.
+        assert!(
+            anim_font_px(30.0 * ease_out_back(0.0)) > 0.0,
+            "la frame de naissance demandait une police de taille nulle"
+        );
+        // Toute la course des deux animations réelles (pop de kill, enrage).
+        for i in 0..=100 {
+            let t = i as f32 / 100.0;
+            for base in [30.0_f32, 36.0] {
+                let px = anim_font_px(base * ease_out_back(t));
+                assert!(px > 0.0, "base={base} t={t} → {px}");
+            }
+        }
+    }
+
+    /// Les entrées dégénérées ne doivent pas non plus produire un zéro : un NaN
+    /// se propage silencieusement depuis un delta-temps nul ou une division.
+    #[test]
+    fn a_degenerate_font_size_falls_back_to_something_drawable() {
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -12.0, 0.0] {
+            assert!(anim_font_px(bad) > 0.0, "entrée {bad} a produit un zéro");
+        }
+    }
 }
