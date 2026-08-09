@@ -57,6 +57,43 @@ pub fn equipped_key(save: &EquipmentSave) -> String {
     parts.join(",")
 }
 
+/// Handles PERMANENTS vers le glTF du corps (fichier entier + `Scene(0)`).
+///
+/// 🚨 Le remède de « l'armure ne tourne plus » (cause prouvée par sonde le
+/// 2026-08-06, `reference_skinned_mesh_follows_bones_not_hierarchy`) : le corps
+/// est le seul à porter DEUX handles vers le même fichier. Au respawn de
+/// l'avatar (changement de pièce), l'ancien `AvatarClips` — dernier handle
+/// fort vers le `Gltf` — tombait, l'asset était déchargé, et le rechargement
+/// qui suivait ré-insérait la scène : Bevy RÉ-INSTANCIAIT le corps sous la
+/// même entité, ses 68 os étaient remplacés APRÈS que les pièces (des meshes
+/// skinnés, qui suivent leurs OS et pas leur parent) se soient liées — elles
+/// restaient figées sur les os morts pendant que le corps tournait.
+///
+/// Garder les handles vivants ici rend chaque `load()` idempotent : plus de
+/// déchargement, plus de rechargement, plus de ré-instanciation — les os
+/// survivent au respawn.
+#[derive(Resource, Default)]
+pub struct AvatarBodyHandles {
+    /// (chemin, glTF entier, Scene(0)) — invalidé si le chemin du génome change.
+    cached: Option<(String, Handle<Gltf>, Handle<Scene>)>,
+}
+
+impl AvatarBodyHandles {
+    /// Les handles du corps pour `path`, chargés UNE fois puis réutilisés.
+    fn body(&mut self, assets: &AssetServer, path: &str) -> (Handle<Gltf>, Handle<Scene>) {
+        match &self.cached {
+            Some((p, g, s)) if p == path => (g.clone(), s.clone()),
+            _ => {
+                let gltf: Handle<Gltf> = assets.load(path.to_string());
+                let scene: Handle<Scene> =
+                    assets.load(GltfAssetLabel::Scene(0).from_asset(path.to_string()));
+                self.cached = Some((path.to_string(), gltf.clone(), scene.clone()));
+                (gltf, scene)
+            }
+        }
+    }
+}
+
 /// Attache le corps et les pièces portées à `parent`, et rend les entités
 /// créées pour que l'appelant y ajoute ce qui le regarde (layer de rendu,
 /// marqueurs de cycle de vie…).
@@ -67,6 +104,7 @@ pub fn equipped_key(save: &EquipmentSave) -> String {
 pub fn spawn_equipped_avatar(
     commands: &mut Commands,
     assets: &AssetServer,
+    handles: &mut AvatarBodyHandles,
     cfg: &EquipmentConfig,
     save: &EquipmentSave,
     parent: Entity,
@@ -74,16 +112,16 @@ pub fn spawn_equipped_avatar(
 ) -> Vec<Entity> {
     let mut spawned = Vec::new();
     if !cfg.body_model.is_empty() {
+        // Handles issus du cache permanent — cf. [`AvatarBodyHandles`].
+        let (gltf, scene) = handles.body(assets, &cfg.body_model);
         spawned.push(
             commands
                 .spawn((
                     AvatarPart,
-                    SceneRoot(
-                        assets.load(GltfAssetLabel::Scene(0).from_asset(cfg.body_model.clone())),
-                    ),
+                    SceneRoot(scene),
                     AvatarBody,
                     // Le glTF complet, pour lire ses clips PAR NOM une fois chargé.
-                    AvatarClips::new(assets.load(cfg.body_model.clone())),
+                    AvatarClips::new(gltf),
                     local,
                     Visibility::Inherited,
                     Name::new("avatar_body"),
@@ -622,7 +660,9 @@ pub struct AvatarPlugin;
 
 impl Plugin for AvatarPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AvatarLocomotion>().add_systems(
+        app.init_resource::<AvatarLocomotion>()
+            .init_resource::<AvatarBodyHandles>()
+            .add_systems(
             Update,
             (
                 sys_tint_avatar_pieces,
