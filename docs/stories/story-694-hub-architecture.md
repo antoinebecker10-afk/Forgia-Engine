@@ -26,11 +26,19 @@ UX n°5 (retours incohérents). Pratiques cibles : `reference_ui_menu_industry_p
    hors commentaires · check 3 crates + clippy 0 + tests 493/494 (toon_config préexistant).
    Exécuté par l'implementer (1 oubli attrapé : champ `weapon` retiré mais site de spawn
    non mis à jour — corrigé) puis vérifié mécaniquement.
-2. **Découpe mécanique de lib.rs** (~1-2 j, Low) — modules `menu/{nav,chrome,cursor,
-   lobby_gate,shell}` + `menu/pages/{root,forgeron,marketplace,armes,livre}` dans la
-   MÊME crate, zéro changement de comportement, re-exports pour les consommateurs
-   (menu_hub_sensor, weapon_preview). Purge du code mort au passage (paused_overlay_ui,
-   bloc ESC dupliqué — constats mineurs n°8/9).
+2. ✅ **Découpe mécanique de lib.rs** — FAIT 2026-08-09 (attente validation en jeu).
+   **lib.rs 2 869 → 249 lignes** (en-tête + wiring ForgiaUiPlugin + prelude + tests).
+   Modules livrés : `menu/{nav 302, chrome 208, cursor 164, lobby_gate 60, shell 484}`
+   + `menu/pages/{root 500, forgeron 542, marketplace 305, armes 64, enclume 62,
+   livre 53}` — `enclume` s'ajoute aux 5 prévus (sys_menu_enclume n'avait pas d'autre
+   foyer). Zéro changement de comportement : items déplacés verbatim, visibilités
+   privé → pub(crate) au besoin, re-export `pub(crate) use menu::nav::MenuPage`
+   pour menu_hub_sensor/weapon_preview (seule référence racine des modules internes).
+   Purges voulues : paused_overlay_ui (mort, #[allow(dead_code)], jamais schedulé —
+   constat n°8) + bloc « Q en Paused » dupliqué inatteignable d'escape_handler
+   (constat n°9). Preuves : check 4 crates (ui, game, viewmodel, rpg) · clippy
+   --all-targets 0 warning · tests 15/15 · plus aucun #[allow(dead_code)] dans la
+   crate · aucun module > 1 200 l. (AC2 tenu dès cet incrément pour lib.rs < 400).
 3. **NavStack** (~½ j, Medium) — `Vec<MenuPage>` : le retour devient DÉRIVÉ (pop),
    ESC/B remontent d'un niveau partout, le Retour du Marketplace cesse de téléporter.
 4. **Registre de pages** (~1 j, Medium) — `PageDecl { id, label, titre, in_nav, badge,
