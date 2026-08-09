@@ -138,17 +138,21 @@ pub fn sys_gamepad_menu_nav(
         // LB / RB — onglet précédent / suivant, avec le son Tab (front réel :
         // just_pressed, pas de répétition). Un onglet est un FRÈRE : switch_tab
         // (pile `[Root, tab]`), pas push — sinon cycler aux bumpers empilerait
-        // tout l'historique d'onglets sous ESC.
-        let tabs = MenuPage::NAV;
-        let idx = tabs.iter().position(|t| *t == nav.current()).unwrap_or(0);
-        let mut moved = None;
-        if pad.just_pressed(GamepadButton::LeftTrigger) {
-            moved = Some(tabs[(idx + tabs.len() - 1) % tabs.len()]);
-        }
-        if pad.just_pressed(GamepadButton::RightTrigger) {
-            moved = Some(tabs[(idx + 1) % tabs.len()]);
-        }
-        if let Some(next) = moved {
+        // tout l'historique d'onglets sous ESC. L'ordre du cycle = l'ordre de
+        // LA table du registre (story-694 incr. 4) ; le Vec ne s'alloue qu'au
+        // front montant d'un bumper, jamais par frame.
+        let lb = pad.just_pressed(GamepadButton::LeftTrigger);
+        let rb = pad.just_pressed(GamepadButton::RightTrigger);
+        if lb || rb {
+            let tabs: Vec<MenuPage> = crate::menu::registry::nav_tabs().map(|d| d.id).collect();
+            let idx = tabs.iter().position(|t| *t == nav.current()).unwrap_or(0);
+            // RB prime si les deux tombent la même frame (préséance de
+            // l'ancien code, conservée à l'identique).
+            let next = if rb {
+                tabs[(idx + 1) % tabs.len()]
+            } else {
+                tabs[(idx + tabs.len() - 1) % tabs.len()]
+            };
             if next != nav.current() {
                 if let Ok(ctx) = contexts.ctx_mut() {
                     forgia_ui_lib::ui_sfx::push_ui_sfx(ctx, forgia_ui_lib::ui_sfx::UiSfxKind::Tab);

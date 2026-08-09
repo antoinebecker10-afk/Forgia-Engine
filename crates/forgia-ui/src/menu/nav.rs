@@ -33,9 +33,10 @@ pub(crate) enum MenuPage {
     // temporaire, et rien n'est supprimé côté moteur : `GameMode::ArenaTest`, le
     // plugin, le génome, le générateur et les 26 tests restent en place.
     // Accès entre-temps : `FORGIA_BOOT_MODE=arena_test`.
-    // Pour rouvrir l'onglet : restaurer la variante ici, son `nav_label`, son
-    // `section_title`, son bras de `draw_page` et `draw_arena_test_section`
-    // (voir l'historique git de ce fichier).
+    // Pour rouvrir l'onglet (depuis le registre, story-694 incr. 4) : restaurer
+    // la variante ici + la garde `_EXHAUSTIVITE` + `TOUTES` ci-dessous, une
+    // `PageDecl` dans `menu/registry.rs::PAGES`, et `draw_arena_test_section`
+    // (historique git de l'ex-lib.rs).
     /// Le Livre — les dix chapitres, leurs verrous, celui qu'on va jouer.
     ///
     /// Sa place est ICI et pas au Lobby : le Lobby est un gate de chargement
@@ -53,71 +54,59 @@ pub(crate) enum MenuPage {
     Options,
 }
 
+// GARDE D'EXHAUSTIVITÉ (compile-time) — ce match est volontairement SANS
+// wildcard : ajouter une variante à `MenuPage` casse la compilation ICI, à
+// deux lignes de `TOUTES` qu'il faut compléter ; le test du registre
+// (`chaque_variante_a_exactement_une_declaration`) exige ensuite sa `PageDecl`.
+// Chaîne : compilateur → TOUTES → test → registre. Elle remplace l'exhaustivité
+// que les ex-match `nav_label`/`section_title` offraient avant l'incrément 4.
+const _EXHAUSTIVITE: () = match MenuPage::Root {
+    MenuPage::Root
+    | MenuPage::Forgeron
+    | MenuPage::Armes
+    | MenuPage::Talents
+    | MenuPage::Enclume
+    | MenuPage::Codex
+    | MenuPage::Missions
+    | MenuPage::Succes
+    | MenuPage::Stats
+    | MenuPage::Livre
+    | MenuPage::Marketplace
+    | MenuPage::Sac
+    | MenuPage::Options => (),
+};
+
 impl MenuPage {
-    /// Ordre de la sidebar de navigation (Accueil en tête, Options en pied).
-    // Livre + Forgeron RETIRÉS de la sidebar (2026-08-05, story-678) : leur
-    // contenu vit sur l'ACCUEIL (écran de préparation, modèle Dicero!). Les
-    // pages existent toujours — Forgeron via « Personnaliser », Livre absorbé
-    // par le carrousel de chapitres.
-    pub(crate) const NAV: [MenuPage; 11] = [
+    // L'ex-`NAV: [MenuPage; 11]` et les deux match de libellés vivent
+    // désormais dans LA table de `menu/registry.rs` (story-694 incr. 4) —
+    // l'ordre des onglets est l'ordre du tableau, filtré `in_nav`. Le libellé
+    // d'onglet se lit directement sur `PageDecl.nav_label` (son seul
+    // consommateur, `draw_hub_nav`, itère la table).
+
+    /// Les 13 variantes — maintenue à deux lignes de la garde `_EXHAUSTIVITE`
+    /// qui force sa mise à jour. Consommée par le test de complétude du
+    /// registre (d'où le cfg(test)) : chaque variante doit avoir exactement
+    /// une `PageDecl`.
+    #[cfg(test)]
+    pub(crate) const TOUTES: [MenuPage; 13] = [
         MenuPage::Root,
+        MenuPage::Forgeron,
         MenuPage::Armes,
-        // Story-678 — le Sac et le Marketplace montent dans la barre : ce sont
-        // les deux écrans où l'on PREND quelque chose, ils ne doivent pas être
-        // enfouis derrière la page Forgeron.
-        MenuPage::Sac,
-        MenuPage::Marketplace,
         MenuPage::Talents,
         MenuPage::Enclume,
         MenuPage::Codex,
         MenuPage::Missions,
         MenuPage::Succes,
         MenuPage::Stats,
-        // `MenuPage::ArenaTest` RETIRÉ DE LA NAVIGATION (2026-07-30, temporaire).
-        // Le banc de blockout reste entièrement en place — page, section, mode,
-        // génome, générateur, tests. Seule son entrée de menu est masquée, le
-        // temps que le sujet redevienne d'actualité.
-        // Pour le rouvrir : remettre `MenuPage::ArenaTest,` sur cette ligne.
-        // Accès entre-temps : `FORGIA_BOOT_MODE=arena_test`.
+        MenuPage::Livre,
+        MenuPage::Marketplace,
+        MenuPage::Sac,
         MenuPage::Options,
     ];
 
-    /// Libellé de l'onglet dans la sidebar (icône + nom court).
-    pub(crate) fn nav_label(self) -> &'static str {
-        match self {
-            MenuPage::Root => "🏠  Accueil",
-            MenuPage::Livre => "📕  Le Livre",
-            MenuPage::Forgeron => "⚒  Forgeron",
-            MenuPage::Armes => "🗡  Armes",
-            MenuPage::Talents => "✨  Talents",
-            MenuPage::Enclume => "🔨  Enclume",
-            MenuPage::Codex => "📖  Codex",
-            MenuPage::Missions => "🎯  Missions",
-            MenuPage::Succes => "🏆  Succès",
-            MenuPage::Stats => "📊  Stats",
-            MenuPage::Marketplace => "💰  Marketplace",
-            MenuPage::Sac => "🎒  Sac",
-            MenuPage::Options => "⚙  Options",
-        }
-    }
-
-    /// Titre display (Lilita) affiché en tête du panneau de section.
+    /// Titre display (Lilita) du panneau de section — délégué au registre.
     pub(crate) fn section_title(self) -> &'static str {
-        match self {
-            MenuPage::Root => "FORGIA",
-            MenuPage::Livre => "LE LIVRE",
-            MenuPage::Forgeron => "TON FORGERON",
-            MenuPage::Armes => "TES ARMES",
-            MenuPage::Talents => "TALENTS",
-            MenuPage::Enclume => "L'ENCLUME DES ÂMES",
-            MenuPage::Codex => "CODEX · BESTIAIRE",
-            MenuPage::Missions => "MISSIONS",
-            MenuPage::Succes => "HAUTS FAITS",
-            MenuPage::Stats => "STATISTIQUES",
-            MenuPage::Marketplace => "MARKETPLACE",
-            MenuPage::Sac => "TON SAC",
-            MenuPage::Options => "OPTIONS",
-        }
+        crate::menu::registry::decl(self).section_title
     }
 }
 
@@ -292,9 +281,11 @@ pub(crate) fn draw_hub_nav(ctx: &egui::Context, nav: &mut NavStack, badges: HubB
                 .stroke(egui::Stroke::new(1.0, HAIR_GOLD_STRONG))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                    // Onglets.
+                    // Onglets — LA table du registre, filtrée in_nav, dans
+                    // l'ordre de déclaration (story-694 incr. 4).
                     let mut first = true;
-                    for tab in MenuPage::NAV {
+                    for decl in crate::menu::registry::nav_tabs() {
+                        let tab = decl.id;
                         // Espace ENTRE les onglets seulement : un espace traînant
                         // après le dernier décalait la barre de 3 px hors de son
                         // axe CENTER_TOP (rapporté « pas parfaitement centré »).
@@ -304,10 +295,10 @@ pub(crate) fn draw_hub_nav(ctx: &egui::Context, nav: &mut NavStack, badges: HubB
                         first = false;
                         let selected = nav.current() == tab;
                         let resp = ui.add_sized(
-                            egui::vec2(tab_width(ui, tab.nav_label()), 34.0),
+                            egui::vec2(tab_width(ui, decl.nav_label), 34.0),
                             egui::Button::selectable(
                                 selected,
-                                egui::RichText::new(tab.nav_label())
+                                egui::RichText::new(decl.nav_label)
                                     .size(16.0)
                                     .color(if selected { C_PRIMARY } else { FORGE_CREME })
                                     .strong(),
@@ -324,16 +315,11 @@ pub(crate) fn draw_hub_nav(ctx: &egui::Context, nav: &mut NavStack, badges: HubB
                         // `Tab` plus bas.
                         forgia_ui_lib::ui_sfx::instrument_hover(&resp);
                         // Story-678 Phase 4 — pastille dorée : quelque chose
-                        // t'attend derrière cet onglet (état réel, jamais décoratif).
-                        //
-                        // Seule l'Enclume est encore concernée ICI : Livre et
-                        // Forgeron ont quitté la sidebar avec la refonte Dicero,
-                        // et leurs pastilles vivent désormais sur les blocs de
-                        // l'Accueil qui ont repris leur contenu (carrousel du
-                        // Livre, bouton « Personnaliser »). Les tester ici était
-                        // du code mort — donc deux signaux calculés que rien
-                        // n'affichait.
-                        let dot = matches!(tab, MenuPage::Enclume) && badges.enclume;
+                        // t'attend derrière cet onglet (état réel, jamais
+                        // décoratif). QUELLE pastille éclaire QUEL onglet est
+                        // déclaré dans la table (`PageDecl.badge`) — plus de
+                        // matches! codé en dur ici.
+                        let dot = decl.badge.is_some_and(|f| f(&badges));
                         if dot {
                             ui.painter().circle_filled(
                                 egui::pos2(resp.rect.right() - 10.0, resp.rect.center().y),

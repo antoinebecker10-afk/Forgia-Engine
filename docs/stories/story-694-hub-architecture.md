@@ -49,8 +49,24 @@ UX n°5 (retours incohérents). Pratiques cibles : `reference_ui_menu_industry_p
    ESC + B manette au menu = `back()` dans l'UNIQUE escape_handler (anti-trap V1
    tenu), garde `wants_keyboard_input` pour l'édition du nom. Capteur menu_hub :
    + `nav_depth`/`nav_path`. Preuves : 7 tests NavStack (22/22 crate), clippy 0.
-4. **Registre de pages** (~1 j, Medium) — `PageDecl { id, label, titre, in_nav, badge,
-   draw }` : nav, badges et hints itèrent LA table ; ajouter une page = 1 déclaration.
+4. ✅ **Registre de pages** — FAIT 2026-08-10 (attente auto-QA + validation en jeu).
+   `menu/registry.rs` : table `PAGES: &[PageDecl { id, nav_label, section_title,
+   in_nav, badge: fn(&HubBadges), draw: Inline|OwnSystem|Shell }]`. La barre, le
+   cycle LB/RB, les titres ET le dispatch itèrent LA table ; l'ex-`MenuPage::NAV`
+   + les 2 match de libellés sont morts ; les 5 pages inline (Codex/Talents/
+   Missions/Succès/Stats) sont des fns du registre (textes/largeurs/panel_id
+   repris à l'octet). **Preuve AC4** : page `PreuveAc4` ajoutée avec 1 variante +
+   1 fn → compile ET apparaît dans la barre sans toucher barre/dispatch/badges/
+   gamepad (puis retirée). Nuance honnête : la `PageDecl` manquante ne casse PAS
+   la compile — c'est le test `chaque_variante_a_exactement_une_declaration` qui
+   force l'enregistrement conscient (garde par test, pas par compilateur).
+   Auto-QA : verifier 7/7 PASS (fidélité à l'octet libellés/titres/textes/ordre) ;
+   qa-lead 1 Majeur corrigé — la perte d'exhaustivité compilateur est comblée par
+   la garde const `_EXHAUSTIVITE` (match SANS wildcard à côté de l'enum) +
+   `MenuPage::TOUTES` consommée par le test (plus de liste miroir manuelle) ;
+   2 Mineurs (commentaire ArenaTest périmé, double lookup decl()) + 2 Cosmétiques
+   (en-tête dupliqué, doc PageDraw::Shell) corrigés aussi.
+   Preuves : 4 tests de cohérence du registre (28/28 crate), clippy 0.
 5. **Crate forgia-menu-hub** (~2-4 j, High) — dépend de forgia-ui ET forgia-mode-roguelite ;
    forgia-ui redevient un shell neutre (MenuCamera2d, curseur/ESC, vidéo, point
    d'injection). Un 2ᵉ mode peut enfin avoir un menu.

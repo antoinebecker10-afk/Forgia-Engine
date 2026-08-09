@@ -9,4 +9,5 @@ pub(crate) mod cursor;
 pub(crate) mod lobby_gate;
 pub(crate) mod nav;
 pub(crate) mod pages;
+pub(crate) mod registry;
 pub(crate) mod shell;

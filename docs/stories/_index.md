@@ -253,5 +253,5 @@
 | 630 | Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity) | [story-630-taa-orbit-camera.md](./story-630-taa-orbit-camera.md) |
 | 691 | Hub menu : quick-wins perf (P1 audit 2026-08-07) — DONE | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
 | 692 | Hub menu : responsive — échelle globale, borderless, backdrop aspect réel — DONE | [story-692-hub-responsive.md](./story-692-hub-responsive.md) |
-| 694 | Hub menu : architecture (P3) — incr. 3/5 FAIT (NavStack : Retour=pop, ESC/B remontent) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
+| 694 | Hub menu : architecture (P3) — incr. 4/5 FAIT (registre PageDecl : 1 page = 1 déclaration) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
 

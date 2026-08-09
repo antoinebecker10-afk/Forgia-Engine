@@ -7,15 +7,10 @@ use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts};
 use forgia_core::prelude::*;
-use forgia_mode_roguelite::hub::{draw_codex_section, section_intro};
 use forgia_mode_roguelite::identity::IdentitySave;
 use forgia_mode_roguelite::meta_shop::MetaShopSave;
 use forgia_mode_roguelite::progress::PlayerProgress;
 use forgia_ui_lib::pause_menu::UserSettings;
-use forgia_ui_lib::style::{
-    FORGE_CREME, FORGE_OR,
-};
-use forgia_ui_lib::theme::display_text;
 
 use crate::arena_backdrop::ArenaBackdropRtt;
 use crate::currency_icons::CurrencyIcons;
@@ -24,7 +19,8 @@ use crate::menu::chrome::{
 };
 use crate::menu::cursor::FPS_GRAB_MODE;
 use crate::menu::nav::{draw_hub_nav, HubBadges, MenuAction, MenuPage, NavStack};
-use crate::menu::pages::root::{draw_options_page, draw_root_landing, draw_stats_section};
+use crate::menu::registry::{self, InlinePageCtx, PageDraw};
+use crate::menu::pages::root::{draw_options_page, draw_root_landing};
 use crate::menu_video::{self, MenuVideoState};
 
 #[derive(Component)]
@@ -289,115 +285,35 @@ pub(crate) fn main_menu_ui(
     draw_hub_nav(ctx, &mut nav, *badges);
     draw_hub_souls_chip(ctx, souls_n, shards_n, icons.as_deref());
 
-    // ── Panneau de la section active ──
-    // Les sections rendent leur contenu et renvoient une action de navigation
-    // d'état (lancer une run / quitter) que l'on applique ici — évite de passer
-    // NextState/MessageWriter dans chaque helper.
+    // ── Panneau de la section active — piloté par LA table (story-694 incr. 4).
+    // Root et Options restent câblés ici (Root rend une MenuAction appliquée
+    // plus bas — évite de passer NextState/MessageWriter dans chaque helper ;
+    // Options mute la pile) ; les pages INLINE tirent leur dessinateur du
+    // registre ; les pages OwnSystem sont dessinées par leur système auto-gaté
+    // — rien à faire dans ce match. Ajouter une page inline = 1 PageDecl + 1 fn.
     let action = match nav.current() {
         MenuPage::Root => draw_root_landing(ctx),
-        MenuPage::Codex => {
-            hub_section_panel(
-                ctx,
-                "hub_sec_codex",
-                MenuPage::Codex.section_title(),
-                720.0,
-                |ui| {
-                    draw_codex_section(ui);
-                },
-            );
-            MenuAction::None
-        }
-        MenuPage::Talents => {
-            // Story-680 cran 1 — cet écran ANNONÇAIT « Choisis ton style — Feu ·
-            // Givre · Éclair · Poison » et « N point(s) de talent en attente »
-            // alors qu'il n'existait ni arbre, ni style, ni combo, et que RIEN
-            // dans le workspace ne dépensait ces points. Un système vide est
-            // neutre ; un système qui promet ce qu'il ne fait pas est une
-            // déception programmée. On dit donc ce qui est vrai.
-            hub_section_panel(
-                ctx,
-                "hub_sec_talents",
-                MenuPage::Talents.section_title(),
-                640.0,
-                |ui| {
-                    section_intro(
-                        ui,
-                        "Ton niveau",
-                        "Ton niveau est la somme de ce que tu as débloqué à l'Enclume.                          Rien à farmer : chaque niveau est un choix que tu as fait.",
-                    );
-                    ui.add_space(8.0);
-                    ui.label(display_text(format!("Niveau {level}"), 22.0, FORGE_OR));
-                    ui.add_space(4.0);
-                    ui.label(display_text(
-                        if remaining == 0 {
-                            "Enclume complète — tout est débloqué.".to_string()
-                        } else {
-                            format!("{remaining} amélioration(s) t'attendent à l'Enclume.")
-                        },
-                        16.0,
-                        FORGE_CREME,
-                    ));
-                },
-            );
-            MenuAction::None
-        }
-        MenuPage::Missions => {
-            // Même doctrine que Talents (story-680 cran 1) : ces deux pages
-            // promettaient des Âmes et des titres qu'aucun système ne verse.
-            hub_section_panel(
-                ctx,
-                "hub_sec_missions",
-                MenuPage::Missions.section_title(),
-                640.0,
-                |ui| {
-                    section_intro(
-                        ui,
-                        "Missions",
-                        "Rien à accomplir pour l'instant — les défis quotidiens et \
-                         hebdomadaires n'existent pas encore. Quand ils arriveront, \
-                         c'est ici qu'ils t'attendront.",
-                    );
-                },
-            );
-            MenuAction::None
-        }
-        MenuPage::Succes => {
-            hub_section_panel(
-                ctx,
-                "hub_sec_succes",
-                MenuPage::Succes.section_title(),
-                640.0,
-                |ui| {
-                    section_intro(
-                        ui,
-                        "Hauts faits",
-                        "Aucun haut fait n'est encore suivi. Cette page s'ouvrira \
-                         quand tes exploits seront comptés.",
-                    );
-                },
-            );
-            MenuAction::None
-        }
-        MenuPage::Stats => {
-            hub_section_panel(
-                ctx,
-                "hub_sec_stats",
-                MenuPage::Stats.section_title(),
-                560.0,
-                |ui| draw_stats_section(ui, meta_save.as_deref(), level),
-            );
-            MenuAction::None
-        }
-        // Forgeron / Armes / Enclume : panneaux interactifs dessinés par leurs
-        // systèmes dédiés (`sys_menu_forgeron` / `sys_menu_armes` / `sys_menu_enclume`).
-        MenuPage::Forgeron
-        | MenuPage::Armes
-        | MenuPage::Enclume
-        | MenuPage::Livre
-        | MenuPage::Marketplace
-        | MenuPage::Sac => MenuAction::None,
         MenuPage::Options => {
             draw_options_page(ctx, &mut nav, &mut settings);
+            MenuAction::None
+        }
+        page => {
+            let d = registry::decl(page);
+            if let PageDraw::Inline {
+                panel_id,
+                panel_width,
+                draw,
+            } = d.draw
+            {
+                let ictx = InlinePageCtx {
+                    level,
+                    ranks_remaining: remaining,
+                    meta_save: meta_save.as_deref(),
+                };
+                hub_section_panel(ctx, panel_id, d.section_title, panel_width, |ui| {
+                    draw(&ictx, ui)
+                });
+            }
             MenuAction::None
         }
     };
