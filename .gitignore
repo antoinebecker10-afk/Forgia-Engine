@@ -93,3 +93,9 @@ castle_hub_edits.json
 
 # Caches Python des scripts outils
 __pycache__/
+
+# Fixtures generees par les bancs de test des hooks (tools/ai/tests/).
+# Elles contiennent des motifs d'injection DELIBERES et se recreent a chaque
+# execution : les versionner ferait rougir le scan anti-injection sur du bruit.
+tools/ai/tests/sec/
+tools/ai/tests/conc*.txt

@@ -1,8 +1,0 @@
-OUTILS DE SESSION — 1 point(s) d'attention :
-  - ollama OK — nomic-embed-text présent
-  - grepai OK — watcher actif, index du 2026-08-09
-  - capteurs 98 fichiers, plus récent il y a 1 h, 6 en alerte — les lire via: python tools/ai/forgia_digest.py all (JAMAIS en brut)
-  - BRP inactif — jeu non lancé, ou lancé sans --features dev-brp (les outils mcp__bevy-brp__* échoueront)
-  - git 320 fichiers modifiés — présumer un AUTRE terminal actif : vérifier les mtimes avant tout commit, ne pas patcher une erreur hors-scope (multi-terminal-coordination.md)
-  - binaire à jour (exe du 09/08 13:47, 0 source plus récente)
-Rapporter cet état à l'utilisateur en une ligne dès la première réponse.
