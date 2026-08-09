@@ -12,6 +12,20 @@
 #
 # Budget : < 3 s. Aucun spawn Python (mempalace a déjà son propre hook).
 
+# ── qui suis-je ? — l'attribution multi-terminal ────────────────────────────
+# Sans ça, `hooks-perf.jsonl` dit QUE des hooks ont tourné, jamais POUR QUI.
+# À trois terminaux ouverts on ne peut donc pas prouver qu'aucun n'est resté
+# sans contrôle : on infère depuis des horodatages voisins, ce qui n'est pas
+# une preuve. L'identifiant de session arrive sur l'entrée standard — il suffit
+# de le lire. Une ligne par ouverture, et l'attribution devient mécanique.
+ENTREE=$(cat 2>/dev/null)
+SID=$(printf '%s' "$ENTREE" | jq -r '.session_id // "inconnu"' 2>/dev/null)
+[ -z "$SID" ] && SID="inconnu"
+JOURNAL="${COCKPIT_LOG_DIR:-D:/IA Antoine/logs}/sessions.jsonl"
+mkdir -p "$(dirname "$JOURNAL")" 2>/dev/null
+printf '{"ts":"%s","session":"%s","cwd":"%s"}\n' \
+    "$(date -Iseconds)" "$SID" "${PWD//\\//}" >> "$JOURNAL" 2>/dev/null
+
 RACINE="${PROJECT_ROOT:-C:/Users/Antoi/Desktop/Forgia Rewrite}"
 cd "$RACINE" 2>/dev/null || { echo "OUTILS: racine introuvable ($RACINE)"; exit 0; }
 
@@ -200,7 +214,7 @@ if [ "$COUPES" -gt 0 ]; then
     ALERTES=$((ALERTES + 1))
 fi
 
-echo "OUTILS DE SESSION — ${ALERTES} point(s) d'attention :"
+echo "OUTILS DE SESSION [${SID:0:8}] — ${ALERTES} point(s) d'attention :"
 for L in "${LIGNES[@]}"; do echo "  - $L"; done
 echo "Rapporter cet état à l'utilisateur en une ligne dès la première réponse."
 exit 0
