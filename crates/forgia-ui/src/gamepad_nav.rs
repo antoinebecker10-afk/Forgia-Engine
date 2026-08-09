@@ -17,7 +17,7 @@ use bevy_egui::{egui, EguiContexts, EguiInput, PrimaryEguiContext};
 use forgia_core::prelude::*;
 use forgia_ui_lib::theme::display_text;
 
-use crate::MenuPage;
+use crate::{MenuPage, NavStack};
 
 /// Quelle famille de périphérique a parlé en dernier — pilote l'affichage des
 /// hints et (plus tard) le masquage du curseur.
@@ -83,7 +83,7 @@ pub fn sys_gamepad_menu_nav(
     pads: Query<&Gamepad>,
     mut contexts: EguiContexts,
     mut inputs: Query<&mut EguiInput, With<PrimaryEguiContext>>,
-    mut page: ResMut<MenuPage>,
+    mut nav: ResMut<NavStack>,
 ) {
     if *app_state.get() != AppMode::Menu {
         return;
@@ -136,22 +136,24 @@ pub fn sys_gamepad_menu_nav(
             push_key(egui::Key::Escape);
         }
         // LB / RB — onglet précédent / suivant, avec le son Tab (front réel :
-        // just_pressed, pas de répétition).
-        let nav = MenuPage::NAV;
-        let idx = nav.iter().position(|t| *t == *page).unwrap_or(0);
+        // just_pressed, pas de répétition). Un onglet est un FRÈRE : switch_tab
+        // (pile `[Root, tab]`), pas push — sinon cycler aux bumpers empilerait
+        // tout l'historique d'onglets sous ESC.
+        let tabs = MenuPage::NAV;
+        let idx = tabs.iter().position(|t| *t == nav.current()).unwrap_or(0);
         let mut moved = None;
         if pad.just_pressed(GamepadButton::LeftTrigger) {
-            moved = Some(nav[(idx + nav.len() - 1) % nav.len()]);
+            moved = Some(tabs[(idx + tabs.len() - 1) % tabs.len()]);
         }
         if pad.just_pressed(GamepadButton::RightTrigger) {
-            moved = Some(nav[(idx + 1) % nav.len()]);
+            moved = Some(tabs[(idx + 1) % tabs.len()]);
         }
         if let Some(next) = moved {
-            if next != *page {
+            if next != nav.current() {
                 if let Ok(ctx) = contexts.ctx_mut() {
                     forgia_ui_lib::ui_sfx::push_ui_sfx(ctx, forgia_ui_lib::ui_sfx::UiSfxKind::Tab);
                 }
-                *page = next;
+                nav.switch_tab(next);
             }
         }
     }

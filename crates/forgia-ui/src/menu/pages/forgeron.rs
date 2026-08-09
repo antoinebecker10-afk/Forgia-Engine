@@ -25,7 +25,7 @@ use crate::{slot_glyph, weapon_preview};
 pub(crate) fn sys_menu_forgeron(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    mut page: ResMut<MenuPage>,
+    mut nav: ResMut<crate::NavStack>,
     cfg: Res<IdentityConfig>,
     mut save: ResMut<IdentitySave>,
     mut arm_cosmetics: ResMut<ArmCosmetics>,
@@ -41,7 +41,7 @@ pub(crate) fn sys_menu_forgeron(
     rtt: Option<Res<weapon_preview::CharacterPreviewRtt>>,
 ) {
     if *app_state.get() != AppMode::Menu
-        || !matches!(*page, MenuPage::Forgeron | MenuPage::Sac)
+        || !matches!(nav.current(), MenuPage::Forgeron | MenuPage::Sac)
     {
         return;
     }
@@ -70,7 +70,7 @@ pub(crate) fn sys_menu_forgeron(
     // Story-678 — chrome commun (titre/marges/transition standard). Le titre
     // suit l'onglet d'entrée : même écran, mais « TON SAC » quand on vient
     // pour l'inventaire.
-    let titre = if *page == MenuPage::Sac {
+    let titre = if nav.current() == MenuPage::Sac {
         MenuPage::Sac.section_title()
     } else {
         MenuPage::Forgeron.section_title()
@@ -208,10 +208,12 @@ pub(crate) fn sys_menu_forgeron(
         });
     });
     if back {
-        *page = MenuPage::Root;
+        nav.back();
     }
     if goto_decors {
-        *page = MenuPage::Marketplace;
+        // Entrée en PROFONDEUR : le Retour du Marketplace ramènera ICI (fiche
+        // ou Sac), plus au Forgeron codé en dur.
+        nav.push(MenuPage::Marketplace);
     }
     if let Some(slot_id) = choisir_slot {
         // La pièce montrée en priorité : celle qu'on porte, sinon la meilleure

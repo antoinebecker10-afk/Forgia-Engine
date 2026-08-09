@@ -17,12 +17,12 @@ use crate::menu::nav::MenuPage;
 pub(crate) fn sys_menu_enclume(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
+    nav: Res<crate::NavStack>,
     cat: Option<Res<MetaShopCatalogue>>,
     save: Option<ResMut<MetaShopSave>>,
     meta: Option<ResMut<MetaSouls>>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Enclume {
+    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Enclume {
         return;
     }
     let (Some(cat), Some(mut save), Some(mut meta)) = (cat, save, meta) else {

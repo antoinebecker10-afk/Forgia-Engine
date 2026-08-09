@@ -16,7 +16,7 @@ use forgia_ui_lib::pause_menu::UserSettings;
 use crate::arena_backdrop::ArenaBackdropRtt;
 use crate::gamepad_nav::LastInputKind;
 use crate::weapon_preview::CharacterPreviewRtt;
-use crate::{HubBadges, MenuPage};
+use crate::{HubBadges, MenuPage, NavStack};
 
 const SENSOR_PATH: &str = "forgia2_menu_hub.json";
 const PERIOD_SECS: f32 = 1.0;
@@ -47,7 +47,7 @@ pub struct MenuHubSensorState {
 pub fn sys_write_menu_hub_sensor(
     time: Res<Time<bevy::time::Real>>,
     app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
+    nav: Res<NavStack>,
     mut state: ResMut<MenuHubSensorState>,
     badges: Res<HubBadges>,
     kind: Res<LastInputKind>,
@@ -62,11 +62,12 @@ pub fn sys_write_menu_hub_sensor(
     let menu_active = *app_state.get() == AppMode::Menu;
     // Fronts montants — comptés à CHAQUE frame, indépendamment de la cadence
     // d'écriture (sinon on rate les changements entre deux écritures).
-    if state.last_page != Some(*page) {
+    let page = nav.current();
+    if state.last_page != Some(page) {
         if state.last_page.is_some() && menu_active {
             state.page_changes_session = state.page_changes_session.saturating_add(1);
         }
-        state.last_page = Some(*page);
+        state.last_page = Some(page);
     }
     // Le fond est VIVANT quand son diorama a réellement posé des props.
     //
@@ -160,9 +161,11 @@ pub fn sys_write_menu_hub_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"menu_hub","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"menu_active":{menu_active},"page":"{:?}","page_changes_session":{},"ui_sfx_session":{ui_sfx},"motion_enabled":{},"last_input":"{}","badge_enclume":{},"badge_forgeron":{},"badge_livre":{},"backdrop_ready":{backdrop_ready},"backdrop_props":{backdrop_props},"avatar_ready":{avatar_ready},"backdrop_shown":"{backdrop_shown}","backdrop_wanted":"{backdrop_wanted}","cosmetics_owned":{backdrops_owned},"cosmetics_total":{backdrops_total},"shards":{shards},"last_run_present":{last_run_present}}}"#,
+        r#"{{"id":"menu_hub","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"menu_active":{menu_active},"page":"{:?}","nav_depth":{},"nav_path":"{}","page_changes_session":{},"ui_sfx_session":{ui_sfx},"motion_enabled":{},"last_input":"{}","badge_enclume":{},"badge_forgeron":{},"badge_livre":{},"backdrop_ready":{backdrop_ready},"backdrop_props":{backdrop_props},"avatar_ready":{avatar_ready},"backdrop_shown":"{backdrop_shown}","backdrop_wanted":"{backdrop_wanted}","cosmetics_owned":{backdrops_owned},"cosmetics_total":{backdrops_total},"shards":{shards},"last_run_present":{last_run_present}}}"#,
         time.elapsed_secs(),
-        *page,
+        page,
+        nav.depth(),
+        nav.path(),
         state.page_changes_session,
         motion.map(|m| m.to_string()).unwrap_or_else(|| "null".into()),
         match *kind {

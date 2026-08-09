@@ -612,7 +612,7 @@ fn sys_rotate_previews(
 /// pour deux textures que personne n'affichait. Le personnage du FOND, lui,
 /// reste rendu par la caméra du diorama (`arena_backdrop`), pas par celles-ci.
 fn sys_gate_preview_cameras(
-    page: Res<crate::MenuPage>,
+    nav: Res<crate::NavStack>,
     warmup: Option<ResMut<PreviewCamWarmup>>,
     mut q_weapon: Query<&mut Camera, (With<WeaponPreviewCam>, Without<CharacterPreviewCam>)>,
     mut q_char: Query<&mut Camera, With<CharacterPreviewCam>>,
@@ -625,8 +625,11 @@ fn sys_gate_preview_cameras(
             return;
         }
     }
-    let weapon_on = matches!(*page, crate::MenuPage::Armes);
-    let char_on = matches!(*page, crate::MenuPage::Forgeron | crate::MenuPage::Sac);
+    let weapon_on = matches!(nav.current(), crate::MenuPage::Armes);
+    let char_on = matches!(
+        nav.current(),
+        crate::MenuPage::Forgeron | crate::MenuPage::Sac
+    );
     for mut cam in &mut q_weapon {
         if cam.is_active != weapon_on {
             cam.is_active = weapon_on;

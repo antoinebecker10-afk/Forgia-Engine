@@ -143,7 +143,7 @@ fn stat_row(ui: &mut egui::Ui, label: &str, value: String) {
 /// verre centré. « Retour » ramène à l'accueil.
 pub(crate) fn draw_options_page(
     ctx: &egui::Context,
-    page: &mut ResMut<MenuPage>,
+    nav: &mut crate::NavStack,
     settings: &mut ResMut<UserSettings>,
 ) {
     // Story-678 — chrome commun. Sauvegarde IMMÉDIATE au changement : un
@@ -165,7 +165,7 @@ pub(crate) fn draw_options_page(
         },
     );
     if retour {
-        **page = MenuPage::Root;
+        nav.back();
     }
 }
 
@@ -182,7 +182,7 @@ pub(crate) fn draw_options_page(
 pub(crate) fn sys_menu_root_dashboard(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    mut page: ResMut<MenuPage>,
+    mut nav: ResMut<crate::NavStack>,
     // `ResMut` : actionner le carrousel vaut « j'ai vu les nouveaux chapitres »
     // et éteint la pastille du Livre (cf. `sys_hub_badges`).
     save: Option<ResMut<MetaShopSave>>,
@@ -196,7 +196,7 @@ pub(crate) fn sys_menu_root_dashboard(
     mut next_game: ResMut<NextState<GameMode>>,
     mut exit: MessageWriter<AppExit>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Root {
+    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Root {
         return;
     }
     let Some(mut save) = save else {
@@ -481,11 +481,12 @@ pub(crate) fn sys_menu_root_dashboard(
         save.seen_chapters_cleared = save.chapters_cleared;
         save.save();
     }
+    // Entrées en PROFONDEUR depuis l'Accueil : push — ESC/Retour y reviendra.
     if goto_forgeron {
-        *page = MenuPage::Forgeron;
+        nav.push(MenuPage::Forgeron);
     }
     if goto_livre {
-        *page = MenuPage::Livre;
+        nav.push(MenuPage::Livre);
     }
     match action {
         MenuAction::Launch(mode) => {

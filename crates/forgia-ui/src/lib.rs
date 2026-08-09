@@ -66,9 +66,10 @@ use menu::shell::{
     escape_handler, main_menu_ui, pause_time, resume_time, spawn_menu_camera_permanent,
     sys_apply_ui_scale, sys_mark_identity_shown, sys_mirror_ui_motion, sys_publish_viewport_h,
 };
-/// Re-export interne : `menu_hub_sensor`, `weapon_preview` et les pages lisent
-/// la page courante via `crate::MenuPage`.
-pub(crate) use menu::nav::MenuPage;
+/// Re-exports internes : `menu_hub_sensor`, `weapon_preview` et les pages
+/// lisent la page courante via `crate::NavStack` (`MenuPage` reste exporté
+/// pour les comparaisons).
+pub(crate) use menu::nav::{MenuPage, NavStack};
 
 pub struct ForgiaUiPlugin;
 
@@ -99,7 +100,7 @@ impl Plugin for ForgiaUiPlugin {
         // MenuCamera2d permanente : spawn 1 fois Startup, JAMAIS despawn.
         // Ordre explicite high pour render egui par-dessus la Camera3d gameplay.
         // Anti-trap V1 : éviter le frame où aucune caméra n'existe (ESC bug).
-        app.init_resource::<MenuPage>()
+        app.init_resource::<NavStack>()
             .init_resource::<HubBadges>()
             .init_resource::<gamepad_nav::LastInputKind>()
             // Story-678 Phase 6 — manette : traduction en événements clavier

@@ -41,7 +41,7 @@ const DECOR_ROW_H: f32 = 28.0;
 pub(crate) fn sys_menu_marketplace(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    mut page: ResMut<MenuPage>,
+    mut nav: ResMut<crate::NavStack>,
     mut tab: Local<usize>,
     catalogue: Option<Res<forgia_mode_roguelite::cosmetics::CosmeticsConfig>>,
     mut identity: Option<ResMut<IdentitySave>>,
@@ -50,7 +50,7 @@ pub(crate) fn sys_menu_marketplace(
 ) {
     use forgia_mode_roguelite::cosmetics::{self, CosmeticKind, CosmeticSource, OwnedCosmetics};
 
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Marketplace {
+    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Marketplace {
         return;
     }
     let (Some(catalogue), Some(identity), Some(save)) =
@@ -300,6 +300,9 @@ pub(crate) fn sys_menu_marketplace(
         forgia_ui_lib::ui_sfx::push_ui_sfx(ctx, son);
     }
     if retour {
-        *page = MenuPage::Forgeron;
+        // AC3 (story-694 incr. 3) — le Retour cesse de téléporter vers
+        // Forgeron : pop dérivé, on revient d'où l'on est VENU (barre → Accueil,
+        // fiche → fiche, Sac → Sac).
+        nav.back();
     }
 }

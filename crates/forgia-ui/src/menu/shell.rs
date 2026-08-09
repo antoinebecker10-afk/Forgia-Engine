@@ -23,7 +23,7 @@ use crate::menu::chrome::{
     draw_hub_smith_chip, draw_hub_souls_chip, hub_section_panel,
 };
 use crate::menu::cursor::FPS_GRAB_MODE;
-use crate::menu::nav::{draw_hub_nav, HubBadges, MenuAction, MenuPage};
+use crate::menu::nav::{draw_hub_nav, HubBadges, MenuAction, MenuPage, NavStack};
 use crate::menu::pages::root::{draw_options_page, draw_root_landing, draw_stats_section};
 use crate::menu_video::{self, MenuVideoState};
 
@@ -70,10 +70,10 @@ pub(crate) fn sys_mirror_ui_motion(
 /// qu'au call-site : le système de la fiche est au plafond des 16 params Bevy.
 pub(crate) fn sys_mark_identity_shown(
     app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
+    nav: Res<NavStack>,
     shown: Option<ResMut<forgia_mode_roguelite::identity::IdentityPanelShown>>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
+    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Forgeron {
         return;
     }
     if let Some(mut s) = shown {
@@ -155,7 +155,7 @@ pub(crate) fn main_menu_ui(
     mut exit: MessageWriter<AppExit>,
     mut video: Option<ResMut<MenuVideoState>>,
     asset_server: Res<AssetServer>,
-    mut page: ResMut<MenuPage>,
+    mut nav: ResMut<NavStack>,
     mut settings: ResMut<UserSettings>,
     // Données persistées au Startup → présentes dès le menu (hub roguelite).
     meta_save: Option<Res<MetaShopSave>>,
@@ -286,14 +286,14 @@ pub(crate) fn main_menu_ui(
     // CE QUE j'ai. Les trois vivent sur la même bande depuis que la navigation
     // est passée à l'horizontale.
     draw_hub_smith_chip(ctx, name, level, remaining, frac);
-    draw_hub_nav(ctx, &mut page, *badges);
+    draw_hub_nav(ctx, &mut nav, *badges);
     draw_hub_souls_chip(ctx, souls_n, shards_n, icons.as_deref());
 
     // ── Panneau de la section active ──
     // Les sections rendent leur contenu et renvoient une action de navigation
     // d'état (lancer une run / quitter) que l'on applique ici — évite de passer
     // NextState/MessageWriter dans chaque helper.
-    let action = match *page {
+    let action = match nav.current() {
         MenuPage::Root => draw_root_landing(ctx),
         MenuPage::Codex => {
             hub_section_panel(
@@ -397,7 +397,7 @@ pub(crate) fn main_menu_ui(
         | MenuPage::Marketplace
         | MenuPage::Sac => MenuAction::None,
         MenuPage::Options => {
-            draw_options_page(ctx, &mut page, &mut settings);
+            draw_options_page(ctx, &mut nav, &mut settings);
             MenuAction::None
         }
     };
@@ -421,15 +421,23 @@ pub(crate) fn main_menu_ui(
 // Rien n'a été touché côté moteur.
 
 /// Handler ESC unique :
+///  - Menu    → remonte d'un niveau de la pile de navigation (story-694 incr. 3)
 ///  - InGame  → Paused (pause gameplay, libère curseur)
 ///  - Paused  → InGame (resume)
 ///  - Paused + Q → Menu (quit to menu)
+///
+/// B manette au menu = le même geste (le hint promet « Ⓑ Annuler ») — lu côté
+/// bevy ICI même, dans l'unique handler (anti-trap V1 « 2 handlers ESC ») : la
+/// traduction egui de B (`gamepad_nav`) ne fait que rendre le focus des widgets.
 pub(crate) fn escape_handler(
     keys: Res<ButtonInput<KeyCode>>,
     app_state: Res<State<AppMode>>,
     mut next_app: ResMut<NextState<AppMode>>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut q_cursor: Query<&mut CursorOptions, With<PrimaryWindow>>,
+    mut nav: ResMut<NavStack>,
+    mut contexts: EguiContexts,
+    pads: Query<&Gamepad>,
 ) {
     let from = app_state.get().clone();
 
@@ -459,14 +467,50 @@ pub(crate) fn escape_handler(
                     opts.visible = false;
                 }
             }
-            other => {
-                info!("[forgia-ui] ESC pressed in {other:?} — no transition");
+            AppMode::Menu => {
+                menu_back(&mut nav, &mut contexts);
+            }
+            AppMode::Boot => {
+                info!("[forgia-ui] ESC pressed in Boot — no transition");
             }
         }
     }
     // Bloc « Q en Paused » dupliqué SUPPRIMÉ (story-694 incr. 2, constat n°9 de
     // l'audit 2026-08-07) : le même test vit en tête de fonction avec un `return`,
     // cette copie était inatteignable quand il tirait.
+
+    // B manette — menu uniquement : in-game, East appartient au gameplay.
+    // `!Escape` : certains mappings (Steam Input) émettent B ET Échap la même
+    // frame — sans ce garde, les deux branches popperaient chacune un niveau.
+    if matches!(from, AppMode::Menu)
+        && !keys.just_pressed(KeyCode::Escape)
+        && pads.iter().any(|p| p.just_pressed(GamepadButton::East))
+    {
+        menu_back(&mut nav, &mut contexts);
+    }
+}
+
+/// ESC/B au menu : remonte d'un niveau de la pile — SAUF quand egui édite du
+/// texte (le champ du nom de la fiche consomme ESC pour rendre son focus : le
+/// premier ESC sort du champ, le second remonte) et sauf au Root, où `back()`
+/// rend `false` et on ne fait rien (Quitter est un bouton explicite).
+///
+/// ⚠️ Couplage d'ordre : le « premier ESC sort du champ » suppose que ce code
+/// (Update) lit `wants_keyboard_input` AVANT que le pass egui de la frame ne
+/// traite la touche — garanti par le `MainScheduleOrder` fixe de Bevy
+/// (Update < PostUpdate, où vit `EguiPrimaryContextPass`). Déplacer
+/// `escape_handler` hors d'Update casserait ce 2-temps en silence.
+fn menu_back(nav: &mut NavStack, contexts: &mut EguiContexts) {
+    let egui_edits_text = contexts
+        .ctx_mut()
+        .map(|c| c.wants_keyboard_input())
+        .unwrap_or(false);
+    if egui_edits_text {
+        return;
+    }
+    if nav.back() {
+        info!("[forgia-ui] retour nav (ESC/B) → {:?}", nav.current());
+    }
 }
 
 /// Freeze `Time<Virtual>` quand on entre en Paused (animations + locomotion

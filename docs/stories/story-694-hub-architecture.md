@@ -39,8 +39,16 @@ UX n°5 (retours incohérents). Pratiques cibles : `reference_ui_menu_industry_p
    (constat n°9). Preuves : check 4 crates (ui, game, viewmodel, rpg) · clippy
    --all-targets 0 warning · tests 15/15 · plus aucun #[allow(dead_code)] dans la
    crate · aucun module > 1 200 l. (AC2 tenu dès cet incrément pour lib.rs < 400).
-3. **NavStack** (~½ j, Medium) — `Vec<MenuPage>` : le retour devient DÉRIVÉ (pop),
-   ESC/B remontent d'un niveau partout, le Retour du Marketplace cesse de téléporter.
+3. ✅ **NavStack** — FAIT 2026-08-09 soir (attente auto-QA + validation en jeu).
+   `NavStack(Vec<MenuPage>)` dans menu/nav.rs = LA vérité (sommet = page courante,
+   fond = Root, invariant jamais-vide) ; `MenuPage` n'est PLUS une Resource — le
+   derive retiré a fait pointer le compilateur sur chacun des 16 sites (aucun
+   oubli possible). Sémantique : onglets (barre + LB/RB) = `switch_tab` [Root,tab] ;
+   drill-ins (Personnaliser→Forgeron, LE LIVRE→Livre, fiche→Marketplace) = `push` ;
+   Retours = `back()` pop — le Retour du Marketplace revient d'OÙ L'ON VIENT (AC3).
+   ESC + B manette au menu = `back()` dans l'UNIQUE escape_handler (anti-trap V1
+   tenu), garde `wants_keyboard_input` pour l'édition du nom. Capteur menu_hub :
+   + `nav_depth`/`nav_path`. Preuves : 7 tests NavStack (22/22 crate), clippy 0.
 4. **Registre de pages** (~1 j, Medium) — `PageDecl { id, label, titre, in_nav, badge,
    draw }` : nav, badges et hints itèrent LA table ; ajouter une page = 1 déclaration.
 5. **Crate forgia-menu-hub** (~2-4 j, High) — dépend de forgia-ui ET forgia-mode-roguelite ;

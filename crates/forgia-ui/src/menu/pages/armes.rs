@@ -23,7 +23,7 @@ use crate::weapon_preview::WeaponPreviewRtt;
 pub(crate) fn sys_menu_armes(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
+    nav: Res<crate::NavStack>,
     mut choice: ResMut<StartingWeaponChoice>,
     cards: Res<WeaponCards>,
     elem_cfg: Res<ElementConfig>,
@@ -32,7 +32,7 @@ pub(crate) fn sys_menu_armes(
     mut meta: ResMut<MetaSouls>,
     rtt: Option<Res<WeaponPreviewRtt>>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Armes {
+    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Armes {
         return;
     }
     let Ok(ctx) = contexts.ctx_mut() else {

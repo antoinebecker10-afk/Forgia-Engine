@@ -19,12 +19,12 @@ use crate::menu::nav::MenuPage;
 pub(crate) fn sys_menu_livre(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
-    mut page: ResMut<MenuPage>,
+    mut nav: ResMut<crate::NavStack>,
     save: Option<Res<MetaShopSave>>,
     palettes: Option<Res<DecorPalettesConfig>>,
     selected: Option<ResMut<SelectedChapter>>,
 ) {
-    if *app_state.get() != AppMode::Menu || *page != MenuPage::Livre {
+    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Livre {
         return;
     }
     let (Some(save), Some(mut selected)) = (save, selected) else {
@@ -48,6 +48,8 @@ pub(crate) fn sys_menu_livre(
         },
     );
     if retour {
-        *page = MenuPage::Root;
+        // Dérivé, plus recopié : la seule entrée du Livre est l'Accueil
+        // (titre cliquable) — pop y ramène.
+        nav.back();
     }
 }

@@ -1,6 +1,7 @@
-//! Navigation du hub-menu : la Resource `MenuPage` (quelle page est affichée),
-//! `MenuAction` (les demandes de transition d'état), les pastilles `HubBadges`
-//! et la barre de navigation horizontale.
+//! Navigation du hub-menu : la pile `NavStack` (source de vérité de la page
+//! affichée — sommet = page courante, Retour = pop), `MenuAction` (les demandes
+//! de transition d'état), les pastilles `HubBadges` et la barre de navigation
+//! horizontale.
 
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -16,7 +17,7 @@ use forgia_ui_lib::style::{C_PRIMARY, FORGE_CREME, FORGE_PANEL, HAIR_GOLD_STRONG
 ///
 /// `Root` = accueil (titre FORGIA + CONTINUER/NOUVELLE PARTIE). Les autres = les
 /// sections du hub, navigables depuis la sidebar verre sans lancer de run.
-#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum MenuPage {
     #[default]
     Root,
@@ -120,9 +121,86 @@ impl MenuPage {
     }
 }
 
+/// La PILE de navigation du hub (story-694, incrément 3) — LA source de vérité
+/// de la page affichée. Le sommet est la page courante, le fond est TOUJOURS
+/// `Root`. « D'où je viens » devient DÉRIVÉ (pop) au lieu d'être recopié par
+/// chaque page — le Retour du Marketplace téléportait vers Forgeron même quand
+/// on venait de la barre (constat UX n°5, audit 2026-08-07).
+///
+/// `MenuPage` n'est plus une Resource : retirer son derive a fait pointer le
+/// compilateur sur chacun des 16 sites à convertir — aucun oubli possible.
+#[derive(Resource, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct NavStack {
+    stack: Vec<MenuPage>,
+}
+
+impl Default for NavStack {
+    fn default() -> Self {
+        Self { stack: vec![MenuPage::Root] }
+    }
+}
+
+impl NavStack {
+    /// La page affichée = le sommet. La pile n'est jamais vide (invariant tenu
+    /// par toutes les méthodes) ; le repli défensif rend `Root`.
+    pub(crate) fn current(&self) -> MenuPage {
+        self.stack.last().copied().unwrap_or(MenuPage::Root)
+    }
+
+    /// Clic d'onglet (barre horizontale ou LB/RB) : les onglets sont des FRÈRES,
+    /// pas des enfants — la pile repart de `[Root, tab]`. ESC depuis un onglet
+    /// remonte donc à l'Accueil, jamais dans l'historique des onglets visités.
+    pub(crate) fn switch_tab(&mut self, tab: MenuPage) {
+        self.stack.clear();
+        self.stack.push(MenuPage::Root);
+        if tab != MenuPage::Root {
+            self.stack.push(tab);
+        }
+    }
+
+    /// Entrée en profondeur (Personnaliser → Forgeron, fiche → Marketplace…) :
+    /// empile. No-op si on y est déjà (double-clic).
+    pub(crate) fn push(&mut self, page: MenuPage) {
+        if self.current() != page {
+            self.stack.push(page);
+        }
+    }
+
+    /// Remonte d'un niveau. `false` au Root (rien à dépiler) — l'appelant
+    /// décide : au menu on ne fait rien, Quitter est un bouton explicite.
+    pub(crate) fn back(&mut self) -> bool {
+        if self.stack.len() > 1 {
+            self.stack.pop();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Retour à l'accueil (OnEnter(Menu)).
+    pub(crate) fn reset(&mut self) {
+        self.stack.clear();
+        self.stack.push(MenuPage::Root);
+    }
+
+    /// Profondeur de la pile — publiée par le capteur menu_hub (`nav_depth`).
+    pub(crate) fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// Chemin lisible pour le capteur — « Root>Forgeron>Marketplace ».
+    pub(crate) fn path(&self) -> String {
+        self.stack
+            .iter()
+            .map(|p| format!("{p:?}"))
+            .collect::<Vec<_>>()
+            .join(">")
+    }
+}
+
 /// Revient à la page racine du menu à chaque entrée dans le menu (retour jeu→menu).
-pub(crate) fn reset_menu_page(mut page: ResMut<MenuPage>) {
-    *page = MenuPage::Root;
+pub(crate) fn reset_menu_page(mut nav: ResMut<NavStack>) {
+    nav.reset();
 }
 
 /// Action de navigation d'état demandée par une section du hub-menu (appliquée par
@@ -153,7 +231,7 @@ pub(crate) struct HubBadges {
 /// « vu » = la page a été ouverte. Écritures gardées — pas de churn à vide.
 pub(crate) fn sys_hub_badges(
     app_state: Res<State<AppMode>>,
-    page: Res<MenuPage>,
+    nav: Res<NavStack>,
     cat: Option<Res<MetaShopCatalogue>>,
     souls: Option<Res<MetaSouls>>,
     meta: Option<Res<MetaShopSave>>,
@@ -164,7 +242,7 @@ pub(crate) fn sys_hub_badges(
         return;
     }
     if let Some(eq) = eq_save.as_deref_mut() {
-        if matches!(*page, MenuPage::Forgeron | MenuPage::Sac) {
+        if matches!(nav.current(), MenuPage::Forgeron | MenuPage::Sac) {
             let total = eq.owned_total();
             if eq.seen_owned_total != total {
                 eq.seen_owned_total = total;
@@ -203,7 +281,7 @@ pub(crate) fn sys_hub_badges(
 /// obligeait chaque page à se décaler de +100 px pour ne pas passer dessous.
 /// À l'horizontale elle coûte [`HUB_TOP_BAR_H`] px de haut, une seule fois, et
 /// les pages retrouvent le centre de l'écran.
-pub(crate) fn draw_hub_nav(ctx: &egui::Context, page: &mut MenuPage, badges: HubBadges) {
+pub(crate) fn draw_hub_nav(ctx: &egui::Context, nav: &mut NavStack, badges: HubBadges) {
     egui::Area::new(egui::Id::new("menu_hub_nav"))
         .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 18.0))
         .show(ctx, |ui| {
@@ -224,7 +302,7 @@ pub(crate) fn draw_hub_nav(ctx: &egui::Context, page: &mut MenuPage, badges: Hub
                             ui.add_space(3.0);
                         }
                         first = false;
-                        let selected = *page == tab;
+                        let selected = nav.current() == tab;
                         let resp = ui.add_sized(
                             egui::vec2(tab_width(ui, tab.nav_label()), 34.0),
                             egui::Button::selectable(
@@ -263,14 +341,16 @@ pub(crate) fn draw_hub_nav(ctx: &egui::Context, page: &mut MenuPage, badges: Hub
                                 C_PRIMARY,
                             );
                         }
-                        if resp.clicked() {
-                            if *page != tab {
-                                forgia_ui_lib::ui_sfx::push_ui_sfx(
-                                    &resp.ctx,
-                                    forgia_ui_lib::ui_sfx::UiSfxKind::Tab,
-                                );
-                            }
-                            *page = tab;
+                        // Re-cliquer l'onglet courant reste un no-op : un
+                        // switch_tab tronquerait la pile (et le chemin de
+                        // retour d'une page profonde) sans rien changer à
+                        // l'écran.
+                        if resp.clicked() && nav.current() != tab {
+                            forgia_ui_lib::ui_sfx::push_ui_sfx(
+                                &resp.ctx,
+                                forgia_ui_lib::ui_sfx::UiSfxKind::Tab,
+                            );
+                            nav.switch_tab(tab);
                         }
                     }
                     });
@@ -299,4 +379,110 @@ fn tab_width(ui: &egui::Ui, label: &str) -> f32 {
         .x
     });
     (text_w + PADDING).max(MIN_W)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn la_pile_nait_sur_root() {
+        let nav = NavStack::default();
+        assert_eq!(nav.current(), MenuPage::Root);
+        assert_eq!(nav.depth(), 1);
+    }
+
+    #[test]
+    fn switch_tab_repart_de_root() {
+        let mut nav = NavStack::default();
+        nav.switch_tab(MenuPage::Armes);
+        nav.switch_tab(MenuPage::Sac);
+        // Les onglets sont des frères : pas d'historique d'onglets empilé.
+        assert_eq!(nav.depth(), 2);
+        assert_eq!(nav.current(), MenuPage::Sac);
+        assert!(nav.back());
+        assert_eq!(nav.current(), MenuPage::Root);
+    }
+
+    #[test]
+    fn back_au_root_ne_fait_rien() {
+        let mut nav = NavStack::default();
+        assert!(!nav.back());
+        assert_eq!(nav.current(), MenuPage::Root);
+        assert_eq!(nav.depth(), 1);
+    }
+
+    /// AC3 — le Retour du Marketplace dépend d'OÙ l'on vient, il ne téléporte
+    /// plus vers Forgeron en dur.
+    #[test]
+    fn le_retour_du_marketplace_depend_d_ou_l_on_vient() {
+        // Entré depuis la barre : retour à l'Accueil.
+        let mut nav = NavStack::default();
+        nav.switch_tab(MenuPage::Marketplace);
+        assert!(nav.back());
+        assert_eq!(nav.current(), MenuPage::Root);
+        // Entré depuis la fiche (Personnaliser → Forgeron → Marketplace) :
+        // retour à la fiche, pas à l'Accueil.
+        let mut nav = NavStack::default();
+        nav.push(MenuPage::Forgeron);
+        nav.push(MenuPage::Marketplace);
+        assert!(nav.back());
+        assert_eq!(nav.current(), MenuPage::Forgeron);
+        assert!(nav.back());
+        assert_eq!(nav.current(), MenuPage::Root);
+    }
+
+    #[test]
+    fn push_ne_double_pas_la_page_courante() {
+        let mut nav = NavStack::default();
+        nav.push(MenuPage::Forgeron);
+        nav.push(MenuPage::Forgeron);
+        assert_eq!(nav.depth(), 2);
+    }
+
+    #[test]
+    fn reset_ramene_a_l_accueil() {
+        let mut nav = NavStack::default();
+        nav.push(MenuPage::Forgeron);
+        nav.push(MenuPage::Marketplace);
+        nav.reset();
+        assert_eq!(nav.current(), MenuPage::Root);
+        assert_eq!(nav.depth(), 1);
+    }
+
+    /// Invariant « jamais vide » sous une rafale adversariale de back().
+    #[test]
+    fn une_rafale_de_back_ne_vide_jamais_la_pile() {
+        let mut nav = NavStack::default();
+        nav.push(MenuPage::Forgeron);
+        nav.push(MenuPage::Marketplace);
+        for _ in 0..10 {
+            nav.back();
+        }
+        assert_eq!(nav.current(), MenuPage::Root);
+        assert_eq!(nav.depth(), 1);
+    }
+
+    /// switch_tab depuis une pile PROFONDE tronque volontairement : changer
+    /// d'onglet est un changement de contexte, l'historique du drill-in ne
+    /// doit pas survivre sous ESC. (Le no-op « re-clic sur l'onglet courant »
+    /// est un garde des APPELANTS — draw_hub_nav, gamepad_nav.)
+    #[test]
+    fn switch_tab_depuis_une_pile_profonde_tronque() {
+        let mut nav = NavStack::default();
+        nav.push(MenuPage::Forgeron);
+        nav.push(MenuPage::Marketplace);
+        nav.switch_tab(MenuPage::Armes);
+        assert_eq!(nav.depth(), 2);
+        assert!(nav.back());
+        assert_eq!(nav.current(), MenuPage::Root);
+    }
+
+    #[test]
+    fn le_chemin_du_capteur_est_lisible() {
+        let mut nav = NavStack::default();
+        nav.push(MenuPage::Forgeron);
+        nav.push(MenuPage::Marketplace);
+        assert_eq!(nav.path(), "Root>Forgeron>Marketplace");
+    }
 }
