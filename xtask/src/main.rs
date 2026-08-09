@@ -33,6 +33,7 @@ fn main() {
         "sensor-sync-writes" => sensor_sync_writes(&args),
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
+        "context-budget" => context_budget(&args),
         "asset-load" => asset_load(&args),
         "arch-drift" => arch_drift(),
         "story-ids" => story_ids(),
@@ -64,6 +65,7 @@ fn print_help() {
     println!("  sensor-sync-writes [--strict] Report synchronous sensor JSON writes; --strict fails if any remain");
     println!("  story-gate [--all-done|--story <id>]   Verify DONE stories claims vs git/code");
     println!("  no-scaffold [--fix]      Fail if any crate is a scaffold (<50 effective LOC or >80% TODO comments). Allowlist in xtask/no-scaffold-allowlist.toml.");
+    println!("  context-budget           Fail if CLAUDE.md + .claude/rules/ exceed the per-session context budget (measured 2026-08-09 : ~27k tokens).");
     println!("  asset-load [--fix]       Lock L1 ratchet : fail if asset-load call-sites drift above per-file baseline. Allowlist in xtask/asset-load-allowlist.toml.");
     println!("  arch-drift               Fail si ARCHITECTURE.md ne liste pas exactement les crates members de Cargo.toml (story-593).");
     println!("  story-ids                Fail sur tout NOUVEAU doublon d'ID story dans docs/stories/ (9 collisions historiques grandfathered).");
@@ -218,8 +220,7 @@ fn verify_lock_hashes(lock_path: &Path, lock: &PcgRegistryLock) -> usize {
     let mut failures = 0;
     for entry in &lock.entries {
         let manifest = entry.manifest.as_str();
-        if Path::new(manifest).is_absolute()
-            || manifest.split(['/', '\\']).any(|part| part == "..")
+        if Path::new(manifest).is_absolute() || manifest.split(['/', '\\']).any(|part| part == "..")
         {
             eprintln!(
                 "[validate-pcg] FAIL lock {} : entrée `{}` — chemin manifest hors racine `{manifest}`",
@@ -1222,6 +1223,90 @@ fn walk_test_count(p: &Path, total: &mut usize) {
     }
 }
 
+// ────────────────────────── context-budget (2026-08-09) ──────────────────────────
+//
+// `CLAUDE.md` et tout `.claude/rules/*.md` sont chargés **à chaque session**,
+// avant même le premier mot. Mesuré le 2026-08-09 : **119 060 o**, soit ~29 700
+// tokens — dont 79 % pour les seules règles. Rien ne les retire jamais, et une
+// règle périmée ne coûte pas que des tokens : elle **oriente mal**
+// (`fine-grained-crates.md` a induit les sessions en erreur pendant des semaines,
+// c'est écrit dans son propre en-tête). Personne ne teste une règle.
+//
+// D'où ce cliquet, du même esprit que `no-scaffold` : il ne juge pas le contenu,
+// il empêche la dérive silencieuse. Le seuil est le mesuré du jour arrondi au
+// millier supérieur — baisser le plafond après un dégraissage, jamais le monter
+// pour faire passer un ajout.
+// Mesuré 92 430 o le 2026-08-09, après le dégraissage d'`outillage.md`
+// (14 468 → 4 927). Le plafond serre à ~2,5 Ko près : c'est un cliquet, pas une
+// autorisation de croître.
+const CONTEXT_BUDGET_BYTES: u64 = 95_000;
+
+fn context_budget(_args: &[String]) -> i32 {
+    println!("[xtask] context-budget — poids charge a CHAQUE session");
+
+    let mut total: u64 = 0;
+    let mut lignes: Vec<(u64, String)> = Vec::new();
+
+    let ajoute = |chemin: &Path, lignes: &mut Vec<(u64, String)>, total: &mut u64| {
+        if let Ok(m) = fs::metadata(chemin) {
+            let n = m.len();
+            *total += n;
+            lignes.push((n, chemin.display().to_string()));
+        }
+    };
+
+    ajoute(Path::new("CLAUDE.md"), &mut lignes, &mut total);
+
+    let regles = Path::new(".claude/rules");
+    if !regles.exists() {
+        eprintln!("ERROR: .claude/rules/ introuvable (lancer depuis la racine du workspace)");
+        return 2;
+    }
+    let mut entrees: Vec<_> = match fs::read_dir(regles) {
+        Ok(d) => d.filter_map(Result::ok).collect(),
+        Err(e) => {
+            eprintln!("ERROR: lecture de .claude/rules/ : {e}");
+            return 2;
+        }
+    };
+    entrees.sort_by_key(std::fs::DirEntry::file_name);
+    for e in entrees {
+        let p = e.path();
+        if p.extension().is_some_and(|x| x == "md") {
+            ajoute(&p, &mut lignes, &mut total);
+        }
+    }
+
+    lignes.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
+    println!("  Les 5 plus lourds :");
+    for (n, nom) in lignes.iter().take(5) {
+        println!("    {n:>7} o  {nom}");
+    }
+    println!(
+        "  TOTAL {total} o  (~{} tokens)  ·  plafond {CONTEXT_BUDGET_BYTES} o",
+        total / 4
+    );
+
+    if total <= CONTEXT_BUDGET_BYTES {
+        println!(
+            "✅ context-budget : {} o de marge",
+            CONTEXT_BUDGET_BYTES - total
+        );
+        0
+    } else {
+        eprintln!(
+            "❌ context-budget : depassement de {} o",
+            total - CONTEXT_BUDGET_BYTES
+        );
+        eprintln!();
+        eprintln!("Une regle se paie a CHAQUE session ; un memory seulement quand on le lit ;");
+        eprintln!("un hook en millisecondes. Deplacer le detail (mesures, historique, cas");
+        eprintln!("d'echec) vers un memory, et ne garder dans la regle que ce qui CHANGE");
+        eprintln!("une decision. Ne PAS monter le plafond pour faire passer un ajout.");
+        1
+    }
+}
+
 // ─────────────────────────── no-scaffold (story-515) ───────────────────────────
 //
 // Story-512+513 ont supprime 99 crates scaffolds. Cette commande empeche la
@@ -1431,10 +1516,7 @@ fn sensor_audit(args: &[String]) -> i32 {
     let declared = parse_registry_filenames(&registry_content);
     let (produced, duplicates) = scan_sensor_producers(Path::new("crates"));
 
-    let orphans: Vec<&String> = produced
-        .keys()
-        .filter(|n| !declared.contains(*n))
-        .collect();
+    let orphans: Vec<&String> = produced.keys().filter(|n| !declared.contains(*n)).collect();
     let missing: Vec<&String> = declared
         .iter()
         .filter(|n| !produced.contains_key(*n))
@@ -1504,7 +1586,9 @@ fn sensor_sync_writes(args: &[String]) -> i32 {
     let mut sites = Vec::new();
 
     fn visit(dir: &Path, sites: &mut Vec<String>) {
-        let Ok(entries) = fs::read_dir(dir) else { return };
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -1514,7 +1598,9 @@ fn sensor_sync_writes(args: &[String]) -> i32 {
             if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
                 continue;
             }
-            let Ok(source) = fs::read_to_string(&path) else { continue };
+            let Ok(source) = fs::read_to_string(&path) else {
+                continue;
+            };
             let is_sensor_file = source.contains("forgia") && source.contains(".json");
             if !is_sensor_file {
                 continue;
@@ -1538,12 +1624,17 @@ fn sensor_sync_writes(args: &[String]) -> i32 {
 
     visit(Path::new("crates"), &mut sites);
     sites.sort();
-    println!("[sensor-sync-writes] {} synchronous sensor write(s)", sites.len());
+    println!(
+        "[sensor-sync-writes] {} synchronous sensor write(s)",
+        sites.len()
+    );
     for site in &sites {
         println!("  {site}");
     }
     if strict && !sites.is_empty() {
-        eprintln!("[sensor-sync-writes] FAIL — migrate these writers to forgia_core::sensor_io::enqueue");
+        eprintln!(
+            "[sensor-sync-writes] FAIL — migrate these writers to forgia_core::sensor_io::enqueue"
+        );
         1
     } else {
         0
@@ -1758,7 +1849,9 @@ fn asset_load(args: &[String]) -> i32 {
     let budgets = load_asset_load_allowlist();
     if budgets.is_empty() {
         eprintln!("[xtask] asset-load: no baseline found.");
-        eprintln!("  Run `cargo xtask asset-load --fix` to generate xtask/asset-load-allowlist.toml.");
+        eprintln!(
+            "  Run `cargo xtask asset-load --fix` to generate xtask/asset-load-allowlist.toml."
+        );
         return 2;
     }
 
@@ -1900,10 +1993,7 @@ fn load_asset_load_allowlist() -> std::collections::BTreeMap<String, usize> {
 }
 
 /// Réécrit la baseline (trié par count décroissant puis nom).
-fn write_asset_load_allowlist(
-    counts: &std::collections::BTreeMap<String, usize>,
-    total: usize,
-) {
+fn write_asset_load_allowlist(counts: &std::collections::BTreeMap<String, usize>, total: usize) {
     let mut s = String::new();
     s.push_str("# asset-load-allowlist.toml — Lock L1 ratchet baseline (story-528)\n");
     s.push_str("#\n");
@@ -1951,7 +2041,7 @@ enum StoryStatus {
     Review,     // code-complete / attente validation / ready-for-review
     InProgress, // in_progress / en cours / wip
     Ready,
-    Draft,      // draft / todo / backlog
+    Draft, // draft / todo / backlog
     Blocked,
     Cancelled,
     Unknown, // aucune ligne de statut reconnue → à normaliser
@@ -2018,7 +2108,10 @@ fn classify_status(head: &str) -> StoryStatus {
     let words = line_words(line);
     let has = |w: &str| words.iter().any(|x| x.as_str() == w);
 
-    if lc.contains("cancel") || lc.contains("annul") || lc.contains("abandon") || lc.contains("wontfix")
+    if lc.contains("cancel")
+        || lc.contains("annul")
+        || lc.contains("abandon")
+        || lc.contains("wontfix")
     {
         StoryStatus::Cancelled
     } else if line.contains('✅') || has("done") || lc.contains("**done") {
@@ -2142,7 +2235,10 @@ fn render_index(stories: &[StoryMeta]) -> String {
         s.push_str("| ID | Titre | Fichier |\n| --- | --- | --- |\n");
         for m in group {
             let title = m.title.replace('|', "\\|");
-            s.push_str(&format!("| {} | {title} | [{}](./{}) |\n", m.id, m.file, m.file));
+            s.push_str(&format!(
+                "| {} | {title} | [{}](./{}) |\n",
+                m.id, m.file, m.file
+            ));
         }
         s.push('\n');
     }
@@ -2434,8 +2530,14 @@ mod tests {
             classify_status("**Statut** : IN_PROGRESS"),
             StoryStatus::InProgress
         );
-        assert_eq!(classify_status("Statut : EN COURS"), StoryStatus::InProgress);
-        assert_eq!(classify_status("Status: In Progress"), StoryStatus::InProgress);
+        assert_eq!(
+            classify_status("Statut : EN COURS"),
+            StoryStatus::InProgress
+        );
+        assert_eq!(
+            classify_status("Status: In Progress"),
+            StoryStatus::InProgress
+        );
     }
 
     #[test]
@@ -2472,7 +2574,10 @@ mod tests {
     #[test]
     fn title_strips_story_prefix() {
         assert_eq!(
-            extract_title("# Story-596 — Roguefight UI Modernization\n", "story-596-x.md"),
+            extract_title(
+                "# Story-596 — Roguefight UI Modernization\n",
+                "story-596-x.md"
+            ),
             "Roguefight UI Modernization"
         );
     }
