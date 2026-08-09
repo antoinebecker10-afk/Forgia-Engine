@@ -117,6 +117,7 @@ fn sys_setup_third_person(
 fn sys_sync_hall_avatar(
     mut commands: Commands,
     assets: Res<AssetServer>,
+    mut body_handles: ResMut<forgia_mode_roguelite::avatar::AvatarBodyHandles>,
     cfg: Res<EquipmentConfig>,
     save: Res<EquipmentSave>,
     q_player: Query<(Entity, &KinematicCharacterController), With<Player>>,
@@ -157,6 +158,7 @@ fn sys_sync_hall_avatar(
     spawn_equipped_avatar(
         &mut commands,
         &assets,
+        &mut body_handles,
         &cfg,
         &save,
         root,
@@ -317,7 +319,10 @@ fn sys_write_castle_avatar_sensor(
     }
 
     let avatar_pos = root.map_or(Vec3::ZERO, |(_, gt)| gt.translation());
-    let camera_pos = q_cam.iter().next().map_or(Vec3::ZERO, |gt| gt.translation());
+    let camera_pos = q_cam
+        .iter()
+        .next()
+        .map_or(Vec3::ZERO, |gt| gt.translation());
     let cam_dist = match (root, q_cam.iter().next()) {
         (Some(_), Some(_)) => camera_pos.distance(avatar_pos),
         _ => 0.0,
@@ -339,7 +344,10 @@ fn sys_write_castle_avatar_sensor(
     };
 
     let (severity, next_step) = if !mounted {
-        ("info", "avatar non monte — hors Hall ou joueur pas encore spawne")
+        (
+            "info",
+            "avatar non monte — hors Hall ou joueur pas encore spawne",
+        )
     } else if mesh_count == 0 {
         (
             "warn",
@@ -381,7 +389,11 @@ fn sys_write_castle_avatar_sensor(
         mesh_count,
         visible_meshes,
         cam_dist,
-        if ground_gap.is_finite() { ground_gap } else { -99.0 },
+        if ground_gap.is_finite() {
+            ground_gap
+        } else {
+            -99.0
+        },
         loco.speed,
         anim_players,
         anim_playing,
