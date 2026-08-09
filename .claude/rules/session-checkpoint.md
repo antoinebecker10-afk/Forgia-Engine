@@ -72,12 +72,64 @@ Garantit : continuité du plan, priorité explicite.
 
 ### Étape 3 — Persistence dans memories
 
-Écrire dans `C:\Users\Antoi\.claude\projects\d--Forgia\memory\` :
+Écrire dans `C:\Users\Antoi\.claude\projects\c--Users-Antoi-Desktop-Forgia-Rewrite\memory\` :
+
+Ne pas écrire les nouvelles connaissances V2 dans l'ancien espace `D--Forgia`.
+Le registre complet et les sources historiques restent accessibles via
+`docs/AI_MEMORY_MAP.md`.
 
 #### a) 1 fichier session (type `project`)
 Recap chronologique : `session_YYYY_MM_DD_<short_slug>.md`
 - Frontmatter `name/description/metadata.type: project`
 - Sections : Livraisons / Bugs résolus / Décisions design / Reste à faire / Cross-refs
+
+#### a bis) Deux clés EXACTES dans le frontmatter (adopté 2026-08-09)
+
+Mesuré ce jour-là : le score de la recherche sémantique **ne distingue pas** une
+bonne réponse d'une question absurde (0,586 pour « recette de tarte aux pommes »
+contre 0,670 pour une réponse juste), et une question en français rate une cible
+anglaise. **L'exact bat le flou.** Deux champs, sur les mémoires qu'on écrit
+désormais — jamais de reprise rétroactive des anciennes :
+
+Écrire dans `metadata:` (le système **normalise** de toute façon : il déplace les
+champs sous `metadata` et éclate les listes inline `[a, b]` en lignes — un motif
+de recherche écrit sur la forme inline ne trouverait donc **rien**) :
+
+```yaml
+metadata:
+  type: reference
+  concepts:            # vocabulaire partagé, cf. concept-first-table-forgia.md
+    - outillage
+    - grepai
+  anchors:             # LE trajet qui manquait : symbole/chemin → leçon
+    - .claude/hooks/tools-health.sh
+    - crates/forgia-mode-roguelite/src/decor.rs
+  valide_au: 2026-08-09
+```
+
+**Les deux commandes de relecture** (mesurées sur la forme normalisée) :
+
+```bash
+grep -lE "^ +- <concept>$"   *.md   # toutes les mémoires d'un concept
+grep -lE "^ +- .*<chemin>"   *.md   # toutes les leçons sur un fichier
+```
+
+- **`concepts`** : mots du tableau `concept-first-table-forgia.md`, étendu au besoin.
+- **`anchors`** : les symboles et chemins RÉELS. C'est le trajet absent
+  aujourd'hui : `SpawnKeepout` — le type qui porte toute la règle de dégagement
+  des spawns — ne figurait dans **aucune** des 890 mémoires. On ne pouvait donc
+  pas aller d'un nom croisé dans le code vers la leçon qui le concerne.
+  Vérifié après ajout : `grep -l "grepai-autostart.ps1" *.md` rend en **99 ms**
+  les DEUX mémoires concernées, celle de juillet et celle d'août.
+- **`valide_au`** : date de dernière vérification contre le code réel.
+
+**La condition sans laquelle tout ceci ne vaut rien** : ces clés doivent être
+LUES à un moment. Une métadonnée qu'on écrit sans jamais la relire reproduit
+exactement l'échec constaté sur mempalace — 11 378 tiroirs, contribution nulle
+à la session. Le point de lecture naturel est le gate `concept-first-gate.sh`
+(il se déclenche avant chaque `Edit` sur un `.rs`), mais **ne le brancher que
+quand assez de mémoires portent des ancres** : le brancher pour une seule
+mémoire, c'est livrer un tuyau sans eau.
 
 #### b) N fichiers reference (type `reference`)
 Pour CHAQUE pattern réutilisable découvert pendant la session :
