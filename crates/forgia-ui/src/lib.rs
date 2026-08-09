@@ -139,7 +139,12 @@ impl Plugin for ForgiaUiPlugin {
             // sur la même toile 1080p que le hub) : compare-and-write, coût nul.
             .add_systems(
                 Update,
-                (sys_mirror_ui_motion, sys_hub_badges, sys_apply_ui_scale),
+                (
+                    sys_mirror_ui_motion,
+                    sys_hub_badges,
+                    sys_apply_ui_scale,
+                    sys_mark_identity_shown,
+                ),
             )
             // Menu titre : curseur libre + reset à la page racine à chaque retour menu.
             .add_systems(OnEnter(AppMode::Menu), (release_cursor, reset_menu_page))
@@ -437,6 +442,25 @@ fn sys_mirror_ui_motion(
         return;
     };
     forgia_ui_lib::motion::set_motion_enabled(ctx, settings.ui_motion_enabled);
+}
+
+/// Story-693 — nourrit le capteur d'identité : « l'édition du nom/couleur a
+/// été montrée ». Son poseur historique (panneau Lobby) est supprimé — la
+/// fiche Forgeron du menu est LA surface d'édition. Marqué à la page plutôt
+/// qu'au call-site : le système de la fiche est au plafond des 16 params Bevy.
+fn sys_mark_identity_shown(
+    app_state: Res<State<AppMode>>,
+    page: Res<MenuPage>,
+    shown: Option<ResMut<forgia_mode_roguelite::identity::IdentityPanelShown>>,
+) {
+    if *app_state.get() != AppMode::Menu || *page != MenuPage::Forgeron {
+        return;
+    }
+    if let Some(mut s) = shown {
+        if !s.0 {
+            s.0 = true;
+        }
+    }
 }
 
 /// Hauteur de référence du design : toute l'UI egui du jeu est dessinée comme
