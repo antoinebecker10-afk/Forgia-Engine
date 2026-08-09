@@ -89,8 +89,16 @@ done
 
 echo
 echo "=== A6 · binaire contenant un motif ASCII ==="
-{ head -c 500 /dev/urandom; printf 'jailbreak'; head -c 500 /dev/urandom; } > "$D/bin.dat"
-verdict "$D/bin.dat" "binaire avec motif ASCII dedans"
+# 🚨 Contenu DETERMINISTE, surtout pas /dev/urandom. Avec de l'aleatoire ce cas
+# passait une fois sur deux — et mes premiers « 44/44 » etaient donc de la
+# chance, pas une preuve. Un test de securite instable ne vaut rien : il fait
+# consigner des verts qui ne disent rien. Les octets nuls et l'UTF-8 invalide
+# sont ici EXPLICITES, parce que c'est exactement ce qui met `grep -i` en echec
+# sur une grande alternance.
+printf 'entete\000binaire\377\376 invalide\000 jailbreak \000 fin\n' > "$D/bin.dat"
+verdict "$D/bin.dat" "binaire (octets nuls + UTF-8 invalide) avec motif ASCII"
+printf '\000\000\000 rien de suspect \000\000\n' > "$D/bin_propre.dat"
+verdict "$D/bin_propre.dat" "binaire SANS motif (0 attendu des deux cotes)"
 
 echo
 echo "=== A7 · fichiers exclus par regle (doivent rendre 0) ==="
