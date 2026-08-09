@@ -5,9 +5,20 @@
     "COCKPIT_LOG_DIR": "D:/IA Antoine/logs",
     "COCKPIT_STATE_DIR": "D:/IA Antoine/state",
     "COCKPIT_PYTHON": "C:/Users/Antoi/AppData/Local/Programs/Python/Python314/python.exe",
-    "COCKPIT_MEMORY_DIR": "C:/Users/Antoi/.claude/projects/c--Users-Antoi-Desktop-Forgia-Rewrite/memory"
+    "COCKPIT_MEMORY_DIR": "C:/Users/Antoi/.claude/projects/c--Users-Antoi-Desktop-Forgia-Rewrite/memory",
+    "MEMPALACE_PALACE_PATH": "C:/Users/Antoi/.mempalace/palace",
+    "PYTHONIOENCODING": "utf-8",
+    "PYTHONUTF8": "1"
   },
   "permissions": {
+    "allow": [
+      "mcp__mempalace__mempalace_status",
+      "mcp__mempalace__mempalace_search",
+      "mcp__mempalace__mempalace_kg_query",
+      "mcp__mempalace__mempalace_kg_stats",
+      "mcp__mempalace__mempalace_list_wings",
+      "mcp__mempalace__mempalace_list_rooms"
+    ],
     "deny": [
       "Edit(file_path:C:/Users/Antoi/Desktop/Forgia Rewrite/CLAUDE.md)",
       "Write(file_path:C:/Users/Antoi/Desktop/Forgia Rewrite/CLAUDE.md)",
@@ -40,6 +51,37 @@
           {
             "type": "command",
             "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 3 \"D:/IA Antoine/.claude/hooks/concept-first-session-reset.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 5 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/mempalace-session-start.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 10 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/tools-health.sh\"",
+            "statusMessage": "Contrôle des outils de session..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 15 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/memorise-sync.sh\"",
+            "statusMessage": "Synchronisation des outils de mémoire..."
           }
         ]
       }
@@ -100,6 +142,17 @@
           {
             "type": "command",
             "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 10 \"D:/IA Antoine/.claude/hooks/pre-compact.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 20 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/mempalace-sync.sh\""
           }
         ]
       }
