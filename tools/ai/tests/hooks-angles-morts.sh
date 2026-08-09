@@ -74,6 +74,37 @@ for q in "a" "$(python -c 'print("bevy "*180)')" "select * from; DROP TABLE--" "
 done
 
 echo
+echo "=== E · prompt-observabilite : declencheur LARGE, mais pas bavard ==="
+OBS="$P/.claude/hooks/prompt-observabilite.sh"
+obs(){ local r got="silence"
+  r=$(echo "{\"prompt\":\"$1\"}" | bash "$OBS" 2>/dev/null); [ -n "$r" ] && got="injecte"
+  if [ "$got" = "$2" ]; then OK=$((OK+1)); echo "  ok    [$got] $1"
+  else KO=$((KO+1)); ALERTE="$ALERTE\n    obs '$1' : attendu $2, obtenu $got"; echo "  ECHEC [$got] $1"; fi; }
+# Symptomes -> doivent injecter. La couverture reste LARGE : demande explicite
+# (« dans tous les contextes ou je pourrais en avoir besoin »).
+obs "ca crash quand je tire"            injecte
+obs "le menu ne s affiche pas"          injecte
+obs "regarde"                           injecte
+obs "j ai relance, ca marche pas"       injecte
+obs "pourquoi ca rame autant"           injecte
+obs "l arme est invisible en jeu"       injecte
+# Conception / instruction -> silence. Un faux positif pollue CHAQUE prompt ;
+# c'est la lecon du declencheur « checkpoint », mot metier dans un jeu.
+obs "ajoute une arme au genome"         silence
+obs "commit ce qui est bon"             silence
+obs "refais un test apres"              silence
+obs "equilibre la courbe de difficulte" silence
+# Le digest contient guillemets et accents : un JSON casse serait ignore EN
+# SILENCE par le harnais — la panne la plus difficile a voir.
+if echo '{"prompt":"ca crash"}' | bash "$OBS" 2>/dev/null | python -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
+    OK=$((OK+1)); echo "  ok    sortie JSON valide (guillemets + accents du digest)"
+else
+    KO=$((KO+1)); ALERTE="$ALERTE\n    prompt-observabilite : JSON invalide"; echo "  ECHEC JSON invalide"
+fi
+rc=$(echo '{"prompt":"ca crash"}' | PROJECT_ROOT=/zzz/nope bash "$OBS" >/dev/null 2>&1; echo $?)
+chk "$rc" "0" "sort 0 meme avec une racine inexistante"
+
+echo
 echo "════════════════════════════════════"
 echo "   REUSSIS : $OK      PROBLEMES : $KO"
 [ -n "$ALERTE" ] && printf "   Detail :%b\n" "$ALERTE"

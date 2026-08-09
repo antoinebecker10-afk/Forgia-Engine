@@ -82,6 +82,11 @@
             "type": "command",
             "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 15 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/memorise-sync.sh\"",
             "statusMessage": "Synchronisation des outils de mémoire..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 12 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/prompt-observabilite.sh\"",
+            "statusMessage": "Lecture des capteurs..."
           }
         ]
       }
