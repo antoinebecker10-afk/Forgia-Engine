@@ -3,8 +3,22 @@
 # Verdict par cas : les deux versions doivent rendre le MEME resultat.
 # Toute divergence = regression de securite (ou detection fantome).
 
+# 🚨 La REFERENCE est versionnee ICI, pas seulement dans le cockpit.
+# `D:/IA Antoine/` n'est pas un depot git : la sauvegarde .bak y etait le SEUL
+# temoin de la semantique d'origine. La perdre aurait fait disparaitre toute
+# possibilite de prouver une non-regression — un banc de securite dont la
+# reference n'est pas versionnee ne garantit rien a moyen terme.
+# Le cockpit reste prioritaire s'il est present (il peut avoir ete mis a jour
+# volontairement) ; sinon on retombe sur la copie du depot.
+REF_DEPOT="$(dirname "$0")/reference-anti-injection-2026-08-09.sh"
 OLD="D:/IA Antoine/.claude/hooks/anti-injection-scan.sh.bak-2026-08-09"
+[ -f "$OLD" ] || OLD="$REF_DEPOT"
 NEW="D:/IA Antoine/.claude/hooks/anti-injection-scan.sh"
+if [ ! -f "$NEW" ]; then
+    echo "ERREUR : le hook courant est introuvable ($NEW)."
+    echo "Le cockpit D:/IA Antoine/ n'est pas monte — banc non concluant, PAS vert."
+    exit 2
+fi
 D="$(dirname "$0")/sec"
 rm -rf "$D"; mkdir -p "$D"
 
