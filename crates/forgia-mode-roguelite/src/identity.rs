@@ -13,13 +13,10 @@
 //! pas de clavier obligatoire). Couleur = cosmétique pur (zéro stat, P6/P8).
 
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
+use bevy_egui::egui;
 use forgia_core::prelude::*;
-use forgia_ui_lib::style::{HAIR_GOLD_STRONG, VERRE_GLASS};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-
-use crate::RunState;
 
 const SAVE_FILE: &str = "identity_save.toml";
 const SAVE_VERSION: u32 = 1;
@@ -124,6 +121,37 @@ pub struct IdentitySave {
     pub arm_color: String,
     #[serde(default = "default_arm_style")]
     pub arm_style: String,
+    /// Story-678 — le DÉCOR du menu affiché, id du catalogue `cosmetics`.
+    ///
+    /// Même forme que `equipped_color` / `unlocked_colors` juste au-dessus :
+    /// c'est le patron des cosmétiques du projet, on ne s'en écarte pas.
+    #[serde(default = "default_backdrop")]
+    pub equipped_backdrop: String,
+    /// Le morceau qui joue au hub — clé de piste (`hub`, `chapter_02`…).
+    #[serde(default = "default_hub_music")]
+    pub hub_music: String,
+    /// Décors ACHETÉS ou accordés — seulement ceux-là.
+    ///
+    /// Les cosmétiques gagnés en battant un chapitre ne sont PAS stockés : ils
+    /// se dérivent de `chapters_cleared` (cf. `cosmetics::OwnedCosmetics`). Les
+    /// stocker ferait deux vérités de la même chose, qui divergeraient dès
+    /// qu'on renumérote un chapitre.
+    #[serde(default)]
+    pub unlocked_backdrops: Vec<String>,
+    /// Bras achetés ou accordés (ids d'article du catalogue).
+    #[serde(default)]
+    pub unlocked_arms: Vec<String>,
+    /// Musiques de hub achetées ou accordées (ids d'article).
+    #[serde(default)]
+    pub unlocked_music: Vec<String>,
+}
+
+fn default_backdrop() -> String {
+    crate::cosmetics::FALLBACK_BACKDROP.to_string()
+}
+
+fn default_hub_music() -> String {
+    "hub".to_string()
 }
 
 fn default_arm_color() -> String {
@@ -143,11 +171,26 @@ impl Default for IdentitySave {
             unlocked_colors: vec!["default".to_string()],
             arm_color: default_arm_color(),
             arm_style: default_arm_style(),
+            equipped_backdrop: default_backdrop(),
+            hub_music: default_hub_music(),
+            unlocked_backdrops: Vec::new(),
+            unlocked_arms: Vec::new(),
+            unlocked_music: Vec::new(),
         }
     }
 }
 
 impl IdentitySave {
+    /// Écrit la sauvegarde sur le disque.
+    ///
+    /// Story-678 : exposé pour `cosmetics.rs`, qui mute les stocks cosmétiques
+    /// (couleurs, décors, bras, musiques) et doit pouvoir les persister. La
+    /// mécanique d'écriture, elle, reste ici — c'est ce module qui possède le
+    /// fichier.
+    pub fn persist(&self) {
+        self.save();
+    }
+
     fn save_path() -> PathBuf {
         crate::persist::save_dir().join(SAVE_FILE)
     }
@@ -164,19 +207,36 @@ impl IdentitySave {
 // ── Systèmes ─────────────────────────────────────────────────────────────────
 
 /// Boot : si aucun nom (1re partie), attribue le nom par défaut SILENCIEUSEMENT
-/// (P7 : pas de prompt). Débloque toutes les couleurs MVP (gratuites).
+/// (P7 : pas de prompt). Débloque les couleurs gratuites — c'est-à-dire celles
+/// que le Marketplace ne gouverne pas (story-678).
 fn sys_init_identity(
     mut save: ResMut<IdentitySave>,
     cfg: Res<IdentityConfig>,
     mut arm_cosmetics: ResMut<ArmCosmetics>,
+    // Ordonné APRÈS `sys_init_cosmetics` (cf. le plugin) : sans le catalogue, on
+    // retomberait sur l'ancien comportement et on offrirait tout.
+    cosmetics: Option<Res<crate::cosmetics::CosmeticsConfig>>,
 ) {
     let mut dirty = false;
     if save.player_name.trim().is_empty() {
         save.player_name = cfg.default_name.clone();
         dirty = true;
     }
-    // MVP : toutes les couleurs sont gratuites → débloquées d'office.
+    // Les couleurs étaient TOUTES offertes au boot (« MVP : gratuites »).
+    //
+    // Story-678 : celles que le Marketplace vend ou conditionne à un chapitre ne
+    // le sont plus — sinon l'onglet Couleurs afficherait un prix pour ce que
+    // cette boucle vient de donner. Le catalogue est l'autorité ; une couleur
+    // qu'il ne liste pas reste gratuite, donc aucune couleur existante ne
+    // disparaît par simple omission. Et rien n'est RETIRÉ d'une sauvegarde : on
+    // n'ajoute pas, on ne retranche jamais.
     for c in &cfg.colors {
+        if cosmetics
+            .as_deref()
+            .is_some_and(|cat| cat.color_is_governed(&c.id))
+        {
+            continue;
+        }
         if !save.unlocked_colors.contains(&c.id) {
             save.unlocked_colors.push(c.id.clone());
             dirty = true;
@@ -194,46 +254,12 @@ fn sys_init_identity(
     arm_cosmetics.style = ArmStyle::from_key(&save.arm_style);
 }
 
-/// Panneau d'identité au Lobby (non-bloquant, P7). Nom + bouton crayon (presets
-/// cliquables + texte optionnel) + pastilles couleur. `Local<bool>` = éditeur ouvert.
-fn draw_identity_panel(
-    mut contexts: EguiContexts,
-    run_state: Option<Res<State<RunState>>>,
-    cfg: Res<IdentityConfig>,
-    mut save: ResMut<IdentitySave>,
-    mut arm_cosmetics: ResMut<ArmCosmetics>,
-    mut editing: Local<bool>,
-    mut shown: ResMut<IdentityPanelShown>,
-) {
-    if !matches!(run_state.as_deref().map(|s| s.get()), Some(RunState::Lobby)) {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
-    shown.0 = true;
-
-    // Home-hub P2.1 — onglet FORGE : panneau CENTRÉ (le hub gère les onglets).
-    // Titre « TON FORGERON » = onglet hub.
-    egui::Area::new(egui::Id::new("forgia_identity_panel"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 10.0))
-        .show(ctx, |ui| {
-            egui::Frame::new()
-                .fill(VERRE_GLASS)
-                .inner_margin(egui::Margin::symmetric(22, 18))
-                .corner_radius(egui::CornerRadius::same(10))
-                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
-                .show(ui, |ui| {
-                    ui.set_min_width(320.0);
-                    draw_identity_content(ui, &cfg, &mut save, &mut arm_cosmetics, &mut editing);
-                });
-        });
-}
-
 /// Contenu du panneau d'identité (nom + couleurs + bras) rendu dans un `Ui` donné.
-/// PARTAGÉ entre le Lobby (`draw_identity_panel`) et le hub-menu (`forgia-ui`) —
-/// zéro duplication. Mute `save` / `arm_cosmetics` + sauve sur disque. `editing` =
-/// état (ouvert/fermé) de l'éditeur de nom (un `Local<bool>` par appelant).
+/// PARTAGÉ avec le hub-menu (`forgia-ui`) — zéro duplication. Le panneau Lobby
+/// dédié (`draw_identity_panel`) a été retiré (story-694 : le Lobby est un gate
+/// auto-start couvert d'un overlay de chargement, jamais vu par personne).
+/// Mute `save` / `arm_cosmetics` + sauve sur disque. `editing` = état
+/// (ouvert/fermé) de l'éditeur de nom (un `Local<bool>` par appelant).
 pub fn draw_identity_content(
     ui: &mut egui::Ui,
     cfg: &IdentityConfig,
@@ -309,9 +335,9 @@ pub fn draw_identity_content(
             );
             let selected = c.id == equipped;
             let size = if selected { 30.0 } else { 24.0 };
-            let (r, resp) =
-                ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
-            ui.painter().rect_filled(r, egui::CornerRadius::same(5), col);
+            let (r, resp) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
+            ui.painter()
+                .rect_filled(r, egui::CornerRadius::same(5), col);
             if selected {
                 ui.painter().rect_stroke(
                     r,
@@ -331,36 +357,32 @@ pub fn draw_identity_content(
         }
     });
 
-    // ── Cosmétique des BRAS ──
+    // ── Cosmétique des BRAS — plus AUCUN sélecteur ici ──
     //
-    // Le sélecteur « Bras — couleur » a été RETIRÉ : les bras du viewmodel sont
-    // désormais ceux du personnage, dont les plaques prennent la rareté de
-    // l'équipement (`ArmCosmetics.armor_rgb`). Un second choix de couleur ne
-    // pilotait plus rien de distinct — deux réglages pour une seule chose.
-    // La combinaison suit donc la couleur du joueur, celle qui porte déjà son
-    // identité.
-    ui.add_space(10.0);
-    ui.separator();
-    ui.label(egui::RichText::new("Bras — style :").size(13.0));
-    ui.horizontal_wrapped(|ui| {
-        for style in [ArmStyle::Peau, ArmStyle::Gantelet, ArmStyle::Cyber] {
-            let selected = save.arm_style == style.key();
-            if ui.selectable_label(selected, style.label()).clicked() {
-                save.arm_style = style.key().to_string();
-                arm_cosmetics.style = style;
-                save.save();
-            }
-        }
-    });
+    // « Bras — couleur » avait déjà été retiré : les bras du viewmodel sont ceux
+    // du personnage, dont les plaques prennent la rareté de l'équipement
+    // (`ArmCosmetics.armor_rgb`). La couleur suit donc celle du joueur.
+    //
+    // « Bras — style » (Peau/Gantelet/Cyber) est retiré à son tour (2026-08-05,
+    // demande en jeu) : sur un écran qui montre déjà le personnage ÉQUIPÉ, un
+    // réglage de peau d'avant-bras est un choix qu'on ne voit pas et qui n'a
+    // rien à décider. Le style reste piloté par la valeur persistée
+    // (`IdentitySave.arm_style`), appliquée au boot par `sys_load_identity` —
+    // le rendu (`forgia-viewmodel::arms`) est inchangé.
 }
 
-/// Flag « panneau identité affiché » (pour le health check du sensor).
+/// Flag « édition d'identité affichée » (pour le health check du sensor).
+///
+/// Posé par la fiche Forgeron du hub-menu (`forgia-ui`) — l'unique surface
+/// d'édition depuis que le panneau Lobby a été retiré (story-694 : le Lobby
+/// est un gate auto-start couvert d'un overlay, son panneau ne s'affichait
+/// pour personne — c'était précisément ce que ce capteur détectait).
 #[derive(Resource, Default)]
 pub struct IdentityPanelShown(pub bool);
 
 /// Sensor `forgia2_identity.json` 1Hz (observability-required). Health check :
-/// `IDENTITY_EDIT_UNREACHABLE` si le panneau n'a jamais été montré (édition
-/// inaccessible) — PAS « jamais nommé » (garder le défaut est légitime, P7).
+/// `IDENTITY_EDIT_UNREACHABLE` si l'édition n'a jamais été montrée (fiche
+/// Forgeron du menu) — PAS « jamais nommé » (garder le défaut est légitime, P7).
 fn sys_write_identity_sensor(
     time: Res<Time>,
     mut accum: Local<f32>,
@@ -377,7 +399,8 @@ fn sys_write_identity_sensor(
     let (severity, next_step) = if named && !shown.0 && time.elapsed_secs() > 60.0 {
         (
             "warn",
-            "panneau identite jamais affiche au Lobby — edition du nom/couleur inaccessible",
+            "edition du nom/couleur jamais affichee (fiche Forgeron du menu) — \
+             verifier MenuPage::Forgeron et sys_mark_identity_shown (forgia-ui)",
         )
     } else {
         ("ok", "")
@@ -396,6 +419,29 @@ fn sys_write_identity_sensor(
     let _ = forgia_core::sensor_io::enqueue(SENSOR_PATH, json);
 }
 
+/// Miroir `IdentitySave` → `ArmCosmetics` (story-678).
+///
+/// Le panneau Forgeron applique ses changements directement (il tient déjà les
+/// deux ressources). Le Marketplace, lui, n'écrit QUE la sauvegarde : sans ce
+/// miroir, acheter des gantelets ne changerait rien à l'écran — l'article
+/// serait payé et inerte.
+///
+/// Set-if-different plutôt qu'une écriture par frame : `ArmCosmetics` est lue
+/// par le viewmodel, et la marquer changée à chaque frame ferait retravailler
+/// tout ce qui l'observe pour rien.
+fn sys_sync_arm_cosmetics(
+    cfg: Res<IdentityConfig>,
+    save: Res<IdentitySave>,
+    mut arm: ResMut<ArmCosmetics>,
+) {
+    let color = cfg.color_rgb(&save.arm_color);
+    let style = ArmStyle::from_key(&save.arm_style);
+    if arm.color != color || arm.style != style {
+        arm.color = color;
+        arm.style = style;
+    }
+}
+
 pub struct IdentityPlugin;
 
 impl Plugin for IdentityPlugin {
@@ -404,11 +450,11 @@ impl Plugin for IdentityPlugin {
             .insert_resource(IdentitySave::load_or_default())
             .init_resource::<IdentityPanelShown>()
             .add_systems(Startup, sys_init_identity)
-            // Hub à onglets (P2) : le panneau forgeron ne s'affiche que sur l'onglet FORGE.
-            .add_systems(
-                EguiPrimaryContextPass,
-                draw_identity_panel.run_if(crate::hub::on_forge_tab),
-            )
+            // Story-678 — les bras suivent la sauvegarde, d'où qu'elle change.
+            // NON gaté sur `GameMode::Roguelite` : le Marketplace vit au MENU,
+            // qui tourne en `GameMode::None` (piège déjà payé sur la musique de
+            // hub et les sons d'UI).
+            .add_systems(Update, sys_sync_arm_cosmetics)
             .add_systems(Update, sys_write_identity_sensor.in_set(GameSet::Sensors));
     }
 }

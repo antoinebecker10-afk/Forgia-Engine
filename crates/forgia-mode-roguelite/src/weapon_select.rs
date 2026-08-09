@@ -20,11 +20,11 @@ use bevy::camera::primitives::Aabb;
 use bevy::gltf::GltfAssetLabel;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
-use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
+use bevy_egui::egui;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType, ARENA_V1_WEAPONS};
 use forgia_core::prelude::*;
 use forgia_ui_lib::style::{
-    C_HP_HIGH, C_TEXT_LIGHT, C_TEXT_MUTED, FORGE_OR, FORGE_PANEL, FORGE_TEAL, HAIR_GOLD_STRONG,
+    C_HP_HIGH, C_TEXT_LIGHT, C_TEXT_MUTED, FORGE_OR, FORGE_TEAL,
 };
 use forgia_ui_lib::theme::display_text;
 use serde::Deserialize;
@@ -286,20 +286,6 @@ pub fn sys_hot_reload_weapon_cards(
     info!("[weapon-select] cartes HOT-RELOADED");
 }
 
-/// Lobby : ← / → cyclent l'arme choisie. Layout-agnostic (AZERTY-safe), pas de
-/// conflit avec les touches 1-4 / ENTRÉE du meta-shop.
-pub fn sys_weapon_select_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut choice: ResMut<StartingWeaponChoice>,
-) {
-    let n = ARENA_V1_WEAPONS.len();
-    if keys.just_pressed(KeyCode::ArrowRight) {
-        choice.idx = (choice.idx + 1) % n;
-    } else if keys.just_pressed(KeyCode::ArrowLeft) {
-        choice.idx = (choice.idx + n - 1) % n;
-    }
-}
-
 /// OnExit(Lobby) = run-start : applique le choix à `EquippedWeapons.current` + calcule
 /// le bonus de maîtrise (niveau de l'arme) dans `WeaponMasteryMods`. No-op si la
 /// Resource est absente.
@@ -392,39 +378,6 @@ fn sys_enforce_unlocked_loadout(
     }
 }
 
-/// Lobby — [U] débloque l'arme sélectionnée si verrouillée + assez d'Âmes (story-613).
-/// Mute MetaSouls + MetaShopSave (persisté disque), miroir de `meta_shop::sys_meta_shop_input`.
-pub fn sys_weapon_unlock_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    choice: Res<StartingWeaponChoice>,
-    cat: Res<MetaShopCatalogue>,
-    mut save: ResMut<MetaShopSave>,
-    mut meta: ResMut<MetaSouls>,
-) {
-    if !keys.just_pressed(KeyCode::KeyU) {
-        return;
-    }
-    let w = ARENA_V1_WEAPONS[choice.idx % ARENA_V1_WEAPONS.len()];
-    let key = vm_key(w);
-    if save.is_weapon_unlocked(key) {
-        return; // déjà possédée
-    }
-    let Some(unlock) = cat.weapon_unlock(key) else {
-        return; // pas déblocable (Pépin / inconnue)
-    };
-    if !unlock_weapon_paid(&mut save, &mut meta, key, unlock.cost) {
-        info!(
-            "[weapon-select] pas assez d'Âmes pour {} ({}/{})",
-            unlock.name, meta.current, unlock.cost
-        );
-        return;
-    }
-    info!(
-        "[weapon-select] ARME DÉBLOQUÉE : {} (-{} Âmes, reste {})",
-        unlock.name, unlock.cost, meta.current
-    );
-}
-
 /// Run terminée (Defeat/Victory) → l'arme équipée gagne 1 niveau de maîtrise (P3,
 /// persisté), dans la limite du plafond `[mastery] max_level` du genome. Chaque arme
 /// progresse indépendamment selon son usage.
@@ -447,329 +400,6 @@ pub fn sys_level_up_equipped_weapon(
         "[weapon-select] {key} → niveau {level}/{}",
         cat.mastery.max_level
     );
-}
-
-/// Dessine la carte de choix d'arme au Lobby (à droite de L'Enclume).
-pub fn draw_weapon_select(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    game_mode: Res<State<GameMode>>,
-    run_state: Option<Res<State<RunState>>>,
-    mut choice: ResMut<StartingWeaponChoice>,
-    cards: Res<WeaponCards>,
-    elem_cfg: Res<ElementConfig>,
-    mut save: ResMut<MetaShopSave>,
-    cat: Res<MetaShopCatalogue>,
-    mut meta: ResMut<MetaSouls>,
-) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
-        return;
-    }
-    if !matches!(run_state.as_deref().map(|s| s.get()), Some(RunState::Lobby)) {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
-
-    // Story-617 — scrim sombre plein écran : recule l'arène 3D live derrière l'UI
-    // → l'écran « se referme » sur la sélection. Order::Background = derrière les panneaux.
-    {
-        let screen = ctx.content_rect();
-        ctx.layer_painter(egui::LayerId::new(
-            egui::Order::Background,
-            egui::Id::new("ws_scrim"),
-        ))
-        .rect_filled(screen, 0.0, egui::Color32::from_black_alpha(120));
-    }
-
-    let n = ARENA_V1_WEAPONS.len();
-    let sel = choice.idx % n;
-    let w = ARENA_V1_WEAPONS[sel];
-    let key = vm_key(w);
-    let owned = save.is_weapon_unlocked(key);
-    let unlock = cat.weapon_unlock(key);
-    // Carte grisée si verrouillée (accent muted) → signal visuel "locked".
-    let accent = if owned {
-        crate::hud::speaker_color(weapon_to_speaker(w))
-    } else {
-        C_TEXT_MUTED
-    };
-    let (name, tagline) = persona(w);
-    let card = cards.cards.get(&w);
-    let element = elem_cfg.element_for(w);
-
-    // ── Carte centrale (vitrine d'arme) : l'aperçu 3D (preview agrandi) flotte AU-DESSUS,
-    // la carte stats + sélecteur ◄ ► est centrée juste dessous. Le titre « CHOISIS TON
-    // ARME » est fourni par le hub (onglet) ; le bas-centre est libre pour LANCER (hub).
-    // Home-hub P2.1 : avant = 3 zones (titre haut / stats gauche / sélecteur bas).
-    egui::Area::new(egui::Id::new("ws_card"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-        .show(ctx, |ui| {
-            // Cadre EXTÉRIEUR transparent + bordure : son HAUT est un viewport vide
-            // (transparent) où l'aperçu 3D (layer 0, rendu derrière egui) apparaît →
-            // l'arme est "dans" la carte. Le panneau stats (fill opaque) est dessous.
-            egui::Frame::new()
-                .fill(egui::Color32::TRANSPARENT)
-                .inner_margin(egui::Margin::same(6))
-                .corner_radius(egui::CornerRadius::same(14))
-                .stroke(egui::Stroke::new(3.0, accent))
-                .show(ui, |ui| {
-                    ui.set_min_width(420.0);
-                    ui.set_max_width(460.0);
-                    ui.vertical_centered(|ui| {
-                        // Viewport d'arme : espace vide (l'aperçu 3D rend derrière egui).
-                        ui.add_space(WEAPON_VIEWPORT_H);
-                        egui::Frame::new()
-                            .fill(FORGE_PANEL)
-                            .inner_margin(egui::Margin::symmetric(24, 16))
-                            .corner_radius(egui::CornerRadius::same(10))
-                            .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
-                            .show(ui, |ui| {
-                                ui.set_min_width(380.0);
-                                // Taille UNIFIÉE : hauteur stats fixe → carte identique
-                                // pour toutes les armes (design cohérent + viewport 3D
-                                // stable, ne bouge plus selon l'arme).
-                                ui.set_min_height(STATS_PANEL_H);
-                                ui.vertical(|ui| {
-                                    // En-tête : nom + index parcouru + tagline.
-                                    ui.horizontal(|ui| {
-                                        ui.heading(display_text(name, 28.0, accent).strong());
-                                        ui.label(
-                                            egui::RichText::new(format!("‹ {}/{} ›", sel + 1, n))
-                                                .size(16.0)
-                                                .color(FORGE_TEAL),
-                                        );
-                                    });
-                                    ui.label(
-                                        egui::RichText::new(tagline)
-                                            .size(14.0)
-                                            .italics()
-                                            .color(C_TEXT_MUTED),
-                                    );
-                                    // Statut verrou + NIVEAU de maîtrise (P3) — visible par arme.
-                                    ui.add_space(4.0);
-                                    ui.horizontal(|ui| {
-                                        if owned {
-                                            ui.label(
-                                                egui::RichText::new("DÉBLOQUÉE")
-                                                    .size(15.0)
-                                                    .strong()
-                                                    .color(C_HP_HIGH),
-                                            );
-                                        } else {
-                                            ui.label(
-                                                egui::RichText::new("VERROUILLÉE")
-                                                    .size(15.0)
-                                                    .strong()
-                                                    .color(C_TEXT_MUTED),
-                                            );
-                                        }
-                                        // Niveau EFFECTIF : un save antérieur au plafond
-                                        // stocke 13 ; afficher « 13/6 » serait illisible.
-                                        // Bonus dérivé de la même source que le runtime.
-                                        let lvl =
-                                            cat.mastery.effective_level(save.weapon_level(key));
-                                        let bonus = (cat.mastery.damage_mul(lvl) - 1.0) * 100.0;
-                                        let cap = cat.mastery.max_level;
-                                        ui.label(
-                                            egui::RichText::new(format!(
-                                                "·  Niveau {lvl}/{cap}  (+{bonus:.0}% dégâts)"
-                                            ))
-                                            .size(15.0)
-                                            .strong()
-                                            .color(FORGE_OR),
-                                        );
-                                    });
-                                    ui.add_space(8.0);
-
-                                    if let Some(e) = element {
-                                        ui.label(
-                                            egui::RichText::new(format!(
-                                                "Élément : {} — {}",
-                                                e.fr_name(),
-                                                e.tag()
-                                            ))
-                                            .size(16.0)
-                                            .strong()
-                                            .color(elem_color(e, &elem_cfg)),
-                                        );
-                                        ui.add_space(8.0);
-                                    }
-
-                                    match card {
-                                        Some(c) => {
-                                            let dps = if c.damage <= 0.0 {
-                                                "roquette AOE".to_string()
-                                            } else {
-                                                format!(
-                                                    "{:.0}",
-                                                    weapon_dps(c.damage, c.fire_rate, c.pellets)
-                                                )
-                                            };
-                                            let dmg = if c.damage <= 0.0 {
-                                                "—".to_string()
-                                            } else {
-                                                format!("{:.0}", c.damage)
-                                            };
-                                            let mag = c.mag_size.to_string();
-                                            egui::Grid::new("forgia_ws_grid")
-                                                .num_columns(2)
-                                                .spacing([18.0, 5.0])
-                                                .show(ui, |ui| {
-                                                    stat_row(ui, "DMG / coup", &dmg);
-                                                    stat_row(
-                                                        ui,
-                                                        "Cadence",
-                                                        &format!("{:.1} /s", c.fire_rate),
-                                                    );
-                                                    stat_row_strong(ui, "DPS", &dps, FORGE_OR);
-                                                    stat_row(ui, "Chargeur", &mag);
-                                                    stat_row(
-                                                        ui,
-                                                        "Recharge",
-                                                        &format!("{:.2} s", c.reload_time_secs),
-                                                    );
-                                                    stat_row(
-                                                        ui,
-                                                        "Portée",
-                                                        &format!("{:.0} m", c.range),
-                                                    );
-                                                    if c.head_damage_mul > 1.0 {
-                                                        stat_row(
-                                                            ui,
-                                                            "Tête",
-                                                            &format!("×{:.1}", c.head_damage_mul),
-                                                        );
-                                                    }
-                                                });
-                                        }
-                                        None => {
-                                            ui.label(
-                                                egui::RichText::new(
-                                                    "stats indisponibles (genome non chargé)",
-                                                )
-                                                .size(14.0)
-                                                .color(C_TEXT_MUTED),
-                                            );
-                                        }
-                                    }
-
-                                    if let Some(e) = element {
-                                        let (best, worst) = strong_weak(&elem_cfg, e);
-                                        ui.add_space(6.0);
-                                        ui.separator();
-                                        ui.label(
-                                            egui::RichText::new(format!(
-                                                "Fort vs   {}   ×{:.1}",
-                                                arch_fr(best.0),
-                                                best.1
-                                            ))
-                                            .size(15.0)
-                                            .color(C_HP_HIGH),
-                                        );
-                                        ui.label(
-                                            egui::RichText::new(format!(
-                                                "Faible vs {}   ×{:.1}",
-                                                arch_fr(worst.0),
-                                                worst.1
-                                            ))
-                                            .size(15.0)
-                                            .color(C_TEXT_MUTED),
-                                        );
-                                    }
-
-                                    // ── Navigation par BOUTONS ◄ ► (clavier ← → toujours dispo) ──
-                                    ui.add_space(12.0);
-                                    ui.separator();
-                                    ui.add_space(8.0);
-                                    ui.vertical_centered(|ui| {
-                                        ui.horizontal(|ui| {
-                                            // Centrage manuel : la rangée prend toute la largeur →
-                                            // on pousse de (largeur - contenu)/2 à gauche.
-                                            let lead =
-                                                ((ui.available_width() - 280.0) * 0.5).max(0.0);
-                                            ui.add_space(lead);
-                                            let prev = ui
-                                                .add(
-                                                    egui::Button::new(
-                                                        egui::RichText::new("‹")
-                                                            .size(30.0)
-                                                            .strong(),
-                                                    )
-                                                    .min_size(egui::vec2(64.0, 42.0)),
-                                                )
-                                                .on_hover_text("Arme précédente")
-                                                .clicked();
-                                            ui.add_space(10.0);
-                                            ui.label(
-                                                egui::RichText::new("Changer d'arme")
-                                                    .size(15.0)
-                                                    .color(C_TEXT_MUTED),
-                                            );
-                                            ui.add_space(10.0);
-                                            let next = ui
-                                                .add(
-                                                    egui::Button::new(
-                                                        egui::RichText::new("›")
-                                                            .size(30.0)
-                                                            .strong(),
-                                                    )
-                                                    .min_size(egui::vec2(64.0, 42.0)),
-                                                )
-                                                .on_hover_text("Arme suivante")
-                                                .clicked();
-                                            if prev {
-                                                choice.idx = (sel + n - 1) % n;
-                                            }
-                                            if next {
-                                                choice.idx = (sel + 1) % n;
-                                            }
-                                        });
-                                        // Déblocage CLIQUABLE si l'arme courante est verrouillée.
-                                        if !owned {
-                                            if let Some(u) = unlock {
-                                                ui.add_space(8.0);
-                                                let afford = meta.current >= u.cost;
-                                                let mut unlock_clicked = false;
-                                                ui.add_enabled_ui(afford, |ui| {
-                                                    unlock_clicked = ui
-                                                        .add(
-                                                            egui::Button::new(
-                                                                egui::RichText::new(format!(
-                                                                    "Débloquer ({} Âmes)",
-                                                                    u.cost
-                                                                ))
-                                                                .size(16.0)
-                                                                .strong(),
-                                                            )
-                                                            .min_size(egui::vec2(220.0, 36.0)),
-                                                        )
-                                                        .clicked();
-                                                });
-                                                if unlock_clicked {
-                                                    unlock_weapon_paid(
-                                                        &mut save, &mut meta, key, u.cost,
-                                                    );
-                                                }
-                                                if !afford {
-                                                    ui.label(
-                                                        egui::RichText::new(format!(
-                                                            "{} Âmes manquantes",
-                                                            u.cost.saturating_sub(meta.current)
-                                                        ))
-                                                        .size(12.0)
-                                                        .color(C_TEXT_MUTED),
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    });
-                                });
-                            });
-                    });
-                });
-        });
 }
 
 /// Rend la **carte d'arme du hub-menu** dans un `Ui` donné : aperçu 3D (image RTT
@@ -1046,22 +676,15 @@ const PREVIEW_Y: f32 = 0.70;
 /// Taille cible (plus grande dimension, m) après calibrage AABB — calibrée pour que
 /// l'arme tienne ENTIÈREMENT dans le viewport (pas de coupe aux bords).
 const PREVIEW_TARGET: f32 = 0.80;
-/// Hauteur (px) du viewport transparent en haut de la carte où l'aperçu 3D apparaît
-/// (exception layout cosmétique de no-hardcode). L'arme (layer 0) rend DERRIÈRE egui
-/// → visible dans ce vide ; le panneau stats opaque est dessous.
-const WEAPON_VIEWPORT_H: f32 = 250.0;
-/// Hauteur (px) FIXE du panneau stats → carte de taille identique pour toutes les
-/// armes (rendu design cohérent ; layout cosmétique, exception no-hardcode).
-const STATS_PANEL_H: f32 = 360.0;
 /// Vitesse de rotation (rad/s).
 const PREVIEW_SPIN: f32 = 0.9;
 
-/// Marqueur sur une arme 3D d'aperçu (parentée caméra). Porte l'arme représentée
-/// → le toggle de visibilité montre uniquement la sélectionnée (story-618).
+/// Marqueur sur une arme 3D d'aperçu (parentée caméra). Story-693 : le champ
+/// `weapon` (utilisé par le toggle de visibilité par onglet) a été retiré avec
+/// le hub Lobby — ce marqueur ne sert plus qu'à cibler les 4 pivots pour le
+/// spin / le despawn (`sys_spin_lobby_preview`, `sys_clear_lobby_preview`).
 #[derive(Component)]
-struct LobbyPreviewWeapon {
-    weapon: WeaponType,
-}
+struct LobbyPreviewWeapon;
 
 /// Scène GLB de l'aperçu = enfant du pivot `LobbyPreviewWeapon`, recentrée (-center)
 /// + scalée par `sys_calibrate_preview` → l'arme tourne AUTOUR DE SON CENTRE.
@@ -1143,7 +766,7 @@ fn sys_lobby_weapon_preview(
         let pivot = commands
             .spawn((
                 Name::new(format!("LobbyPreview_{key}")),
-                LobbyPreviewWeapon { weapon: w },
+                LobbyPreviewWeapon,
                 Transform::from_xyz(0.0, PREVIEW_Y, -PREVIEW_DIST),
                 Visibility::Hidden,
                 ChildOf(cam),
@@ -1179,30 +802,6 @@ fn sys_lobby_weapon_preview(
     }
     state.spawned = true;
     info!("[weapon-select] aperçu 3D : 4 armes + pré-chauffe éléments (spawn-once, story-618)");
-}
-
-/// Story-618 — toggle la visibilité : seule l'arme sélectionnée est visible. Cycle
-/// instantané (aucun spawn/despawn). La 1ère apparition de chaque arme paie sa
-/// compile de pipeline une fois, puis c'est caché.
-fn sys_toggle_preview_visibility(
-    choice: Res<StartingWeaponChoice>,
-    hub: Res<crate::hub::HubTab>,
-    mut q: Query<(&LobbyPreviewWeapon, &mut Visibility)>,
-) {
-    let sel = ARENA_V1_WEAPONS[choice.idx % ARENA_V1_WEAPONS.len()];
-    // L'aperçu d'arme ne s'affiche que sur l'onglet ARMES (vitrine de la carte) ;
-    // sur Forge on montre les bras, ailleurs rien (home-hub P2.1).
-    let on_armes = *hub == crate::hub::HubTab::Armes;
-    for (pw, mut vis) in &mut q {
-        let want = if on_armes && pw.weapon == sel {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-        if *vis != want {
-            *vis = want;
-        }
-    }
 }
 
 /// Calibre l'échelle une fois l'AABB chargée (miroir `sys_calibrate_merchant`).
@@ -1287,12 +886,6 @@ impl Plugin for WeaponSelectPlugin {
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        app.add_systems(
-            Update,
-            (sys_weapon_select_input, sys_weapon_unlock_input)
-                .in_set(GameSet::UI)
-                .run_if(in_state(RunState::Lobby)),
-        );
         // Story-613 — en run, les armes verrouillées ne sont pas jouables (le switch
         // Digit2-4 est annulé avant le tir). Tourne en Movement (avant Combat).
         // `sys_sync_mastery_current` suit IMMÉDIATEMENT le garde de loadout : celui-ci
@@ -1306,19 +899,15 @@ impl Plugin for WeaponSelectPlugin {
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        // Hub à onglets (P2) : le wizard d'arme ne s'affiche que sur l'onglet ARMES.
-        // L'aperçu 3D reste toujours visible (hero du hub), seul le panneau egui est gaté.
-        app.add_systems(
-            EguiPrimaryContextPass,
-            draw_weapon_select.run_if(crate::hub::on_armes_tab),
-        );
-        // Aperçu 3D de l'arme (parentée caméra, tourne) — story-614.
+        // Aperçu 3D de l'arme (parentée caméra, tourne) — story-614. Story-693 : le
+        // toggle de visibilité par onglet a été retiré avec le hub Lobby ; les
+        // pivots spawnent `Visibility::Hidden` (l.778) et restent cachés (comme
+        // avant : l'onglet ARMES n'était de toute façon jamais visible).
         app.init_resource::<PreviewState>();
         app.add_systems(
             Update,
             (
                 sys_lobby_weapon_preview,
-                sys_toggle_preview_visibility,
                 sys_calibrate_preview,
                 sys_spin_lobby_preview,
             )

@@ -20,24 +20,21 @@
 //! l'affichage comme au clic. Ne faire confiance à personne coûte une ligne.
 
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts};
-use forgia_core::prelude::*;
-use forgia_ui_lib::style::{
-    C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_OR, FORGE_PANEL, FORGE_PANEL_LIGHT,
-    HAIR_GOLD_STRONG,
-};
+use bevy_egui::egui;
+use forgia_ui_lib::style::{C_PRIMARY, C_TEXT_MUTED, FORGE_CREME, FORGE_PANEL, FORGE_PANEL_LIGHT};
 use forgia_ui_lib::theme::display_text;
 
 use crate::decor_palettes::DecorPalettesConfig;
 use crate::meta_shop::{chapter_unlocked, MetaShopSave, SelectedChapter, CHAPTERS_PER_BOOK};
-use crate::RunState;
 
 /// Le nom de la direction artistique d'un chapitre, pour que la liste dise où
 /// l'on va — « CHAPITRE 6 » seul ne raconte rien.
 ///
 /// Repli sur une chaîne vide plutôt que sur un nom inventé : un chapitre sans DA
 /// déclarée doit se voir comme tel.
-fn chapter_da_name(palettes: Option<&DecorPalettesConfig>, chapter: u32) -> String {
+/// Nom d'univers (DA) d'un chapitre — vide si aucune palette. Public depuis
+/// story-678 Phase 3 : la carte « CHAPITRE EN COURS » de l'accueil l'affiche aussi.
+pub fn chapter_da_name(palettes: Option<&DecorPalettesConfig>, chapter: u32) -> String {
     palettes
         .and_then(|c| c.palette_id_for_chapter(chapter))
         .and_then(|id| palettes.and_then(|c| c.palette(id)))
@@ -99,7 +96,11 @@ pub fn chapter_select_content(
         };
 
         let frame = egui::Frame::new()
-            .fill(if actif { FORGE_PANEL_LIGHT } else { FORGE_PANEL })
+            .fill(if actif {
+                FORGE_PANEL_LIGHT
+            } else {
+                FORGE_PANEL
+            })
             .corner_radius(egui::CornerRadius::same(8))
             .inner_margin(egui::Margin::symmetric(10, 7));
         frame.show(ui, |ui| {
@@ -131,42 +132,6 @@ pub fn chapter_select_content(
     });
 }
 
-/// Panneau du Lobby — le même Livre, pour qui s'y arrête.
-pub fn draw_chapter_select(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    game_mode: Res<State<GameMode>>,
-    run_state: Option<Res<State<RunState>>>,
-    save: Res<MetaShopSave>,
-    palettes: Option<Res<DecorPalettesConfig>>,
-    mut selected: ResMut<SelectedChapter>,
-) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
-        return;
-    }
-    if !matches!(run_state.as_deref().map(State::get), Some(RunState::Lobby)) {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else { return };
-    let palettes_ref = palettes.as_deref();
-
-    egui::Area::new(egui::Id::new("forgia_chapter_select"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 40.0))
-        .show(ctx, |ui| {
-            egui::Frame::new()
-                .fill(FORGE_PANEL)
-                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
-                .corner_radius(egui::CornerRadius::same(16))
-                .inner_margin(20)
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label(display_text("LE LIVRE", 30.0, FORGE_OR).strong());
-                    });
-                    chapter_select_content(ui, &save, palettes_ref, &mut selected);
-                });
-        });
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,7 +156,11 @@ mod tests {
     fn a_stale_selection_is_pulled_back_before_being_shown() {
         assert_eq!(SelectedChapter(10).clamped(0), 1);
         assert_eq!(SelectedChapter(10).clamped(3), 4);
-        assert_eq!(SelectedChapter(2).clamped(6), 2, "un choix légitime est gardé");
+        assert_eq!(
+            SelectedChapter(2).clamped(6),
+            2,
+            "un choix légitime est gardé"
+        );
     }
 
     /// Le nom de DA vient du génome ; s'il manque, la ligne reste lisible au lieu
@@ -206,14 +175,11 @@ mod tests {
     /// …et avec le génome livré, les dix chapitres ont tous un nom à montrer.
     #[test]
     fn the_shipped_book_names_all_ten_chapters() {
-        let content =
-            std::fs::read_to_string("assets/genomes/roguelite/roguelite_palettes.toml")
-                .or_else(|_| {
-                    std::fs::read_to_string(
-                        "../../assets/genomes/roguelite/roguelite_palettes.toml",
-                    )
-                })
-                .expect("roguelite_palettes.toml introuvable");
+        let content = std::fs::read_to_string("assets/genomes/roguelite/roguelite_palettes.toml")
+            .or_else(|_| {
+                std::fs::read_to_string("../../assets/genomes/roguelite/roguelite_palettes.toml")
+            })
+            .expect("roguelite_palettes.toml introuvable");
         let cfg = DecorPalettesConfig::parse_toml(&content);
         for chapitre in 1..=CHAPTERS_PER_BOOK {
             assert!(

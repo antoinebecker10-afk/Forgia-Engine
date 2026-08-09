@@ -21,11 +21,9 @@
 //! Startup → `MetaSouls.current` (1×, évite l'écrasement au re-entry).
 
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
+use bevy_egui::egui;
 use forgia_core::prelude::*;
-use forgia_ui_lib::style::{
-    C_HP_HIGH, C_TEXT_MUTED, FORGE_AME, FORGE_OR, FORGE_PANEL, FORGE_TEAL, HAIR_GOLD_STRONG,
-};
+use forgia_ui_lib::style::{C_HP_HIGH, C_TEXT_MUTED, FORGE_AME, FORGE_OR, FORGE_TEAL};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -1570,148 +1568,6 @@ pub fn draw_enclume_panel(
     intent
 }
 
-/// Dessine l'Enclume au Lobby (EguiPrimaryContextPass).
-pub fn draw_meta_shop_lobby(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    game_mode: Res<State<GameMode>>,
-    run_state: Option<Res<State<RunState>>>,
-    cat: Res<MetaShopCatalogue>,
-    save: Res<MetaShopSave>,
-    meta: Res<MetaSouls>,
-) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Roguelite {
-        return;
-    }
-    if !matches!(run_state.as_deref().map(|s| s.get()), Some(RunState::Lobby)) {
-        return;
-    }
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
-
-    // Home-hub P2.1 — onglet ENCLUME : panneau CENTRÉ (le hub gère les onglets,
-    // un seul panneau visible à la fois). Titre « L'ENCLUME DES ÂMES » = onglet hub.
-    egui::Area::new(egui::Id::new("forgia_meta_shop"))
-        .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 10.0))
-        .show(ctx, |ui| {
-            // Story-596 — couleurs palette Forge partagée (étaient des littéraux
-            // locaux dupliquant FORGE_OR & co) + titre display font.
-            egui::Frame::new()
-                .fill(FORGE_PANEL)
-                .inner_margin(egui::Margin::symmetric(44, 30))
-                .corner_radius(egui::CornerRadius::same(14))
-                .stroke(egui::Stroke::new(1.5, HAIR_GOLD_STRONG))
-                .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        // Story-681 — le NIVEAU au Lobby. Depuis story-680, le
-                        // niveau EST la somme des rangs achetés ici : c'est donc
-                        // l'écran où il veut dire quelque chose. L'afficher
-                        // ailleurs sans l'afficher ici serait absurde.
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "Niveau {}",
-                                save.player_level(&cat)
-                            ))
-                            .size(26.0)
-                            .strong()
-                            .color(FORGE_OR),
-                        );
-                        let remaining = save.ranks_remaining(&cat);
-                        ui.label(
-                            egui::RichText::new(if remaining == 0 {
-                                "Enclume complète".to_string()
-                            } else {
-                                format!("{remaining} amélioration(s) encore disponible(s)")
-                            })
-                            .size(15.0)
-                            .color(C_TEXT_MUTED),
-                        );
-                        ui.add_space(10.0);
-                        ui.label(
-                            egui::RichText::new(format!("◇ Âmes : {}", meta.current))
-                                .size(24.0)
-                                .strong()
-                                .color(FORGE_TEAL),
-                        );
-                        ui.add_space(16.0);
-                        // Story-681 — le Lobby lisait `up.name` / `up.desc`, donc
-                        // il affichait TOUJOURS la face principale : un joueur
-                        // ayant basculé sur « Cuirasse » voyait quand même
-                        // « Vitalité +15 PV ». Même classe de mensonge que le
-                        // « SALLE 5 / 4 » — deux écrans, une seule vérité.
-                        for (i, up) in cat.upgrades.iter().enumerate() {
-                            let rank = save.rank(&up.id);
-                            let max = up.max_rank();
-                            let (name, desc, _) = up.face(save.face_of(&up.id));
-                            let (text, col) = match up.cost_for_next(rank) {
-                                Some(cost) => {
-                                    let afford = meta.current >= cost;
-                                    (
-                                        format!(
-                                            "[{}]  {name} — {desc}  (rang {rank}/{max})  ·  {cost} âmes",
-                                            i + 1
-                                        ),
-                                        if afford { FORGE_OR } else { C_TEXT_MUTED },
-                                    )
-                                }
-                                None => (
-                                    format!("[—]  {name} — {desc}  (MAX {max}/{max})"),
-                                    C_HP_HIGH,
-                                ),
-                            };
-                            ui.label(egui::RichText::new(text).size(19.0).color(col));
-                            // La face alternative est ANNONCÉE : sans ça, le
-                            // choix existerait sans jamais être offert au Lobby.
-                            if up.has_alt() {
-                                let (other, other_desc, _) = up.face(1 - save.face_of(&up.id));
-                                ui.label(
-                                    egui::RichText::new(format!(
-                                        "        ⇄ [F{}]  {other} — {other_desc}",
-                                        i + 1
-                                    ))
-                                    .size(15.0)
-                                    .color(FORGE_TEAL),
-                                );
-                            }
-                            ui.add_space(4.0);
-                        }
-                        // Paliers d'atouts (boons) — story-616 (touches 5/6/7).
-                        ui.add_space(10.0);
-                        ui.label(
-                            egui::RichText::new("— ATOUTS (paliers de boons) —")
-                                .size(16.0)
-                                .strong()
-                                .color(FORGE_TEAL),
-                        );
-                        ui.add_space(4.0);
-                        for (i, bt) in cat.boon_tier_unlocks.iter().enumerate() {
-                            let owned = save.is_boon_tier_unlocked(&bt.key);
-                            let (text, col) = if owned {
-                                (format!("[—]  {} — DÉBLOQUÉ", bt.name), C_HP_HIGH)
-                            } else {
-                                let afford = meta.current >= bt.cost;
-                                (
-                                    format!("[{}]  {}  ·  {} âmes", i + 5, bt.name, bt.cost),
-                                    if afford { FORGE_OR } else { C_TEXT_MUTED },
-                                )
-                            };
-                            ui.label(egui::RichText::new(text).size(19.0).color(col));
-                            ui.add_space(4.0);
-                        }
-                        ui.add_space(14.0);
-                        ui.label(
-                            egui::RichText::new(
-                                "1-4 acheter · F1-F4 changer de voie · 5-7 atouts · ENTRÉE = lancer",
-                            )
-                                .size(18.0)
-                                .color(C_TEXT_MUTED),
-                        );
-                    });
-                });
-        });
-}
-
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 pub struct MetaShopPlugin;
@@ -1734,11 +1590,6 @@ impl Plugin for MetaShopPlugin {
             sys_meta_shop_input
                 .in_set(GameSet::UI)
                 .run_if(in_state(RunState::Lobby)),
-        );
-        // Hub à onglets (P2) : L'Enclume ne s'affiche que sur l'onglet ENCLUME.
-        app.add_systems(
-            EguiPrimaryContextPass,
-            draw_meta_shop_lobby.run_if(crate::hub::on_enclume_tab),
         );
         // Story-616 — propage les paliers d'atouts débloqués vers forgia-rpg-data
         // (le roll de boons filtre alors les candidats par palier débloqué).

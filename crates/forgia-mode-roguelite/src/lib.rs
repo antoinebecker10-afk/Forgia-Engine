@@ -24,9 +24,11 @@ use forgia_core::prelude::*;
 /// Story-673 — les MESURES d'assets (asset_registry.toml), lues au lieu d'être devinées.
 pub mod ambiances;
 pub mod asset_metrics;
-pub mod avatar;
 pub mod atmosphere;
 pub mod audio;
+pub mod avatar;
+/// Story-678 — le MARKETPLACE : catalogue des cosmétiques + règle de possession.
+pub mod cosmetics;
 pub mod boons_apply;
 pub mod boss_portal;
 pub mod boucherie_rocket;
@@ -42,6 +44,8 @@ pub mod element_vfx;
 pub mod elements;
 pub mod enemies;
 pub mod enemy_anim;
+/// La mort d'un ennemi : butin, retrait de ce qui doit cesser, puis envol.
+pub mod enemy_death;
 pub mod enemy_rig_debug;
 pub mod enemy_scaling;
 pub mod equipment;
@@ -149,13 +153,6 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_plugins(equipment::EquipmentPlugin);
         // Montage de l'avatar équipé, partagé par l'aperçu du menu et le Hall.
         app.add_plugins(avatar::AvatarPlugin);
-        // 2026-08-04 — LE LIVRE : le sélecteur de chapitres du Lobby. Gaté sur son
-        // onglet, comme les autres panneaux ; la règle de déblocage vit dans
-        // `meta_shop` et y est testée sans egui.
-        app.add_systems(
-            bevy_egui::EguiPrimaryContextPass,
-            chapters::draw_chapter_select.run_if(crate::hub::on_chapitres_tab),
-        );
         // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
         // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
         app.init_resource::<load_timing::LoadTimingState>();
@@ -266,15 +263,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         if !app.is_plugin_added::<forgia_postprocess::toon::ForgiaPpToonPlugin>() {
             app.add_plugins(forgia_postprocess::toon::ForgiaPpToonPlugin);
         }
-        // OUTLINE — désactivé 2026-05-29 (root cause crash : wgpu panic
-        // "SurfaceAcquireSemaphores still in use by SurfaceTexture"). Toon et
-        // Outline déclarent les mêmes node_edges (Tonemapping → X → EndMainPass)
-        // → render graph crée deux passes parallèles sur la même surface
-        // texture. Fix futur : modifier OutlineSettings::node_edges pour insérer
-        // APRÈS ToonSettings::node_label() au lieu de Tonemapping.
-        // if !app.is_plugin_added::<forgia_postprocess::outline::ForgiaPpOutlinePlugin>() {
-        //     app.add_plugins(forgia_postprocess::outline::ForgiaPpOutlinePlugin);
-        // }
+        // L'outline Sobel est fusionné dans le shader toon : une seule passe
+        // fullscreen. Ne pas ajouter ForgiaPpOutlinePlugin séparément sur Bevy
+        // 0.18 (crash wgpu SurfaceTexture confirmé en runtime).
         app.add_systems(Startup, toon_config::sys_init_toon_genome);
         app.add_systems(
             OnEnter(GameMode::Roguelite),
@@ -331,6 +322,16 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .run_if(in_state(GameMode::Roguelite)),
         );
         app.add_systems(Update, poi::sys_write_poi_sensor.in_set(GameSet::Sensors));
+        // 2026-08-05 — la mort d'un ennemi roguelite passe désormais par ICI :
+        // `AscendsOnDeath` l'a exclu du balayage de `forgia-fps`, donc si ce
+        // système ne tourne pas, plus AUCUN ennemi ne meurt ni ne lâche de butin.
+        // Dans `GameSet::Combat` : après les dégâts de la frame, avant les effets.
+        app.add_systems(
+            Update,
+            enemy_death::sys_start_death_ascension
+                .in_set(GameSet::Combat)
+                .run_if(in_state(GameMode::Roguelite)),
+        );
         // Story-582 (2026-06-07) — système d'éléments par-arme (feu/poison/
         // explosif/perforant) : matchups vs archetype + status DoT + AOE +
         // exécution. Mute forgia_combat::Health directement (despawn_dead_cubes
@@ -400,6 +401,21 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // Story-673 — mesures d'assets : le décor en dérive ses emprises réelles.
         app.add_systems(Startup, asset_metrics::sys_init_asset_registry);
         app.add_systems(Startup, decor_palettes::sys_init_decor_palettes);
+        // Story-678 — catalogue des décors du menu.
+        //
+        // 🚨 NI l'init NI le hot-reload ne sont gatés sur `GameMode::Roguelite` :
+        // ce catalogue sert au MENU, qui tourne en `GameMode::None`. Le gate
+        // Roguelite est le piège déjà payé deux fois (musique de hub, sons
+        // d'UI) — un système utile au menu et gaté sur le mode de jeu ne tourne
+        // jamais là où on l'attend.
+        // Catalogue chargé À LA CONSTRUCTION, pas au Startup : `sys_init_identity`
+        // en a besoin pour savoir quelles couleurs restent gratuites, et
+        // dépendre d'un `insert_resource` d'un autre système de Startup
+        // demanderait un point de synchronisation pour rien.
+        app.insert_resource(cosmetics::CosmeticsConfig::load_now());
+        app.init_resource::<cosmetics::CosmeticsWatch>();
+        app.add_systems(Startup, cosmetics::sys_log_cosmetics);
+        app.add_systems(Update, cosmetics::sys_hot_reload_cosmetics);
         // Story-676 — les UNIVERS d'arène (sol + ciel + brouillard + ambiante).
         // Le sol était une const Rust, le brouillard était volcanique partout.
         app.add_systems(
@@ -898,7 +914,6 @@ fn sys_spin_coins(time: Res<Time>, mut q: Query<&mut Transform, With<CoinSpin>>)
 
 // Story-591 — `auto_start_run_on_enter` retiré : le hub Lobby (L'Enclume des
 // Âmes) démarre la run sur ENTRÉE (meta_shop::sys_meta_shop_input).
-
 
 /// Story-676 — déclare à `forgia-stage` TOUTES les tuiles de sol des univers.
 ///
