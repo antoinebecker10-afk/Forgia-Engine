@@ -243,6 +243,9 @@ pub struct ArenaBackdropRtt {
     /// C'est la mesure que le capteur publie. `rtt.is_some()` ne prouvait rien :
     /// la ressource existe même si la palette est vide et que le fond est nu.
     pub props_spawned: usize,
+    /// Compteur de désarmement de la propagation des layers
+    /// (cf. `weapon_preview::LAYERS_SETTLE_PASSES` — implémentation partagée).
+    layers_settled: u16,
 }
 
 impl ArenaBackdropRtt {
@@ -378,6 +381,7 @@ fn sys_spawn_arena_backdrop(
         // Volontairement vide : force la première construction.
         shown: BuiltKey::default(),
         props_spawned: 0,
+        layers_settled: 0,
     });
     info!("[arena-backdrop] fond d'arène spawné ({width}×{height}, layer {ARENA_LAYER})");
 }
@@ -570,6 +574,8 @@ fn sys_rebuild_backdrop_on_change(
         seed_of(&decor_choisi.id),
     );
     rtt.props_spawned = posed;
+    // Les scènes fraîches vont se peupler : réarme la propagation des layers.
+    rtt.layers_settled = 0;
     // Réactive la caméra si un démontage à chaud l'avait coupée.
     if let Ok(mut cam) = q_camera.get_mut(rtt.camera) {
         cam.is_active = true;
@@ -811,26 +817,31 @@ fn spawn_backdrop_prop(
 
 /// Propage `RenderLayers` à tous les descendants du diorama : un `SceneRoot` GLB
 /// ne le fait pas en 0.18, et un prop non marqué serait rendu par la caméra du
-/// monde (donc invisible ici, et visible ailleurs).
+/// monde (donc invisible ici, et visible ailleurs). Implémentation partagée
+/// [`crate::weapon_preview::propagate_layers_from`] : désarmement après
+/// stabilisation + pile réutilisée (P1bis — ce BFS tournait chaque frame du
+/// menu, pour toujours, sur ~17 sous-arbres GLB). La racine porte
+/// `RenderLayers::layer(ARENA_LAYER)` dès son spawn : c'est d'elle que le
+/// helper lit la cible.
 fn sys_propagate_backdrop_layers(
-    rtt: Option<Res<ArenaBackdropRtt>>,
+    rtt: Option<ResMut<ArenaBackdropRtt>>,
     q_children: Query<&Children>,
     q_layers: Query<&RenderLayers>,
     mut commands: Commands,
+    mut stack: Local<Vec<Entity>>,
 ) {
-    let Some(rtt) = rtt else {
+    let Some(mut rtt) = rtt else {
         return;
     };
-    let target = RenderLayers::layer(ARENA_LAYER);
-    let mut stack = vec![rtt.root];
-    while let Some(e) = stack.pop() {
-        if q_layers.get(e).map(|l| *l != target).unwrap_or(true) {
-            commands.entity(e).insert(target.clone());
-        }
-        if let Ok(children) = q_children.get(e) {
-            stack.extend(children.iter());
-        }
-    }
+    let root = rtt.root;
+    crate::weapon_preview::propagate_layers_from(
+        root,
+        &mut rtt.layers_settled,
+        &q_children,
+        &q_layers,
+        &mut commands,
+        &mut stack,
+    );
 }
 
 /// Calibrage AABB : chaque prop est mis à SA taille cible, posé sur le sol.

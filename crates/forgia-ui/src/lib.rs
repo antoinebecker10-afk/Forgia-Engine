@@ -2295,28 +2295,32 @@ fn paperdoll_slot(
             egui::Stroke::new(if resp.hovered() { 2.5 } else { 1.5 }, col),
             egui::StrokeKind::Inside,
         );
-        let bulle = match porte {
-            Some(id) => format!(
-                "{} — {}
+        // PARESSEUX : formatée seulement au survol (P1bis), comme au sac.
+        let resp = resp.on_hover_ui(|ui| {
+            let bulle = match porte {
+                Some(id) => format!(
+                    "{} — {}
 {} +{:.0}%
 
 Clic : voir dans le sac",
-                slot.label,
-                cfg.rarity(id).map(|r| r.label.as_str()).unwrap_or(id),
-                slot.stat_label,
-                cfg.rarity(id)
-                    .map(|r| slot.per_tier * r.bonus_mul * 100.0)
-                    .unwrap_or(0.0)
-            ),
-            None => format!(
-                "{} — vide
+                    slot.label,
+                    cfg.rarity(id).map(|r| r.label.as_str()).unwrap_or(id),
+                    slot.stat_label,
+                    cfg.rarity(id)
+                        .map(|r| slot.per_tier * r.bonus_mul * 100.0)
+                        .unwrap_or(0.0)
+                ),
+                None => format!(
+                    "{} — vide
 {}
 
 Clic : voir dans le sac",
-                slot.label, slot.stat_label
-            ),
-        };
-        if resp.on_hover_text(bulle).clicked() {
+                    slot.label, slot.stat_label
+                ),
+            };
+            ui.label(bulle);
+        });
+        if resp.clicked() {
             clique = true;
         }
         ui.label(
@@ -2331,11 +2335,8 @@ Clic : voir dans le sac",
         );
         ui.label(
             egui::RichText::new(match porte {
-                Some(id) => cfg
-                    .rarity(id)
-                    .map(|r| r.label.clone())
-                    .unwrap_or_else(|| id.clone()),
-                None => "vide".to_string(),
+                Some(id) => cfg.rarity(id).map(|r| r.label.as_str()).unwrap_or(id),
+                None => "vide",
             })
             .size(10.0)
             .color(col),
@@ -2411,8 +2412,11 @@ fn draw_sac(
                         .get(&slot.id)
                         .is_some_and(|v| v.iter().any(|r| r == &rarity.id));
                     let sur_soi = porte.as_deref() == Some(rarity.id.as_str());
-                    let choisie = selection.as_ref()
-                        == Some(&(slot.id.clone(), rarity.id.clone()));
+                    // Sans clone : deux Strings par case et par frame juste
+                    // pour COMPARER (audit 2026-08-07, P1bis).
+                    let choisie = selection
+                        .as_ref()
+                        .is_some_and(|(s, r)| *s == slot.id && *r == rarity.id);
                     let sense = if a_soi {
                         egui::Sense::click()
                     } else {
@@ -2462,36 +2466,42 @@ fn draw_sac(
                         );
                     }
 
-                    let gain = slot.per_tier * rarity.bonus_mul;
-                    let delta = cfg.power_of(&rarity.id) as i32 - porte_power as i32;
-                    let bulle = if !a_soi {
-                        format!(
-                            "{} — {}\npas encore trouvée\n{} +{:.0}% si tu l'obtiens",
-                            slot.label,
-                            rarity.label,
-                            slot.stat_label,
-                            gain * 100.0
-                        )
-                    } else if sur_soi {
-                        format!(
-                            "{} — {}\nPORTÉE · {} +{:.0}%\n\nDouble-clic pour la retirer ({:+} Puissance)",
-                            slot.label,
-                            rarity.label,
-                            slot.stat_label,
-                            gain * 100.0,
-                            -(cfg.power_of(&rarity.id) as i32)
-                        )
-                    } else {
-                        format!(
-                            "{} — {}\n{} +{:.0}%  ({:+.0}% vs portée)\n{delta:+} Puissance\n\nDouble-clic pour l'équiper",
-                            slot.label,
-                            rarity.label,
-                            slot.stat_label,
-                            gain * 100.0,
-                            (gain - porte_gain) * 100.0
-                        )
-                    };
-                    let resp = resp.on_hover_text(bulle);
+                    // PARESSEUX (`on_hover_ui`) : ces bulles étaient formatées
+                    // pour CHAQUE case à CHAQUE frame (≈ 25 format! dont un
+                    // seul peut servir — audit 2026-08-07, P1bis). Le format!
+                    // ne s'exécute plus qu'au survol.
+                    let resp = resp.on_hover_ui(|ui| {
+                        let gain = slot.per_tier * rarity.bonus_mul;
+                        let delta = cfg.power_of(&rarity.id) as i32 - porte_power as i32;
+                        let bulle = if !a_soi {
+                            format!(
+                                "{} — {}\npas encore trouvée\n{} +{:.0}% si tu l'obtiens",
+                                slot.label,
+                                rarity.label,
+                                slot.stat_label,
+                                gain * 100.0
+                            )
+                        } else if sur_soi {
+                            format!(
+                                "{} — {}\nPORTÉE · {} +{:.0}%\n\nDouble-clic pour la retirer ({:+} Puissance)",
+                                slot.label,
+                                rarity.label,
+                                slot.stat_label,
+                                gain * 100.0,
+                                -(cfg.power_of(&rarity.id) as i32)
+                            )
+                        } else {
+                            format!(
+                                "{} — {}\n{} +{:.0}%  ({:+.0}% vs portée)\n{delta:+} Puissance\n\nDouble-clic pour l'équiper",
+                                slot.label,
+                                rarity.label,
+                                slot.stat_label,
+                                gain * 100.0,
+                                (gain - porte_gain) * 100.0
+                            )
+                        };
+                        ui.label(bulle);
+                    });
                     if resp.clicked() {
                         *selection = Some((slot.id.clone(), rarity.id.clone()));
                     }

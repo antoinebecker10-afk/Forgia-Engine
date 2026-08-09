@@ -69,6 +69,13 @@ fn weapon_preview_scene(assets: &GameAssets, choice_idx: usize) -> Handle<Scene>
     assets.weapon_preview_scenes[choice_idx % assets.weapon_preview_scenes.len()].clone()
 }
 
+/// Passes consécutives SANS insertion avant de DÉSARMER la propagation des
+/// `RenderLayers` (~5 s à 60 fps). Les scènes GLB se peuplent async sur les
+/// frames qui suivent un spawn/swap/rebuild — passé ce délai, re-balayer
+/// l'arbre chaque frame était un O(N) permanent pour rien (audit 2026-08-07,
+/// P1bis). Tout geste qui ajoute des entités remet son compteur à zéro.
+pub(crate) const LAYERS_SETTLE_PASSES: u16 = 300;
+
 /// Ressource de l'aperçu ARME : `TextureId` (affiché par `sys_menu_armes`) + entité
 /// `SceneRoot` swappable à la sélection.
 #[derive(Resource)]
@@ -77,6 +84,8 @@ pub struct WeaponPreviewRtt {
     image: Handle<Image>,
     scene_entity: Entity,
     shown_idx: usize,
+    /// Compteur de désarmement de la propagation des layers (cf. [`LAYERS_SETTLE_PASSES`]).
+    layers_settled: u16,
 }
 
 /// Marqueur des entités racines d'un aperçu (caméra / lumière / pivot) — despawn
@@ -303,6 +312,7 @@ fn sys_spawn_weapon_preview(
         image,
         scene_entity,
         shown_idx: choice.idx,
+        layers_settled: 0,
     });
     info!("[weapon-preview] aperçu 3D arme spawné (layer {WEAPON_LAYER})");
 }
@@ -322,6 +332,9 @@ fn sys_swap_weapon_preview(
         return;
     }
     rtt.shown_idx = choice.idx;
+    // La nouvelle scène va se peupler sur les frames qui viennent : la
+    // propagation des layers doit se réarmer pour la voir.
+    rtt.layers_settled = 0;
     let scene = weapon_preview_scene(&assets, choice.idx);
     if let Ok(mut sr) = q_scene.get_mut(rtt.scene_entity) {
         sr.0 = scene;
@@ -361,6 +374,8 @@ pub struct CharacterPreviewRtt {
     parts: Vec<Entity>,
     /// Équipement actuellement montré — clé de reconstruction.
     shown: String,
+    /// Compteur de désarmement de la propagation des layers (cf. [`LAYERS_SETTLE_PASSES`]).
+    layers_settled: u16,
 }
 
 /// OnEnter(Menu) — crée l'aperçu 3D du personnage équipé (layer CHARACTER_LAYER).
@@ -415,6 +430,7 @@ fn sys_spawn_character_preview(
         // Volontairement différent de toute clé réelle (même vide) pour forcer la
         // première construction.
         shown: "\u{0}jamais construit".to_string(),
+        layers_settled: 0,
     });
     info!("[weapon-preview] aperçu 3D personnage spawné (layer {CHARACTER_LAYER})");
 }
@@ -425,6 +441,7 @@ fn sys_spawn_character_preview(
 fn sys_sync_character_pieces(
     mut commands: Commands,
     assets: Res<AssetServer>,
+    mut body_handles: ResMut<forgia_mode_roguelite::avatar::AvatarBodyHandles>,
     cfg: Res<EquipmentConfig>,
     save: Res<EquipmentSave>,
     rtt: Option<ResMut<CharacterPreviewRtt>>,
@@ -437,6 +454,8 @@ fn sys_sync_character_pieces(
         return;
     }
     rtt.shown = key;
+    // Corps + pièces vont être reconstruits : réarme la propagation des layers.
+    rtt.layers_settled = 0;
 
     // On détruit EXACTEMENT ce qu'on avait créé (cf. `CharacterPreviewRtt::parts`).
     // `try_despawn` et non `despawn` : une pièce peut déjà être partie par une
@@ -459,6 +478,7 @@ fn sys_sync_character_pieces(
     rtt.parts = spawn_equipped_avatar(
         &mut commands,
         &assets,
+        &mut body_handles,
         &cfg,
         &save,
         holder,
@@ -474,32 +494,76 @@ fn sys_sync_character_pieces(
 
 // ── Systèmes génériques (arme + bras + personnage) ──────────────────────────────
 
-/// Propage le `RenderLayers` de chaque racine d'aperçu à TOUS ses descendants (un
-/// `SceneRoot` GLB ne le fait pas en 0.18). Lit le layer porté par la racine.
+/// Balaye l'arbre sous `root` et pose le `RenderLayers` de la racine sur tout
+/// descendant qui ne le porte pas — puis se DÉSARME (audit 2026-08-07, P1bis).
+///
+/// L'implémentation UNIQUE de la classe « propagation de layers » : l'aperçu
+/// arme, le personnage et le diorama du fond (`arena_backdrop`) la partagent.
+/// Un `SceneRoot` GLB ne propage pas les layers en 0.18 ; les scènes se
+/// peuplent async, donc on re-balaye — mais pas pour toujours : après
+/// [`LAYERS_SETTLE_PASSES`] passes sans rien poser, ce O(N) s'arrête jusqu'au
+/// prochain réarmement (`settled = 0` posé par les spawns/swaps/rebuilds).
+/// Pile fournie par l'appelant (`Local` du système) : zéro alloc par frame.
+pub(crate) fn propagate_layers_from(
+    root: Entity,
+    settled: &mut u16,
+    q_children: &Query<&Children>,
+    q_layers: &Query<&RenderLayers>,
+    commands: &mut Commands,
+    stack: &mut Vec<Entity>,
+) {
+    if *settled >= LAYERS_SETTLE_PASSES {
+        return;
+    }
+    let Ok(target) = q_layers.get(root).cloned() else {
+        return;
+    };
+    let mut inserted = false;
+    stack.clear();
+    stack.push(root);
+    while let Some(e) = stack.pop() {
+        if q_layers.get(e).map(|l| *l != target).unwrap_or(true) {
+            commands.entity(e).insert(target.clone());
+            inserted = true;
+        }
+        if let Ok(children) = q_children.get(e) {
+            stack.extend(children.iter());
+        }
+    }
+    *settled = if inserted { 0 } else { settled.saturating_add(1) };
+}
+
+/// Propage le `RenderLayers` de chaque racine d'aperçu à TOUS ses descendants,
+/// via [`propagate_layers_from`] (désarmement + pile réutilisée).
 fn sys_propagate_preview_layers(
-    weapon: Option<Res<WeaponPreviewRtt>>,
-    character: Option<Res<CharacterPreviewRtt>>,
+    weapon: Option<ResMut<WeaponPreviewRtt>>,
+    character: Option<ResMut<CharacterPreviewRtt>>,
     q_children: Query<&Children>,
     q_layers: Query<&RenderLayers>,
     mut commands: Commands,
+    mut stack: Local<Vec<Entity>>,
 ) {
-    let roots = [
-        weapon.as_ref().map(|w| w.scene_entity),
-        character.as_ref().map(|c| c.holder),
-    ];
-    for root in roots.into_iter().flatten() {
-        let Ok(target) = q_layers.get(root).cloned() else {
-            continue;
-        };
-        let mut stack = vec![root];
-        while let Some(e) = stack.pop() {
-            if q_layers.get(e).map(|l| *l != target).unwrap_or(true) {
-                commands.entity(e).insert(target.clone());
-            }
-            if let Ok(children) = q_children.get(e) {
-                stack.extend(children.iter());
-            }
-        }
+    if let Some(mut w) = weapon {
+        let root = w.scene_entity;
+        propagate_layers_from(
+            root,
+            &mut w.layers_settled,
+            &q_children,
+            &q_layers,
+            &mut commands,
+            &mut stack,
+        );
+    }
+    if let Some(mut c) = character {
+        let root = c.holder;
+        propagate_layers_from(
+            root,
+            &mut c.layers_settled,
+            &q_children,
+            &q_layers,
+            &mut commands,
+            &mut stack,
+        );
     }
 }
 
