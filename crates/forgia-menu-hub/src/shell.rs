@@ -266,6 +266,59 @@ pub(crate) fn main_menu_ui(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forgia_mode_roguelite::identity::IdentityPanelShown;
+
+    /// Monte le minimum pour faire TOURNER le système : un état, la pile, le
+    /// drapeau. Les tests de pile voisins n'appellent que des méthodes ; celui-ci
+    /// exerce le système lui-même, câblage `Res`/`ResMut` compris.
+    fn app_au_menu(page: MenuPage) -> App {
+        let mut app = App::new();
+        // `init_state` exige le schedule `StateTransition` — sans ce plugin, le
+        // montage panique avant d'avoir rien prouvé.
+        app.add_plugins(bevy::state::app::StatesPlugin);
+        app.insert_state(AppMode::Menu);
+        let mut nav = NavStack::default();
+        if page != MenuPage::Root {
+            nav.switch_tab(page);
+        }
+        app.insert_resource(nav);
+        app.insert_resource(IdentityPanelShown(false));
+        app.add_systems(Update, sys_mark_identity_shown);
+        app
+    }
+
+    /// Régression story-694 incrément 5 : ce système a changé de CRATE, et le
+    /// capteur `identity` a rallumé son avertissement le soir même. Ce test
+    /// sépare les deux causes possibles — « la fiche n'a pas été ouverte » et
+    /// « le déménagement a cassé le marquage » — pour qu'on n'ait plus jamais à
+    /// le déduire d'un souvenir de playtest.
+    #[test]
+    fn la_fiche_forgeron_marque_l_identite_comme_montree() {
+        let mut app = app_au_menu(MenuPage::Forgeron);
+        app.update();
+        assert!(
+            app.world().resource::<IdentityPanelShown>().0,
+            "sur la fiche Forgeron, le drapeau doit passer à vrai"
+        );
+    }
+
+    /// Le pendant : ailleurs qu'à la fiche, rien ne se marque. Sans lui, un
+    /// système qui écrirait `true` inconditionnellement passerait le test
+    /// ci-dessus — et le capteur ne dirait plus jamais rien d'utile.
+    #[test]
+    fn ailleurs_qu_a_la_fiche_rien_n_est_marque() {
+        let mut app = app_au_menu(MenuPage::Root);
+        app.update();
+        assert!(
+            !app.world().resource::<IdentityPanelShown>().0,
+            "hors de la fiche Forgeron, le drapeau doit rester faux"
+        );
+    }
+}
+
 // `draw_arena_test_section` retirée avec l'onglet (2026-07-30, temporaire) — elle
 // n'avait plus qu'un appelant, supprimé lui aussi. Son contenu est dans
 // l'historique git de `forgia-ui/src/menu/shell.rs` ; la restaurer suffit à
