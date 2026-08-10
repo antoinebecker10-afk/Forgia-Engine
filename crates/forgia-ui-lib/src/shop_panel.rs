@@ -99,7 +99,9 @@ fn draw_shop(
                 if ui
                     .add(
                         egui::Button::new(
-                            egui::RichText::new("✕ Fermer").size(15.0).color(FORGE_CHARBON),
+                            egui::RichText::new("✕ Fermer")
+                                .size(15.0)
+                                .color(FORGE_CHARBON),
                         )
                         .fill(FORGE_METAL_CHAUD)
                         .corner_radius(egui::CornerRadius::same(8)),
@@ -172,8 +174,9 @@ fn draw_shop(
                         for (idx, slot) in inv.slots().iter().enumerate() {
                             let Some(s) = slot else { continue };
                             let def = registry.get(&s.id);
-                            let name =
-                                def.map(|d| d.display_name.clone()).unwrap_or(s.id.0.clone());
+                            let name = def
+                                .map(|d| d.display_name.clone())
+                                .unwrap_or(s.id.0.clone());
                             let tier = def.map(|d| d.rarity.tier_index()).unwrap_or(0);
                             let unit = registry.buy_price_of(&s.id);
                             let value = ((unit as f32) * shop.sell_ratio).round() as u32;

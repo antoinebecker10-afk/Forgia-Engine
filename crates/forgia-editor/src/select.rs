@@ -368,9 +368,21 @@ pub fn world_bounds(
             // encadrée (transformer seulement min/max donnerait une boîte fausse).
             for corner in 0..8 {
                 let local = Vec3::new(
-                    if corner & 1 == 0 { local_min.x } else { local_max.x },
-                    if corner & 2 == 0 { local_min.y } else { local_max.y },
-                    if corner & 4 == 0 { local_min.z } else { local_max.z },
+                    if corner & 1 == 0 {
+                        local_min.x
+                    } else {
+                        local_max.x
+                    },
+                    if corner & 2 == 0 {
+                        local_min.y
+                    } else {
+                        local_max.y
+                    },
+                    if corner & 4 == 0 {
+                        local_min.z
+                    } else {
+                        local_max.z
+                    },
                 );
                 let world = affine.transform_point3(local);
                 min = min.min(world);

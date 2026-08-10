@@ -161,12 +161,10 @@ fn read_physics(snap: &mut SensorSnapshot) {
         snap.physics.gravity_y = v.get("gravity_y").and_then(|x| x.as_f64());
         snap.physics.rigid_bodies_total = v.get("rigid_bodies_total").and_then(|x| x.as_i64());
         snap.physics.rigid_bodies_dynamic = v.get("rigid_bodies_dynamic").and_then(|x| x.as_i64());
-        snap.physics.rigid_bodies_kinematic_pos = v
-            .get("rigid_bodies_kinematic_pos")
-            .and_then(|x| x.as_i64());
-        snap.physics.rigid_bodies_kinematic_vel = v
-            .get("rigid_bodies_kinematic_vel")
-            .and_then(|x| x.as_i64());
+        snap.physics.rigid_bodies_kinematic_pos =
+            v.get("rigid_bodies_kinematic_pos").and_then(|x| x.as_i64());
+        snap.physics.rigid_bodies_kinematic_vel =
+            v.get("rigid_bodies_kinematic_vel").and_then(|x| x.as_i64());
         snap.physics.rigid_bodies_fixed = v.get("rigid_bodies_fixed").and_then(|x| x.as_i64());
         snap.physics.colliders_total = v.get("colliders_total").and_then(|x| x.as_i64());
         snap.physics.colliders_sensor = v.get("colliders_sensor").and_then(|x| x.as_i64());
@@ -191,7 +189,10 @@ fn read_perf(snap: &mut SensorSnapshot) {
 fn read_player(snap: &mut SensorSnapshot) {
     if let Some(v) = read_json("forgia2_player_state.json") {
         snap.player.app_mode = v.get("app_mode").and_then(|x| x.as_str()).map(String::from);
-        snap.player.game_mode = v.get("game_mode").and_then(|x| x.as_str()).map(String::from);
+        snap.player.game_mode = v
+            .get("game_mode")
+            .and_then(|x| x.as_str())
+            .map(String::from);
         snap.player.position = read_vec3(&v, "position");
         snap.player.velocity = read_vec3(&v, "velocity");
         snap.player.grounded = v.get("grounded").and_then(|x| x.as_bool());
@@ -248,9 +249,8 @@ fn read_combat(snap: &mut SensorSnapshot) {
     if let Some(v) = read_json("forgia_bot_ai.json") {
         snap.combat.bots_alive = v.get("bots_alive").and_then(|x| x.as_i64());
         snap.combat.bots_with_los = v.get("bots_with_los").and_then(|x| x.as_i64());
-        snap.combat.alerts_triggered_session = v
-            .get("alerts_triggered_session")
-            .and_then(|x| x.as_i64());
+        snap.combat.alerts_triggered_session =
+            v.get("alerts_triggered_session").and_then(|x| x.as_i64());
         snap.combat.los_checks_session = v.get("los_checks_session").and_then(|x| x.as_i64());
     }
 }
@@ -305,15 +305,11 @@ fn read_audio(snap: &mut SensorSnapshot) {
         snap.audio.master_volume = v.get("master_volume").and_then(|x| x.as_f64());
     }
     if let Some(v) = read_json("forgia_music_state.json") {
-        snap.audio.music_track = v
-            .get("track")
-            .and_then(|x| x.as_str())
-            .map(String::from);
+        snap.audio.music_track = v.get("track").and_then(|x| x.as_str()).map(String::from);
         snap.audio.music_intensity = v.get("intensity").and_then(|x| x.as_f64());
     }
     if let Some(v) = read_json("forgia_voicelines.json") {
-        snap.audio.voicelines_played_session =
-            v.get("played_session").and_then(|x| x.as_i64());
+        snap.audio.voicelines_played_session = v.get("played_session").and_then(|x| x.as_i64());
         snap.audio.last_voiceline = v
             .get("last_voiceline")
             .and_then(|x| x.as_str())
@@ -323,10 +319,7 @@ fn read_audio(snap: &mut SensorSnapshot) {
 
 fn read_system(snap: &mut SensorSnapshot) {
     if let Some(v) = read_json("forgia2_health.json") {
-        snap.system.health_severity = v
-            .get("severity")
-            .and_then(|x| x.as_str())
-            .map(String::from);
+        snap.system.health_severity = v.get("severity").and_then(|x| x.as_str()).map(String::from);
         if let Some(arr) = v.get("recent_alerts").and_then(|x| x.as_array()) {
             snap.system.recent_alerts = arr
                 .iter()
@@ -349,9 +342,8 @@ fn read_system(snap: &mut SensorSnapshot) {
         snap.system.lag_events_last_30s = v.get("events_last_30s").and_then(|x| x.as_i64());
     }
     if let Some(v) = read_json("forgia2_watchdog.json") {
-        snap.system.watchdog_seconds_in_emergency = v
-            .get("seconds_in_emergency")
-            .and_then(|x| x.as_f64());
+        snap.system.watchdog_seconds_in_emergency =
+            v.get("seconds_in_emergency").and_then(|x| x.as_f64());
     }
 }
 
@@ -360,9 +352,5 @@ fn read_vec3(v: &Value, key: &str) -> Option<[f64; 3]> {
     if arr.len() < 3 {
         return None;
     }
-    Some([
-        arr[0].as_f64()?,
-        arr[1].as_f64()?,
-        arr[2].as_f64()?,
-    ])
+    Some([arr[0].as_f64()?, arr[1].as_f64()?, arr[2].as_f64()?])
 }

@@ -8,16 +8,18 @@
 //! - `damage_direction` (CoD-style arcs)
 //! - `dialogue` (modal dialogue UI)
 
-pub mod style;
-pub mod theme;
-pub mod hud;
-pub mod hud_ammo;
-pub mod pause_menu;
 pub mod damage_direction;
 pub mod dialogue;
+pub mod hud;
+pub mod hud_ammo;
 pub mod inventory_panel;
+pub mod pause_menu;
 pub mod quest_journal;
 pub mod shop_panel;
+pub mod motion;
+pub mod style;
+pub mod theme;
+pub mod ui_sfx;
 
 use bevy::prelude::*;
 

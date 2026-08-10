@@ -155,13 +155,16 @@ pub fn sys_apply_ground_snap(
         // +57 m = +116 m). Tout objet ayant son propre collider est concerné.
         subtree.clear();
         collect_subtree(entity, &q_children, &mut subtree);
-        let keep = |candidate: Entity| {
-            !subtree.contains(&candidate) && Some(candidate) != player_entity
-        };
+        let keep =
+            |candidate: Entity| !subtree.contains(&candidate) && Some(candidate) != player_entity;
         let filter = QueryFilter::default().exclude_sensors().predicate(&keep);
 
         let bottom = center.y - size.y * 0.5;
-        let origin = Vec3::new(center.x, center.y + size.y * 0.5 + SNAP_PROBE_UP_M, center.z);
+        let origin = Vec3::new(
+            center.x,
+            center.y + size.y * 0.5 + SNAP_PROBE_UP_M,
+            center.z,
+        );
         let Some((_, toi)) = ctx.cast_ray(
             origin,
             Vec3::NEG_Y,
@@ -332,7 +335,10 @@ mod tests {
 
     #[test]
     fn dropping_is_always_allowed() {
-        assert!(!snap_lift_rejected(-120.0), "déposer un objet en l'air est nominal");
+        assert!(
+            !snap_lift_rejected(-120.0),
+            "déposer un objet en l'air est nominal"
+        );
         assert!(!snap_lift_rejected(0.0));
     }
 

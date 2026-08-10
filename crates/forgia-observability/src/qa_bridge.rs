@@ -168,7 +168,9 @@ pub fn sys_write_qa_sensor(
     }
     *accum = 0.0;
 
-    let (bus_ingested, dedup_hits) = bus.map(|b| (b.total_ingested, b.dedup_hits)).unwrap_or((0, 0));
+    let (bus_ingested, dedup_hits) = bus
+        .map(|b| (b.total_ingested, b.dedup_hits))
+        .unwrap_or((0, 0));
 
     // Sévérité du sensor = celle de la dernière émission si « récente », sinon ok.
     let recent = bridge.emitted_total > 0
@@ -274,7 +276,10 @@ mod tests {
     #[test]
     fn no_edge_when_steady() {
         assert!(!is_rising_edge(ObsSeverity::Warn, ObsSeverity::Warn));
-        assert!(!is_rising_edge(ObsSeverity::Critical, ObsSeverity::Critical));
+        assert!(!is_rising_edge(
+            ObsSeverity::Critical,
+            ObsSeverity::Critical
+        ));
     }
 
     #[test]
@@ -294,7 +299,10 @@ mod tests {
     #[test]
     fn severity_mapping_warn_major_critical_critical() {
         assert_eq!(map_severity(ObsSeverity::Warn), Some(QaSeverity::Major));
-        assert_eq!(map_severity(ObsSeverity::Critical), Some(QaSeverity::Critical));
+        assert_eq!(
+            map_severity(ObsSeverity::Critical),
+            Some(QaSeverity::Critical)
+        );
     }
 
     #[test]

@@ -43,9 +43,9 @@ pub mod watchdog_sensor;
 // Story-520+ regression detector cross-migration. Snapshot baseline T+5s →
 // compare cross-runs → HealthAlert on drift (entity count / sensor missing /
 // player despawn).
+pub mod lag_events_sensor;
 pub mod migration_baseline;
 pub mod player_state_sensor;
-pub mod lag_events_sensor;
 // Story-549 (suite session 2026-05-28) — Rapier blind spot.
 pub mod physics_sensor;
 // Story-553 — RPG player ↔ biome/water linkage.
@@ -190,7 +190,7 @@ impl Plugin for ForgiaObservabilityPlugin {
             Update,
             (
                 physics_sensor::sys_write_physics_sensor,
-                rpg_player_sensor::sys_write_rpg_player_sensor,
+                rpg_player_sensor::sys_write_rpg_player_sensor.run_if(in_state(GameMode::Rpg)),
                 quests_sensor::sys_write_quests_sensor,
                 inventory_sensor::sys_write_inventory_sensor,
                 npcs_sensor::sys_write_npcs_sensor,
@@ -216,10 +216,7 @@ impl Plugin for ForgiaObservabilityPlugin {
         // `RpgHealthState` contient aussi les checks Roguelite RGL-*. Le fichier
         // canonique doit donc être produit dans tous les modes : le laisser gaté
         // RPG faisait échouer `sensor_health` pendant une run Roguelite saine.
-        app.add_systems(
-            Update,
-            sys_write_rpg_health_json.in_set(GameSet::Sensors),
-        );
+        app.add_systems(Update, sys_write_rpg_health_json.in_set(GameSet::Sensors));
         // story-622 (Phase 0.2) — réveil du bus QA : pont santé→BugReport
         // (edge-trigger sur les checks RpgHealthState) + sensor forgia2_qa.json.
         // Cross-mode (RpgHealthState peuplé par RPG via CHK-* ou Roguelite via RGL-*).

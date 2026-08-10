@@ -15,6 +15,7 @@
 //! existait — re-porté ici pour V2.
 
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use std::collections::VecDeque;
 
 const LAG_THRESHOLD_MS: f32 = 30.0;
@@ -32,14 +33,23 @@ pub struct LagEventsRing {
     pub events: VecDeque<LagEvent>,
     pub total_recorded: u64,
     pub frame_index: u64,
+    pub ignored_unfocused: u64,
 }
 
 /// Tick frame en `First` schedule — push si lag detected. 0-alloc en hot path
 /// (VecDeque préalloué + bounded).
-pub fn sys_track_lag_events(time: Res<Time>, mut ring: ResMut<LagEventsRing>) {
+pub fn sys_track_lag_events(
+    time: Res<Time>,
+    primary_window: Query<&Window, With<PrimaryWindow>>,
+    mut ring: ResMut<LagEventsRing>,
+) {
     ring.frame_index = ring.frame_index.saturating_add(1);
     let dt_ms = time.delta_secs() * 1000.0;
     if dt_ms <= LAG_THRESHOLD_MS {
+        return;
+    }
+    if primary_window.single().is_ok_and(|window| !window.focused) {
+        ring.ignored_unfocused = ring.ignored_unfocused.saturating_add(1);
         return;
     }
     let event = LagEvent {
@@ -102,10 +112,11 @@ pub fn sys_write_lag_events_sensor(
     }
 
     let json = format!(
-        r#"{{"id":"lag_events","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"threshold_ms":{:.1},"total_recorded":{},"buffer_len":{},"events_last_30s":{},"events":[{}]}}"#,
+        r#"{{"id":"lag_events","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"threshold_ms":{:.1},"total_recorded":{},"ignored_unfocused":{},"buffer_len":{},"events_last_30s":{},"events":[{}]}}"#,
         now,
         LAG_THRESHOLD_MS,
         ring.total_recorded,
+        ring.ignored_unfocused,
         ring.events.len(),
         events_last_30s,
         events_json,

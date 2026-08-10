@@ -314,10 +314,9 @@ pub fn sys_drive_op(
         record_transform(&mut edits, item.entity, transform, &q_prop, &q_decor);
         // Journal consultable : une ligne par geste validé, avec l'état d'avant,
         // pour pouvoir revenir en arrière sur CE geste précis plus tard.
-        if let Some((target, label, asset)) = crate::history::describe(
-            q_prop.get(item.entity).ok(),
-            q_decor.get(item.entity).ok(),
-        ) {
+        if let Some((target, label, asset)) =
+            crate::history::describe(q_prop.get(item.entity).ok(), q_decor.get(item.entity).ok())
+        {
             history.record(
                 match kind {
                     OpKind::Rotate => crate::history::EditKind::Rotated,
@@ -336,7 +335,9 @@ pub fn sys_drive_op(
         if kind == OpKind::Move {
             match session.snap {
                 SnapMode::Ground => {
-                    commands.entity(item.entity).insert(NeedsGroundSnap::default());
+                    commands
+                        .entity(item.entity)
+                        .insert(NeedsGroundSnap::default());
                 }
                 SnapMode::Grid => {
                     commands.entity(item.entity).insert(NeedsGridSnap);
@@ -640,7 +641,10 @@ mod tests {
             },
             Vec3::ZERO,
         );
-        assert!(rotated.scale.x < 0.0, "le miroir doit survivre à la rotation");
+        assert!(
+            rotated.scale.x < 0.0,
+            "le miroir doit survivre à la rotation"
+        );
 
         let scaled = apply_gesture(
             &item,

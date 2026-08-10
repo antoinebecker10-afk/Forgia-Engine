@@ -213,8 +213,10 @@ fn draw_card(
     let def = catalogue.find(id);
     let cost = def.map(|d| d.effective_souls_cost()).unwrap_or(u32::MAX);
     let affordable = souls_current >= cost;
-    let (size, response) =
-        ui.allocate_exact_size(egui::vec2(w, h), egui::Sense::click().union(egui::Sense::hover()));
+    let (size, response) = ui.allocate_exact_size(
+        egui::vec2(w, h),
+        egui::Sense::click().union(egui::Sense::hover()),
+    );
     let rect = response.rect;
     let _ = size;
 
@@ -222,7 +224,9 @@ fn draw_card(
 
     // Story-558 Phase 7 — card cartoon : fond crème + border rarity 5px.
     // Hover : shadow stack + border ×1.5 (lift cartoon Hearthstone).
-    let rarity_color = def.map(|d| rarity_color(d.rarity)).unwrap_or(FORGE_METAL_CHAUD);
+    let rarity_color = def
+        .map(|d| rarity_color(d.rarity))
+        .unwrap_or(FORGE_METAL_CHAUD);
     if response.hovered() {
         cartoon_drop_shadow(&painter, rect, 14.0, egui::vec2(6.0, 6.0));
     }
@@ -366,7 +370,13 @@ fn draw_card(
     // Click ne vaut que si abordable (AC3 gate UI-side ; sys_handle_coffre_pick
     // est defense-in-depth backend).
     if !affordable {
+        if response.clicked() {
+            crate::ui_sfx::push_ui_sfx(&response.ctx, crate::ui_sfx::UiSfxKind::Denied);
+        }
         return None;
+    }
+    if response.clicked() {
+        crate::ui_sfx::push_ui_sfx(&response.ctx, crate::ui_sfx::UiSfxKind::Buy);
     }
     response.clicked().then(|| def.id.clone())
 }

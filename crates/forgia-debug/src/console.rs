@@ -53,16 +53,30 @@ Commands:
 /// lui-même — pure source de découplage.
 #[derive(Message, Debug, Clone)]
 pub enum ConsoleEvent {
-    Teleport { x: f32, y: f32, z: f32 },
-    Heal { amount: Option<f32> },
+    Teleport {
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+    Heal {
+        amount: Option<f32>,
+    },
     ToggleGod,
     Respawn,
     SetWave(u32),
-    SetTuning { key: String, value: f32 },
-    Spawn { archetype: String },
+    SetTuning {
+        key: String,
+        value: f32,
+    },
+    Spawn {
+        archetype: String,
+    },
     DumpSensors,
     /// Commande inconnue — handlers custom peuvent matcher.
-    Custom { raw: String, args: Vec<String> },
+    Custom {
+        raw: String,
+        args: Vec<String>,
+    },
 }
 
 /// Résultat du parsing — soit un event à émettre, soit un feedback texte

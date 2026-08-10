@@ -14,7 +14,10 @@ impl DebugCategory for TerrainCategory {
 
         ui.label("— chunks —");
         ui.label(format!("total_chunks:        {}", fmt_opt(t.total_chunks)));
-        ui.label(format!("loading:             {}", fmt_opt(t.chunks_loading)));
+        ui.label(format!(
+            "loading:             {}",
+            fmt_opt(t.chunks_loading)
+        ));
         ui.label(format!("loaded:              {}", fmt_opt(t.chunks_loaded)));
 
         ui.separator();

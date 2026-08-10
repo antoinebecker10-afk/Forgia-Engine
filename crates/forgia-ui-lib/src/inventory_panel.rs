@@ -172,7 +172,7 @@ fn draw_inventory_panel(
     // ── Appliquer les clics APRÈS le rendu (évite l'emprunt mut pendant render).
     if let Some(idx) = left_click {
         match cursor.held.take() {
-            None => cursor.held = inv.take(idx),       // ramasser
+            None => cursor.held = inv.take(idx),              // ramasser
             Some(held) => cursor.held = inv.place(idx, held), // poser / échanger
         }
     }
@@ -240,7 +240,11 @@ fn draw_inventory_panel(
 }
 
 /// Dessine un slot (vide ou plein) et renvoie sa `Response` (clics + survol).
-fn draw_slot(ui: &mut egui::Ui, slot: &Option<ItemStack>, registry: &ItemRegistry) -> egui::Response {
+fn draw_slot(
+    ui: &mut egui::Ui,
+    slot: &Option<ItemStack>,
+    registry: &ItemRegistry,
+) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(SLOT, SLOT), egui::Sense::click());
     let p = ui.painter_at(rect);
     p.rect_filled(rect, 6.0, FORGE_CREME);
@@ -268,7 +272,9 @@ fn draw_slot(ui: &mut egui::Ui, slot: &Option<ItemStack>, registry: &ItemRegistr
         egui::StrokeKind::Inside,
     );
 
-    let name = def.map(|d| d.display_name.as_str()).unwrap_or(s.id.0.as_str());
+    let name = def
+        .map(|d| d.display_name.as_str())
+        .unwrap_or(s.id.0.as_str());
     let initials: String = name
         .chars()
         .filter(|c| c.is_alphanumeric())

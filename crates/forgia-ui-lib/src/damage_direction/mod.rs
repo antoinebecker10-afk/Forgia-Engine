@@ -13,13 +13,13 @@
 //! calcule angle horizontal `atan2(attacker_xz - player_xz)` projeté caméra.
 //! Genome `assets/genomes/damage_dir_tuning.toml`. Sensor `forgia_damage_dir.json`.
 
+use crate::style::*;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_combat::prelude::*;
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::{FpsCamera, Player};
-use crate::style::*;
 use std::collections::VecDeque;
 
 mod tuning;

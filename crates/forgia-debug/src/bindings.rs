@@ -30,13 +30,34 @@ impl Default for DebugBindings {
         // Master toggle.
         bindings.insert(KeyCode::F3, DebugAction::ToggleMaster);
         // Category toggles 1-6 (digit row, pas numpad pour AZERTY compat).
-        bindings.insert(KeyCode::Digit1, DebugAction::ToggleCategory(CategoryId::System));
-        bindings.insert(KeyCode::Digit2, DebugAction::ToggleCategory(CategoryId::Combat));
-        bindings.insert(KeyCode::Digit3, DebugAction::ToggleCategory(CategoryId::Player));
-        bindings.insert(KeyCode::Digit4, DebugAction::ToggleCategory(CategoryId::Terrain));
-        bindings.insert(KeyCode::Digit5, DebugAction::ToggleCategory(CategoryId::Anim));
-        bindings.insert(KeyCode::Digit6, DebugAction::ToggleCategory(CategoryId::Audio));
-        bindings.insert(KeyCode::Digit7, DebugAction::ToggleCategory(CategoryId::Physics));
+        bindings.insert(
+            KeyCode::Digit1,
+            DebugAction::ToggleCategory(CategoryId::System),
+        );
+        bindings.insert(
+            KeyCode::Digit2,
+            DebugAction::ToggleCategory(CategoryId::Combat),
+        );
+        bindings.insert(
+            KeyCode::Digit3,
+            DebugAction::ToggleCategory(CategoryId::Player),
+        );
+        bindings.insert(
+            KeyCode::Digit4,
+            DebugAction::ToggleCategory(CategoryId::Terrain),
+        );
+        bindings.insert(
+            KeyCode::Digit5,
+            DebugAction::ToggleCategory(CategoryId::Anim),
+        );
+        bindings.insert(
+            KeyCode::Digit6,
+            DebugAction::ToggleCategory(CategoryId::Audio),
+        );
+        bindings.insert(
+            KeyCode::Digit7,
+            DebugAction::ToggleCategory(CategoryId::Physics),
+        );
         // Console runtime (story-548).
         bindings.insert(KeyCode::Backquote, DebugAction::ToggleConsole);
         bindings.insert(KeyCode::F1, DebugAction::ToggleConsole);

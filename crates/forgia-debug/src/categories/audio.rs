@@ -11,10 +11,7 @@ impl DebugCategory for AudioCategory {
         let a = &snap.audio;
 
         ui.label("— channels —");
-        ui.label(format!(
-            "channels_active: {}",
-            fmt_opt(a.channels_active)
-        ));
+        ui.label(format!("channels_active: {}", fmt_opt(a.channels_active)));
         ui.label(format!(
             "master_volume:   {}",
             fmt_opt_f64(a.master_volume, 2)

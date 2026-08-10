@@ -35,7 +35,9 @@ mod tuning;
 pub use tuning::{EnemyNameplate, EnemyNameplateTuning, EnemyNameplateTuningHandle};
 
 pub mod prelude {
-    pub use crate::{EnemyNameplate, EnemyNameplateTuning, ForgiaEnemyNameplatePlugin, NameplateAnchor};
+    pub use crate::{
+        EnemyNameplate, EnemyNameplateTuning, ForgiaEnemyNameplatePlugin, NameplateAnchor,
+    };
 }
 
 /// Override (m) de la hauteur locale du nameplate au-dessus du parent — posé par le
@@ -92,7 +94,10 @@ impl Default for NameplateSight {
 /// Gardé par `Changed` : à vue stable — le cas courant — ce système ne touche
 /// rien. Il ne tourne qu'aux transitions.
 pub fn sys_apply_nameplate_sight(
-    mut plates: Query<(&NameplateSight, &mut Visibility), (With<NameplateRoot>, Changed<NameplateSight>)>,
+    mut plates: Query<
+        (&NameplateSight, &mut Visibility),
+        (With<NameplateRoot>, Changed<NameplateSight>),
+    >,
 ) {
     for (sight, mut vis) in &mut plates {
         let voulu = if sight.visible {
@@ -304,10 +309,22 @@ fn build_nameplate_for(
     };
     if let Some(d) = defense {
         if d.shield_max > 0.0 {
-            spawn_plate_row(d.shield_max, t.shield_segment_hp, shield_y, t.shield_color, true);
+            spawn_plate_row(
+                d.shield_max,
+                t.shield_segment_hp,
+                shield_y,
+                t.shield_color,
+                true,
+            );
         }
         if d.armor_max > 0.0 {
-            spawn_plate_row(d.armor_max, t.armor_segment_hp, armor_y, t.armor_color, false);
+            spawn_plate_row(
+                d.armor_max,
+                t.armor_segment_hp,
+                armor_y,
+                t.armor_color,
+                false,
+            );
         }
     }
 
@@ -461,10 +478,7 @@ fn update_defense_bars(
     q_roots: Query<(&NameplateRoot, &Children)>,
     q_defense: Query<&DefenseLayer>,
     mut q_shield: Query<(&NameplateShieldFill, &mut Visibility)>,
-    mut q_armor: Query<
-        (&NameplateArmorFill, &mut Visibility),
-        Without<NameplateShieldFill>,
-    >,
+    mut q_armor: Query<(&NameplateArmorFill, &mut Visibility), Without<NameplateShieldFill>>,
 ) {
     for (root, children) in &q_roots {
         let Ok(dl) = q_defense.get(root.target) else {

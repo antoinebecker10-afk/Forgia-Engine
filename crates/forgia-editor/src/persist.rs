@@ -239,11 +239,7 @@ pub fn load_edits(
             transform,
         );
     }
-    let (props, overrides, records) = (
-        file.props.len(),
-        file.overrides.len(),
-        file.history.len(),
-    );
+    let (props, overrides, records) = (file.props.len(), file.overrides.len(), file.history.len());
     edits.props = file.props;
     edits.overrides = file.overrides;
     history.adopt(file.history);
@@ -328,10 +324,7 @@ pub fn save_now(edits: &mut SceneEdits, history: &crate::history::EditHistory) {
 
 /// Sauvegarde en quittant le Hall — aucune édition ne doit se perdre parce que
 /// le délai d'autosave n'était pas écoulé.
-pub fn flush_on_exit(
-    history: Res<crate::history::EditHistory>,
-    mut edits: ResMut<SceneEdits>,
-) {
+pub fn flush_on_exit(history: Res<crate::history::EditHistory>, mut edits: ResMut<SceneEdits>) {
     if edits.dirty {
         save_now(&mut edits, &history);
     }
@@ -464,7 +457,10 @@ mod tests {
         let id = edits.push_prop("models/a.glb", &Transform::default());
         edits.dirty = false;
         edits.remove_prop(id + 99);
-        assert!(!edits.dirty(), "aucune suppression ne doit pas salir l'état");
+        assert!(
+            !edits.dirty(),
+            "aucune suppression ne doit pas salir l'état"
+        );
         edits.remove_prop(id);
         assert!(edits.dirty());
         assert!(edits.props.is_empty());

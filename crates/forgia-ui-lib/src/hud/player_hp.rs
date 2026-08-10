@@ -134,12 +134,28 @@ pub(crate) fn draw_player_hp(
         let mut seg_bottom = bottom_y - seg_gap;
         if def.shield_max > 0.5 {
             let top = seg_bottom - seg_h;
-            draw_defense_segment(&painter, left_x, top, bar_w, seg_h, def.shield / def.shield_max, C_SHIELD);
+            draw_defense_segment(
+                &painter,
+                left_x,
+                top,
+                bar_w,
+                seg_h,
+                def.shield / def.shield_max,
+                C_SHIELD,
+            );
             seg_bottom = top - seg_gap;
         }
         if def.armor_max > 0.5 {
             let top = seg_bottom - seg_h;
-            draw_defense_segment(&painter, left_x, top, bar_w, seg_h, def.armor / def.armor_max, C_ARMOR);
+            draw_defense_segment(
+                &painter,
+                left_x,
+                top,
+                bar_w,
+                seg_h,
+                def.armor / def.armor_max,
+                C_ARMOR,
+            );
         }
     }
 }

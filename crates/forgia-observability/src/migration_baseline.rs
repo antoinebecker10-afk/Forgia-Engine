@@ -22,6 +22,7 @@
 //! tracker l'évolution baseline cross-PR (artifact dans `docs/baselines/`).
 
 use bevy::prelude::*;
+use forgia_core::prelude::GameMode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -56,7 +57,9 @@ pub fn sys_load_previous_baseline(mut state: ResMut<MigrationBaselineState>) {
         return;
     }
     let Ok(contents) = fs::read_to_string(BASELINE_JSON_PATH) else {
-        info!("[migration-baseline] no previous baseline found at {BASELINE_JSON_PATH} — first run.");
+        info!(
+            "[migration-baseline] no previous baseline found at {BASELINE_JSON_PATH} — first run."
+        );
         return;
     };
     match serde_json::from_str::<MigrationBaseline>(&contents) {
@@ -81,6 +84,7 @@ pub fn sys_capture_and_compare_baseline(
     mut state: ResMut<MigrationBaselineState>,
     all_entities: Query<Entity>,
     player_check: Query<(), With<bevy::prelude::Camera3d>>, // proxy : Camera3d implique scene loaded
+    mode: Res<State<GameMode>>,
 ) {
     if state.captured {
         return;
@@ -109,7 +113,9 @@ pub fn sys_capture_and_compare_baseline(
 
     info!(
         "[migration-baseline] captured : entities={} sensors={} player_spawned={}",
-        current.boot_entity_count, sensors_present.len(), current.player_spawned
+        current.boot_entity_count,
+        sensors_present.len(),
+        current.player_spawned
     );
 
     // Write to disk.
@@ -139,7 +145,12 @@ pub fn sys_capture_and_compare_baseline(
             );
         }
         // Detect dropped sensors.
-        let prev_set: HashSet<&str> = prev.sensors_present.iter().map(|s| s.as_str()).collect();
+        let prev_set: HashSet<&str> = prev
+            .sensors_present
+            .iter()
+            .map(|s| s.as_str())
+            .filter(|path| sensor_applies_to_mode(path, mode.get().clone()))
+            .collect();
         let curr_set: HashSet<&str> = current.sensors_present.iter().map(|s| s.as_str()).collect();
         let dropped: Vec<&str> = prev_set.difference(&curr_set).copied().collect();
         if !dropped.is_empty() {
@@ -155,6 +166,14 @@ pub fn sys_capture_and_compare_baseline(
     }
 
     state.current = current;
+}
+
+fn sensor_applies_to_mode(path: &str, mode: GameMode) -> bool {
+    match path {
+        "forgia2_arena.json" => mode == GameMode::Fps,
+        "forgia2_rpg_health.json" => mode == GameMode::Rpg,
+        _ => true,
+    }
 }
 
 /// Liste les fichiers `forgia2_*.json` à la racine workspace (proxy détection sensors).
@@ -176,4 +195,18 @@ fn scan_sensor_files() -> Vec<String> {
     }
     out.sort();
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_mode_specific_sensors_do_not_create_false_regressions() {
+        assert!(!sensor_applies_to_mode(
+            "forgia2_arena.json",
+            GameMode::Roguelite
+        ));
+        assert!(sensor_applies_to_mode("forgia2_arena.json", GameMode::Fps));
+    }
 }

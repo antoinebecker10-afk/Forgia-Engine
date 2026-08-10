@@ -13,7 +13,10 @@ impl DebugCategory for SystemCategory {
             "frame_ms:      {}",
             fmt_opt_f64(snap.perf.frame_ms, 2)
         ));
-        ui.label(format!("ram_mb:        {}", fmt_opt_f64(snap.system.ram_mb, 1)));
+        ui.label(format!(
+            "ram_mb:        {}",
+            fmt_opt_f64(snap.system.ram_mb, 1)
+        ));
         ui.label(format!(
             "entities:      {}",
             fmt_opt(snap.system.entities_total)

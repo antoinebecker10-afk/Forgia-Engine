@@ -311,11 +311,7 @@ fn draw_history(
                 for record in history.records.iter().rev() {
                     ui.horizontal(|ui| {
                         if record.reverted {
-                            ui.label(
-                                egui::RichText::new(record.summary())
-                                    .weak()
-                                    .strikethrough(),
-                            );
+                            ui.label(egui::RichText::new(record.summary()).weak().strikethrough());
                             ui.label(egui::RichText::new("annulé").weak().italics());
                         } else {
                             ui.label(record.summary());
@@ -402,8 +398,11 @@ fn draw_inspector(
             }
             if selection.items.len() > 1 {
                 ui.label(
-                    egui::RichText::new(format!("+ {} autre(s) sélectionné(s)", selection.items.len() - 1))
-                        .italics(),
+                    egui::RichText::new(format!(
+                        "+ {} autre(s) sélectionné(s)",
+                        selection.items.len() - 1
+                    ))
+                    .italics(),
                 );
             }
             ui.separator();
@@ -461,9 +460,7 @@ fn draw_inspector(
 
             if changed {
                 let snapshot = *transform;
-                crate::transform_ops::record_transform(
-                    edits, entity, &snapshot, q_prop, q_decor,
-                );
+                crate::transform_ops::record_transform(edits, entity, &snapshot, q_prop, q_decor);
             }
         });
 }

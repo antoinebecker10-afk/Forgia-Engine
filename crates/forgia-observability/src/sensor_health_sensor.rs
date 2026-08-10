@@ -6,6 +6,7 @@
 //! Story-469 — Vague 5 Phase 5b Session C.
 
 use bevy::prelude::*;
+use forgia_core::prelude::GameMode;
 use std::time::SystemTime;
 
 /// 12 sensors canoniques attendus (V5 cible — chunks reportable Session D).
@@ -45,7 +46,15 @@ pub fn severity_for_sensor_health(missing: usize, stale: usize) -> (&'static str
     }
 }
 
-pub fn sys_write_sensor_health(time: Res<Time>, mut accum: Local<f32>) {
+fn expected_in_mode(path: &str, mode: GameMode) -> bool {
+    match path {
+        "forgia2_arena.json" => mode == GameMode::Fps,
+        "forgia2_rpg_health.json" => mode == GameMode::Rpg,
+        _ => true,
+    }
+}
+
+pub fn sys_write_sensor_health(time: Res<Time>, mode: Res<State<GameMode>>, mut accum: Local<f32>) {
     *accum += time.delta_secs();
     if *accum < 1.0 {
         return;
@@ -57,7 +66,13 @@ pub fn sys_write_sensor_health(time: Res<Time>, mut accum: Local<f32>) {
     let mut missing: Vec<&str> = Vec::new();
     let mut present = 0u32;
 
-    for path in EXPECTED_SENSORS {
+    let expected: Vec<_> = EXPECTED_SENSORS
+        .iter()
+        .copied()
+        .filter(|path| expected_in_mode(path, mode.get().clone()))
+        .collect();
+
+    for path in &expected {
         match std::fs::metadata(path).and_then(|m| m.modified()) {
             Ok(mtime) => {
                 let age = now.duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0);
@@ -78,7 +93,7 @@ pub fn sys_write_sensor_health(time: Res<Time>, mut accum: Local<f32>) {
     let json = format!(
         r#"{{"id":"sensor_health","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"expected":{},"present":{},"missing":{},"stale":{},"missing_paths":{},"stale_paths":{}}}"#,
         time.elapsed_secs(),
-        EXPECTED_SENSORS.len(),
+        expected.len(),
         present,
         missing.len(),
         stale.len(),
@@ -122,5 +137,12 @@ mod tests {
     #[test]
     fn expected_sensors_count_is_15() {
         assert_eq!(EXPECTED_SENSORS.len(), 15);
+    }
+
+    #[test]
+    fn mode_specific_sensors_are_not_expected_outside_their_mode() {
+        assert!(!expected_in_mode("forgia2_arena.json", GameMode::Roguelite));
+        assert!(expected_in_mode("forgia2_arena.json", GameMode::Fps));
+        assert!(!expected_in_mode("forgia2_rpg_health.json", GameMode::Fps));
     }
 }

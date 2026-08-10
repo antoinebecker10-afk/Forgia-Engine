@@ -38,6 +38,7 @@ pub fn sys_write_editor_sensor(
 
     let in_hub = matches!(game_mode.get(), GameMode::CastleHub);
     let (severity, next_step) = severity_for_editor(
+        in_hub,
         session.open,
         edits.last_save_ok,
         edits.dirty(),
@@ -64,12 +65,16 @@ pub fn sys_write_editor_sensor(
 
 /// Sévérité + action de remédiation. Extraite pour être testable sans app Bevy.
 fn severity_for_editor(
+    in_hub: bool,
     open: bool,
     last_save_ok: bool,
     dirty: bool,
     library_scanned: bool,
     library_total: usize,
 ) -> (&'static str, &'static str) {
+    if !in_hub {
+        return ("ok", "-");
+    }
     if !last_save_ok {
         return (
             "critical",
@@ -97,31 +102,54 @@ mod tests {
 
     #[test]
     fn closed_and_clean_is_ok() {
-        assert_eq!(severity_for_editor(false, true, false, false, 0).0, "ok");
+        assert_eq!(
+            severity_for_editor(true, false, true, false, false, 0).0,
+            "ok"
+        );
     }
 
     #[test]
     fn failed_write_is_critical() {
-        assert_eq!(severity_for_editor(true, false, true, true, 900).0, "critical");
+        assert_eq!(
+            severity_for_editor(true, true, false, true, true, 900).0,
+            "critical"
+        );
     }
 
     #[test]
     fn empty_library_warns_only_once_scanned() {
-        assert_eq!(severity_for_editor(true, true, false, false, 0).0, "ok");
-        assert_eq!(severity_for_editor(true, true, false, true, 0).0, "warn");
+        assert_eq!(
+            severity_for_editor(true, true, true, false, false, 0).0,
+            "ok"
+        );
+        assert_eq!(
+            severity_for_editor(true, true, true, false, true, 0).0,
+            "warn"
+        );
     }
 
     #[test]
     fn pending_edits_after_close_warn() {
-        assert_eq!(severity_for_editor(false, true, true, true, 900).0, "warn");
+        assert_eq!(
+            severity_for_editor(true, false, true, true, true, 900).0,
+            "warn"
+        );
+    }
+
+    #[test]
+    fn failures_outside_the_hub_do_not_raise_false_alarms() {
+        assert_eq!(
+            severity_for_editor(false, false, false, true, true, 900).0,
+            "ok"
+        );
     }
 
     #[test]
     fn every_severity_carries_a_next_step() {
         for case in [
-            severity_for_editor(true, false, true, true, 900),
-            severity_for_editor(true, true, false, true, 0),
-            severity_for_editor(false, true, true, true, 900),
+            severity_for_editor(true, true, false, true, true, 900),
+            severity_for_editor(true, true, true, false, true, 0),
+            severity_for_editor(true, false, true, true, true, 900),
         ] {
             assert_ne!(case.1, "-", "une alerte doit dire quoi faire");
         }

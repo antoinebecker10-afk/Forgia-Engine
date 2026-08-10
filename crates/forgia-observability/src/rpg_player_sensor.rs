@@ -96,7 +96,10 @@ pub fn sys_write_rpg_player_sensor(
             "Player drowning bottom of map (>50m deep) — terrain hole ou fall-through",
         )
     } else if is_swimming && !head_above_water {
-        ("warn", "Player fully underwater — drown imminent (V2 sans mécanique breath)")
+        (
+            "warn",
+            "Player fully underwater — drown imminent (V2 sans mécanique breath)",
+        )
     } else {
         ("ok", "")
     };

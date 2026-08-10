@@ -14,6 +14,8 @@ use std::collections::{HashMap, VecDeque};
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
+use bevy_kira_audio::{AudioChannel, AudioControl, AudioSource};
+use forgia_audio::{UserAudioVolumes, VoiceChannel};
 use forgia_combat::combat_juice::CombatHitEvent;
 use forgia_combat::confidence::ShotResolved;
 use forgia_combat::weapons::WeaponType;
@@ -75,6 +77,10 @@ pub struct BarkLine {
     #[allow(dead_code)] // priority override = incréments suivants (death/boss).
     pub priority: u32,
     pub cooldown_sec: f32,
+    /// Voix optionnelle correspondant exactement à cette réplique. L'absence
+    /// conserve le bark texte sans substituer une voix incohérente.
+    #[serde(default)]
+    pub audio_path: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -140,6 +146,9 @@ pub struct BarkLibrary {
 #[derive(Resource, Default)]
 pub struct BarkTuningHandleState(pub Option<Handle<Genome<BarkGenome>>>);
 
+#[derive(Resource, Default)]
+pub struct BarkVoiceHandles(pub HashMap<String, Handle<AudioSource>>);
+
 fn load_bark_genome(mut state: ResMut<BarkTuningHandleState>, asset_server: Res<AssetServer>) {
     state.0 = Some(asset_server.load("genomes/roguelite/roguelite_dialogue.toml"));
 }
@@ -149,6 +158,8 @@ fn sync_bark_library(
     state: Res<BarkTuningHandleState>,
     assets: Res<Assets<Genome<BarkGenome>>>,
     mut library: ResMut<BarkLibrary>,
+    asset_server: Res<AssetServer>,
+    mut voices: ResMut<BarkVoiceHandles>,
 ) {
     // Resync sur Added (boot) ET Modified (hot-reload file_watcher). Un proxy
     // « taille des pools » raterait les changements de tuning seuls (bug vu
@@ -164,6 +175,14 @@ fn sync_bark_library(
     };
     library.pools = g.data.pool.clone();
     library.tuning = tuning_from(&g.data.genes);
+    voices.0.clear();
+    for line in library.pools.iter().flat_map(|pool| &pool.lines) {
+        if let Some(path) = line.audio_path.as_deref().filter(|path| !path.is_empty()) {
+            voices
+                .0
+                .insert(line.id.clone(), asset_server.load(path.to_owned()));
+        }
+    }
     info!(
         "[barks] library loaded: {} pools, P(kill)={:.2}, lock={}s, max/min={}",
         library.pools.len(),
@@ -200,6 +219,8 @@ pub struct BarkEngine {
     pub misses_seen: u32,
     pub skipped_chance: u32,
     pub played_total: u32,
+    pub voiced_total: u32,
+    pub missing_voice_total: u32,
     pub suppressed_lock: u32,
     pub suppressed_rate: u32,
     pub last_line_id: String,
@@ -217,6 +238,8 @@ impl Default for BarkEngine {
             misses_seen: 0,
             skipped_chance: 0,
             played_total: 0,
+            voiced_total: 0,
+            missing_voice_total: 0,
             suppressed_lock: 0,
             suppressed_rate: 0,
             last_line_id: String::new(),
@@ -364,6 +387,7 @@ impl BarkEngine {
 
 /// Lit kills (CombatHitEvent) et tirs ratés (ShotResolved) : l'arme en main
 /// commente. Tourne aussi hors-combat pour expirer le bark actif.
+#[allow(clippy::too_many_arguments)]
 fn sys_trigger_combat_barks(
     mut hits: MessageReader<CombatHitEvent>,
     mut shots: MessageReader<ShotResolved>,
@@ -371,6 +395,9 @@ fn sys_trigger_combat_barks(
     library: Res<BarkLibrary>,
     time: Res<Time>,
     game_mode: Res<State<GameMode>>,
+    voices: Res<BarkVoiceHandles>,
+    voice_channel: Option<Res<AudioChannel<VoiceChannel>>>,
+    mix: Option<Res<UserAudioVolumes>>,
 ) {
     let now = time.elapsed_secs();
     if let Some(active) = &engine.active {
@@ -402,6 +429,13 @@ fn sys_trigger_combat_barks(
             now,
         );
         engine.route_counters(&outcome);
+        play_selected_voice(
+            &outcome,
+            &mut engine,
+            &voices,
+            voice_channel.as_deref(),
+            mix.as_deref(),
+        );
     }
 
     // Story-533 AC7 — le tir raté fait parler les armes qui jugent (pool miss).
@@ -421,7 +455,37 @@ fn sys_trigger_combat_barks(
             now,
         );
         engine.route_counters(&outcome);
+        play_selected_voice(
+            &outcome,
+            &mut engine,
+            &voices,
+            voice_channel.as_deref(),
+            mix.as_deref(),
+        );
     }
+}
+
+fn play_selected_voice(
+    outcome: &BarkOutcome,
+    engine: &mut BarkEngine,
+    voices: &BarkVoiceHandles,
+    channel: Option<&AudioChannel<VoiceChannel>>,
+    mix: Option<&UserAudioVolumes>,
+) {
+    if *outcome != BarkOutcome::Played {
+        return;
+    }
+    let Some(handle) = voices.0.get(&engine.last_line_id) else {
+        engine.missing_voice_total += 1;
+        return;
+    };
+    let Some(channel) = channel else {
+        return;
+    };
+    channel
+        .play(handle.clone())
+        .with_volume(mix.map_or(1.0, UserAudioVolumes::voice_gain));
+    engine.voiced_total += 1;
 }
 
 /// Bulle cartoon bas-droite (l'arme parle au-dessus du compteur munitions).
@@ -488,10 +552,25 @@ fn sys_write_barks_sensor(
     }
     *accum = 0.0;
 
+    let voiced_lines_loaded = library
+        .pools
+        .iter()
+        .flat_map(|pool| &pool.lines)
+        .filter(|line| {
+            line.audio_path
+                .as_deref()
+                .is_some_and(|path| !path.is_empty())
+        })
+        .count();
     let (severity, next_step) = if library.pools.is_empty() {
         (
             "info",
             "0 pool charge - verifier assets/genomes/roguelite/roguelite_dialogue.toml + loader Genome<BarkGenome>",
+        )
+    } else if voiced_lines_loaded == 0 {
+        (
+            "info",
+            "Barks texte actifs; ajouter audio_path apres enregistrement des voix francaises correspondantes.",
         )
     } else {
         ("ok", "")
@@ -502,15 +581,18 @@ fn sys_write_barks_sensor(
         .map(|a| a.text.as_str())
         .unwrap_or("");
     let json = format!(
-        r#"{{"id":"barks","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"pools_loaded":{},"chance_on_kill":{:.2},"chance_on_miss":{:.2},"kills_seen":{},"misses_seen":{},"skipped_chance":{},"played_total":{},"suppressed_lock":{},"suppressed_rate":{},"last_line_id":"{}","active_text":"{}"}}"#,
+        r#"{{"id":"barks","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"pools_loaded":{},"voiced_lines_loaded":{},"chance_on_kill":{:.2},"chance_on_miss":{:.2},"kills_seen":{},"misses_seen":{},"skipped_chance":{},"played_total":{},"voiced_total":{},"missing_voice_total":{},"suppressed_lock":{},"suppressed_rate":{},"last_line_id":"{}","active_text":"{}"}}"#,
         time.elapsed_secs(),
         library.pools.len(),
+        voiced_lines_loaded,
         library.tuning.chance_on_kill,
         library.tuning.chance_on_miss,
         engine.kills_seen,
         engine.misses_seen,
         engine.skipped_chance,
         engine.played_total,
+        engine.voiced_total,
+        engine.missing_voice_total,
         engine.suppressed_lock,
         engine.suppressed_rate,
         engine.last_line_id,
@@ -535,6 +617,7 @@ impl Plugin for WeaponBarksPlugin {
         app.init_resource::<BarkEngine>()
             .init_resource::<BarkLibrary>()
             .init_resource::<BarkTuningHandleState>()
+            .init_resource::<BarkVoiceHandles>()
             .init_asset::<Genome<BarkGenome>>()
             .register_asset_loader(GenomeLoader::<BarkGenome>::default())
             .add_systems(Startup, load_bark_genome)
@@ -595,6 +678,7 @@ lines = [
             weight: w,
             priority: 30,
             cooldown_sec: 10.0,
+            audio_path: None,
         };
         let lines = [mk("a", 30), mk("b", 25), mk("c", 20), mk("d", 25)];
         let refs: Vec<&BarkLine> = lines.iter().collect();
@@ -639,6 +723,7 @@ lines = [
                     weight: 100,
                     priority: 30,
                     cooldown_sec: 12.0,
+                    audio_path: None,
                 }],
             }],
             tuning: BarkTuning {
@@ -692,6 +777,7 @@ lines = [
                     weight: 100,
                     priority: 40,
                     cooldown_sec: 18.0,
+                    audio_path: None,
                 }],
             }],
             tuning: BarkTuning {
@@ -718,9 +804,6 @@ lines = [
         assert_eq!(engine.misses_seen, 2);
         assert_eq!(engine.played_total, 1, "seule Lenoir juge");
         assert_eq!(engine.last_line_id, "lenoir_miss_01");
-        assert_eq!(
-            engine.active.as_ref().expect("bulle").text,
-            "Lamentable."
-        );
+        assert_eq!(engine.active.as_ref().expect("bulle").text, "Lamentable.");
     }
 }

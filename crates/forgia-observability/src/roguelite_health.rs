@@ -51,7 +51,9 @@ pub fn chk_render_blank(
             "Culling (B0004 InheritedVisibility) / passe opaque / frustum — voir forgia2_render.json.",
         );
     }
-    CheckResult::ok(format!("RGL-1: {mesh_visible}/{mesh_total} Mesh3d visibles"))
+    CheckResult::ok(format!(
+        "RGL-1: {mesh_visible}/{mesh_total} Mesh3d visibles"
+    ))
 }
 
 /// RGL-2 — vague figée : run actif, hors break, aucun bot vivant depuis trop longtemps.
@@ -68,7 +70,9 @@ pub fn chk_stuck_wave(
 ) -> CheckResult {
     let active = run_state == "in_run" || run_state == "boss";
     if !active || in_break || run_ended || boss_defeated {
-        return CheckResult::ok(format!("RGL-2: pas de combat actif à surveiller ({run_state})"));
+        return CheckResult::ok(format!(
+            "RGL-2: pas de combat actif à surveiller ({run_state})"
+        ));
     }
     if bots_alive == 0 && time_in_state_secs > stuck_wave_secs {
         return CheckResult::warn(
@@ -80,7 +84,9 @@ pub fn chk_stuck_wave(
             "Voir forgia2_worldgen (SpawnQueue) + director de vagues : spawn bloqué ?",
         );
     }
-    CheckResult::ok(format!("RGL-2: {bots_alive} bot(s) vivant(s) en `{run_state}`"))
+    CheckResult::ok(format!(
+        "RGL-2: {bots_alive} bot(s) vivant(s) en `{run_state}`"
+    ))
 }
 
 /// Lit `forgia2_roguelite_state.json` (garde de staleness via `timestamp_secs`, même
@@ -169,10 +175,19 @@ pub fn sys_roguelite_health(
         .iter()
         .filter(|(cam, is_3d)| *is_3d && cam.is_active)
         .count() as u64;
-    let rgl1 = chk_render_blank(mesh_total, mesh_visible, cams_3d_active, cfg.blank_mesh_floor);
+    let rgl1 = chk_render_blank(
+        mesh_total,
+        mesh_visible,
+        cams_3d_active,
+        cfg.blank_mesh_floor,
+    );
 
     // RGL-2 — vague figée (lecture du sensor roguelite, garde de staleness).
-    let rgl2 = read_stuck_wave(time.elapsed_secs(), cfg.stuck_wave_secs, cfg.state_stale_secs);
+    let rgl2 = read_stuck_wave(
+        time.elapsed_secs(),
+        cfg.stuck_wave_secs,
+        cfg.state_stale_secs,
+    );
 
     // En Roguelite, les checks RPG (CHK-*) ne tournent pas : on possède l'état santé.
     let worst = if rank(rgl1.severity) >= rank(rgl2.severity) {

@@ -75,13 +75,21 @@ fn draw_quest_journal(
         if !matches!(state.status, QuestStatus::Active | QuestStatus::Completed) {
             continue;
         }
-        let Some(def) = catalogue.get(qid) else { continue };
+        let Some(def) = catalogue.get(qid) else {
+            continue;
+        };
         let completed = state.status == QuestStatus::Completed;
         let objs: Vec<ObjView> = def
             .objectives
             .iter()
             .enumerate()
-            .map(|(i, o)| (o.label.clone(), state.progress.get(i).copied().unwrap_or(0), o.target))
+            .map(|(i, o)| {
+                (
+                    o.label.clone(),
+                    state.progress.get(i).copied().unwrap_or(0),
+                    o.target,
+                )
+            })
             .collect();
         entries.push((qid.clone(), def.title.clone(), objs, completed));
     }
@@ -122,7 +130,11 @@ fn draw_quest_journal(
                     egui::RichText::new(format!("{} {title}", if *completed { "✔" } else { "•" }))
                         .size(18.0)
                         .strong()
-                        .color(if *completed { FORGE_TEAL } else { FORGE_CHARBON }),
+                        .color(if *completed {
+                            FORGE_TEAL
+                        } else {
+                            FORGE_CHARBON
+                        }),
                 );
                 for (label, cur, target) in objs {
                     ui.horizontal(|ui| {
@@ -148,7 +160,11 @@ fn draw_quest_journal(
                         .strong()
                         .color(FORGE_CHARBON),
                 )
-                .fill(if is_tracked { FORGE_OR } else { FORGE_METAL_CHAUD })
+                .fill(if is_tracked {
+                    FORGE_OR
+                } else {
+                    FORGE_METAL_CHAUD
+                })
                 .stroke(egui::Stroke::new(2.0, FORGE_CHARBON))
                 .corner_radius(egui::CornerRadius::same(8))
                 .min_size(egui::vec2(130.0, 28.0));
@@ -200,7 +216,13 @@ fn draw_quest_tracker(
         .objectives
         .iter()
         .enumerate()
-        .map(|(i, o)| (o.label.clone(), state.progress.get(i).copied().unwrap_or(0), o.target))
+        .map(|(i, o)| {
+            (
+                o.label.clone(),
+                state.progress.get(i).copied().unwrap_or(0),
+                o.target,
+            )
+        })
         .collect();
 
     let Ok(ctx) = contexts.ctx_mut() else { return };
@@ -229,7 +251,11 @@ fn draw_quest_tracker(
                             if done { "✔" } else { "›" }
                         ))
                         .size(13.0)
-                        .color(if done { FORGE_TEAL } else { C_TEXT_LIGHT }),
+                        .color(if done {
+                            FORGE_TEAL
+                        } else {
+                            C_TEXT_LIGHT
+                        }),
                     );
                 }
                 if completed {

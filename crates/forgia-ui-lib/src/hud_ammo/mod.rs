@@ -23,13 +23,13 @@
 //! - Reload arc : segments stack-alloc, pas de Vec
 //! - egui painter Foreground layer unique
 
+use crate::style::*;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 use forgia_combat::prelude::*;
 use forgia_combat::weapons::{EquippedWeapons, WeaponType, ARENA_V1_WEAPONS};
 use forgia_core::prelude::*;
 use forgia_genome_core::{Genome, GenomeLoader};
-use crate::style::*;
 
 mod sensor;
 mod tuning;

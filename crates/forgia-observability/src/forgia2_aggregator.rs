@@ -20,6 +20,7 @@
 //! - `critical` : ≥ 3 sources missing OU toutes les sources missing.
 
 use bevy::prelude::*;
+use forgia_core::prelude::GameMode;
 use std::time::SystemTime;
 
 const STALE_THRESHOLD_SECS: u64 = 10;
@@ -122,7 +123,11 @@ fn compose_aggregate(
 /// Système 1Hz — écrit forgia2_combat.json + forgia2_arena.json.
 /// Run en `GameSet::Sensors`, mode-gated en `GameMode::Fps` (les 7 sources Tier 1
 /// sont toutes FPS-spécifiques, inutile de tourner en RPG).
-pub fn sys_write_forgia2_aggregates(time: Res<Time>, mut state: ResMut<Forgia2AggregatorState>) {
+pub fn sys_write_forgia2_aggregates(
+    time: Res<Time>,
+    game_mode: Res<State<GameMode>>,
+    mut state: ResMut<Forgia2AggregatorState>,
+) {
     let now = time.elapsed_secs();
     if now - state.last_write_secs < 1.0 {
         return;
@@ -132,8 +137,12 @@ pub fn sys_write_forgia2_aggregates(time: Res<Time>, mut state: ResMut<Forgia2Ag
     let (combat_json, _, _) = compose_aggregate("combat", now, COMBAT_SOURCES);
     let _ = forgia_core::sensor_io::enqueue("forgia2_combat.json", combat_json);
 
-    let (arena_json, _, _) = compose_aggregate("arena", now, ARENA_SOURCES);
-    let _ = forgia_core::sensor_io::enqueue("forgia2_arena.json", arena_json);
+    if matches!(game_mode.get(), GameMode::Fps) {
+        let (arena_json, _, _) = compose_aggregate("arena", now, ARENA_SOURCES);
+        let _ = forgia_core::sensor_io::enqueue("forgia2_arena.json", arena_json);
+    } else {
+        let _ = forgia_core::sensor_io::remove("forgia2_arena.json");
+    }
 }
 
 #[cfg(test)]

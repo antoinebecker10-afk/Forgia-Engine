@@ -49,8 +49,12 @@ pub fn sys_write_fps_feel_sensor(
     }
     state.last_write_secs = now;
 
-    let dash_delta = metrics.dash_uses_total.saturating_sub(state.last_dash_total) as f32;
-    let hit_delta = metrics.hit_feedbacks_total.saturating_sub(state.last_hit_total) as f32;
+    let dash_delta = metrics
+        .dash_uses_total
+        .saturating_sub(state.last_dash_total) as f32;
+    let hit_delta = metrics
+        .hit_feedbacks_total
+        .saturating_sub(state.last_hit_total) as f32;
     let aim_delta = metrics
         .aim_assist_engagements_total
         .saturating_sub(state.last_aim_total) as f32;

@@ -13,7 +13,8 @@ impl DebugCategory for AnimCategory {
         ui.label("— foot IK —");
         ui.label(format!(
             "bones_missing:  {}",
-            a.foot_ik_bones_missing.map_or("n/a".into(), |b| b.to_string())
+            a.foot_ik_bones_missing
+                .map_or("n/a".into(), |b| b.to_string())
         ));
         ui.label(format!(
             "active:         {}",

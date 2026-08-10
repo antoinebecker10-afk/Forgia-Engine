@@ -20,7 +20,10 @@ impl DebugCategory for PhysicsCategory {
             "rigid_bodies: {} total",
             fmt_opt(p.rigid_bodies_total)
         ));
-        ui.label(format!("  dynamic:        {}", fmt_opt(p.rigid_bodies_dynamic)));
+        ui.label(format!(
+            "  dynamic:        {}",
+            fmt_opt(p.rigid_bodies_dynamic)
+        ));
         ui.label(format!(
             "  kinematic_pos:  {}",
             fmt_opt(p.rigid_bodies_kinematic_pos)
@@ -29,10 +32,16 @@ impl DebugCategory for PhysicsCategory {
             "  kinematic_vel:  {}",
             fmt_opt(p.rigid_bodies_kinematic_vel)
         ));
-        ui.label(format!("  fixed:          {}", fmt_opt(p.rigid_bodies_fixed)));
+        ui.label(format!(
+            "  fixed:          {}",
+            fmt_opt(p.rigid_bodies_fixed)
+        ));
         ui.separator();
         ui.label(format!("colliders: {}", fmt_opt(p.colliders_total)));
-        ui.label(format!("  sensors (no collision): {}", fmt_opt(p.colliders_sensor)));
+        ui.label(format!(
+            "  sensors (no collision): {}",
+            fmt_opt(p.colliders_sensor)
+        ));
         ui.separator();
         ui.label(format!("KCC (player controller): {}", fmt_opt(p.kcc_count)));
         ui.label(format!("joints: {}", fmt_opt(p.joints_count)));
