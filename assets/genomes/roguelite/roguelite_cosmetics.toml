@@ -1,0 +1,292 @@
+# roguelite_cosmetics.toml — LE MARKETPLACE : tout ce qui se porte et ne se
+# joue pas.
+#
+# Story-678, 2026-08-06. Né comme catalogue de décors, généralisé le même jour :
+# quatre familles, un seul catalogue, une seule règle de possession.
+#
+#   kind = "decor"  → le fond du menu          (palette + ambiance)
+#   kind = "color"  → la couleur du forgeron   (color = id de roguelite_identity.toml)
+#   kind = "arm"    → les bras vus en FPS      (arm_style + color)
+#   kind = "music"  → le morceau du hub        (music = clé de piste)
+#
+# ─── Comment on l'obtient (`source`) ────────────────────────────────────────
+#
+#   "start"    possédé dès la première partie
+#   "chapter"  gagné en battant le chapitre `chapter` — DÉRIVÉ de la
+#              progression, jamais stocké (sinon divergence à la première
+#              renumérotation des chapitres)
+#   "shards"   acheté `price` ÉCLATS — stocké
+#   "exploit"  accordé par un haut fait — stocké
+#
+# ⚠ Les hauts faits N'EXISTENT PAS encore. La source "exploit" est implémentée
+# et testée, mais aucune entrée ne l'utilise : un article inobtenable serait du
+# contenu mort.
+#
+# ─── Les ÉCLATS, monnaie cosmétique ─────────────────────────────────────────
+#
+# Séparés des Âmes par décision du 2026-08-06. Un cosmétique payé en Âmes est un
+# rang d'Enclume non acheté, et la courbe de puissance est en cours de
+# recalibrage : deux monnaies = deux lectures qui ne se brouillent pas.
+#
+# ⚠ PREMIER JET, jamais joué. Une run de 10 rounds gagnée rapporte
+# 10×1 + 10 = 20 Éclats ; une couleur en coûte 40 (deux runs), un décor de
+# variante 90 (~4-5 runs). À confronter au playtest.
+
+[shards]
+per_round = 1            # récompense la PROFONDEUR atteinte, pas le temps passé
+per_chapter_cleared = 10 # prime de chapitre bouclé
+
+# ═══════════════════ DÉCORS ═══════════════════
+# Les dix arènes du Livre — une par chapitre, gagnées en le battant.
+
+[[cosmetics]]
+id = "crypte_enclume"
+kind = "decor"
+label = "La Crypte de l'Enclume"
+palette = "inferno"
+ambiance = "forge_ardente"
+source = "start"
+
+[[cosmetics]]
+id = "donjon_oublie"
+kind = "decor"
+label = "Le Donjon Oublié"
+palette = "donjon"
+ambiance = "crypte_suintante"
+source = "chapter"
+chapter = 2
+
+[[cosmetics]]
+id = "salle_festin"
+kind = "decor"
+label = "La Salle de Festin"
+palette = "festin"
+ambiance = "halles_de_bois"
+source = "chapter"
+chapter = 3
+
+[[cosmetics]]
+id = "la_reserve"
+kind = "decor"
+label = "La Réserve"
+palette = "tresor"
+ambiance = "crypte_suintante"
+source = "chapter"
+chapter = 4
+
+[[cosmetics]]
+id = "le_bourg"
+kind = "decor"
+label = "Le Bourg"
+palette = "bourg"
+ambiance = "halles_de_bois"
+source = "chapter"
+chapter = 5
+
+[[cosmetics]]
+id = "foret_profonde"
+kind = "decor"
+label = "La Forêt Profonde"
+palette = "foret"
+ambiance = "gorges_d_ocre"
+source = "chapter"
+chapter = 6
+
+[[cosmetics]]
+id = "les_falaises"
+kind = "decor"
+label = "Les Falaises"
+palette = "falaises"
+ambiance = "cime_de_pierre"
+source = "chapter"
+chapter = 7
+
+[[cosmetics]]
+id = "la_rocaille"
+kind = "decor"
+label = "La Rocaille"
+palette = "rocaille"
+ambiance = "gorges_d_ocre"
+source = "chapter"
+chapter = 8
+
+[[cosmetics]]
+id = "hauts_paturages"
+kind = "decor"
+label = "Les Hauts Pâturages"
+palette = "paturages"
+ambiance = "cime_de_pierre"
+source = "chapter"
+chapter = 9
+
+[[cosmetics]]
+id = "les_champs"
+kind = "decor"
+label = "Les Champs"
+palette = "champs"
+ambiance = "gorges_d_ocre"
+source = "chapter"
+chapter = 10
+
+# Variantes — mêmes props, autre heure du jour. Zéro asset neuf : c'est
+# l'ambiance qui fait le lieu. Le prix monte avec la profondeur de l'original.
+
+[[cosmetics]]
+id = "forge_crepuscule"
+kind = "decor"
+label = "La Forge au crépuscule"
+palette = "inferno"
+ambiance = "necropole_glacee"
+source = "shards"
+price = 60
+
+[[cosmetics]]
+id = "donjon_englouti"
+kind = "decor"
+label = "Le Donjon englouti"
+palette = "donjon"
+ambiance = "gorges_d_ocre"
+source = "shards"
+price = 75
+
+[[cosmetics]]
+id = "festin_braises_eteintes"
+kind = "decor"
+label = "La Salle de Festin, braises éteintes"
+palette = "festin"
+ambiance = "necropole_glacee"
+source = "shards"
+price = 90
+
+[[cosmetics]]
+id = "falaises_sous_la_glace"
+kind = "decor"
+label = "Les Falaises sous la glace"
+palette = "falaises"
+ambiance = "necropole_glacee"
+source = "shards"
+price = 110
+
+# ═══════════════════ COULEURS ═══════════════════
+# 🚨 Ces quatre couleurs existaient déjà dans roguelite_identity.toml et étaient
+# INOBTENABLES : le panneau Forgeron les filtre sur `unlocked_colors`, qui ne
+# contient que « default » et que RIEN ne remplissait. Du contenu mort depuis sa
+# création — le Marketplace lui donne enfin une porte d'entrée.
+#
+# `color` = l'id dans roguelite_identity.toml. C'est LUI qui est stocké dans
+# `unlocked_colors` (le stock que le panneau filtre déjà), pas l'id d'article.
+
+[[cosmetics]]
+id = "color_azur"
+kind = "color"
+label = "Azur"
+color = "azur"
+source = "shards"
+price = 40
+
+[[cosmetics]]
+id = "color_emeraude"
+kind = "color"
+label = "Émeraude"
+color = "emeraude"
+source = "shards"
+price = 40
+
+[[cosmetics]]
+id = "color_pourpre"
+kind = "color"
+label = "Pourpre"
+color = "pourpre"
+source = "chapter"
+chapter = 4
+
+[[cosmetics]]
+id = "color_or"
+kind = "color"
+label = "Or"
+color = "or"
+source = "chapter"
+chapter = 8
+
+# ═══════════════════ BRAS ═══════════════════
+# Les bras sont l'objet le plus regardé du jeu : ils sont à l'écran à chaque
+# tir. `arm_style` = peau | gantelet | cyber (forgia-core::ArmStyle).
+
+[[cosmetics]]
+id = "arm_peau"
+kind = "arm"
+label = "Mains nues"
+arm_style = "peau"
+color = "default"
+source = "start"
+
+[[cosmetics]]
+id = "arm_gantelet"
+kind = "arm"
+label = "Gantelets de forge"
+arm_style = "gantelet"
+color = "default"
+source = "chapter"
+chapter = 2
+
+[[cosmetics]]
+id = "arm_cyber"
+kind = "arm"
+label = "Gants cyber"
+arm_style = "cyber"
+color = "azur"
+source = "shards"
+price = 80
+
+[[cosmetics]]
+id = "arm_gantelet_or"
+kind = "arm"
+label = "Gantelets dorés"
+arm_style = "gantelet"
+color = "or"
+source = "shards"
+price = 120
+
+# ═══════════════════ MUSIQUE DU HUB ═══════════════════
+# Onze pistes existent déjà (bande-son Suno du 2026-08-05) : le thème du hub et
+# les dix thèmes de chapitre. Choisir celui qui joue au menu ne coûte aucun
+# asset — seulement de déclarer lesquels sont ouverts.
+
+[[cosmetics]]
+id = "music_hub"
+kind = "music"
+label = "Thème de la Forge"
+music = "hub"
+source = "start"
+
+[[cosmetics]]
+id = "music_ch02"
+kind = "music"
+label = "Thème du Donjon Oublié"
+music = "chapter_02"
+source = "chapter"
+chapter = 2
+
+[[cosmetics]]
+id = "music_ch05"
+kind = "music"
+label = "Thème du Bourg"
+music = "chapter_05"
+source = "chapter"
+chapter = 5
+
+[[cosmetics]]
+id = "music_ch07"
+kind = "music"
+label = "Thème des Falaises"
+music = "chapter_07"
+source = "chapter"
+chapter = 7
+
+[[cosmetics]]
+id = "music_ch10"
+kind = "music"
+label = "Thème des Champs"
+music = "chapter_10"
+source = "shards"
+price = 50

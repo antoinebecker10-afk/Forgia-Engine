@@ -11,13 +11,34 @@
 
 [weapons.pepin]
 # Slot 1 (Digit1) — Gun (pistolet semi-auto) — Pépin
+# ─── Viewmodel PIXEL ART ────────────────────────────────────────────────────
+# Le GLB (assets/models/weapons/forgia/pepin.glb) est un maillage FUSIONNÉ :
+# 1 node, 1 mesh, 0 animation, 0 squelette — donc aucun rechargement animé
+# possible dessus tel quel. Les frames sont produites par
+# `tools/art/pepin_sprites.py`, qui REND ce même GLB sous l'angle voulu puis
+# réduit l'image en pixel art (procédé Doom / Duke 3D). Le barillet y est isolé
+# par un critère géométrique, ce qui rend le rechargement de revolver animable
+# sans toucher à l'asset.
+#
+# Régénérer après tout changement d'angle :
+#   cd tools/art && python pepin_sprites.py
+sprite_dir = "textures/weapons/pixel/pepin"
+sprite_fire_frames = 3
+sprite_reload_frames = 12
+sprite_idle_frames = 12       # Pépin est vivant : il cligne des yeux au repos
+sprite_idle_secs = 3.6        # durée d'une boucle de repos
+sprite_ads_frames = 12        # visée : l'arme plein dos, clip à part (convention CoD)
 target_size = 0.90              # ★ réduit hipfire 1.10→0.90 (au jugé moins encombrant)
 hide_support_hand = true        # pistolet une-main : pas de main gauche (story-661)
 offset_x = 0.22
 offset_y = -0.35
 offset_z = -1.30
+# Rotations à ZÉRO en mode sprite : le quad doit rester face caméra. Le -90° en
+# yaw servait à orienter le GLB ; appliqué à un quad il le met de chant, donc
+# invisible. Valeurs GLB conservées ici pour un retour arrière :
+#   rotation_y_deg = -90.0
 rotation_x_deg = 0.0
-rotation_y_deg = -90.0
+rotation_y_deg = 0.0
 rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
