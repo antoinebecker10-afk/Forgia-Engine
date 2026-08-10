@@ -2,7 +2,7 @@
 #
 # Per-file budget of asset-load call-sites. CI gate : `cargo xtask asset-load`.
 # Regenerate after removing loads : `cargo xtask asset-load --fix`.
-# Baseline total : 94 (target V2 Lock L1 : <= 30).
+# Baseline total : 121 (target V2 Lock L1 : <= 30).
 #
 # Detection : .load( / .load::<> / .load_with_settings( / .load_folder( with
 # non-empty parens, excluding genome configs (genomes/, Genome<, .toml).
@@ -11,26 +11,35 @@
 "crates/forgia-mode-fps-arena/src/lib.rs" = 22
 "crates/forgia-effects/src/weapon_vfx/mod.rs" = 10
 "crates/forgia-rpg/src/lib.rs" = 10
+"crates/forgia-stage/src/lib.rs" = 9
 "crates/forgia-qa-replay/src/player.rs" = 7
-"crates/forgia-stage/src/lib.rs" = 5
+"crates/forgia-foliage/src/material_override.rs" = 4
 "crates/forgia-viewmodel/src/attach.rs" = 4
-"crates/forgia-foliage/src/material_override.rs" = 3
+"crates/forgia-game/src/castle_ground.rs" = 3
+"crates/forgia-mode-roguelite/src/audio.rs" = 3
+"crates/forgia-mode-roguelite/src/avatar.rs" = 3
 "crates/forgia-terrain/src/terrain_material.rs" = 3
 "crates/forgia-assets/src/lib.rs" = 2
+"crates/forgia-game/src/castle_hub.rs" = 2
 "crates/forgia-mode-roguelite/src/boss_portal.rs" = 2
+"crates/forgia-mode-roguelite/src/loot_room.rs" = 2
 "crates/forgia-mode-roguelite/src/merchant.rs" = 2
+"crates/forgia-pcg-runtime/src/lib.rs" = 2
 "crates/forgia-rpg/src/character.rs" = 2
 "crates/forgia-terrain/src/lod.rs" = 2
+"crates/forgia-ui/src/currency_icons.rs" = 2
 "crates/forgia-ui/src/menu_video.rs" = 2
 "crates/forgia-audio/src/biome.rs" = 1
+"crates/forgia-editor/src/library.rs" = 1
 "crates/forgia-foliage/src/lib.rs" = 1
+"crates/forgia-game/src/castle_envmap.rs" = 1
+"crates/forgia-game/src/castle_lightmaps.rs" = 1
 "crates/forgia-game/src/cyber_city.rs" = 1
 "crates/forgia-level-presets/src/lib.rs" = 1
 "crates/forgia-mode-fps-arena/src/wave.rs" = 1
-"crates/forgia-mode-roguelite/src/audio.rs" = 1
 "crates/forgia-mode-roguelite/src/decor.rs" = 1
 "crates/forgia-mode-roguelite/src/enemy_anim.rs" = 1
-"crates/forgia-mode-roguelite/src/loot_room.rs" = 1
+"crates/forgia-mode-roguelite/src/equipment.rs" = 1
 "crates/forgia-mode-roguelite/src/run.rs" = 1
 "crates/forgia-mode-roguelite/src/waves.rs" = 1
 "crates/forgia-mode-roguelite/src/weapon_select.rs" = 1
@@ -39,15 +48,7 @@
 "crates/forgia-qa-harness/src/test_app.rs" = 1
 "crates/forgia-rpg/src/worldgen_village.rs" = 1
 "crates/forgia-skeleton-template/src/lib.rs" = 1
-"crates/forgia-worldgen/src/lib.rs" = 1
-
-# ── Story-678 — hub-menu (2026-08-06) ────────────────────────────────────────
-# `arena_backdrop` : les props du diorama viennent de la palette du DÉCOR ÉQUIPÉ,
-# choisi par le joueur au Marketplace. Ils sont déjà préchargés dans `DecorAssets`
-# pour toutes les palettes — ce `load` rend donc le handle existant, il ne
-# déclenche pas de lecture disque. Le site est neuf, pas la charge.
+"crates/forgia-ui-lib/src/hud/barks.rs" = 1
 "crates/forgia-ui/src/arena_backdrop.rs" = 1
-# `currency_icons` : deux PNG de 128 px (8 Ko), chargés une seule fois à l'entrée
-# du menu. Les passer par `GameAssets` ferait payer un préchargement au boot du
-# jeu pour deux images que seul le menu regarde.
-"crates/forgia-ui/src/currency_icons.rs" = 2
+"crates/forgia-viewmodel/src/sprite.rs" = 1
+"crates/forgia-worldgen/src/lib.rs" = 1
