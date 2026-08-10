@@ -22,12 +22,12 @@ use forgia_input::prelude::InputBlockers;
 /// macOS / Wayland / X11 gardent `Locked` (verrouillage au centre), plus précis
 /// là où il existe.
 #[cfg(target_os = "windows")]
-pub(crate) const FPS_GRAB_MODE: CursorGrabMode = CursorGrabMode::Confined;
+pub const FPS_GRAB_MODE: CursorGrabMode = CursorGrabMode::Confined;
 #[cfg(not(target_os = "windows"))]
-pub(crate) const FPS_GRAB_MODE: CursorGrabMode = CursorGrabMode::Locked;
+pub const FPS_GRAB_MODE: CursorGrabMode = CursorGrabMode::Locked;
 
 /// Capture le curseur + invisible quand on entre InGame (pour mouse_look).
-pub(crate) fn grab_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
+pub fn grab_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
     if let Ok(mut opts) = q.single_mut() {
         opts.grab_mode = FPS_GRAB_MODE;
         opts.visible = false;
@@ -40,13 +40,13 @@ pub(crate) fn grab_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>)
 /// Story-528 follow-up — bloque mouse_look + block fire pendant Roguelite
 /// Defeat/Victory pour que la souris puisse cliquer les boutons end-of-run
 /// sans pivoter la caméra ni tirer.
-pub(crate) fn block_look_on(mut blockers: ResMut<InputBlockers>) {
+pub fn block_look_on(mut blockers: ResMut<InputBlockers>) {
     blockers.block_look = true;
     blockers.block_fire = true;
     info!("[forgia-ui] InputBlockers: look+fire ON (Roguelite end-of-run)");
 }
 
-pub(crate) fn block_look_off(mut blockers: ResMut<InputBlockers>) {
+pub fn block_look_off(mut blockers: ResMut<InputBlockers>) {
     blockers.block_look = false;
     blockers.block_fire = false;
     info!("[forgia-ui] InputBlockers: look+fire OFF");
@@ -126,7 +126,7 @@ pub(crate) fn sys_regrab_cursor_on_focus(
 }
 
 /// Release cursor (visible + free) quand on entre Menu.
-pub(crate) fn release_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
+pub fn release_cursor(mut q: Query<&mut CursorOptions, With<PrimaryWindow>>) {
     if let Ok(mut opts) = q.single_mut() {
         opts.grab_mode = CursorGrabMode::None;
         opts.visible = true;

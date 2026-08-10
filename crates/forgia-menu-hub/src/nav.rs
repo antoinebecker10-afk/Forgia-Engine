@@ -18,7 +18,7 @@ use forgia_ui_lib::style::{C_PRIMARY, FORGE_CREME, FORGE_PANEL, HAIR_GOLD_STRONG
 /// `Root` = accueil (titre FORGIA + CONTINUER/NOUVELLE PARTIE). Les autres = les
 /// sections du hub, navigables depuis la sidebar verre sans lancer de run.
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum MenuPage {
+pub enum MenuPage {
     #[default]
     Root,
     Forgeron,
@@ -106,7 +106,7 @@ impl MenuPage {
 
     /// Titre display (Lilita) du panneau de section — délégué au registre.
     pub(crate) fn section_title(self) -> &'static str {
-        crate::menu::registry::decl(self).section_title
+        crate::registry::decl(self).section_title
     }
 }
 
@@ -119,7 +119,7 @@ impl MenuPage {
 /// `MenuPage` n'est plus une Resource : retirer son derive a fait pointer le
 /// compilateur sur chacun des 16 sites à convertir — aucun oubli possible.
 #[derive(Resource, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct NavStack {
+pub struct NavStack {
     stack: Vec<MenuPage>,
 }
 
@@ -207,7 +207,7 @@ pub(crate) enum MenuAction {
 /// Reconstruites après l'incident de découpe du 2026-08-06 (une édition par
 /// script a remplacé un span trop large ; ce fichier n'était pas commité).
 #[derive(Resource, Clone, Copy, Default, PartialEq)]
-pub(crate) struct HubBadges {
+pub struct HubBadges {
     /// Au moins un achat possible à l'Enclume avec les Âmes courantes.
     pub(crate) enclume: bool,
     /// Une pièce d'armure ramassée depuis la dernière visite de la fiche.
@@ -284,7 +284,7 @@ pub(crate) fn draw_hub_nav(ctx: &egui::Context, nav: &mut NavStack, badges: HubB
                     // Onglets — LA table du registre, filtrée in_nav, dans
                     // l'ordre de déclaration (story-694 incr. 4).
                     let mut first = true;
-                    for decl in crate::menu::registry::nav_tabs() {
+                    for decl in crate::registry::nav_tabs() {
                         let tab = decl.id;
                         // Espace ENTRE les onglets seulement : un espace traînant
                         // après le dernier décalait la barre de 3 px hors de son

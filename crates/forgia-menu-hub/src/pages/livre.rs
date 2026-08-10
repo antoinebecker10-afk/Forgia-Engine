@@ -11,8 +11,8 @@ use forgia_mode_roguelite::meta_shop::{
 };
 use forgia_ui_lib::style::glass_btn;
 
-use crate::menu::chrome::hub_section_panel;
-use crate::menu::nav::MenuPage;
+use crate::chrome::hub_section_panel;
+use crate::nav::MenuPage;
 
 /// Le LIVRE en page pleine — la même `chapter_select_content` que le carrousel
 /// de l'accueil, pour la vue d'ensemble des dix chapitres.

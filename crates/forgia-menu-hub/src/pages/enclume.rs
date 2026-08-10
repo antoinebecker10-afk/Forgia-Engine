@@ -9,8 +9,8 @@ use forgia_mode_roguelite::meta_shop::{
 use forgia_mode_roguelite::run::MetaSouls;
 use forgia_ui_lib::style::FORGE_CREME;
 
-use crate::menu::chrome::hub_section_panel;
-use crate::menu::nav::MenuPage;
+use crate::chrome::hub_section_panel;
+use crate::nav::MenuPage;
 
 /// L'ENCLUME au menu — les cartes cliquables de `draw_enclume_panel`, l'achat
 /// appliqué par `apply_meta_purchase` (une seule règle de dépense).

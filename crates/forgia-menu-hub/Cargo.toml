@@ -1,0 +1,21 @@
+[package]
+name = "forgia-menu-hub"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Le hub-menu du Roguelite : pile de navigation, registre de pages, chrome, diorama d'arène et aperçus 3D. Se branche sur le shell neutre `forgia-ui`."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
+forgia-core = { workspace = true }
+# Le shell neutre : caméra du menu, échelle UI, verbes du curseur, et la
+# demande de retour (`MenuBackRequested`) que cette crate consomme.
+forgia-ui = { workspace = true }
+# La source des données du hub (âmes, équipement, cosmétiques, chapitres…).
+# C'est CETTE dépendance qui vivait à l'envers dans `forgia-ui` — story-694.
+forgia-mode-roguelite = { workspace = true }
+forgia-ui-lib = { workspace = true }
+forgia-assets = { workspace = true }

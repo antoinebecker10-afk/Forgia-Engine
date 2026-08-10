@@ -173,13 +173,13 @@ pub fn setup_menu_video(mut commands: Commands, asset_server: Res<AssetServer>) 
 pub fn menu_video_tick(
     time: Res<Time<bevy::time::Real>>,
     app_state: Res<State<AppMode>>,
-    backdrop: Option<Res<crate::arena_backdrop::ArenaBackdropRtt>>,
+    covered: Res<crate::MenuBackdropCovered>,
     video: Option<ResMut<MenuVideoState>>,
 ) {
     if *app_state.get() != AppMode::Menu {
         return;
     }
-    if backdrop.as_deref().is_some_and(|b| b.is_showing()) {
+    if covered.0 {
         return;
     }
     let Some(mut video) = video else { return };

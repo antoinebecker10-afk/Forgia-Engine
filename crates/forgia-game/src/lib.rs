@@ -169,6 +169,17 @@ pub fn run_game() -> AppExit {
         forgia_qa_replay::ForgiaQaReplayPlugin,
     ));
 
+    // 5a. Le hub-menu du Roguelite, sorti du shell neutre par la story-694
+    //     incrément 5. Son propre bloc : le tuple du bloc 5 était PLEIN (16 =
+    //     le maximum de l'impl `Plugins` de Bevy), et y glisser une 17ᵉ entrée
+    //     ne produit pas « tuple trop long » mais un `Plugins<_> is not
+    //     satisfied` illisible. Anti-trap V1 « add_systems tuple > 20 », même
+    //     cause côté plugins.
+    //
+    //     Il ajoute `ForgiaUiPlugin` lui-même si besoin (idempotent) — le bloc 5
+    //     l'a déjà fait, cet appel est donc un no-op ; il documente la dépendance.
+    app.add_plugins(forgia_menu_hub::prelude::ForgiaMenuHubPlugin);
+
     // 5b. Story-457 (2026-05-19) — damage types + nameplate (split du bloc 5
     //     pour rester sous la limite tuple Bevy 15).
     // story-542 (2026-05-27) — ForgiaDamagePlugin guard symmetric avec ai-arena-bot:167.

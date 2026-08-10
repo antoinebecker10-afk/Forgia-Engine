@@ -2,7 +2,7 @@
 name = "forgia-ui"
 version = "0.1.0"
 edition = "2021"
-description = "Forgia V2 — Menu (Start + choix FPS/RPG + Pause + Settings) + HUD. 1 handler ESC unique."
+description = "Forgia V2 — Le SHELL NEUTRE du menu : MenuCamera2d, curseur, handler ESC unique, fond vidéo, point d'injection. Le hub roguelite vit dans forgia-menu-hub."
 
 [lints]
 workspace = true
@@ -10,15 +10,16 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 bevy_egui = { workspace = true }
-leafwing-input-manager = { workspace = true }
 forgia-core = { workspace = true }
-forgia-assets = { workspace = true }
 forgia-input = { workspace = true }
-forgia-combat = { workspace = true }
 forgia-crosshair = { workspace = true }
 forgia-effects = { workspace = true }
-forgia-mode-roguelite = { workspace = true }
-# Story-558 Phase 7 follow-up — CoffreSession Resource pour cursor toggle.
-forgia-rpg-data = { workspace = true }
-# Story-596 Phase A — palette/composants Forge (cartoon_btn, display_text) pour le menu.
+# Palette/composants Forge + UserSettings (échelle et motion de l'UI).
 forgia-ui-lib = { workspace = true }
+# ⚠️ INCRÉMENT 5d — les deux dernières raisons de dépendre d'un MODE de jeu
+# depuis le shell partagé : `sys_sync_cursor_with_coffre` (CoffreSession,
+# RogueliteWave) et `sys_force_lobby_cursor_free` (RunState). Ce sont des
+# réconciliateurs IN-GAME, pas du menu ; leur départ vers forgia-mode-roguelite
+# ferme AC5 et supprime ces deux lignes.
+forgia-mode-roguelite = { workspace = true }
+forgia-rpg-data = { workspace = true }

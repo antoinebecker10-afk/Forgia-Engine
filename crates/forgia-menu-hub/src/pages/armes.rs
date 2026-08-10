@@ -12,8 +12,8 @@ use forgia_mode_roguelite::weapon_select::{
     draw_weapon_menu_panel, StartingWeaponChoice, WeaponCards,
 };
 
-use crate::menu::chrome::hub_section_panel;
-use crate::menu::nav::MenuPage;
+use crate::chrome::hub_section_panel;
+use crate::nav::MenuPage;
 use crate::weapon_preview::WeaponPreviewRtt;
 
 /// Section Armes au menu-titre — carte d'arme (stats / élément / matchup +

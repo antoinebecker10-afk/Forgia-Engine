@@ -11,8 +11,8 @@ use forgia_ui_lib::style::{
 };
 
 use crate::currency_icons::{CurrencyIcons, CURRENCY_ICON};
-use crate::menu::chrome::hub_section_panel;
-use crate::menu::nav::MenuPage;
+use crate::chrome::hub_section_panel;
+use crate::nav::MenuPage;
 
 /// Colonnes du Marketplace — fixes, pour que les lignes s'alignent.
 const DECOR_NAME_W: f32 = 290.0;

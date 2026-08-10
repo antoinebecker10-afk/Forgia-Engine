@@ -13,8 +13,8 @@ use forgia_mode_roguelite::meta_shop::MetaShopSave;
 use forgia_ui_lib::style::{FORGE_CREME, FORGE_OR};
 use forgia_ui_lib::theme::display_text;
 
-use crate::menu::nav::{HubBadges, MenuPage};
-use crate::menu::pages::root::draw_stats_section;
+use crate::nav::{HubBadges, MenuPage};
+use crate::pages::root::draw_stats_section;
 
 /// Données passées aux dessinateurs INLINE — extraites par `main_menu_ui` de
 /// ses propres params. S'enrichit quand une nouvelle page inline en a besoin.

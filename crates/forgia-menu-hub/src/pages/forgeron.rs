@@ -12,8 +12,8 @@ use forgia_ui_lib::style::{
 };
 use forgia_ui_lib::theme::display_text;
 
-use crate::menu::chrome::hub_section_panel;
-use crate::menu::nav::MenuPage;
+use crate::chrome::hub_section_panel;
+use crate::nav::MenuPage;
 use crate::{slot_glyph, weapon_preview};
 
 /// LA FICHE — le personnage encadré par ses emplacements, le sac en grille à

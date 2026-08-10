@@ -144,7 +144,7 @@ pub fn sys_gamepad_menu_nav(
         let lb = pad.just_pressed(GamepadButton::LeftTrigger);
         let rb = pad.just_pressed(GamepadButton::RightTrigger);
         if lb || rb {
-            let tabs: Vec<MenuPage> = crate::menu::registry::nav_tabs().map(|d| d.id).collect();
+            let tabs: Vec<MenuPage> = crate::registry::nav_tabs().map(|d| d.id).collect();
             let idx = tabs.iter().position(|t| *t == nav.current()).unwrap_or(0);
             // RB prime si les deux tombent la même frame (préséance de
             // l'ancien code, conservée à l'identique).

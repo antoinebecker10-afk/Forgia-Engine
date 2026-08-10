@@ -126,7 +126,8 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 ### UI & rendu
 | Crate | LOC | Rôle | Wired |
 |---|---|---|---|
-| forgia-ui | 674 | Menu (fond vidéo webp) + ESC handler unique + Time pause | ✅ |
+| forgia-ui | 984 | **Shell neutre** du menu : MenuCamera2d, curseur, ESC handler unique, fond vidéo webp, Time pause. Point d'injection `MenuBackRequested` (story-694 incr. 5) | ✅ |
+| forgia-menu-hub | 5492 | **Hub-menu du Roguelite** : NavStack, registre `PageDecl`, chrome, 6 pages, diorama d'arène RTT, aperçus 3D. Extrait de forgia-ui — la frontière vivait à l'envers | ✅ |
 | forgia-ui-lib | 3550 | style + hud + hud_ammo + pause_menu + damage_direction + dialogue + quest_journal + inventory + shop | ✅ (×7 sub-plugins) |
 | forgia-postprocess | 444 | Matériaux fullscreen — **2 shaders réels (toon, outline), 43 stubs passthrough** | ✦ (toon via roguelite) |
 | forgia-effects | 1857 | VFX hanabi + tracers + damage numbers (prespawn anti-freeze = TODO, roadmap M2-B5) | ✅ |

@@ -19,8 +19,8 @@ use forgia_ui_lib::style::{
 };
 use forgia_ui_lib::theme::display_text;
 
-use crate::menu::chrome::{hub_content_top, hub_section_panel};
-use crate::menu::nav::{HubBadges, MenuAction, MenuPage};
+use crate::chrome::{hub_content_top, hub_section_panel};
+use crate::nav::{HubBadges, MenuAction, MenuPage};
 
 /// Accueil (page racine) : le titre de l'enseigne. Tout le reste (carrousel de
 /// chapitre, dernière run, boutons de départ, équipement) est dessiné par

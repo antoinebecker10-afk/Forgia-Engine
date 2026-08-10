@@ -1,33 +1,26 @@
-//! Le SHELL du menu : caméra 2D permanente, échelle UI globale (toile 1080p,
-//! story-692), le dispatcher `main_menu_ui`, le handler ESC unique et la
-//! pause du temps virtuel.
+//! Le SHELL NEUTRE du menu : caméra 2D permanente, échelle UI globale (toile
+//! 1080p, story-692), le handler ESC unique et la pause du temps virtuel.
+//!
+//! Ce module ne connaît AUCUN mode de jeu. Le dessin du hub (chrome, pages,
+//! diorama) vit dans `forgia-menu-hub` depuis la story-694 incrément 5 ; le
+//! seul lien est [`MenuBackRequested`], émis ici et consommé là-bas.
 
 use bevy::camera::ClearColorConfig;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use bevy_egui::{egui, EguiContexts};
 use forgia_core::prelude::*;
-use forgia_mode_roguelite::identity::IdentitySave;
-use forgia_mode_roguelite::meta_shop::MetaShopSave;
-use forgia_mode_roguelite::progress::PlayerProgress;
-use forgia_ui_lib::pause_menu::UserSettings;
 
-use crate::arena_backdrop::ArenaBackdropRtt;
-use crate::currency_icons::CurrencyIcons;
-use crate::menu::chrome::{
-    draw_hub_smith_chip, draw_hub_souls_chip, hub_section_panel,
-};
 use crate::menu::cursor::FPS_GRAB_MODE;
-use crate::menu::nav::{draw_hub_nav, HubBadges, MenuAction, MenuPage, NavStack};
-use crate::menu::registry::{self, InlinePageCtx, PageDraw};
-use crate::menu::pages::root::{draw_options_page, draw_root_landing};
-use crate::menu_video::{self, MenuVideoState};
 
 #[derive(Component)]
-pub(crate) struct MenuCamera2d;
+pub struct MenuCamera2d;
 
 /// MenuCamera2d permanente — spawn une fois au Startup, JAMAIS despawn.
-pub(crate) fn spawn_menu_camera_permanent(mut commands: Commands, q: Query<Entity, With<MenuCamera2d>>) {
+pub(crate) fn spawn_menu_camera_permanent(
+    mut commands: Commands,
+    q: Query<Entity, With<MenuCamera2d>>,
+) {
     if q.is_empty() {
         commands.spawn((
             Camera2d,
@@ -43,7 +36,6 @@ pub(crate) fn spawn_menu_camera_permanent(mut commands: Commands, q: Query<Entit
     }
 }
 
-
 /// Story-678 Phase 2 — pousse le toggle motion persisté (UserSettings) vers la
 /// mémoire egui où vivent les helpers (`forgia_ui_lib::motion`). Un insert de
 /// bool par frame : idempotent, trop bon marché pour mériter une garde.
@@ -58,25 +50,6 @@ pub(crate) fn sys_mirror_ui_motion(
         return;
     };
     forgia_ui_lib::motion::set_motion_enabled(ctx, settings.ui_motion_enabled);
-}
-
-/// Story-693 — nourrit le capteur d'identité : « l'édition du nom/couleur a
-/// été montrée ». Son poseur historique (panneau Lobby) est supprimé — la
-/// fiche Forgeron du menu est LA surface d'édition. Marqué à la page plutôt
-/// qu'au call-site : le système de la fiche est au plafond des 16 params Bevy.
-pub(crate) fn sys_mark_identity_shown(
-    app_state: Res<State<AppMode>>,
-    nav: Res<NavStack>,
-    shown: Option<ResMut<forgia_mode_roguelite::identity::IdentityPanelShown>>,
-) {
-    if *app_state.get() != AppMode::Menu || nav.current() != MenuPage::Forgeron {
-        return;
-    }
-    if let Some(mut s) = shown {
-        if !s.0 {
-            s.0 = true;
-        }
-    }
 }
 
 /// Hauteur de référence du design : toute l'UI egui du jeu est dessinée comme
@@ -143,201 +116,21 @@ pub(crate) fn sys_publish_viewport_h(
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("forgia_viewport_h"), h));
 }
 
-pub(crate) fn main_menu_ui(
-    mut contexts: EguiContexts,
-    app_state: Res<State<AppMode>>,
-    mut next_app: ResMut<NextState<AppMode>>,
-    mut next_game: ResMut<NextState<GameMode>>,
-    mut exit: MessageWriter<AppExit>,
-    mut video: Option<ResMut<MenuVideoState>>,
-    asset_server: Res<AssetServer>,
-    mut nav: ResMut<NavStack>,
-    mut settings: ResMut<UserSettings>,
-    // Données persistées au Startup → présentes dès le menu (hub roguelite).
-    meta_save: Option<Res<MetaShopSave>>,
-    progress: Option<Res<PlayerProgress>>,
-    identity: Option<Res<IdentitySave>>,
-    // Story-678 Phase 4 — pastilles calculées par `sys_hub_badges`.
-    badges: Res<HubBadges>,
-    // Story-678 Phase 5 — le fond d'arène du chapitre atteint (diorama RTT).
-    backdrop: Option<Res<ArenaBackdropRtt>>,
-    // Story-678 — icônes des monnaies (absentes tant qu'egui n'a pas de contexte).
-    icons: Option<Res<CurrencyIcons>>,
-    mut last_state: Local<Option<AppMode>>,
-) {
-    let current = app_state.get().clone();
-    if last_state.as_ref() != Some(&current) {
-        info!("[forgia-ui] main_menu_ui state = {current:?}");
-        *last_state = Some(current.clone());
-    }
-    if current != AppMode::Menu {
-        return;
-    }
-
-    // ── Quel fond ? ──
-    // Story-678 Phase 5 — l'arène du chapitre atteint remplace la vidéo de
-    // branding. On ne bascule QUE si le diorama a réellement posé des props :
-    // une palette vide donnerait un écran nu, et le repli vidéo vaut mieux
-    // qu'un fond noir. Le capteur publie ce compte.
-    let arena_bg = backdrop
-        .as_deref()
-        .filter(|b| b.is_showing())
-        .map(|b| b.tex_id);
-    // Fond vidéo : maintient le cache LRU + preroll, renvoie le TextureId de la
-    // frame courante. None → fallback fond sombre uni (preroll en cours / asset
-    // absent). Calculé AVANT `ctx_mut` (libère le &mut EguiContexts).
-    //
-    // Sous l'arène, le pipeline vidéo est GELÉ (story-691) : le tick n'avance
-    // plus la frame et on ne touche plus au cache — les 8 frames restent en
-    // VRAM et `prerolled` reste vrai, donc couper `ui_backdrop_enabled` à chaud
-    // réaffiche la vidéo immédiatement, sans re-preroll ni décodage à vide.
-    let video_bg = if arena_bg.is_some() {
-        None
-    } else {
-        video
-            .as_deref_mut()
-            .and_then(|v| menu_video::ensure_menu_video_frame(&mut contexts, v, &asset_server))
-    };
-    let bg_id = arena_bg.or(video_bg);
-    // Le scrim s'adapte : sur l'arène il épargne le tiers droit (le personnage
-    // y est), sur la vidéo il reste le dégradé vertical d'origine.
-    let bg_is_arena = arena_bg.is_some();
-
-    let Ok(ctx) = contexts.ctx_mut() else {
-        warn!("[forgia-ui] main_menu_ui: egui ctx not found (no Camera2d?)");
-        return;
-    };
-
-    // ── Couche background : fond vidéo plein écran + scrim dégradé vertical ──
-    // (story-596 — haut léger, bas dense pour asseoir l'UI sans éteindre la vidéo).
-    egui::CentralPanel::default()
-        .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(8, 8, 12)))
-        .show(ctx, |ui| {
-            if let Some(id) = bg_id {
-                let rect = ui.max_rect();
-                ui.painter().image(
-                    id,
-                    rect,
-                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                    egui::Color32::WHITE,
-                );
-                // Scrim : assied l'UI sans éteindre le fond.
-                //
-                // Sur l'ARÈNE il devient DIAGONAL — dense à gauche, où vivent
-                // la carte de chapitre et son texte ; presque nul à droite, où
-                // le personnage se tient. Un dégradé purement vertical
-                // (celui de la vidéo) noyait le personnage dans le même voile
-                // que le texte, alors qu'il est le sujet de ce côté-là.
-                let mut scrim = egui::Mesh::default();
-                let (lt, rt, rb, lb) = if bg_is_arena {
-                    (
-                        egui::Color32::from_black_alpha(130),
-                        egui::Color32::from_black_alpha(25),
-                        egui::Color32::from_black_alpha(85),
-                        egui::Color32::from_black_alpha(185),
-                    )
-                } else {
-                    let top = egui::Color32::from_black_alpha(40);
-                    let bottom = egui::Color32::from_black_alpha(170);
-                    (top, top, bottom, bottom)
-                };
-                scrim.colored_vertex(rect.left_top(), lt);
-                scrim.colored_vertex(rect.right_top(), rt);
-                scrim.colored_vertex(rect.right_bottom(), rb);
-                scrim.colored_vertex(rect.left_bottom(), lb);
-                scrim.add_triangle(0, 1, 2);
-                scrim.add_triangle(0, 2, 3);
-                ui.painter().add(egui::Shape::mesh(scrim));
-            }
-            // Story-678 — le fantôme plein écran de l'avatar a été remplacé par
-            // le portrait CADRÉ de l'écran de préparation (le personnage géant
-            // débordait du cadre, retour utilisateur 2026-08-05). Le portrait
-            // vit dans `sys_menu_root_dashboard` (colonne droite).
-        });
-
-    // ── Données persistées (chargées au Startup → lisibles dès le menu) ──
-    let souls_n = meta_save.as_ref().map(|s| s.souls_total).unwrap_or(0);
-    let shards_n = meta_save.as_ref().map(|s| s.shards_total).unwrap_or(0);
-    let name = identity
-        .as_ref()
-        .map(|i| {
-            if i.player_name.is_empty() {
-                "Forgeron"
-            } else {
-                i.player_name.as_str()
-            }
-        })
-        .unwrap_or("Forgeron");
-    // Story-680 cran 1 — le niveau est la SOMME DES RANGS achetés à l'Enclume
-    // (modèle Gunfire Reborn). Plus d'XP « 40 + secondes de run », qui payait le
-    // temps passé et rien d'autre. La barre mesure la part de l'Enclume
-    // réellement débloquée — une information vraie.
-    let (level, remaining, frac) = progress
-        .as_ref()
-        .map(|p| (p.level, p.ranks_remaining, p.completion()))
-        .unwrap_or((1, 0, 0.0));
-
-    // ── Chrome persistant du haut d'écran ──
-    // Il se lit de gauche à droite comme une phrase : QUI je suis · OÙ je vais ·
-    // CE QUE j'ai. Les trois vivent sur la même bande depuis que la navigation
-    // est passée à l'horizontale.
-    draw_hub_smith_chip(ctx, name, level, remaining, frac);
-    draw_hub_nav(ctx, &mut nav, *badges);
-    draw_hub_souls_chip(ctx, souls_n, shards_n, icons.as_deref());
-
-    // ── Panneau de la section active — piloté par LA table (story-694 incr. 4).
-    // Root et Options restent câblés ici (Root rend une MenuAction appliquée
-    // plus bas — évite de passer NextState/MessageWriter dans chaque helper ;
-    // Options mute la pile) ; les pages INLINE tirent leur dessinateur du
-    // registre ; les pages OwnSystem sont dessinées par leur système auto-gaté
-    // — rien à faire dans ce match. Ajouter une page inline = 1 PageDecl + 1 fn.
-    let action = match nav.current() {
-        MenuPage::Root => draw_root_landing(ctx),
-        MenuPage::Options => {
-            draw_options_page(ctx, &mut nav, &mut settings);
-            MenuAction::None
-        }
-        page => {
-            let d = registry::decl(page);
-            if let PageDraw::Inline {
-                panel_id,
-                panel_width,
-                draw,
-            } = d.draw
-            {
-                let ictx = InlinePageCtx {
-                    level,
-                    ranks_remaining: remaining,
-                    meta_save: meta_save.as_deref(),
-                };
-                hub_section_panel(ctx, panel_id, d.section_title, panel_width, |ui| {
-                    draw(&ictx, ui)
-                });
-            }
-            MenuAction::None
-        }
-    };
-
-    match action {
-        MenuAction::Launch(mode) => {
-            next_game.set(mode);
-            next_app.set(AppMode::InGame);
-        }
-        MenuAction::Quit => {
-            exit.write(AppExit::Success);
-        }
-        MenuAction::None => {}
-    }
-}
-
-
-// `draw_arena_test_section` retirée avec l'onglet (2026-07-30, temporaire) — elle
-// n'avait plus qu'un appelant, supprimé lui aussi. Son contenu est dans
-// l'historique git de ce fichier ; la restaurer suffit à rouvrir le banc.
-// Rien n'a été touché côté moteur.
+/// « Le menu doit remonter d'un niveau. »
+///
+/// C'est LE point d'injection du shell (story-694 incrément 5). Le shell
+/// possède la touche — anti-trap V1 « 1 KeyCode = 1 handler » — mais pas la
+/// pile : celle-ci vit dans la crate du hub, qui consomme ce message. Un
+/// second mode peut donc réutiliser ESC sans redéclarer de handler, et sans
+/// que `forgia-ui` ait à connaître ses pages.
+///
+/// Le garde « egui édite du texte » est évalué À L'ÉMISSION, ici : c'est un
+/// fait egui, pas un fait de hub. Le consommateur n'a donc rien à re-vérifier.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct MenuBackRequested;
 
 /// Handler ESC unique :
-///  - Menu    → remonte d'un niveau de la pile de navigation (story-694 incr. 3)
+///  - Menu    → émet [`MenuBackRequested`] (la pile vit dans `forgia-menu-hub`)
 ///  - InGame  → Paused (pause gameplay, libère curseur)
 ///  - Paused  → InGame (resume)
 ///  - Paused + Q → Menu (quit to menu)
@@ -351,7 +144,7 @@ pub(crate) fn escape_handler(
     mut next_app: ResMut<NextState<AppMode>>,
     mut next_game: ResMut<NextState<GameMode>>,
     mut q_cursor: Query<&mut CursorOptions, With<PrimaryWindow>>,
-    mut nav: ResMut<NavStack>,
+    mut back: MessageWriter<MenuBackRequested>,
     mut contexts: EguiContexts,
     pads: Query<&Gamepad>,
 ) {
@@ -384,39 +177,38 @@ pub(crate) fn escape_handler(
                 }
             }
             AppMode::Menu => {
-                menu_back(&mut nav, &mut contexts);
+                request_menu_back(&mut back, &mut contexts);
             }
             AppMode::Boot => {
                 info!("[forgia-ui] ESC pressed in Boot — no transition");
             }
         }
     }
-    // Bloc « Q en Paused » dupliqué SUPPRIMÉ (story-694 incr. 2, constat n°9 de
-    // l'audit 2026-08-07) : le même test vit en tête de fonction avec un `return`,
-    // cette copie était inatteignable quand il tirait.
 
     // B manette — menu uniquement : in-game, East appartient au gameplay.
     // `!Escape` : certains mappings (Steam Input) émettent B ET Échap la même
-    // frame — sans ce garde, les deux branches popperaient chacune un niveau.
+    // frame — sans ce garde, les deux branches en demanderaient chacune une.
     if matches!(from, AppMode::Menu)
         && !keys.just_pressed(KeyCode::Escape)
         && pads.iter().any(|p| p.just_pressed(GamepadButton::East))
     {
-        menu_back(&mut nav, &mut contexts);
+        request_menu_back(&mut back, &mut contexts);
     }
 }
 
-/// ESC/B au menu : remonte d'un niveau de la pile — SAUF quand egui édite du
+/// ESC/B au menu : demande de remonter d'un niveau — SAUF quand egui édite du
 /// texte (le champ du nom de la fiche consomme ESC pour rendre son focus : le
-/// premier ESC sort du champ, le second remonte) et sauf au Root, où `back()`
-/// rend `false` et on ne fait rien (Quitter est un bouton explicite).
+/// premier ESC sort du champ, le second remonte).
 ///
 /// ⚠️ Couplage d'ordre : le « premier ESC sort du champ » suppose que ce code
 /// (Update) lit `wants_keyboard_input` AVANT que le pass egui de la frame ne
 /// traite la touche — garanti par le `MainScheduleOrder` fixe de Bevy
 /// (Update < PostUpdate, où vit `EguiPrimaryContextPass`). Déplacer
 /// `escape_handler` hors d'Update casserait ce 2-temps en silence.
-fn menu_back(nav: &mut NavStack, contexts: &mut EguiContexts) {
+///
+/// C'est aussi pourquoi le garde reste ICI et ne part pas avec la pile : le
+/// consommateur du message tourne plus tard, quand egui a déjà vu la touche.
+fn request_menu_back(back: &mut MessageWriter<MenuBackRequested>, contexts: &mut EguiContexts) {
     let egui_edits_text = contexts
         .ctx_mut()
         .map(|c| c.wants_keyboard_input())
@@ -424,9 +216,7 @@ fn menu_back(nav: &mut NavStack, contexts: &mut EguiContexts) {
     if egui_edits_text {
         return;
     }
-    if nav.back() {
-        info!("[forgia-ui] retour nav (ESC/B) → {:?}", nav.current());
-    }
+    back.write(MenuBackRequested);
 }
 
 /// Freeze `Time<Virtual>` quand on entre en Paused (animations + locomotion
@@ -441,4 +231,3 @@ pub(crate) fn resume_time(mut virtual_time: ResMut<Time<Virtual>>) {
     virtual_time.unpause();
     info!("[forgia-ui] Time<Virtual> resumed");
 }
-

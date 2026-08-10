@@ -3417,6 +3417,7 @@ dependencies = [
  "forgia-input",
  "forgia-juice-screen-flash",
  "forgia-killfeed",
+ "forgia-menu-hub",
  "forgia-mode-roguelite",
  "forgia-observability",
  "forgia-player",
@@ -3534,6 +3535,19 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "forgia-mesh-voxelizer",
+]
+
+[[package]]
+name = "forgia-menu-hub"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "forgia-assets",
+ "forgia-core",
+ "forgia-mode-roguelite",
+ "forgia-ui",
+ "forgia-ui-lib",
 ]
 
 [[package]]
@@ -3879,8 +3893,6 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
- "forgia-assets",
- "forgia-combat",
  "forgia-core",
  "forgia-crosshair",
  "forgia-effects",
@@ -3888,7 +3900,6 @@ dependencies = [
  "forgia-mode-roguelite",
  "forgia-rpg-data",
  "forgia-ui-lib",
- "leafwing-input-manager",
 ]
 
 [[package]]

@@ -67,9 +67,50 @@ UX n°5 (retours incohérents). Pratiques cibles : `reference_ui_menu_industry_p
    2 Mineurs (commentaire ArenaTest périmé, double lookup decl()) + 2 Cosmétiques
    (en-tête dupliqué, doc PageDraw::Shell) corrigés aussi.
    Preuves : 4 tests de cohérence du registre (28/28 crate), clippy 0.
-5. **Crate forgia-menu-hub** (~2-4 j, High) — dépend de forgia-ui ET forgia-mode-roguelite ;
-   forgia-ui redevient un shell neutre (MenuCamera2d, curseur/ESC, vidéo, point
-   d'injection). Un 2ᵉ mode peut enfin avoir un menu.
+5. **Crate forgia-menu-hub** — découpé en cinq marches, dont trois FAITES 2026-08-10.
+
+   **5a ✅ Deps mortes.** La moitié d'AC5 ne demandait aucun déplacement : `forgia-fps`
+   et `forgia-rpg` déclaraient `forgia-ui` sans jamais la citer (0 fichier dans `src/`),
+   `forgia-viewmodel` n'en tirait qu'un re-export (`CrosshairMode`, vraie source
+   `forgia-crosshair`). Preuve `cargo tree -e normal`, occurrences de
+   `forgia-mode-roguelite` : viewmodel 1→0, rpg 1→0, fps 1→0.
+
+   **5b+5c ✅ La crate existe et le hub y vit.** Fusionnés : le ratchet `no-scaffold`
+   interdit (à raison) de créer la crate vide d'abord. **5 492 lignes** migrées par
+   `git mv` (historique préservé) — `nav`, `registry`, `chrome`, `lobby_gate`,
+   `pages/*`, `arena_backdrop`, `weapon_preview`, `menu_hub_sensor`, `currency_icons`,
+   `slot_glyph`, `gamepad_nav` — plus la moitié hub de `shell.rs`. `forgia-ui` retombe
+   à **984 lignes** et perd 3 deps devenues mortes (assets, combat, leafwing).
+
+   **Deux coutures ont dû être inventées**, l'extraction n'étant pas un simple
+   déplacement :
+   - `MenuBackRequested` — `escape_handler` fait À LA FOIS `InGame↔Paused` (neutre) et
+     le retour de nav (a besoin de `NavStack`, qui part). Il ne pouvait donc pas migrer
+     en bloc. Le shell garde la touche (anti-trap V1 « 1 KeyCode = 1 handler ») et émet ;
+     le hub consomme. Le garde `wants_keyboard_input` reste **à l'émission** : c'est un
+     fait egui, et le consommateur tourne quand egui a déjà vu la touche — le commentaire
+     de `menu_back` avertissait que ce 2-temps casse *en silence*.
+   - `MenuBackdropCovered` — `menu_video_tick` (shell) lisait `ArenaBackdropRtt` (hub)
+     pour se geler. Le shell apprend maintenant le FAIT (« le fond est couvert »), pas
+     sa cause. Publié en `PreUpdate`, donc avant le tick, sans ancre supplémentaire.
+
+   Ordonnancement : `MenuShellSet::{Escape, Prepare}` publiés par le shell ; le hub
+   s'ordonne `.after(...)`. L'ordre se déclare toujours dans ce sens — l'inverse ferait
+   dépendre `forgia-ui` de son consommateur.
+
+   Preuves : check workspace 0 erreur/0 warning · clippy `--workspace --all-targets`
+   0 warning · **29 tests** = les 28 d'avant, tous retrouvés et redistribués
+   (25 hub + 3 vidéo + 1 shell), + 1 nouveau · `no-scaffold` 0 violation ·
+   `arch-drift` OK (65 crates) · **pas de cycle** : hub→ui = 1, ui→hub = 0.
+
+   **5d ⬜ (session dédiée, High).** Les deux réconciliateurs curseur IN-GAME
+   (`sys_sync_cursor_with_coffre`, `sys_force_lobby_cursor_free`) et les 6 câblages
+   `OnEnter/OnExit(RunState::*)` partent vers `forgia-mode-roguelite`. Ce sont les
+   systèmes derrière deux bugs déjà payés (« pas de souris au lancement », « caméra
+   morte après le portail ») : ils exigent un playtest curseur dédié — Coffre, portail,
+   Lobby, alt-tab, fin de run.
+
+   **5e ⬜** Retirer `forgia-mode-roguelite` de `forgia-ui/Cargo.toml` → **ferme AC5**.
 
 ## Critères d'acceptance (globaux)
 
