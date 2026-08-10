@@ -1,0 +1,6 @@
+{
+  "title": "Hermes 3",
+  "provider": "ollama",
+  "model": "hermes3",
+  "apiBase": "http://localhost:11434"
+}

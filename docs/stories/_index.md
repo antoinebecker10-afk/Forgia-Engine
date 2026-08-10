@@ -7,18 +7,18 @@
 
 | Statut | Nombre |
 | --- | --- |
-| IN_PROGRESS | 46 |
-| REVIEW | 58 |
+| IN_PROGRESS | 47 |
+| REVIEW | 59 |
 | BLOCKED | 5 |
 | DRAFT | 34 |
 | UNKNOWN | 10 |
-| DONE | 45 |
+| DONE | 47 |
 | CANCELLED | 1 |
-| **Total** | **199** |
+| **Total** | **203** |
 
-> 🚨 **46 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
+> 🚨 **47 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
-## IN_PROGRESS (46)
+## IN_PROGRESS (47)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -68,8 +68,9 @@
 | 661 | Story 661 — Bras viewmodel GLB cartoon (remplace les poings procéduraux) | [story-661-bras-viewmodel-glb-cartoon.md](./story-661-bras-viewmodel-glb-cartoon.md) |
 | 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 | 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
+| 694 | Hub menu : architecture (P3 de l'audit 2026-08-07) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
 
-## REVIEW (58)
+## REVIEW (59)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -131,6 +132,7 @@
 | 674 | L'aménagement se DÉRIVE : bruit bleu + compte depuis l'aire | [story-674-amenagement-derive-bruit-bleu.md](./story-674-amenagement-derive-bruit-bleu.md) |
 | 675 | Personnage Trooper + équipement loot par rareté | [story-675-equipement-trooper-rarete.md](./story-675-equipement-trooper-rarete.md) |
 | 677 | La boucle de rounds et son mur | [story-677-boucle-de-rounds-et-mur.md](./story-677-boucle-de-rounds-et-mur.md) |
+| 693 | Pépin en viewmodel pixel art (et le rechargement enfin animable) | [story-693-pepin-viewmodel-pixel-art.md](./story-693-pepin-viewmodel-pixel-art.md) |
 
 ## BLOCKED (5)
 
@@ -196,7 +198,7 @@
 | 609 | `cargo xtask gene-search` (introspection genome cross-pack) | [story-609-xtask-gene-search.md](./story-609-xtask-gene-search.md) |
 | 654 | Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut | [story-654-nameplate-v2-plaques-icones.md](./story-654-nameplate-v2-plaques-icones.md) |
 
-## DONE (45)
+## DONE (47)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -245,13 +247,12 @@
 | 645 | R3 : sceller la boucle (Victory + maîtrise + best-run + boons pondérés) | [story-645-r3-seal-the-loop.md](./story-645-r3-seal-the-loop.md) |
 | 664 | Warmup des pipelines PBR au Lobby (anti-freeze « tourner la caméra ») | [story-664-pipeline-warmup-pbr-lobby.md](./story-664-pipeline-warmup-pbr-lobby.md) |
 | 690 | Le capteur d'arène mesure enfin la géométrie posée | [story-690-capteur-de-geometrie-d-arene.md](./story-690-capteur-de-geometrie-d-arene.md) |
+| 691 | Hub menu : quick-wins perf (P1 de l'audit 2026-08-07) | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
+| 692 | Hub menu : responsive (P2 de l'audit 2026-08-07) | [story-692-hub-responsive.md](./story-692-hub-responsive.md) |
 
 ## CANCELLED (1)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
 | 630 | Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity) | [story-630-taa-orbit-camera.md](./story-630-taa-orbit-camera.md) |
-| 691 | Hub menu : quick-wins perf (P1 audit 2026-08-07) — DONE | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
-| 692 | Hub menu : responsive — échelle globale, borderless, backdrop aspect réel — DONE | [story-692-hub-responsive.md](./story-692-hub-responsive.md) |
-| 694 | Hub menu : architecture (P3) — incr. 4/5 FAIT (registre PageDecl : 1 page = 1 déclaration) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
 

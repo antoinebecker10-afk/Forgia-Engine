@@ -30,3 +30,47 @@
 | **input** | input, keybind, PlayerAction, AZERTY | fw+def | `leafwing-input-manager` ActionState (frame) ; `KeybindRegistry` (boot+hr) | All systems `.in_set(GameSet::Input)` (frame) | `forgia_input_log.json` | * | L | int |
 
 **Le tableau se complète à chaque demande résolue.** Stale dès qu'un path est cassé — marquer ou re-pointer.
+
+---
+
+## Discipline grepai — référence mesurée du 2026-08-08
+
+`concept-first.md` §3 étape 2 exige `grepai_search` sur le mot-concept, et pose
+la métrique : « **stat à 0 = règle ignorée** ». Voici l'état constaté, pour que
+la dérive se mesure au lieu de se supposer.
+
+```
+Total queries      11          ← plat depuis le 2026-07-31
+By command:        search 11
+                   trace-callers  0   ← jamais utilisé
+                   trace-callees  0   ← jamais utilisé
+                   trace-graph    0   ← jamais utilisé
+Économie quand il sert : 93,2 % (78 907 tokens sur 11 requêtes)
+```
+
+Pendant ces 8 jours de stat plate ont été livrés : le hub story-678 complet, le
+Marketplace, le système de cosmétiques, la refonte de la fiche personnage et un
+audit de 63 constats — c'est-à-dire précisément le travail transverse pour
+lequel la règle existe.
+
+### Le cercle vicieux à connaître
+
+L'index était figé au **30 juillet**, la dernière requête date du **31**. Il a
+cessé d'être utilisé le lendemain du jour où il a cessé d'être frais. Un index
+périmé répond à côté → on l'évite → personne ne le réindexe. **Réindexer est
+donc la première marche, pas la dernière** : sans ça, exiger son usage revient
+à exiger des réponses fausses.
+
+### Comment l'user vérifie, sans dépendre de l'agent
+
+```bash
+grepai stats      # le compteur est tenu par grepai, l'agent ne peut pas le forger
+```
+
+1. **Le total monte** — plancher minimal.
+2. **`By command:` se diversifie** — tant qu'on ne voit que `search`, l'agent
+   fait avec grepai ce qu'il faisait avec grep. `trace-callers` qui apparaît
+   = il utilise enfin ce qu'un grep ne sait pas faire.
+3. **Demander « tu l'as trouvé comment ? »** et attendre un `fichier:ligne`
+   issu de l'appel. Un compteur peut être gonflé par des requêtes creuses ;
+   une citation, non.

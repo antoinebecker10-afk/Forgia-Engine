@@ -107,6 +107,7 @@
 | `forgia2_elements.json` | T0 | forgia-mode-roguelite | `src/elements.rs:36` | 1Hz | élément par arme, DoT actifs (burn/poison/shock/miasma), matchups, réactions (combustion/miasma/surcharge) — story-582/641 | active |
 | `forgia2_fps_feel.json` | T0 | forgia-observability | `src/fps_feel_sensor.rs:38` | 1Hz | dash uses, hit feedbacks, aim assist — story-528 | active |
 | `forgia2_menu_video.json` | T0 | forgia-ui | `src/menu_video.rs:55` | 1Hz | frames fond vidéo menu, cache LRU, preroll | active |
+| `forgia2_menu_hub.json` | T0 | forgia-ui | `src/menu_hub_sensor.rs` | 1Hz | hub-menu : page, navigation cumulée session, sons UI, pastilles, entrée souris/manette, fond avatar, dernière run — health MENU MUET / BACKDROP MORT (story-678) | active |
 | `forgia2_obstacles.json` | T0 | forgia-mode-roguelite | `src/parcours_obstacles.rs:35` | 1Hz | obstacles animés + push physique — story-590 | active |
 | `forgia2_barks.json` | T0 | forgia-ui-lib | `src/hud/barks.rs` | 1Hz | barks armes parlantes : pools_loaded, played/suppressed (lock+rate), last_line_id, bulle active — story-531 AC5-7 | active |
 | `forgia2_boucherie.json` | T0 | forgia-mode-roguelite | `src/boucherie_rocket.rs` | 1Hz | roquettes Boucherie : fired/explosions/enemies_hit/avg_hits_per_explosion/kills — story-534 AC10 | active |
