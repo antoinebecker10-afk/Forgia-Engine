@@ -24,7 +24,7 @@
 //! dit au lieu de laisser le level design dériver en silence.
 
 use bevy::prelude::*;
-use bevy_egui::{EguiContexts, egui};
+use bevy_egui::{egui, EguiContexts};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use forgia_core::prelude::*;
 use forgia_player::prelude::Player;
@@ -2504,7 +2504,10 @@ mod tests {
             "la marge manquante doit être chiffrée: {next}"
         );
         // Un sol qui déborde l'enceinte ne déclenche rien.
-        assert_eq!(arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 0, "", 0.0, 2.0, 0).0, "ok");
+        assert_eq!(
+            arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 0, "", 0.0, 2.0, 0).0,
+            "ok"
+        );
     }
 
     /// Poser un plafond sans lumière est LA panne certaine du passage aux salles
@@ -2512,9 +2515,13 @@ mod tests {
     /// une lumière ». L'alerte doit donc nommer la salle.
     #[test]
     fn health_flags_covered_room_without_light() {
-        let (sev, next) = arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 2, "chapelle", 5.0, 2.0, 0);
+        let (sev, next) =
+            arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 2, "chapelle", 5.0, 2.0, 0);
         assert_eq!(sev, "critical");
-        assert!(next.contains("chapelle"), "la salle doit être nommée: {next}");
+        assert!(
+            next.contains("chapelle"),
+            "la salle doit être nommée: {next}"
+        );
         assert!(next.contains("NOIRES") || next.contains("noire"), "{next}");
         // Salle couverte ET éclairée : rien à signaler.
         assert_eq!(
@@ -2553,8 +2560,14 @@ mod tests {
             arena_test_health("", 0, 1.0, 12, 0.0, 1.174, 0.0, 0, "", 0.0, 2.0, 0).0,
             "critical"
         );
-        assert_eq!(arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 0, "", 0.0, 2.0, 0).0, "ok");
-        assert_eq!(arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 0, "", 0.0, 2.0, 3).0, "warn");
+        assert_eq!(
+            arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 0, "", 0.0, 2.0, 0).0,
+            "ok"
+        );
+        assert_eq!(
+            arena_test_health("", 12, 1.0, 12, 1.0, 1.174, 0.0, 0, "", 0.0, 2.0, 3).0,
+            "warn"
+        );
     }
 
     #[test]
@@ -2720,7 +2733,10 @@ mod tests {
             "chicane attendue : sans elle le tunnel offre 62 m de ligne droite, \
              ce qui en fait un stand de tir et non un contournement"
         );
-        assert!(g.ramps.len() >= 6, "routes sûres attendues (≥6 rampes de liaison)");
+        assert!(
+            g.ramps.len() >= 6,
+            "routes sûres attendues (≥6 rampes de liaison)"
+        );
         // Toute route doit offrir le couloir qu'elle déclare. Ce contrat a été
         // un cliquet de dette borné à 15 obstructions ; il est désormais tenu, et
         // l'exigence est franche. Historique, pour ne pas refaire le chemin :

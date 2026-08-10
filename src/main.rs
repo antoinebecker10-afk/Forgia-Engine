@@ -98,7 +98,10 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("JSON valide");
         assert_eq!(parsed["id"], "crash");
         assert_eq!(parsed["severity"], "critical");
-        assert!(parsed["message"].as_str().unwrap().contains("index out of bounds"));
+        assert!(parsed["message"]
+            .as_str()
+            .unwrap()
+            .contains("index out of bounds"));
         assert!(parsed["location"].as_str().unwrap().contains("lib.rs:612"));
         assert!(parsed["backtrace"].as_str().unwrap().contains("run_game"));
         assert!(!parsed["next_step"].as_str().unwrap().is_empty());

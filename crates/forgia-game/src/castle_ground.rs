@@ -381,7 +381,10 @@ fn sys_nudge_ground(
 /// valeurs des consts. Format : `{"align":[x,y,z],"vscale":f,"yaw_deg":f}`.
 fn parse_tune(s: &str) -> (Vec3, f32, f32) {
     let mut align = TERRAIN_ALIGN;
-    if let Some(i) = s.find("\"align\"").and_then(|k| s[k..].find('[').map(|b| k + b + 1)) {
+    if let Some(i) = s
+        .find("\"align\"")
+        .and_then(|k| s[k..].find('[').map(|b| k + b + 1))
+    {
         if let Some(end) = s[i..].find(']') {
             let vals: Vec<f32> = s[i..i + end]
                 .split(',')
@@ -395,7 +398,9 @@ fn parse_tune(s: &str) -> (Vec3, f32, f32) {
     let vscale = num_after(s, "\"vscale\"")
         .unwrap_or(TERRAIN_VSCALE)
         .clamp(0.50, 1.25);
-    let yaw = num_after(s, "\"yaw_deg\"").unwrap_or(0.0).clamp(-180.0, 180.0);
+    let yaw = num_after(s, "\"yaw_deg\"")
+        .unwrap_or(0.0)
+        .clamp(-180.0, 180.0);
     (align, vscale, yaw)
 }
 
@@ -405,8 +410,7 @@ fn num_after(s: &str, key: &str) -> Option<f32> {
     let rest = s[k..].trim_start_matches(|c: char| c == ':' || c.is_whitespace());
     let b = rest.as_bytes();
     let mut j = 0;
-    while j < b.len()
-        && (b[j].is_ascii_digit() || matches!(b[j], b'-' | b'+' | b'.' | b'e' | b'E'))
+    while j < b.len() && (b[j].is_ascii_digit() || matches!(b[j], b'-' | b'+' | b'.' | b'e' | b'E'))
     {
         j += 1;
     }
@@ -543,23 +547,35 @@ mod tests {
 
     #[test]
     fn inactive_is_ok() {
-        assert_eq!(severity_for_ground(false, "not_present", 0, "not_present", 0).0, "ok");
+        assert_eq!(
+            severity_for_ground(false, "not_present", 0, "not_present", 0).0,
+            "ok"
+        );
     }
 
     #[test]
     fn failed_scene_is_critical_when_active() {
-        assert_eq!(severity_for_ground(true, "failed", 0, "not_present", 0).0, "critical");
+        assert_eq!(
+            severity_for_ground(true, "failed", 0, "not_present", 0).0,
+            "critical"
+        );
     }
 
     #[test]
     fn loaded_but_empty_warns() {
-        assert_eq!(severity_for_ground(true, "loaded", 0, "loaded", 1).0, "warn");
+        assert_eq!(
+            severity_for_ground(true, "loaded", 0, "loaded", 1).0,
+            "warn"
+        );
         assert_eq!(severity_for_ground(true, "loaded", 1, "loaded", 1).0, "ok");
     }
 
     #[test]
     fn visible_terrain_without_navigation_collider_warns() {
-        assert_eq!(severity_for_ground(true, "loaded", 1, "loaded", 0).0, "warn");
+        assert_eq!(
+            severity_for_ground(true, "loaded", 1, "loaded", 0).0,
+            "warn"
+        );
     }
 
     #[test]

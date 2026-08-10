@@ -18,7 +18,12 @@ pub struct ToonSettings {
     pub bands: f32,
     pub strength: f32,
     pub edge_dark: f32,
-    pub _pad: f32,
+    pub outline_thickness: f32,
+    pub outline_threshold: f32,
+    pub outline_strength: f32,
+    pub _pad0: f32,
+    pub _pad1: f32,
+    pub edge_color: Vec4,
 }
 
 impl Default for ToonSettings {
@@ -27,7 +32,12 @@ impl Default for ToonSettings {
             bands: 4.0,
             strength: 1.0,
             edge_dark: 0.15,
-            _pad: 0.0,
+            outline_thickness: 1.0,
+            outline_threshold: 0.15,
+            outline_strength: 0.0,
+            _pad0: 0.0,
+            _pad1: 0.0,
+            edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
         }
     }
 }

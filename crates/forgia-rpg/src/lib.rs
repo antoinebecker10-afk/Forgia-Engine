@@ -16,18 +16,18 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use forgia_audio::prelude::AudioSampleOffset;
 use forgia_core::prelude::*;
+use forgia_damage::Health;
 use forgia_rpg_data::dialogue::{
     DialogueChoice, DialogueEffect, DialogueId, DialogueNode, DialogueRegistry, DialogueSession,
     DialogueTree, NodeId, StartDialogue,
 };
-use forgia_rpg_data::shop::ShopSession;
-use forgia_damage::Health;
 use forgia_rpg_data::gold::Gold;
 use forgia_rpg_data::inventory::{Inventory, UseItemRequest};
 use forgia_rpg_data::items::ItemRegistry;
 use forgia_rpg_data::quests::{
     Objective, QuestCatalogue, QuestDef, QuestId, QuestLog, QuestStatus, TrackedQuest,
 };
+use forgia_rpg_data::shop::ShopSession;
 use forgia_rpg_data::xp_curves::XpProgress;
 
 /// Or de départ du joueur RPG. TODO(economy-genome) : déplacer vers un genome
@@ -1315,7 +1315,11 @@ fn teleport_player_to_terrain(
     let Ok(mut tf) = q.single_mut() else { return };
     // Léger offset XZ (+3,+3) pour ne pas spawn pile sur le puits ; +2 en Y = marge
     // au-dessus du sol flatten, la gravité Rapier pose ensuite le joueur au sol.
-    let spawn = Vec3::new(anchor.center.x + 3.0, anchor.center.y + 2.0, anchor.center.z + 3.0);
+    let spawn = Vec3::new(
+        anchor.center.x + 3.0,
+        anchor.center.y + 2.0,
+        anchor.center.z + 3.0,
+    );
     tf.translation = spawn;
     commands.remove_resource::<PendingPlayerTeleport>();
     info!(
@@ -1533,7 +1537,9 @@ fn register_sample_dialogues(mut registry: ResMut<DialogueRegistry>) {
             )],
         ),
     );
-    registry.trees.insert(maitre_turnin.id.clone(), maitre_turnin);
+    registry
+        .trees
+        .insert(maitre_turnin.id.clone(), maitre_turnin);
 
     // ── Mira : marchande ───────────────────────────────────────────────────
     let mut mira = DialogueTree {
@@ -2421,8 +2427,13 @@ mod tests {
     fn make_test_app() -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
+            .add_plugins(bevy::state::app::StatesPlugin)
             .add_plugins(AssetPlugin::default())
             .add_plugins(ScenePlugin)
+            .init_asset::<Mesh>()
+            .init_asset::<StandardMaterial>()
+            .init_state::<GameMode>()
+            .init_resource::<crate::character::TestCharacterMode>()
             .add_systems(Update, spawn_rex_character);
         app
     }

@@ -24,9 +24,9 @@
 //! de collision par zone dans le pipeline d'assets.
 
 use bevy::asset::{LoadState, RenderAssetUsages};
+use bevy::light::CascadeShadowConfigBuilder;
 use bevy::math::Affine3A;
 use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
-use bevy::light::CascadeShadowConfigBuilder;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
@@ -585,7 +585,11 @@ fn build_streamed_cell_colliders(
             };
             let base = positions.len() as u32;
             for p in pos {
-                positions.push(world_in_cell.transform_point3(Vec3::from_array(*p)).to_array());
+                positions.push(
+                    world_in_cell
+                        .transform_point3(Vec3::from_array(*p))
+                        .to_array(),
+                );
             }
             match mesh.indices() {
                 Some(Indices::U32(ix)) => indices.extend(ix.iter().map(|i| base + i)),
@@ -597,14 +601,19 @@ fn build_streamed_cell_colliders(
             continue; // scène pas encore instanciée — on réessaie la frame suivante
         }
         commands.entity(cell).remove::<CellCollisionPending>();
-        let mut merged = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+        let mut merged = Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        );
         merged.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
         merged.insert_indices(Indices::U32(indices));
         match Collider::from_bevy_mesh(&merged, &ComputedColliderShape::TriMesh(default())) {
             Some(collider) => {
-                commands
-                    .entity(cell)
-                    .insert((collider, RigidBody::Fixed, CastleHubWalkableCollision));
+                commands.entity(cell).insert((
+                    collider,
+                    RigidBody::Fixed,
+                    CastleHubWalkableCollision,
+                ));
             }
             None => warn!("[castle-hub] collider cellule non bâti (mesh dégénéré)"),
         }

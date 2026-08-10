@@ -11,8 +11,79 @@ use bevy::prelude::*;
 /// Story-674 — primitives d'aménagement partagées (bruit bleu, compte d'abris).
 pub mod layout;
 
+/// Canonical filesystem resolution for shipped and development assets.
+pub mod asset_paths {
+    use std::path::{Path, PathBuf};
+
+    const ASSET_ROOT_ENV: &str = "FORGIA_ASSET_ROOT";
+
+    fn root_from(start: &Path) -> Option<PathBuf> {
+        start
+            .ancestors()
+            .map(|base| base.join("assets"))
+            .find(|path| path.is_dir())
+    }
+
+    /// Finds the real asset directory independently from the process working directory.
+    pub fn asset_root() -> PathBuf {
+        if let Some(path) = std::env::var_os(ASSET_ROOT_ENV).map(PathBuf::from) {
+            if path.is_dir() {
+                return path;
+            }
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            if let Some(path) = root_from(&cwd) {
+                return path;
+            }
+        }
+        if let Ok(executable) = std::env::current_exe() {
+            if let Some(path) = executable.parent().and_then(root_from) {
+                return path;
+            }
+        }
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("assets")
+    }
+
+    /// Resolves a path relative to `assets/`. An optional leading `assets/` is accepted.
+    pub fn asset_path(relative: impl AsRef<Path>) -> PathBuf {
+        let relative = relative.as_ref();
+        asset_root().join(relative.strip_prefix("assets").unwrap_or(relative))
+    }
+
+    /// Root containing `assets/`, used by legacy filesystem readers that still
+    /// resolve `assets/...` and `config/...` from the process working directory.
+    pub fn runtime_root() -> PathBuf {
+        asset_root()
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn workspace_assets_are_found_from_the_core_crate() {
+            assert!(asset_root().join("genomes").is_dir());
+        }
+
+        #[test]
+        fn optional_assets_prefix_is_not_duplicated() {
+            assert_eq!(asset_path("genomes"), asset_path("assets/genomes"));
+        }
+
+        #[test]
+        fn runtime_root_contains_the_asset_directory() {
+            assert_eq!(runtime_root().join("assets"), asset_root());
+        }
+    }
+}
+
 pub mod prelude {
-    pub use crate::cosmetics::{ArmCosmetics, ArmStyle, ViewmodelForcedVisible};
+    pub use crate::cosmetics::{ArmCosmetics, ArmStyle, UiStudioCamera, ViewmodelForcedVisible};
     pub use crate::fps_feel::FpsFeelMetrics;
     pub use crate::hud_visibility::{gameplay_hud_visible, GameplayHudVisible};
     pub use crate::states::{AppMode, GameMode, WorldMode};
@@ -230,6 +301,20 @@ pub mod cosmetics {
             }
         }
     }
+
+    /// Marqueur des caméras d'aperçu UI en « studio » (RTT : arme, personnage).
+    ///
+    /// Story-678, audit 2026-08-06. Le grading d'univers
+    /// (`color_grading::sys_apply`) s'applique à TOUTES les `Camera3d` — les
+    /// caméras d'aperçu comprises, dont le fond sombre ressortait teinté du
+    /// rose de l'ambiance. Ce marqueur les en exclut. Le fond d'arène du menu,
+    /// lui, n'est PAS marqué : il montre l'univers, il doit en garder le look.
+    ///
+    /// Vit ici pour la même raison qu'`ArmCosmetics` : les caméras sont
+    /// spawnées par `forgia-ui`, le grading par `forgia-game` — forgia-core est
+    /// leur seul ancêtre commun sans cycle.
+    #[derive(Component, Debug, Clone, Copy, Default)]
+    pub struct UiStudioCamera;
 
     /// Cosmétique des bras procéduraux (couleur + style). Pilotée par l'onglet Forge
     /// (forgia-mode-roguelite), appliquée au matériau par forgia-viewmodel — via

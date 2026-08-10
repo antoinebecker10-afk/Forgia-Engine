@@ -486,7 +486,10 @@ fn sys_spawn_creator_lights(
         }
         count.0 += 1;
     }
-    info!("[castle-flames] {} lumières du créateur instanciées", count.0);
+    info!(
+        "[castle-flames] {} lumières du créateur instanciées",
+        count.0
+    );
 }
 
 fn sys_cleanup_creator_lights(
@@ -510,11 +513,17 @@ fn sys_apply_sun(
     tuning: Res<CastleLighting>,
     mut q_key: Query<
         &mut DirectionalLight,
-        (With<crate::castle_hub::CastleKeyLight>, Without<crate::castle_hub::CastleFillLight>),
+        (
+            With<crate::castle_hub::CastleKeyLight>,
+            Without<crate::castle_hub::CastleFillLight>,
+        ),
     >,
     mut q_fill: Query<
         &mut DirectionalLight,
-        (With<crate::castle_hub::CastleFillLight>, Without<crate::castle_hub::CastleKeyLight>),
+        (
+            With<crate::castle_hub::CastleFillLight>,
+            Without<crate::castle_hub::CastleKeyLight>,
+        ),
     >,
 ) {
     if !tuning.is_changed() {
@@ -631,7 +640,10 @@ fn sys_poll_tuning(
             material.emissive = tuning.emissive();
         }
     }
-    info!("[castle-flames] réglages rechargés ({} fois)", watch.reloads);
+    info!(
+        "[castle-flames] réglages rechargés ({} fois)",
+        watch.reloads
+    );
 }
 
 /// Applique l'ambiante des réglages aux caméras, et la met à jour à chaud.
@@ -706,7 +718,11 @@ fn sys_place_flames(
         let Ok(global) = q_global.get(entity) else {
             continue;
         };
-        let scale = Vec3::new(tuning.size_m, tuning.size_m * FLAME_HEIGHT_RATIO, tuning.size_m);
+        let scale = Vec3::new(
+            tuning.size_m,
+            tuning.size_m * FLAME_HEIGHT_RATIO,
+            tuning.size_m,
+        );
         for (index, point) in pending.points.iter().enumerate() {
             let position = global.transform_point(Vec3::from_array(*point));
             commands.spawn((
@@ -866,9 +882,21 @@ fn world_bounds(
             let local_max = Vec3::from(aabb.max());
             for corner in 0..8 {
                 let point = affine.transform_point3(Vec3::new(
-                    if corner & 1 == 0 { local_min.x } else { local_max.x },
-                    if corner & 2 == 0 { local_min.y } else { local_max.y },
-                    if corner & 4 == 0 { local_min.z } else { local_max.z },
+                    if corner & 1 == 0 {
+                        local_min.x
+                    } else {
+                        local_max.x
+                    },
+                    if corner & 2 == 0 {
+                        local_min.y
+                    } else {
+                        local_max.y
+                    },
+                    if corner & 4 == 0 {
+                        local_min.z
+                    } else {
+                        local_max.z
+                    },
                 ));
                 min = min.min(point);
                 max = max.max(point);
@@ -957,7 +985,10 @@ mod tests {
     fn partial_toml_keeps_other_defaults() {
         let parsed = CastleLighting::parse_toml("[ambient]\nbrightness = 42.0\n");
         assert_eq!(parsed.ambient_brightness, 42.0);
-        assert_eq!(parsed.max_active_lights, CastleLighting::default().max_active_lights);
+        assert_eq!(
+            parsed.max_active_lights,
+            CastleLighting::default().max_active_lights
+        );
     }
 
     #[test]
@@ -1014,7 +1045,11 @@ mod tests {
         let five = mounts
             .points_for("SM_PROP_candleholder_castle_04_LOD0")
             .expect("connu");
-        assert_eq!(three.len(), 3, "le chandelier à trois branches a trois mèches");
+        assert_eq!(
+            three.len(),
+            3,
+            "le chandelier à trois branches a trois mèches"
+        );
         assert_eq!(five.len(), 5);
         // Les mèches sont bien réparties, pas empilées sur un même axe.
         let spread = three
@@ -1028,7 +1063,9 @@ mod tests {
     fn a_simple_candle_has_exactly_one_wick_and_a_vase_none() {
         let mounts = shipped_mounts();
         assert_eq!(
-            mounts.points_for("SM_PROP_candle_castle_05_LOD0").map(<[_]>::len),
+            mounts
+                .points_for("SM_PROP_candle_castle_05_LOD0")
+                .map(<[_]>::len),
             Some(1)
         );
         assert!(mounts.points_for("SM_PROP_vase_castle_01_LOD0").is_none());
@@ -1039,7 +1076,12 @@ mod tests {
     fn wicks_sit_above_the_candle_base() {
         for mount in shipped_mounts().0 {
             for point in mount.points {
-                assert!(point[1] > 0.0, "{} : mèche à Y={}", mount.node_type, point[1]);
+                assert!(
+                    point[1] > 0.0,
+                    "{} : mèche à Y={}",
+                    mount.node_type,
+                    point[1]
+                );
             }
         }
     }

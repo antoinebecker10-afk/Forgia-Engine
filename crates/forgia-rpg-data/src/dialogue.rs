@@ -44,12 +44,22 @@ pub struct DialogueChoice {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DialogueEffect {
-    GiveItem { id: String, count: u32 },
-    StartQuest { id: String },
+    GiveItem {
+        id: String,
+        count: u32,
+    },
+    StartQuest {
+        id: String,
+    },
     /// Increment a quest objective counter (no-combat progression hook).
-    AdvanceQuest { tag: String, delta: u32 },
+    AdvanceQuest {
+        tag: String,
+        delta: u32,
+    },
     /// Remet une quête `Completed` au donneur → `TurnedIn` (clôture la boucle).
-    TurnInQuest { id: String },
+    TurnInQuest {
+        id: String,
+    },
     /// Ouvre la boutique du PNJ courant (vendeur). Termine le dialogue.
     OpenShop,
     EndConversation,

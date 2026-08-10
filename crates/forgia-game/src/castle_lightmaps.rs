@@ -447,7 +447,10 @@ mod tests {
         for nodes in table().cells.values() {
             for (node, slot) in nodes {
                 let [min_u, min_v, max_u, max_v] = slot.uv;
-                assert!(max_u > min_u && max_v > min_v, "rectangle dégénéré : {node}");
+                assert!(
+                    max_u > min_u && max_v > min_v,
+                    "rectangle dégénéré : {node}"
+                );
                 // Le débord d'atlas du bake vaut quelques texels sur 4096 ; au-delà
                 // c'est une erreur de lecture du binaire Unity.
                 assert!(min_u > -0.01 && min_v > -0.01, "hors atlas : {node}");
@@ -472,7 +475,10 @@ mod tests {
     fn a_missing_table_is_critical_but_loading_is_not() {
         assert_eq!(severity_for_lightmaps(true, true, 0, 0, 30.0).0, "critical");
         assert_eq!(severity_for_lightmaps(true, true, 6801, 0, 1.0).0, "ok");
-        assert_eq!(severity_for_lightmaps(true, true, 6801, 0, 30.0).0, "critical");
+        assert_eq!(
+            severity_for_lightmaps(true, true, 6801, 0, 30.0).0,
+            "critical"
+        );
         assert_eq!(severity_for_lightmaps(true, true, 6801, 4000, 30.0).0, "ok");
     }
 }

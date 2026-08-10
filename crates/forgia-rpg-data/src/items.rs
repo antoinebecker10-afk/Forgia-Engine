@@ -111,19 +111,21 @@ const ITEMS_TOML_PATH: &str = "config/items/items.toml";
 /// Startup : charge `config/items/items.toml`, fallback hardcodé si absent.
 pub fn load_items_registry(mut registry: ResMut<ItemRegistry>) {
     match std::fs::read_to_string(ITEMS_TOML_PATH) {
-        Ok(text) => match toml::from_str::<ItemsToml>(&text) {
-            Ok(parsed) => {
-                let n = parsed.items.len();
-                for def in parsed.items {
-                    registry.register(def);
+        Ok(text) => {
+            match toml::from_str::<ItemsToml>(&text) {
+                Ok(parsed) => {
+                    let n = parsed.items.len();
+                    for def in parsed.items {
+                        registry.register(def);
+                    }
+                    info!("[forgia-rpg-data] ItemRegistry : {n} objets chargés depuis {ITEMS_TOML_PATH}");
                 }
-                info!("[forgia-rpg-data] ItemRegistry : {n} objets chargés depuis {ITEMS_TOML_PATH}");
+                Err(e) => {
+                    warn!("[forgia-rpg-data] items.toml parse échoué ({e}) — fallback hardcodé");
+                    register_fallback(&mut registry);
+                }
             }
-            Err(e) => {
-                warn!("[forgia-rpg-data] items.toml parse échoué ({e}) — fallback hardcodé");
-                register_fallback(&mut registry);
-            }
-        },
+        }
         Err(_) => {
             info!("[forgia-rpg-data] {ITEMS_TOML_PATH} absent — fallback hardcodé");
             register_fallback(&mut registry);

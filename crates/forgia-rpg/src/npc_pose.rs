@@ -49,8 +49,12 @@ pub fn sys_pose_npcs_idle(
         // forgia-rig-topology). Closures en bloc isolé : le borrow immutable de
         // q_transform se termine AVANT le get_mut d'application ci-dessous.
         let topo = {
-            let children_of =
-                |e: Entity| q_children.get(e).map(|c| c.iter().collect()).unwrap_or_default();
+            let children_of = |e: Entity| {
+                q_children
+                    .get(e)
+                    .map(|c| c.iter().collect())
+                    .unwrap_or_default()
+            };
             let transform_of = |e: Entity| q_transform.get(e).ok().copied();
             let name_of = |e: Entity| q_names.get(e).ok().map(|n| n.to_string());
             analyze_rig_topology(npc, &children_of, &transform_of, &name_of)

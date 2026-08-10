@@ -159,15 +159,17 @@ fn sys_apply_env_map(
             attached += 1;
             continue;
         }
-        commands.entity(entity).insert(GeneratedEnvironmentMapLight {
-            environment_map: env.handle.clone(),
-            intensity: tuning.env_intensity,
-            // 🚨 Sa part **diffuse** fait double emploi avec le rebond déjà cuit
-            // dans les lightmaps. On ne garde donc que le spéculaire — c'est-à-dire
-            // exactement ce qu'on lui demandait : des reflets sur la pierre.
-            affects_lightmapped_mesh_diffuse: !tuning.lightmaps_enabled,
-            ..default()
-        });
+        commands
+            .entity(entity)
+            .insert(GeneratedEnvironmentMapLight {
+                environment_map: env.handle.clone(),
+                intensity: tuning.env_intensity,
+                // 🚨 Sa part **diffuse** fait double emploi avec le rebond déjà cuit
+                // dans les lightmaps. On ne garde donc que le spéculaire — c'est-à-dire
+                // exactement ce qu'on lui demandait : des reflets sur la pierre.
+                affects_lightmapped_mesh_diffuse: !tuning.lightmaps_enabled,
+                ..default()
+            });
         attached += 1;
     }
     env.attached = attached;

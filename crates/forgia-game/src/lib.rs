@@ -313,6 +313,7 @@ fn boot_to_menu(mut app_mode: ResMut<NextState<AppMode>>, mut game: ResMut<NextS
         "roguelite" => Some(GameMode::Roguelite),
         "castle_hub" => Some(GameMode::CastleHub),
         "fps" => Some(GameMode::Fps),
+        "rpg" => Some(GameMode::Rpg),
         "" => None,
         autre => {
             warn!("[forgia-game] FORGIA_BOOT_MODE=\"{autre}\" inconnu — démarrage au menu");

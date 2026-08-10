@@ -150,7 +150,8 @@ fn sys_load_missing_props(mut props: ResMut<MissingProps>, mut stats: ResMut<Pro
     props.pending.clear();
     props.loaded = 0;
 
-    let Ok(content) = fs::read_to_string(MISSING_PROPS_PATH) else {
+    let Ok(content) = fs::read_to_string(forgia_core::asset_paths::asset_path(MISSING_PROPS_PATH))
+    else {
         warn!("castle_props : {MISSING_PROPS_PATH} illisible, aucune instance réimportée");
         return;
     };
@@ -251,7 +252,11 @@ fn collect_parts(
                 material: material.0.clone(),
                 // La primitive d'un nœud racine porte l'identité ; on la compose
                 // quand même, pour ne rien supposer de l'export.
-                local: if entity == root { Transform::IDENTITY } else { *local },
+                local: if entity == root {
+                    Transform::IDENTITY
+                } else {
+                    *local
+                },
             });
         }
         if let Ok(children) = q_children.get(entity) {
@@ -388,7 +393,8 @@ mod tests {
     use super::*;
 
     fn table() -> MissingPropsFile {
-        let content = fs::read_to_string(MISSING_PROPS_PATH)
+        let path = forgia_core::asset_paths::asset_path(MISSING_PROPS_PATH);
+        let content = fs::read_to_string(&path)
             .expect("la table des instances manquantes doit être versionnée");
         toml::from_str(&content).expect("la table doit être du TOML valide")
     }
@@ -397,7 +403,11 @@ mod tests {
     #[test]
     fn the_fifty_absent_banners_are_all_in_the_table() {
         let parsed = table();
-        assert_eq!(parsed.prop.len(), 50, "50 bannières `_static` étaient absentes");
+        assert_eq!(
+            parsed.prop.len(),
+            50,
+            "50 bannières `_static` étaient absentes"
+        );
     }
 
     /// Elles doivent réutiliser un mesh que nos cellules contiennent déjà —
@@ -419,7 +429,10 @@ mod tests {
     fn transforms_are_sane() {
         for entry in table().prop {
             let prop = to_prop(entry);
-            assert!(prop.transform.rotation.is_normalized(), "quaternion non unitaire");
+            assert!(
+                prop.transform.rotation.is_normalized(),
+                "quaternion non unitaire"
+            );
             assert!(
                 prop.transform.scale.min_element() > 0.0,
                 "échelle nulle ou négative : la bannière serait invisible ou retournée"

@@ -10,7 +10,7 @@ use bevy_kira_audio::{AudioApp, AudioChannel, AudioControl, AudioInstance, Audio
 use forgia_core::prelude::*;
 use forgia_terrain::{BiomeMap, BiomeType};
 
-use crate::ForgiaAudioCorePlugin;
+use crate::{ForgiaAudioCorePlugin, UserAudioVolumes};
 
 /// Channel dédié pour ambient biome — découplé du music/sfx.
 #[derive(Resource)]
@@ -79,6 +79,7 @@ fn update_biome_ambient(
     offset: Option<Res<AudioSampleOffset>>,
     mut state: ResMut<BiomeAmbientState>,
     mut audio_instances: ResMut<Assets<AudioInstance>>,
+    mix: Res<UserAudioVolumes>,
     player_q: Query<&Transform>,
     mut frame_counter: Local<u32>,
 ) {
@@ -110,7 +111,11 @@ fn update_biome_ambient(
 
     let path = biome_ambient_asset(biome);
     let src: Handle<AudioSource> = asset_server.load(path);
-    let handle = audio.play(src).looped().handle();
+    let handle = audio
+        .play(src)
+        .looped()
+        .with_volume(crate::amp_to_db(mix.ambience_gain()))
+        .handle();
 
     state.current = Some(biome);
     state.instance = Some(handle);

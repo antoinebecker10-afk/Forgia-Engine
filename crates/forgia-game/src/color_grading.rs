@@ -256,8 +256,13 @@ fn sys_apply(
     state: Res<State<GameMode>>,
     mut watch: ResMut<ColorGradingWatch>,
     mut last_mode: Local<Option<GameMode>>,
-    q_cam_all: Query<Entity, With<Camera3d>>,
-    q_cam_new: Query<Entity, Added<Camera3d>>,
+    // `Without<UiStudioCamera>` — audit 2026-08-06 : appliqué à TOUTES les
+    // Camera3d, le grading teintait aussi les aperçus RTT du menu (arme,
+    // personnage), dont le fond studio sombre ressortait rose ambiance. Les
+    // caméras d'aperçu s'excluent via ce marqueur ; le fond d'arène du menu
+    // reste gradé (il montre l'univers).
+    q_cam_all: Query<Entity, (With<Camera3d>, Without<forgia_core::prelude::UiStudioCamera>)>,
+    q_cam_new: Query<Entity, (Added<Camera3d>, Without<forgia_core::prelude::UiStudioCamera>)>,
     // Story-689 — l'UNIVERS a son propre grading. Sans ça, les six ambiances de
     // story-676 (ciel, brouillard, lumière tous différents) étaient ramenées au
     // même rendu chaud-rose par une correction appliquée par MODE : six
@@ -289,7 +294,10 @@ fn sys_apply(
 
     // Changer d'univers DOIT ré-appliquer : sinon le round 2 garderait la
     // colorimétrie du round 1 et la rotation ne se verrait pas.
-    let amb_id = current_amb.as_deref().map(|c| c.id.clone()).unwrap_or_default();
+    let amb_id = current_amb
+        .as_deref()
+        .map(|c| c.id.clone())
+        .unwrap_or_default();
     let amb_changed = *last_amb != amb_id;
     if amb_changed {
         *last_amb = amb_id;
@@ -369,7 +377,10 @@ mod tests {
 
     #[test]
     fn parse_empty_is_default() {
-        assert_eq!(ColorGradingConfig::parse_toml(""), ColorGradingConfig::default());
+        assert_eq!(
+            ColorGradingConfig::parse_toml(""),
+            ColorGradingConfig::default()
+        );
     }
 
     #[test]

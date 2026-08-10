@@ -68,7 +68,12 @@ impl Plugin for ForgiaShopPlugin {
             .add_message::<CloseShop>()
             .add_systems(
                 Update,
-                (open_shop_sessions, close_shop_sessions, process_buy, process_sell),
+                (
+                    open_shop_sessions,
+                    close_shop_sessions,
+                    process_buy,
+                    process_sell,
+                ),
             );
     }
 }

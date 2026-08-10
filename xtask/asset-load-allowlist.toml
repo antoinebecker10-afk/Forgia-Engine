@@ -40,3 +40,14 @@
 "crates/forgia-rpg/src/worldgen_village.rs" = 1
 "crates/forgia-skeleton-template/src/lib.rs" = 1
 "crates/forgia-worldgen/src/lib.rs" = 1
+
+# ── Story-678 — hub-menu (2026-08-06) ────────────────────────────────────────
+# `arena_backdrop` : les props du diorama viennent de la palette du DÉCOR ÉQUIPÉ,
+# choisi par le joueur au Marketplace. Ils sont déjà préchargés dans `DecorAssets`
+# pour toutes les palettes — ce `load` rend donc le handle existant, il ne
+# déclenche pas de lecture disque. Le site est neuf, pas la charge.
+"crates/forgia-ui/src/arena_backdrop.rs" = 1
+# `currency_icons` : deux PNG de 128 px (8 Ko), chargés une seule fois à l'entrée
+# du menu. Les passer par `GameAssets` ferait payer un préchargement au boot du
+# jeu pour deux images que seul le menu regarde.
+"crates/forgia-ui/src/currency_icons.rs" = 2

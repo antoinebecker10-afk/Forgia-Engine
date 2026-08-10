@@ -62,7 +62,11 @@ pub struct UnlockedBoonTiers {
 impl UnlockedBoonTiers {
     /// Tout débloqué (vétéran / tests).
     pub fn all() -> Self {
-        Self { uncommon: true, rare: true, legendary: true }
+        Self {
+            uncommon: true,
+            rare: true,
+            legendary: true,
+        }
     }
 
     /// Le palier de cette rareté est-il offert ? Common toujours vrai.
@@ -189,7 +193,8 @@ impl BoonDef {
     /// Coût final en Souls : `souls_cost` du TOML si défini, sinon défaut par rarity.
     /// Story-558 AC3 — defaults proposés Common=20, Uncommon=40, Legendary=80.
     pub fn effective_souls_cost(&self) -> u32 {
-        self.souls_cost.unwrap_or_else(|| default_souls_cost(self.rarity))
+        self.souls_cost
+            .unwrap_or_else(|| default_souls_cost(self.rarity))
     }
 }
 
@@ -220,7 +225,12 @@ pub struct RarityWeights {
 impl Default for RarityWeights {
     fn default() -> Self {
         // Miroir EXACT de [rarity_weights] dans roguelite_boons.toml.
-        Self { common: 100, uncommon: 45, rare: 18, legendary: 6 }
+        Self {
+            common: 100,
+            uncommon: 45,
+            rare: 18,
+            legendary: 6,
+        }
     }
 }
 
@@ -630,7 +640,10 @@ pub fn sys_handle_coffre_pick(
 ) {
     for pick in picks.read() {
         let Some(def) = catalogue.find(&pick.boon_id) else {
-            warn!("[boons] picked id {:?} not in catalogue — ignored", pick.boon_id);
+            warn!(
+                "[boons] picked id {:?} not in catalogue — ignored",
+                pick.boon_id
+            );
             continue;
         };
         if session.is_open && !session.candidates.contains(&pick.boon_id) {
@@ -831,7 +844,11 @@ mod tests {
         );
         active.apply(&common_fire, &cat);
         assert_eq!(active.tag_count(&BoonTag::Fire), LEGENDARY_TAG_THRESHOLD);
-        assert_eq!(active.unlocked_legendary.len(), 1, "AC5 unlock at threshold");
+        assert_eq!(
+            active.unlocked_legendary.len(),
+            1,
+            "AC5 unlock at threshold"
+        );
         assert_eq!(active.unlocked_legendary[0], legendary.id);
     }
 
@@ -965,7 +982,10 @@ effect = { kind = "damage_mul", factor = 1.15 }
         let cat = BoonsCatalogue {
             // Sac désactivé : ces tests portent sur le tirage, pas sur le plafond.
             bag_slots: 0,
-            rarity_weights: RarityWeights { legendary: 0, ..Default::default() },
+            rarity_weights: RarityWeights {
+                legendary: 0,
+                ..Default::default()
+            },
             entries: vec![
                 def("c1", BoonRarity::Common, &[]),
                 def("l1", BoonRarity::Legendary, &[BoonTag::Fire]),
@@ -976,8 +996,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
             unlocked_legendary: vec![BoonId("l1".into())],
             ..Default::default()
         };
-        let out =
-            roll_candidates_weighted(&cat, &active, &UnlockedBoonTiers::all(), 3, |_| 0);
+        let out = roll_candidates_weighted(&cat, &active, &UnlockedBoonTiers::all(), 3, |_| 0);
         assert_eq!(out.len(), 1, "poids 0 → legendary hors pool");
         assert_eq!(out[0].0, "c1");
     }
@@ -996,7 +1015,11 @@ effect = { kind = "damage_mul", factor = 1.15 }
             ],
         };
         let out = roll_candidates_weighted(
-            &cat, &ActiveBoons::default(), &UnlockedBoonTiers::all(), 3, |_| 0,
+            &cat,
+            &ActiveBoons::default(),
+            &UnlockedBoonTiers::all(),
+            3,
+            |_| 0,
         );
         assert_eq!(out.len(), 2, "sans remise : pas de doublon, pool épuisé");
         assert_ne!(out[0], out[1]);
@@ -1016,7 +1039,13 @@ effect = { kind = "damage_mul", factor = 1.15 }
         };
         let active = ActiveBoons::default();
         // Force any RNG output — pool should be 2 commons only.
-        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, fake_seq(vec![0, 0, 0, 0]));
+        let out = roll_candidates(
+            &cat,
+            &active,
+            &UnlockedBoonTiers::all(),
+            3,
+            fake_seq(vec![0, 0, 0, 0]),
+        );
         assert_eq!(out.len(), 2, "legendary locked → pool=2 → only 2 picks");
         for id in &out {
             assert_ne!(id.0, "l1", "locked legendary must never appear");
@@ -1040,7 +1069,13 @@ effect = { kind = "damage_mul", factor = 1.15 }
             unlocked_legendary: vec![leg.id],
             ..Default::default()
         };
-        let out = roll_candidates(&cat, &active, &UnlockedBoonTiers::all(), 3, fake_seq(vec![2, 0, 0]));
+        let out = roll_candidates(
+            &cat,
+            &active,
+            &UnlockedBoonTiers::all(),
+            3,
+            fake_seq(vec![2, 0, 0]),
+        );
         assert_eq!(out.len(), 3);
         assert!(out.iter().any(|id| id.0 == "l1"));
     }
@@ -1106,7 +1141,11 @@ effect = { kind = "damage_mul", factor = 1.15 }
         assert_eq!(out.len(), 1, "tiers verrouillés → seul Common éligible");
         assert_eq!(out[0].0, "c1");
         // Uncommon débloqué → 2 éligibles (Common + Uncommon), Rare encore exclu.
-        let tiers = UnlockedBoonTiers { uncommon: true, rare: false, legendary: false };
+        let tiers = UnlockedBoonTiers {
+            uncommon: true,
+            rare: false,
+            legendary: false,
+        };
         let out2 = roll_candidates(&cat, &active, &tiers, 3, |_| 0);
         assert_eq!(out2.len(), 2);
         assert!(!out2.iter().any(|id| id.0 == "r1"), "Rare verrouillé exclu");
@@ -1136,8 +1175,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
         // Guard against TOML schema drift — story-529 AC4 garanti via ce test.
         // Manifest dir = crates/forgia-rpg-data, assets root = workspace root.
         let manifest = env!("CARGO_MANIFEST_DIR");
-        let path = std::path::Path::new(manifest)
-            .join("../../assets/genomes/roguelite_boons.toml");
+        let path = std::path::Path::new(manifest).join("../../assets/genomes/roguelite_boons.toml");
         let s = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         let cat: BoonsCatalogue =
@@ -1200,17 +1238,16 @@ effect = { kind = "damage_mul", factor = 1.15 }
         // explicite (pas de fallback default). Évite drift quand on ajoute un
         // nouveau boon sans réfléchir au prix.
         let manifest = env!("CARGO_MANIFEST_DIR");
-        let path = std::path::Path::new(manifest)
-            .join("../../assets/genomes/roguelite_boons.toml");
+        let path = std::path::Path::new(manifest).join("../../assets/genomes/roguelite_boons.toml");
         let s = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-        let cat: BoonsCatalogue =
-            toml::from_str(&s).unwrap_or_else(|e| panic!("parse: {e}"));
+        let cat: BoonsCatalogue = toml::from_str(&s).unwrap_or_else(|e| panic!("parse: {e}"));
         for b in &cat.entries {
             assert!(
                 b.souls_cost.is_some(),
                 "boon {:?} ({}): souls_cost manquant dans TOML",
-                b.id, b.name
+                b.id,
+                b.name
             );
         }
     }
@@ -1219,8 +1256,7 @@ effect = { kind = "damage_mul", factor = 1.15 }
     fn production_boons_souls_cost_respects_rarity_ordering() {
         // Common ≤ Uncommon ≤ Rare ≤ Legendary (par TOML actuel).
         let manifest = env!("CARGO_MANIFEST_DIR");
-        let path = std::path::Path::new(manifest)
-            .join("../../assets/genomes/roguelite_boons.toml");
+        let path = std::path::Path::new(manifest).join("../../assets/genomes/roguelite_boons.toml");
         let s = std::fs::read_to_string(&path).unwrap();
         let cat: BoonsCatalogue = toml::from_str(&s).unwrap();
         let max_common = cat
@@ -1296,7 +1332,10 @@ mod tag_progress_tests {
         }
         let p = a.tag_progress();
         assert_eq!(p[0].0, BoonTag::Precision);
-        assert!(p[0].2, "à {LEGENDARY_TAG_THRESHOLD}, la synergie est aboutie");
+        assert!(
+            p[0].2,
+            "à {LEGENDARY_TAG_THRESHOLD}, la synergie est aboutie"
+        );
     }
 
     /// Un atout multi-tags fait progresser PLUSIEURS synergies — c'est ce qui
@@ -1450,7 +1489,11 @@ mod bag_tests {
     }
 
     fn cat_with(entries: Vec<BoonDef>, slots: u32) -> BoonsCatalogue {
-        BoonsCatalogue { entries, rarity_weights: RarityWeights::default(), bag_slots: slots }
+        BoonsCatalogue {
+            entries,
+            rarity_weights: RarityWeights::default(),
+            bag_slots: slots,
+        }
     }
 
     /// **LE test du sac.** Une fois plein, on n'ajoute plus rien de NOUVEAU —
@@ -1462,10 +1505,16 @@ mod bag_tests {
         let cat = cat_with(vec![], slots);
         let mut a = ActiveBoons::default();
         for i in 0..slots {
-            assert!(a.try_apply(&def(&format!("b{i}"), &[]), &cat, slots), "place {i}");
+            assert!(
+                a.try_apply(&def(&format!("b{i}"), &[]), &cat, slots),
+                "place {i}"
+            );
         }
         assert_eq!(a.distinct_count(), slots as usize);
-        assert!(!a.try_apply(&def("de_trop", &[]), &cat, slots), "le sac est plein");
+        assert!(
+            !a.try_apply(&def("de_trop", &[]), &cat, slots),
+            "le sac est plein"
+        );
         assert_eq!(a.distinct_count(), slots as usize, "et rien n'a été ajouté");
     }
 
@@ -1493,7 +1542,11 @@ mod bag_tests {
     fn a_full_bag_is_only_offered_what_it_already_carries() {
         let slots = 2;
         let cat = cat_with(
-            vec![def("porte_a", &[]), def("porte_b", &[]), def("inconnu", &[])],
+            vec![
+                def("porte_a", &[]),
+                def("porte_b", &[]),
+                def("inconnu", &[]),
+            ],
             slots,
         );
         let mut a = ActiveBoons::default();
@@ -1542,6 +1595,10 @@ mod bag_tests {
     #[test]
     fn the_shipped_bag_can_hold_a_synergy() {
         let cat = BoonsCatalogue::default();
-        assert!(cat.bag_slots >= LEGENDARY_TAG_THRESHOLD, "{}", cat.bag_slots);
+        assert!(
+            cat.bag_slots >= LEGENDARY_TAG_THRESHOLD,
+            "{}",
+            cat.bag_slots
+        );
     }
 }

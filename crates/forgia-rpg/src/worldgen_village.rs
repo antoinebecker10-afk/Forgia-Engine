@@ -118,7 +118,12 @@ const WELL: &str = "buildings/blue/building_well_blue.gltf";
 /// Fixed civic buildings placed at known hexes so an NPC can stand in front of "their" building.
 /// `(q, r, building, npc-name)`. The well + its NPC are handled separately.
 const CIVIC_LANDMARKS: &[(i32, i32, &str, &str)] = &[
-    (2, -1, "buildings/blue/building_blacksmith_blue.gltf", "MaitreForgeron"),
+    (
+        2,
+        -1,
+        "buildings/blue/building_blacksmith_blue.gltf",
+        "MaitreForgeron",
+    ),
     (-1, 2, "buildings/red/building_market_red.gltf", "Mira"),
     (1, 1, "buildings/green/building_tavern_green.gltf", "Dorin"),
 ];
@@ -344,7 +349,9 @@ fn scene(
 ) -> Handle<Scene> {
     cache
         .entry(rel)
-        .or_insert_with(|| asset_server.load(GltfAssetLabel::Scene(0).from_asset(format!("{KIT}/{rel}"))))
+        .or_insert_with(|| {
+            asset_server.load(GltfAssetLabel::Scene(0).from_asset(format!("{KIT}/{rel}")))
+        })
         .clone()
 }
 
@@ -397,7 +404,10 @@ pub(crate) fn sys_spawn_worldgen_village(
         let road = road_tile.is_some();
         let (tile_path, tile_yaw) = match road_tile {
             Some((p, yaw)) => (p, yaw),
-            None => (TILE_GRASS, (rng.below(6) as f32) * std::f32::consts::FRAC_PI_3),
+            None => (
+                TILE_GRASS,
+                (rng.below(6) as f32) * std::f32::consts::FRAC_PI_3,
+            ),
         };
         commands.spawn((
             RpgVillagePiece,
@@ -443,11 +453,19 @@ pub(crate) fn sys_spawn_worldgen_village(
             continue;
         }
         // Fixed civic buildings (for NPC stations), facing the plaza center.
-        if let Some(&(_, _, path, _)) =
-            CIVIC_LANDMARKS.iter().find(|&&(q, r, _, _)| hex == Hex::new(q, r))
+        if let Some(&(_, _, path, _)) = CIVIC_LANDMARKS
+            .iter()
+            .find(|&&(q, r, _, _)| hex == Hex::new(q, r))
         {
             let h = scene(&asset_server, &mut cache, path);
-            spawn_prop(&mut commands, h, pos, face_center_yaw(local), building_scale, true);
+            spawn_prop(
+                &mut commands,
+                h,
+                pos,
+                face_center_yaw(local),
+                building_scale,
+                true,
+            );
             buildings += 1;
             continue;
         }
@@ -461,7 +479,14 @@ pub(crate) fn sys_spawn_worldgen_village(
                 };
                 let yaw = (rng.below(6) as f32) * std::f32::consts::FRAC_PI_3;
                 let s = building_scale * (0.92 + rng.next_f32() * 0.16);
-                spawn_prop(&mut commands, scene(&asset_server, &mut cache, path), pos, yaw, s, true);
+                spawn_prop(
+                    &mut commands,
+                    scene(&asset_server, &mut cache, path),
+                    pos,
+                    yaw,
+                    s,
+                    true,
+                );
                 buildings += 1;
             }
             TileRole::Decoration if !spawn_clear(hex) => {
@@ -614,7 +639,10 @@ mod tests {
         );
         // Corners ({3,5}/{3,4}) have a unique rotation → left untouched.
         let corner = WALL_TILES[1].0;
-        assert_eq!(orient_wall_outward(corner, 1.234, Vec2::new(0.0, -1.0)), 1.234);
+        assert_eq!(
+            orient_wall_outward(corner, 1.234, Vec2::new(0.0, -1.0)),
+            1.234
+        );
     }
 
     #[test]
@@ -630,7 +658,10 @@ mod tests {
         // Player spawns at world origin; village center at (16,16) → 22.6 m away, inside inner disc.
         let z = village_flatten_zone(Vec2::new(16.0, 16.0), 5.0);
         let player = Vec2::new(0.0, 0.0);
-        assert!(player.distance(z.center) < z.inner_radius, "player spawn must be on flat ground");
+        assert!(
+            player.distance(z.center) < z.inner_radius,
+            "player spawn must be on flat ground"
+        );
         assert_eq!(z.target_y, 5.0);
     }
 
@@ -655,20 +686,35 @@ mod tests {
 
     #[test]
     fn autotiler_matches_signatures() {
-        assert_eq!(road_tile_for(0b001001).unwrap().0, "tiles/roads/hex_road_A.gltf"); // straight
-        assert_eq!(road_tile_for(0b111111).unwrap().0, "tiles/roads/hex_road_L.gltf"); // 6-way
-        assert_eq!(road_tile_for(0b001000).unwrap().0, "tiles/roads/hex_road_M.gltf"); // dead-end
+        assert_eq!(
+            road_tile_for(0b001001).unwrap().0,
+            "tiles/roads/hex_road_A.gltf"
+        ); // straight
+        assert_eq!(
+            road_tile_for(0b111111).unwrap().0,
+            "tiles/roads/hex_road_L.gltf"
+        ); // 6-way
+        assert_eq!(
+            road_tile_for(0b001000).unwrap().0,
+            "tiles/roads/hex_road_M.gltf"
+        ); // dead-end
         assert!(road_tile_for(0).is_none());
         // 3-spoke center = neighbours dir 0,2,4 → slots {0,2,4} → D (3-way Y).
         assert_eq!(road_mask(Hex::ZERO), 0b010101);
-        assert_eq!(road_tile_for(road_mask(Hex::ZERO)).unwrap().0, "tiles/roads/hex_road_D.gltf");
+        assert_eq!(
+            road_tile_for(road_mask(Hex::ZERO)).unwrap().0,
+            "tiles/roads/hex_road_D.gltf"
+        );
     }
 
     #[test]
     fn autotiler_covers_every_mask() {
         // Completeness: every non-zero 6-bit connection mask maps to some tile.
         for mask in 1u8..0b100_0000 {
-            assert!(road_tile_for(mask).is_some(), "no tile for mask {mask:#08b}");
+            assert!(
+                road_tile_for(mask).is_some(),
+                "no tile for mask {mask:#08b}"
+            );
         }
     }
 
@@ -682,7 +728,11 @@ mod tests {
         assert!(is_tower(Hex::new(5, -5)));
         assert!(is_tower(Hex::new(-5, 0)));
         // Gate posts (the gate's wall-ring neighbours) = towers.
-        let posts = Hex::new(5, 0).neighbors().iter().filter(|h| is_tower(**h)).count();
+        let posts = Hex::new(5, 0)
+            .neighbors()
+            .iter()
+            .filter(|h| is_tower(**h))
+            .count();
         assert!(posts >= 1, "a gate must be flanked by towers");
         // A non-gate ring hex resolves to a wall; inner hexes are not fortifications.
         assert!(wall_at(Hex::new(5, -2)).is_some());
@@ -701,7 +751,9 @@ mod tests {
 
     #[test]
     fn npc_stations_cover_all_lineup_spots() {
-        let anchor = RpgVillageAnchor { center: Vec3::new(16.0, 5.0, 16.0) };
+        let anchor = RpgVillageAnchor {
+            center: Vec3::new(16.0, 5.0, 16.0),
+        };
         let stations = npc_stations(&anchor);
         assert_eq!(stations.len(), CIVIC_LANDMARKS.len() + 1); // civic buildings + the well
     }

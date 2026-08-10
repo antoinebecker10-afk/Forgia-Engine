@@ -29,10 +29,8 @@ use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::{QueryFilter, ReadRapierContext};
 use forgia_anim_locomotion::{
     LocomotionBoneCache, LocomotionDriver, LocomotionState, LocomotionTarget, LocomotionTemplate,
-    ProcBodyAnim,
-    AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP,
-    IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP, LEAN_FORWARD_AMP, ROLL_WADDLE_AMP, WALK_BOB_AMP,
-    WALK_FREQ,
+    ProcBodyAnim, AIRBORNE_VY_THRESHOLD, FALL_STRETCH_AMP, IDLE_SPEED_THRESHOLD, JUMP_SQUASH_AMP,
+    LEAN_FORWARD_AMP, ROLL_WADDLE_AMP, WALK_BOB_AMP, WALK_FREQ,
 };
 use forgia_auto_rig::{AutoRigGizmosConfig, AutoRigTemplate, NeedsAutoRig};
 use forgia_camera_orbit::OrbitCamera;
@@ -304,18 +302,21 @@ pub(crate) fn spawn_character_lineup(
 
     for (i, (name, glb_path, greeting)) in LINEUP_CHARACTERS.iter().enumerate() {
         // Station dédiée si elle existe, sinon arc autour du puits (fallback).
-        let (px, pz, yaw) = if let Some((_, xz, syaw)) =
-            stations.iter().find(|(s, _, _)| *s == *name)
-        {
-            (xz.x, xz.y, *syaw)
-        } else {
-            let t = if n > 1 { i as f32 / (n as f32 - 1.0) } else { 0.5 };
-            let angle = start_angle + t * spread;
-            let px = center.x + angle.cos() * RADIUS;
-            let pz = center.z + angle.sin() * RADIUS;
-            let yaw = (px - center.x).atan2(pz - center.z);
-            (px, pz, yaw)
-        };
+        let (px, pz, yaw) =
+            if let Some((_, xz, syaw)) = stations.iter().find(|(s, _, _)| *s == *name) {
+                (xz.x, xz.y, *syaw)
+            } else {
+                let t = if n > 1 {
+                    i as f32 / (n as f32 - 1.0)
+                } else {
+                    0.5
+                };
+                let angle = start_angle + t * spread;
+                let px = center.x + angle.cos() * RADIUS;
+                let pz = center.z + angle.sin() * RADIUS;
+                let yaw = (px - center.x).atan2(pz - center.z);
+                (px, pz, yaw)
+            };
         let mut ent = commands.spawn((
             LineupCharacter,
             LineupName(name.to_string()),

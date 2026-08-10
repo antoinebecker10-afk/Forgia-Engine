@@ -2,8 +2,9 @@
 //!
 //! ## ⚠ État réel des shaders (story-593, audit 2026-06-10)
 //!
-//! **2 effets RÉELS** : `toon` (cel-shading, wired Roguelite) et `outline`
-//! (Sobel — écrit mais plugin désactivé, crash wgpu, cf forgia-mode-roguelite).
+//! **1 pipeline RÉEL** : `toon`, qui combine cel-shading et contour Sobel dans
+//! une passe unique. Ne pas réactiver `outline` comme seconde passe : cette
+//! composition a provoqué un crash wgpu (cf. forgia-mode-roguelite).
 //! **43 effets = STUBS passthrough** : la plomberie Rust (Settings/Plugin/macro)
 //! existe, mais leurs `.wgsl` contiennent `TODO: implement` et rendent l'image
 //! inchangée (× strength). Activer leur plugin ne produit AUCUN effet visuel.
