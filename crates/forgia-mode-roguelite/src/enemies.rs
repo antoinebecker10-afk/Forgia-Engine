@@ -44,6 +44,22 @@ impl EnemyArchetype {
             Self::Boss => "boss",
         }
     }
+
+    /// Teinte de la traînée d'envol (2026-08-05). Chaque famille laisse sa
+    /// propre signature lumineuse en montant — on lit QUI vient de mourir sans
+    /// avoir vu le kill. Valeurs HDR (>1) : c'est de la lumière, pas un albédo.
+    pub fn ascension_tint(self) -> LinearRgba {
+        match self {
+            // Braise rouge — la masse qui tombe.
+            Self::Tank => LinearRgba::new(4.0, 1.1, 0.5, 1.0),
+            // Teal vif — le rusher, la même famille que les âmes.
+            Self::Runner => LinearRgba::new(0.5, 3.0, 3.4, 1.0),
+            // Violet froid — le tireur embusqué.
+            Self::Sniper => LinearRgba::new(2.4, 0.9, 4.0, 1.0),
+            // Or massif — le boss part en majesté.
+            Self::Boss => LinearRgba::new(4.5, 3.4, 1.2, 1.0),
+        }
+    }
 }
 
 /// Stats d'un archetype — data-driven (genome `roguelite_enemies.toml`, hot-reload).

@@ -16,6 +16,7 @@
 
 use bevy::prelude::*;
 use bevy::time::Real;
+use bevy::window::PrimaryWindow;
 use bevy_rapier3d::prelude::Collider;
 use forgia_core::prelude::*;
 use forgia_effects::pipeline_ready::PipelineCacheStats;
@@ -67,6 +68,7 @@ pub struct LoadTimingState {
     last_pipeline_waiting: usize,
     recent: Vec<FreezeRec>,
     total_freezes: u64,
+    ignored_unfocused: u64,
 }
 
 /// Mesure non-intrusive : compte entités + colliders chaque frame, attribue et
@@ -77,6 +79,7 @@ pub fn sys_load_timing(
     q_all: Query<Entity>,
     q_col: Query<(), With<Collider>>,
     pipelines: Option<Res<PipelineCacheStats>>,
+    primary_window: Query<&Window, With<PrimaryWindow>>,
     mut st: ResMut<LoadTimingState>,
 ) {
     let entities = q_all.iter().count();
@@ -91,6 +94,10 @@ pub fn sys_load_timing(
     st.last_pipeline_waiting = pipeline_waiting;
 
     if *app_state.get() != AppMode::InGame || dt_ms <= FREEZE_MS {
+        return;
+    }
+    if primary_window.single().is_ok_and(|window| !window.focused) {
+        st.ignored_unfocused = st.ignored_unfocused.saturating_add(1);
         return;
     }
 
@@ -136,8 +143,8 @@ pub fn sys_load_timing(
     events.push(']');
 
     let json = format!(
-        r#"{{"id":"load_timing","threshold_ms":{:.0},"total_freezes":{},"entities_now":{},"colliders_now":{},"recent":{}}}"#,
-        FREEZE_MS, st.total_freezes, entities, colliders, events
+        r#"{{"id":"load_timing","threshold_ms":{:.0},"total_freezes":{},"ignored_unfocused":{},"entities_now":{},"colliders_now":{},"recent":{}}}"#,
+        FREEZE_MS, st.total_freezes, st.ignored_unfocused, entities, colliders, events
     );
     let _ = forgia_core::sensor_io::enqueue("forgia2_load_timing.json", json);
 }

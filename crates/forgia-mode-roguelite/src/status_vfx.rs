@@ -40,10 +40,10 @@
 //! panache au-dessus = visibles.
 
 use bevy::prelude::*;
-use forgia_enemy_nameplate::{NameplateRoot, NameplateSight};
 use bevy_hanabi::{EffectAsset, EffectSpawner};
 use forgia_effects::prelude::{EffectMaterial, ParticleEffect, WeaponVfxEffects};
 use forgia_enemy_nameplate::{EnemyNameplate, NameplateRegistry};
+use forgia_enemy_nameplate::{NameplateRoot, NameplateSight};
 
 use crate::element_vfx::ElementVfxStats;
 use crate::elements::{Element, ElementConfig, StatusBurn, StatusPoison};
@@ -623,7 +623,6 @@ pub fn sys_detach_shock_vfx(
         }
     }
 }
-
 
 // ─── Plaques de nom gouvernées par la ligne de vue ───────────────────────────
 

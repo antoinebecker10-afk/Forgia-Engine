@@ -356,7 +356,8 @@ casse = "palette_qui_n_existe_pas"
     /// Un génome sans `inferno` ne doit pas priver le repli de sa palette.
     #[test]
     fn the_fallback_palette_is_always_present() {
-        let c = DecorPalettesConfig::parse_toml("[palettes.autre]\nname = \"x\"\nbig = [\"a.glb\"]");
+        let c =
+            DecorPalettesConfig::parse_toml("[palettes.autre]\nname = \"x\"\nbig = [\"a.glb\"]");
         assert!(c.palettes.contains_key(FALLBACK_PALETTE));
         assert!(c.palettes.contains_key("autre"));
     }
@@ -375,9 +376,14 @@ casse = "palette_qui_n_existe_pas"
             .expect("roguelite_palettes.toml introuvable depuis la crate ET depuis la racine");
         let c = DecorPalettesConfig::parse_toml(&content);
         for id in ["inferno", "donjon", "paturages", "bourg"] {
-            let p = c.palette(id).unwrap_or_else(|| panic!("palette {id} absente"));
+            let p = c
+                .palette(id)
+                .unwrap_or_else(|| panic!("palette {id} absente"));
             assert!(!p.name.is_empty(), "{id} doit avoir un nom lisible");
-            assert!(!p.big.is_empty(), "{id} doit avoir des masses de remplissage");
+            assert!(
+                !p.big.is_empty(),
+                "{id} doit avoir des masses de remplissage"
+            );
             assert!(!p.scatter.is_empty(), "{id} doit avoir du semis au sol");
         }
         for stage in [
@@ -506,9 +512,7 @@ mod wall_prop_shape_tests {
         let thin = m.size.x.min(m.size.z);
         let wide = m.size.x.max(m.size.z);
         assert!(
-            m.height_m >= TALL_M
-                && thin / wide < THIN_RATIO
-                && thin < STANDS_ALONE_THICKNESS_M,
+            m.height_m >= TALL_M && thin / wide < THIN_RATIO && thin < STANDS_ALONE_THICKNESS_M,
             "la bannière ({thin:.2} × {wide:.2} × {:.2}) devrait être détectée comme murale",
             m.height_m
         );
@@ -557,7 +561,11 @@ mod wall_props_coverage_tests {
     fn every_wall_prop_exists_and_is_measured() {
         let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
         let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
-        let root = if std::fs::metadata("assets").is_ok() { "assets" } else { "../../assets" };
+        let root = if std::fs::metadata("assets").is_ok() {
+            "assets"
+        } else {
+            "../../assets"
+        };
         let mut faults = Vec::new();
         for (id, p) in &cfg.palettes {
             for path in &p.wall_props {
@@ -568,7 +576,11 @@ mod wall_props_coverage_tests {
                 }
             }
         }
-        assert!(faults.is_empty(), "décor mural invalide :\n{}", faults.join("\n"));
+        assert!(
+            faults.is_empty(),
+            "décor mural invalide :\n{}",
+            faults.join("\n")
+        );
     }
 }
 

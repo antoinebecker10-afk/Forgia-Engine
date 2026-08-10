@@ -453,9 +453,15 @@ tiles = ["a.glb", "b.glb", "c.glb"]
 "#,
         );
         assert!(!c.floors.contains_key("bancal"));
-        assert!(!c.floors.contains_key("trop_fin"), "un pas de 0,1 m = 2,5 M de tuiles");
+        assert!(
+            !c.floors.contains_key("trop_fin"),
+            "un pas de 0,1 m = 2,5 M de tuiles"
+        );
         assert!(c.floors.contains_key("bon"));
-        assert!(c.floors.contains_key(FALLBACK_FLOOR), "le repli est garanti");
+        assert!(
+            c.floors.contains_key(FALLBACK_FLOOR),
+            "le repli est garanti"
+        );
     }
 
     /// L'horloge de run : l'univers suit la profondeur, puis boucle.
@@ -540,10 +546,18 @@ shuffle_start_by_seed = true
             .or_else(|_| fs::read_to_string(format!("../../{GENOME_PATH}")))
             .expect("roguelite_ambiances.toml introuvable");
         let c = AmbiancesConfig::parse_toml(&content);
-        assert!(c.ambiances.len() >= 6, "seulement {} univers", c.ambiances.len());
+        assert!(
+            c.ambiances.len() >= 6,
+            "seulement {} univers",
+            c.ambiances.len()
+        );
         assert!(c.rotation.order.len() >= 6, "rotation trop courte");
 
-        let root = if fs::metadata("assets").is_ok() { "assets" } else { "../../assets" };
+        let root = if fs::metadata("assets").is_ok() {
+            "assets"
+        } else {
+            "../../assets"
+        };
         let missing: Vec<&String> = c
             .all_floor_paths()
             .iter()
@@ -553,7 +567,10 @@ shuffle_start_by_seed = true
             .leak()
             .iter()
             .collect();
-        assert!(missing.is_empty(), "tuiles de sol absentes du disque : {missing:#?}");
+        assert!(
+            missing.is_empty(),
+            "tuiles de sol absentes du disque : {missing:#?}"
+        );
 
         // Chaque ambiance doit pointer un sol RÉEL, pas retomber en silence.
         for (id, a) in &c.ambiances {

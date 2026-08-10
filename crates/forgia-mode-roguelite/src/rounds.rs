@@ -177,11 +177,7 @@ impl RoundsConfig {
             enabled: t.boucle.enabled.unwrap_or(d.enabled),
             max_rounds: t.boucle.max_rounds.unwrap_or(d.max_rounds).min(10_000),
             // ≥ 1.0 : une croissance < 1 rendrait le round 10 plus facile que le 1.
-            hp_growth: t
-                .menace
-                .pv_par_round
-                .unwrap_or(d.hp_growth)
-                .clamp(1.0, 2.0),
+            hp_growth: t.menace.pv_par_round.unwrap_or(d.hp_growth).clamp(1.0, 2.0),
             damage_growth: t
                 .menace
                 .degats_par_round
@@ -289,8 +285,7 @@ impl RoundsConfig {
         let tiers = (round / self.tier_every) as i32;
         Threat {
             hp: self.hp_growth.powi(round as i32) * self.tier_hp_step.powi(tiers),
-            damage: self.damage_growth.powi(round as i32)
-                * self.tier_damage_step.powi(tiers),
+            damage: self.damage_growth.powi(round as i32) * self.tier_damage_step.powi(tiers),
         }
     }
 
@@ -357,8 +352,7 @@ impl RoundsConfig {
     /// « pas de mur », c'est « le mur est hors de portée » — le distinguer évite
     /// de lire un `0` comme un succès.
     pub fn wall_round(&self, uptake: f32) -> Option<u32> {
-        (0..WALL_SEARCH_LIMIT)
-            .find(|&r| self.time_to_clear(r, uptake) > self.round_time_budget_s)
+        (0..WALL_SEARCH_LIMIT).find(|&r| self.time_to_clear(r, uptake) > self.round_time_budget_s)
     }
 
     /// Marge du round courant : `1 - ttk / budget`. Négatif = le mur est franchi.
@@ -659,7 +653,11 @@ mod tests {
             let a = c.threat(r);
             let b = c.threat(r + 1);
             assert!(b.hp > a.hp, "plateau de pv entre {r} et {}", r + 1);
-            assert!(b.damage > a.damage, "plateau de dégâts entre {r} et {}", r + 1);
+            assert!(
+                b.damage > a.damage,
+                "plateau de dégâts entre {r} et {}",
+                r + 1
+            );
         }
     }
 
@@ -685,8 +683,12 @@ mod tests {
     #[test]
     fn upgrading_pushes_the_wall_far_enough_to_matter() {
         let c = RoundsConfig::default();
-        let lazy = c.wall_round(0.0).expect("un joueur qui ne prend rien DOIT buter");
-        let diligent = c.wall_round(1.0).expect("le mur doit exister même en jouant bien");
+        let lazy = c
+            .wall_round(0.0)
+            .expect("un joueur qui ne prend rien DOIT buter");
+        let diligent = c
+            .wall_round(1.0)
+            .expect("le mur doit exister même en jouant bien");
         assert!(
             diligent > lazy,
             "prendre les récompenses ne repousse pas le mur ({lazy} → {diligent})"
@@ -711,7 +713,10 @@ mod tests {
     #[test]
     fn the_early_rounds_are_clearable_without_any_upgrade() {
         let c = RoundsConfig::default();
-        assert!(c.margin(0, 0.0) > 0.0, "le round 0 doit passer les mains nues");
+        assert!(
+            c.margin(0, 0.0) > 0.0,
+            "le round 0 doit passer les mains nues"
+        );
         assert!(c.margin(1, 0.0) > 0.0, "le round 1 aussi");
     }
 
@@ -720,7 +725,10 @@ mod tests {
     fn the_margin_flips_sign_exactly_at_the_wall() {
         let c = RoundsConfig::default();
         let wall = c.wall_round(0.5).expect("mur attendu");
-        assert!(c.margin(wall, 0.5) < 0.0, "au mur, la marge doit être négative");
+        assert!(
+            c.margin(wall, 0.5) < 0.0,
+            "au mur, la marge doit être négative"
+        );
         assert!(
             c.margin(wall - 1, 0.5) >= 0.0,
             "juste avant le mur, la marge doit être positive"
@@ -742,8 +750,14 @@ budget_temps_round_s = 0.0
 dps_reference = 0.0
 "#,
         );
-        assert!(c.hp_growth >= 1.0, "croissance < 1 = round 10 plus facile que le 1");
-        assert!(c.tier_every >= 1, "palier tous les 0 rounds = division par zéro");
+        assert!(
+            c.hp_growth >= 1.0,
+            "croissance < 1 = round 10 plus facile que le 1"
+        );
+        assert!(
+            c.tier_every >= 1,
+            "palier tous les 0 rounds = division par zéro"
+        );
         assert!(c.tier_hp_step >= 1.0);
         assert!(c.dps_reference > 0.0);
         // Et la courbe reste monotone malgré l'hostilité.
@@ -792,9 +806,17 @@ mod pace_tests {
     fn the_three_states_land_on_their_thresholds() {
         assert_eq!(pace_from_elapsed(0.0, 90.0), Pace::Holding);
         assert_eq!(pace_from_elapsed(53.0, 90.0), Pace::Holding);
-        assert_eq!(pace_from_elapsed(54.0, 90.0), Pace::Pressured, "60 % du budget");
+        assert_eq!(
+            pace_from_elapsed(54.0, 90.0),
+            Pace::Pressured,
+            "60 % du budget"
+        );
         assert_eq!(pace_from_elapsed(89.0, 90.0), Pace::Pressured);
-        assert_eq!(pace_from_elapsed(90.0, 90.0), Pace::Falling, "au budget = le mur");
+        assert_eq!(
+            pace_from_elapsed(90.0, 90.0),
+            Pace::Falling,
+            "au budget = le mur"
+        );
         assert_eq!(pace_from_elapsed(300.0, 90.0), Pace::Falling);
     }
 
@@ -817,7 +839,11 @@ mod pace_tests {
                 assert!(p.trend(90.0).is_none(), "{} round(s) : trop tôt", i + 1);
             }
         }
-        assert_eq!(p.trend(90.0), Some(Pace::Holding), "moyenne 40 s sur 90 = ça tient");
+        assert_eq!(
+            p.trend(90.0),
+            Some(Pace::Holding),
+            "moyenne 40 s sur 90 = ça tient"
+        );
     }
 
     /// La tendance suit les DERNIERS rounds, pas toute la run : décrocher
@@ -844,7 +870,10 @@ mod pace_tests {
         let mut p = RoundPace::default();
         p.combat_secs = 0.0;
         p.finish_round(1);
-        assert!(p.cleared.is_empty(), "une respiration n'est pas une performance");
+        assert!(
+            p.cleared.is_empty(),
+            "une respiration n'est pas une performance"
+        );
     }
 
     /// Les libellés sont le message : ils doivent dire QUOI FAIRE.
@@ -916,7 +945,10 @@ mod chapter_step_tests {
         let mut precedent = cfg.threat_at(1, 0).hp;
         for chapitre in 2..=CHAPTERS_PER_BOOK {
             let hp = cfg.threat_at(chapitre, 0).hp;
-            assert!(hp > precedent, "chapitre {chapitre} pas plus dur que le précédent");
+            assert!(
+                hp > precedent,
+                "chapitre {chapitre} pas plus dur que le précédent"
+            );
             assert!(
                 (hp / precedent - cfg.chapter_hp_step).abs() < 1e-4,
                 "l'écart entre chapitres doit être celui du génome"

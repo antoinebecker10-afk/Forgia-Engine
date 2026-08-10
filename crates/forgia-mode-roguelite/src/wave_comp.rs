@@ -382,7 +382,12 @@ const ARCHETYPE_ORDER: [EnemyArchetype; 4] = [
 /// Invariant non négociable : le total est **toujours >= 1**. Une vague à 0 ennemi
 /// ne déclencherait jamais `seen_alive`, donc la salle ne se nettoierait jamais et
 /// la run se figerait (`waves::clear_detection_armed`).
-pub fn compose(cfg: &WaveCompConfig, wave: u8, kind: Option<StageKind>, density: f32) -> Vec<CompLine> {
+pub fn compose(
+    cfg: &WaveCompConfig,
+    wave: u8,
+    kind: Option<StageKind>,
+    density: f32,
+) -> Vec<CompLine> {
     let base = cfg.base_for(wave);
     let mods = cfg.mods_for(kind);
     // Salle sans combat : rien à spawner, et surtout PAS de plancher.
@@ -506,7 +511,10 @@ mod tests {
         let event = compose(&c, 1, Some(StageKind::Event), 1.0);
         assert_ne!(combat, elite, "Élite doit différer de Combat");
         assert_ne!(combat, event, "Événement doit différer de Combat");
-        assert_ne!(elite, event, "Élite et Événement doivent différer entre eux");
+        assert_ne!(
+            elite, event,
+            "Élite et Événement doivent différer entre eux"
+        );
 
         let tanks = |l: &[CompLine]| {
             l.iter()
@@ -533,7 +541,12 @@ mod tests {
         assert!(s0 < s1 && s1 <= s2, "la densité monte avec la profondeur");
         // Garde-fou de budget de frame.
         let insane = total(&compose(&c, 1, Some(StageKind::Combat), 100.0));
-        let capped = total(&compose(&c, 1, Some(StageKind::Combat), c.density.max_factor));
+        let capped = total(&compose(
+            &c,
+            1,
+            Some(StageKind::Combat),
+            c.density.max_factor,
+        ));
         assert_eq!(insane, capped, "densité bornée par max_factor");
     }
 
@@ -585,7 +598,10 @@ mod tests {
             StageKind::Shop,
             StageKind::Treasure,
         ] {
-            assert!(room_spawns_enemies(&c, Some(k)), "{k:?} doit faire combattre");
+            assert!(
+                room_spawns_enemies(&c, Some(k)),
+                "{k:?} doit faire combattre"
+            );
             assert!(total(&compose(&c, 1, Some(k), 1.0)) >= 1, "{k:?} non vide");
         }
         // Graph absent → prudence : on ne vide jamais une salle par accident.
@@ -643,7 +659,11 @@ mod tests {
             .or_else(|_| std::fs::read_to_string(format!("../../{GENOME_PATH}")))
             .expect("roguelite_waves.toml introuvable depuis la crate ET depuis la racine");
         let c = WaveCompConfig::parse_toml(&content);
-        assert_eq!(c, WaveCompConfig::default(), "le TOML est le miroir du Rust");
+        assert_eq!(
+            c,
+            WaveCompConfig::default(),
+            "le TOML est le miroir du Rust"
+        );
     }
 
     #[test]
@@ -652,7 +672,10 @@ mod tests {
         let r1 = compose(&c, 1, Some(StageKind::Combat), 1.0);
         let r2 = compose(&c, 2, Some(StageKind::Combat), 1.0);
         let radius = |l: &[CompLine], a: EnemyArchetype| {
-            l.iter().find(|(x, _, _)| *x == a).map(|(_, _, r)| *r).unwrap()
+            l.iter()
+                .find(|(x, _, _)| *x == a)
+                .map(|(_, _, r)| *r)
+                .unwrap()
         };
         assert!(
             radius(&r2, EnemyArchetype::Tank) > radius(&r1, EnemyArchetype::Tank),
@@ -664,7 +687,7 @@ mod tests {
 #[cfg(test)]
 mod ring_reach_tests {
     use super::*;
-    use crate::enemies::{EnemyStatsConfig, EnemyArchetype};
+    use crate::enemies::{EnemyArchetype, EnemyStatsConfig};
 
     /// Story-686 — **un ennemi doit pouvoir VOIR le joueur en apparaissant.**
     ///

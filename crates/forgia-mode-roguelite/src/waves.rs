@@ -294,7 +294,10 @@ impl WaveSpawnConfigs<'_, '_> {
     ///
     /// Absent (arène pas encore bâtie) → `0` = aucune borne, comportement d'avant.
     pub fn arena_radius(&self) -> f32 {
-        self.stage_result.as_deref().map(|r| r.extent_m).unwrap_or(0.0)
+        self.stage_result
+            .as_deref()
+            .map(|r| r.extent_m)
+            .unwrap_or(0.0)
     }
 
     /// Contexte de spawn pour une vague donnée.
@@ -395,9 +398,7 @@ pub fn spawn_wave_enemies(
     // Graine de placement : RUN × salle × vague. Avant story-669 c'était
     // `WAVE_BASE_SEED ^ wave` — une CONSTANTE : le joueur mémorisait en 2 runs où
     // arrivent les 3 Tanks, et deux runs différentes étaient superposables.
-    let place_seed = ctx
-        .run_seed
-        .rotate_left(u32::from(ctx.stage) % 64)
+    let place_seed = ctx.run_seed.rotate_left(u32::from(ctx.stage) % 64)
         ^ u64::from(wave).wrapping_mul(0xBF58_476D_1CE4_E5B9)
         ^ WAVE_BASE_SEED;
     let mut yaw_rng = Xoshiro256StarStar::seed_from_u64(place_seed);
@@ -484,6 +485,13 @@ pub fn spawn_wave_enemies(
                     // « haut de capsule + 0.6 » plaçait le nameplate dans le crâne du
                     // Runner et 2 m au-dessus du Boss (capsule décalibrée du mesh).
                     forgia_enemy_nameplate::NameplateAnchor(head_y_offset + head_radius + 0.35),
+                    // 2026-08-05 — ce corps S'ENVOLE à sa mort (reprise du RPG V1)
+                    // au lieu de disparaître. Ce marqueur fait aussi que
+                    // `despawn_dead_cubes` (forgia-fps) laisse passer : c'est
+                    // `sys_start_death_ascension` qui prend la main.
+                    forgia_effects::prelude::AscendsOnDeath {
+                        tint: archetype.ascension_tint(),
+                    },
                 ))
                 .id();
             // Body collider (capsule), classified HitZone::Body par défaut.
@@ -694,8 +702,8 @@ pub fn sys_wave_orchestrator(
             wave.in_break = true;
             wave.break_secs_left = BREAK_SECS;
             commands.queue(|world: &mut World| {
-                let mut q =
-                    world.query_filtered::<&mut forgia_damage::Health, With<forgia_player::Player>>();
+                let mut q = world
+                    .query_filtered::<&mut forgia_damage::Health, With<forgia_player::Player>>();
                 if let Ok(mut hp) = q.single_mut(world) {
                     hp.current = hp.max;
                 }
@@ -1042,7 +1050,14 @@ mod tests {
         spawn_wave_enemies(
             &mut commands,
             &asset_server,
-            &cfgs.ctx(1, 0, Some(forgia_stage::graph::StageKind::Combat), 1.0, 0, &obstacles),
+            &cfgs.ctx(
+                1,
+                0,
+                Some(forgia_stage::graph::StageKind::Combat),
+                1.0,
+                0,
+                &obstacles,
+            ),
         );
         *spawned = true;
     }
@@ -1108,7 +1123,10 @@ mod tests {
             ..Default::default()
         };
         arm_non_combat_room(&mut w, &comp, 2);
-        assert!(!w.seen_alive, "une salle de combat garde son gate anti-race");
+        assert!(
+            !w.seen_alive,
+            "une salle de combat garde son gate anti-race"
+        );
         assert_eq!(w.current_wave, 1);
     }
 
@@ -1190,7 +1208,11 @@ mod tests {
     /// un gène, quelqu'un le changera.
     #[test]
     fn the_boss_arena_holds_for_other_chapter_shapes() {
-        assert_eq!(boss_arena_for(10, 1), 9, "1 combat par arène → 9 arènes puis le boss");
+        assert_eq!(
+            boss_arena_for(10, 1),
+            9,
+            "1 combat par arène → 9 arènes puis le boss"
+        );
         assert_eq!(boss_arena_for(4, 3), 1, "3 combats puis le boss");
         assert_eq!(boss_arena_for(1, 3), 0, "chapitre réduit au boss");
         assert_eq!(boss_arena_for(0, 3), 0, "pas de round de combat");
@@ -1258,7 +1280,11 @@ mod tests {
             is_boss_arena: true,
             ..Default::default()
         };
-        assert_eq!(boss.round(3), 10, "le boss ferme le chapitre, il ne le dépasse pas");
+        assert_eq!(
+            boss.round(3),
+            10,
+            "le boss ferme le chapitre, il ne le dépasse pas"
+        );
 
         // Sans le drapeau, on retombe sur le défaut : la preuve que c'est bien
         // lui qui sépare « composition » de « indice de combat ».
@@ -1266,7 +1292,11 @@ mod tests {
             is_boss_arena: false,
             ..boss
         };
-        assert_eq!(sans_drapeau.round(3), 12, "c'est exactement le défaut observé");
+        assert_eq!(
+            sans_drapeau.round(3),
+            12,
+            "c'est exactement le défaut observé"
+        );
     }
 
     /// Et l'arène du boss se marque toute seule en y entrant — personne n'a à
@@ -1661,8 +1691,14 @@ mod recolte_tests {
     /// doit rien changer par sa seule existence.
     #[test]
     fn no_boon_means_the_bare_reward() {
-        assert_eq!(recolte(crate::run::SOULS_PER_WAVE, 1.0), crate::run::SOULS_PER_WAVE);
-        assert_eq!(recolte(crate::run::SOULS_PER_BOSS, 1.0), crate::run::SOULS_PER_BOSS);
+        assert_eq!(
+            recolte(crate::run::SOULS_PER_WAVE, 1.0),
+            crate::run::SOULS_PER_WAVE
+        );
+        assert_eq!(
+            recolte(crate::run::SOULS_PER_BOSS, 1.0),
+            crate::run::SOULS_PER_BOSS
+        );
     }
 
     /// Un atout de récolte rapporte VRAIMENT plus.
@@ -1707,7 +1743,11 @@ mod arena_clamp_tests {
         // Joueur collé au mur (x = 78), anneau sniper 50 m vers l'extérieur.
         let voulu = Vec2::new(128.0, 0.0);
         let pose = clamp_into_arena(voulu, arena, 0.4);
-        assert!(pose.length() <= arena, "dans l'enceinte : {}", pose.length());
+        assert!(
+            pose.length() <= arena,
+            "dans l'enceinte : {}",
+            pose.length()
+        );
         assert!(pose.length() > 0.0, "et pas ramené au centre");
     }
 
@@ -1719,7 +1759,10 @@ mod arena_clamp_tests {
         let pose = clamp_into_arena(voulu, 50.0, 0.4);
         let a = voulu.normalize();
         let b = pose.normalize();
-        assert!((a.x - b.x).abs() < 1e-4 && (a.y - b.y).abs() < 1e-4, "{a:?} vs {b:?}");
+        assert!(
+            (a.x - b.x).abs() < 1e-4 && (a.y - b.y).abs() < 1e-4,
+            "{a:?} vs {b:?}"
+        );
     }
 
     /// Un point DÉJÀ dedans n'est pas touché : la borne ne doit pas resserrer

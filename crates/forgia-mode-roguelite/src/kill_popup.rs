@@ -119,7 +119,10 @@ pub fn draw_kill_popups(
         } else {
             (1.0 - (lifetime_t - 0.5) / 0.5).max(0.0)
         };
-        let size = 30.0 * pop_scale;
+        // 🚨 `ease_out_back(0)` vaut 0 : sans plancher, la frame de naissance du
+        // pop demandait une police de taille NULLE et epaint faisait tomber le
+        // jeu (« Bad px_scale_factor: 0 »). Observé en jeu le 2026-08-06.
+        let size = forgia_ui_lib::style::anim_font_px(30.0 * pop_scale);
         let mut color = p.color;
         color = egui::Color32::from_rgba_unmultiplied(
             color.r(),

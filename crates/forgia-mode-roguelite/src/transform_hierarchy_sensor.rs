@@ -154,7 +154,10 @@ pub fn sys_capture_transform_lag_roots(
     }
     history.recent.push_back(snapshot);
 
-    let latest = history.recent.back().expect("just pushed transform lag snapshot");
+    let latest = history
+        .recent
+        .back()
+        .expect("just pushed transform lag snapshot");
     let recent_json = history
         .recent
         .iter()
@@ -170,10 +173,7 @@ pub fn sys_capture_transform_lag_roots(
     // post-mortem de plusieurs pics au lieu du seul dernier.
     let json = format!(
         r#"{{"id":"transform_lag","timestamp_secs":{:.2},"dt_ms":{:.2},"changed_transforms":{},"roots":[{}],"recent":[{recent_json}]}}"#,
-        latest.timestamp_secs,
-        latest.dt_ms,
-        latest.changed_transforms,
-        latest.roots_json,
+        latest.timestamp_secs, latest.dt_ms, latest.changed_transforms, latest.roots_json,
     );
     let _ = forgia_core::sensor_io::enqueue(LAG_SENSOR_PATH, json);
 }

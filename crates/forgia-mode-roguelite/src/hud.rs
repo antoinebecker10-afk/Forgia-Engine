@@ -112,7 +112,6 @@ pub(crate) fn run_progress_label(
     format!("{progress}  ·  VAGUE {current_wave} / {waves_per_stage}")
 }
 
-
 pub(crate) fn draw_wave_counter(
     mut contexts: EguiContexts,
     app_state: Res<State<AppMode>>,
@@ -174,9 +173,8 @@ pub(crate) fn draw_wave_counter(
         .as_deref()
         .map(|b| b.tag_progress())
         .unwrap_or_default();
-    let panel_h = 78.0
-        + if show_pace { 24.0 } else { 0.0 }
-        + if synergies.is_empty() { 0.0 } else { 22.0 };
+    let panel_h =
+        78.0 + if show_pace { 24.0 } else { 0.0 } + if synergies.is_empty() { 0.0 } else { 22.0 };
     let center_x = screen.center().x;
     let top_y = screen.min.y + 18.0;
     let panel_rect = egui::Rect::from_min_size(
@@ -279,32 +277,32 @@ pub(crate) fn draw_wave_counter(
                 1.5,
             );
         } else {
-        // La triade HP, pas un 4e code couleur : le joueur lit déjà
-        // vert/jaune/rouge comme « ça va / attention / danger ». Réutiliser son
-        // vocabulaire coûte zéro apprentissage.
-        let color = match now {
-            crate::rounds::Pace::Holding => C_HP_HIGH,
-            crate::rounds::Pace::Pressured => C_HP_MID,
-            crate::rounds::Pace::Falling => C_HP_LOW,
-        };
-        // La tendance ne s'affiche qu'une fois qu'elle veut dire quelque chose —
-        // sur un seul round, « tu décroches » serait du bruit.
-        let trend = pace.trend(budget);
-        let text = match trend {
-            Some(t) if t != now => {
-                format!("{}   ·   3 DERNIERS : {}", now.label(), t.label())
-            }
-            _ => now.label().to_string(),
-        };
-        text_with_outline(
-            &painter,
-            egui::pos2(center_x, top_y + 80.0),
-            egui::Align2::CENTER_CENTER,
-            &text,
-            display_font(15.0),
-            color,
-            1.5,
-        );
+            // La triade HP, pas un 4e code couleur : le joueur lit déjà
+            // vert/jaune/rouge comme « ça va / attention / danger ». Réutiliser son
+            // vocabulaire coûte zéro apprentissage.
+            let color = match now {
+                crate::rounds::Pace::Holding => C_HP_HIGH,
+                crate::rounds::Pace::Pressured => C_HP_MID,
+                crate::rounds::Pace::Falling => C_HP_LOW,
+            };
+            // La tendance ne s'affiche qu'une fois qu'elle veut dire quelque chose —
+            // sur un seul round, « tu décroches » serait du bruit.
+            let trend = pace.trend(budget);
+            let text = match trend {
+                Some(t) if t != now => {
+                    format!("{}   ·   3 DERNIERS : {}", now.label(), t.label())
+                }
+                _ => now.label().to_string(),
+            };
+            text_with_outline(
+                &painter,
+                egui::pos2(center_x, top_y + 80.0),
+                egui::Align2::CENTER_CENTER,
+                &text,
+                display_font(15.0),
+                color,
+                1.5,
+            );
         }
     }
 
@@ -462,10 +460,44 @@ fn boon_visual(effect: &BoonEffectKind) -> (egui::Color32, String) {
         BoonEffectKind::Knockback { .. } => {
             (egui::Color32::from_rgb(255, 140, 60), "recul".to_string())
         }
-        BoonEffectKind::FlatBonus { stat, amount } => (
-            egui::Color32::from_rgb(200, 200, 200),
-            format!("+{amount:.0} {stat}"),
-        ),
+        // Les stats `flat_bonus` sont des FRACTIONS (0.10 = +10 %) : formater en
+        // pourcentage, jamais en entier — « +0 crit_chance » a déjà fait croire
+        // à un boon inerte (2026-08-05). Libellés joueur, pas noms de champs.
+        BoonEffectKind::FlatBonus { stat, amount } => {
+            let pct = amount * 100.0;
+            match stat.as_str() {
+                "crit_chance" => (
+                    egui::Color32::from_rgb(255, 215, 90),
+                    format!("+{pct:.0}% crit"),
+                ),
+                "headshot_mul" => (
+                    egui::Color32::from_rgb(255, 120, 120),
+                    format!("+{pct:.0}% headshot"),
+                ),
+                "reload_speed" => (
+                    egui::Color32::from_rgb(90, 200, 200),
+                    format!("+{pct:.0}% recharge"),
+                ),
+                "mag_size" => (
+                    egui::Color32::from_rgb(140, 170, 255),
+                    format!("+{pct:.0}% chargeur"),
+                ),
+                "move_speed" => (
+                    egui::Color32::from_rgb(120, 220, 140),
+                    format!("+{pct:.0}% vitesse"),
+                ),
+                "loot_gain" => (
+                    egui::Color32::from_rgb(240, 200, 100),
+                    format!("+{pct:.0}% butin"),
+                ),
+                // Stat inconnue = inerte (boons_apply la loge en error + capteur) :
+                // l'afficher brute, en gris — le gris redevient un vrai signal.
+                _ => (
+                    egui::Color32::from_rgb(200, 200, 200),
+                    format!("+{amount:.2} {stat}"),
+                ),
+            }
+        }
     }
 }
 
@@ -643,110 +675,112 @@ pub(crate) fn draw_defeat_overlay(
             // Story-558 Phase 7 — overlay cartoon kid-friendly :
             // fond bois clair (pas noir grimdark) + border or 5px + shadow stack.
             // Anti-pattern documenté audit §8 : punition cosmétique Defeat = décourage.
-            glass_frame_hero().inner_margin(egui::Margin::symmetric(80, 48)).show(ui, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(4.0);
-                    // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
-                    // (bible v1 — vocab CE2, vocabulaire poétique enfants).
-                    ui.heading(display_text("LA FORGE T'A BRISÉ", 56.0, FORGE_BRAISE).strong());
-                    ui.add_space(18.0);
-                    // Story-597 Phase B — la 1re mort ENSEIGNE la méta-boucle
-                    // (voix Maître Forgeron, ≤8 mots/ligne) ; les fois suivantes,
-                    // juste l'encouragement court. Flag persisté (FtueSave), marqué
-                    // vu à la SORTIE de l'écran (ftue::sys_mark_first_death_seen).
-                    let first_death = !ftue.first_death_recap_seen;
-                    if first_death {
-                        for line in [
-                            "Tes Âmes restent quand tu tombes.",
-                            "Dépense-les à L'Enclume.",
-                            "Reviens plus fort. Toujours.",
-                        ] {
-                            ui.add_space(6.0);
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(80, 48))
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(4.0);
+                        // Titre cartoon : "LA FORGE T'A BRISÉ" braise sur bois
+                        // (bible v1 — vocab CE2, vocabulaire poétique enfants).
+                        ui.heading(display_text("LA FORGE T'A BRISÉ", 56.0, FORGE_BRAISE).strong());
+                        ui.add_space(18.0);
+                        // Story-597 Phase B — la 1re mort ENSEIGNE la méta-boucle
+                        // (voix Maître Forgeron, ≤8 mots/ligne) ; les fois suivantes,
+                        // juste l'encouragement court. Flag persisté (FtueSave), marqué
+                        // vu à la SORTIE de l'écran (ftue::sys_mark_first_death_seen).
+                        let first_death = !ftue.first_death_recap_seen;
+                        if first_death {
+                            for line in [
+                                "Tes Âmes restent quand tu tombes.",
+                                "Dépense-les à L'Enclume.",
+                                "Reviens plus fort. Toujours.",
+                            ] {
+                                ui.add_space(6.0);
+                                ui.label(
+                                    egui::RichText::new(line)
+                                        .size(22.0)
+                                        .strong()
+                                        .color(FORGE_CREME),
+                                );
+                            }
+                        } else {
                             ui.label(
-                                egui::RichText::new(line)
+                                egui::RichText::new("Mais le marteau t'attend.")
                                     .size(22.0)
-                                    .strong()
+                                    .italics()
                                     .color(FORGE_CREME),
                             );
                         }
-                    } else {
-                        ui.label(
-                            egui::RichText::new("Mais le marteau t'attend.")
-                                .size(22.0)
-                                .italics()
-                                .color(FORGE_CREME),
-                        );
-                    }
 
-                    // Story-597 — « toute run paie » : Âmes FORGÉES cette run
-                    // (meta.earned_run), gardées. + total + Or perdu (secondaire).
-                    ui.add_space(20.0);
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "Cette run t'a forgé ◇ {} Âmes — gardées !",
-                            meta.earned_run
-                        ))
-                        .size(22.0)
-                        .strong()
-                        .color(FORGE_CHARBON)
-                        .background_color(FORGE_OR),
-                    );
-                    ui.add_space(6.0);
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "Total ◇ {} âmes  ·  Or perdu : {}",
-                            last_defeat.souls_persistent, last_defeat.or_lost
-                        ))
-                        .size(16.0)
-                        .color(FORGE_CREME),
-                    );
-                    ui.add_space(36.0);
+                        // Story-597 — « toute run paie » : Âmes FORGÉES cette run
+                        // (meta.earned_run), gardées. + total + Or perdu (secondaire).
+                        ui.add_space(20.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Cette run t'a forgé ◇ {} Âmes — gardées !",
+                                meta.earned_run
+                            ))
+                            .size(22.0)
+                            .strong()
+                            .color(FORGE_CHARBON)
+                            .background_color(FORGE_OR),
+                        );
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Total ◇ {} âmes  ·  Or perdu : {}",
+                                last_defeat.souls_persistent, last_defeat.or_lost
+                            ))
+                            .size(16.0)
+                            .color(FORGE_CREME),
+                        );
+                        ui.add_space(36.0);
 
-                    // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
-                    // Hub-menu étape 6 : le Lobby auto-lance la run (config au menu)
-                    // → ce bouton = REJOUER direct. Shopping/reconfig = Retour au menu.
-                    if cartoon_btn(ui, "↻  REJOUER", FORGE_OR).clicked() {
-                        info!("[roguelite-hud] Defeat → Lobby (rejouer, auto-start)");
-                        // Story-597 — marque le récap vu (couvre ce chemin de sortie).
-                        ftue.mark_first_death(timer.secs);
-                        next_run.set(RunState::Lobby);
-                    }
-                    // Story-597 — 1re mort : REJOUER relance sans rien dépenser
-                    // (le Lobby auto-lance). On le dit, pour ne pas promettre
-                    // une boutique qui n'est pas sur ce chemin.
-                    if first_death {
-                        ui.add_space(4.0);
-                        ui.label(
-                            egui::RichText::new("↑ tu repars sans rien acheter")
-                                .size(15.0)
-                                .italics()
-                                .color(FORGE_CREME),
-                        );
-                    }
-                    ui.add_space(10.0);
-                    if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
-                        info!("[roguelite-hud] Defeat → Menu");
-                        // Story-597 — marque aussi le récap vu sur le chemin Menu
-                        // (OnExit SubState ne fire pas ici → fix qa BUG-597-B-01).
-                        ftue.mark_first_death(timer.secs);
-                        next_app.set(AppMode::Menu);
-                        next_game.set(GameMode::None);
-                    }
-                    // La flèche guide pointe le SEUL chemin qui mène à L'Enclume :
-                    // le menu-titre. Elle était sous REJOUER, qui relance la run
-                    // sans permettre la moindre dépense — le FTUE enseignait donc
-                    // le chemin qui ne marche pas.
-                    if first_death {
-                        ui.add_space(4.0);
-                        ui.label(
-                            egui::RichText::new("↑ passe par L'Enclume, dépense tes Âmes")
-                                .size(15.0)
-                                .italics()
-                                .color(FORGE_BRAISE),
-                        );
-                    }
+                        // Story-596 — bouton cartoon partagé (forgia-ui-lib::style).
+                        // Hub-menu étape 6 : le Lobby auto-lance la run (config au menu)
+                        // → ce bouton = REJOUER direct. Shopping/reconfig = Retour au menu.
+                        if cartoon_btn(ui, "↻  REJOUER", FORGE_OR).clicked() {
+                            info!("[roguelite-hud] Defeat → Lobby (rejouer, auto-start)");
+                            // Story-597 — marque le récap vu (couvre ce chemin de sortie).
+                            ftue.mark_first_death(timer.secs);
+                            next_run.set(RunState::Lobby);
+                        }
+                        // Story-597 — 1re mort : REJOUER relance sans rien dépenser
+                        // (le Lobby auto-lance). On le dit, pour ne pas promettre
+                        // une boutique qui n'est pas sur ce chemin.
+                        if first_death {
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new("↑ tu repars sans rien acheter")
+                                    .size(15.0)
+                                    .italics()
+                                    .color(FORGE_CREME),
+                            );
+                        }
+                        ui.add_space(10.0);
+                        if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
+                            info!("[roguelite-hud] Defeat → Menu");
+                            // Story-597 — marque aussi le récap vu sur le chemin Menu
+                            // (OnExit SubState ne fire pas ici → fix qa BUG-597-B-01).
+                            ftue.mark_first_death(timer.secs);
+                            next_app.set(AppMode::Menu);
+                            next_game.set(GameMode::None);
+                        }
+                        // La flèche guide pointe le SEUL chemin qui mène à L'Enclume :
+                        // le menu-titre. Elle était sous REJOUER, qui relance la run
+                        // sans permettre la moindre dépense — le FTUE enseignait donc
+                        // le chemin qui ne marche pas.
+                        if first_death {
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new("↑ passe par L'Enclume, dépense tes Âmes")
+                                    .size(15.0)
+                                    .italics()
+                                    .color(FORGE_BRAISE),
+                            );
+                        }
+                    });
                 });
-            });
         });
 }
 
@@ -784,77 +818,80 @@ pub(crate) fn draw_victory_overlay(
             // Story-596 Phase A — miroir cartoon du Defeat (bois + or, boutons
             // partagés) : l'écran de victoire ne peut pas être moins soigné que
             // l'écran d'échec (était : noir alpha + boutons egui par défaut).
-            glass_frame_hero().inner_margin(egui::Margin::symmetric(80, 48)).show(ui, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(4.0);
-                    ui.heading(display_text("VICTOIRE !", 64.0, FORGE_OR).strong());
-                    ui.add_space(18.0);
-                    ui.label(
-                        egui::RichText::new("Le Forgeron Noir plie le genou… pour cette fois.")
-                            .size(22.0)
-                            .italics()
-                            .color(FORGE_CREME),
-                    );
-                    ui.add_space(20.0);
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "◇ {} âmes forgées cette run !",
-                            meta.earned_run
-                        ))
-                        .size(20.0)
-                        .strong()
-                        .color(FORGE_CHARBON)
-                        .background_color(FORGE_OR),
-                    );
-                    // R3.3 — chrono de la run + record. `LastRunStats` est figé par
-                    // `sys_record_run_stats` à l'entrée de Victory (même frame).
-                    ui.add_space(10.0);
-                    let fmt =
-                        |s: f32| format!("{} min {:02} s", (s / 60.0) as u32, (s % 60.0) as u32);
-                    if last_stats.new_best {
+            glass_frame_hero()
+                .inner_margin(egui::Margin::symmetric(80, 48))
+                .show(ui, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(4.0);
+                        ui.heading(display_text("VICTOIRE !", 64.0, FORGE_OR).strong());
+                        ui.add_space(18.0);
+                        ui.label(
+                            egui::RichText::new("Le Forgeron Noir plie le genou… pour cette fois.")
+                                .size(22.0)
+                                .italics()
+                                .color(FORGE_CREME),
+                        );
+                        ui.add_space(20.0);
                         ui.label(
                             egui::RichText::new(format!(
-                                "🏆 NOUVEAU RECORD — {} !",
-                                fmt(last_stats.secs)
+                                "◇ {} âmes forgées cette run !",
+                                meta.earned_run
                             ))
-                            .size(22.0)
+                            .size(20.0)
                             .strong()
-                            .color(FORGE_OR),
+                            .color(FORGE_CHARBON)
+                            .background_color(FORGE_OR),
                         );
-                    } else {
+                        // R3.3 — chrono de la run + record. `LastRunStats` est figé par
+                        // `sys_record_run_stats` à l'entrée de Victory (même frame).
+                        ui.add_space(10.0);
+                        let fmt = |s: f32| {
+                            format!("{} min {:02} s", (s / 60.0) as u32, (s % 60.0) as u32)
+                        };
+                        if last_stats.new_best {
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "🏆 NOUVEAU RECORD — {} !",
+                                    fmt(last_stats.secs)
+                                ))
+                                .size(22.0)
+                                .strong()
+                                .color(FORGE_OR),
+                            );
+                        } else {
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Temps : {}   ·   Record : {}",
+                                    fmt(last_stats.secs),
+                                    fmt(save.best_victory_secs)
+                                ))
+                                .size(18.0)
+                                .color(FORGE_CREME),
+                            );
+                        }
                         ui.label(
                             egui::RichText::new(format!(
-                                "Temps : {}   ·   Record : {}",
-                                fmt(last_stats.secs),
-                                fmt(save.best_victory_secs)
+                                "Victoires : {} / {} runs",
+                                save.victories, save.runs_played
                             ))
-                            .size(18.0)
+                            .size(16.0)
                             .color(FORGE_CREME),
                         );
-                    }
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "Victoires : {} / {} runs",
-                            save.victories, save.runs_played
-                        ))
-                        .size(16.0)
-                        .color(FORGE_CREME),
-                    );
-                    ui.add_space(28.0);
+                        ui.add_space(28.0);
 
-                    // Hub-menu étape 6 : Lobby auto-lance → REJOUER direct.
-                    if cartoon_btn(ui, "↻  REJOUER", FORGE_OR).clicked() {
-                        info!("[roguelite-hud] Victory → Lobby (rejouer, auto-start)");
-                        next_run.set(RunState::Lobby);
-                    }
-                    ui.add_space(10.0);
-                    if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
-                        info!("[roguelite-hud] Victory → Menu");
-                        next_app.set(AppMode::Menu);
-                        next_game.set(GameMode::None);
-                    }
+                        // Hub-menu étape 6 : Lobby auto-lance → REJOUER direct.
+                        if cartoon_btn(ui, "↻  REJOUER", FORGE_OR).clicked() {
+                            info!("[roguelite-hud] Victory → Lobby (rejouer, auto-start)");
+                            next_run.set(RunState::Lobby);
+                        }
+                        ui.add_space(10.0);
+                        if cartoon_btn(ui, "✕  RETOUR AU MENU", FORGE_METAL_CHAUD).clicked() {
+                            info!("[roguelite-hud] Victory → Menu");
+                            next_app.set(AppMode::Menu);
+                            next_game.set(GameMode::None);
+                        }
+                    });
                 });
-            });
         });
 }
 
@@ -1162,8 +1199,12 @@ pub fn draw_enemy_archetype_labels(
         };
         // Couleur d'archétype (source unique `archetype_color`) + alpha de fade distance.
         let base = archetype_color(*archetype);
-        let color =
-            egui::Color32::from_rgba_unmultiplied(base.r(), base.g(), base.b(), (255.0 * alpha) as u8);
+        let color = egui::Color32::from_rgba_unmultiplied(
+            base.r(),
+            base.g(),
+            base.b(),
+            (255.0 * alpha) as u8,
+        );
         let pos = egui::pos2(screen_pos.x, screen_pos.y);
         let outline = egui::Color32::from_rgba_unmultiplied(0, 0, 0, (255.0 * alpha) as u8);
         // Outline 8 directions.
@@ -1220,6 +1261,13 @@ pub(crate) fn sys_track_boss_enrage_banner(
 }
 
 /// Banner top-center "⚒ FORGE EN COLÈRE !" — fade in/out + scale pop.
+fn boss_enrage_font_size(pop_scale: f32) -> f32 {
+    // La protection vit désormais dans `forgia_ui_lib::style::anim_font_px` —
+    // elle était écrite ici seulement, et le pop de kill, qui anime sa taille de
+    // la même façon, a planté le jeu faute de l'avoir. Un seul gardien.
+    forgia_ui_lib::style::anim_font_px(36.0 * pop_scale)
+}
+
 pub(crate) fn draw_boss_enrage_banner(
     mut contexts: EguiContexts,
     state: Res<BossEnrageBannerState>,
@@ -1278,7 +1326,7 @@ pub(crate) fn draw_boss_enrage_banner(
             let text_color =
                 egui::Color32::from_rgba_unmultiplied(255, 244, 220, (alpha * 255.0) as u8);
             let outline = egui::Color32::from_rgba_unmultiplied(43, 24, 16, (alpha * 255.0) as u8);
-            let size = 36.0 * pop_scale;
+            let size = boss_enrage_font_size(pop_scale);
             let pos = rect.center();
             for dx in [-2.0_f32, 0.0, 2.0] {
                 for dy in [-2.0_f32, 0.0, 2.0] {
@@ -1739,7 +1787,16 @@ pub(crate) fn draw_vitals_card(
     }
 
     // ── Barre d'énergie (vie relabelée — anti-canon : jamais le mot « HP ») ──
-    draw_vitals_bar(&painter, content_left, y, bar_w, BAR_H, frac, hp_color(frac), 5.0);
+    draw_vitals_bar(
+        &painter,
+        content_left,
+        y,
+        bar_w,
+        BAR_H,
+        frac,
+        hp_color(frac),
+        5.0,
+    );
     text_with_outline(
         &painter,
         egui::pos2(content_left + 8.0, y + BAR_H * 0.5),
@@ -1869,7 +1926,17 @@ fn draw_apprentice_face(painter: &egui::Painter, center: egui::Pos2, r: f32) {
     painter.circle_filled(center + egui::vec2(-eye_dx, eye_dy), eye_r, C_TEXT_LIGHT);
     painter.circle_filled(center + egui::vec2(eye_dx, eye_dy), eye_r, C_TEXT_LIGHT);
     // Sourire (arc bas = amical, bible « Apprenti doux »).
-    arc_stroke(painter, center, r * 0.5, 0.18 * PI, 0.64 * PI, 1.0, FORGE_OR, 2.5, 16);
+    arc_stroke(
+        painter,
+        center,
+        r * 0.5,
+        0.18 * PI,
+        0.64 * PI,
+        1.0,
+        FORGE_OR,
+        2.5,
+        16,
+    );
 }
 
 // ─── Bandeau Ultime (touche F, 10 s) — story-596 T4b ────────────────────────
@@ -2105,10 +2172,7 @@ pub(crate) fn draw_ultimate_gauge(
     painter.circle_stroke(
         center,
         RING_R,
-        egui::Stroke::new(
-            3.5,
-            egui::Color32::from_rgba_unmultiplied(20, 22, 28, 200),
-        ),
+        egui::Stroke::new(3.5, egui::Color32::from_rgba_unmultiplied(20, 22, 28, 200)),
     );
     // Halo pulsé quand prêt — invite à lâcher l'Ultime avec F.
     if ready {
@@ -2126,10 +2190,16 @@ pub(crate) fn draw_ultimate_gauge(
     // Arc de charge (recharge) / vidange (actif) ; plein quand prêt.
     let progress = if ready { 1.0 } else { ult.hud_fill() };
     let arc_col = if ready || active { accent } else { FORGE_OR };
-    arc_stroke(&painter, center, RING_R, -FRAC_PI_2, TAU, progress, arc_col, 3.5, 64);
+    arc_stroke(
+        &painter, center, RING_R, -FRAC_PI_2, TAU, progress, arc_col, 3.5, 64,
+    );
 
     // Étiquette discrète « ULT » au-dessus de l'anneau (pas un bouton cliquable).
-    let cap_col = if ready || active { accent } else { C_TEXT_MUTED };
+    let cap_col = if ready || active {
+        accent
+    } else {
+        C_TEXT_MUTED
+    };
     text_with_outline(
         &painter,
         egui::pos2(center.x, center.y - RING_R - 6.0),
@@ -2330,6 +2400,14 @@ mod tests {
         let _ = RogueliteHudPlugin;
     }
 
+    #[test]
+    fn boss_enrage_font_never_reaches_epaint_invalid_zero_scale() {
+        assert_eq!(boss_enrage_font_size(0.0), 1.0);
+        assert_eq!(boss_enrage_font_size(-1.0), 1.0);
+        assert_eq!(boss_enrage_font_size(f32::NAN), 1.0);
+        assert_eq!(boss_enrage_font_size(1.0), 36.0);
+    }
+
     // ── Story-482 — Bark bubble speaker mapping ────────────────────────────
 
     #[test]
@@ -2516,10 +2594,16 @@ mod run_progress_tests {
             ..RoundsConfig::default()
         };
         let neuf = label_at_round(9, 3, &cfg);
-        assert!(!neuf.contains("BOSS"), "le round 9 n'est pas encore le boss : {neuf}");
+        assert!(
+            !neuf.contains("BOSS"),
+            "le round 9 n'est pas encore le boss : {neuf}"
+        );
         let boss = label_at_round(10, 3, &cfg);
         assert!(boss.contains("BOSS"), "{boss}");
-        assert!(!boss.contains("11"), "le numérateur ne dépasse pas le total : {boss}");
+        assert!(
+            !boss.contains("11"),
+            "le numérateur ne dépasse pas le total : {boss}"
+        );
     }
 
     /// La porte annonce ce qu'il y a derrière. Confondre les deux libellés ferait
@@ -2543,7 +2627,10 @@ mod run_progress_tests {
     fn an_endless_loop_never_promises_a_boss() {
         use super::next_room_label;
         for stage in [0u8, 3, 50, 200] {
-            assert_eq!(next_room_label(stage, 0, 3), "ENTRER DANS LA PIÈCE SUIVANTE");
+            assert_eq!(
+                next_room_label(stage, 0, 3),
+                "ENTRER DANS LA PIÈCE SUIVANTE"
+            );
         }
     }
 
@@ -2565,14 +2652,20 @@ mod run_progress_tests {
         assert!(tier.contains("PALIER"), "{tier}");
         // Un round ordinaire ne porte ni l'un ni l'autre.
         let plain = label_at_round(2, 3, &cfg);
-        assert!(!plain.contains("RÉPIT") && !plain.contains("PALIER"), "{plain}");
+        assert!(
+            !plain.contains("RÉPIT") && !plain.contains("PALIER"),
+            "{plain}"
+        );
     }
 
     /// Hors boucle, l'affichage historique est préservé au caractère près.
     #[test]
     fn the_graph_mode_display_is_unchanged() {
         let cfg = graph_mode();
-        assert_eq!(run_progress_label(0, 1, 2, 4, &cfg), "SALLE 1 / 4  ·  VAGUE 1 / 2");
+        assert_eq!(
+            run_progress_label(0, 1, 2, 4, &cfg),
+            "SALLE 1 / 4  ·  VAGUE 1 / 2"
+        );
         assert_eq!(run_progress_label(3, 1, 2, 4, &cfg), "SALLE 4 / 4  ·  BOSS");
     }
 }

@@ -354,7 +354,11 @@ mod tests {
         ];
         let a = pick_chain_targets(Vec3::ZERO, &c, 10.0, 2);
         assert_eq!(a, pick_chain_targets(Vec3::ZERO, &c, 10.0, 2));
-        assert_eq!(a[0], ent(3), "à distance égale, l'entité la plus basse d'abord");
+        assert_eq!(
+            a[0],
+            ent(3),
+            "à distance égale, l'entité la plus basse d'abord"
+        );
     }
 
     /// Zéro cible supplémentaire = aucun saut : un joueur sans atout Chaîne ne

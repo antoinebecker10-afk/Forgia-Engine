@@ -115,10 +115,7 @@ pub fn sys_write_roguelite_state(
     let seed = run_seed.as_ref().map(|s| s.seed).unwrap_or(0);
     let stage_count = run_seed.as_ref().map(|s| s.stage_count).unwrap_or(0);
     // Story-668 — maîtrise d'arme : niveaux stockés + plafond du genome.
-    let mastery_cap = meta_cat
-        .as_ref()
-        .map(|c| c.mastery.max_level)
-        .unwrap_or(0);
+    let mastery_cap = meta_cat.as_ref().map(|c| c.mastery.max_level).unwrap_or(0);
     let weapon_levels = meta_save
         .as_ref()
         .map(|s| {

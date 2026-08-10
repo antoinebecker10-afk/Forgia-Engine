@@ -179,7 +179,10 @@ mod tests {
     fn the_footprint_follows_the_runtime_rescale() {
         // Un bâtiment hexagon typique : ~2 m de large, ~4 m de haut, emprise 1,5 m.
         let b = m(2.1, 3.98, 2.1, 1.5);
-        assert!((b.footprint_at_target(0.0) - 1.5).abs() < 1e-4, "sans cible = natif");
+        assert!(
+            (b.footprint_at_target(0.0) - 1.5).abs() < 1e-4,
+            "sans cible = natif"
+        );
         // Calibré à 12 m (target_building) : facteur 12/3,98 ≈ 3,01.
         let at12 = b.footprint_at_target(12.0);
         assert!(
@@ -197,7 +200,10 @@ mod tests {
         let flat = m(0.0, 0.0, 0.0, 0.0);
         assert_eq!(flat.footprint_at_target(12.0), 0.0);
         let tall = m(1.0, 100.0, 1.0, 0.7);
-        assert!(tall.footprint_at_target(4.0) < 0.7, "un prop réduit rétrécit aussi");
+        assert!(
+            tall.footprint_at_target(4.0) < 0.7,
+            "un prop réduit rétrécit aussi"
+        );
     }
 
     #[test]
@@ -219,7 +225,11 @@ mod tests {
             .or_else(|_| fs::read_to_string(format!("../../{REGISTRY_PATH}")))
             .expect("asset_registry.toml introuvable — python tools/gltf/scan_assets.py");
         let reg = AssetRegistry::parse_toml(&content);
-        assert!(reg.len() > 400, "registre suspicieusement petit : {}", reg.len());
+        assert!(
+            reg.len() > 400,
+            "registre suspicieusement petit : {}",
+            reg.len()
+        );
 
         let pal = fs::read_to_string(crate::decor_palettes::GENOME_PATH)
             .or_else(|_| {
@@ -271,9 +281,8 @@ mod spawn_clearance_tests {
     #[test]
     fn no_authored_blocker_covers_its_arena_spawn() {
         let reg = AssetRegistry::parse_toml(&read(REGISTRY_PATH));
-        let genome: ArenaLayoutsGenome =
-            toml::from_str(&read("assets/genomes/arena_layouts.toml"))
-                .expect("arena_layouts.toml illisible");
+        let genome: ArenaLayoutsGenome = toml::from_str(&read("assets/genomes/arena_layouts.toml"))
+            .expect("arena_layouts.toml illisible");
 
         let mut measured = 0usize;
         let mut unmeasured: Vec<&str> = Vec::new();

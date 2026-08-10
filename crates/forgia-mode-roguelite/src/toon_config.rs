@@ -12,7 +12,6 @@
 
 use bevy::prelude::*;
 use forgia_player::prelude::ViewmodelCamera;
-use forgia_postprocess::outline::OutlineSettings;
 use forgia_postprocess::toon::ToonSettings;
 use serde::Deserialize;
 use std::fs;
@@ -107,20 +106,15 @@ impl RogueliteToonConfig {
             bands: self.bands,
             strength: self.strength,
             edge_dark: self.edge_dark,
-            _pad: 0.0,
-        }
-    }
-
-    pub fn to_outline(self) -> OutlineSettings {
-        OutlineSettings {
-            thickness: self.outline_thickness,
-            threshold: self.outline_threshold,
-            strength: if self.outline_enabled {
+            outline_thickness: self.outline_thickness,
+            outline_threshold: self.outline_threshold,
+            outline_strength: if self.outline_enabled {
                 self.outline_strength
             } else {
                 0.0
             },
-            _pad: 0.0,
+            _pad0: 0.0,
+            _pad1: 0.0,
             edge_color: Vec4::new(0.0, 0.0, 0.0, 1.0),
         }
     }
@@ -208,20 +202,17 @@ pub fn sys_apply_toon_settings(
 ) {
     let cfg_changed = cfg.is_changed();
     let toon = cfg.to_toon();
-    let outline = cfg.to_outline();
 
     if cfg_changed {
         let mut count = 0u32;
         for e in &q_cam_all {
             commands.entity(e).insert(toon);
-            let _ = outline;
             count += 1;
         }
         watch.attached_cameras = count;
     } else {
         for e in &q_cam_new {
             commands.entity(e).insert(toon);
-            let _ = outline;
             watch.attached_cameras = watch.attached_cameras.saturating_add(1);
         }
     }
@@ -238,18 +229,16 @@ pub fn sys_force_apply_toon_settings(
     q_cam: Query<Entity, (With<Camera3d>, Without<ViewmodelCamera>)>,
 ) {
     let toon = cfg.to_toon();
-    let outline = cfg.to_outline();
     let mut count = 0u32;
     for e in &q_cam {
         commands.entity(e).insert(toon);
-        let _ = outline;
         count += 1;
     }
     watch.attached_cameras = count;
     info!("[roguelite-toon] force-attached toon+outline to {count} Camera3d(s)");
 }
 
-/// OnExit(GameMode::Roguelite) — retire ToonSettings + OutlineSettings.
+/// OnExit(GameMode::Roguelite) — retire la passe combinée toon + outline.
 pub fn sys_detach_toon_from_cameras(
     mut commands: Commands,
     q_cam: Query<Entity, With<Camera3d>>,
@@ -261,15 +250,10 @@ pub fn sys_detach_toon_from_cameras(
     watch.attached_cameras = 0;
 }
 
-/// État RÉEL de l'outline Sobel : le plugin est désactivé (crash wgpu
-/// `SurfaceAcquireSemaphores`, cf lib.rs bloc commenté) — `to_outline()` est
-/// calculé puis jeté (`let _ = outline;`) dans les 3 systèmes apply.
-///
-/// Story-593 (audit 2026-06-10 P1) : le sensor exportait `outline_enabled` (la
-/// CONFIG) sans dire que rien n'est appliqué — une IA diagnostiquait sur un état
-/// fictif. Cette const est LA source de vérité runtime ; la flipper à `true`
-/// UNIQUEMENT quand le plugin outline est réellement re-branché (fix node_edges).
-const OUTLINE_ATTACHED: bool = false;
+/// L'outline est exécuté dans la même passe fullscreen que le toon. Le plugin
+/// `ForgiaPpOutlinePlugin` reste volontairement désactivé : deux passes séparées
+/// font planter wgpu sur Bevy 0.18.
+const OUTLINE_ATTACHED: bool = true;
 
 /// Sensor `forgia2_toon.json` 1Hz — état runtime + dernière config appliquée.
 pub fn sys_write_toon_sensor(
@@ -291,9 +275,7 @@ pub fn sys_write_toon_sensor(
         return;
     };
 
-    let outline_ghost = cfg.outline_enabled && !OUTLINE_ATTACHED;
-    let (severity, next_step) =
-        severity_for_toon(cfg.strength, watch.attached_cameras, outline_ghost);
+    let (severity, next_step) = severity_for_toon(cfg.strength, watch.attached_cameras);
 
     let json = format!(
         r#"{{"id":"toon","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"bands":{:.2},"strength":{:.2},"edge_dark":{:.2},"outline_enabled":{},"outline_attached":{},"outline_thickness":{:.2},"outline_threshold":{:.2},"outline_strength":{:.2},"attached_cameras":{},"reload_count":{},"last_reload_secs":{:.1}}}"#,
@@ -319,20 +301,11 @@ pub fn sys_write_toon_sensor(
 /// Pur — testable. Severity `warn` si config "on" mais aucune caméra attachée
 /// (= post-process invisible runtime malgré activation), `info` si l'outline est
 /// demandé en config mais jamais appliqué (plugin désactivé, story-593).
-pub fn severity_for_toon(
-    strength: f32,
-    attached_cameras: u32,
-    outline_requested_not_attached: bool,
-) -> (&'static str, &'static str) {
+pub fn severity_for_toon(strength: f32, attached_cameras: u32) -> (&'static str, &'static str) {
     if strength > 0.0 && attached_cameras == 0 {
         (
             "warn",
             "toon strength>0 mais 0 Camera3d attached — post-process invisible",
-        )
-    } else if outline_requested_not_attached {
-        (
-            "info",
-            "outline_enabled en config mais plugin outline DESACTIVE (crash wgpu) — etat reel = outline_attached:false ; fix = node_edges apres ToonSettings (lib.rs)",
         )
     } else {
         ("ok", "")
@@ -380,23 +353,18 @@ default = -5.0
     }
 
     #[test]
-    fn to_outline_disabled_zeroes_strength() {
+    fn combined_pass_disables_outline_strength_from_config() {
         let mut cfg = RogueliteToonConfig::default();
         cfg.outline_enabled = false;
         cfg.outline_strength = 0.9;
-        assert_eq!(cfg.to_outline().strength, 0.0);
+        assert_eq!(cfg.to_toon().outline_strength, 0.0);
     }
 
     #[test]
     fn severity_warn_when_strength_but_no_camera() {
-        assert_eq!(severity_for_toon(1.0, 0, false).0, "warn");
-        assert_eq!(severity_for_toon(1.0, 1, false).0, "ok");
-        assert_eq!(severity_for_toon(0.0, 0, false).0, "ok");
-        // Story-593 : outline demandé en config mais plugin désactivé → info
-        // (le sensor ne doit plus rapporter un outline fictif comme sain).
-        assert_eq!(severity_for_toon(1.0, 1, true).0, "info");
-        // La caméra manquante prime sur l'écart outline.
-        assert_eq!(severity_for_toon(1.0, 0, true).0, "warn");
+        assert_eq!(severity_for_toon(1.0, 0).0, "warn");
+        assert_eq!(severity_for_toon(1.0, 1).0, "ok");
+        assert_eq!(severity_for_toon(0.0, 0).0, "ok");
     }
 
     #[test]

@@ -634,7 +634,10 @@ mod tests {
         // Le recompute tourne CHAQUE FRAME : sans ce dédoublonnage, l'alerte
         // deviendrait 60 lignes/seconde, donc illisible, donc ignorée.
         let mut issues = BoonRoutingIssues::default();
-        assert!(issues.note_unknown_stat("reload_speed"), "1re fois → on loggue");
+        assert!(
+            issues.note_unknown_stat("reload_speed"),
+            "1re fois → on loggue"
+        );
         assert!(
             !issues.note_unknown_stat("reload_speed"),
             "2e fois → silencieux, mais la trace reste"
@@ -678,7 +681,10 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(sains.boons, 1.0);
-        assert_eq!(sains.boon_damage_count, 0, "rien à appliquer, rien d'anormal");
+        assert_eq!(
+            sains.boon_damage_count, 0,
+            "rien à appliquer, rien d'anormal"
+        );
 
         let suspect = PowerBreakdown {
             boon_count: 2,

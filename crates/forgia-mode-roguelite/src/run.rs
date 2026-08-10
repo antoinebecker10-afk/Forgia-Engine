@@ -252,11 +252,7 @@ pub fn sys_stage_dispatch(
         Some(cfg) => {
             let id = cfg.ambiance_id_for_round(u32::from(depth), run_seed_val);
             let p = cfg.floor_of(id);
-            let tiles: [String; 3] = [
-                p.tiles[0].clone(),
-                p.tiles[1].clone(),
-                p.tiles[2].clone(),
-            ];
+            let tiles: [String; 3] = [p.tiles[0].clone(), p.tiles[1].clone(), p.tiles[2].clone()];
             (
                 id.to_string(),
                 Some(forgia_stage::FloorTiles {
@@ -1095,7 +1091,10 @@ const ARENA_SPAWN_HEIGHT_M: f32 = 2.0;
 /// qui est exactement le genre de dépendance au timing qui passe les tests et
 /// casse en jeu.
 pub fn sys_snap_player_to_arena_spawn(
-    q_new_anchors: Query<(&forgia_anchor::AnchorPoint, &GlobalTransform), Added<forgia_anchor::AnchorPoint>>,
+    q_new_anchors: Query<
+        (&forgia_anchor::AnchorPoint, &GlobalTransform),
+        Added<forgia_anchor::AnchorPoint>,
+    >,
     mut q_player: Query<&mut Transform, With<Player>>,
     mut pending: Local<Option<Vec3>>,
 ) {
@@ -1131,7 +1130,11 @@ mod tests {
     #[test]
     fn the_stage_order_is_deterministic_per_seed_but_differs_between_seeds() {
         let a = stage_sequence(0x1234_5678, 4);
-        assert_eq!(a, stage_sequence(0x1234_5678, 4), "même graine → même donjon");
+        assert_eq!(
+            a,
+            stage_sequence(0x1234_5678, 4),
+            "même graine → même donjon"
+        );
         // Sur un échantillon de graines, au moins deux ordres distincts doivent
         // apparaître — sinon la « variété » est fictive.
         let mut seen = std::collections::HashSet::new();

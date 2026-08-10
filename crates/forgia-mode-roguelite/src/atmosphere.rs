@@ -33,11 +33,7 @@ const FOG_SUN_EXPONENT: f32 = 30.0;
 fn ambiance_fog(a: &Ambiance, density: f32) -> DistanceFog {
     DistanceFog {
         color: Color::srgb(a.fog_rgb[0], a.fog_rgb[1], a.fog_rgb[2]),
-        directional_light_color: Color::srgb(
-            a.fog_sun_rgb[0],
-            a.fog_sun_rgb[1],
-            a.fog_sun_rgb[2],
-        ),
+        directional_light_color: Color::srgb(a.fog_sun_rgb[0], a.fog_sun_rgb[1], a.fog_sun_rgb[2]),
         directional_light_exponent: FOG_SUN_EXPONENT,
         falloff: FogFalloff::Exponential { density },
     }
@@ -101,12 +97,10 @@ fn sys_ensure_atmosphere(
         }
         // Insère si absent, OU ré-applique si config changée (hot-reload densité).
         if cfg_changed || q_has_fog.get(cam).is_err() {
-            commands
-                .entity(cam)
-                .insert((
-                    ambiance_fog(ambiance, density),
-                    ambiance_ambient(ambiance, brightness),
-                ));
+            commands.entity(cam).insert((
+                ambiance_fog(ambiance, density),
+                ambiance_ambient(ambiance, brightness),
+            ));
         }
     }
 }
