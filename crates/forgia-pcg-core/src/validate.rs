@@ -213,7 +213,11 @@ fn check_budgets(spec: &ContentSpec, metrics: &PlanMetrics, out: &mut Vec<HardVi
     // BTreeMap → deterministic target order.
     for (target, budget) in &spec.budgets {
         let checks = [
-            ("stream_cells", budget.max_stream_cells, metrics.stream_cells),
+            (
+                "stream_cells",
+                budget.max_stream_cells,
+                metrics.stream_cells,
+            ),
             (
                 "visible_meshes",
                 budget.max_visible_meshes,
@@ -456,8 +460,16 @@ fn socket_clearance_world_aabb(
     let clearance: &Clearance = socket.clearance.as_ref()?;
     let half = clearance.local_half_extents();
     let centre = socket.frame.origin_m;
-    let local_min = [centre[0] - half[0], centre[1] - half[1], centre[2] - half[2]];
-    let local_max = [centre[0] + half[0], centre[1] + half[1], centre[2] + half[2]];
+    let local_min = [
+        centre[0] - half[0],
+        centre[1] - half[1],
+        centre[2] - half[2],
+    ];
+    let local_max = [
+        centre[0] + half[0],
+        centre[1] + half[1],
+        centre[2] + half[2],
+    ];
     Some(world_aabb(
         local_min,
         local_max,
@@ -613,8 +625,20 @@ value = 8
         SpatialPlan {
             logical: logical(),
             instances: vec![
-                instance("instance.wall", "wall.door", "great_hall", [0.0, 0.0, 0.0], 0.0),
-                instance("instance.door", "door.oak", "west_entry", [0.0, 0.0, -0.35], 0.0),
+                instance(
+                    "instance.wall",
+                    "wall.door",
+                    "great_hall",
+                    [0.0, 0.0, 0.0],
+                    0.0,
+                ),
+                instance(
+                    "instance.door",
+                    "door.oak",
+                    "west_entry",
+                    [0.0, 0.0, -0.35],
+                    0.0,
+                ),
             ],
             bindings: vec![binding(
                 "instance.wall",
@@ -681,10 +705,9 @@ value = 8
         let tight = tight.replace("value = 8", "value = 1");
         let spec = ContentSpec::parse_toml(&tight).unwrap();
         let report = validate_spatial_plan(&spec, &manifest(), &valid_plan());
-        assert!(report
-            .violations
-            .iter()
-            .any(|v| matches!(v, HardViolation::Budget { metric, .. } if metric == "collision_proxies")));
+        assert!(report.violations.iter().any(
+            |v| matches!(v, HardViolation::Budget { metric, .. } if metric == "collision_proxies")
+        ));
         assert!(report
             .violations
             .iter()

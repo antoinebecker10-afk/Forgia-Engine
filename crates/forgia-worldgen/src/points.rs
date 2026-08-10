@@ -316,8 +316,16 @@ mod tests {
         assert_ne!(ids_a, ids_b, "different chunk coord → different content");
         // Chunk (1,0) buildings sit in world X ∈ [40, 80).
         for p in &b.points {
-            assert!(p.ground_pos.x >= 40.0 && p.ground_pos.x < 80.0, "in cell X: {}", p.ground_pos.x);
-            assert!(p.ground_pos.z >= 0.0 && p.ground_pos.z < 40.0, "in cell Z: {}", p.ground_pos.z);
+            assert!(
+                p.ground_pos.x >= 40.0 && p.ground_pos.x < 80.0,
+                "in cell X: {}",
+                p.ground_pos.x
+            );
+            assert!(
+                p.ground_pos.z >= 0.0 && p.ground_pos.z < 40.0,
+                "in cell Z: {}",
+                p.ground_pos.z
+            );
         }
     }
 
@@ -339,8 +347,14 @@ mod tests {
     fn different_seed_changes_hamlet() {
         let reg = registry();
         let ground = GroundSampler::default();
-        let r1 = HamletRecipe { seed: 1, ..HamletRecipe::default() };
-        let r2 = HamletRecipe { seed: 999, ..HamletRecipe::default() };
+        let r1 = HamletRecipe {
+            seed: 1,
+            ..HamletRecipe::default()
+        };
+        let r2 = HamletRecipe {
+            seed: 999,
+            ..HamletRecipe::default()
+        };
         let a = generate_hamlet(&r1, &reg, &ground, Vec3::ZERO, Vec3::X, Vec3::Z);
         let b = generate_hamlet(&r2, &reg, &ground, Vec3::ZERO, Vec3::X, Vec3::Z);
         // Border is deterministic regardless of seed, but interior fill differs → sequences differ.
@@ -357,7 +371,11 @@ mod tests {
         let recipe = HamletRecipe::default();
         let cloud = generate_hamlet(&recipe, &reg, &ground, Vec3::ZERO, Vec3::X, Vec3::Z);
         for p in &cloud.points {
-            assert!(p.ground_pos.y.abs() < 1e-3, "flat ground → y≈0, got {}", p.ground_pos.y);
+            assert!(
+                p.ground_pos.y.abs() < 1e-3,
+                "flat ground → y≈0, got {}",
+                p.ground_pos.y
+            );
         }
     }
 }

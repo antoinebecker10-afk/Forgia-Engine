@@ -89,13 +89,24 @@ mod tests {
     #[test]
     fn chunk_seeds_are_stable_and_distinct() {
         assert_eq!(chunk_seed(100, 3, -7), chunk_seed(100, 3, -7), "stable");
-        assert_ne!(chunk_seed(100, 3, -7), chunk_seed(100, -7, 3), "coord order matters");
-        assert_ne!(chunk_seed(100, 3, -7), chunk_seed(101, 3, -7), "world seed matters");
+        assert_ne!(
+            chunk_seed(100, 3, -7),
+            chunk_seed(100, -7, 3),
+            "coord order matters"
+        );
+        assert_ne!(
+            chunk_seed(100, 3, -7),
+            chunk_seed(101, 3, -7),
+            "world seed matters"
+        );
         // No collisions across a small grid.
         let mut seen = std::collections::HashSet::new();
         for x in -5..5 {
             for y in -5..5 {
-                assert!(seen.insert(chunk_seed(1, x, y)), "no collision at ({x},{y})");
+                assert!(
+                    seen.insert(chunk_seed(1, x, y)),
+                    "no collision at ({x},{y})"
+                );
             }
         }
     }

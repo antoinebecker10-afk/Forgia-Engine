@@ -39,7 +39,11 @@ pub fn sys_write_worldgen_sensor(
 
     let registry_modules = registry.map(|r| r.len()).unwrap_or(0);
     let (severity, next_step) = severity_for_worldgen(registry_modules);
-    let roads = if city.present { city.roads.segments.len() } else { 0 };
+    let roads = if city.present {
+        city.roads.segments.len()
+    } else {
+        0
+    };
     let parcels = if city.present { city.parcels.len() } else { 0 };
 
     let json = format!(

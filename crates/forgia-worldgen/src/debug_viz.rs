@@ -41,11 +41,7 @@ pub fn sys_worldgen_gizmos(
 
 /// Draw the city layout (P3): roads (gold = major, grey = minor) + parcel outlines (green).
 /// Same F8 toggle as the AABB gizmos.
-pub fn sys_layout_gizmos(
-    viz: Res<WorldgenDebugViz>,
-    layout: Res<CityLayout>,
-    mut gizmos: Gizmos,
-) {
+pub fn sys_layout_gizmos(viz: Res<WorldgenDebugViz>, layout: Res<CityLayout>, mut gizmos: Gizmos) {
     if !viz.0 || !layout.present {
         return;
     }

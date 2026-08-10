@@ -211,7 +211,11 @@ mod tests {
         let file: AssetRegistryFile = ron::from_str(ASSET_META_RON).unwrap();
         let raw = file.entries.len();
         let reg = AssetRegistry::from_file(file);
-        assert_eq!(reg.len(), raw, "no duplicate module ids (HashMap would collapse them)");
+        assert_eq!(
+            reg.len(),
+            raw,
+            "no duplicate module ids (HashMap would collapse them)"
+        );
     }
 
     #[test]
@@ -230,8 +234,13 @@ mod tests {
             assert!(m.aabb_min.1 <= m.aabb_max.1, "{}: min.y > max.y", m.id);
             assert!(m.aabb_min.2 <= m.aabb_max.2, "{}: min.z > max.z", m.id);
             for c in [
-                m.aabb_min.0, m.aabb_min.1, m.aabb_min.2, m.aabb_max.0, m.aabb_max.1,
-                m.aabb_max.2, m.ground_offset,
+                m.aabb_min.0,
+                m.aabb_min.1,
+                m.aabb_min.2,
+                m.aabb_max.0,
+                m.aabb_max.1,
+                m.aabb_max.2,
+                m.ground_offset,
             ] {
                 assert!(c.is_finite(), "{}: non-finite geometry", m.id);
             }
@@ -282,7 +291,12 @@ mod tests {
     fn decals_have_no_collider_and_zero_height() {
         let reg = registry();
         for m in reg.by_role(AssetRole::Decal) {
-            assert_eq!(m.collider, ColliderKind::NoCollider, "{} decal must not collide", m.id);
+            assert_eq!(
+                m.collider,
+                ColliderKind::NoCollider,
+                "{} decal must not collide",
+                m.id
+            );
             assert!(m.height() < 0.06, "{} decal should be flat", m.id);
         }
     }
@@ -308,7 +322,13 @@ mod tests {
     fn has_walkable_and_vertical_modules() {
         // Sanity: a usable kit has both surfaces to stand on and verticality.
         let reg = registry();
-        assert!(reg.by_role(AssetRole::Platform).count() >= 5, "kit needs walkables");
-        assert!(reg.by_role(AssetRole::Pillar).count() >= 1, "kit needs verticality");
+        assert!(
+            reg.by_role(AssetRole::Platform).count() >= 5,
+            "kit needs walkables"
+        );
+        assert!(
+            reg.by_role(AssetRole::Pillar).count() >= 1,
+            "kit needs verticality"
+        );
     }
 }

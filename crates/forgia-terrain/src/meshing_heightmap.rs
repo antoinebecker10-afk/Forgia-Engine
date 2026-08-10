@@ -135,7 +135,9 @@ pub fn build_chunk_mesh(
             0.0
         };
         // Story-577 polish : couleur blendée par biomes voisins (fin du seam Voronoi).
-        colors.push(blended_vertex_color(biome_map, wx, wz, pos[1], slope, config));
+        colors.push(blended_vertex_color(
+            biome_map, wx, wz, pos[1], slope, config,
+        ));
     }
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
 

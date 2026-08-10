@@ -41,7 +41,11 @@ pub fn build_road_mesh(
         let world_x = origin.x + axis_x.x * p.x + axis_z.x * p.y;
         let world_z = origin.z + axis_x.z * p.x + axis_z.z * p.y;
         let h = ground.height(world_x, world_z) + ROAD_Y_EPS;
-        Vec3::new(axis_x.x * p.x + axis_z.x * p.y, h, axis_x.z * p.x + axis_z.z * p.y)
+        Vec3::new(
+            axis_x.x * p.x + axis_z.x * p.y,
+            h,
+            axis_x.z * p.x + axis_z.z * p.y,
+        )
     };
 
     for seg in &roads.segments {
@@ -80,7 +84,10 @@ pub fn build_road_mesh(
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
@@ -112,7 +119,14 @@ mod tests {
                 kind: RoadKind::Major,
             }],
         };
-        let mesh = build_road_mesh(&roads, Vec3::ZERO, Vec3::X, Vec3::Z, &GroundSampler::default(), ROAD_WIDTH_M);
+        let mesh = build_road_mesh(
+            &roads,
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::Z,
+            &GroundSampler::default(),
+            ROAD_WIDTH_M,
+        );
         assert_eq!(mesh.count_vertices(), 16, "12 m / 3 m = 4 quads × 4 verts");
         assert_eq!(mesh.indices().map(bevy::mesh::Indices::len), Some(24));
         // Each ribbon quad is 4 verts → vertex count is a multiple of 4.
@@ -141,7 +155,18 @@ mod tests {
                 kind: RoadKind::Minor,
             }],
         };
-        let mesh = build_road_mesh(&roads, Vec3::ZERO, Vec3::X, Vec3::Z, &GroundSampler::default(), ROAD_WIDTH_M);
-        assert_eq!(mesh.count_vertices(), 0, "zero-length segment produces no quad");
+        let mesh = build_road_mesh(
+            &roads,
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::Z,
+            &GroundSampler::default(),
+            ROAD_WIDTH_M,
+        );
+        assert_eq!(
+            mesh.count_vertices(),
+            0,
+            "zero-length segment produces no quad"
+        );
     }
 }

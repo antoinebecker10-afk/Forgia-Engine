@@ -59,14 +59,34 @@ pub fn subdivide_rect(corners: [Vec2; 4], target_area: f32, max_depth: u32, out:
         // Split across edges 0→1 and 3→2 (halve the longer pair).
         let m01 = corners[0].midpoint(corners[1]);
         let m32 = corners[3].midpoint(corners[2]);
-        subdivide_rect([corners[0], m01, m32, corners[3]], target_area, max_depth - 1, out);
-        subdivide_rect([m01, corners[1], corners[2], m32], target_area, max_depth - 1, out);
+        subdivide_rect(
+            [corners[0], m01, m32, corners[3]],
+            target_area,
+            max_depth - 1,
+            out,
+        );
+        subdivide_rect(
+            [m01, corners[1], corners[2], m32],
+            target_area,
+            max_depth - 1,
+            out,
+        );
     } else {
         // Split across edges 1→2 and 0→3.
         let m12 = corners[1].midpoint(corners[2]);
         let m03 = corners[0].midpoint(corners[3]);
-        subdivide_rect([corners[0], corners[1], m12, m03], target_area, max_depth - 1, out);
-        subdivide_rect([m03, m12, corners[2], corners[3]], target_area, max_depth - 1, out);
+        subdivide_rect(
+            [corners[0], corners[1], m12, m03],
+            target_area,
+            max_depth - 1,
+            out,
+        );
+        subdivide_rect(
+            [m03, m12, corners[2], corners[3]],
+            target_area,
+            max_depth - 1,
+            out,
+        );
     }
 }
 
@@ -102,7 +122,10 @@ mod tests {
         let total: f32 = out.iter().map(|p| rect_area(&to4(&p.polygon))).sum();
         assert!((total - 576.0).abs() < 1.0, "lots tile the block: {total}");
         for p in &out {
-            assert!(rect_area(&to4(&p.polygon)) <= 100.0 + 1e-2, "lot under target area");
+            assert!(
+                rect_area(&to4(&p.polygon)) <= 100.0 + 1e-2,
+                "lot under target area"
+            );
             assert_eq!(p.polygon.len(), 4, "lots stay rectangular");
         }
     }
@@ -126,7 +149,10 @@ mod tests {
         let max = Vec2::splat(30.0);
         let coarse = generate_parcels(min, max, 30.0, 3.0, 300.0, 8).len();
         let fine = generate_parcels(min, max, 30.0, 3.0, 80.0, 8).len();
-        assert!(fine > coarse, "smaller target → more parcels ({fine} vs {coarse})");
+        assert!(
+            fine > coarse,
+            "smaller target → more parcels ({fine} vs {coarse})"
+        );
     }
 
     fn to4(poly: &[Vec2]) -> [Vec2; 4] {

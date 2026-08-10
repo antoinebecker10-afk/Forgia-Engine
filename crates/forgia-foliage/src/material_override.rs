@@ -29,10 +29,22 @@ use std::collections::VecDeque;
 /// (ktx2.rs `Bc7RgbaUnormSrgb`), pas l'OETF du fichier. Les 3 sont donc encodées sRGB.
 /// (Corriger nor/arm en linéaire = follow-up qualité séparé, changerait l'éclairage.)
 /// Les `.jpg` sources restent en place (revert).
-pub const BARK_DIFF_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.ktx2";
+pub const BARK_DIFF_PATH: &str =
+    "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_diff_2k.ktx2";
 pub const BARK_NOR_PATH: &str =
     "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_nor_gl_2k.ktx2";
 pub const BARK_ARM_PATH: &str = "textures/pbr/jolcham_oak_bark_01/jolcham_oak_bark_01_arm_2k.ktx2";
+
+/// Atlas de feuilles du Hall (pack Highlands Castle) — le feuillage le plus
+/// abouti du projet. Recette relevée sur `M_ENV_tree_leaves_castle_01` :
+/// MASK + double-face + roughness 0 + teinte sombre MULTIPLIÉE (étude 2026-08-10).
+pub const LEAF_DIFF_PATH: &str =
+    "models/environment/castle/castle_stream_cells_grass/textures/T_ENV_tree_leaves_castle_01.png";
+
+/// Teinte de multiplication des feuilles, en LINÉAIRE (sémantique glTF
+/// `baseColorFactor` du Hall : `[0.084, 0.392, 0.028]`) — l'atlas est clair,
+/// la teinte l'assombrit et l'unifie.
+pub const LEAF_TINT_LINEAR: [f32; 3] = [0.084, 0.392, 0.028];
 
 /// Noms de primitives consideres comme "tronc" (lowercase substring match).
 ///
@@ -46,6 +58,12 @@ pub const TRUNK_PATTERNS: &[&str] = &["bark", "trunk", "wood", "stem", "tree"];
 /// Noms de primitives qui sont du FEUILLAGE, jamais du tronc. Filtre prioritaire :
 /// `Tree_01_zb.926.Tree_01_Leaves` contient `"tree"` mais EST du feuillage.
 pub const LEAF_PATTERNS: &[&str] = &["leaf", "leaves", "canopy", "foliage", "needle"];
+
+/// Retourne `true` si `name` (insensible a la casse) designe une primitive feuillage.
+pub fn is_leaf_primitive_name(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    LEAF_PATTERNS.iter().any(|pat| lower.contains(pat))
+}
 
 /// Retourne `true` si `name` (insensible a la casse) designe une primitive tronc.
 ///
@@ -70,6 +88,14 @@ pub struct BarkTextures {
     pub material: Option<Handle<StandardMaterial>>,
 }
 
+/// Handles vers l'atlas de feuilles du Hall + material bake lazily.
+#[derive(Resource, Default)]
+pub struct LeafTextures {
+    pub diff: Handle<Image>,
+    /// Material bake lazily au 1er appel `apply_trunk_bark_override`.
+    pub material: Option<Handle<StandardMaterial>>,
+}
+
 /// Configuration de l'override material trunk.
 ///
 /// `Default` custom : `enabled = true`, `frames_polled_max = 30`
@@ -78,6 +104,10 @@ pub struct BarkTextures {
 pub struct BarkOverrideConfig {
     /// Active/desactive l'override au runtime.
     pub enabled: bool,
+    /// Active/desactive l'override FEUILLAGE (recette Hall). Essai visuel
+    /// 2026-08-10 : les canopees Quaternius sont des volumes pleins, pas des
+    /// cards — se juge a l'ecran, toggle pour revert instantane.
+    pub leaves_enabled: bool,
     /// Nombre max de frames de polling avant fallback triangle count.
     pub frames_polled_max: u8,
     /// Arbres overrides par nom (statistiques sensor).
@@ -86,16 +116,20 @@ pub struct BarkOverrideConfig {
     pub fallback: u32,
     /// Arbres abandonnes (aucune primitive trouvee apres double timeout).
     pub not_found: u32,
+    /// Primitives feuillage overrides (statistiques sensor).
+    pub leaves_overridden: u32,
 }
 
 impl Default for BarkOverrideConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            leaves_enabled: true,
             frames_polled_max: 30,
             overridden: 0,
             fallback: 0,
             not_found: 0,
+            leaves_overridden: 0,
         }
     }
 }
@@ -164,6 +198,11 @@ pub fn preload_bark_textures(mut commands: Commands, asset_server: Res<AssetServ
         arm: asset_server.load_with_settings(BARK_ARM_PATH, repeat),
         material: None,
     });
+    // Atlas de feuilles : sampler par défaut (UVs natifs des canopées, pas de tiling).
+    commands.insert_resource(LeafTextures {
+        diff: asset_server.load(LEAF_DIFF_PATH),
+        material: None,
+    });
 }
 
 /// Update system : applique l'override material trunk sur les arbres marques.
@@ -180,6 +219,7 @@ pub fn preload_bark_textures(mut commands: Commands, asset_server: Res<AssetServ
 pub fn apply_trunk_bark_override(
     mut commands: Commands,
     mut bark: ResMut<BarkTextures>,
+    mut leaves: ResMut<LeafTextures>,
     mut cfg: ResMut<BarkOverrideConfig>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     meshes: Res<Assets<Mesh>>,
@@ -213,10 +253,34 @@ pub fn apply_trunk_bark_override(
         }
     };
 
+    // Lazy-build du material feuilles (recette Hall : MASK + double-face +
+    // roughness 0 + reflectance 0 + teinte lineaire sombre multipliee).
+    let leaf_mat_handle = match &leaves.material {
+        Some(h) => h.clone(),
+        None => {
+            let [lr, lg, lb] = LEAF_TINT_LINEAR;
+            let mat = StandardMaterial {
+                base_color: Color::linear_rgb(lr, lg, lb),
+                base_color_texture: Some(leaves.diff.clone()),
+                alpha_mode: AlphaMode::Mask(0.2),
+                double_sided: true,
+                cull_mode: None,
+                perceptual_roughness: 0.0,
+                metallic: 0.0,
+                reflectance: 0.0,
+                ..default()
+            };
+            let handle = materials.add(mat);
+            leaves.material = Some(handle.clone());
+            handle
+        }
+    };
+
     for (entity, mut marker) in &mut q_targets {
         // Collecte tous les descendants via BFS iteratif.
         let mut stack: Vec<Entity> = vec![entity];
         let mut name_match: Option<Entity> = None;
+        let mut leaf_matches: Vec<Entity> = Vec::new();
         let mut mesh_children: Vec<(Entity, usize)> = Vec::new(); // (entity, tri_count)
 
         while let Some(current) = stack.pop() {
@@ -233,12 +297,13 @@ pub fn apply_trunk_bark_override(
                             .unwrap_or(0);
                         mesh_children.push((child, tri_count));
 
-                        // Verifie si le nom matche.
-                        if name_match.is_none() {
-                            if let Ok(name) = q_name.get(child) {
-                                if is_trunk_primitive_name(name.as_str()) {
-                                    name_match = Some(child);
-                                }
+                        if let Ok(name) = q_name.get(child) {
+                            // Verifie si le nom matche tronc / feuillage.
+                            if name_match.is_none() && is_trunk_primitive_name(name.as_str()) {
+                                name_match = Some(child);
+                            }
+                            if is_leaf_primitive_name(name.as_str()) {
+                                leaf_matches.push(child);
                             }
                         }
                     }
@@ -247,6 +312,21 @@ pub fn apply_trunk_bark_override(
         }
 
         let double_timeout = cfg.frames_polled_max.saturating_mul(2);
+
+        // Feuillage : applique au moment ou le marker se RESOUT (une seule fois),
+        // quel que soit le sort du tronc — sinon re-insertion a chaque frame de poll.
+        let resolves = name_match.is_some()
+            || (marker.frames_polled >= cfg.frames_polled_max && !mesh_children.is_empty())
+            || marker.frames_polled >= double_timeout;
+        if resolves && cfg.leaves_enabled {
+            for &leaf in &leaf_matches {
+                commands
+                    .entity(leaf)
+                    .remove::<MeshMaterial3d<StandardMaterial>>()
+                    .insert(MeshMaterial3d(leaf_mat_handle.clone()));
+                cfg.leaves_overridden += 1;
+            }
+        }
 
         if let Some(trunk_child) = name_match {
             // Match par nom : override immediat.
@@ -396,6 +476,20 @@ mod tests {
         assert!(!is_trunk_primitive_name("Sphere001"));
         assert!(!is_trunk_primitive_name("Empty"));
         assert!(!is_trunk_primitive_name(""));
+    }
+
+    #[test]
+    fn leaf_name_matcher_symmetric_with_trunk_filter() {
+        // Tout nom que le filtre tronc exclut comme feuillage est bien un leaf-match.
+        assert!(is_leaf_primitive_name("Icosphere.001.Leaves"));
+        assert!(is_leaf_primitive_name("Tree_01_zb.926.Tree_01_Leaves"));
+        assert!(is_leaf_primitive_name("canopy_high"));
+        assert!(is_leaf_primitive_name("Leaf_Pine"));
+        assert!(is_leaf_primitive_name("needle_cluster"));
+        // Un tronc n'est jamais un leaf-match.
+        assert!(!is_leaf_primitive_name("Icosphere.001.Tree"));
+        assert!(!is_leaf_primitive_name("oak_bark_lod0"));
+        assert!(!is_leaf_primitive_name("Cube.083.Black"));
     }
 
     #[test]

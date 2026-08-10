@@ -124,9 +124,15 @@ mod tests {
         let t = template();
         let b = resolve_building(&t, &reg, 0.0, 0.0, 10.0, 7, 0.5);
         assert!(b.len() >= 2, "base + at least one floor");
-        assert!((b[0].ground_pos.y - 10.0).abs() < 1e-3, "base sits on base_y");
+        assert!(
+            (b[0].ground_pos.y - 10.0).abs() < 1e-3,
+            "base sits on base_y"
+        );
         for w in b.windows(2) {
-            assert!(w[1].ground_pos.y >= w[0].ground_pos.y, "each module is on top of the previous");
+            assert!(
+                w[1].ground_pos.y >= w[0].ground_pos.y,
+                "each module is on top of the previous"
+            );
         }
         // All share the same footprint XZ.
         for p in &b {
@@ -140,7 +146,10 @@ mod tests {
         let t = template(); // base(1) + [1..=3] floors + cap(1) → 3..=5 modules
         for seed in 0..50u64 {
             let n = resolve_building(&t, &reg, 0.0, 0.0, 0.0, seed, 0.5).len();
-            assert!((3..=5).contains(&n), "module count {n} out of expected range");
+            assert!(
+                (3..=5).contains(&n),
+                "module count {n} out of expected range"
+            );
         }
     }
 }

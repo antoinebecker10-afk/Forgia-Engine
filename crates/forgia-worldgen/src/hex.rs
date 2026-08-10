@@ -174,7 +174,11 @@ mod tests {
     fn from_world_inverts_to_world() {
         let size = 5.0;
         for h in hex_spiral(4) {
-            assert_eq!(Hex::from_world(h.to_world(size), size), h, "roundtrip failed for {h:?}");
+            assert_eq!(
+                Hex::from_world(h.to_world(size), size),
+                h,
+                "roundtrip failed for {h:?}"
+            );
         }
     }
 

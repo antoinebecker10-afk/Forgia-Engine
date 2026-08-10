@@ -155,7 +155,14 @@ pub fn sys_stream_city(
             let Some(gltf_mesh) = gltf_meshes.get(gm) else {
                 continue; // sub-asset not ready — skip this chunk's building for now
             };
-            entities.push(spawn_module(&mut commands, &kit, &meshes, meta, gltf_mesh, point));
+            entities.push(spawn_module(
+                &mut commands,
+                &kit,
+                &meshes,
+                meta,
+                gltf_mesh,
+                point,
+            ));
         }
         streaming.active.insert(c, entities);
     }

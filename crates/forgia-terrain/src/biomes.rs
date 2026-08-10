@@ -127,16 +127,16 @@ impl BiomeType {
     /// des défauts, comme `color()`/`roughness()` ; mirroir des 10 TOML.
     pub fn amplitude_mult_default(&self) -> f32 {
         match self {
-            Self::Plains => 0.45,    // plaines plates
-            Self::Forest => 1.0,     // rolling (référence)
-            Self::Desert => 0.65,    // dunes basses
-            Self::Mountain => 1.5,   // montagnes hautes
-            Self::Swamp => 0.40,     // marais très plat
-            Self::Tundra => 0.85,    // collines douces
-            Self::Savanna => 0.70,   // plat-ondulé
-            Self::Jungle => 1.10,    // vallonné dense
-            Self::Volcanic => 1.30,  // accidenté
-            Self::Canyon => 1.20,    // relief marqué
+            Self::Plains => 0.45,   // plaines plates
+            Self::Forest => 1.0,    // rolling (référence)
+            Self::Desert => 0.65,   // dunes basses
+            Self::Mountain => 1.5,  // montagnes hautes
+            Self::Swamp => 0.40,    // marais très plat
+            Self::Tundra => 0.85,   // collines douces
+            Self::Savanna => 0.70,  // plat-ondulé
+            Self::Jungle => 1.10,   // vallonné dense
+            Self::Volcanic => 1.30, // accidenté
+            Self::Canyon => 1.20,   // relief marqué
         }
     }
 }
@@ -205,8 +205,7 @@ pub fn clear_world_biome_map() {
 // ECS au `BiomeRegistry`. On publie donc la table résolue (TOML ou fallback) dans
 // ce global indexé par `BiomeType as usize` (Plains=0…Canyon=9). Set au spawn +
 // hot-reload par forgia-rpg, clear à la sortie. `None` → fallback hardcodé.
-static WORLD_BIOME_AMPLITUDES: std::sync::RwLock<Option<[f32; 10]>> =
-    std::sync::RwLock::new(None);
+static WORLD_BIOME_AMPLITUDES: std::sync::RwLock<Option<[f32; 10]>> = std::sync::RwLock::new(None);
 
 /// Table d'amplitude relief par défaut (fallback hardcodé), indexée
 /// `BiomeType as usize`. Utilisée quand aucune table TOML n'est publiée.

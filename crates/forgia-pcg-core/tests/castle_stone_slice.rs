@@ -14,7 +14,14 @@ use forgia_pcg_core::{
 const KIT: &str = include_str!("../../../assets/pcg/kits/castle_stone/1.0.0/kit.toml");
 const SPEC: &str = include_str!("../../../assets/pcg/specs/hall_highlands.content-spec.toml");
 
-fn attach(instance: &str, zone: &str, from: &str, from_socket: &str, piece: &str, socket: &str) -> AttachRequest {
+fn attach(
+    instance: &str,
+    zone: &str,
+    from: &str,
+    from_socket: &str,
+    piece: &str,
+    socket: &str,
+) -> AttachRequest {
     AttachRequest {
         instance_id: instance.into(),
         zone_id: zone.into(),
@@ -41,10 +48,31 @@ fn castle_stone_slice_assembles_and_validates() {
         yaw_deg: 0.0,
     };
     let attachments = [
-        attach("inst.entree", "west_entry", "inst.great_hall", "entry", "entree", "door_out"),
-        attach("inst.mur_a", "rampart", "inst.entree", "west", "mur_droit", "east"),
+        attach(
+            "inst.entree",
+            "west_entry",
+            "inst.great_hall",
+            "entry",
+            "entree",
+            "door_out",
+        ),
+        attach(
+            "inst.mur_a",
+            "rampart",
+            "inst.entree",
+            "west",
+            "mur_droit",
+            "east",
+        ),
         attach("inst.tour", "tower", "inst.mur_a", "west", "tour", "attach"),
-        attach("inst.angle", "rampart", "inst.entree", "east", "angle", "west"),
+        attach(
+            "inst.angle",
+            "rampart",
+            "inst.entree",
+            "east",
+            "angle",
+            "west",
+        ),
     ];
 
     let mut plan =
@@ -79,7 +107,10 @@ fn castle_stone_slice_assembles_and_validates() {
 
     let layout = StreamingLayout::from_spec(spec.streaming.as_ref().expect("[streaming] present"));
     plan.stream_cells = compute_stream_cells(&plan, &layout);
-    assert!(!plan.stream_cells.is_empty(), "cells computed from the assembly");
+    assert!(
+        !plan.stream_cells.is_empty(),
+        "cells computed from the assembly"
+    );
 
     let report = validate_spatial_plan(&spec, &manifest, &plan);
     assert!(

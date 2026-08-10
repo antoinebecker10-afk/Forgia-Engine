@@ -223,7 +223,10 @@ fn sys_worldgen_input(
         match cache::load(BAKE_CITY_PATH) {
             Some(points) => {
                 stats.last_row = points.len() as u32;
-                info!("[worldgen] F11: loaded {} baked modules (no regen)", points.len());
+                info!(
+                    "[worldgen] F11: loaded {} baked modules (no regen)",
+                    points.len()
+                );
                 queue.pending.extend(points);
             }
             None => warn!("[worldgen] F11: no baked city — press F9 first"),
@@ -244,7 +247,13 @@ fn sys_worldgen_input(
         };
         let (origin, right, fwd) = camera_placement(cam);
         let mode = if f9 { GenMode::City } else { GenMode::Hamlet };
-        *last = LastGen { active: true, mode, origin, axis_x: right, axis_z: fwd };
+        *last = LastGen {
+            active: true,
+            mode,
+            origin,
+            axis_x: right,
+            axis_z: fwd,
+        };
         (mode, origin, right, fwd)
     } else if last.active {
         (last.mode, last.origin, last.axis_x, last.axis_z)
@@ -384,7 +393,10 @@ pub fn build_city(
             continue;
         }
         if registry.get(&lm.module_id).is_none() {
-            warn!("[worldgen] landmark '{}' not in registry — skipped", lm.module_id);
+            warn!(
+                "[worldgen] landmark '{}' not in registry — skipped",
+                lm.module_id
+            );
             continue;
         }
         let local = Vec2::new(lm.x, lm.z);
@@ -402,7 +414,10 @@ pub fn build_city(
     // Procedural buildings on the remaining parcels (grammar-resolved, seeded per parcel).
     let reserve_r = recipe.landmark_reserve_radius.max(0.0);
     for (i, parcel) in parcels.iter().enumerate() {
-        if reserved.iter().any(|r| parcel.center.distance(*r) < reserve_r) {
+        if reserved
+            .iter()
+            .any(|r| parcel.center.distance(*r) < reserve_r)
+        {
             continue; // reserved for a landmark
         }
         let world = to_world(parcel.center);

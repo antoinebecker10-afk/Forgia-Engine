@@ -421,7 +421,11 @@ mod tests {
                 "road_config {b:?}: TOML {rt:?} != fallback {rf:?}"
             );
             // Champs Option volontairement omis → doivent rester None / 1.0.
-            assert_eq!(toml.lacunarity_for(b), None, "lacunarity {b:?} doit rester None");
+            assert_eq!(
+                toml.lacunarity_for(b),
+                None,
+                "lacunarity {b:?} doit rester None"
+            );
             assert_eq!(toml.persistence_for(b), None, "persistence {b:?}");
             assert_eq!(toml.slope_max_for(b), None, "slope_max {b:?}");
             assert!(

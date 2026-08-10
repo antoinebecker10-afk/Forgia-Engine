@@ -100,7 +100,10 @@ pub fn build_house_mesh(
         tri(corners[i], corners[(i + 1) % 4], apex, roof_color);
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, pos);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, nrm);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, col);
@@ -125,7 +128,15 @@ mod tests {
 
     #[test]
     fn house_has_walls_and_roof() {
-        let m = build_house_mesh(6.0, 5.0, 4.0, 2.5, 0.4, [0.8, 0.7, 0.5, 1.0], [0.6, 0.2, 0.15, 1.0]);
+        let m = build_house_mesh(
+            6.0,
+            5.0,
+            4.0,
+            2.5,
+            0.4,
+            [0.8, 0.7, 0.5, 1.0],
+            [0.6, 0.2, 0.15, 1.0],
+        );
         // 4 walls (4 verts each) + 4 roof tris (3 verts each) = 16 + 12 = 28 verts.
         assert_eq!(m.count_vertices(), 28);
         // 4 walls (6 idx) + 4 tris (3 idx) = 24 + 12 = 36 indices.

@@ -436,7 +436,12 @@ fn build_lod2_terrain_mesh(
             .unwrap_or(0.0);
         // Story-577 polish : couleur blendée (cohérent avec les chunks LOD0/LOD1).
         colors.push(crate::meshing_heightmap::blended_vertex_color(
-            biome_map, sample_x, sample_z, pos[1], slope, terrain_cfg,
+            biome_map,
+            sample_x,
+            sample_z,
+            pos[1],
+            slope,
+            terrain_cfg,
         ));
     }
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
@@ -586,8 +591,13 @@ pub fn build_lod2_tiles_system(
         let center = cluster_world_center(key);
 
         // Per-cluster mesh : Y per-vertex heightmap (+ flatten village) + color biome.
-        let cluster_mesh =
-            build_lod2_terrain_mesh(center, off, &terrain_cfg, &biome_map, flatten_zones.as_deref());
+        let cluster_mesh = build_lod2_terrain_mesh(
+            center,
+            off,
+            &terrain_cfg,
+            &biome_map,
+            flatten_zones.as_deref(),
+        );
         // B2 (story-587) : collider trimesh sur le mesh LOD2 → le sol lointain
         // (128–1500m) devient collisionnable. Avant, seuls les chunks LOD0/LOD1
         // portaient un `Collider::heightfield` → chute à travers le terrain dès qu'on

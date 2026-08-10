@@ -225,9 +225,9 @@ seed = 1
             preload_neighbors: 1,
         };
         let p = plan(vec![
-            instance("a", [1.0, 0.0, 1.0]),    // cell (0,0,0)
-            instance("b", [40.0, 0.0, 1.0]),   // cell (1,0,0) — neighbour of a
-            instance("c", [200.0, 0.0, 1.0]),  // cell (6,0,0) — isolated
+            instance("a", [1.0, 0.0, 1.0]),   // cell (0,0,0)
+            instance("b", [40.0, 0.0, 1.0]),  // cell (1,0,0) — neighbour of a
+            instance("c", [200.0, 0.0, 1.0]), // cell (6,0,0) — isolated
         ]);
         let cells = compute_stream_cells(&p, &layout);
         assert_eq!(cells.len(), 3);
@@ -270,8 +270,14 @@ seed = 1
             ]
         );
         // Physics strictly precedes Rendered (the whole point).
-        let physics = ladder.iter().position(|p| *p == CellPhase::Physics).unwrap();
-        let render = ladder.iter().position(|p| *p == CellPhase::Rendered).unwrap();
+        let physics = ladder
+            .iter()
+            .position(|p| *p == CellPhase::Physics)
+            .unwrap();
+        let render = ladder
+            .iter()
+            .position(|p| *p == CellPhase::Rendered)
+            .unwrap();
         assert!(physics < render);
     }
 

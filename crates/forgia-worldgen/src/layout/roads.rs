@@ -88,9 +88,31 @@ pub fn generate_roads(
     let cell = sep.max(0.5);
     let mut out = Vec::new();
     let mut occ_major = HashSet::new();
-    trace_family(field, &seeds, min, max, step, max_steps, cell, false, &mut occ_major, &mut out);
+    trace_family(
+        field,
+        &seeds,
+        min,
+        max,
+        step,
+        max_steps,
+        cell,
+        false,
+        &mut occ_major,
+        &mut out,
+    );
     let mut occ_minor = HashSet::new();
-    trace_family(field, &seeds, min, max, step, max_steps, cell, true, &mut occ_minor, &mut out);
+    trace_family(
+        field,
+        &seeds,
+        min,
+        max,
+        step,
+        max_steps,
+        cell,
+        true,
+        &mut occ_minor,
+        &mut out,
+    );
     RoadNetwork { segments: out }
 }
 
@@ -153,7 +175,11 @@ fn trace_family(
     occ: &mut HashSet<(i32, i32)>,
     out: &mut Vec<RoadSegment>,
 ) {
-    let kind = if minor { RoadKind::Minor } else { RoadKind::Major };
+    let kind = if minor {
+        RoadKind::Minor
+    } else {
+        RoadKind::Major
+    };
     for &seed in seeds {
         if occ.contains(&cell_key(seed, cell)) {
             continue; // this area is already served by a road of this family
@@ -209,8 +235,14 @@ mod tests {
         assert_eq!(a.segments.len(), b.segments.len(), "deterministic");
         for s in &a.segments {
             for p in [s.a, s.b] {
-                assert!(p.x >= min.x - 4.1 && p.x <= max.x + 4.1, "x in bounds: {p:?}");
-                assert!(p.y >= min.y - 4.1 && p.y <= max.y + 4.1, "y in bounds: {p:?}");
+                assert!(
+                    p.x >= min.x - 4.1 && p.x <= max.x + 4.1,
+                    "x in bounds: {p:?}"
+                );
+                assert!(
+                    p.y >= min.y - 4.1 && p.y <= max.y + 4.1,
+                    "y in bounds: {p:?}"
+                );
             }
         }
         assert!(a.segments.iter().any(|s| s.kind == RoadKind::Major));
@@ -231,6 +263,9 @@ mod tests {
         let far = f.major_dir(Vec2::new(1000.0, 0.0));
         assert!((far.x - 1.0).abs() < 0.05, "far from center → grid (+X)");
         assert!(near.x.abs() < 0.9, "near center → bent away from pure +X");
-        assert!(near.y.abs() > 0.1, "near center → gained a perpendicular component");
+        assert!(
+            near.y.abs() > 0.1,
+            "near center → gained a perpendicular component"
+        );
     }
 }

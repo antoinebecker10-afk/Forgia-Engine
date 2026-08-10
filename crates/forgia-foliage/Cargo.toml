@@ -14,3 +14,5 @@ forgia-core = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-asset-registry = { workspace = true }
 forgia-streaming = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

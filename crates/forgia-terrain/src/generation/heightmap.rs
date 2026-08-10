@@ -63,7 +63,11 @@ fn base_noise_norm(x: f32, z: f32, config: &TerrainConfig, perlin: &Perlin) -> f
     let mut h: f32 = 0.0;
     for &(freq, amp, ridged) in &config.octaves {
         let p = perlin.get([f64::from(sx) * freq, f64::from(sz) * freq]) as f32;
-        let v = if ridged { (1.0 - p.abs()) * 2.0 - 1.0 } else { p };
+        let v = if ridged {
+            (1.0 - p.abs()) * 2.0 - 1.0
+        } else {
+            p
+        };
         h += v * amp;
     }
     (h + 1.0) * 0.5

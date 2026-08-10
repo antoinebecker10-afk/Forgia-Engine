@@ -65,7 +65,9 @@ impl PcgStreamPlan {
                 let instances = plan
                     .instances
                     .iter()
-                    .filter(|inst| cell_of(inst.translation_m, &layout).as_str() == cell.id.as_str())
+                    .filter(|inst| {
+                        cell_of(inst.translation_m, &layout).as_str() == cell.id.as_str()
+                    })
                     .map(|inst| resolve_instance(inst, manifest))
                     .collect();
                 RuntimeCell {
@@ -189,7 +191,11 @@ fn drive_pcg_stream(
     let cells: Vec<String> = state.target.keys().cloned().collect();
     for cell in cells {
         let current = state.phase_of(&cell);
-        let target = state.target.get(&cell).copied().unwrap_or(CellPhase::Unloaded);
+        let target = state
+            .target
+            .get(&cell)
+            .copied()
+            .unwrap_or(CellPhase::Unloaded);
         let next = match current.cmp(&target) {
             std::cmp::Ordering::Less => current.next_up(),
             std::cmp::Ordering::Greater => current.next_down(),
@@ -227,8 +233,7 @@ mod tests {
     };
 
     const KIT: &str = include_str!("../../../assets/pcg/kits/castle_stone/1.0.0/kit.toml");
-    const SPEC: &str =
-        include_str!("../../../assets/pcg/specs/hall_highlands.content-spec.toml");
+    const SPEC: &str = include_str!("../../../assets/pcg/specs/hall_highlands.content-spec.toml");
 
     fn attach(
         instance: &str,
@@ -263,10 +268,31 @@ mod tests {
                 yaw_deg: 0.0,
             },
             &[
-                attach("inst.entree", "west_entry", "inst.great_hall", "entry", "entree", "door_out"),
-                attach("inst.mur_a", "rampart", "inst.entree", "west", "mur_droit", "east"),
+                attach(
+                    "inst.entree",
+                    "west_entry",
+                    "inst.great_hall",
+                    "entry",
+                    "entree",
+                    "door_out",
+                ),
+                attach(
+                    "inst.mur_a",
+                    "rampart",
+                    "inst.entree",
+                    "west",
+                    "mur_droit",
+                    "east",
+                ),
                 attach("inst.tour", "tower", "inst.mur_a", "west", "tour", "attach"),
-                attach("inst.angle", "rampart", "inst.entree", "east", "angle", "west"),
+                attach(
+                    "inst.angle",
+                    "rampart",
+                    "inst.entree",
+                    "east",
+                    "angle",
+                    "west",
+                ),
             ],
         )
         .unwrap();
@@ -276,8 +302,7 @@ mod tests {
     #[test]
     fn builds_runtime_cells_with_resolved_assets() {
         let (spec, manifest, plan) = shipped_plan();
-        let stream_plan =
-            PcgStreamPlan::build(&plan, &manifest, spec.streaming.as_ref().unwrap());
+        let stream_plan = PcgStreamPlan::build(&plan, &manifest, spec.streaming.as_ref().unwrap());
         assert!(stream_plan.cells.len() >= 2);
         assert!(stream_plan.activate_order_sound);
         assert!(stream_plan.deactivate_order_sound);
@@ -294,8 +319,7 @@ mod tests {
     #[test]
     fn load_activates_physics_before_render_and_preloads_neighbour() {
         let (spec, manifest, plan) = shipped_plan();
-        let stream_plan =
-            PcgStreamPlan::build(&plan, &manifest, spec.streaming.as_ref().unwrap());
+        let stream_plan = PcgStreamPlan::build(&plan, &manifest, spec.streaming.as_ref().unwrap());
         let loaded = stream_plan.cells[0].id.clone();
         let dependency = stream_plan.cells[0].dependencies[0].clone();
 
@@ -327,15 +351,16 @@ mod tests {
     #[test]
     fn unload_tears_down_render_before_physics() {
         let (spec, manifest, plan) = shipped_plan();
-        let stream_plan =
-            PcgStreamPlan::build(&plan, &manifest, spec.streaming.as_ref().unwrap());
+        let stream_plan = PcgStreamPlan::build(&plan, &manifest, spec.streaming.as_ref().unwrap());
         let cell = stream_plan.cells[0].id.clone();
 
         let mut app = App::new();
         app.add_plugins(ForgiaPcgStreamPlugin);
         app.insert_resource(stream_plan);
         // Load fully, then unload.
-        app.world_mut().resource_mut::<PcgStreamRequests>().load(&cell);
+        app.world_mut()
+            .resource_mut::<PcgStreamRequests>()
+            .load(&cell);
         for _ in 0..4 {
             app.update();
         }
@@ -343,7 +368,9 @@ mod tests {
             .resource_mut::<PcgStreamState>()
             .transitions
             .clear();
-        app.world_mut().resource_mut::<PcgStreamRequests>().unload(&cell);
+        app.world_mut()
+            .resource_mut::<PcgStreamRequests>()
+            .unload(&cell);
         for _ in 0..4 {
             app.update();
         }
@@ -357,7 +384,11 @@ mod tests {
             .collect();
         assert_eq!(
             seq,
-            vec![CellPhase::Physics, CellPhase::Preloaded, CellPhase::Unloaded]
+            vec![
+                CellPhase::Physics,
+                CellPhase::Preloaded,
+                CellPhase::Unloaded
+            ]
         );
         assert_eq!(state.phase_of(&cell), CellPhase::Unloaded);
     }

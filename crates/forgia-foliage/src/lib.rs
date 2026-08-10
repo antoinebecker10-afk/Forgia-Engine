@@ -69,6 +69,93 @@ fn biome_min_spacing(biome: BiomeType) -> f32 {
     }
 }
 
+/// Densité par biome pilotée par la couche definition —
+/// `assets/genomes/biomes/vegetation_density.toml`. Fallback : les tables Rust
+/// ci-dessus (`biome_max_per_chunk` / `biome_min_spacing`) → zéro régression si
+/// le TOML est absent ou invalide. Chargé au build du plugin ; relancer le mode
+/// pour appliquer une édition.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct VegetationDensityGenome {
+    per_biome: HashMap<BiomeType, BiomeDensity>,
+    /// Plafond DUR d'arbres simultanés (None = fallback const). Leçon OOM
+    /// 2026-08-10 : sans plafond, densité × poids de biome = explosion mémoire
+    /// (42 729 entités, chaque arbre portant un RigidBody Rapier).
+    max_total: Option<usize>,
+}
+
+/// Fallback du plafond global si le TOML est absent — invariant de sécurité
+/// mémoire (même intention que le gène `veg_max_total_base = 3500`, jamais
+/// consommé ; la valeur vivante est dans `vegetation_density.toml`).
+const DEFAULT_MAX_TOTAL_TREES: usize = 4000;
+
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+struct BiomeDensity {
+    max_per_chunk: usize,
+    min_spacing: f32,
+}
+
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+struct GlobalDensityToml {
+    max_total: usize,
+}
+
+#[derive(serde::Deserialize)]
+struct VegetationDensityToml {
+    #[serde(default)]
+    per_biome: HashMap<String, BiomeDensity>,
+    #[serde(default)]
+    global: Option<GlobalDensityToml>,
+}
+
+const VEGETATION_DENSITY_GENOME_PATH: &str = "assets/genomes/biomes/vegetation_density.toml";
+
+impl VegetationDensityGenome {
+    pub fn load_or_default() -> Self {
+        match std::fs::read_to_string(VEGETATION_DENSITY_GENOME_PATH) {
+            Ok(content) => Self::from_toml_str(&content),
+            Err(_) => Self::default(),
+        }
+    }
+
+    fn from_toml_str(content: &str) -> Self {
+        let parsed: VegetationDensityToml = match toml::from_str(content) {
+            Ok(p) => p,
+            Err(e) => {
+                warn!("[foliage] vegetation_density.toml invalide ({e}) — fallback Rust");
+                return Self::default();
+            }
+        };
+        let per_biome = parsed
+            .per_biome
+            .iter()
+            .map(|(name, d)| (BiomeType::from_name(name), *d))
+            .collect();
+        Self {
+            per_biome,
+            max_total: parsed.global.map(|g| g.max_total),
+        }
+    }
+
+    /// Plafond global d'arbres simultanés, toutes zones confondues.
+    pub fn max_total(&self) -> usize {
+        self.max_total.unwrap_or(DEFAULT_MAX_TOTAL_TREES)
+    }
+
+    pub fn max_per_chunk(&self, biome: BiomeType) -> usize {
+        self.per_biome
+            .get(&biome)
+            .map(|d| d.max_per_chunk)
+            .unwrap_or_else(|| biome_max_per_chunk(biome))
+    }
+
+    pub fn min_spacing(&self, biome: BiomeType) -> f32 {
+        self.per_biome
+            .get(&biome)
+            .map(|d| d.min_spacing)
+            .unwrap_or_else(|| biome_min_spacing(biome))
+    }
+}
+
 /// Couleur trunk + canopy approximative par biome (legacy procedural variants —
 /// gardé en cas de fallback si AssetRegistry vide).
 #[allow(dead_code)]
@@ -155,6 +242,7 @@ pub struct ForgiaFoliagePlugin;
 impl Plugin for ForgiaFoliagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VegetationManager>()
+            .insert_resource(VegetationDensityGenome::load_or_default())
             .init_resource::<BarkOverrideConfig>()
             .init_resource::<FoliageFallbackDiagnostic>()
             .add_systems(
@@ -201,6 +289,7 @@ fn populate_new_chunks(
     asset_server: Res<AssetServer>,
     registry: Res<AssetRegistry>,
     cfg: Res<BarkOverrideConfig>,
+    density: Res<VegetationDensityGenome>,
     biome_map: Option<Res<BiomeMap>>,
     terrain_cfg: Option<Res<TerrainConfig>>,
     rpg_offset: Option<Res<RpgSampleOffset>>,
@@ -242,10 +331,19 @@ fn populate_new_chunks(
         let sample_z = center.z + rpg_offset.z;
         let biome = biome_map.biome_at(sample_x, sample_z);
 
-        let target = ((biome_max_per_chunk(biome) as f32) * density_factor).round() as usize;
+        // Plafond global DUR (leçon OOM 2026-08-10) : le budget restant borne le
+        // target ; à 0, le chunk est marqué peuplé-vide (pas de retry par frame ;
+        // un unload/reload du chunk re-tentera si de la capacité s'est libérée).
+        let remaining = density.max_total().saturating_sub(veg.total_trees);
+        if remaining == 0 {
+            veg.chunk_entities.insert(*coord, Vec::new());
+            continue;
+        }
+        let target =
+            (((density.max_per_chunk(biome) as f32) * density_factor).round() as usize).min(remaining);
         // LOD1 : espacement Poisson augmenté pour distribution naturelle (sinon
         // les ×0.2 premiers points s'agglutinent dans un coin).
-        let spacing = biome_min_spacing(biome) / density_factor.sqrt();
+        let spacing = density.min_spacing(biome) / density_factor.sqrt();
         let seed = derive_chunk_seed(coord, terrain_cfg.seed);
 
         let pts = poisson_disk_sample(CHUNK_X as f32, CHUNK_Z as f32, spacing, seed, 30);
@@ -607,6 +705,52 @@ mod tests {
         assert!(biome_max_per_chunk(BiomeType::Jungle) > biome_max_per_chunk(BiomeType::Forest));
         assert!(biome_max_per_chunk(BiomeType::Forest) > biome_max_per_chunk(BiomeType::Plains));
         assert!(biome_max_per_chunk(BiomeType::Volcanic) <= biome_max_per_chunk(BiomeType::Desert));
+    }
+
+    /// Genome absent/vide → chaque biome retombe EXACTEMENT sur la table Rust
+    /// (zéro régression si le TOML disparaît).
+    #[test]
+    fn density_genome_default_mirrors_rust_tables() {
+        let g = VegetationDensityGenome::default();
+        for b in [
+            BiomeType::Plains,
+            BiomeType::Forest,
+            BiomeType::Desert,
+            BiomeType::Mountain,
+            BiomeType::Swamp,
+            BiomeType::Tundra,
+            BiomeType::Savanna,
+            BiomeType::Jungle,
+            BiomeType::Volcanic,
+            BiomeType::Canyon,
+        ] {
+            assert_eq!(g.max_per_chunk(b), biome_max_per_chunk(b), "{b:?}");
+            assert!((g.min_spacing(b) - biome_min_spacing(b)).abs() < 1e-6, "{b:?}");
+        }
+        // Le plafond de sécurité existe MÊME sans TOML (leçon OOM 2026-08-10).
+        assert_eq!(g.max_total(), DEFAULT_MAX_TOTAL_TREES);
+    }
+
+    /// Un override par-biome est lu ; les biomes absents gardent le fallback ;
+    /// un TOML invalide ne panique pas.
+    #[test]
+    fn density_genome_parses_overrides_and_survives_garbage() {
+        let g = VegetationDensityGenome::from_toml_str(
+            "[global]\nmax_total = 1234\n[per_biome.forest]\nmax_per_chunk = 80\nmin_spacing = 2.4\n",
+        );
+        assert_eq!(g.max_total(), 1234);
+        assert_eq!(g.max_per_chunk(BiomeType::Forest), 80);
+        assert!((g.min_spacing(BiomeType::Forest) - 2.4).abs() < 1e-6);
+        assert_eq!(
+            g.max_per_chunk(BiomeType::Plains),
+            biome_max_per_chunk(BiomeType::Plains)
+        );
+
+        let garbage = VegetationDensityGenome::from_toml_str("pas du toml ][");
+        assert_eq!(
+            garbage.max_per_chunk(BiomeType::Forest),
+            biome_max_per_chunk(BiomeType::Forest)
+        );
     }
 
     #[test]

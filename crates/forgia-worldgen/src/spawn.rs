@@ -148,7 +148,10 @@ pub(crate) fn spawn_module(
     parent.with_children(|p| {
         // Visual: one child per glTF primitive (same local space → identity transform).
         for prim in &primitives {
-            let material = prim.material.clone().unwrap_or_else(|| fallback_mat.clone());
+            let material = prim
+                .material
+                .clone()
+                .unwrap_or_else(|| fallback_mat.clone());
             p.spawn((
                 Mesh3d(prim.mesh.clone()),
                 MeshMaterial3d(material),

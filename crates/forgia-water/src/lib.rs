@@ -63,10 +63,7 @@ impl Plugin for ForgiaWaterPlugin {
 /// Sync `WaterSettings.height` ← `SeaLevel` Resource si Changed/Added.
 /// Permet aux modes (RPG) d'inserer `SeaLevel(N)` au OnEnter et que la nappe
 /// reflète immédiatement. Pas de hot path : déclenche uniquement sur Changed.
-fn sync_sea_level_resource(
-    sea_level: Option<Res<SeaLevel>>,
-    mut settings: ResMut<WaterSettings>,
-) {
+fn sync_sea_level_resource(sea_level: Option<Res<SeaLevel>>, mut settings: ResMut<WaterSettings>) {
     let Some(sea_level) = sea_level else {
         return;
     };
