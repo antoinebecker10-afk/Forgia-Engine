@@ -3,6 +3,21 @@
 > **Constitution V2. L'IA lit ce fichier en premier et s'y conforme.**
 > Hérité V1 + nettoyé sections obsolètes + leçons V1 intégrées dès jour 1.
 
+## 0. Mémoire permanente — règle bloquante
+
+Avant toute modification non triviale, lire `docs/AI_MEMORY_MAP.md`, puis
+l'index mémoire actif qu'il désigne. Rechercher dans **tous** les espaces mémoire
+enregistrés les concepts, crates, systèmes, symptômes et stories concernés, puis
+lire les fichiers `feedback_*`, `reference_*` et `session_*` pertinents.
+
+La mémoire historique est obligatoire comme contexte d'apprentissage, mais elle
+doit toujours être vérifiée contre le code, les tests, les genomes et les
+capteurs actuels. Les `.jsonl` sont consultés en dernier recours quand la mémoire
+synthétisée ne permet pas de retrouver une décision ou un échange précis.
+
+Les nouvelles connaissances V2 sont écrites uniquement dans la destination
+canonique donnée par `docs/AI_MEMORY_MAP.md` et indexées dans son `MEMORY.md`.
+
 ---
 
 ## 1. Vision

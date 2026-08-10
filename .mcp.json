@@ -8,9 +8,11 @@
     "mempalace": {
       "type": "stdio",
       "command": "C:/Users/Antoi/AppData/Local/Programs/Python/Python314/python.exe",
-      "args": ["-m", "mempalace.mcp_server", "--palace", "D:/Mémoire claude/mempalace"],
+      "args": ["-m", "mempalace.mcp_server"],
       "env": {
-        "PYTHONIOENCODING": "utf-8"
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+        "MEMPALACE_PALACE_PATH": "C:/Users/Antoi/.mempalace/palace"
       }
     },
     "context7": {
@@ -25,6 +27,11 @@
       "env": {
         "OLLAMA_HOST": "http://localhost:11434"
       }
+    },
+    "bevy-brp": {
+      "type": "stdio",
+      "command": "C:/Users/Antoi/.cargo/bin/bevy_brp_mcp.exe",
+      "args": []
     }
   }
 }

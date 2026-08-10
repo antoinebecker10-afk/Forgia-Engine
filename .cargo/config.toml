@@ -6,6 +6,11 @@ forgia-dev = "run -p forgia --features profile-tracy --"
 forgia-fast = "run -p forgia --profile release-fast --features profile-tracy --"
 # À lancer seulement pour une enquête mémoire avec le viewer Tracy ouvert.
 forgia-memory = "run -p forgia --profile release-fast --features profile-tracy-memory --"
+# Lance le jeu avec le pont d'inspection ECS sur localhost:15702. Le serveur MCP
+# `bevy-brp` peut alors interroger le monde vivant sans toucher aux builds joueur.
+forgia-brp = "run -p forgia --features dev-brp --"
+# Audit local rapide et sans compilation du code du jeu.
+forgia-supply-chain = "deny check advisories bans sources"
 
 # Bevy + wgpu + Tracy peuvent épuiser la RAM/pagefile si rustc compile les 20+
 # crates lourdes en parallèle. Deux jobs gardent le build reproductible sur la
