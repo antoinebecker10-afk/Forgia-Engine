@@ -31,58 +31,107 @@ use crate::proc_walk;
 pub const GAIT_BIPED_LIZARD_PATH: &str = "config/genomes/anim/gait_biped_lizard.toml";
 
 // ── Défauts serde = miroir EXACT des const proc_walk (zéro régression) ──────────
-fn d_stride_walk() -> f32 { proc_walk::STRIDE_PER_M_WALK }
-fn d_stride_run() -> f32 { proc_walk::STRIDE_PER_M_RUN }
-fn d_stance_walk() -> f32 { proc_walk::STANCE_FRAC_WALK }
-fn d_stance_run() -> f32 { proc_walk::STANCE_FRAC_RUN }
-fn d_thigh_walk() -> f32 { proc_walk::AMP_THIGH_WALK }
-fn d_thigh_run() -> f32 { proc_walk::AMP_THIGH_RUN }
-fn d_arm_walk() -> f32 { proc_walk::AMP_ARM_WALK }
-fn d_arm_run() -> f32 { proc_walk::AMP_ARM_RUN }
-fn d_knee_walk() -> f32 { proc_walk::KNEE_FLEX_PEAK_WALK }
-fn d_knee_run() -> f32 { proc_walk::KNEE_FLEX_PEAK_RUN }
-fn d_pyaw_walk() -> f32 { proc_walk::PELVIC_YAW_AMP_WALK }
-fn d_pyaw_run() -> f32 { proc_walk::PELVIC_YAW_AMP_RUN }
-fn d_pbob_walk() -> f32 { proc_walk::PELVIC_BOB_AMP_WALK }
-fn d_pbob_run() -> f32 { proc_walk::PELVIC_BOB_AMP_RUN }
+fn d_stride_walk() -> f32 {
+    proc_walk::STRIDE_PER_M_WALK
+}
+fn d_stride_run() -> f32 {
+    proc_walk::STRIDE_PER_M_RUN
+}
+fn d_stance_walk() -> f32 {
+    proc_walk::STANCE_FRAC_WALK
+}
+fn d_stance_run() -> f32 {
+    proc_walk::STANCE_FRAC_RUN
+}
+fn d_thigh_walk() -> f32 {
+    proc_walk::AMP_THIGH_WALK
+}
+fn d_thigh_run() -> f32 {
+    proc_walk::AMP_THIGH_RUN
+}
+fn d_arm_walk() -> f32 {
+    proc_walk::AMP_ARM_WALK
+}
+fn d_arm_run() -> f32 {
+    proc_walk::AMP_ARM_RUN
+}
+fn d_knee_walk() -> f32 {
+    proc_walk::KNEE_FLEX_PEAK_WALK
+}
+fn d_knee_run() -> f32 {
+    proc_walk::KNEE_FLEX_PEAK_RUN
+}
+fn d_pyaw_walk() -> f32 {
+    proc_walk::PELVIC_YAW_AMP_WALK
+}
+fn d_pyaw_run() -> f32 {
+    proc_walk::PELVIC_YAW_AMP_RUN
+}
+fn d_pbob_walk() -> f32 {
+    proc_walk::PELVIC_BOB_AMP_WALK
+}
+fn d_pbob_run() -> f32 {
+    proc_walk::PELVIC_BOB_AMP_RUN
+}
 
 /// Paires WALK/RUN du cycle de marche, lerpées par `for_speed`. Tous les champs ont
 /// un défaut serde (miroir const) → un TOML partiel/absent ne casse jamais.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct GaitGenome {
     /// Cycles par mètre (cadence). Walk ~0.55, run ~0.40.
-    #[serde(default = "d_stride_walk")] pub stride_per_m_walk: f32,
-    #[serde(default = "d_stride_run")] pub stride_per_m_run: f32,
+    #[serde(default = "d_stride_walk")]
+    pub stride_per_m_walk: f32,
+    #[serde(default = "d_stride_run")]
+    pub stride_per_m_run: f32,
     /// Ratio stance/swing.
-    #[serde(default = "d_stance_walk")] pub stance_frac_walk: f32,
-    #[serde(default = "d_stance_run")] pub stance_frac_run: f32,
+    #[serde(default = "d_stance_walk")]
+    pub stance_frac_walk: f32,
+    #[serde(default = "d_stance_run")]
+    pub stance_frac_run: f32,
     /// Amplitude swing cuisse (rad).
-    #[serde(default = "d_thigh_walk")] pub amp_thigh_walk: f32,
-    #[serde(default = "d_thigh_run")] pub amp_thigh_run: f32,
+    #[serde(default = "d_thigh_walk")]
+    pub amp_thigh_walk: f32,
+    #[serde(default = "d_thigh_run")]
+    pub amp_thigh_run: f32,
     /// Amplitude swing bras / pitch épaule (rad).
-    #[serde(default = "d_arm_walk")] pub amp_arm_walk: f32,
-    #[serde(default = "d_arm_run")] pub amp_arm_run: f32,
+    #[serde(default = "d_arm_walk")]
+    pub amp_arm_walk: f32,
+    #[serde(default = "d_arm_run")]
+    pub amp_arm_run: f32,
     /// Flexion genou peak (rad). Anatomie : digitigrade ~92° vs plantigrade différent.
-    #[serde(default = "d_knee_walk")] pub knee_flex_peak_walk: f32,
-    #[serde(default = "d_knee_run")] pub knee_flex_peak_run: f32,
+    #[serde(default = "d_knee_walk")]
+    pub knee_flex_peak_walk: f32,
+    #[serde(default = "d_knee_run")]
+    pub knee_flex_peak_run: f32,
     /// Yaw bassin (rad).
-    #[serde(default = "d_pyaw_walk")] pub pelvic_yaw_amp_walk: f32,
-    #[serde(default = "d_pyaw_run")] pub pelvic_yaw_amp_run: f32,
+    #[serde(default = "d_pyaw_walk")]
+    pub pelvic_yaw_amp_walk: f32,
+    #[serde(default = "d_pyaw_run")]
+    pub pelvic_yaw_amp_run: f32,
     /// Bob vertical bassin (m).
-    #[serde(default = "d_pbob_walk")] pub pelvic_bob_amp_walk: f32,
-    #[serde(default = "d_pbob_run")] pub pelvic_bob_amp_run: f32,
+    #[serde(default = "d_pbob_walk")]
+    pub pelvic_bob_amp_walk: f32,
+    #[serde(default = "d_pbob_run")]
+    pub pelvic_bob_amp_run: f32,
 }
 
 impl Default for GaitGenome {
     fn default() -> Self {
         Self {
-            stride_per_m_walk: d_stride_walk(), stride_per_m_run: d_stride_run(),
-            stance_frac_walk: d_stance_walk(), stance_frac_run: d_stance_run(),
-            amp_thigh_walk: d_thigh_walk(), amp_thigh_run: d_thigh_run(),
-            amp_arm_walk: d_arm_walk(), amp_arm_run: d_arm_run(),
-            knee_flex_peak_walk: d_knee_walk(), knee_flex_peak_run: d_knee_run(),
-            pelvic_yaw_amp_walk: d_pyaw_walk(), pelvic_yaw_amp_run: d_pyaw_run(),
-            pelvic_bob_amp_walk: d_pbob_walk(), pelvic_bob_amp_run: d_pbob_run(),
+            stride_per_m_walk: d_stride_walk(),
+            stride_per_m_run: d_stride_run(),
+            stance_frac_walk: d_stance_walk(),
+            stance_frac_run: d_stance_run(),
+            amp_thigh_walk: d_thigh_walk(),
+            amp_thigh_run: d_thigh_run(),
+            amp_arm_walk: d_arm_walk(),
+            amp_arm_run: d_arm_run(),
+            knee_flex_peak_walk: d_knee_walk(),
+            knee_flex_peak_run: d_knee_run(),
+            pelvic_yaw_amp_walk: d_pyaw_walk(),
+            pelvic_yaw_amp_run: d_pyaw_run(),
+            pelvic_bob_amp_walk: d_pbob_walk(),
+            pelvic_bob_amp_run: d_pbob_run(),
         }
     }
 }
@@ -97,18 +146,27 @@ impl GaitGenome {
                 Ok(g) => {
                     bevy::log::info!(
                         "[gait-genome] chargé {} : stride={:.2}/{:.2} amp_thigh={:.2}/{:.2}",
-                        p.display(), g.stride_per_m_walk, g.stride_per_m_run,
-                        g.amp_thigh_walk, g.amp_thigh_run
+                        p.display(),
+                        g.stride_per_m_walk,
+                        g.stride_per_m_run,
+                        g.amp_thigh_walk,
+                        g.amp_thigh_run
                     );
                     g
                 }
                 Err(e) => {
-                    bevy::log::warn!("[gait-genome] parse {} échoué ({e}) — défaut (miroir const)", p.display());
+                    bevy::log::warn!(
+                        "[gait-genome] parse {} échoué ({e}) — défaut (miroir const)",
+                        p.display()
+                    );
                     Self::default()
                 }
             },
             Err(_) => {
-                bevy::log::info!("[gait-genome] pas de {} — défaut (miroir const)", p.display());
+                bevy::log::info!(
+                    "[gait-genome] pas de {} — défaut (miroir const)",
+                    p.display()
+                );
                 Self::default()
             }
         }

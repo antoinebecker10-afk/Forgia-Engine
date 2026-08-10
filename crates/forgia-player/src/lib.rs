@@ -27,8 +27,7 @@ pub mod prelude {
     pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
     pub use crate::{
         CameraFov, CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning,
-        MovementSpeedMultiplier,
-        Player, PlayerLocomotion, PlayerMovementTuning, ViewmodelCamera,
+        MovementSpeedMultiplier, Player, PlayerLocomotion, PlayerMovementTuning, ViewmodelCamera,
     };
 }
 
@@ -284,10 +283,16 @@ pub struct CameraMode {
     pub is_third_person: bool,
 }
 
-/// Story-615 — FOV hipfire de la caméra FPS, en degrés. Source de vérité partagée
+/// Story-615 — FOV hipfire de la caméra FPS, en degrés **HORIZONTAUX** (convention
+/// joueur/marché — CS2, Gunfire quotent l'horizontal). Source de vérité partagée
 /// entre `forgia-ui-lib` (slider menu ESC → écrit ici) et `forgia-viewmodel`
-/// (`apply_ads_camera_fov` lit ici comme base, puis lerp vers l'ADS). Vit dans
-/// `forgia-player` car c'est la dépendance commune des deux crates (zéro cycle).
+/// (`apply_ads_camera_fov` lit ici, convertit en vertical Bevy selon l'aspect de
+/// la projection, puis lerp vers l'ADS). Vit dans `forgia-player` car c'est la
+/// dépendance commune des deux crates (zéro cycle).
+///
+/// ⚠️ Fix 2026-08-05 : ces degrés étaient appliqués tels quels au `fov` VERTICAL
+/// de Bevy → 90 donnait 121°H réels à 16:9 (étirement des bords, nausée). La
+/// conversion H→V vit dans `forgia-viewmodel::pose::horizontal_fov_to_vertical_deg`.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct CameraFov {
     pub hipfire_deg: f32,
@@ -295,8 +300,8 @@ pub struct CameraFov {
 
 impl Default for CameraFov {
     fn default() -> Self {
-        // 90° = défaut UserSettings.fov_deg. Plus large que l'ancien hipfire 45°
-        // (≈73° H, étroit) — fenêtre FPS rapide recommandée ~90-110° horizontal.
+        // 90° HORIZONTAL = défaut UserSettings.fov_deg (≈58,7° vertical à 16:9).
+        // Fenêtre FPS rapide recommandée ~90-110° horizontal.
         Self { hipfire_deg: 90.0 }
     }
 }
@@ -608,7 +613,11 @@ fn player_movement(
     // Story-594 : valeurs genome (assets/genomes/player_movement.toml, hot-reload).
     // Sprint (Shift) : bloqué en ADS (speed_mul < 1.0 = visée, convention CoD).
     let sprinting = action.pressed(&PlayerAction::Sprint) && speed_mul.0 >= 1.0;
-    let sprint_mul = if sprinting { tuning.sprint_multiplier } else { 1.0 };
+    let sprint_mul = if sprinting {
+        tuning.sprint_multiplier
+    } else {
+        1.0
+    };
     // 2026-08-04 — atouts « corps ». Multiplicatif avec l'ADS et le sprint : les
     // trois sont des raisons INDÉPENDANTES d'aller plus ou moins vite, et les
     // additionner les ferait s'annuler (viser en sprintant avec un atout ne doit

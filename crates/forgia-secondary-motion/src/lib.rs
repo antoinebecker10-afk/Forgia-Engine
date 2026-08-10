@@ -55,12 +55,13 @@ pub struct ForgiaSecondaryMotionPlugin;
 
 impl Plugin for ForgiaSecondaryMotionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PostUpdate,
-            solver::update_spring_bones
-                .before(TransformSystems::Propagate)
-                .run_if(any_with_component::<SpringBoneChain>),
-        );
+        app.init_resource::<forgia_anim_debug::AnimLayerStats>()
+            .add_systems(
+                PostUpdate,
+                solver::update_spring_bones
+                    .before(TransformSystems::Propagate)
+                    .run_if(any_with_component::<SpringBoneChain>),
+            );
     }
 }
 

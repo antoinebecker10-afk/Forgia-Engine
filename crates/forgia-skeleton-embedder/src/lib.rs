@@ -565,10 +565,7 @@ fn embed_one_chain(
                 const LEG_Z_FORWARD_BIAS: f32 = 0.6;
                 let template_pos = center_xz + template.bones[bone_idx].pos_vec3() * mesh_height;
                 let z_final = path_pos.z + LEG_Z_FORWARD_BIAS * (template_pos.z - path_pos.z);
-                (
-                    Vec3::new(path_pos.x, template_pos.y, z_final),
-                    path_r,
-                )
+                (Vec3::new(path_pos.x, template_pos.y, z_final), path_r)
             } else {
                 (path_pos, path_r)
             }

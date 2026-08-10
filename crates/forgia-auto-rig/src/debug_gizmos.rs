@@ -86,7 +86,14 @@ pub struct TorsoStat {
 
 impl TorsoStat {
     fn new(y: f32, z: f32) -> Self {
-        Self { y_min: y, y_max: y, y_last: y, z_min: z, z_max: z, z_last: z }
+        Self {
+            y_min: y,
+            y_max: y,
+            y_last: y,
+            z_min: z,
+            z_max: z,
+            z_last: z,
+        }
     }
     fn update(&mut self, y: f32, z: f32) {
         self.y_min = self.y_min.min(y);
@@ -110,7 +117,13 @@ pub fn draw_rig_gizmos(
     mut dump_timer: Local<f32>,
     mut torso_accum: Local<HashMap<u64, TorsoStat>>,
     mut gizmos: Gizmos,
-    q_bones: Query<(Entity, &GlobalTransform, &Name, Option<&ChildOf>, &BoneEntity)>,
+    q_bones: Query<(
+        Entity,
+        &GlobalTransform,
+        &Name,
+        Option<&ChildOf>,
+        &BoneEntity,
+    )>,
     q_global: Query<&GlobalTransform>,
 ) {
     // `config.enabled` ne masque QUE l'overlay VISUEL (rings + lignes). Le dump
@@ -191,7 +204,13 @@ pub fn draw_rig_gizmos(
 /// `rig` permet d'isoler Rex (= le seul squelette avec des os `tail_*`).
 /// `dy_prev`/`dz_prev` ne sont calculés qu'à l'intérieur d'un même `rig`.
 fn write_rig_bones_sensor(
-    q_bones: &Query<(Entity, &GlobalTransform, &Name, Option<&ChildOf>, &BoneEntity)>,
+    q_bones: &Query<(
+        Entity,
+        &GlobalTransform,
+        &Name,
+        Option<&ChildOf>,
+        &BoneEntity,
+    )>,
     torso_accum: &HashMap<u64, TorsoStat>,
 ) {
     // (rig_id, name, color, world) — rig_id = bits stables de l'entity rig_root.
@@ -208,8 +227,11 @@ fn write_rig_bones_sensor(
         .collect();
     // Tri : par squelette (rig) puis Y monde décroissant dans le squelette.
     rows.sort_by(|a, b| {
-        a.0.cmp(&b.0)
-            .then(b.3.y.partial_cmp(&a.3.y).unwrap_or(std::cmp::Ordering::Equal))
+        a.0.cmp(&b.0).then(
+            b.3.y
+                .partial_cmp(&a.3.y)
+                .unwrap_or(std::cmp::Ordering::Equal),
+        )
     });
 
     let mut json = String::with_capacity(4096);
@@ -258,15 +280,25 @@ fn write_rig_bones_sensor(
 /// Label court de classe (aligné `color_for_name`) pour le sensor.
 fn class_label(name: &str) -> &'static str {
     let n = name.to_ascii_lowercase();
-    if n.contains("thigh") || n.contains("shin") || n.contains("foot") || n.contains("leg") || n.contains("toe") {
+    if n.contains("thigh")
+        || n.contains("shin")
+        || n.contains("foot")
+        || n.contains("leg")
+        || n.contains("toe")
+    {
         "leg"
-    } else if n.contains("arm") || n.contains("forearm") || n.contains("clavicle") || n.contains("hand") {
+    } else if n.contains("arm")
+        || n.contains("forearm")
+        || n.contains("clavicle")
+        || n.contains("hand")
+    {
         "arm"
     } else if n.contains("tail_") {
         "tail"
     } else if n.contains("head") || n.contains("neck") || n.contains("skull") {
         "head"
-    } else if n.contains("spine") || n.contains("chest") || n.contains("hip") || n.contains("torso") {
+    } else if n.contains("spine") || n.contains("chest") || n.contains("hip") || n.contains("torso")
+    {
         "spine"
     } else {
         "unknown"
@@ -278,7 +310,12 @@ fn class_label(name: &str) -> &'static str {
 /// (hip, spine_*, thigh_L/R, shin_*, foot_*, arm_L/R, forearm_*, neck, head, tail_*).
 fn color_for_name(name: &str) -> Color {
     let n = name.to_ascii_lowercase();
-    if n.contains("thigh") || n.contains("shin") || n.contains("foot") || n.contains("leg") || n.contains("toe") {
+    if n.contains("thigh")
+        || n.contains("shin")
+        || n.contains("foot")
+        || n.contains("leg")
+        || n.contains("toe")
+    {
         if n.contains("_l") || n.ends_with("l") {
             COLOR_LEG
         } else {

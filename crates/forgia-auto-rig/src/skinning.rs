@@ -168,7 +168,12 @@ pub fn inject_skinning_for_rigged_meshes(
         //    GlobalTransform n'est pas encore propagé → retry au prochain frame.
         let live_positions: Vec<Vec3> = bones
             .iter()
-            .map(|&b| q_global.get(b).map(|gt| gt.translation()).unwrap_or(Vec3::ZERO))
+            .map(|&b| {
+                q_global
+                    .get(b)
+                    .map(|gt| gt.translation())
+                    .unwrap_or(Vec3::ZERO)
+            })
             .collect();
         if live_positions.iter().all(|p| p.length_squared() < 1e-6) {
             // Retry attendu (pas de stats incrément).
@@ -812,11 +817,8 @@ mod tests {
             .id();
         world.entity_mut(root).add_child(child);
 
-        let mut state: SystemState<(
-            Query<&GlobalTransform>,
-            Query<&Children>,
-            Query<&Transform>,
-        )> = SystemState::new(&mut world);
+        let mut state: SystemState<(Query<&GlobalTransform>, Query<&Children>, Query<&Transform>)> =
+            SystemState::new(&mut world);
         let (q_global, q_children, q_transform) = state.get(&world);
         let rest = compute_rest_bone_globals(root, &q_global, &q_children, &q_transform);
 
@@ -842,8 +844,13 @@ mod tests {
             Vec3::new(0.0, 0.5, 0.5),
             Vec3::new(0.0, 0.5, -0.5),
         ];
-        let (_, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
+        let (_, weights) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &pts(&bones),
+            &neutral_kinds(bones.len()),
+            &cfg(),
+        );
         for w in &weights {
             let sum: f32 = w.iter().sum();
             assert!(
@@ -864,8 +871,13 @@ mod tests {
             Vec3::new(10.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, 10.0),
         ];
-        let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
+        let (indices, weights) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &pts(&bones),
+            &neutral_kinds(bones.len()),
+            &cfg(),
+        );
         assert_eq!(indices[0][0], 0, "bone 0 doit être le 1er joint");
         assert!(
             weights[0][0] > 0.9,
@@ -881,8 +893,13 @@ mod tests {
         // distribués si plusieurs slots actifs).
         let positions = vec![[1.0, 1.0, 1.0]];
         let bones = vec![Vec3::ZERO];
-        let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
+        let (indices, weights) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &pts(&bones),
+            &neutral_kinds(bones.len()),
+            &cfg(),
+        );
         assert_eq!(indices[0][0], 0);
         let sum: f32 = weights[0].iter().sum();
         assert!(
@@ -896,8 +913,13 @@ mod tests {
     fn weights_indices_have_correct_length() {
         let positions = vec![[0.0, 0.0, 0.0]; 100];
         let bones = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z, Vec3::NEG_X];
-        let (indices, weights) =
-            compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &pts(&bones), &neutral_kinds(bones.len()), &cfg());
+        let (indices, weights) = compute_nearest_bone_weights(
+            &positions,
+            &Mat4::IDENTITY,
+            &pts(&bones),
+            &neutral_kinds(bones.len()),
+            &cfg(),
+        );
         assert_eq!(indices.len(), 100);
         assert_eq!(weights.len(), 100);
     }
@@ -949,9 +971,21 @@ mod tests {
             (Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, -0.5, 0.0)), // 2 chest
         ];
         let kinds = vec![
-            BoneSkinKind { is_arm: false, is_head: true, is_body: false },
-            BoneSkinKind { is_arm: true, is_head: false, is_body: false },
-            BoneSkinKind { is_arm: false, is_head: false, is_body: false },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: true,
+                is_body: false,
+            },
+            BoneSkinKind {
+                is_arm: true,
+                is_head: false,
+                is_body: false,
+            },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: false,
+                is_body: false,
+            },
         ];
         let (indices, _) =
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
@@ -990,9 +1024,21 @@ mod tests {
             (Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, -0.5, 0.0)), // 2 hip (body, loin)
         ];
         let kinds = vec![
-            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
-            BoneSkinKind { is_arm: true, is_head: false, is_body: false },
-            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: false,
+                is_body: true,
+            },
+            BoneSkinKind {
+                is_arm: true,
+                is_head: false,
+                is_body: false,
+            },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: false,
+                is_body: true,
+            },
         ];
         let (indices, _) =
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());
@@ -1030,9 +1076,21 @@ mod tests {
             (Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, -0.5, 0.0)), // 2 hip (body, loin)
         ];
         let kinds = vec![
-            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
-            BoneSkinKind { is_arm: false, is_head: true, is_body: false },
-            BoneSkinKind { is_arm: false, is_head: false, is_body: true },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: false,
+                is_body: true,
+            },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: true,
+                is_body: false,
+            },
+            BoneSkinKind {
+                is_arm: false,
+                is_head: false,
+                is_body: true,
+            },
         ];
         let (indices, _) =
             compute_nearest_bone_weights(&positions, &Mat4::IDENTITY, &segments, &kinds, &cfg());

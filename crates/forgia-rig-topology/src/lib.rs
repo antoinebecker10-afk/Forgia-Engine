@@ -521,7 +521,11 @@ mod tests {
             ("thigh_r", Some("bone_root"), Vec3::new(0.15, -0.4, 0.0)),
         ]);
         let topo = analyze(&b);
-        assert_eq!(topo.left_arm, Some(b.by_name["arm_l"]), "upper arm identifié");
+        assert_eq!(
+            topo.left_arm,
+            Some(b.by_name["arm_l"]),
+            "upper arm identifié"
+        );
         assert_eq!(topo.left_forearm, Some(b.by_name["forearm_l"]));
         assert_eq!(topo.left_hand, Some(b.by_name["hand_l"]));
         assert_eq!(topo.right_forearm, Some(b.by_name["forearm_r"]));

@@ -121,7 +121,10 @@ pub fn dash_input_system(
 
     metrics.dash_uses_total = metrics.dash_uses_total.saturating_add(1);
     events.write(DashUsedEvent);
-    info!("[forgia-player::dash] {VOICELINE_HOP} (charges restantes: {})", dash.charges);
+    info!(
+        "[forgia-player::dash] {VOICELINE_HOP} (charges restantes: {})",
+        dash.charges
+    );
 }
 
 /// System motion : pendant la fenêtre active, override la translation horizontal
@@ -153,7 +156,11 @@ pub fn dash_motion_system(
 
 /// System recharge : incrémente charges quand >= cooldown_per_charge_secs s'est
 /// écoulé depuis le dernier usage ET charges < max.
-pub fn dash_recharge_system(time: Res<Time>, tuning: Res<DashTuning>, mut q: Query<&mut DashState, With<Player>>) {
+pub fn dash_recharge_system(
+    time: Res<Time>,
+    tuning: Res<DashTuning>,
+    mut q: Query<&mut DashState, With<Player>>,
+) {
     let Ok(mut dash) = q.single_mut() else {
         return;
     };

@@ -981,7 +981,11 @@ mod tests {
         let t = SkeletonTemplate::biped_lizard();
         // 3 spine + 2 head/neck + 8 bras (clav+upper+fore+main ×2) + 8 jambes
         // (thigh+shin+foot+toe ×2) + 4 tail = 25.
-        assert_eq!(t.bones.len(), 25, "biped_lizard = 25 os (humanoïde complet)");
+        assert_eq!(
+            t.bones.len(),
+            25,
+            "biped_lizard = 25 os (humanoïde complet)"
+        );
         assert_eq!(t.bones[0].name, "hip");
         assert!(t.bones[0].parent.is_none());
         assert!(!t.bones.iter().any(|b| b.name == "spine_mid"));
