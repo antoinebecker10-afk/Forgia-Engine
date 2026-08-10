@@ -38,15 +38,15 @@ pub mod arms;
 pub mod arms_sensor;
 pub mod attach;
 pub mod calibration;
-pub mod vm_camera;
 pub mod calibration_sensor;
 pub mod fade;
 pub mod genome;
 pub mod pose;
+pub mod sprite;
+pub mod vm_camera;
 
 // Re-exports clés pour faciliter `use forgia_viewmodel::{...}`.
 pub use arms::{ForgiaViewmodelArmsPlugin, ViewmodelArms, ViewmodelArmsTuning};
-pub use vm_camera::{ForgiaViewmodelCameraPlugin, ViewmodelFovTuning, VIEWMODEL_LAYER};
 pub use attach::{
     attach_viewmodel_to_camera, auto_scale_viewmodel, despawn_viewmodel,
     ensure_camera_shake_component, load_weapon_models, update_viewmodel_on_switch,
@@ -67,6 +67,10 @@ pub use pose::{
     update_ads_progress, AdsState, AdsTuning, ForgiaViewmodelPosePlugin, RightMouseState,
     ViewmodelMotionOffset, ViewmodelMotionTuning,
 };
+pub use sprite::{
+    ForgiaViewmodelSpritePlugin, NeedsSpriteMesh, SpriteClip, SpriteViewmodel, weapon_is_sprite,
+};
+pub use vm_camera::{ForgiaViewmodelCameraPlugin, ViewmodelFovTuning, VIEWMODEL_LAYER};
 
 /// Plugin global : compose attach + pose + fade, idempotent sur MeshFaderPlugin.
 ///
@@ -95,6 +99,7 @@ impl Plugin for ForgiaViewmodelPlugin {
         app.add_systems(Startup, genome::load_viewmodel_genome)
             .add_plugins((
                 ForgiaViewmodelAttachPlugin,
+                sprite::ForgiaViewmodelSpritePlugin,
                 ForgiaViewmodelPosePlugin,
                 ForgiaViewmodelFadePlugin,
                 arms::ForgiaViewmodelArmsPlugin,

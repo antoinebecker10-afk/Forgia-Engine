@@ -71,8 +71,7 @@ impl CombatRng {
     /// (`seed`, `drop_counter`, `salt`) — jamais de l'horloge ni de l'adresse
     /// entité (`Entity::to_bits`, non reproductible).
     pub fn drop_stream(&self, salt: u64) -> forgia_rng::Rng {
-        let mixed = self
-            .seed
+        let mixed = self.seed
             ^ self.drop_counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)
             ^ salt.wrapping_mul(0x2545_F491_4F6C_DD1D);
         forgia_rng::Rng::new(mixed)
@@ -84,8 +83,7 @@ impl CombatRng {
         // Mix multiplicatif (constantes premières impaires) — chaque dimension
         // (tir / sous-index / usage) sur un sel distinct → flux décorrélés. Le
         // splitmix64 interne de `Rng::new` diffuse ensuite les bits.
-        let mixed = self
-            .seed
+        let mixed = self.seed
             ^ self.shot_counter.wrapping_mul(0x9E37_79B9_7F4A_7C15)
             ^ u64::from(sub_index).wrapping_mul(0xBF58_476D_1CE4_E5B9)
             ^ salt.wrapping_mul(0x2545_F491_4F6C_DD1D);

@@ -57,6 +57,35 @@ pub struct ViewmodelGenomeEntry {
     /// Défaut `false` (deux mains). Hot-reload.
     #[serde(default)]
     pub hide_support_hand: bool,
+    /// Dossier des frames pixel art (relatif à `assets/`). Vide = viewmodel 3D
+    /// GLB classique. Renseigné → l'arme est rendue en sprite sur un quad, et les
+    /// bras 3D sont masqués (la main fait partie du sprite).
+    ///
+    /// Aucune DURÉE d'animation ici : les clips se calent sur les valeurs
+    /// gameplay qui existent déjà (`reload_time_secs`, `fire_rate`). Une durée
+    /// d'anim écrite à part serait la même grandeur écrite deux fois, et les
+    /// deux finiraient par diverger au premier passage de balance.
+    #[serde(default)]
+    pub sprite_dir: String,
+    /// Nombre de frames du clip de tir (fichiers `<arme>_fire_NN.png`).
+    #[serde(default)]
+    pub sprite_fire_frames: usize,
+    /// Nombre de frames du clip de rechargement (`<arme>_reload_NN.png`).
+    #[serde(default)]
+    pub sprite_reload_frames: usize,
+    /// Frames du clip de repos. > 1 → l'arme s'anime au repos (Pépin cligne des
+    /// yeux). C'est la seule durée d'animation stockée ici : contrairement au
+    /// rechargement et au tir, aucune valeur de gameplay ne porte le rythme d'un
+    /// battement de paupière.
+    #[serde(default = "default_sprite_idle_frames")]
+    pub sprite_idle_frames: usize,
+    #[serde(default = "default_sprite_idle_secs")]
+    pub sprite_idle_secs: f32,
+    /// Frames du clip de VISÉE. L'arme y est vue plein dos, dans l'axe du canon
+    /// (convention CoD) — ce n'est pas le sprite de hanche recadré, c'est la même
+    /// arme regardée d'ailleurs, donc un clip à part.
+    #[serde(default)]
+    pub sprite_ads_frames: usize,
     /// Roulis PAR-ARME (deg) autour de l'axe avant-bras, ajouté à la pose bakée →
     /// oriente la paume par-arme sans re-baker le GLB (story-661). Défaut 0.
     /// `grip_` = main crosse (droite), `barrel_` = main soutien (gauche).
@@ -243,6 +272,14 @@ fn default_mag_size() -> u32 {
 fn default_reserve_max() -> u32 {
     120
 }
+fn default_sprite_idle_frames() -> usize {
+    1
+}
+
+fn default_sprite_idle_secs() -> f32 {
+    3.5
+}
+
 fn default_reload_time_secs() -> f32 {
     1.8
 }

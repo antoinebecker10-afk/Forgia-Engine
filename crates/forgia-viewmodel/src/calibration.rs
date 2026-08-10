@@ -132,6 +132,12 @@ mod tests {
             reload_kind: "mag".to_string(),
             infinite_ammo: false,
             low_ammo_threshold: 0.25,
+            sprite_dir: String::new(),
+            sprite_fire_frames: 0,
+            sprite_reload_frames: 0,
+            sprite_idle_frames: 1,
+            sprite_idle_secs: 3.5,
+            sprite_ads_frames: 0,
         }
     }
 

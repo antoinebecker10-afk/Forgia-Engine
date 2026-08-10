@@ -71,16 +71,35 @@ impl AmmoCtx<'_> {
 
 // ─── System : sync genome → slots ──────────────────────────────────────────
 
+/// Pur — applique le bonus d'atout « chargeur » aux tailles de munitions.
+///
+/// Rend `(chargeur, réserve)`. **La réserve n'est jamais multipliée** : le HUD
+/// promet « +X % chargeur », et les deux grandeurs pilotent des choses
+/// différentes (rythme du combat vs autonomie entre stations). `max(1)` interdit
+/// un chargeur vide, qui rendrait l'arme injouable.
+pub fn boosted_ammo_sizes(mag_size: u32, reserve_max: u32, mag_mul: f32) -> (u32, u32) {
+    let boosted = ((mag_size as f32 * mag_mul).round() as u32).max(1);
+    (boosted, reserve_max)
+}
+
 /// Extrait l'`AmmoConfig` d'un `ViewmodelGenomeEntry`.
 fn config_from_entry(e: &ViewmodelGenomeEntry, mag_mul: f32) -> AmmoConfig {
     // 2026-08-04 — le bonus de chargeur s'applique ICI, à la conversion
     // génome → config, et non dans le génome lui-même : celui-ci est la source
     // de vérité de l'arme, pas de la run. `max(1)` garantit qu'aucun réglage ne
     // peut produire un chargeur vide (une arme injouable).
-    let grossi = |n: u32| ((n as f32 * mag_mul).round() as u32).max(1);
+    //
+    // ⚠️ 2026-08-06 — il ne touche QUE le chargeur. Il grossissait aussi
+    // `reserve_max`, alors que le HUD annonce « +X % chargeur » : le joueur
+    // achetait une promesse et en recevait deux, dont une invisible. Or les deux
+    // ne jouent pas le même rôle — le chargeur décide du rythme du COMBAT (tirs
+    // avant rechargement), la réserve décide de l'AUTONOMIE entre deux stations.
+    // Les mélanger rendait l'atout impossible à doser. Une réserve agrandie doit
+    // être son propre atout, avec son propre nom.
+    let (mag_size, reserve_max) = boosted_ammo_sizes(e.mag_size, e.reserve_max, mag_mul);
     AmmoConfig {
-        mag_size: grossi(e.mag_size),
-        reserve_max: grossi(e.reserve_max),
+        mag_size,
+        reserve_max,
         reload_time_secs: e.reload_time_secs,
         reload_kind: ReloadKind::from_genome_str(&e.reload_kind),
         infinite_ammo: e.infinite_ammo,
@@ -98,9 +117,10 @@ pub fn sync_ammo_slots_from_genome(
     handle: Option<Res<ViewmodelGenomeHandle>>,
     assets: Res<Assets<Genome<ViewmodelGenome>>>,
     mut equipped: ResMut<EquippedWeapons>,
-    // 2026-08-04 — atouts d'ENTRETIEN : chargeur et réserve agrandis. Relu à
-    // chaque sync, donc un atout pris en cours de run s'applique au prochain
-    // hot-reload de génome comme à la prochaine arme équipée.
+    // 2026-08-04 — atouts d'ENTRETIEN : le CHARGEUR agrandi (la réserve, non —
+    // cf. `config_from_entry`). Relu à chaque sync, donc un atout pris en cours
+    // de run s'applique au prochain hot-reload de génome comme à la prochaine
+    // arme équipée.
     mods: Option<Res<forgia_combat::combat_mods::PlayerCombatMods>>,
     mut ammo_events: MessageWriter<AmmoChanged>,
 ) {
@@ -234,4 +254,45 @@ pub fn cancel_reload_on_weapon_switch(
         events.write(snap);
     }
     *last_current = Some(current);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Le défaut signalé en jeu (2026-08-06) : l'atout « +X % chargeur »
+    /// grossissait AUSSI la réserve. Le joueur achetait une promesse et en
+    /// recevait deux — dont une que le HUD n'annonçait pas.
+    #[test]
+    fn the_magazine_boon_leaves_the_reserve_alone() {
+        // Pépin : 12 balles au chargeur, 84 en réserve. Atout « Besace sans
+        // Fond » (+40 %).
+        let (mag, reserve) = boosted_ammo_sizes(12, 84, 1.40);
+        assert_eq!(mag, 17, "12 × 1,40 = 16,8 → 17");
+        assert_eq!(reserve, 84, "la réserve ne bouge PAS");
+    }
+
+    #[test]
+    fn without_any_boon_nothing_changes() {
+        let (mag, reserve) = boosted_ammo_sizes(30, 120, 1.0);
+        assert_eq!((mag, reserve), (30, 120));
+    }
+
+    #[test]
+    fn a_magazine_can_never_reach_zero() {
+        // Un multiplicateur pathologique ne doit jamais rendre l'arme
+        // injouable : un chargeur de 0 ne tire pas et ne se recharge pas.
+        let (mag, reserve) = boosted_ammo_sizes(3, 15, 0.0);
+        assert_eq!(mag, 1, "plancher à 1 balle");
+        assert_eq!(reserve, 15);
+    }
+
+    #[test]
+    fn boons_stack_multiplicatively_on_the_magazine_only() {
+        // Les deux atouts de la famille cumulés (+20 % et +40 % → ×1,60 côté
+        // `PlayerCombatMods`) : le chargeur suit, la réserve reste plate.
+        let (mag, reserve) = boosted_ammo_sizes(5, 25, 1.60);
+        assert_eq!(mag, 8, "5 × 1,60 = 8");
+        assert_eq!(reserve, 25);
+    }
 }

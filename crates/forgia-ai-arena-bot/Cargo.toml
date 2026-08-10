@@ -12,4 +12,7 @@ bevy = { workspace = true }
 forgia-core = { workspace = true }
 forgia-damage = { path = "../forgia-damage" }
 forgia-combat = { workspace = true }
+# 2026-08-05 — `on_bot_death` doit connaître `AscendsOnDeath` pour ne PAS balayer
+# un corps qui s'envole (cf. le garde jumeau de `despawn_dead_cubes`, forgia-fps).
+forgia-effects = { workspace = true }
 bevy_rapier3d = { workspace = true }

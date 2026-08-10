@@ -63,9 +63,9 @@ fn weapon_knockback_mult(
 ) -> f32 {
     use crate::weapons::WeaponType;
     match w {
-        WeaponType::ModernAR => t.mult_pepin,           // Pépin (pistolet)
-        WeaponType::AssaultRifle => t.mult_bourrasque,  // Bourrasque (SMG)
-        WeaponType::Shotgun => t.mult_lenoir,           // Madame Lenoir (sniper)
+        WeaponType::ModernAR => t.mult_pepin, // Pépin (pistolet)
+        WeaponType::AssaultRifle => t.mult_bourrasque, // Bourrasque (SMG)
+        WeaponType::Shotgun => t.mult_lenoir, // Madame Lenoir (sniper)
         WeaponType::RocketLauncher => t.mult_boucherie, // Boucherie (pump)
         _ => t.mult_default,
     }
@@ -105,9 +105,9 @@ pub fn sys_apply_hit_knockback(
             .weapon
             .map(|w| weapon_knockback_mult(w, &tuning))
             .unwrap_or(tuning.mult_default); // None = melee/world → défaut
-        // Les atouts s'ajoutent MULTIPLICATIVEMENT au multiplicateur d'arme :
-        // « Impact » renforce le caractère de l'arme au lieu de l'écraser — une
-        // Boucherie boostée projette encore plus qu'un Pépin boosté.
+                                             // Les atouts s'ajoutent MULTIPLICATIVEMENT au multiplicateur d'arme :
+                                             // « Impact » renforce le caractère de l'arme au lieu de l'écraser — une
+                                             // Boucherie boostée projette encore plus qu'un Pépin boosté.
         let boon_mult = 1.0 + mods.as_deref().map(|m| m.knockback_strength).unwrap_or(0.0);
         let weapon_mult = weapon_mult * boon_mult;
         let v = knockback_velocity(dir, &tuning, weapon_mult, ev.is_kill);

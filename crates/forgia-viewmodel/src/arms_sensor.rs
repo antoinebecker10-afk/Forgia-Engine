@@ -80,8 +80,13 @@ pub fn write_arms_sensor(
         None => "none",
     };
     // Grâce de 5 ticks (~5 s) : laisse le boot spawner la caméra + les bras.
-    let (severity, next_step) =
-        severity_for_arms(tuning.enabled, tuning.use_glb, glb_failed, roots, *ticks > 5);
+    let (severity, next_step) = severity_for_arms(
+        tuning.enabled,
+        tuning.use_glb,
+        glb_failed,
+        roots,
+        *ticks > 5,
+    );
 
     let json = format!(
         r#"{{"id":"viewmodel_arms","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"enabled":{},"use_glb":{},"glb_scale":{:.2},"mode_active":"{mode_active}","arms_roots":{roots},"hands":{hands},"glb_state_l":"{state_l}","glb_state_r":"{state_r}"}}"#,

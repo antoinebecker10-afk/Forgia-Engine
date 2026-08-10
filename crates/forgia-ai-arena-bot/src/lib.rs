@@ -558,6 +558,7 @@ fn on_bot_death(
     event: On<DeathEvent>,
     mut commands: Commands,
     bots: Query<(&Transform, Option<&BotSpawnPoint>), With<ArenaBot>>,
+    q_ascends: Query<(), With<forgia_effects::prelude::AscendsOnDeath>>,
     mut pending: ResMut<PendingRespawns>,
     game_mode: Option<Res<State<GameMode>>>,
 ) {
@@ -565,13 +566,27 @@ fn on_bot_death(
     let Ok((xf, spawn)) = bots.get(target) else {
         return;
     };
-    let is_roguelite = matches!(game_mode.as_deref().map(|s| s.get()), Some(GameMode::Roguelite));
+    let is_roguelite = matches!(
+        game_mode.as_deref().map(|s| s.get()),
+        Some(GameMode::Roguelite)
+    );
     if !is_roguelite {
         let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
         let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
         pending.queue.push((delay, pos));
     }
     let _ = xf;
+    // 2026-08-05 — un corps qui s'envole n'est balayé par PERSONNE : c'est
+    // `forgia-effects::death_ascension` qui le despawne à la fin de l'envol.
+    //
+    // Ce garde est le jumeau de celui de `despawn_dead_cubes` (forgia-fps).
+    // L'envol des morts a exempté ce balayeur-là et oublié celui-ci : le corps
+    // disparaissait ici pendant le flush du `trigger(DeathEvent)`, avant même
+    // d'avoir reçu `Ascending` — d'où le panic « Entity despawned » sur l'insert.
+    // Deux balayeurs pour un seul concept : ils portent désormais le même garde.
+    if q_ascends.contains(target) {
+        return;
+    }
     if let Ok(mut ec) = commands.get_entity(target) {
         ec.try_despawn();
     }
@@ -585,7 +600,10 @@ fn tick_respawns(
 ) {
     // 2026-05-29 — en Roguelite, drain la queue sans respawn. Garde-fou si des
     // respawns avaient été queuées avant entrée mode (race OnEnter vs ticks).
-    if matches!(game_mode.as_deref().map(|s| s.get()), Some(GameMode::Roguelite)) {
+    if matches!(
+        game_mode.as_deref().map(|s| s.get()),
+        Some(GameMode::Roguelite)
+    ) {
         pending.queue.clear();
         return;
     }
@@ -627,4 +645,71 @@ pub mod prelude {
         ArenaBot, BotShootConfig, BotShootRng, BotSpawnPoint, BotState, BotTarget, BotTracer,
         ForgiaAiArenaBotPlugin, PendingRespawns,
     };
+}
+
+#[cfg(test)]
+mod death_sweep_tests {
+    use super::*;
+    use forgia_damage::DamageKind;
+    use forgia_effects::prelude::AscendsOnDeath;
+
+    /// Monte le strict nécessaire pour faire tourner l'observer de mort.
+    fn app_with_observer() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<PendingRespawns>();
+        app.add_observer(on_bot_death);
+        app
+    }
+
+    fn kill(app: &mut App, target: Entity) {
+        app.world_mut().trigger(DeathEvent {
+            target,
+            source: None,
+            final_kind: DamageKind::Physical,
+        });
+        app.update();
+    }
+
+    /// L'invariant qui a coûté un crash : deux balayeurs de mort existent
+    /// (`despawn_dead_cubes` et celui-ci) et un corps qui s'envole doit
+    /// échapper aux DEUX. Le corriger d'un seul côté laissait cet observer
+    /// despawner la cible pendant le flush, avant son `Ascending`.
+    #[test]
+    fn an_ascending_body_is_never_swept_by_the_death_observer() {
+        let mut app = app_with_observer();
+        let bot = app
+            .world_mut()
+            .spawn((
+                ArenaBot::default(),
+                Transform::default(),
+                AscendsOnDeath::default(),
+            ))
+            .id();
+
+        kill(&mut app, bot);
+
+        assert!(
+            app.world().get_entity(bot).is_ok(),
+            "un corps qui s'envole doit survivre à l'observer — c'est \
+             death_ascension qui le despawne à la fin de l'envol"
+        );
+    }
+
+    /// Le pendant : sans le marqueur, le balayage reste celui d'avant.
+    #[test]
+    fn a_plain_bot_is_still_swept() {
+        let mut app = app_with_observer();
+        let bot = app
+            .world_mut()
+            .spawn((ArenaBot::default(), Transform::default()))
+            .id();
+
+        kill(&mut app, bot);
+
+        assert!(
+            app.world().get_entity(bot).is_err(),
+            "un bot sans envol doit toujours être despawné par l'observer"
+        );
+    }
 }

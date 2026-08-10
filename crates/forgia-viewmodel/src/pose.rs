@@ -249,8 +249,29 @@ pub fn update_ads_progress(
     crosshair.sniper_fullscreen = sniper_fullscreen;
 }
 
-/// Interpole le FOV camera entre default et ads_fov_deg du genome.
+/// Convertit un FOV **horizontal** (convention joueur : slider menu, benchmarks
+/// FPS du marché) en FOV **vertical** (convention Bevy `PerspectiveProjection.fov`),
+/// selon l'aspect réel de la projection : `fov_v = 2·atan(tan(fov_h/2) / aspect)`.
+///
+/// Pourquoi : appliquer les degrés du slider tels quels en vertical donnait
+/// 121° horizontal réel à 16:9 pour un réglage « 90 » — étirement massif des
+/// bords d'écran (classe « une grandeur, deux conventions »). Hor+ standard :
+/// l'angle horizontal perçu est stable quel que soit l'aspect de la fenêtre.
+fn horizontal_fov_to_vertical_deg(fov_h_deg: f32, aspect_ratio: f32) -> f32 {
+    // Garde : aspect nul/négatif (projection pas encore synchronisée à la
+    // fenêtre) → on évite le NaN, la frame suivante corrigera.
+    let aspect = aspect_ratio.max(0.1);
+    let half_h_rad = (fov_h_deg * 0.5).to_radians();
+    (2.0 * (half_h_rad.tan() / aspect).atan()).to_degrees()
+}
+
+/// Interpole le FOV camera entre le hipfire joueur et ads_fov_deg du genome.
 /// Ajoute par-dessus l'offset FOV punch courant (forgia-juice-fov-punch).
+///
+/// Conventions : `CameraFov.hipfire_deg` est un FOV **horizontal** (converti ici
+/// en vertical par aspect) ; `ads_fov_deg` (genome) et le FOV punch restent des
+/// degrés **verticaux** — leur tuning (zoom sniper 25°, punch additif) est calé
+/// sur cette échelle et ne change pas de sens.
 pub fn apply_ads_camera_fov(
     ads: Res<AdsState>,
     equipped: Res<EquippedWeapons>,
@@ -267,11 +288,14 @@ pub fn apply_ads_camera_fov(
         .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current))
         .map(|e| e.ads_fov_deg)
         .unwrap_or(25.0);
-    let base_fov = camera_fov.hipfire_deg.lerp(ads_fov, ads.progress);
     let punch_attenuation = 1.0 - ads.progress * tuning.punch_attenuation;
-    let final_fov = base_fov + fov_punch.current_deg * punch_attenuation;
     for mut proj in &mut q_cam {
         if let Projection::Perspective(p) = proj.as_mut() {
+            // Conversion par caméra : l'aspect vit sur la projection (mis à
+            // jour par Bevy au resize), pas de valeur écran supposée.
+            let hipfire_v = horizontal_fov_to_vertical_deg(camera_fov.hipfire_deg, p.aspect_ratio);
+            let base_fov = hipfire_v.lerp(ads_fov, ads.progress);
+            let final_fov = base_fov + fov_punch.current_deg * punch_attenuation;
             p.fov = final_fov.to_radians();
         }
     }
@@ -363,5 +387,45 @@ impl Plugin for ForgiaViewmodelPosePlugin {
                     .chain()
                     .run_if(in_state(GameMode::Fps).or(in_state(GameMode::Roguelite))),
             );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ASPECT_16_9: f32 = 16.0 / 9.0;
+
+    #[test]
+    fn fov_90_horizontal_at_16_9_is_about_59_vertical() {
+        // tan(45°)=1 → fov_v = 2·atan(9/16) ≈ 58,72°. C'est le « vrai 90 » des
+        // FPS du marché — pas les 121°H qu'on affichait avant le fix.
+        let v = horizontal_fov_to_vertical_deg(90.0, ASPECT_16_9);
+        assert!((v - 58.72).abs() < 0.1, "attendu ~58.72, obtenu {v}");
+    }
+
+    #[test]
+    fn fov_106_horizontal_at_16_9_is_about_73_vertical() {
+        // Repère CS2 max (106,26°H ↔ 73,74°V à 16:9).
+        let v = horizontal_fov_to_vertical_deg(106.26, ASPECT_16_9);
+        assert!((v - 73.74).abs() < 0.1, "attendu ~73.74, obtenu {v}");
+    }
+
+    #[test]
+    fn conversion_is_monotonic_over_slider_range() {
+        // Le slider (60..=120) doit produire un vertical strictement croissant.
+        let mut prev = horizontal_fov_to_vertical_deg(60.0, ASPECT_16_9);
+        for h in 61..=120 {
+            let v = horizontal_fov_to_vertical_deg(h as f32, ASPECT_16_9);
+            assert!(v > prev, "non monotone à {h}°H : {v} <= {prev}");
+            prev = v;
+        }
+    }
+
+    #[test]
+    fn degenerate_aspect_does_not_produce_nan() {
+        // Projection pas encore synchronisée (aspect 0) → clamp, pas de NaN.
+        let v = horizontal_fov_to_vertical_deg(90.0, 0.0);
+        assert!(v.is_finite());
     }
 }

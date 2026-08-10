@@ -26,9 +26,7 @@ use forgia_player::prelude::FpsCamera;
 use crate::attach::{NeedsAutoScale, ViewmodelBaseScale, WeaponViewmodel};
 use crate::calibration::{viewmodel_target_size, viewmodel_transform};
 use crate::genome::{lookup_genome_entry, ViewmodelGenome, ViewmodelGenomeHandle};
-use crate::pose::{
-    apply_ads_viewmodel, apply_viewmodel_sway_bob, AdsState, ViewmodelMotionOffset,
-};
+use crate::pose::{apply_ads_viewmodel, apply_viewmodel_sway_bob, AdsState, ViewmodelMotionOffset};
 
 /// Marker sur le root des bras (enfant de la FpsCamera).
 #[derive(Component)]
@@ -306,7 +304,10 @@ fn smooth_noise(px: u32, py: u32, size: f32, cells: f32) -> f32 {
     let (x0, y0) = (fx.floor() as u32, fy.floor() as u32);
     let (tx, ty) = (fx - x0 as f32, fy - y0 as f32);
     let corner = |cx: u32, cy: u32| {
-        hash01(cx.wrapping_mul(374_761_393).wrapping_add(cy.wrapping_mul(668_265_263)))
+        hash01(
+            cx.wrapping_mul(374_761_393)
+                .wrapping_add(cy.wrapping_mul(668_265_263)),
+        )
     };
     let (v00, v10) = (corner(x0, y0), corner(x0 + 1, y0));
     let (v01, v11) = (corner(x0, y0 + 1), corner(x0 + 1, y0 + 1));
@@ -326,13 +327,13 @@ fn skin_detail_texture() -> Image {
     for y in 0..N {
         for x in 0..N {
             let blotch = smooth_noise(x, y, N as f32, 5.0); // grandes taches
-            // 2e octave (fréquence ~2.5×, coordonnées décalées pour décorréler) :
-            // marbrures moyennes entre les grandes taches et le grain.
+                                                            // 2e octave (fréquence ~2.5×, coordonnées décalées pour décorréler) :
+                                                            // marbrures moyennes entre les grandes taches et le grain.
             let blotch2 = smooth_noise(x.wrapping_add(53), y.wrapping_add(97), N as f32, 13.0);
             let grain = hash01(x.wrapping_mul(73).wrapping_add(y.wrapping_mul(151)));
             // Variation multiplicative douce, légèrement chaude (même moyenne qu'avant).
-            let v = ((0.85 + 0.10 * blotch + 0.05 * blotch2) * (0.97 + 0.03 * grain))
-                .clamp(0.0, 1.0);
+            let v =
+                ((0.85 + 0.10 * blotch + 0.05 * blotch2) * (0.97 + 0.03 * grain)).clamp(0.0, 1.0);
             let idx = ((y * N + x) * 4) as usize;
             data[idx] = (v * 255.0) as u8;
             data[idx + 1] = (v * 0.985 * 255.0) as u8;
@@ -372,7 +373,8 @@ fn spawn_finger(
 ) {
     let root = commands
         .spawn((
-            Transform::from_translation(base).with_rotation(base_rot * Quat::from_rotation_x(curl1)),
+            Transform::from_translation(base)
+                .with_rotation(base_rot * Quat::from_rotation_x(curl1)),
             Visibility::Inherited,
             Name::new("Finger"),
         ))
@@ -441,10 +443,7 @@ fn spawn_hand(
         // la manche (1.25×) pour ne pas la percer.
         commands
             .spawn((
-                Mesh3d(meshes.add(Capsule3d::new(
-                    FOREARM_RADIUS * 1.12,
-                    FOREARM_LEN * 0.20,
-                ))),
+                Mesh3d(meshes.add(Capsule3d::new(FOREARM_RADIUS * 1.12, FOREARM_LEN * 0.20))),
                 MeshMaterial3d(skin.clone()),
                 Transform::from_xyz(0.0, -FOREARM_LEN * 0.60, 0.0)
                     .with_scale(Vec3::new(1.10, 1.0, 0.92)),
@@ -658,7 +657,11 @@ pub fn position_hands(
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
     q_weapon: Query<
         (&Transform, Option<&ViewmodelBaseScale>),
-        (With<WeaponViewmodel>, Without<NeedsAutoScale>, Without<ViewmodelHand>),
+        (
+            With<WeaponViewmodel>,
+            Without<NeedsAutoScale>,
+            Without<ViewmodelHand>,
+        ),
     >,
     mut q: Query<(&mut Transform, &ViewmodelHand), Without<WeaponViewmodel>>,
 ) {
@@ -702,7 +705,11 @@ pub fn position_hands(
             match entry.and_then(|e| e.barrel_anchor) {
                 Some(a) => Vec3::from(a) * ads_mul,
                 // Main soutien : avant (-Z vers le canon), sous l'arme.
-                None => Vec3::new(tuning.barrel_x, tuning.barrel_drop, -tuning.barrel_fwd * len),
+                None => Vec3::new(
+                    tuning.barrel_x,
+                    tuning.barrel_drop,
+                    -tuning.barrel_fwd * len,
+                ),
             }
         };
         let wrist = gun + delta_rot * offset;
@@ -729,8 +736,8 @@ pub fn position_hands(
                 }
             })
             .unwrap_or(0.0);
-        let rot = Quat::from_rotation_arc(Vec3::Y, fwd)
-            * Quat::from_rotation_y(roll_deg.to_radians());
+        let rot =
+            Quat::from_rotation_arc(Vec3::Y, fwd) * Quat::from_rotation_y(roll_deg.to_radians());
         // GLB = mètres réels (glb_scale ~1) ; procédural = proportions internes ×scale.
         let scale = if tuning.use_glb {
             tuning.glb_scale
@@ -767,9 +774,12 @@ pub fn update_arms_visibility(
     let entry = genome_handle
         .as_deref()
         .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
-    let hide = entry
-        .map(|e| e.sniper_scope_fullscreen && ads.progress > 0.5)
-        .unwrap_or(false);
+    // Une arme pixel art porte sa main DANS le sprite : laisser les bras 3D
+    // par-dessus donnerait deux mains sur la même crosse.
+    let hide = crate::sprite::weapon_is_sprite(entry)
+        || entry
+            .map(|e| e.sniper_scope_fullscreen && ads.progress > 0.5)
+            .unwrap_or(false);
     let target = if hide {
         Visibility::Hidden
     } else {

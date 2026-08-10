@@ -78,6 +78,15 @@ pub fn attach_viewmodel_to_camera(
     genome_assets: Res<Assets<Genome<ViewmodelGenome>>>,
 ) {
     let Some(assets) = assets else { return };
+    let entry = genome_handle
+        .as_deref()
+        .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
+    // Arme rendue en pixel art : c'est `sprite::spawn_sprite_viewmodel` qui la
+    // prend en charge. Les deux systèmes gardent la même condition « pas encore
+    // de viewmodel sous la caméra », donc un seul des deux spawne.
+    if crate::sprite::weapon_is_sprite(entry) {
+        return;
+    }
     for (cam, children) in &q_cam {
         let has_vm = children
             .map(|c| c.iter().any(|child| q_viewmodel.get(child).is_ok()))
@@ -85,9 +94,6 @@ pub fn attach_viewmodel_to_camera(
         if has_vm {
             continue;
         }
-        let entry = genome_handle
-            .as_deref()
-            .and_then(|h| lookup_genome_entry(&genome_assets, h, equipped.current));
         let scene = scene_for_weapon(&assets, equipped.current);
         let tf = viewmodel_transform(equipped.current, entry);
         let target = viewmodel_target_size(equipped.current, entry);
@@ -143,7 +149,12 @@ pub fn update_viewmodel_on_switch(
         scene.0 = scene_for_weapon(&assets, equipped.current);
         *tf = viewmodel_transform(equipped.current, entry);
         *vis = Visibility::Hidden;
-        commands.entity(entity).insert(NeedsAutoScale {
+        // `try_insert` : sur un switch vers une arme à SPRITE, le module sprite
+        // despawn ce viewmodel 3D dans la même passe — ses commands s'appliquent
+        // AVANT celles-ci, et l'`insert` frappait une entité morte (crash prouvé
+        // en jeu le 2026-08-09 : « Entity despawned 414v7 », switch Digit2 puis
+        // Digit1 en ~1,5 s). Une cible despawnée ici est légitime, pas un bug.
+        commands.entity(entity).try_insert(NeedsAutoScale {
             target_size: viewmodel_target_size(equipped.current, entry),
         });
         vm.current = equipped.current;

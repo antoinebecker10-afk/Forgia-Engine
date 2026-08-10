@@ -168,8 +168,7 @@ pub fn sync_viewmodel_camera_active(
     mut q: Query<&mut Camera, With<ViewmodelCamera>>,
 ) {
     // Visible si gameplay (HUD) OU aperçu forcé (onglet Forge du hub).
-    let want =
-        hud_visible.map(|h| h.0).unwrap_or(true) || forced.map(|f| f.0).unwrap_or(false);
+    let want = hud_visible.map(|h| h.0).unwrap_or(true) || forced.map(|f| f.0).unwrap_or(false);
     for mut cam in &mut q {
         if cam.is_active != want {
             cam.is_active = want;

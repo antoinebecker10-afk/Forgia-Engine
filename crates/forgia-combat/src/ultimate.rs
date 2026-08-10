@@ -132,11 +132,7 @@ const SENSOR_PERIOD_SECS: f32 = 1.0;
 /// Écrit `forgia2_ultimate.json` 1Hz : état (ready/active/cooldown), timers,
 /// nombre d'activations, remplissage HUD. Permet à un agent de diagnostiquer
 /// l'Ultime sans lancer le rendu (point de validation T1b).
-pub fn sys_write_ultimate_sensor(
-    time: Res<Time>,
-    mut accum: Local<f32>,
-    ult: Res<UltimateState>,
-) {
+pub fn sys_write_ultimate_sensor(time: Res<Time>, mut accum: Local<f32>, ult: Res<UltimateState>) {
     *accum += time.delta_secs();
     if *accum < SENSOR_PERIOD_SECS {
         return;
@@ -179,7 +175,10 @@ mod tests {
         let mut u = UltimateState::default();
         assert!(u.try_activate());
         assert!(u.is_active());
-        assert!(!u.can_activate(), "ne peut pas se réactiver pendant l'Ultime");
+        assert!(
+            !u.can_activate(),
+            "ne peut pas se réactiver pendant l'Ultime"
+        );
         assert_eq!(u.activations, 1);
         // Re-tenter pendant l'actif = refusé, pas de double comptage.
         assert!(!u.try_activate());

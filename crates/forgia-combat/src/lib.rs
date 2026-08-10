@@ -25,7 +25,9 @@ pub mod sensor;
 pub mod ultimate;
 pub mod weapons;
 
-// TODO: port from V1 — viewmodel, reload, health, rpg_systems, targeting, boss, gcd
+// Inventaire V1, pas une liste de TODO : la plupart de ces responsabilités ont
+// été remplacées en V2 ou ne concernent pas le Roguelite. Décision détaillée :
+// docs/audits/v1-nonported-classification-2026-08-05.md.
 // pub mod viewmodel;
 // pub mod reload;
 // pub mod health;

@@ -180,21 +180,27 @@ const HEALTH_CHECK_MIN_SHOTS: u64 = 3;
 /// Health check : `warn` si l'assist est actif mais ne corrige aucun tir sur la
 /// fenêtre (cône trop étroit ou cibles introuvables — aurait attrapé le bug
 /// `forgia_damage::Health` qui rendait l'ancien aim assist mort en Roguelite).
-fn evaluate_window(total_delta: u64, corr_delta: u64, strength: f32) -> (&'static str, &'static str, f32) {
+fn evaluate_window(
+    total_delta: u64,
+    corr_delta: u64,
+    strength: f32,
+) -> (&'static str, &'static str, f32) {
     let pct = if total_delta > 0 {
         100.0 * corr_delta as f32 / total_delta as f32
     } else {
         0.0
     };
-    let (severity, next_step) =
-        if strength > 0.0 && total_delta >= HEALTH_CHECK_MIN_SHOTS && corr_delta == 0 {
-            (
+    let (severity, next_step) = if strength > 0.0
+        && total_delta >= HEALTH_CHECK_MIN_SHOTS
+        && corr_delta == 0
+    {
+        (
                 "warn",
                 "aim assist actif mais 0 tir corrige sur la fenetre : cone trop etroit ou cibles introuvables (Mortal manquant ?)",
             )
-        } else {
-            ("ok", "")
-        };
+    } else {
+        ("ok", "")
+    };
     (severity, next_step, pct)
 }
 
@@ -333,7 +339,10 @@ mod tests {
     fn sensor_window_pct_uses_delta_not_cumulative() {
         // 100 tirs anciens (cumul) hors fenêtre ; fenêtre courante = 4 tirs, 2 corrigés.
         let (_sev, _step, pct) = evaluate_window(4, 2, 0.6);
-        assert!((pct - 50.0).abs() < 1e-3, "pct fenêtre = 2/4 = 50%, got {pct}");
+        assert!(
+            (pct - 50.0).abs() < 1e-3,
+            "pct fenêtre = 2/4 = 50%, got {pct}"
+        );
     }
 
     #[test]
@@ -380,8 +389,7 @@ mod tests {
         let a = 2.0_f32.to_radians();
         let near = Vec3::new(a.sin() * 3.0, 0.0, -a.cos() * 3.0);
         let mid = Vec3::new(a.sin() * 25.0, 0.0, -a.cos() * 25.0);
-        let (_d1, corr_near) =
-            bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [near].into_iter(), &t);
+        let (_d1, corr_near) = bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [near].into_iter(), &t);
         let (_d2, corr_mid) = bend_fire_direction(Vec3::ZERO, Vec3::NEG_Z, [mid].into_iter(), &t);
         assert!(
             corr_near < corr_mid,

@@ -151,14 +151,15 @@ fn draw_cartoon_stars(
     // 4 étoiles aux 4 cardinaux autour du crosshair, distance 28 px.
     let radius = 28.0;
     let size_pct = 0.6 + 0.4 * alpha_pct; // shrink en fade.
-    let positions = [
-        (0.0, -radius),
-        (0.0, radius),
-        (-radius, 0.0),
-        (radius, 0.0),
-    ];
+    let positions = [(0.0, -radius), (0.0, radius), (-radius, 0.0), (radius, 0.0)];
     for (dx, dy) in positions {
-        draw_star_4_branches(&painter, center.x + dx, center.y + dy, 9.0 * size_pct, yellow);
+        draw_star_4_branches(
+            &painter,
+            center.x + dx,
+            center.y + dy,
+            9.0 * size_pct,
+            yellow,
+        );
     }
 }
 

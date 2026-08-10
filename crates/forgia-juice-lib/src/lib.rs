@@ -6,10 +6,10 @@
 //! - `camera_shake` (procedural shake)
 //! - `screen_flash` (full-screen color flash on damage/kill)
 
-pub mod recoil;
-pub mod fov_punch;
 pub mod camera_shake;
+pub mod fov_punch;
 pub mod knockback;
+pub mod recoil;
 
 use bevy::prelude::*;
 

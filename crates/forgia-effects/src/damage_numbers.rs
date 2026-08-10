@@ -103,8 +103,7 @@ fn spawn_on_hit(
         // encore visible (16 >> ~11 vivants au pire à cadence Bourrasque).
         let slot = pool.slots[pool.cursor];
         pool.cursor = (pool.cursor + 1) % DAMAGE_NUMBER_POOL_SIZE;
-        let Ok((mut fnum, mut text, mut font, mut tcolor, mut tf, mut vis)) =
-            q_slots.get_mut(slot)
+        let Ok((mut fnum, mut text, mut font, mut tcolor, mut tf, mut vis)) = q_slots.get_mut(slot)
         else {
             continue;
         };

@@ -50,7 +50,11 @@ impl ElementAffinity {
     };
 
     pub fn new(shield_mult: f32, armor_mult: f32, life_mult: f32) -> Self {
-        Self { shield_mult, armor_mult, life_mult }
+        Self {
+            shield_mult,
+            armor_mult,
+            life_mult,
+        }
     }
 }
 
@@ -285,7 +289,10 @@ mod tests {
         let leak = d.absorb_elemental(40.0, &shock);
         assert_eq!(leak, 0.0);
         assert_eq!(d.shield, 0.0);
-        assert!((d.armor - 25.0).abs() < 1e-3, "reste 6.67 brut ×0.75 = 5 sur l'armure");
+        assert!(
+            (d.armor - 25.0).abs() < 1e-3,
+            "reste 6.67 brut ×0.75 = 5 sur l'armure"
+        );
     }
 
     /// Feu +50 % Vie : après avoir percé bouclier+armure, le résidu frappe la Vie ×1.5.
@@ -306,7 +313,10 @@ mod tests {
     fn elemental_neutral_matches_physical() {
         let mut d = layer();
         let leak = d.absorb_elemental(100.0, &ElementAffinity::NEUTRAL);
-        assert!((leak - 20.0).abs() < 1e-4, "50 bouclier + 30 armure = 80, fuite 20");
+        assert!(
+            (leak - 20.0).abs() < 1e-4,
+            "50 bouclier + 30 armure = 80, fuite 20"
+        );
         assert_eq!(d.shield, 0.0);
         assert_eq!(d.armor, 0.0);
     }
@@ -344,8 +354,14 @@ mod tests {
             d.note_hit();
             d.regen(0.5);
         }
-        assert!(d.shield <= before, "régén gelée tant que note_hit est répété (Miasma actif)");
-        assert!(!d.is_regenerating(), "since_hit remis à 0 chaque tick → jamais en régén");
+        assert!(
+            d.shield <= before,
+            "régén gelée tant que note_hit est répété (Miasma actif)"
+        );
+        assert!(
+            !d.is_regenerating(),
+            "since_hit remis à 0 chaque tick → jamais en régén"
+        );
     }
 
     /// Un `mult` minuscule (genome mal réglé) dégrade proprement : la couche devient
@@ -355,9 +371,15 @@ mod tests {
         let mut d = layer(); // shield 50
         let aff = ElementAffinity::new(0.001, 0.001, 1.0);
         let leak = d.absorb_elemental(40.0, &aff);
-        assert!(leak.is_finite() && leak == 0.0, "budget 40 << needed → tout absorbé");
+        assert!(
+            leak.is_finite() && leak == 0.0,
+            "budget 40 << needed → tout absorbé"
+        );
         assert!(d.shield.is_finite() && d.shield >= 0.0);
-        assert!((d.shield - 49.96).abs() < 1e-3, "40×0.001 = 0.04 retiré du bouclier");
+        assert!(
+            (d.shield - 49.96).abs() < 1e-3,
+            "40×0.001 = 0.04 retiré du bouclier"
+        );
     }
 
     #[test]
@@ -376,7 +398,7 @@ mod tests {
         let mut d = layer();
         d.absorb(30.0, DamageChannel::Physical); // shield 20
         d.note_hit(); // since_hit = 0
-        // Sous le délai (3 s) : gelé.
+                      // Sous le délai (3 s) : gelé.
         assert_eq!(d.regen(2.0), 0.0); // since_hit 2.0 < 3.0
         assert_eq!(d.regen(0.5), 0.0); // since_hit 2.5 < 3.0
         assert_eq!(d.shield, 20.0, "aucune régén avant le délai");

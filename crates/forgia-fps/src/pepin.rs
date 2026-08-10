@@ -135,7 +135,10 @@ fn sys_write_pepin_sensor(
     let (severity, next_step) = if tuning.enabled {
         ("ok", "")
     } else {
-        ("info", "jauge desactivee (enabled=false dans pepin_confidence.toml)")
+        (
+            "info",
+            "jauge desactivee (enabled=false dans pepin_confidence.toml)",
+        )
     };
     let json = format!(
         r#"{{"id":"pepin","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"stacks":{},"max_stacks":{},"peak_run":{},"hits_run":{},"misses_run":{},"accuracy":{:.3},"damage_mul":{:.3}}}"#,
@@ -191,7 +194,10 @@ mod tests {
         assert_eq!(confidence_damage_mul(&c, &t, PEPIN_WEAPON), 1.0);
         c.stacks = 10;
         let full = confidence_damage_mul(&c, &t, PEPIN_WEAPON);
-        assert!((full - 1.2).abs() < 1e-5, "+20 % à pleine confiance, got {full}");
+        assert!(
+            (full - 1.2).abs() < 1e-5,
+            "+20 % à pleine confiance, got {full}"
+        );
         // Les autres armes ne profitent JAMAIS de la jauge.
         assert_eq!(confidence_damage_mul(&c, &t, WeaponType::Shotgun), 1.0);
     }

@@ -22,12 +22,14 @@ use forgia_core::prelude::*;
 use forgia_crosshair::CrosshairTuning;
 use forgia_damage::{DamageKind, DeathEvent, Mortal};
 use forgia_effects::prelude::{
-    spawn_hitscan_tracer, spawn_impact_vfx, spawn_kill_burst, spawn_muzzle_flash, TracerResources,
-    WeaponVfxEffects,
+    spawn_hitscan_tracer, spawn_impact_vfx, spawn_kill_burst, spawn_muzzle_flash, AscendsOnDeath,
+    TracerResources, WeaponVfxEffects,
 };
 use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_input::InputBlockers;
-use forgia_juice_lib::camera_shake::{CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse};
+use forgia_juice_lib::camera_shake::{
+    CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse,
+};
 use forgia_juice_lib::fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
 use forgia_juice_lib::recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
 use forgia_mode_fps_arena::TargetCube;
@@ -44,9 +46,9 @@ pub mod bourrasque;
 mod hitscan_sensor;
 pub mod lenoir;
 pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
+pub mod aim_assist;
 pub mod pepin;
 mod score;
-pub mod aim_assist;
 
 pub mod prelude {
     pub use crate::aim_assist::AimAssistTuning;
@@ -429,8 +431,12 @@ pub struct HitscanCtx<'w, 's> {
     pub pepin_tuning: Res<'w, pepin::PepinTuning>,
     /// Story-615 — bullet magnetism : cibles candidates (cross-mode, découplé du
     /// type `Health` — `Mortal Without<Player>` matche ennemis FPS + Roguelite).
-    pub aim_targets:
-        Query<'w, 's, &'static GlobalTransform, (With<Mortal>, Without<Player>, Without<FpsCamera>)>,
+    pub aim_targets: Query<
+        'w,
+        's,
+        &'static GlobalTransform,
+        (With<Mortal>, Without<Player>, Without<FpsCamera>),
+    >,
     pub aim_tuning: Res<'w, aim_assist::AimAssistTuning>,
     pub aim_metrics: ResMut<'w, aim_assist::AimAssistMetrics>,
     /// Compteur d'engagements agrégé (forgia2_fps_feel.json).
@@ -622,7 +628,17 @@ fn find_health_ancestor(
 }
 
 /// Despawn les cubes morts (HP=0). Système séparé chained après fire.
-fn despawn_dead_cubes(mut commands: Commands, q: Query<(Entity, &Health), With<TargetCube>>) {
+/// Balayage des cibles mortes → `DeathEvent` + despawn immédiat.
+///
+/// `Without<AscendsOnDeath>` (2026-08-05) : une entité qui doit **s'envoler** à
+/// sa mort n'est PAS traitée ici. Son mode s'en charge — lui seul sait quels
+/// composants retirer (IA, collision, ciblage) avant de lancer l'ascension, et
+/// c'est lui qui émettra `DeathEvent`. Sans cette exclusion, le corps serait
+/// despawné dans la même frame et l'envol ne se verrait jamais.
+fn despawn_dead_cubes(
+    mut commands: Commands,
+    q: Query<(Entity, &Health), (With<TargetCube>, Without<AscendsOnDeath>)>,
+) {
     for (entity, hp) in &q {
         if hp.is_dead() {
             // Story-490 — bridge V7 damage pipeline. Trigger DeathEvent AVANT
@@ -852,10 +868,12 @@ fn fire_weapon_minimal(
     // tir est désormais engagé (trigger OK + munition consommée). Lu par
     // forgia-mode-roguelite::audio pour jouer le SFX mappé au WeaponType.
     if let Ok(shooter) = q_player.single() {
-        hitscan_ctx.fired.write(forgia_combat::combat_juice::WeaponFiredEvent {
-            shooter,
-            weapon: ammo.equipped.current,
-        });
+        hitscan_ctx
+            .fired
+            .write(forgia_combat::combat_juice::WeaponFiredEvent {
+                shooter,
+                weapon: ammo.equipped.current,
+            });
     }
 
     // Cooldown depuis genome (fallback 0.1s = ModernAR 10 shots/s).
@@ -1392,7 +1410,10 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Left,
@@ -1411,7 +1432,10 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Left,
@@ -1431,7 +1455,10 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Left,
@@ -1561,7 +1588,10 @@ mod tests {
         let mut app = App::new();
         app.add_message::<MouseButtonInput>()
             .init_resource::<LeftMouseState>()
-            .add_systems(Update, (track_left_mouse_state, drain_left_click_edge).chain());
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
 
         app.world_mut().write_message(MouseButtonInput {
             button: MouseButton::Right,

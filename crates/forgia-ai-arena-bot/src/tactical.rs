@@ -754,8 +754,12 @@ pub fn bot_separation(
     for (entity, mut tf) in &mut bots {
         if let Some(delta) = deltas.get(&entity) {
             // Anti-traversée : la poussée de séparation respecte aussi les murs.
-            let safe =
-                collide_and_slide(tf.translation, Vec3::new(delta.x, 0.0, delta.y), &ctx, entity);
+            let safe = collide_and_slide(
+                tf.translation,
+                Vec3::new(delta.x, 0.0, delta.y),
+                &ctx,
+                entity,
+            );
             tf.translation.x += safe.x;
             tf.translation.z += safe.z;
         }
@@ -917,9 +921,7 @@ mod ground_follow_tests {
             "descendre doit être plus permissif que gravir"
         );
         let d = c.max_step_down_m;
-        assert!(
-            resolve_step_altitude(FOOT, Some(-d + 0.01), FOOT, c.max_step_up_m, d).is_some()
-        );
+        assert!(resolve_step_altitude(FOOT, Some(-d + 0.01), FOOT, c.max_step_up_m, d).is_some());
         assert_eq!(
             resolve_step_altitude(FOOT, Some(-d - 0.01), FOOT, c.max_step_up_m, d),
             None,
@@ -964,7 +966,10 @@ mod ground_follow_tests {
     #[test]
     fn degenerate_limits_never_let_a_bot_climb_or_fall_forever() {
         assert_eq!(resolve_step_altitude(FOOT, Some(0.5), FOOT, 0.0, 0.0), None);
-        assert_eq!(resolve_step_altitude(FOOT, Some(-0.5), FOOT, 0.0, 0.0), None);
+        assert_eq!(
+            resolve_step_altitude(FOOT, Some(-0.5), FOOT, 0.0, 0.0),
+            None
+        );
         // Un sol EXACTEMENT sous les pieds passe toujours, même à limites nulles.
         let y = resolve_step_altitude(FOOT, Some(0.0), FOOT, 0.0, 0.0).unwrap();
         assert!((y - FOOT).abs() < 1e-5);
@@ -1014,7 +1019,11 @@ mod unstick_tests {
         let tu = t();
         let pas = (tu.stuck_after_secs / DT).ceil() as u32 + 1;
         let s = courir(StuckState::default(), 0.0, 0.05, pas);
-        assert!(s.is_escaping(), "toujours planté après {:.2} s", tu.stuck_after_secs);
+        assert!(
+            s.is_escaping(),
+            "toujours planté après {:.2} s",
+            tu.stuck_after_secs
+        );
     }
 
     /// Le piège du seuil ABSOLU : un bot qui rabote un mur avance encore un

@@ -19,11 +19,18 @@ pub mod pipeline_ready;
 pub mod weapon_vfx;
 // Story-523 fusion : 4 VFX-adjacent crates intégrées comme modules.
 pub mod damage_numbers;
+// L'envol des morts (2026-08-05) — reprise du `goblin_death_system` du RPG V1,
+// avec une vraie traînée lumineuse. Ici parce que forgia-effects est la
+// dépendance commune de forgia-fps (qui laisse passer) et des modes (qui
+// déclenchent).
+pub mod death_ascension;
 pub mod hitmarker;
 pub mod mesh_fader;
 pub mod vfx_tracers;
 
-// TODO: port from V1 effects/ — les modules suivants nécessitent des deps supplémentaires
+// Modules V1 non portés : voir docs/audits/v1-nonported-classification-2026-08-05.md.
+// Ils ne constituent pas une liste de TODO implicite : chacun doit être justifié
+// par le scope Roguelite et son architecture V2 avant d'être réintroduit.
 // pub mod fireball_vfx;   // needs forgia-player (Fireball, IceBolt, GoblinOnFire, etc.)
 // pub mod ice_vfx;        // needs forgia-player
 // pub mod shield_vfx;     // needs forgia-player
@@ -48,13 +55,17 @@ pub mod prelude {
     // spawnent une aura sans dépendre directement de bevy_hanabi.
     // Story-647 : EffectMaterial aussi — obligatoire sur toute entité ParticleEffect
     // depuis que les EffectAsset déclarent un slot texture.
-    pub use bevy_hanabi::{EffectMaterial, ParticleEffect};
     pub use crate::ForgiaEffectsPlugin;
+    pub use bevy_hanabi::{EffectMaterial, ParticleEffect};
     // Audit fire-path 2026-07-20 — détecteur générique de compilation de pipelines
     // (anti-freeze de specialization au 1er affichage, consommé par le warmup décor).
     pub use crate::pipeline_ready::{PipelinesReady, PipelinesReadyPlugin};
     // Story-523 re-exports des modules fusionnés.
     pub use crate::damage_numbers::ForgiaDamageNumbersPlugin;
+    pub use crate::death_ascension::{
+        AscendPhase, Ascending, AscendsOnDeath, DeathAscensionPlugin, DeathAscensionStats,
+        DeathAscensionTuning,
+    };
     pub use crate::hitmarker::{ForgiaHitmarkerPlugin, HitmarkerState};
     pub use crate::mesh_fader::{MaterialFader, MaterialFaderCloned, MeshFaderPlugin};
     pub use crate::vfx_tracers::ForgiaVfxTracersPlugin;
@@ -70,6 +81,10 @@ impl Plugin for ForgiaEffectsPlugin {
         // Audit fire-path 2026-07-20 — détecteur « pipelines compilés » (RenderApp),
         // consommé par le warmup PBR du Lobby roguelite. Idempotent (skip si RenderApp absent).
         app.add_plugins(pipeline_ready::PipelinesReadyPlugin);
+        // L'envol des morts + sa traînée (2026-08-05). Inerte tant qu'aucune
+        // entité ne porte `Ascending` : aucun coût pour les modes qui ne
+        // l'utilisent pas.
+        app.add_plugins(death_ascension::DeathAscensionPlugin);
         app.add_systems(PostStartup, prespawn_hanabi_dummies)
             .add_systems(Startup, weapon_vfx::setup_weapon_vfx)
             .add_systems(Startup, weapon_vfx::tracer::setup_tracer_resources)
@@ -77,7 +92,6 @@ impl Plugin for ForgiaEffectsPlugin {
             .add_systems(
                 Update,
                 (
-                    effects_tick,
                     emissive_fade_tick,
                     lifetime_tick,
                     // LOT B (audit fire-path 2026-07-20) — decay des lumières des
@@ -199,10 +213,6 @@ fn prespawn_hanabi_dummies(mut commands: Commands, effects: Res<weapon_vfx::Weap
     info!(
         "[forgia-effects] prespawn 4 hanabi dummies (shader warmup status/impact_flash, story-594/652/653) + 38 entités de pool persistant LOT B (muzzle/impact/kill, déjà warmées à leur spawn)"
     );
-}
-
-fn effects_tick() {
-    // TODO: Phase 2 — Lifetime cleanup tick for MuzzleVfxMarker + ImpactVfxMarker entities
 }
 
 #[cfg(test)]

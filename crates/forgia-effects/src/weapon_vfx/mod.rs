@@ -481,7 +481,11 @@ fn spawn_impact_pool(
                 ImpactVfxMarker,
             ))
             .id();
-        ImpactPoolSlot { sparks, dust, light }
+        ImpactPoolSlot {
+            sparks,
+            dust,
+            light,
+        }
     })
 }
 
@@ -605,7 +609,13 @@ fn build_weapon_vfx(
         &tex_glow,
         &tex_muzzle_tongue,
     );
-    let impact_pool = spawn_impact_pool(commands, &impact_sparks, &impact_dust, &tex_spark, &tex_dust);
+    let impact_pool = spawn_impact_pool(
+        commands,
+        &impact_sparks,
+        &impact_dust,
+        &tex_spark,
+        &tex_dust,
+    );
     let kill_pool = spawn_kill_pool(commands, &kill_burst, &tex_burst);
 
     WeaponVfxEffects {
