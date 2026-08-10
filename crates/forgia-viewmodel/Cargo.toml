@@ -17,5 +17,8 @@ forgia-player = { workspace = true }
 forgia-effects = { workspace = true }
 forgia-juice-lib = { workspace = true }
 forgia-input = { workspace = true }
-forgia-ui = { workspace = true }
+# Le crosshair est lu DIRECTEMENT à sa source : passer par le re-export de
+# `forgia-ui` faisait entrer tout le hub-menu (et les 28k l. du roguelite
+# derrière) dans le graphe du viewmodel. Story-694 AC5.
+forgia-crosshair = { workspace = true }
 forgia-assets = { workspace = true }

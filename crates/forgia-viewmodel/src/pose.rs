@@ -22,7 +22,7 @@ use forgia_genome_core::Genome;
 use forgia_input::prelude::MouseSensitivityMultiplier;
 use forgia_juice_lib::fov_punch::FovPunchState;
 use forgia_player::prelude::{CameraFov, FpsCamera, MovementSpeedMultiplier, PlayerLocomotion};
-use forgia_ui::prelude::CrosshairMode;
+use forgia_crosshair::CrosshairMode;
 
 use crate::attach::{NeedsAutoScale, ViewmodelBaseScale, WeaponViewmodel};
 use crate::calibration::{viewmodel_rotation_ads, viewmodel_rotation_hipfire, viewmodel_transform};

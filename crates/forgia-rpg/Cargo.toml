@@ -20,7 +20,6 @@ forgia-damage = { workspace = true }
 forgia-terrain = { workspace = true }
 forgia-foliage = { workspace = true }
 forgia-audio = { workspace = true }
-forgia-ui = { workspace = true }
 forgia-rpg-data = { workspace = true }
 forgia-camera-orbit = { workspace = true }
 forgia-secondary-motion = { workspace = true }
