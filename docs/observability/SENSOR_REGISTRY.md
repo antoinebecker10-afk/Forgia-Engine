@@ -143,6 +143,12 @@
 | `forgia2_merchant.json` | T0 | forgia-mode-roguelite | `src/merchant.rs:50` | 1Hz | marchand : offres, proximité, achats Or/Âmes, revives — story-591 | active |
 | `forgia2_render.json` | T0 | forgia-observability | `src/render_sensor.rs:137` | 1Hz | mesh3d_visible vs total (écran vide/brun), caméras 3D actives, clear_color | active |
 | `forgia2_editor.json` | T0 | forgia-editor | `src/sensor.rs:19` | 1Hz | éditeur de scène in-game du Hall : ouvert/snap, props/overrides, sélection, opération active, bibliothèque, sauvegardes ; alert critical si écriture castle_hub_edits.json en échec — story-665 | active |
+| `forgia2_castle_avatar.json` | T0 | forgia-game | `src/castle_avatar.rs:410` | 1Hz | avatar du Hall : anim, copies d'os, désync squelette, positions avatar/caméra, pièces équipées | active |
+| `forgia2_death_ascension.json` | T0 | forgia-effects | `src/death_ascension.rs:50` | 1Hz | envol des morts : segments actifs, cap anti-explosion, genome gamefeel hot-reload | active |
+| `forgia2_equipment.json` | T0 | forgia-mode-roguelite | `src/equipment.rs:34` | 1Hz | équipement persistant : save equipment_save.toml, pièces équipées, config roguelite_equipment.toml | active |
+| `forgia2_power.json` | T0 | forgia-mode-roguelite | `src/power_sensor.rs:50` | 1Hz | courbe de puissance : marge ttk/budget, mur lazy/diligent, boons sans effet ou over-cap | active |
+| `forgia2_rounds.json` | T0 | forgia-mode-roguelite | `src/rounds.rs:563` | 1Hz | boucle de rounds : round courant, menace, rythme (RoundPace reset par run — bug 2026-08-04) | active |
+| `forgia2_viewmodel_sprite.json` | T0 | forgia-viewmodel | `src/sprite.rs:474` | 1Hz | viewmodel sprite pixel art : declared/spawned, clip+frame, awaiting_mesh, probe_state (story-693) | active |
 
 ## Producteurs retirés — historique (story-593, audit 2026-06-10)
 
