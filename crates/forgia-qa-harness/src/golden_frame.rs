@@ -279,12 +279,7 @@ const REDACTED_INT: &str = "[int]";
 
 /// Whitelist des champs volatiles à redacter récursivement.
 const VOLATILE_FLOAT_FIELDS: &[&str] = &["timestamp_secs", "elapsed_secs"];
-const VOLATILE_INT_FIELDS: &[&str] = &[
-    "timestamp_ns",
-    "elapsed_ns",
-    "pid",
-    "wall_clock_unix_ms",
-];
+const VOLATILE_INT_FIELDS: &[&str] = &["timestamp_ns", "elapsed_ns", "pid", "wall_clock_unix_ms"];
 
 fn redact_volatile_in(value: &mut serde_json::Value) {
     match value {
@@ -419,9 +414,10 @@ mod tests {
     fn capture_invokes_registered_sensor() {
         let mut app = App::new();
         let mut registry = SensorRegistry::default();
-        registry.register("forgia_mock", |_world| {
-            serde_json::json!({ "stable_value": 42 })
-        });
+        registry.register(
+            "forgia_mock",
+            |_world| serde_json::json!({ "stable_value": 42 }),
+        );
         app.insert_resource(registry);
 
         let frame = GoldenFrame::new(0, 0);
@@ -482,8 +478,14 @@ mod tests {
         let json_2 = serde_json::to_string(&run_2).unwrap();
         let json_3 = serde_json::to_string(&run_3).unwrap();
 
-        assert_eq!(json_1, json_2, "run #1 vs run #2 diverge — déterminisme cassé");
-        assert_eq!(json_2, json_3, "run #2 vs run #3 diverge — déterminisme cassé");
+        assert_eq!(
+            json_1, json_2,
+            "run #1 vs run #2 diverge — déterminisme cassé"
+        );
+        assert_eq!(
+            json_2, json_3,
+            "run #2 vs run #3 diverge — déterminisme cassé"
+        );
     }
 
     /// Vague 2 — golden snapshot via insta sur sensor mock.

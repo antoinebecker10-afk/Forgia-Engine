@@ -49,7 +49,7 @@ pub use bug::{
 pub use bus::{BugBus, MetricBus};
 pub use dedup::SlidingWindowDedup;
 pub use metric::MetricSample;
-pub use plugin::{ForgiaQaCorePlugin, QaCoreSet, drain_bug_messages_to_bus};
+pub use plugin::{drain_bug_messages_to_bus, ForgiaQaCorePlugin, QaCoreSet};
 pub use schema::SchemaMigrate;
 pub use severity::Severity;
 pub use signature::BugSignature;

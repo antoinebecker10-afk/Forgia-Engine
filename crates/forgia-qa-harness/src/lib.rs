@@ -54,6 +54,6 @@ pub mod test_app;
 pub use collecting_sink::{BugCollector, CollectingBugSink};
 #[cfg(feature = "golden")]
 pub use golden_frame::{
-    GoldenFrame, SensorCollector, SensorRegistry, SnapshotBundle, capture, tick_deterministic,
+    capture, tick_deterministic, GoldenFrame, SensorCollector, SensorRegistry, SnapshotBundle,
 };
 pub use test_app::{TestApp, TestAppBuilder};

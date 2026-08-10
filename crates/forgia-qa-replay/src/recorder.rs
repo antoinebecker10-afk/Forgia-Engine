@@ -7,8 +7,8 @@
 
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Res, ResMut};
-use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
+use bevy::input::ButtonInput;
 
 use crate::session::{InputEvent, RecordedSession};
 
@@ -171,7 +171,9 @@ mod tests {
 
     #[test]
     fn replay_mode_replaying_helpers() {
-        let m = ReplayMode::Replaying { source_path: "x.ron".into() };
+        let m = ReplayMode::Replaying {
+            source_path: "x.ron".into(),
+        };
         assert!(m.is_replaying());
         assert!(!m.is_recording());
     }
@@ -266,7 +268,9 @@ mod tests {
             .add_systems(bevy::app::Update, capture_keyboard_input_system);
 
         // Démarrer le recording
-        app.world_mut().resource_mut::<ReplayRecorder>().start("test");
+        app.world_mut()
+            .resource_mut::<ReplayRecorder>()
+            .start("test");
         app.world_mut().insert_resource(ReplayMode::Recording);
 
         // Tick 1 frame
@@ -291,7 +295,9 @@ mod tests {
             .init_resource::<ReplayRecorder>()
             .add_systems(bevy::app::Update, capture_keyboard_input_system);
 
-        app.world_mut().resource_mut::<ReplayRecorder>().start("test");
+        app.world_mut()
+            .resource_mut::<ReplayRecorder>()
+            .start("test");
         app.world_mut().insert_resource(ReplayMode::Recording);
 
         // Pas d'InputPlugin → ButtonInput<KeyCode> absent.
@@ -304,7 +310,9 @@ mod tests {
 
     #[test]
     fn replay_mode_replaying_path_captured() {
-        let m = ReplayMode::Replaying { source_path: "/tmp/foo.ron".into() };
+        let m = ReplayMode::Replaying {
+            source_path: "/tmp/foo.ron".into(),
+        };
         match m {
             ReplayMode::Replaying { source_path } => {
                 assert_eq!(source_path, "/tmp/foo.ron");

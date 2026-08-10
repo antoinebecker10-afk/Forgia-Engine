@@ -60,7 +60,11 @@ impl BotRunner {
             let bot_started = Instant::now();
             let result = bot.run();
             let elapsed = bot_started.elapsed();
-            entries.push(RunEntry { name, elapsed, result });
+            entries.push(RunEntry {
+                name,
+                elapsed,
+                result,
+            });
         }
 
         let total_elapsed = started.elapsed();

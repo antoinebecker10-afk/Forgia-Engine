@@ -83,10 +83,7 @@ fn install_record_sink(mut bus: ResMut<BugBus>) {
 
 /// Drain `Messages<BugReport>` vers [`BugBus`]. No-op sans `qa-runtime`.
 #[cfg(feature = "qa-runtime")]
-pub fn drain_bug_messages_to_bus(
-    mut reader: MessageReader<BugReport>,
-    mut bus: ResMut<BugBus>,
-) {
+pub fn drain_bug_messages_to_bus(mut reader: MessageReader<BugReport>, mut bus: ResMut<BugBus>) {
     for report in reader.read() {
         // Ignore les erreurs sink ici (best-effort, on ne casse pas le frame ECS).
         // En P2, un sensor sensor_health.json comptera les sink failures.
@@ -96,11 +93,7 @@ pub fn drain_bug_messages_to_bus(
 
 /// No-op release sans `qa-runtime`. Tous arguments inutilisés.
 #[cfg(not(feature = "qa-runtime"))]
-pub fn drain_bug_messages_to_bus(
-    _reader: MessageReader<BugReport>,
-    _bus: ResMut<BugBus>,
-) {
-}
+pub fn drain_bug_messages_to_bus(_reader: MessageReader<BugReport>, _bus: ResMut<BugBus>) {}
 
 /// Drain `Messages<MetricSample>` vers [`MetricBus`]. No-op sans `qa-runtime`.
 #[cfg(feature = "qa-runtime")]
@@ -114,11 +107,7 @@ fn drain_metric_messages_to_bus(
 }
 
 #[cfg(not(feature = "qa-runtime"))]
-fn drain_metric_messages_to_bus(
-    _reader: MessageReader<MetricSample>,
-    _bus: ResMut<MetricBus>,
-) {
-}
+fn drain_metric_messages_to_bus(_reader: MessageReader<MetricSample>, _bus: ResMut<MetricBus>) {}
 
 #[cfg(test)]
 mod tests {

@@ -170,8 +170,8 @@ impl RecordedSession {
 
     /// Désérialise depuis chaîne RON. Vérifie `schema_version`.
     pub fn parse_ron(text: &str) -> Result<Self, RecordedSessionError> {
-        let session: RecordedSession = ron::from_str(text)
-            .map_err(|e| RecordedSessionError::Ron(e.to_string()))?;
+        let session: RecordedSession =
+            ron::from_str(text).map_err(|e| RecordedSessionError::Ron(e.to_string()))?;
         if session.schema_version != SCHEMA_VERSION {
             return Err(RecordedSessionError::SchemaMismatch {
                 found: session.schema_version,
@@ -244,7 +244,10 @@ impl std::fmt::Display for RecordedSessionError {
             Self::Io(e) => write!(f, "I/O error: {e}"),
             Self::Ron(e) => write!(f, "RON error: {e}"),
             Self::SchemaMismatch { found, expected } => {
-                write!(f, "schema_version mismatch: found {found}, expected {expected}")
+                write!(
+                    f,
+                    "schema_version mismatch: found {found}, expected {expected}"
+                )
             }
         }
     }
@@ -259,11 +262,20 @@ mod tests {
     #[test]
     fn input_event_frame_extraction() {
         assert_eq!(
-            InputEvent::KeyPressed { code: 42, frame: 100 }.frame(),
+            InputEvent::KeyPressed {
+                code: 42,
+                frame: 100
+            }
+            .frame(),
             100
         );
         assert_eq!(
-            InputEvent::MouseMoved { dx: 1.0, dy: 2.0, frame: 200 }.frame(),
+            InputEvent::MouseMoved {
+                dx: 1.0,
+                dy: 2.0,
+                frame: 200
+            }
+            .frame(),
             200
         );
     }
@@ -318,10 +330,25 @@ mod tests {
     fn ron_roundtrip_full_session() {
         let mut s = RecordedSession::new("hash456").with_bug_id("01HXYZ");
         s.record_input(InputEvent::KeyPressed { code: 65, frame: 0 });
-        s.record_input(InputEvent::MouseMoved { dx: 5.0, dy: -3.0, frame: 1 });
-        s.record_input(InputEvent::GamepadAxis { axis: 0, value: 0.5, frame: 2 });
-        s.record_rng(RngState { seed: 42, state: [1, 2, 3, 4], frame: 0 });
-        s.record_fingerprint(FingerprintEntry { frame: 1, state_hash: 0xDEADBEEF });
+        s.record_input(InputEvent::MouseMoved {
+            dx: 5.0,
+            dy: -3.0,
+            frame: 1,
+        });
+        s.record_input(InputEvent::GamepadAxis {
+            axis: 0,
+            value: 0.5,
+            frame: 2,
+        });
+        s.record_rng(RngState {
+            seed: 42,
+            state: [1, 2, 3, 4],
+            frame: 0,
+        });
+        s.record_fingerprint(FingerprintEntry {
+            frame: 1,
+            state_hash: 0xDEADBEEF,
+        });
         s.frame_count = 100;
 
         let ron = s.to_ron_pretty().expect("serialize");
@@ -348,7 +375,10 @@ mod tests {
     fingerprints: [],
 )"#;
         match RecordedSession::parse_ron(bad) {
-            Err(RecordedSessionError::SchemaMismatch { found: 999, expected: 1 }) => {}
+            Err(RecordedSessionError::SchemaMismatch {
+                found: 999,
+                expected: 1,
+            }) => {}
             other => panic!("expected SchemaMismatch, got {other:?}"),
         }
     }

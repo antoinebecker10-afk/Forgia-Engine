@@ -34,9 +34,9 @@ pub mod plugin;
 pub mod recorder;
 pub mod session;
 
-pub use player::{ReplayPlayer, advance_replay_cursor_system};
+pub use player::{advance_replay_cursor_system, ReplayPlayer};
 pub use plugin::ForgiaQaReplayPlugin;
-pub use recorder::{ReplayMode, ReplayRecorder, capture_keyboard_input_system};
+pub use recorder::{capture_keyboard_input_system, ReplayMode, ReplayRecorder};
 pub use session::{FingerprintEntry, InputEvent, RecordedSession, RecordedSessionError, RngState};
 
 /// Version courante du schéma `RecordedSession` sérialisé en RON.

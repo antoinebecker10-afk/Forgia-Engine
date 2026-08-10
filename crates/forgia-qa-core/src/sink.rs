@@ -85,7 +85,9 @@ impl BugSink for FileSink {
     fn ingest(&mut self, report: &BugReport) -> Result<(), SinkError> {
         let path = self.file_path_for(report);
         let s = match self.format {
-            SerFormat::Ron => ron::ser::to_string_pretty(report, ron::ser::PrettyConfig::default())?,
+            SerFormat::Ron => {
+                ron::ser::to_string_pretty(report, ron::ser::PrettyConfig::default())?
+            }
         };
         fs::write(path, s)?;
         Ok(())

@@ -144,7 +144,10 @@ mod tests {
 
     fn fresh_report() -> BugReport {
         BugReport::new(
-            BugCategory::FrameTimeSpike { p99_ms: 50.0, threshold_ms: 33.0 },
+            BugCategory::FrameTimeSpike {
+                p99_ms: 50.0,
+                threshold_ms: 33.0,
+            },
             Severity::Major,
             DetectionSource::TelemetryAnomaly {
                 metric: "frame_time_ms".into(),
@@ -209,7 +212,10 @@ mod tests {
             self.ingest_calls += 1;
             Err(crate::sink::SinkError::Other("boom".into()))
         }
-        fn increment_occurrence(&mut self, _id: crate::bug::BugId) -> Result<(), crate::sink::SinkError> {
+        fn increment_occurrence(
+            &mut self,
+            _id: crate::bug::BugId,
+        ) -> Result<(), crate::sink::SinkError> {
             self.increment_calls += 1;
             Err(crate::sink::SinkError::Other("boom-incr".into()))
         }
@@ -244,7 +250,11 @@ mod tests {
     fn set_sinks_replaces_completely() {
         let mut b = BugBus::default(); // 1 NullSink
         assert_eq!(b.sink_count(), 1);
-        b.set_sinks(vec![Box::new(NullSink), Box::new(NullSink), Box::new(NullSink)]);
+        b.set_sinks(vec![
+            Box::new(NullSink),
+            Box::new(NullSink),
+            Box::new(NullSink),
+        ]);
         assert_eq!(b.sink_count(), 3);
         b.set_sinks(vec![]);
         assert_eq!(b.sink_count(), 0);

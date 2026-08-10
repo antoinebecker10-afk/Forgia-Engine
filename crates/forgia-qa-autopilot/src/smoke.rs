@@ -108,7 +108,10 @@ mod tests {
             // No-op scenario : devrait Pass.
         });
         let result = bot.run();
-        assert!(result.is_pass(), "empty scenario should Pass, got {result:?}");
+        assert!(
+            result.is_pass(),
+            "empty scenario should Pass, got {result:?}"
+        );
     }
 
     #[test]
@@ -137,16 +140,26 @@ mod tests {
     fn smoke_bot_fail_on_blocker_bug() {
         let mut bot = SmokeBot::new("emit_blocker", |test| {
             let bug = BugReport::new(
-                BugCategory::Panic { message: "boom".into(), location: "x".into() },
+                BugCategory::Panic {
+                    message: "boom".into(),
+                    location: "x".into(),
+                },
                 Severity::Blocker,
-                DetectionSource::UnitTest { test_name: "smoke".into() },
+                DetectionSource::UnitTest {
+                    test_name: "smoke".into(),
+                },
             );
             test.emit_bug(bug);
             test.tick(2); // drain Messages → BugBus → CollectingBugSink
         });
         let result = bot.run();
         assert!(result.is_fail(), "Blocker bug should produce Fail");
-        if let BotResult::Fail { reason, bugs, stats } = result {
+        if let BotResult::Fail {
+            reason,
+            bugs,
+            stats,
+        } = result
+        {
             assert!(reason.contains("Blocker"));
             assert_eq!(bugs.len(), 1);
             assert_eq!(stats.bugs_emitted, 1);
@@ -157,15 +170,23 @@ mod tests {
     fn smoke_bot_pass_on_major_bug_only() {
         let mut bot = SmokeBot::new("emit_major", |test| {
             let bug = BugReport::new(
-                BugCategory::FrameTimeSpike { p99_ms: 50.0, threshold_ms: 33.0 },
+                BugCategory::FrameTimeSpike {
+                    p99_ms: 50.0,
+                    threshold_ms: 33.0,
+                },
                 Severity::Major,
-                DetectionSource::UnitTest { test_name: "smoke".into() },
+                DetectionSource::UnitTest {
+                    test_name: "smoke".into(),
+                },
             );
             test.emit_bug(bug);
             test.tick(2);
         });
         let result = bot.run();
-        assert!(result.is_pass(), "Major bug should still Pass (only Blocker fails)");
+        assert!(
+            result.is_pass(),
+            "Major bug should still Pass (only Blocker fails)"
+        );
         if let BotResult::Pass { stats } = result {
             assert_eq!(stats.bugs_emitted, 1);
         }

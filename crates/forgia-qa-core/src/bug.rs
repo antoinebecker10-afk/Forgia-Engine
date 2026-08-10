@@ -9,11 +9,11 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use ulid::Ulid;
 
-use crate::SCHEMA_VERSION;
 use crate::severity::Severity;
 use crate::signature::BugSignature;
 use crate::source::DetectionSource;
 use crate::tr_id::TrId;
+use crate::SCHEMA_VERSION;
 
 /// Identifiant unique de bug. ULID = lexicographiquement triable, 128 bits, dédup-friendly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -68,27 +68,91 @@ pub enum BugStatus {
 #[serde(tag = "category", rename_all = "snake_case")]
 #[allow(missing_docs)] // variants self-explanatory, documented as group above
 pub enum BugCategory {
-    LogicInvariantViolation { tr_id: String, detail: String },
-    StateDesync { expected: String, actual: String },
-    EventOrderingViolation { detail: String },
-    FrameTimeSpike { p99_ms: f32, threshold_ms: f32 },
-    SystemOverbudget { system: String, budget_ms: f32, actual_ms: f32, tr_budget_id: String },
-    AllocationLeak { bytes_growth_per_min: u64 },
-    EntityLeak { archetype: String, growth_rate: f32 },
-    VramOverbudget { used_mb: u64, budget_mb: u64 },
-    AssetLoadFailure { path: String, reason: String },
-    ShaderCompilationError { detail: String },
-    VisualAnomaly { kind: VisualAnomalyKind },
-    PbrMaterialViolation { entity_repr: String, reason: String },
-    PhysicsExplosion { entity_repr: String, velocity: f32 },
-    Stuck { entity_repr: String, duration_s: f32 },
-    OutOfBounds { entity_repr: String, x: f32, y: f32, z: f32 },
-    TerrainAnomaly { kind: String, chunk_x: i32, chunk_z: i32 },
-    NonDeterminism { divergence_frame: u64, field: String },
-    Panic { message: String, location: String },
-    ConfigSchemaMismatch { file: String, field: String },
-    SaveFileCorruption { path: String, reason: String },
-    StabilityLockViolation { lock_id: String, detail: String },
+    LogicInvariantViolation {
+        tr_id: String,
+        detail: String,
+    },
+    StateDesync {
+        expected: String,
+        actual: String,
+    },
+    EventOrderingViolation {
+        detail: String,
+    },
+    FrameTimeSpike {
+        p99_ms: f32,
+        threshold_ms: f32,
+    },
+    SystemOverbudget {
+        system: String,
+        budget_ms: f32,
+        actual_ms: f32,
+        tr_budget_id: String,
+    },
+    AllocationLeak {
+        bytes_growth_per_min: u64,
+    },
+    EntityLeak {
+        archetype: String,
+        growth_rate: f32,
+    },
+    VramOverbudget {
+        used_mb: u64,
+        budget_mb: u64,
+    },
+    AssetLoadFailure {
+        path: String,
+        reason: String,
+    },
+    ShaderCompilationError {
+        detail: String,
+    },
+    VisualAnomaly {
+        kind: VisualAnomalyKind,
+    },
+    PbrMaterialViolation {
+        entity_repr: String,
+        reason: String,
+    },
+    PhysicsExplosion {
+        entity_repr: String,
+        velocity: f32,
+    },
+    Stuck {
+        entity_repr: String,
+        duration_s: f32,
+    },
+    OutOfBounds {
+        entity_repr: String,
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+    TerrainAnomaly {
+        kind: String,
+        chunk_x: i32,
+        chunk_z: i32,
+    },
+    NonDeterminism {
+        divergence_frame: u64,
+        field: String,
+    },
+    Panic {
+        message: String,
+        location: String,
+    },
+    ConfigSchemaMismatch {
+        file: String,
+        field: String,
+    },
+    SaveFileCorruption {
+        path: String,
+        reason: String,
+    },
+    StabilityLockViolation {
+        lock_id: String,
+        detail: String,
+    },
 }
 
 /// Sous-classification des [`BugCategory::VisualAnomaly`].
@@ -267,7 +331,10 @@ mod tests {
 
     fn sample_report() -> BugReport {
         BugReport::new(
-            BugCategory::FrameTimeSpike { p99_ms: 50.0, threshold_ms: 33.0 },
+            BugCategory::FrameTimeSpike {
+                p99_ms: 50.0,
+                threshold_ms: 33.0,
+            },
             Severity::Major,
             DetectionSource::TelemetryAnomaly {
                 metric: "frame_time_ms".into(),

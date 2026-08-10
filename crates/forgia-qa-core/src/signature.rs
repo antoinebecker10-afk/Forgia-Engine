@@ -115,13 +115,33 @@ mod tests {
             location: "lib.rs:1".into(),
         };
         let frames_3 = vec![
-            Frame { function: "a".into(), file: "x.rs".into(), line: 1 },
-            Frame { function: "b".into(), file: "x.rs".into(), line: 2 },
-            Frame { function: "c".into(), file: "x.rs".into(), line: 3 },
+            Frame {
+                function: "a".into(),
+                file: "x.rs".into(),
+                line: 1,
+            },
+            Frame {
+                function: "b".into(),
+                file: "x.rs".into(),
+                line: 2,
+            },
+            Frame {
+                function: "c".into(),
+                file: "x.rs".into(),
+                line: 3,
+            },
         ];
         let mut frames_5 = frames_3.clone();
-        frames_5.push(Frame { function: "d".into(), file: "x.rs".into(), line: 4 });
-        frames_5.push(Frame { function: "e".into(), file: "x.rs".into(), line: 5 });
+        frames_5.push(Frame {
+            function: "d".into(),
+            file: "x.rs".into(),
+            line: 4,
+        });
+        frames_5.push(Frame {
+            function: "e".into(),
+            file: "x.rs".into(),
+            line: 5,
+        });
         let s_top3 = BugSignature::compute(&cat, &ctx_with_frames(frames_3));
         let s_top5 = BugSignature::compute(&cat, &ctx_with_frames(frames_5));
         assert_eq!(s_top3, s_top5);

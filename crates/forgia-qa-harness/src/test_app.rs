@@ -202,10 +202,7 @@ impl TestApp {
     /// Si `BugBus.total_ingested > 0`.
     pub fn expect_no_bug(&self) {
         let count = self.total_bugs_ingested();
-        assert_eq!(
-            count, 0,
-            "expected no BugReport, got {count} ingested"
-        );
+        assert_eq!(count, 0, "expected no BugReport, got {count} ingested");
     }
 
     /// Assertion : N BugReport ingérés exactement.
@@ -215,16 +212,16 @@ impl TestApp {
     /// Si le compteur diffère.
     pub fn expect_emitted_bug_count(&self, n: u64) {
         let count = self.total_bugs_ingested();
-        assert_eq!(
-            count, n,
-            "expected {n} BugReport ingested, got {count}"
-        );
+        assert_eq!(count, n, "expected {n} BugReport ingested, got {count}");
     }
 
     /// Snapshot des `BugReport` collectés (clone via `CollectingBugSink`).
     /// Retourne `Vec::new()` si `with_qa_core()` n'a pas été appelé.
     pub fn bugs(&self) -> Vec<BugReport> {
-        self.collector.as_ref().map(|c| c.snapshot()).unwrap_or_default()
+        self.collector
+            .as_ref()
+            .map(|c| c.snapshot())
+            .unwrap_or_default()
     }
 
     /// Assertion : aucun BugReport de severity `>= Blocker` n'a été ingéré.
@@ -347,9 +344,14 @@ mod tests {
         use forgia_qa_core::{BugCategory, DetectionSource};
         let mut test = TestApp::new().with_qa_core().build();
         let bug = BugReport::new(
-            BugCategory::Panic { message: "boom".into(), location: "x".into() },
+            BugCategory::Panic {
+                message: "boom".into(),
+                location: "x".into(),
+            },
             Severity::Blocker,
-            DetectionSource::UnitTest { test_name: "t".into() },
+            DetectionSource::UnitTest {
+                test_name: "t".into(),
+            },
         );
         test.emit_bug(bug);
         test.tick(2);
@@ -361,9 +363,14 @@ mod tests {
     fn expect_no_critical_panics_on_critical() {
         let mut test = TestApp::new().with_qa_core().build();
         let bug = BugReport::new(
-            BugCategory::FrameTimeSpike { p99_ms: 100.0, threshold_ms: 33.0 },
+            BugCategory::FrameTimeSpike {
+                p99_ms: 100.0,
+                threshold_ms: 33.0,
+            },
             Severity::Critical,
-            forgia_qa_core::DetectionSource::UnitTest { test_name: "t".into() },
+            forgia_qa_core::DetectionSource::UnitTest {
+                test_name: "t".into(),
+            },
         );
         test.emit_bug(bug);
         test.tick(2);
@@ -420,10 +427,7 @@ mod tests {
         let mut session = RecordedSession::new("test");
         session.frame_count = 5;
 
-        let test = TestApp::new()
-            .with_qa_core()
-            .with_session(session)
-            .build();
+        let test = TestApp::new().with_qa_core().with_session(session).build();
 
         let player = test.app.world().resource::<ReplayPlayer>();
         assert!(player.is_loaded());
@@ -436,10 +440,7 @@ mod tests {
         let mut session = RecordedSession::new("test");
         session.frame_count = 3;
 
-        let mut test = TestApp::new()
-            .with_qa_core()
-            .with_session(session)
-            .build();
+        let mut test = TestApp::new().with_qa_core().with_session(session).build();
         let frames_consumed = test.run_to_completion();
         // ReplayBudget = 3 × 10 = 30 max, mais le replay finish dès que
         // current_frame > frame_count. Devrait s'arrêter en quelques ticks.
@@ -474,9 +475,14 @@ mod tests {
     fn bug_for_test() -> BugReport {
         use forgia_qa_core::{BugCategory, DetectionSource};
         BugReport::new(
-            BugCategory::FrameTimeSpike { p99_ms: 50.0, threshold_ms: 33.0 },
+            BugCategory::FrameTimeSpike {
+                p99_ms: 50.0,
+                threshold_ms: 33.0,
+            },
             Severity::Major,
-            DetectionSource::UnitTest { test_name: "harness_test".into() },
+            DetectionSource::UnitTest {
+                test_name: "harness_test".into(),
+            },
         )
     }
 }

@@ -37,7 +37,9 @@ impl CollectingBugSink {
     /// `TestApp` pour les assertions.
     pub fn new() -> (Self, BugCollector) {
         let bugs: Arc<Mutex<Vec<BugReport>>> = Arc::new(Mutex::new(Vec::new()));
-        let sink = Self { bugs: Arc::clone(&bugs) };
+        let sink = Self {
+            bugs: Arc::clone(&bugs),
+        };
         let collector = BugCollector { bugs };
         (sink, collector)
     }
@@ -73,10 +75,7 @@ impl BugSink for CollectingBugSink {
 impl BugCollector {
     /// Snapshot des `BugReport` collectés (clone pour éviter rétention du lock).
     pub fn snapshot(&self) -> Vec<BugReport> {
-        self.bugs
-            .lock()
-            .map(|g| g.clone())
-            .unwrap_or_default()
+        self.bugs.lock().map(|g| g.clone()).unwrap_or_default()
     }
 
     /// Compteur total (incluant toutes les severities).
@@ -127,9 +126,14 @@ mod tests {
 
     fn make_bug(severity: Severity) -> BugReport {
         BugReport::new(
-            BugCategory::FrameTimeSpike { p99_ms: 50.0, threshold_ms: 33.0 },
+            BugCategory::FrameTimeSpike {
+                p99_ms: 50.0,
+                threshold_ms: 33.0,
+            },
             severity,
-            DetectionSource::UnitTest { test_name: "harness".into() },
+            DetectionSource::UnitTest {
+                test_name: "harness".into(),
+            },
         )
     }
 

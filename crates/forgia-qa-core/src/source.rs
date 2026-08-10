@@ -86,10 +86,20 @@ mod tests {
     #[test]
     fn ron_roundtrip_variants() {
         let cases = vec![
-            DetectionSource::UnitTest { test_name: "foo::bar".into() },
-            DetectionSource::RuntimeAssert { file: "combat.rs".into(), line: 42 },
-            DetectionSource::TelemetryAnomaly { metric: "frame_time_ms".into(), score: 4.2 },
-            DetectionSource::LegacySensor { sensor_file: "forgia_textures.json".into() },
+            DetectionSource::UnitTest {
+                test_name: "foo::bar".into(),
+            },
+            DetectionSource::RuntimeAssert {
+                file: "combat.rs".into(),
+                line: 42,
+            },
+            DetectionSource::TelemetryAnomaly {
+                metric: "frame_time_ms".into(),
+                score: 4.2,
+            },
+            DetectionSource::LegacySensor {
+                sensor_file: "forgia_textures.json".into(),
+            },
         ];
         for case in cases {
             let s = ron::to_string(&case).expect("serialize");

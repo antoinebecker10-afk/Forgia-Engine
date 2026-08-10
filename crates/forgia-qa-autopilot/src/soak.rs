@@ -136,10 +136,7 @@ impl Bot for SoakBot {
                 return BotResult::Fail {
                     reason: format!(
                         "entity drift detected: {} → {} (Δ {}, threshold ±{})",
-                        first.entity_count,
-                        last.entity_count,
-                        delta,
-                        self.drift_threshold_entities,
+                        first.entity_count, last.entity_count, delta, self.drift_threshold_entities,
                     ),
                     bugs,
                     stats,
@@ -169,7 +166,10 @@ mod tests {
     fn soak_passive_short_passes() {
         let mut bot = SoakBot::passive("passive_100", 100);
         let result = bot.run();
-        assert!(result.is_pass(), "passive 100 frames should Pass: {result:?}");
+        assert!(
+            result.is_pass(),
+            "passive 100 frames should Pass: {result:?}"
+        );
         if let BotResult::Pass { stats } = result {
             assert_eq!(stats.frames_consumed, 100);
         }

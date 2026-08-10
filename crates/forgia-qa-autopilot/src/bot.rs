@@ -111,7 +111,9 @@ mod tests {
 
     #[test]
     fn is_inconclusive_helper() {
-        let r = BotResult::Inconclusive { note: "no plugin".into() };
+        let r = BotResult::Inconclusive {
+            note: "no plugin".into(),
+        };
         assert!(r.is_inconclusive());
         assert!(!r.is_pass());
     }

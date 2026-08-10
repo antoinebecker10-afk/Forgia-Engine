@@ -125,10 +125,7 @@ impl ReplayPlayer {
 ///
 /// Ordering : ce système doit tourner en `Last` (PostUpdate) pour que les
 /// consommateurs (Update) aient déjà lu les inputs du frame courant.
-pub fn advance_replay_cursor_system(
-    mode: Res<ReplayMode>,
-    mut player: ResMut<ReplayPlayer>,
-) {
+pub fn advance_replay_cursor_system(mode: Res<ReplayMode>, mut player: ResMut<ReplayPlayer>) {
     if !mode.is_replaying() || !player.is_loaded() || player.is_finished() {
         return;
     }
