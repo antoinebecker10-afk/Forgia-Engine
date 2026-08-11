@@ -22,7 +22,11 @@
 #
 # Régénérer après tout changement d'angle :
 #   cd tools/art && python pepin_sprites.py
-sprite_dir = "textures/weapons/pixel/pepin"
+# DÉSACTIVÉ 2026-08-11 (demande Antoine) : retour au viewmodel GLB 3D.
+# sprite_dir vide = weapon_is_sprite() false, le chemin 3D reprend la main.
+# Les frames et le pipeline (tools/art/pepin_sprites.py) restent disponibles
+# pour réactivation — il suffit de restaurer le chemin ci-dessous.
+sprite_dir = ""
 sprite_fire_frames = 3
 sprite_reload_frames = 12
 sprite_idle_frames = 12       # Pépin est vivant : il cligne des yeux au repos
