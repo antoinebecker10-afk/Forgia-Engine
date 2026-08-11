@@ -1,6 +1,6 @@
 # Story-695 — La cible web (wasm/WebGPU) devient un build officiel de Forgia
 
-**Statut** : IN_PROGRESS (incrément 1 ✅ livré 2026-08-11 — suite : inc.2 sink observabilité)
+**Statut** : IN_PROGRESS (inc.1+2+3 ✅ livrés 2026-08-11 — restent : 5 manifeste, 6 parité, 7 versioning)
 **Niveau BMAD** : Enterprise (7 incréments, ~15 crates touchées au total)
 **Origine** : nuit du 2026-08-10→11 — portage prototype validé en jeu dans Chrome
 (menu, run, Hall — 185 fps menu vs 240 natif). Audit complet :
@@ -14,8 +14,8 @@ depuis `main`/branche, pas depuis un worktree patché à la main.
 | # | Contenu | Statut |
 |---|---|---|
 | 1 | Les 8 correctifs du prototype portés proprement (cfg-gates wasm, web-time, tonemapping) — `cargo check` vert sur les DEUX cibles | ✅ DONE 2026-08-11 |
-| 2 | Sink d'observabilité web (capteurs → console structurée) — prérequis canal testeurs | TODO |
-| 3 | Persistance web (localStorage : Enclume, équipement) | TODO |
+| 2 | Sink d'observabilité web (capteurs → mémoire + `forgia_dump_sensors()` + bouton 📋 Diag) | ✅ DONE 2026-08-11 |
+| 3 | Persistance web (localStorage via `persist.rs` : Enclume, équipement, identité, FTUE) | ✅ DONE 2026-08-11 |
 | 4 | (fusionné dans inc.1 : graine + timestamps via web-time) | DONE-par-1 |
 | 5 | Manifeste d'assets déclaré + validé au build (fin du grep) ; vidéo menu → .webm | TODO |
 | 6 | Matrice de parité web/natif complète (amorce dans l'audit §2) | TODO |
