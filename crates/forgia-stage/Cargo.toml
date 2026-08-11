@@ -8,6 +8,7 @@ description = "Stage system — arena loader (terrain + ramparts + anchors) + ru
 workspace = true
 
 [dependencies]
+web-time = { workspace = true }
 bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }

@@ -98,7 +98,11 @@ unused_variables = "warn"
 
 [workspace.dependencies]
 # Pin Bevy 0.18.1 stable until V1 ship. Migration 0.19+ post-ship V1.1.
-bevy = { version = "0.18.1", features = ["wav", "mp3", "vorbis", "jpeg", "bevy_dev_tools", "ktx2", "basis-universal", "webp", "file_watcher"] }
+# Story-695 : base lean compatible wasm — "webgpu" remplace le defaut silencieux
+# webgl2 sur le web (inerte en natif). "basis-universal" (C++, pas de sysroot
+# wasm) et "file_watcher" (natif-only) sont re-ajoutes cote natif par la
+# dependance target-gatee de forgia-game.
+bevy = { version = "0.18.1", features = ["wav", "mp3", "vorbis", "jpeg", "bevy_dev_tools", "ktx2", "webp", "webgpu"] }
 bevy_rapier3d = { version = "0.33", features = ["debug-render-3d"] }
 bevy_egui = "0.39.1"
 bevy_hanabi = { version = "0.18", default-features = false, features = ["3d"] }
@@ -112,6 +116,10 @@ ndshape = "0.3"
 voronoice = "0.2"
 rayon = "1"
 zstd = "0.13"
+
+# Story-695 : horloges portables — std::time panique sur wasm32 (« time not
+# implemented ») ; web-time = horloge JS sur web, re-export std en natif.
+web-time = "1"
 
 # Procgen — spatial index pour validation building-vs-road (story-446)
 rstar = "0.12"

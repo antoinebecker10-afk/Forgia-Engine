@@ -8,6 +8,7 @@ description = "Generic anchor-point system (PlayerSpawn / PoiSlot / Landmark / B
 workspace = true
 
 [dependencies]
+web-time = { workspace = true }
 bevy = { workspace = true }
 forgia-core = { workspace = true }
 serde = { workspace = true }

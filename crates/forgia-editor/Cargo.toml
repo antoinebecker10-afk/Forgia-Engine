@@ -8,6 +8,7 @@ description = "In-game scene editor (props: select / transform / library / snap 
 workspace = true
 
 [dependencies]
+web-time = { workspace = true }
 bevy = { workspace = true }
 bevy_egui = { workspace = true }
 bevy_rapier3d = { workspace = true }

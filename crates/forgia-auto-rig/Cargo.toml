@@ -8,6 +8,7 @@ description = "Runtime skeleton synthesis — template-fit auto-rig for static m
 workspace = true
 
 [dependencies]
+web-time = { workspace = true }
 bevy = { workspace = true }
 forgia-core = { workspace = true }
 forgia-rig-topology = { workspace = true }

@@ -25,6 +25,7 @@ profile-tracy-memory = ["bevy/trace_tracy_memory"]
 dev-brp = ["bevy/bevy_remote"]
 
 [dependencies]
+web-time = { workspace = true }
 bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 bevy_egui = { workspace = true }
@@ -76,3 +77,10 @@ serde = { workspace = true }
 # Table pièce -> zone de lightmap : 6801 entrées, trop volumineuses pour du TOML.
 serde_json = { workspace = true }
 toml = { workspace = true }
+
+
+# Story-695 : features natif-only re-ajoutees ici (hot-reload assets + textures
+# basis). La resolution de features par cible fait qu'un build wasm ne les voit
+# jamais — la base workspace reste lean/web-compatible.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy = { version = "0.18.1", features = ["basis-universal", "file_watcher"] }

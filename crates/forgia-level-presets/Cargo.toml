@@ -8,6 +8,7 @@ description = "Module palette data layer (CoverCluster / SniperPerch / MeleePit 
 workspace = true
 
 [dependencies]
+web-time = { workspace = true }
 bevy = { workspace = true }
 forgia-core = { workspace = true }
 forgia-anchor = { workspace = true }
