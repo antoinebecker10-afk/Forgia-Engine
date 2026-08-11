@@ -77,6 +77,11 @@ if (-not $ServeOnly) {
             New-Item -ItemType Directory -Force (Split-Path $dst -Parent) | Out-Null
             Copy-Item $src $dst -Force
             $n++
+            # .gltf (JSON) = buffers .bin + textures EXTERNES : copier le dossier
+            # entier, sinon le modele est vide (avatar invisible, 2026-08-11).
+            if ($r -match '\.gltf$') {
+                Copy-Item (Split-Path $src -Parent) (Split-Path (Split-Path $dst -Parent) -Parent) -Recurse -Force
+            }
         }
     }
     Copy-Item "$Root\assets\genomes" "$Demo\assets\" -Recurse -Force
