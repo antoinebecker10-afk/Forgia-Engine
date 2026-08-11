@@ -375,7 +375,10 @@ default = -5.0
             assert_eq!(cfg.bands, 4.0);
             assert_eq!(cfg.strength, 0.6);
             assert_eq!(cfg.edge_dark, 0.0);
-            assert!(cfg.outline_enabled);
+            // Outline OFF par design : la passe Sobel fait tomber DX12
+            // (cf reference_runtime_root_and_single_pass_outline) —
+            // roguelite_outline_enabled default = 0 depuis le genome.
+            assert!(!cfg.outline_enabled);
         }
     }
 }
