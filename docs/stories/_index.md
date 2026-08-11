@@ -69,6 +69,7 @@
 | 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 | 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
 | 694 | Hub menu : architecture (P3 de l'audit 2026-08-07) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
+| 695 | Cible web wasm/WebGPU officielle (canal testeurs) | [story-695-web-target-officielle.md](./story-695-web-target-officielle.md) |
 
 ## REVIEW (59)
 
