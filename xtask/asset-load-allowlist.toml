@@ -21,13 +21,13 @@
 "crates/forgia-terrain/src/terrain_material.rs" = 3
 "crates/forgia-assets/src/lib.rs" = 2
 "crates/forgia-game/src/castle_hub.rs" = 2
+"crates/forgia-menu-hub/src/currency_icons.rs" = 2
 "crates/forgia-mode-roguelite/src/boss_portal.rs" = 2
 "crates/forgia-mode-roguelite/src/loot_room.rs" = 2
 "crates/forgia-mode-roguelite/src/merchant.rs" = 2
 "crates/forgia-pcg-runtime/src/lib.rs" = 2
 "crates/forgia-rpg/src/character.rs" = 2
 "crates/forgia-terrain/src/lod.rs" = 2
-"crates/forgia-ui/src/currency_icons.rs" = 2
 "crates/forgia-ui/src/menu_video.rs" = 2
 "crates/forgia-audio/src/biome.rs" = 1
 "crates/forgia-editor/src/library.rs" = 1
@@ -36,6 +36,7 @@
 "crates/forgia-game/src/castle_lightmaps.rs" = 1
 "crates/forgia-game/src/cyber_city.rs" = 1
 "crates/forgia-level-presets/src/lib.rs" = 1
+"crates/forgia-menu-hub/src/arena_backdrop.rs" = 1
 "crates/forgia-mode-fps-arena/src/wave.rs" = 1
 "crates/forgia-mode-roguelite/src/decor.rs" = 1
 "crates/forgia-mode-roguelite/src/enemy_anim.rs" = 1
@@ -49,6 +50,5 @@
 "crates/forgia-rpg/src/worldgen_village.rs" = 1
 "crates/forgia-skeleton-template/src/lib.rs" = 1
 "crates/forgia-ui-lib/src/hud/barks.rs" = 1
-"crates/forgia-ui/src/arena_backdrop.rs" = 1
 "crates/forgia-viewmodel/src/sprite.rs" = 1
 "crates/forgia-worldgen/src/lib.rs" = 1
