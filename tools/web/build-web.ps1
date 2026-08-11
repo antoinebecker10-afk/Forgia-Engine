@@ -49,11 +49,26 @@ if (-not $ServeOnly) {
         Move-Item "$Demo\forgia_bg.opt.wasm" "$Demo\forgia_bg.wasm" -Force
     }
 
-    Write-Host "[3/4] sync assets references par le code..." -ForegroundColor Cyan
+    Write-Host "[3/4] sync assets references par le code ET les genomes..." -ForegroundColor Cyan
     # Inc.5 (story-695) remplacera ce grep par un manifeste declare + valide.
+    # Lecon du 2026-08-11 : les GLB d'arene/stage vivent dans les TOML, pas les .rs
+    # — les oublier = Hall vide + ecran noir in-game chez les testeurs.
     $refs = Get-ChildItem "$Root\crates" -Recurse -Filter *.rs |
         Select-String -Pattern '"([^"]+\.(glb|gltf|png|webp|jpg|ogg|wav|mp3|ktx2|basis|hdr))"' -AllMatches |
-        ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value }
+    $genomeFiles = @()
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes\roguelite" -Recurse -Filter *.toml -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes" -Filter "roguelite_*.toml" -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes" -Filter "arena*.toml" -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes" -Filter "level_modules.toml" -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes" -Filter "viewmodel*.toml" -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes" -Filter "castle*.toml" -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes\weapons" -Recurse -Filter *.toml -ErrorAction SilentlyContinue
+    $genomeFiles += Get-ChildItem "$Root\assets\genomes\enemies" -Recurse -Filter *.toml -ErrorAction SilentlyContinue
+    $refs += $genomeFiles |
+        Select-String -Pattern '"([^"]+\.(glb|gltf|png|webp|jpg|ogg|wav|mp3|ktx2|basis|hdr))"' -AllMatches |
+        ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value }
+    $refs = $refs | Sort-Object -Unique
     $n = 0
     foreach ($r in $refs) {
         $src = "$Root\assets\$r"
