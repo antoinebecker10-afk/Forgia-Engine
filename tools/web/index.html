@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Forgia — démo web</title>
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; background:#0b0b12; overflow:hidden; }
+  canvas { display:block; width:100vw !important; height:100vh !important; touch-action:none; outline:none; }
+  #overlay { position:fixed; inset:0; display:flex; flex-direction:column; gap:16px; align-items:center; justify-content:center; color:#e8e3d8; font-family:system-ui, sans-serif; background:#0b0b12; z-index:10; text-align:center; padding:24px; }
+  #overlay button { font-size:1.3rem; padding:14px 40px; border-radius:8px; border:1px solid #c96; background:#1a1420; color:#e8e3d8; cursor:pointer; }
+  #status { font-size:.85rem; opacity:.7; max-width:520px; white-space:pre-wrap; }
+  #bar { width:280px; height:6px; background:#222; border-radius:3px; overflow:hidden; display:none; }
+  #bar > div { height:100%; width:0%; background:#c96; transition:width .2s; }
+  #fps { position:fixed; top:6px; right:8px; z-index:20; color:#7f7; background:rgba(0,0,0,.55);
+         font:12px monospace; padding:3px 8px; border-radius:4px; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="overlay">
+  <h1>FORGIA</h1>
+  <div id="status">Démo web — vérification WebGPU…</div>
+  <div id="bar"><div></div></div>
+  <button id="start" style="display:none">JOUER</button>
+</div>
+<script type="module">
+const status = document.getElementById('status');
+const btn = document.getElementById('start');
+const overlay = document.getElementById('overlay');
+const bar = document.getElementById('bar');
+const errors = [];
+window.addEventListener('error', e => { errors.push(e.message); showErr(); });
+window.addEventListener('unhandledrejection', e => { errors.push(String(e.reason)); showErr(); });
+// Le panic hook Rust (console_error_panic_hook) ecrit le VRAI message via console.error :
+// on le miroite dans la page pour lire le panic sans devtools (indispensable sur mobile).
+const origErr = console.error.bind(console);
+console.error = (...a) => { origErr(...a); const s = a.map(String).join(' '); if (errors.length < 8) { errors.push(s.slice(0, 600)); showErr(); } };
+function showErr() { status.textContent = 'ERREUR:\n' + errors.slice(-4).join('\n'); overlay.style.display = 'flex'; }
+if (!navigator.gpu) {
+  status.textContent = 'WebGPU indisponible sur ce navigateur.\nAndroid : Chrome recent requis. iPhone : Safari iOS 26+.\nVerifie aussi que la page est bien servie en HTTPS (ou localhost).';
+} else {
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) { status.textContent = 'WebGPU present mais aucun adaptateur GPU. GPU blocklist ?'; }
+  else { status.textContent = 'WebGPU OK. Chargement du jeu…'; btn.style.display = 'block'; }
+}
+if (new URLSearchParams(location.search).has('autostart')) { queueMicrotask(() => btn.onclick()); }
+btn.onclick = async () => {
+  btn.style.display = 'none'; bar.style.display = 'block'; status.textContent = 'Telechargement du module…';
+  try {
+    const resp = await fetch('./forgia_bg.wasm');
+    const total = +resp.headers.get('Content-Length') || 0;
+    const reader = resp.body.getReader();
+    const chunks = []; let got = 0;
+    for (;;) { const {done, value} = await reader.read(); if (done) break; chunks.push(value); got += value.length; if (total) bar.firstElementChild.style.width = (100*got/total).toFixed(1)+'%'; }
+    const bytes = new Uint8Array(got); let o = 0; for (const c of chunks) { bytes.set(c, o); o += c.length; }
+    status.textContent = 'Compilation wasm…';
+    const init = (await import('./forgia.js')).default;
+    try { await document.documentElement.requestFullscreen({navigationUI:'hide'}); } catch (_) {}
+    try { await screen.orientation.lock('landscape'); } catch (_) {}
+    overlay.style.display = 'none';
+    // Compteur FPS JS (rAF) : moyenne 1 s + pire frame de la fenetre.
+    const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; document.body.appendChild(fpsEl);
+    let frames = [], last = performance.now();
+    (function loop(t) {
+      frames.push(t - last); last = t;
+      if (frames.length > 60) frames.shift();
+      const avg = frames.reduce((a, b) => a + b, 0) / frames.length;
+      const worst = Math.max(...frames);
+      fpsEl.textContent = `${(1000 / avg).toFixed(0)} fps · pire ${worst.toFixed(0)} ms`;
+      requestAnimationFrame(loop);
+    })(last);
+    await init({ module_or_path: bytes.buffer });
+  } catch (e) { if (!String(e).includes('control flow')) { errors.push(String(e)); showErr(); } }
+};
+</script>
+</body>
+</html>
