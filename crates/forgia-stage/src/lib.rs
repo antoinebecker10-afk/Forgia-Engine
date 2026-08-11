@@ -91,7 +91,7 @@ use forgia_level_presets::{LevelModulesGenome, LevelModulesHandles, ModulePalett
 use forgia_prefab::{spawn_gltf_prefab, PrefabSpawn, PrefabStats};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
-use std::time::{SystemTime, UNIX_EPOCH};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 const STAGES_GENOME_PATH: &str = "genomes/roguelite_stages.toml";
 const POIS_GENOME_PATH: &str = "genomes/roguelite_pois.toml";

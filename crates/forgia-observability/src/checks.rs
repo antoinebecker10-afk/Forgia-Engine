@@ -281,7 +281,7 @@ pub fn chk_sensor_liveness(
     config: &RpgMonitorConfig,
 ) -> CheckResult {
     let stale_secs = config.liveness.stale_secs;
-    let now = SystemTime::now();
+    let now = wall_now();
     let mut stale: Vec<&str> = Vec::new();
     let mut absent: Vec<&str> = Vec::new();
 
@@ -744,4 +744,17 @@ mod tests {
         assert!(matches!(r.severity, Severity::Ok));
         assert!(r.message.contains("mort"));
     }
+}
+
+/// Story-695 : `SystemTime::now()` panique sur wasm32 (« time not implemented »).
+/// Repli epoch — les chemins compares sont des mtimes de FICHIERS, morts sur web,
+/// donc le resultat n'y est jamais consomme utilement. On garde std::time ici
+/// (interop fs::metadata) plutot que web-time.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn wall_now() -> SystemTime {
+    SystemTime::now()
+}
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn wall_now() -> SystemTime {
+    SystemTime::UNIX_EPOCH
 }

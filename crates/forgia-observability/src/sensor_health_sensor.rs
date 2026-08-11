@@ -7,7 +7,6 @@
 
 use bevy::prelude::*;
 use forgia_core::prelude::GameMode;
-use std::time::SystemTime;
 
 /// 12 sensors canoniques attendus (V5 cible — chunks reportable Session D).
 const EXPECTED_SENSORS: &[&str] = &[
@@ -61,7 +60,7 @@ pub fn sys_write_sensor_health(time: Res<Time>, mode: Res<State<GameMode>>, mut 
     }
     *accum = 0.0;
 
-    let now = SystemTime::now();
+    let now = crate::checks::wall_now();
     let mut stale: Vec<&str> = Vec::new();
     let mut missing: Vec<&str> = Vec::new();
     let mut present = 0u32;

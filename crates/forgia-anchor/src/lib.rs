@@ -24,7 +24,7 @@
 use bevy::prelude::*;
 use serde::Serialize;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 const SENSOR_PATH: &str = "forgia2_anchor.json";
 const SENSOR_WRITE_PERIOD_SEC: f64 = 1.0;

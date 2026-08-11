@@ -25,7 +25,8 @@
 
 use bevy::prelude::*;
 use forgia_core::prelude::*;
-use std::time::Instant;
+// wasm : std::time::Instant panique — celui de Bevy (web-time) est portable.
+use bevy::platform::time::Instant;
 
 pub mod bone_trace;
 

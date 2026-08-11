@@ -152,8 +152,8 @@ fn sys_apply_forge_theme(mut contexts: EguiContexts, mut applied: Local<bool>) {
     ctx.set_style(style);
     *applied = true;
 
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let ts = web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let json = format!(

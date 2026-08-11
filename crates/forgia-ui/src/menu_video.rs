@@ -34,6 +34,7 @@ const MENU_VIDEO_DIR: &str = "ui/menu_video";
 /// Utilisé quand `std::fs::read_dir` échoue (cwd ≠ racine projet en build
 /// distribué). Pattern industry standard : sprite atlas count baké dans le code.
 /// **À mettre à jour si la vidéo source change** (`Forgia Menu .mp4` = 361 frames).
+#[cfg(not(target_arch = "wasm32"))]
 const MENU_VIDEO_FRAME_COUNT_FALLBACK: usize = 361;
 
 /// FPS de lecture = fps d'extraction de la source (invariant de l'asset, pas un
@@ -96,11 +97,14 @@ pub struct MenuVideoState {
 ///   2. sinon `CARGO_MANIFEST_DIR/assets/...` (binaires hors workspace)
 ///   3. sinon fallback [`MENU_VIDEO_FRAME_COUNT_FALLBACK`] (build distribué)
 pub fn setup_menu_video(mut commands: Commands, asset_server: Res<AssetServer>) {
+    #[cfg(not(target_arch = "wasm32"))]
     let primary_dir = std::path::Path::new("assets").join(MENU_VIDEO_DIR);
+    #[cfg(not(target_arch = "wasm32"))]
     let secondary_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
         .join(MENU_VIDEO_DIR);
 
+    #[cfg(not(target_arch = "wasm32"))]
     let count_webp = |dir: &std::path::Path| -> Option<usize> {
         std::fs::read_dir(dir).ok().map(|entries| {
             entries
@@ -115,6 +119,14 @@ pub fn setup_menu_video(mut commands: Commands, asset_server: Res<AssetServer>) 
         })
     };
 
+    // Story-695 (wasm) : les frames ne sont pas dans le bundle web et fs::read_dir
+    // echoue toujours — le fallback 361 ferait tourner le player sur des fichiers
+    // absents (~24 fetch 404/s + spam WARN = lag mesure, cf audit 2026-08-11).
+    // 0 = fond uni, le chemin gracieux prevu. Un fallback pense pour un echec
+    // ponctuel devient une boucle infinie quand l'echec est permanent.
+    #[cfg(target_arch = "wasm32")]
+    let (frame_count, source) = (0usize, "wasm: video menu desactivee".to_string());
+    #[cfg(not(target_arch = "wasm32"))]
     let (frame_count, source) = match count_webp(&primary_dir) {
         Some(n) if n > 0 => (n, format!("scan {}", primary_dir.display())),
         _ => match count_webp(&secondary_dir) {

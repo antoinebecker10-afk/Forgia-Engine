@@ -860,7 +860,7 @@ fn stream_chunks_around_player(
             continue;
         }
 
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         let mesh_data = build_chunk_mesh(
             coord,
             off,

@@ -14,7 +14,7 @@ use forgia_core::layout::{
 };
 use forgia_level_presets::ModuleKind;
 use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 const SENSOR_PATH: &str = "forgia2_stage_layout.json";
 const SENSOR_WRITE_PERIOD_SEC: f64 = 1.0;

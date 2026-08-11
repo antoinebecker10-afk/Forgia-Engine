@@ -31,7 +31,9 @@ use forgia_player::prelude::Player;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
+// std pour les mtimes fs (interop metadata) ; web_time pour le now() du capteur.
+use std::time::SystemTime;
+use web_time::UNIX_EPOCH;
 
 /// Scénario de travail courant et unique de l'Arena Test.
 const GENOME_PATH: &str = "assets/genomes/arena_test_crypte_vertical.toml";
@@ -2241,7 +2243,7 @@ fn sys_write_sensor(
     let payload = ArenaTestSensor {
         id: "arena_test",
         severity,
-        timestamp_secs: SystemTime::now()
+        timestamp_secs: web_time::SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs_f64())
             .unwrap_or(0.0),

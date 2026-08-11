@@ -99,7 +99,7 @@ pub fn sys_capture_and_compare_baseline(
     let sensors_present = scan_sensor_files();
 
     let current = MigrationBaseline {
-        timestamp_unix: SystemTime::now()
+        timestamp_unix: crate::checks::wall_now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0),

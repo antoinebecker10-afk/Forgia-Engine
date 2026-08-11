@@ -62,7 +62,7 @@ pub fn generate_chunk_lod(
     cave_network: Option<&crate::cave_network::CaveNetworkTopology>,
 ) -> ChunkData {
     let _span = info_span!("terrain_generate_chunk", cx = coord.x, cz = coord.z).entered();
-    let gen_start = std::time::Instant::now();
+    let gen_start = web_time::Instant::now();
     let mut chunk = ChunkData::new_air();
     let origin = coord.world_origin();
 
@@ -82,7 +82,7 @@ pub fn generate_chunk_lod(
     let w = PAD_X as usize;
     let d = PAD_Z as usize;
     let mut height_buf = vec![0.0f32; w * d];
-    let mut layer_start = std::time::Instant::now();
+    let mut layer_start = web_time::Instant::now();
     let mut erosion_rate_buf = vec![0.0f32; w * d];
     let mut max_slope_buf = vec![1.8f32; w * d];
     let mut max_passes_buf = 0usize;
@@ -294,7 +294,7 @@ pub fn generate_chunk_lod(
         diag.padding_ring_saved = true;
 
         if max_passes_buf > 0 {
-            layer_start = std::time::Instant::now();
+            layer_start = web_time::Instant::now();
             erode_heightmap_variable(&mut height_buf, w, d, max_passes_buf, &erosion_rate_buf);
             diag.layer_timings.erosion_variable_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
             diag.erosion_variable.ran = true;
@@ -302,7 +302,7 @@ pub fn generate_chunk_lod(
         }
 
         if detail == GenDetail::Full {
-            layer_start = std::time::Instant::now();
+            layer_start = web_time::Instant::now();
             let base_count = (w * d) / 24;
             let scale = genome_overrides
                 .and_then(|o| o.hydro_droplet_scale)
@@ -320,7 +320,7 @@ pub fn generate_chunk_lod(
         }
 
         if detail == GenDetail::Full {
-            layer_start = std::time::Instant::now();
+            layer_start = web_time::Instant::now();
             let talus = genome_overrides
                 .and_then(|o| o.thermal_talus_angle)
                 .unwrap_or(1.5);
@@ -344,14 +344,14 @@ pub fn generate_chunk_lod(
         }
 
         if detail == GenDetail::Full {
-            layer_start = std::time::Instant::now();
+            layer_start = web_time::Instant::now();
             let sea_level = gen_config.map_or(config.sea_level, |gc| gc.sea_level);
             valley_carve(&mut height_buf, w, d, sea_level);
             diag.layer_timings.valley_carving_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
             diag.valley_carving.ran = true;
         }
 
-        layer_start = std::time::Instant::now();
+        layer_start = web_time::Instant::now();
         let slope_passes = match detail {
             GenDetail::Full => 2,
             GenDetail::Fast => 1,
@@ -363,7 +363,7 @@ pub fn generate_chunk_lod(
         diag.slope_limiting.detail = Some(format!("passes={}", slope_passes));
 
         // 2.5. Path flattening
-        layer_start = std::time::Instant::now();
+        layer_start = web_time::Instant::now();
         if let Some(paths) = path_network {
             if let Some(gc) = gen_config {
                 for pz in 0..PAD_Z {
@@ -398,7 +398,7 @@ pub fn generate_chunk_lod(
         diag.path_flatten.ran = path_network.is_some() && gen_config.is_some();
 
         // 2.6. Village flattening
-        layer_start = std::time::Instant::now();
+        layer_start = web_time::Instant::now();
         if let Some(villages) = village_network {
             for pz in 0..PAD_Z {
                 for px in 0..PAD_X {
@@ -419,7 +419,7 @@ pub fn generate_chunk_lod(
         diag.village_flatten.ran = village_network.is_some();
 
         // 2.7. Castle flattening
-        layer_start = std::time::Instant::now();
+        layer_start = web_time::Instant::now();
         if let Some(castle) = castle_footprint {
             for pz in 0..PAD_Z {
                 for px in 0..PAD_X {
@@ -498,7 +498,7 @@ pub fn generate_chunk_lod(
     }
 
     // 3. Convert heightmap -> SDF
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     diag.sdf_conversion.ran = true;
     let pad_x_usz = PAD_X as usize;
     for pz in 0..PAD_Z {
@@ -517,7 +517,7 @@ pub fn generate_chunk_lod(
     diag.layer_timings.sdf_conversion_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
 
     // 3.5. Guarantee minimum terrain thickness (5 voxels below surface)
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     diag.min_thickness.ran = true;
     for pz in 0..PAD_Z {
         for px in 0..PAD_X {
@@ -544,7 +544,7 @@ pub fn generate_chunk_lod(
     diag.layer_timings.min_thickness_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
 
     // 3.6. Global SDF smoothing pass (2 iterations)
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     diag.sdf_smoothing.ran = true;
     {
         let smooth_passes = 2;
@@ -582,7 +582,7 @@ pub fn generate_chunk_lod(
     diag.layer_timings.sdf_smoothing_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
 
     // 3.7. Cave carving via 3D Perlin noise overlay
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     if gen_config.is_some() && detail == GenDetail::Full && cave_worm_params.is_some() {
         let cave_perlin = Perlin::new(config.seed.wrapping_add(99999));
         let sea_level = gen_config.map_or(config.sea_level, |gc| gc.sea_level);
@@ -645,7 +645,7 @@ pub fn generate_chunk_lod(
     diag.layer_timings.caves_perlin_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
 
     // 3.8. Worm cave carving
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     if gen_config.is_some() && detail == GenDetail::Full {
         if let Some(worm_params) = cave_worm_params {
             let sea_level = gen_config.map_or(config.sea_level, |gc| gc.sea_level);
@@ -657,7 +657,7 @@ pub fn generate_chunk_lod(
     diag.layer_timings.caves_worm_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
 
     // 3.8b. Network tunnels
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     if detail == GenDetail::Full {
         if let Some(net) = cave_network {
             crate::cave_network::carve_network_tunnels(&mut chunk, config, coord, net);
@@ -667,7 +667,7 @@ pub fn generate_chunk_lod(
     diag.layer_timings.caves_network_ms = layer_start.elapsed().as_secs_f32() * 1000.0;
 
     // 3.9. Village caves
-    layer_start = std::time::Instant::now();
+    layer_start = web_time::Instant::now();
     if detail == GenDetail::Full {
         if let Some(village_net) = village_network {
             carve_village_caves(&mut chunk, config, coord, village_net);

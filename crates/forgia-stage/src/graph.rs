@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_run.toml";
 const SENSOR_PATH: &str = "forgia_stage_graph.json";

@@ -100,11 +100,15 @@ pub mod sensor_io {
     use std::fmt;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
+    #[cfg(not(target_arch = "wasm32"))]
     use std::sync::mpsc::{self, SyncSender};
+    #[cfg(not(target_arch = "wasm32"))]
     use std::sync::OnceLock;
 
+    #[cfg(not(target_arch = "wasm32"))]
     const QUEUE_CAPACITY: usize = 256;
 
+    #[cfg(not(target_arch = "wasm32"))]
     enum SensorJob {
         Write { path: PathBuf, contents: String },
         Remove { path: PathBuf },
@@ -125,6 +129,7 @@ pub mod sensor_io {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     static SENSOR_WRITER: OnceLock<SyncSender<SensorJob>> = OnceLock::new();
     static ENQUEUED: AtomicU64 = AtomicU64::new(0);
     static PROCESSED: AtomicU64 = AtomicU64::new(0);
@@ -143,6 +148,7 @@ pub mod sensor_io {
         pub write_failures: u64,
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn sender() -> &'static SyncSender<SensorJob> {
         SENSOR_WRITER.get_or_init(|| {
             let (tx, rx) = mpsc::sync_channel::<SensorJob>(QUEUE_CAPACITY);
@@ -183,6 +189,14 @@ pub mod sensor_io {
         path: impl Into<PathBuf>,
         contents: impl Into<String>,
     ) -> Result<(), EnqueueError> {
+        // wasm32 (story-695) : pas de threads ni de fs — le writer ne peut pas
+        // exister. No-op silencieux ; le sink web (inc.2) prendra le relais.
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (path.into(), contents.into());
+            return Ok(());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         match sender().try_send(SensorJob::Write {
             path: path.into(),
             contents: contents.into(),
@@ -204,6 +218,12 @@ pub mod sensor_io {
 
     /// Programme la suppression d'un fichier de santé sans bloquer la frame.
     pub fn remove(path: impl Into<PathBuf>) -> Result<(), EnqueueError> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = path.into();
+            return Ok(());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         match sender().try_send(SensorJob::Remove { path: path.into() }) {
             Ok(()) => {
                 ENQUEUED.fetch_add(1, Ordering::Relaxed);

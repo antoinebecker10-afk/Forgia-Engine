@@ -1033,8 +1033,8 @@ pub fn sys_end_run(
 /// Seed depuis l'horloge système (nanos) — fallback si user ne fournit pas.
 /// Pas crypto-secure, suffisant pour seed déterministe roguelite.
 fn default_seed_from_clock() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
         .map(|d| (d.as_nanos() & u128::from(u64::MAX)) as u64)
         .unwrap_or(0xC0FF_EEDE_ADBE_EF00)
 }

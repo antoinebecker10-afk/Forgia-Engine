@@ -119,7 +119,12 @@ impl CachedChunkData {
         for &v in &sdf_i16 {
             bytes.extend_from_slice(&v.to_le_bytes());
         }
+        // wasm32 : pas de zstd (dep C sans sysroot wasm) — le cache disque
+        // n'existe pas sur web, les octets restent bruts (symetrique to_chunk).
+        #[cfg(not(target_arch = "wasm32"))]
         let sdf_compressed = zstd::bulk::compress(&bytes, CACHE_ZSTD_LEVEL).unwrap_or(bytes);
+        #[cfg(target_arch = "wasm32")]
+        let sdf_compressed = bytes;
         Self {
             sdf_compressed,
             original_i16_count,
@@ -128,8 +133,13 @@ impl CachedChunkData {
     }
 
     pub fn to_chunk(&self) -> ChunkData {
-        let budget = self.original_i16_count * std::mem::size_of::<i16>();
-        let decompressed = zstd::bulk::decompress(&self.sdf_compressed, budget).unwrap_or_default();
+        #[cfg(not(target_arch = "wasm32"))]
+        let decompressed = {
+            let budget = self.original_i16_count * std::mem::size_of::<i16>();
+            zstd::bulk::decompress(&self.sdf_compressed, budget).unwrap_or_default()
+        };
+        #[cfg(target_arch = "wasm32")]
+        let decompressed = self.sdf_compressed.clone();
         let expected_bytes = self.original_i16_count * 2;
         let valid_bytes = decompressed.len().min(expected_bytes);
         let inv_scale = 1.0 / SDF_QUANT_SCALE;

@@ -193,8 +193,8 @@ impl EditHistory {
 /// Horloge murale, uniquement pour l'affichage « il y a … ». Un échec de lecture
 /// donne 0 : l'entrée reste utilisable, seule sa date est inconnue.
 fn now_epoch_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
         .unwrap_or(0)
 }

@@ -64,6 +64,7 @@ pub fn run_game() -> AppExit {
     // `config/...` via std::fs. Normaliser une seule fois le CWD rend le binaire
     // lançable depuis Explorer, target/debug ou un outil externe, tandis que
     // AssetPlugin reçoit toujours le chemin absolu canonique ci-dessous.
+    #[cfg(not(target_arch = "wasm32"))]
     let asset_root = forgia_core::asset_paths::asset_root();
     let runtime_root = forgia_core::asset_paths::runtime_root();
     if let Err(error) = std::env::set_current_dir(&runtime_root) {
@@ -75,10 +76,31 @@ pub fn run_game() -> AppExit {
 
     let mut app = App::new();
 
+    // Story-695 (portage web) : gardes wasm — les tonemappers a LUT embarquent
+    // des KTX2 Rgba16Unorm sans equivalent WebGPU (panic wgpu au premier upload,
+    // avant meme qu'une camera existe) ; et FPS/frame_time en console navigateur,
+    // seule telemetrie possible sans fs tant que le sink web (inc.2) n'existe pas.
+    #[cfg(target_arch = "wasm32")]
+    {
+        app.add_systems(
+            Update,
+            (wasm_neutralize_rgba16unorm_images, wasm_safe_tonemapping),
+        );
+        app.add_plugins((
+            bevy::diagnostic::FrameTimeDiagnosticsPlugin::default(),
+            bevy::diagnostic::LogDiagnosticsPlugin::default(),
+        ));
+    }
+
     // 1. Bevy DefaultPlugins EN PREMIER (fournit StatesPlugin requis par ForgiaCorePlugin)
     app.add_plugins(
         DefaultPlugins
             .set(AssetPlugin {
+                // wasm : fetch HTTP relatif a la page — un chemin disque absolu
+                // produirait des fetch file:// bloques par le navigateur.
+                #[cfg(target_arch = "wasm32")]
+                file_path: "assets".to_string(),
+                #[cfg(not(target_arch = "wasm32"))]
                 file_path: asset_root.to_string_lossy().into_owned(),
                 ..default()
             })
@@ -111,6 +133,22 @@ pub fn run_game() -> AppExit {
                     anisotropy_clamp: 16,
                     ..ImageSamplerDescriptor::linear()
                 },
+            })
+            // Story-695 : sur wasm, Bevy demande les limites MINIMALES de la spec
+            // WebGPU (8 storage buffers/stage) — insuffisant pour les layouts
+            // hanabi. Functionality = demander les limites reelles de l'adaptateur.
+            // En natif on garde le defaut (Compatibility) : comportement inchange.
+            .set(bevy::render::RenderPlugin {
+                render_creation: bevy::render::settings::WgpuSettings {
+                    priority: if cfg!(target_arch = "wasm32") {
+                        bevy::render::settings::WgpuSettingsPriority::Functionality
+                    } else {
+                        bevy::render::settings::WgpuSettings::default().priority
+                    },
+                    ..default()
+                }
+                .into(),
+                ..default()
             }),
     );
 
@@ -338,5 +376,53 @@ fn boot_to_menu(mut app_mode: ResMut<NextState<AppMode>>, mut game: ResMut<NextS
             app_mode.set(AppMode::InGame);
         }
         None => app_mode.set(AppMode::Menu),
+    }
+}
+
+// ─── Gardes wasm (story-695, portage web) ────────────────────────────────────
+
+/// Remplace toute image Rgba16Unorm (LUT tonemapping embarquees par Bevy) par le
+/// placeholder 1x1x1 D3, avant que le renderer tente un upload WebGPU qui panique
+/// (format sans equivalent dans la spec). Couple avec `wasm_safe_tonemapping` :
+/// les cameras basculent sur un tonemapper pur shader, la LUT n'est jamais lue.
+#[cfg(target_arch = "wasm32")]
+fn wasm_neutralize_rgba16unorm_images(mut images: ResMut<Assets<bevy::image::Image>>) {
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    let ids: Vec<_> = images
+        .iter()
+        .filter(|(_, img)| img.texture_descriptor.format == TextureFormat::Rgba16Unorm)
+        .map(|(id, _)| id)
+        .collect();
+    for id in ids {
+        if let Some(img) = images.get_mut(id) {
+            *img = bevy::image::Image::new_fill(
+                Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D3,
+                &[128, 128, 128, 255],
+                TextureFormat::Rgba8Unorm,
+                bevy::asset::RenderAssetUsages::RENDER_WORLD,
+            );
+        }
+    }
+}
+
+/// Bascule les tonemappers a LUT (TonyMcMapface/AgX/BlenderFilmic) vers
+/// AcesFitted (pur shader) sur toute camera, y compris via le menu pause.
+#[cfg(target_arch = "wasm32")]
+fn wasm_safe_tonemapping(
+    mut tonemappings: Query<
+        &mut bevy::core_pipeline::tonemapping::Tonemapping,
+        Changed<bevy::core_pipeline::tonemapping::Tonemapping>,
+    >,
+) {
+    use bevy::core_pipeline::tonemapping::Tonemapping as T;
+    for mut t in &mut tonemappings {
+        if matches!(*t, T::TonyMcMapface | T::AgX | T::BlenderFilmic) {
+            *t = T::AcesFitted;
+        }
     }
 }

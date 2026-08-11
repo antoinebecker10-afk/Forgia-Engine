@@ -151,7 +151,7 @@ pub fn auto_rig_pinocchio_v1(
             resolution: VoxelizerConfig::resolution_for_mesh_size(mesh_height),
             ..Default::default()
         };
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         let grid = voxelize_mesh(&positions_local, &indices, &voxel_cfg);
         let voxel_ms = t0.elapsed().as_millis();
         let voxel_count = grid.filled_count();
@@ -166,7 +166,7 @@ pub fn auto_rig_pinocchio_v1(
         }
 
         // 3. Medial axis
-        let t1 = std::time::Instant::now();
+        let t1 = web_time::Instant::now();
         let graph = extract_medial_axis(&grid, &MedialAxisConfig::default());
         let medial_ms = t1.elapsed().as_millis();
         let sphere_count = graph.sphere_count();
