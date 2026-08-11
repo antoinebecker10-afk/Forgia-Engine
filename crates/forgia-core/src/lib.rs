@@ -189,11 +189,15 @@ pub mod sensor_io {
         path: impl Into<PathBuf>,
         contents: impl Into<String>,
     ) -> Result<(), EnqueueError> {
-        // wasm32 (story-695) : pas de threads ni de fs — le writer ne peut pas
-        // exister. No-op silencieux ; le sink web (inc.2) prendra le relais.
+        // wasm32 (story-695 inc.2) : pas de threads ni de fs — chaque capteur
+        // garde son DERNIER etat en memoire, exporte vers JS par
+        // `forgia_dump_sensors()` (bouton diagnostic de la page web).
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = (path.into(), contents.into());
+            let path: PathBuf = path.into();
+            if let Ok(mut map) = crate::web_sensor_sink::SENSORS.lock() {
+                map.insert(path.to_string_lossy().into_owned(), contents.into());
+            }
             return Ok(());
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -220,7 +224,10 @@ pub mod sensor_io {
     pub fn remove(path: impl Into<PathBuf>) -> Result<(), EnqueueError> {
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = path.into();
+            let path: PathBuf = path.into();
+            if let Ok(mut map) = crate::web_sensor_sink::SENSORS.lock() {
+                map.remove(&path.to_string_lossy().into_owned());
+            }
             return Ok(());
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -530,4 +537,54 @@ mod tests {
         app.add_plugins(bevy::state::app::StatesPlugin);
         app.add_plugins(ForgiaCorePlugin);
     }
+}
+
+// ─── Sink web des capteurs (story-695 inc.2) ─────────────────────────────────
+
+/// Sur wasm, `sensor_io` range le dernier etat de chaque capteur ici : le
+/// « regarde » des testeurs web. Exporte vers JS par [`forgia_dump_sensors`].
+#[cfg(target_arch = "wasm32")]
+pub(crate) mod web_sensor_sink {
+    use std::collections::BTreeMap;
+    use std::sync::Mutex;
+
+    pub(crate) static SENSORS: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
+}
+
+/// Export JS : tous les capteurs en un objet JSON `{ "forgia2_x.json": "<contenu>" }`.
+/// Les contenus sont embarques en CHAINES echappees : un capteur au JSON invalide
+/// ne peut pas corrompre le dump entier. Appele par le bouton diagnostic de la page.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn forgia_dump_sensors() -> String {
+    fn escape_into(out: &mut String, s: &str) {
+        for c in s.chars() {
+            match c {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                '\n' => out.push_str("\\n"),
+                '\r' => out.push_str("\\r"),
+                '\t' => out.push_str("\\t"),
+                c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+                c => out.push(c),
+            }
+        }
+    }
+    let Ok(map) = web_sensor_sink::SENSORS.lock() else {
+        return "{}".to_string();
+    };
+    let mut out = String::with_capacity(map.len() * 256);
+    out.push('{');
+    for (i, (key, value)) in map.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push('"');
+        escape_into(&mut out, key);
+        out.push_str("\":\"");
+        escape_into(&mut out, value);
+        out.push('"');
+    }
+    out.push('}');
+    out
 }

@@ -120,6 +120,7 @@ zstd = "0.13"
 # Story-695 : horloges portables — std::time panique sur wasm32 (« time not
 # implemented ») ; web-time = horloge JS sur web, re-export std en natif.
 web-time = "1"
+wasm-bindgen = "0.2"
 
 # Procgen — spatial index pour validation building-vs-road (story-446)
 rstar = "0.12"
