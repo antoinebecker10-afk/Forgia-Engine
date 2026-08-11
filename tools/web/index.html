@@ -31,13 +31,19 @@ const btn = document.getElementById('start');
 const overlay = document.getElementById('overlay');
 const bar = document.getElementById('bar');
 const errors = [];
-window.addEventListener('error', e => { errors.push(e.message); showErr(); });
-window.addEventListener('unhandledrejection', e => { errors.push(String(e.reason)); showErr(); });
+// Seuls les panics Rust sont FATALS et meritent l'overlay plein ecran. Les
+// erreurs JS benignes (ex: pointer lock refuse = WrongDocumentError, retente
+// au clic suivant) restent en console — afficher un ecran d'erreur sur un
+// incident non fatal a fait croire a un crash le 2026-08-11.
+const FATAL = /panicked|unreachable|RuntimeError/;
+function showErr() { status.textContent = 'ERREUR:\n' + errors.slice(-4).join('\n'); overlay.style.display = 'flex'; }
+function onErr(s) { if (errors.length < 8) { errors.push(s.slice(0, 600)); } if (FATAL.test(s)) { showErr(); } }
+window.addEventListener('error', e => onErr(e.message));
+window.addEventListener('unhandledrejection', e => onErr(String(e.reason)));
 // Le panic hook Rust (console_error_panic_hook) ecrit le VRAI message via console.error :
 // on le miroite dans la page pour lire le panic sans devtools (indispensable sur mobile).
 const origErr = console.error.bind(console);
-console.error = (...a) => { origErr(...a); const s = a.map(String).join(' '); if (errors.length < 8) { errors.push(s.slice(0, 600)); showErr(); } };
-function showErr() { status.textContent = 'ERREUR:\n' + errors.slice(-4).join('\n'); overlay.style.display = 'flex'; }
+console.error = (...a) => { origErr(...a); onErr(a.map(String).join(' ')); };
 if (!navigator.gpu) {
   status.textContent = 'WebGPU indisponible sur ce navigateur.\nAndroid : Chrome recent requis. iPhone : Safari iOS 26+.\nVerifie aussi que la page est bien servie en HTTPS (ou localhost).';
 } else {
@@ -60,6 +66,22 @@ btn.onclick = async () => {
     try { await document.documentElement.requestFullscreen({navigationUI:'hide'}); } catch (_) {}
     try { await screen.orientation.lock('landscape'); } catch (_) {}
     overlay.style.display = 'none';
+    // Badge de chargement pilote par les logs du jeu : apres la compilation
+    // wasm, ~190 MB d'assets chargent derriere un ecran sombre — sans signal,
+    // ca ressemble a un blocage (retour testeur 2026-08-11).
+    const badge = document.createElement('div');
+    badge.id = 'fps'; badge.style.top = 'auto'; badge.style.bottom = '12px';
+    badge.style.right = 'auto'; badge.style.left = '50%'; badge.style.transform = 'translateX(-50%)';
+    badge.style.color = '#e8e3d8'; badge.style.fontSize = '14px';
+    badge.textContent = 'Demarrage du moteur…';
+    document.body.appendChild(badge);
+    const badgeWatch = (...a) => {
+      const s = a.map(String).join(' ');
+      if (s.includes('Forgia V2 boot OK')) { badge.textContent = 'Chargement du monde… (~190 MB au premier lancement)'; }
+      if (s.includes('state = Menu')) { badge.remove(); }
+    };
+    for (const lvl of ['log', 'info']) { const orig = console[lvl].bind(console); console[lvl] = (...a) => { orig(...a); badgeWatch(...a); }; }
+    setTimeout(() => badge.remove(), 120000);
     // Compteur FPS JS (rAF) : moyenne 1 s + pire frame de la fenetre.
     const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; document.body.appendChild(fpsEl);
     let frames = [], last = performance.now();
