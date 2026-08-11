@@ -62,7 +62,22 @@ btn.onclick = async () => {
     for (;;) { const {done, value} = await reader.read(); if (done) break; chunks.push(value); got += value.length; if (total) bar.firstElementChild.style.width = (100*got/total).toFixed(1)+'%'; }
     const bytes = new Uint8Array(got); let o = 0; for (const c of chunks) { bytes.set(c, o); o += c.length; }
     status.textContent = 'Compilation wasm…';
-    const init = (await import('./forgia.js')).default;
+    const mod = await import('./forgia.js');
+    const init = mod.default;
+    // Bouton diagnostic (story-695 inc.2) : copie l'etat de TOUS les capteurs
+    // du jeu + erreurs + contexte navigateur — le « regarde » des testeurs.
+    const diag = document.createElement('button');
+    diag.textContent = '📋 Diag';
+    diag.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:20;font:12px monospace;padding:4px 10px;border-radius:4px;border:1px solid #555;background:rgba(0,0,0,.55);color:#e8e3d8;cursor:pointer;';
+    diag.onclick = async () => {
+      let sensors = {};
+      try { if (mod.forgia_dump_sensors) sensors = JSON.parse(mod.forgia_dump_sensors()); } catch (e) { sensors = { dump_error: String(e) }; }
+      const report = JSON.stringify({ ts: new Date().toISOString(), url: location.href, ua: navigator.userAgent, errors, sensors }, null, 1);
+      try { await navigator.clipboard.writeText(report); diag.textContent = '📋 copié !'; }
+      catch { console.log(report); diag.textContent = '📋 → console (F12)'; }
+      setTimeout(() => { diag.textContent = '📋 Diag'; }, 2500);
+    };
+    document.body.appendChild(diag);
     try { await document.documentElement.requestFullscreen({navigationUI:'hide'}); } catch (_) {}
     try { await screen.orientation.lock('landscape'); } catch (_) {}
     overlay.style.display = 'none';
