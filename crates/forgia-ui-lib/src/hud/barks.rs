@@ -713,6 +713,9 @@ lines = [
         app.add_plugins(bevy::state::app::StatesPlugin);
         app.insert_state(GameMode::Roguelite);
         app.init_resource::<BarkEngine>();
+        // sys_trigger_combat_barks exige Res<BarkVoiceHandles> depuis la refonte
+        // audio — le plugin prod l'insere, les TestApp doivent suivre.
+        app.init_resource::<BarkVoiceHandles>();
         app.insert_resource(BarkLibrary {
             pools: vec![BarkPool {
                 speaker: "pepin".into(),
@@ -767,6 +770,9 @@ lines = [
         app.add_plugins(bevy::state::app::StatesPlugin);
         app.insert_state(GameMode::Roguelite);
         app.init_resource::<BarkEngine>();
+        // sys_trigger_combat_barks exige Res<BarkVoiceHandles> depuis la refonte
+        // audio — le plugin prod l'insere, les TestApp doivent suivre.
+        app.init_resource::<BarkVoiceHandles>();
         app.insert_resource(BarkLibrary {
             pools: vec![BarkPool {
                 speaker: "lenoir".into(),
