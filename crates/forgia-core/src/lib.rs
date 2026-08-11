@@ -588,3 +588,28 @@ pub fn forgia_dump_sensors() -> String {
     out.push('}');
     out
 }
+
+/// Story-695 inc.3 : acces localStorage — la persistance des saves sur web.
+/// Cle par fichier de save (`forgia_save:<nom>`), valeurs TOML telles quelles.
+#[cfg(target_arch = "wasm32")]
+pub mod web_storage {
+    fn storage() -> Option<web_sys::Storage> {
+        web_sys::window()?.local_storage().ok().flatten()
+    }
+
+    pub fn get(key: &str) -> Option<String> {
+        storage()?.get_item(key).ok().flatten()
+    }
+
+    pub fn set(key: &str, value: &str) -> bool {
+        storage()
+            .map(|s| s.set_item(key, value).is_ok())
+            .unwrap_or(false)
+    }
+
+    pub fn remove(key: &str) {
+        if let Some(s) = storage() {
+            let _ = s.remove_item(key);
+        }
+    }
+}

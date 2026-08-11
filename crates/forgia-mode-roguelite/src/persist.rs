@@ -11,6 +11,10 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use web_time::{SystemTime, UNIX_EPOCH};
 
+/// Prefixe des cles localStorage des saves web (story-695 inc.3).
+#[cfg(target_arch = "wasm32")]
+const WEB_SAVE_PREFIX: &str = "forgia_save:";
+
 /// Répertoire de sauvegarde STABLE, découplé du dossier d'installation :
 /// `%APPDATA%\Forgia\` sur Windows (créé si absent). Objectif distribution
 /// joueur : une mise à jour du build (remplacement du dossier de jeu, re-dézip,
@@ -54,6 +58,26 @@ pub(crate) fn legacy_config_dir() -> PathBuf {
 /// `save_dir()`, rendant l'ancien fichier inerte (source de vérité unique dès
 /// la première sauvegarde réussie).
 pub(crate) fn load_toml_migrating<T: DeserializeOwned + Default>(file_name: &str) -> T {
+    // wasm32 (story-695 inc.3) : les saves vivent dans localStorage, cle par
+    // fichier. Meme garantie qu'en natif : un TOML corrompu est preserve sous
+    // une cle `.corrupt-<ts>` avant de repartir des defauts.
+    #[cfg(target_arch = "wasm32")]
+    {
+        let key = format!("{WEB_SAVE_PREFIX}{file_name}");
+        if let Some(contents) = forgia_core::web_storage::get(&key) {
+            match toml::from_str(&contents) {
+                Ok(value) => return value,
+                Err(error) => {
+                    let backup = format!("{key}.corrupt-{}", now_unix_secs());
+                    let _ = forgia_core::web_storage::set(&backup, &contents);
+                    forgia_core::web_storage::remove(&key);
+                    warn!("[save] invalid TOML in localStorage {key}: {error}; preserved as {backup}");
+                }
+            }
+        }
+        // Tombe sur le T::default() de fin de fonction (partage avec le natif).
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     for path in [
         save_dir().join(file_name),
         legacy_config_dir().join(file_name),
@@ -89,6 +113,7 @@ fn now_unix_secs() -> u64 {
         .unwrap_or(0)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn corrupt_backup_path(path: &Path, timestamp_unix_secs: u64) -> PathBuf {
     let file_name = path
         .file_name()
@@ -108,11 +133,27 @@ pub(crate) fn save_toml_atomic<T: Serialize>(path: &Path, value: &T, tag: &str) 
             return;
         }
     };
+    // wasm32 : localStorage.setItem est atomique par nature — pas de tmp/rename.
+    #[cfg(target_arch = "wasm32")]
+    {
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("save.toml");
+        let key = format!("{WEB_SAVE_PREFIX}{file_name}");
+        if !forgia_core::web_storage::set(&key, &s) {
+            warn!("[{tag}] save failed (localStorage {key})");
+        }
+        return;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     let tmp = path.with_extension("tmp");
+    #[cfg(not(target_arch = "wasm32"))]
     if let Err(e) = std::fs::write(&tmp, &s) {
         warn!("[{tag}] save failed (write tmp {}): {e}", tmp.display());
         return;
     }
+    #[cfg(not(target_arch = "wasm32"))]
     if let Err(e) = std::fs::rename(&tmp, path) {
         warn!(
             "[{tag}] save failed (rename {} -> {}): {e}",
