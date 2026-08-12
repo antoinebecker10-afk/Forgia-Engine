@@ -100,6 +100,12 @@ impl Plugin for ForgiaObservabilityPlugin {
         // (Vulkan/DX12) pour le verdict CPU/GPU-bound du perf_sensor. Non inclus
         // dans DefaultPlugins (sauf feature tracing-tracy) → ajout explicite,
         // idempotent. Overhead timestamp-query négligeable.
+        // wasm EXCLU (story-695, 2026-08-12) : sur WebGPU la lecture du buffer
+        // de statistiques échoue (« Failed to download render statistics
+        // buffer » ×N) puis wgpu panique (createBuffer mappedAtCreation) —
+        // crash reproduit 2/2 sur le site public à 1-3 min de session. Le
+        // perf_sensor tolère l'absence (gpu stats à 0, verdict headroom).
+        #[cfg(not(target_arch = "wasm32"))]
         if !app.is_plugin_added::<bevy::render::diagnostic::RenderDiagnosticsPlugin>() {
             app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin);
         }
