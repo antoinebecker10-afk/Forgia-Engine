@@ -18,6 +18,7 @@
 //! chaque tir touché → feedback constant immédiat.
 
 use bevy::prelude::*;
+use bevy_egui::EguiContexts;
 use bevy_kira_audio::prelude::Decibels;
 use bevy_kira_audio::{
     AudioApp, AudioChannel, AudioControl, AudioInstance, AudioSource, AudioTween,
@@ -31,7 +32,6 @@ use forgia_combat::weapons::WeaponType;
 use forgia_core::prelude::*;
 use forgia_player::prelude::DashUsedEvent;
 use forgia_player::{Player, PlayerLocomotion};
-use bevy_egui::EguiContexts;
 use forgia_rpg_data::boons::{BoonAppliedEvent, CoffrePickedEvent};
 use forgia_rpg_data::loot_tables::Souls;
 use forgia_ui_lib::ui_sfx::{drain_ui_sfx, UiSfxKind};
@@ -715,7 +715,28 @@ fn sys_sfx_on_combat_hit(
     // par-son (prouvé via forgia2_volume.json) → il faut multiplier ici.
     let master = cfg.master_volume * user_vol.sfx_gain();
     for ev in events.read() {
-        if q_enemy.get(ev.target).is_ok() {
+        // story-698 — LE SON DE KILL NE PARTAIT QUASIMENT JAMAIS : 8 pour 77 morts,
+        // mesuré le 2026-08-12. Ce test était `q_enemy.get(ev.target).is_ok()`, une
+        // requête sur une cible **déjà despawnée** :
+        //
+        //     despawn_dead_cubes    → GameSet::Combat
+        //     sys_sfx_on_combat_hit → GameSet::Effects   (Combat passe AVANT)
+        //
+        // Sur un coup fatal, l'entité disparaît dans la même frame, avant qu'on
+        // arrive ici. La requête échouait, le son ne partait pas — et le compteur,
+        // qui est à l'intérieur du bloc, ne comptait pas non plus. D'où un capteur
+        // à 8 qu'on a longtemps lu comme « 8 morts » au lieu de « 8 sons joués ».
+        // Les 8 rescapés sont les morts survenues APRÈS le set Combat (roquette,
+        // DoT) : celles-là survivent jusqu'à la frame suivante.
+        //
+        // Réparé sans toucher à l'ordonnancement — le déplacer coupleraient deux
+        // crates pour un son. On déduit : cible introuvable + coup fatal + attaquant
+        // ≠ la cible ⇒ c'était un ennemi. Le joueur, lui, reste query-able quand il
+        // encaisse (il n'est pas despawné à la mort, il respawn), donc sa branche
+        // `hurt` ci-dessous n'est pas volée.
+        let cible_disparue = q_enemy.get(ev.target).is_err() && q_player.get(ev.target).is_err();
+        let ennemi_mort_ce_frame = ev.is_kill && cible_disparue && ev.attacker != Some(ev.target);
+        if q_enemy.get(ev.target).is_ok() || ennemi_mort_ce_frame {
             // L'ennemi encaisse : impact, ou kill si HP=0. Pitch varié ±5 %
             // (story-651) : ces sons jouent jusqu'à 16×/s en full-auto.
             let def = if ev.is_kill { &cfg.kill } else { &cfg.impact };
@@ -1387,7 +1408,10 @@ mod tests {
                 }
             }
         }
-        assert!(checked > 0, "aucun .ogg scanné — le contrôle serait aveugle");
+        assert!(
+            checked > 0,
+            "aucun .ogg scanné — le contrôle serait aveugle"
+        );
         assert!(
             offenders.is_empty(),
             "{checked} fichiers scannés, {} multi-flux (Bevy ne les chargera pas) : {:?}\n\
@@ -1427,8 +1451,14 @@ mod tests {
         // menu. Seuls InRun et Boss réclament la piste du chapitre.
         assert!(!wants_chapter_track(Some(&RunState::Lobby)), "Lobby → hub");
         assert!(!wants_chapter_track(None), "menu (pas de SubState) → hub");
-        assert!(!wants_chapter_track(Some(&RunState::Defeat)), "défaite → hub");
-        assert!(!wants_chapter_track(Some(&RunState::Victory)), "victoire → hub");
+        assert!(
+            !wants_chapter_track(Some(&RunState::Defeat)),
+            "défaite → hub"
+        );
+        assert!(
+            !wants_chapter_track(Some(&RunState::Victory)),
+            "victoire → hub"
+        );
         assert!(wants_chapter_track(Some(&RunState::InRun { stage: 0 })));
         assert!(wants_chapter_track(Some(&RunState::Boss { stage: 3 })));
     }
