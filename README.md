@@ -1,9 +1,10 @@
 # Forgia V2
 
 > **Moteur de jeu IA-natif** (Rust / Bevy 0.18.1). Le créateur décrit son jeu et importe
-> ses assets, l'IA le construit. Le moat : un codebase **observable** (~100 sensors JSON
-> runtime) et **data-driven** (~105 genomes TOML hot-reload) conçu pour être piloté par
-> agents IA de façon fiable.
+> ses assets, l'IA le construit. Le moat : un codebase **observable** (97 sensors JSON
+> runtime) et **data-driven** (159 fichiers de génome TOML — 136 dans `assets/genomes/`,
+> 23 dans `config/` — soit 1 883 gènes validés par le gate `validate-genomes`) conçu pour
+> être piloté par agents IA de façon fiable.
 
 ## État actuel (mis à jour 2026-08-12)
 
