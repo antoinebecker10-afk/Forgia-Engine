@@ -10,6 +10,8 @@ workspace = true
 [dependencies]
 bevy = { workspace = true }
 forgia-core = { workspace = true }
+# Story-700 inc.3 — le bot suit un chemin au lieu de foncer en ligne droite.
+forgia-navmesh = { workspace = true }
 forgia-damage = { path = "../forgia-damage" }
 forgia-combat = { workspace = true }
 # 2026-08-05 — `on_bot_death` doit connaître `AscendsOnDeath` pour ne PAS balayer

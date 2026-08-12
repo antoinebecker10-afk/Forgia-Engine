@@ -86,7 +86,7 @@ Volontairement hors scope, chacun étant un incrément à part :
 | Inc. | Contenu |
 | --- | --- |
 | ~~2~~ | ✅ **LIVRÉ 2026-08-12** — cf. section ci-dessous |
-| **3** | `forgia-ai-arena-bot` suit le chemin au lieu de la ligne droite + chien de garde de désenlisement |
+| ~~3~~ | ✅ **LIVRÉ 2026-08-12** — cf. section ci-dessous |
 | **4** | Le compagnon : suivre, se poster, barre PV permanente |
 | **5** | Le compagnon porte le **second élément** → jalon hérité de [story-697](story-697-reactions-elementaires-jamais-declenchees.md) : les réactions partent en combat ordinaire, plus seulement sur boss |
 
@@ -143,6 +143,83 @@ chacune a son alerte distincte :
 
 `forgia-ai-arena-bot` avance encore en ligne droite. Le maillage existe et se construit
 maintenant tout seul, mais **personne ne le suit** — c'est l'inc. 3.
+
+---
+
+## Incrément 3 — le bot suit enfin le chemin (2026-08-12)
+
+### Deux découvertes qui ont réduit le scope
+
+**1. Le chien de garde de désenlisement existait déjà.** L'incrément prévoyait de le
+construire ; `unstick_step` le fait depuis longtemps, et bien : `stuck_secs` s'accumule sur
+un seuil **relatif à la vitesse** (un bot qui rabote un mur avance encore un peu — tester
+« déplacement nul » l'aurait raté), déclenche `unstick_left`, fait longer l'obstacle au
+lieu de foncer, remet l'ardoise à zéro en sortie pour éviter la sortie perpétuelle, et
+compte ses déclenchements dans le capteur.
+
+> J'allais en écrire un second. C'est exactement le piège que `concept-first` §4 nomme :
+> chercher le nom d'un type au lieu du **mot-concept**. La règle
+> [`spawn-clearance.md`](../../.claude/rules/spawn-clearance.md) §5 dit encore que cette
+> pièce n'existe pas — **elle est périmée sur ce point**.
+
+**Conséquence heureuse** : ce mécanisme devient le **filet** sous le suivi de chemin, et
+son compteur `unstick_triggered_session` offre une **mesure de succès gratuite** — il doit
+**chuter**. S'il ne bouge pas après cet incrément, le chemin n'est pas suivi.
+
+**2. Une grandeur écrite deux fois, et c'était ma faute.** `TacticalTuning::max_step_up_m`
+vaut **0,45 m** ; le `step_height_m` que j'avais écrit à l'inc. 1 dans `navmesh.toml` vaut
+**0,45 m**. Même grandeur, deux fichiers, deux crates — la classe de défaut n°1 du projet,
+reproduite par moi douze heures plus tôt.
+
+Le miroir est inévitable (crates séparées), donc `spawn-clearance.md` §4bis impose un test
+qui compare les deux ensembles. Il existe :
+`le_ressaut_du_navmesh_et_celui_du_bot_sont_la_meme_grandeur`. **S'ils divergent, le
+maillage promet des chemins que le bot ne peut pas emprunter — et rien ne lève d'erreur :
+le bot suit un trajet valide et se bloque contre une marche.**
+
+### Le changement, et sa petitesse est le point
+
+`bot_tactical_movement` empile strafe, évitement local, glissement contre les murs et
+suivi de sol sur une direction de base. **Une seule ligne portait « fonce vers la cible ».**
+C'est elle, et elle seule, qui change :
+
+```rust
+// avant
+let fwd_dir = (to_target / dist).with_y(0.0).normalize_or_zero();
+// après — le reste de la pile tactique est intact
+let fwd_dir = nav_path.and_then(BotPath::current).map(…).unwrap_or(straight);
+```
+
+**Le repli en ligne droite est explicite et non négociable.** Hors arène, pendant le
+chargement, ou si la cible est hors du maillage, le bot se comporte *exactement* comme
+avant. On n'échange pas un défaut connu contre un bot immobile.
+
+### Ce qui est neuf
+
+- **`BotPath`** — composant : points, curseur, délai, cible planifiée. Le curseur avance
+  **en boucle** : un grunt à 9 m/s franchit deux points serrés dans une frame, et
+  s'arrêter au premier le ferait reculer.
+- **`sys_bot_navpath`** — entretient le chemin avant le mouvement. Recalcul sur **trois
+  raisons seulement** : plus de chemin, cible déplacée de plus de 2 m, ou délai de 0,5 s
+  écoulé. Le chemin est du travail de *planification*, pas de frame.
+- **`sys_attach_bot_path`** — attache le composant aux bots existants, plutôt que d'aller
+  modifier chaque crate de mode qui les spawne.
+- Trois gènes dans `TacticalTuning` : `waypoint_arrive_m`, `repath_period_secs`,
+  `target_moved_repath_m`.
+- Sans maillage, `sys_bot_navpath` **vide** les chemins au lieu de les laisser périmer.
+
+### Vérifications
+
+- `cargo test -p forgia-ai-arena-bot` — **38 passés, 0 échec** (26 + 12)
+- `cargo clippy -p forgia-ai-arena-bot --all-targets` — **0 warning** (vrai cargo)
+- Le test miroir du ressaut **passe** : 0,45 = 0,45
+
+### Ce qui reste à prouver, et seul le jeu peut le faire
+
+Aucun test headless ne dit qu'un bot *se sent* mieux. Le juge est le capteur :
+**`unstick_triggered_session` doit chuter** entre une run d'avant et une run d'après, et
+`forgia2_navmesh.json` doit montrer `obstacles_kept > 0` sur la même run. Les deux chiffres
+existent déjà — il ne manque que la run.
 
 ---
 

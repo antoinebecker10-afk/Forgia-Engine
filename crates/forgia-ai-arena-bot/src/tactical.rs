@@ -71,6 +71,18 @@ pub struct TacticalTuning {
     /// Durée pendant laquelle le bot longe l'obstacle au lieu de foncer vers sa
     /// cible. Il ne se téléporte JAMAIS : on ne change que sa direction.
     pub unstick_secs: f32,
+    // ── Story-700 inc.3 — suivi de chemin (navmesh) ───────────────
+    /// Distance à laquelle un point du chemin est considéré atteint (m). Trop
+    /// petit = le bot tourne autour sans jamais valider ; trop grand = il coupe
+    /// les virages et frotte les murs que le chemin contournait.
+    pub waypoint_arrive_m: f32,
+    /// Délai minimum entre deux recalculs de chemin (s). Le chemin est du travail
+    /// de PLANIFICATION, pas de frame : N bots qui retriangulent chaque frame
+    /// mangeraient le budget pour un résultat identique.
+    pub repath_period_secs: f32,
+    /// Déplacement de la cible au-delà duquel on recalcule sans attendre le délai
+    /// (m). C'est ce qui garde la poursuite réactive malgré le throttle ci-dessus.
+    pub target_moved_repath_m: f32,
 }
 
 impl Default for TacticalTuning {
@@ -93,6 +105,14 @@ impl Default for TacticalTuning {
             stuck_progress_frac: 0.25,
             stuck_after_secs: 0.7,
             unstick_secs: 0.9,
+            // Dérivé du gabarit : la capsule d'un bot fait ~0,6 m de diamètre, on
+            // valide donc un point dès qu'il est sous le mètre — sans couper au point
+            // de frotter le mur que le chemin contournait.
+            waypoint_arrive_m: 1.0,
+            // 2 Hz : un grunt à 9 m/s parcourt 4,5 m entre deux calculs, très en deçà
+            // de la maille d'une arène. `target_moved_repath_m` rattrape le reste.
+            repath_period_secs: 0.5,
+            target_moved_repath_m: 2.0,
         }
     }
 }
@@ -480,7 +500,15 @@ fn collide_and_slide(
 /// Run APRÈS `bot_state_machine` original pour appliquer le tactical layer.
 #[allow(clippy::too_many_arguments)]
 pub fn bot_tactical_movement(
-    mut bots: Query<(Entity, &mut ArenaBot, &mut Transform), Without<BotTarget>>,
+    mut bots: Query<
+        (
+            Entity,
+            &mut ArenaBot,
+            &mut Transform,
+            Option<&crate::navpath::BotPath>,
+        ),
+        Without<BotTarget>,
+    >,
     targets: Query<&Transform, With<BotTarget>>,
     rapier: ReadRapierContext,
     tuning: Res<TacticalTuning>,
@@ -494,7 +522,7 @@ pub fn bot_tactical_movement(
     let Ok(ctx) = rapier.single() else { return };
     let dt = time.delta_secs();
 
-    for (bot_entity, mut bot, mut xf) in &mut bots {
+    for (bot_entity, mut bot, mut xf, nav_path) in &mut bots {
         if bot.state == BotState::Dead {
             continue;
         }
@@ -511,7 +539,23 @@ pub fn bot_tactical_movement(
         if !want_chase || bot.speed < 0.01 || dist < 0.01 {
             continue;
         }
-        let fwd_dir = (to_target / dist).with_y(0.0).normalize_or_zero();
+        // Story-700 inc.3 — c'est LA ligne qui portait « fonce vers la cible », et la
+        // seule. Le chemin du navmesh la remplace ; strafe, évitement local, glissement
+        // contre les murs et suivi de sol restent inchangés en dessous.
+        //
+        // Le repli en ligne droite est explicite et non négociable : hors arène, pendant
+        // le chargement, ou si la cible est hors du maillage, le bot se comporte
+        // EXACTEMENT comme avant cet incrément. On n'échange pas un défaut connu contre
+        // un bot immobile.
+        let straight = (to_target / dist).with_y(0.0).normalize_or_zero();
+        let fwd_dir = nav_path
+            .and_then(crate::navpath::BotPath::current)
+            .map(|w| {
+                Vec3::new(w.x - xf.translation.x, 0.0, w.y - xf.translation.z)
+                    .normalize_or_zero()
+            })
+            .filter(|d| d.length_squared() > 0.0)
+            .unwrap_or(straight);
         let strafe = compute_strafe_offset(&mut bot, fwd_dir, &tuning, dt);
         let desired = (fwd_dir + strafe.normalize_or_zero() * 0.4).normalize_or_zero();
         // Phase 3 obstacle avoidance.

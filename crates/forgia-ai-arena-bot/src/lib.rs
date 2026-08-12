@@ -9,7 +9,9 @@ use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::GameMode;
 use forgia_damage::{DamageEvent, DamageKind, DeathEvent, ForgiaDamagePlugin, Health, Mortal};
 
+pub mod navpath;
 pub mod tactical;
+pub use navpath::BotPath;
 pub use tactical::{BotAiSensor, TacticalTuning};
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -255,6 +257,12 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     tactical::bot_los_check,
                     tactical::bot_perception_alert,
                     bot_state_machine,
+                    // Story-700 inc.3 — le chemin s'entretient AVANT le mouvement, qui
+                    // ne fait que lire le point courant. Sans maillage, ces deux
+                    // systèmes sont quasi gratuits et le mouvement retombe en ligne
+                    // droite : le comportement d'avant est le repli, pas l'exception.
+                    navpath::sys_attach_bot_path,
+                    navpath::sys_bot_navpath,
                     // Phase 3 tactical_movement run APRÈS state_machine pour override le
                     // mouvement basique chase forward avec strafe + obstacle avoidance.
                     tactical::bot_tactical_movement,
