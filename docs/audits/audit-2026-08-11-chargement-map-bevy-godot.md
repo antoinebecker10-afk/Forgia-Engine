@@ -144,6 +144,27 @@ sautées, visibles manette en main.
 |---|---|---|---|
 | ~~1~~ | ~~**File d'instanciation budgétée**~~ — **DÉJÀ FAIT depuis juin, cf §4 bis** | — | — |
 | **1** | **Budget de DÉPART** (le seul volet non couvert) | 1 948 entités perdues en une frame = 43,6 ms. `DecorSpawnQueue` (story-626) ne traite que l'arrivée. | **Masquer à la mise en file** (`Visibility::Hidden` + collider off) : à 200/frame le pic met 10 frames à disparaître, donc différer sans masquer laisserait des fantômes en scène. |
+
+### Les dérivations à reprendre pour le budget de départ
+
+Elles sont mesurées, pas choisies — à resservir telles quelles le jour du câblage :
+
+| Sens | Mesuré | Coût unitaire | Budget ~5 ms (tiers d'un frame 60 fps) |
+|---|---|---|---|
+| Arrivée | 91 ent. / 56 ms · 98 / 50 ms | **0,51 – 0,62 ms** | ≈ 10 / frame |
+| **Départ** | **1 948 ent. / 43,6 ms** | **0,022 ms** — ~25× moins cher | **≈ 200 / frame** |
+
+Trois invariants qu'un budget de départ doit tenir, et qui ne sont pas
+symétriques de ceux de l'arrivée :
+
+1. **Reporter, jamais jeter.** Une entrée perdue à l'arrivée = contenu manquant,
+   visible. Perdue au départ = **entité immortelle, fuite invisible.** Il ne doit
+   exister aucune méthode qui vide la file en silence.
+2. **Progrès garanti** : au moins une entrée sort par frame même si son coût
+   dépasse le budget, sinon une entrée trop lourde bloque la file pour toujours.
+3. **La `Resource` porteuse ne doit PAS être state-scopée** — détruite à `OnExit`
+   avec des entités dedans, elles fuient définitivement. Et `try_despawn`, jamais
+   `despawn` : entre la mise en file et le drain, l'entité peut déjà être morte.
 | **2** | Vérifier le partage des `Handle<Scene>` dans `decor.rs` | Deux props du même GLB doivent partager le handle. Si `material_override` clone un `StandardMaterial` par instance, le batch saute **en silence**. | Faible — c'est une vérification. |
 | **3** | `VisibilityRange` sur les props d'arène | Pas pour dessiner moins : pour **collapser plusieurs meshes en un seul** à distance (doc Bevy : *« reducing the number of meshes… useful for reducing drawcall count »*). Piège : non propagé aux enfants → système post-instanciation sur les `SceneRoot`. | Moyen. **Déclassé** par le run du 08-12 : la passe opaque a baissé en ajoutant des props. |
 | **4** | **Occlusion culling : pas maintenant.** | Expérimental, peut culler à tort, exige `DepthPrepass`, et on a **91 %** de marge GPU. | — |
