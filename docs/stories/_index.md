@@ -10,11 +10,11 @@
 | IN_PROGRESS | 47 |
 | REVIEW | 45 |
 | BLOCKED | 5 |
-| DRAFT | 34 |
+| DRAFT | 37 |
 | UNKNOWN | 11 |
 | DONE | 50 |
 | CANCELLED | 12 |
-| **Total** | **204** |
+| **Total** | **207** |
 
 > 🚨 **47 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
@@ -130,7 +130,7 @@
 | 623 | Parcours joueur Roguelite : Identité + Progression + Onboarding | [story-623-roguelite-player-journey-identity-progression-onboarding.md](./story-623-roguelite-player-journey-identity-progression-onboarding.md) |
 | 679 | Manette au menu : valider ce qui a été livré sans manette | [story-679-manette-menu-validation.md](./story-679-manette-menu-validation.md) |
 
-## DRAFT (34)
+## DRAFT (37)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -168,6 +168,9 @@
 | 573 | Sorts F par arme parlante (identité) | [story-573-per-weapon-spells.md](./story-573-per-weapon-spells.md) |
 | 625 | Arène : coquille authored data-driven (Tier 1, modèle Returnal) | [story-625-arena-authored-shell.md](./story-625-arena-authored-shell.md) |
 | 633 | Dette : migrer les asset loads ad-hoc vers GameAssets (Lock L1) | [story-633-asset-load-preload-migration.md](./story-633-asset-load-preload-migration.md) |
+| 696 | Le hitstop ne se déclenche jamais, et son capteur s'est tu | [story-696-hitstop-muet-et-capteur-fige.md](./story-696-hitstop-muet-et-capteur-fige.md) |
+| 697 | Les éléments s'appliquent, mais ne réagissent JAMAIS | [story-697-reactions-elementaires-jamais-declenchees.md](./story-697-reactions-elementaires-jamais-declenchees.md) |
+| 698 | 51 kills, 0 burst visuel et 2 sons de mort | [story-698-kills-sans-burst-ni-son.md](./story-698-kills-sans-burst-ni-son.md) |
 
 ## UNKNOWN (11)
 

@@ -29,7 +29,15 @@ Les ennemis sont **`RigidBody::KinematicPositionBased`** (`waves.rs:173`) → `E
 - [x] Boucherie > 2× Pépin (test `weapon_mult_scales_push`)
 - [x] Cumul borné par `knockback_max_m` (test `accumulation_is_capped`)
 - [x] Genome hot-reload + capteur (pushes/kill_pushes/active_now/last_displacement_m)
+- [x] **Le mécanisme tire** — run du 2026-08-12, `forgia2_knockback.json` :
+      `pushes: 419`, `kill_pushes: 51`, `last_displacement_m: 0.60`
+      (base 0,30 · kill ×3 · plafond 2,5 m). Recoupé par
+      `forgia2_fps_feel.json::hit_feedbacks_total: 420` — deux compteurs
+      indépendants qui concordent à 1 près.
 - [ ] **Validation feel user** : les ennemis « encaissent », la Boucherie projette, pas d'éjection hors arène ni de clipping mur visible
+      → *reste ouvert à dessein : un compteur ne dit pas si ça fait du bien.
+      Le plafond à 2,5 m rend l'éjection hors arène improbable, mais ça se
+      constate manette en main, pas dans un JSON.*
 - [x] `cargo check` + clippy 0 warning introduit + tests verts
 
 ## Risques connus (à observer runtime)

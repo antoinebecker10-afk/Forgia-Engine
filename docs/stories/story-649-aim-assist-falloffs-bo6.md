@@ -28,7 +28,15 @@ Aide **binaire** : une cible à 6.9° du réticule (bord du cône de 7°) receva
 - [x] Fondu longue portée (test `long_range_help_fades_out`)
 - [x] `strength=0` reste strictement off ; borne anti-aimbot conservée
 - [x] 38 tests verts, clippy 0 warning introduit, capteur `forgia2_aimassist.json` inchangé (mêmes champs)
-- [ ] **Validation feel user** : `corrected_pct_window` attendu en nette baisse (était ~45 %) et plus aucun « raté net mais touché »
+- [x] **La moitié MESURABLE de l'AC est atteinte** — run du 2026-08-12,
+      `forgia2_aimassist.json` : `shots_corrected: 156` sur `shots_total: 496`,
+      soit **31 %**, contre les **~45 %** d'avant. La baisse attendue est là.
+      Réglages actifs : `strength 0.50`, `cone 3.5°`, `max_correction 2.0°`,
+      `engage_distance 40 m`. Recoupé par
+      `forgia2_fps_feel.json::aim_assist_engagements_total: 156`.
+- [ ] **Validation feel user** : plus aucun « raté net mais touché »
+      → *reste ouvert à dessein : c'est la moitié subjective, et aucun compteur
+      ne distingue une correction légitime d'une correction volée.*
 
 ## Rollback / tuning
 

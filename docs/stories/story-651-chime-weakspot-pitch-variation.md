@@ -27,7 +27,14 @@ tir (pitch varié) < impact hit (pitch varié) < **tink weakspot (fixe)** < thum
 - [x] Pitch tirs/impacts varie dans [0.95, 1.05] (test `pitch_variation_stays_in_bounds_and_varies`)
 - [x] Chime et kill = pitch fixe (signatures)
 - [x] Asset CC0 documenté (CREDITS.md) ; genome hot-reload ; capteur `weakspots`
+- [x] **Le son part** — run du 2026-08-12, `forgia2_roguelite_audio.json` :
+      `weakspots: 192` sur `impacts: 369` (52 %), au sein de `sfx_played: 2075`.
 - [ ] **Validation oreille user** : le « tink » installe l'envie de viser la tête ; le full-auto ne fait plus métronome
+      → *reste ouvert à dessein : la variation de pitch et l'effet « métronome »
+      ne s'entendent pas dans un compteur.*
+      ⚠️ **Anomalie voisine relevée au passage** (hors scope de cette story) :
+      `roguelite_audio.kills: 2` alors que `knockback.kill_pushes: 51`. Le son de
+      mort ne part quasiment jamais — cf story de défaut ouverte le 2026-08-12.
 - [x] Tests + clippy + build verts
 
 ## Suite
