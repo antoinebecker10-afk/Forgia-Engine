@@ -2,8 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
-    # Budget zero-pay : les pushes docs-only ne consomment AUCUNE minute.
+    # TOUTES les branches (2026-08-11) : un dev qui pousse sur feat/* doit avoir
+    # un signal AVANT la PR — sinon il travaille deux jours à l'aveugle. C'est le
+    # prérequis du travail à plusieurs.
+    #
+    # Le budget tient par trois mécanismes, pas par la restriction de branche :
+    #   1. les jobs CHERS (check, test) restent gardés au gate — voir leur `if:`
+    #   2. la `concurrency` ci-dessous fusionne push et pull_request (×1, pas ×2)
+    #   3. `paths-ignore` : les pushes docs-only ne consomment AUCUNE minute
+    branches: ['**']
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -15,8 +22,23 @@ on:
 
 # Budget zero-pay : un nouveau push annule le run précédent de la même branche
 # (pas d'empilement de runs qui brûlent le quota gratuit 2000 min/mois).
+#
+# Sans fusion push/pull_request, ouvrir `branches: ['**']` ferait tourner DEUX
+# runs par push dès qu'une PR est ouverte : ×2 le quota pour un signal identique.
+#
+# Il faut `ref_name`, PAS `ref` : sur un push `github.ref` vaut
+# `refs/heads/feat/x` alors que `github.head_ref` (pull_request) vaut `feat/x` —
+# deux chaînes différentes, donc deux groupes, donc aucune fusion. `ref_name` est
+# déjà la forme courte et se confond avec `head_ref`.
+#   push feat/x → head_ref vide → ref_name = feat/x → ci-feat/x
+#   PR  feat/x → head_ref      = feat/x            → ci-feat/x   (même groupe ✓)
+#
+# Contrepartie assumée : le second run annule le premier. Si un jour des checks
+# deviennent requis sur la PR, une course peut laisser le run de PR en
+# « cancelled » et bloquer la fusion — il faudra alors relancer à la main, ou
+# restreindre `cancel-in-progress` aux branches hors gate.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -33,6 +55,12 @@ jobs:
   check:
     name: Cargo Check
     runs-on: ubuntu-latest
+    # Gate seulement. Sur une branche de feature, `clippy --all-targets` (job
+    # ci-dessous, lui non gardé) type-vérifie DÉJÀ tout ce que `check
+    # --all-targets` vérifie : le lancer aussi doublerait la facture pour zéro
+    # signal supplémentaire. Sur main et en PR, on garde les deux — le
+    # comportement d'avant 2026-08-11 est intact là où il comptait.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +98,15 @@ jobs:
   test:
     name: Cargo Test (per-crate)
     runs-on: ubuntu-latest
+    # Gate seulement — c'est LE job cher : boucle sur les ~65 crates, timeout 90 min.
+    # L'ouvrir à toutes les branches épuiserait le quota en quelques jours.
+    #
+    # Contrepartie assumée : sur une branche de feature, les tests ne tournent pas
+    # en CI. Ils restent à la charge du dev en local, où ils sont RAPIDES parce que
+    # scopés — `cargo test -p <crate>` rend en secondes une fois le cache chaud.
+    # Si un jour ce trou fait mal (une régression découverte seulement à la PR),
+    # l'étape suivante est de tester les crates TOUCHÉES par le diff, pas toutes.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     # story-592 (M0.6) : continue-on-error RETIRE — les 1066 tests bloquent a nouveau.
     # Boucle per-crate au lieu de --workspace : 3 echecs DIFFERENTS observes en
     # workspace build local (artefacts incrementaux/courses), alors que chaque
