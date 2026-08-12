@@ -1,0 +1,26 @@
+# navmesh.toml — construction du maillage de navigation (épic E1, refonte GDD Phase 1).
+#
+# Ces valeurs décident de CE QUI EST FRANCHISSABLE. Les changer change où les agents
+# peuvent passer — pas seulement leur confort de déplacement.
+
+[agent]
+# Rayon d'emprise de l'agent (m). La capsule du joueur fait 0,6 m de diamètre → 0,30 m.
+# Les obstacles sont dilatés d'autant ET le bord rétréci d'autant : le chemin rendu est
+# une ligne médiane que l'agent suit sans frotter les murs.
+# `map-design-patterns.md` §1 : un personnage est un DISQUE, les dégagements se mesurent
+# en distance — jamais en boîte englobante gonflée.
+radius_m = 0.30
+
+# Ressaut franchissable (m). **L'IA NE SAUTE PAS** (`map-design-intention.md` §2.5) :
+# tout solide plus haut que ça est un obstacle, même si un joueur le franchirait d'un
+# saut (1,174 m). Référence marché : `MaxStepHeight` d'Unreal = 0,45 m.
+# ⚠️ Ce seuil n'a RIEN à voir avec `SIGHT_BREAK_H_M` (1,80 m) qui définit le couvert :
+# un muret d'1 m ne casse aucune ligne de vue mais arrête un agent qui ne saute pas.
+step_height_m = 0.45
+
+[quality]
+# Nombre de côtés du polygone qui approxime un disque. Le polygone CIRCONSCRIT le disque
+# dilaté — jamais inscrit : un polygone inscrit passerait à l'intérieur de l'obstacle et
+# laisserait des chemins mordre dedans.
+# Plus haut = maillage plus fidèle et plus lourd. 12 côtés = 3,5 % de sur-emprise.
+disc_segments = 12

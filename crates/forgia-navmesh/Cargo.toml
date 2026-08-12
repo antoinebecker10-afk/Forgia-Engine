@@ -1,0 +1,15 @@
+[package]
+name = "forgia-navmesh"
+version = "0.1.0"
+edition = "2021"
+description = "Navigation mesh — la géométrie solide d'une zone devient un maillage polyanya interrogeable. Fondation de l'épic E1 (compagnon) et remède structurel aux agents coincés dans le décor."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+vleue_navigator = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

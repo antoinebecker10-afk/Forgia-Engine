@@ -33,6 +33,7 @@ members = [
     "crates/forgia-level-presets",
     "crates/forgia-mesh-voxelizer",
     "crates/forgia-medial-axis",
+    "crates/forgia-navmesh",
     "crates/forgia-skeleton-embedder",
     "crates/forgia-skeleton-template",
     "crates/forgia-mode-fps-arena",
@@ -125,6 +126,11 @@ wasm-bindgen = "0.2"
 # Procgen — spatial index pour validation building-vs-road (story-446)
 rstar = "0.12"
 
+# Navigation — navmesh polyanya (épic E1 compagnon). Résolu contre bevy 0.18.1 sans
+# doublon de version (vérifié 2026-08-12 : un seul bevy_ecs 0.18.1 dans le lock).
+# `default-features = false` retire `debug-with-gizmos` : une lib n'impose pas bevy_gizmos.
+vleue_navigator = { version = "0.15", default-features = false }
+
 # Common
 sentry = "0.34"
 serde = { version = "1.0", features = ["derive"] }
@@ -167,6 +173,7 @@ forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
 forgia-level-presets = { path = "crates/forgia-level-presets" }
 forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
 forgia-medial-axis = { path = "crates/forgia-medial-axis" }
+forgia-navmesh = { path = "crates/forgia-navmesh" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
 forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
 forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }

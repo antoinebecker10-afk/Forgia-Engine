@@ -75,6 +75,7 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 | forgia-killfeed | 551 | Kill feed + multi-kill banner | ✅ |
 | forgia-enemy-nameplate | 419 | HP bar 3D billboard au-dessus des ennemis | ✅ |
 | forgia-ai-arena-bot | 1017 | Bot FSM (Idle/Chase/Attack) + LOS throttlé 8 Hz | ✦ (via fps/roguelite) |
+| forgia-navmesh | 428 | Solides → maillage polyanya interrogeable (vleue_navigator 0.15). Fondation E1 compagnon | ⚠️ (aucun consommateur — branchement = story-700 inc.2) |
 
 ### Modes de jeu
 | Crate | LOC | Rôle | Wired |
