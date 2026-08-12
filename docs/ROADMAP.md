@@ -25,6 +25,12 @@
   redirection GDD. Rediriger 143 stories coûte bien plus cher que 60 : fermer d'abord, rediriger ensuite.
 - **Statuts normalisés, un seul vocabulaire** : `DRAFT → READY → IN_PROGRESS → REVIEW → DONE`. (Bannir `EN COURS` / `IN PROGRESS` / `CODE-COMPLETE` → mapper sur `IN_PROGRESS` / `REVIEW`.)
 - **DONE mécanique** : `cargo run -p xtask -- story-gate` (jamais de DONE auto-déclaré).
+- **Dette de validation** : `python tools/ai/validation_debt.py` — combien de travail livré
+  n'a **jamais tourné** ? Compte les crates plus récentes que le binaire, les capteurs
+  antérieurs au code, et les stories en REVIEW (seuil **3**). Un incrément qui change le
+  comportement en jeu **bloque le suivant** tant qu'il n'a pas été observé : le rythme et
+  les deux natures d'incrément sont définis dans [`REFONTE_GDD.md`](REFONTE_GDD.md) §3.
+  *Adopté le 2026-08-12 après quatre incréments empilés sans une seule run.*
 - **Critère de tri de la passe en cours** : chaque story ouverte sert **(a)** un épic du GDD → garder et
   retagger · **(b)** le cœur combat / l'Abîme → garder, toujours valide · **(c)** rien dans le GDD →
   `CANCELLED` avec motif écrit.

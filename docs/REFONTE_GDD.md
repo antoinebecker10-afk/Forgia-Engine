@@ -69,6 +69,52 @@ Compagnon + navmesh · extraction au choix · l'Oubli (4 stades, propagation) ·
 > Chaque phase se termine par un **jalon falsifiable**. Tant qu'il n'est pas franchi, on n'ouvre pas
 > la suivante. Un jalon qui échoue **change le plan** — il ne se contourne pas.
 
+### Le rythme — deux natures d'incrément, et une seule bloque
+
+> **Adopté le 2026-08-12, après s'être fait avoir le jour même.** Quatre incréments livrés,
+> testés, poussés — tests headless verts, clippy propre, gates au vert — sans qu'**aucun**
+> ne tourne une seule fois en jeu. Personne ne savait si un bot suivait réellement un
+> chemin. Le défaut ne levait aucune erreur : c'est exactement un capteur à zéro qui
+> rapporte « ok » ([story-699](stories/story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md)),
+> appliqué au processus au lieu du code.
+
+| Nature | Définition | Règle |
+| --- | --- | --- |
+| 🧱 **FONDATION** | Rien ne le consomme encore — une crate neuve, un type partagé, un capteur sans producteur | **Peut s'empiler.** Le jeu ne peut pas en montrer l'effet, exiger une run serait du théâtre |
+| 👁️ **OBSERVABLE** | Il change ce qui se passe à l'écran ou dans un capteur | **Bloque le suivant** tant qu'il n'a pas tourné |
+
+**Chaque incrément déclare sa nature dans sa story.** Ce n'est pas un détail de forme :
+c'est ce qui rend la règle applicable au lieu d'être une bonne intention.
+
+*Vérification rétroactive du 2026-08-12* — inc.1 (crate navmesh), inc.2 (aucun consommateur)
+et inc.4a (`Faction`) étaient bien des **fondations** : les empiler était légitime.
+**L'inc.3 était OBSERVABLE** — il change le déplacement des bots — et il aurait dû bloquer.
+La règle aurait attrapé exactement la faute commise.
+
+### Le palier de validation
+
+**À chaque fin de phase, et après tout incrément OBSERVABLE** : une run, quatre commandes.
+
+```bash
+python tools/ai/validation_debt.py     # 0. combien de travail n'a jamais tourne ?
+cargo build -p forgia --profile release-fast   # jamais -p forgia-game : exe perime EN SILENCE
+#   … jouer la situation que l'increment est cense changer …
+python tools/ai/forgia_digest.py all   # 97 capteurs + log -> ~2,5 Ko
+python tools/ai/phase0_check.py        # un verdict par story ouverte
+```
+
+`validation_debt.py` est le garde : il compte les crates plus récentes que le binaire, les
+capteurs antérieurs au code, et les stories livrées non validées. **Il rend la dette
+refusable au lieu de la laisser invisible.** Son seuil de stories en REVIEW est **3** —
+au-delà, on ne sait plus laquelle a cassé quoi.
+
+### Ce que le palier n'est pas
+
+Ce n'est **pas** un test de non-régression, ni un remplacement des tests headless — ceux-là
+restent le filet mécanique. C'est la seule chose qu'aucun test ne peut faire : **confronter
+le code à la réalité**. Un bot peut suivre un chemin géométriquement parfait et avoir l'air
+absurde à l'écran ; aucun `assert` ne le dira jamais.
+
 ### Phase 0 — Réparer le socle (prérequis, pas de la refonte)
 
 État **mesuré** le 2026-08-12 par `tools/ai/phase0_check.py` (un verdict par story ouverte, tiré des
