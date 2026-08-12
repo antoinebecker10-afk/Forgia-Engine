@@ -1,6 +1,25 @@
 # story-693 — Pépin en viewmodel pixel art (et le rechargement enfin animable)
 
-**Statut** : 🚧 IN_PROGRESS — compile, 0 clippy, 25 tests verts ; **non validé en jeu**
+**Statut** : CANCELLED (2026-08-12) — décision « retour au GLB » prise le 2026-08-11.
+
+> ⛔ **Clôturée sur décision, pas sur échec.** Le dernier AC prévoyait deux issues :
+> étendre aux 3 autres armes, **ou revenir au GLB**. Antoine a choisi la seconde.
+> Le pixel art est désactivé en couche definition (`sprite_dir = ""`, commit
+> `46e8808`) ; **les 18 frames et le pipeline `tools/art/pepin_sprites.py` restent
+> en place** pour une réactivation éventuelle.
+>
+> **Séquelle corrigée le 2026-08-12** : le passage au sprite avait mis
+> `rotation_y_deg` de Pépin à `0.0` (obligatoire pour qu'un quad reste face caméra).
+> Le revert avait vidé `sprite_dir` **sans restaurer l'angle** → l'arme s'affichait
+> de profil, rapporté en jeu. Restauré à `-90.0`, avec un commentaire dans
+> `viewmodel_arena.toml` qui lie désormais explicitement cet angle au mode actif.
+> **Leçon** : un revert par la couche definition doit remettre *tous* les gènes que
+> la feature avait déplacés, pas seulement son interrupteur.
+>
+> Ce qui reste acquis et réutilisable : `reference_weapon_glbs_are_fused_meshes`
+> (les 4 GLB d'armes sont 1 node / 1 mesh / 0 anim → aucune animation d'arme
+> possible en 3D sans passer par Blender). C'est le constat qui a motivé la story,
+> et il reste vrai.
 **Créée** : 2026-08-09
 **Niveau BMAD** : Standard (9 fichiers code/data + 18 frames)
 
@@ -111,11 +130,14 @@ couvertes par test — un capteur qui ne peut pas rougir ne mesure rien.
 - [x] 25 tests verts, dont 6 sur la couche sprite
 - [x] Aucune durée d'animation dupliquée depuis le génome
 - [x] Capteur avec branche `critical` atteignable et testée
-- [ ] **Validé en jeu** : Pépin s'affiche en pixel art, net (pas flou)
-- [ ] **Validé en jeu** : R déclenche l'animation, le chargeur tombe et remonte
-- [ ] **Validé en jeu** : une seule main (pas de bras 3D en doublon)
-- [ ] Cadrage / taille jugés manette en main, offsets re-tunés si besoin
-- [ ] Décision : on étend aux 3 autres armes, ou on revient au GLB
+- [x] **Décision prise (2026-08-11, Antoine) : on REVIENT AU GLB.** C'est l'une des
+      deux issues que cet AC prévoyait explicitement — la story se clôt dessus, elle
+      n'est pas abandonnée en route.
+- [~] **Validé en jeu** : Pépin en pixel art net — *sans objet*, le pixel art est
+      désactivé par génome (`sprite_dir = ""`, commit `46e8808`).
+- [~] **Validé en jeu** : R anime le chargeur — *sans objet*, même raison.
+- [~] **Validé en jeu** : une seule main — *sans objet*, même raison.
+- [~] Cadrage / taille manette en main — *sans objet*, même raison.
 
 ## Reste à faire
 

@@ -1,5 +1,18 @@
 # Story-473 — `forgia-stage-graph` NEW crate (P0 V7)
 
+> ⛔ **CANCELLED 2026-08-12 — cible supprimée par [ADR-0002](../adr/ADR-0002-cleanup-crates-266-to-62.md)**
+> La crate `forgia-stage-graph` a été supprimée le 2026-05-26 par le cleanup 266 → 62 crates,
+> cinq jours après l'invalidation ci-dessous. Le travail décrit n'est donc plus
+> réalisable tel quel : il n'a plus de cible. Le ratchet `cargo xtask no-scaffold`
+> interdit désormais de recréer la crate à vide.
+>
+> **Ce fichier reste une spécification valide** : si le besoin revient, il faut une
+> story neuve qui choisit un foyer existant (cf `.claude/rules/fine-grained-crates.md`
+> — une crate se justifie par ses consommateurs, pas par son existence).
+>
+> **Statut** : CANCELLED
+
+
 > 🚨 **STATUT PARTIELLEMENT INVALIDÉ 2026-05-21** — cas particulier :
 > - Le code existe vraiment : `crates/forgia-stage-graph/` = **875 LOC réelles**
 > - **MAIS le dossier crate entier est `??` (untracked) — JAMAIS commité sur master**
@@ -10,7 +23,7 @@
 > À commit + lock sa visibilité (cf story-491 coordination autre terminal).
 > Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut** : ✅ DONE 2026-05-20 — 24/24 tests verts, 0 clippy `-D warnings` premier coup. Crate NEW créée + workspace mis à jour. ~530 LOC.
+> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 24/24 tests verts, 0 clippy `-D warnings` premier coup. Crate NEW créée + workspace mis à jour. ~530 LOC.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit maturité crates 2026-05-19 — **P0 vrai ship-blocker** : sans graph, pas de structure de run roguelite.

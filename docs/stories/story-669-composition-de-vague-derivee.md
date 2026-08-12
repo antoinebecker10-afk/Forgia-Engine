@@ -135,7 +135,24 @@ remède que prescrit `scalability.md` (« bundle quand > 12 params »).
 - [x] `cargo clippy -p forgia-mode-roguelite --all-targets -- -D warnings` : **0 warning**
 - [x] `cargo test -p forgia-mode-roguelite --lib` : **294 passed, 0 failed** (+10)
 - [x] `xtask sensor-audit` : **124/124**
-- [ ] **Validation runtime** (cf récap ci-dessous)
+- [ ] **Validation runtime** — ⚠️ **PARTIELLE, et le récap ci-dessous est PÉRIMÉ.**
+      - ✅ Vérifié en jeu le 2026-08-12 : progression de salle et densité dérivée —
+        log `SALLE 2/4 (Some(Combat))`, `forgia2_roguelite_state.json` →
+        `room_density: 1.25`, `room_kind: "combat"`.
+      - ❌ **Invérifiable en l'état** : le récap demande de comparer une porte
+        **Élite** à une porte **Événement**. Antoine (2026-08-12) : *« Élite vs
+        Événement n'existe plus »* — le choix n'est plus atteignable en jeu.
+      - 🔎 **Écart à instruire, ne pas refermer en silence** : `StageKind::Elite` et
+        `::Event` existent toujours (`forgia-stage/src/graph.rs:64`),
+        `generate_run_graph` tire encore des kinds variés par depth, `hud.rs:904`
+        mappe encore leurs icônes, et `wave_comp.rs:330` a encore leurs
+        multiplicateurs. Mais les portails du mode sont `PortalKind::Enter/Next/
+        Return` (`loot_room.rs:89`) — **linéaires, sans choix de kind**. Donc soit
+        du contenu mort, soit un consommateur débranché.
+      - **Ne PAS cocher cet AC en réécrivant le récap** : ce serait la DONE fictive
+        que story-495 et `story-done-gate.md` existent pour empêcher. La suite est
+        une story de diagnostic sur le portail de choix (cf story-646 Inc.2, donnée
+        pour livrée), pas une retouche de critère.
 
 ## Tests (10 nouveaux)
 

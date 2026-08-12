@@ -8,13 +8,13 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 47 |
-| REVIEW | 59 |
+| REVIEW | 46 |
 | BLOCKED | 5 |
 | DRAFT | 34 |
-| UNKNOWN | 10 |
-| DONE | 47 |
-| CANCELLED | 1 |
-| **Total** | **203** |
+| UNKNOWN | 11 |
+| DONE | 49 |
+| CANCELLED | 12 |
+| **Total** | **204** |
 
 > 🚨 **47 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
@@ -69,9 +69,8 @@
 | 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 | 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
 | 694 | Hub menu : architecture (P3 de l'audit 2026-08-07) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
-| 695 | Cible web wasm/WebGPU officielle (canal testeurs) | [story-695-web-target-officielle.md](./story-695-web-target-officielle.md) |
 
-## REVIEW (59)
+## REVIEW (46)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -80,16 +79,6 @@
 | 467 | V5 Session B : sensors perf + entities + memory | [story-467-v5-session-b-perf-entities-memory.md](./story-467-v5-session-b-perf-entities-memory.md) |
 | 469 | V5 Session C : sensors lifecycle + watchdog + audio + input + sensor_health | [story-469-v5-session-c-lifecycle-watchdog-audio-input.md](./story-469-v5-session-c-lifecycle-watchdog-audio-input.md) |
 | 470 | V7 M1 Roguelite Fondations (scaffold MVP) | [story-470-v7-m1-roguelite-fondations.md](./story-470-v7-m1-roguelite-fondations.md) |
-| 471 | `forgia-analytics` Sentry crash dump (P0 V7) | [story-471-forgia-analytics-sentry-crash-dump.md](./story-471-forgia-analytics-sentry-crash-dump.md) |
-| 472 | `forgia-audio-voicelines` Tier 1 selection logic (P0 V7) | [story-472-forgia-audio-voicelines-tier1.md](./story-472-forgia-audio-voicelines-tier1.md) |
-| 473 | `forgia-stage-graph` NEW crate (P0 V7) | [story-473-forgia-stage-graph.md](./story-473-forgia-stage-graph.md) |
-| 474 | `forgia-loot-tables` (P0 V7) | [story-474-forgia-loot-tables.md](./story-474-forgia-loot-tables.md) |
-| 475 | `forgia-equipment` (P0 V7) | [story-475-forgia-equipment.md](./story-475-forgia-equipment.md) |
-| 477 | `forgia-audio-music-state` Tier 1 (P0 V7) | [story-477-forgia-audio-music-state.md](./story-477-forgia-audio-music-state.md) |
-| 478 | `forgia-audio-ducking` Tier 1 (P0 V7) | [story-478-forgia-audio-ducking.md](./story-478-forgia-audio-ducking.md) |
-| 479 | `forgia-scene` saves system (P0 V7) | [story-479-forgia-scene-saves.md](./story-479-forgia-scene-saves.md) |
-| 481 | `forgia-audio-voicelines` Tier 1.5 wire-up (P0 V7 M4) | [story-481-audio-voicelines-tier1.5-wireup.md](./story-481-audio-voicelines-tier1.5-wireup.md) |
-| 482 | `forgia-audio-voicelines` Tier 1.6 floating bark text overlay (P0 V7 M4) | [story-482-audio-voicelines-tier1.6-bark-text-overlay.md](./story-482-audio-voicelines-tier1.6-bark-text-overlay.md) |
 | 514 | INVALIDATED (forgia-core split god-object) | [story-514-cancelled.md](./story-514-cancelled.md) |
 | 531 | 🔫 Pépin Moveset Distinctive (Mission 3 GDD) | [story-531-pepin-moveset.md](./story-531-pepin-moveset.md) |
 | 539 | Village hexagonal KayKit dans le RPG | [story-539-rpg-hex-village-kaykit.md](./story-539-rpg-hex-village-kaykit.md) |
@@ -130,10 +119,7 @@
 | 667 | Arena Test : le banc de blockout d'arène | [story-667-arena-test-blockout-bench.md](./story-667-arena-test-blockout-bench.md) |
 | 668 | Vague 0 : remettre les invariants de la boucle roguelite debout | [story-668-vague0-invariants-boucle-roguelite.md](./story-668-vague0-invariants-boucle-roguelite.md) |
 | 669 | La composition de vague redevient une dérivation | [story-669-composition-de-vague-derivee.md](./story-669-composition-de-vague-derivee.md) |
-| 674 | L'aménagement se DÉRIVE : bruit bleu + compte depuis l'aire | [story-674-amenagement-derive-bruit-bleu.md](./story-674-amenagement-derive-bruit-bleu.md) |
 | 675 | Personnage Trooper + équipement loot par rareté | [story-675-equipement-trooper-rarete.md](./story-675-equipement-trooper-rarete.md) |
-| 677 | La boucle de rounds et son mur | [story-677-boucle-de-rounds-et-mur.md](./story-677-boucle-de-rounds-et-mur.md) |
-| 693 | Pépin en viewmodel pixel art (et le rechargement enfin animable) | [story-693-pepin-viewmodel-pixel-art.md](./story-693-pepin-viewmodel-pixel-art.md) |
 
 ## BLOCKED (5)
 
@@ -184,7 +170,7 @@
 | 625 | Arène : coquille authored data-driven (Tier 1, modèle Returnal) | [story-625-arena-authored-shell.md](./story-625-arena-authored-shell.md) |
 | 633 | Dette : migrer les asset loads ad-hoc vers GameAssets (Lock L1) | [story-633-asset-load-preload-migration.md](./story-633-asset-load-preload-migration.md) |
 
-## UNKNOWN (10)
+## UNKNOWN (11)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -198,8 +184,9 @@
 | 608 | Console `:set` live-tuning (canal balance IA single-param) | [story-608-console-set-live-tuning.md](./story-608-console-set-live-tuning.md) |
 | 609 | `cargo xtask gene-search` (introspection genome cross-pack) | [story-609-xtask-gene-search.md](./story-609-xtask-gene-search.md) |
 | 654 | Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut | [story-654-nameplate-v2-plaques-icones.md](./story-654-nameplate-v2-plaques-icones.md) |
+| 695 | La cible web (wasm/WebGPU) devient un build officiel de Forgia | [story-695-web-target-officielle.md](./story-695-web-target-officielle.md) |
 
-## DONE (47)
+## DONE (49)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -247,13 +234,26 @@
 | 641 | P0-3 : moteur de réactions générique + Element::Shock (Électrique) | [story-641-p0-3-reactions-engine-shock-element.md](./story-641-p0-3-reactions-engine-shock-element.md) |
 | 645 | R3 : sceller la boucle (Victory + maîtrise + best-run + boons pondérés) | [story-645-r3-seal-the-loop.md](./story-645-r3-seal-the-loop.md) |
 | 664 | Warmup des pipelines PBR au Lobby (anti-freeze « tourner la caméra ») | [story-664-pipeline-warmup-pbr-lobby.md](./story-664-pipeline-warmup-pbr-lobby.md) |
+| 674 | L'aménagement se DÉRIVE : bruit bleu + compte depuis l'aire | [story-674-amenagement-derive-bruit-bleu.md](./story-674-amenagement-derive-bruit-bleu.md) |
+| 677 | La boucle de rounds et son mur | [story-677-boucle-de-rounds-et-mur.md](./story-677-boucle-de-rounds-et-mur.md) |
 | 690 | Le capteur d'arène mesure enfin la géométrie posée | [story-690-capteur-de-geometrie-d-arene.md](./story-690-capteur-de-geometrie-d-arene.md) |
 | 691 | Hub menu : quick-wins perf (P1 de l'audit 2026-08-07) | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
 | 692 | Hub menu : responsive (P2 de l'audit 2026-08-07) | [story-692-hub-responsive.md](./story-692-hub-responsive.md) |
 
-## CANCELLED (1)
+## CANCELLED (12)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
+| 471 | `forgia-analytics` Sentry crash dump (P0 V7) | [story-471-forgia-analytics-sentry-crash-dump.md](./story-471-forgia-analytics-sentry-crash-dump.md) |
+| 472 | `forgia-audio-voicelines` Tier 1 selection logic (P0 V7) | [story-472-forgia-audio-voicelines-tier1.md](./story-472-forgia-audio-voicelines-tier1.md) |
+| 473 | `forgia-stage-graph` NEW crate (P0 V7) | [story-473-forgia-stage-graph.md](./story-473-forgia-stage-graph.md) |
+| 474 | `forgia-loot-tables` (P0 V7) | [story-474-forgia-loot-tables.md](./story-474-forgia-loot-tables.md) |
+| 475 | `forgia-equipment` (P0 V7) | [story-475-forgia-equipment.md](./story-475-forgia-equipment.md) |
+| 477 | `forgia-audio-music-state` Tier 1 (P0 V7) | [story-477-forgia-audio-music-state.md](./story-477-forgia-audio-music-state.md) |
+| 478 | `forgia-audio-ducking` Tier 1 (P0 V7) | [story-478-forgia-audio-ducking.md](./story-478-forgia-audio-ducking.md) |
+| 479 | `forgia-scene` saves system (P0 V7) | [story-479-forgia-scene-saves.md](./story-479-forgia-scene-saves.md) |
+| 481 | `forgia-audio-voicelines` Tier 1.5 wire-up (P0 V7 M4) | [story-481-audio-voicelines-tier1.5-wireup.md](./story-481-audio-voicelines-tier1.5-wireup.md) |
+| 482 | `forgia-audio-voicelines` Tier 1.6 floating bark text overlay (P0 V7 M4) | [story-482-audio-voicelines-tier1.6-bark-text-overlay.md](./story-482-audio-voicelines-tier1.6-bark-text-overlay.md) |
 | 630 | Anti-aliasing sur la caméra orbitale 3P (RPG + CyberCity) | [story-630-taa-orbit-camera.md](./story-630-taa-orbit-camera.md) |
+| 693 | Pépin en viewmodel pixel art (et le rechargement enfin animable) | [story-693-pepin-viewmodel-pixel-art.md](./story-693-pepin-viewmodel-pixel-art.md) |
 

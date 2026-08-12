@@ -1,5 +1,18 @@
 # Story-481 — `forgia-audio-voicelines` Tier 1.5 wire-up (P0 V7 M4)
 
+> ⛔ **CANCELLED 2026-08-12 — cible supprimée par [ADR-0002](../adr/ADR-0002-cleanup-crates-266-to-62.md)**
+> La crate `forgia-audio-voicelines` a été supprimée le 2026-05-26 par le cleanup 266 → 62 crates,
+> cinq jours après l'invalidation ci-dessous. Le travail décrit n'est donc plus
+> réalisable tel quel : il n'a plus de cible. Le ratchet `cargo xtask no-scaffold`
+> interdit désormais de recréer la crate à vide.
+>
+> **Ce fichier reste une spécification valide** : si le besoin revient, il faut une
+> story neuve qui choisit un foyer existant (cf `.claude/rules/fine-grained-crates.md`
+> — une crate se justifie par ses consommateurs, pas par son existence).
+>
+> **Statut** : CANCELLED
+
+
 > 🚨 **STATUT INVALIDÉ EN CASCADE 2026-05-21** — cette story prétend brancher
 > `BarkEvent → select_bark → sensor` mais dépend de la crate `forgia-audio-voicelines`
 > qui est restée **scaffold 16 LOC** (cf story-472 invalidé). Sans la Tier 1 réelle,
@@ -8,7 +21,7 @@
 > **Vrai statut : BLOCKED** (par re-impl story-472 / story-491). Voir
 > `feedback_fictive_done_status_2026_05_21.md` + audit story-gate §détail.
 
-> **Statut** : ✅ DONE 2026-05-20 — 3 fichiers + Cargo deps, 2/2 tests `weapon_to_speaker`, clippy `-D warnings` vert sur forgia-mode-roguelite + forgia-audio-voicelines + forgia-game
+> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 3 fichiers + Cargo deps, 2/2 tests `weapon_to_speaker`, clippy `-D warnings` vert sur forgia-mode-roguelite + forgia-audio-voicelines + forgia-game
 > **Scale BMAD** : Standard (3 fichiers)
 > **Date** : 2026-05-20
 > **Origine** : Story-472 Tier 1 livré mais Plugin jamais plugé + 0 producteur `BarkEvent` → sensor `forgia_voicelines.json` n'apparaît pas, logique non testable runtime

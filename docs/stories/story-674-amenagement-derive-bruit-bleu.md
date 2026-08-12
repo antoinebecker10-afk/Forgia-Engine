@@ -1,6 +1,6 @@
 # story-674 — L'aménagement se DÉRIVE : bruit bleu + compte depuis l'aire
 
-**Statut** : IN_PROGRESS (livré, runtime non validé)
+**Statut** : DONE (2026-08-12 — runtime validé, 9/9 AC)
 **Date** : 2026-07-31
 **Niveau BMAD** : Standard
 **Related** : story-672 (dégagement des spawns), story-673 (registre d'assets mesuré)
@@ -91,7 +91,15 @@ Coût d'instanciation : 420 props à `decor_spawn_budget_per_frame = 12` →
 - [x] Test que le plafond garde la répartition (4 quadrants)
 - [x] Test que le compte suit la taille de la salle
 - [x] Le chemin public de `poisson_disk_sample` est conservé pour la végétation
-- [ ] **Validé en jeu** — non fait
+- [x] **Validé en jeu** — 2026-08-12. Preuve dans `forgia2_run.log` : la dérivation
+      tourne bien à partir de l'aire, pas d'un compte écrit à la main —
+      `[decor] semis : 404 positions dérivées à 5.0 m (aire/espacement² = 633)`,
+      puis `[decor] planned 564 GLB props` sur `forge_sanctum`. Jugement de
+      répartition rendu manette en main (« ça semble bon »).
+      ⚠️ **Réserve consignée, hors scope de cette story** : le plafond mord —
+      `decor_max_props = 330 → 74 props NON posés` (le message le dit
+      « volontairement, budget de frame »). La dérivation est correcte ; c'est le
+      plafond qui décide du résultat final.
 
 ---
 

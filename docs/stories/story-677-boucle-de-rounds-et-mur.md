@@ -1,6 +1,6 @@
 # story-677 — La boucle de rounds et son mur
 
-**Statut** : IN_PROGRESS (livré, runtime non validé)
+**Statut** : DONE (2026-08-12 — runtime validé, 9/9 AC)
 **Date** : 2026-08-01
 **Niveau BMAD** : Standard
 **Related** : story-676 (univers d'arène), story-669 (composition de vague), story-658 (scaling)
@@ -108,7 +108,16 @@ serait décoratif et la boucle ne serait qu'un compte à rebours.
       division par zéro (test)
 - [x] Une seule courbe de difficulté s'applique à la fois
 - [x] Capteur avec severity + next-step actionnable
-- [ ] **Validé en jeu** — non fait
+- [x] **Validé en jeu** — 2026-08-12. `forgia2_rounds.json` : `severity: ok`,
+      `loop_enabled: true`, **round 4** atteint, **3 rounds nettoyés**
+      (`cleared_secs: [19.1, 37.7, 34.9]`), le mur est calculé et vivant
+      (`wall_lazy: 7`, `wall_full: 15`), `pace: "TU TIENS"` et `pace_trend`
+      stable. Croisé au log : `Wave 1 cleared — break 15s before wave 2
+      (HP restored, Coffre opened)`.
+      ⚠️ **Réserve** : `forgia2_power.json` est repassé en `ok` (il était en
+      `warn` « la puissance réelle dépasse le modèle »), mais
+      `boon_damage_count: 0` et `model_ratio: 1.443` — la courbe plate connue
+      n'est pas résolue par cette story, elle est seulement hors de son périmètre.
 
 ---
 
