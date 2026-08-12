@@ -1,6 +1,10 @@
 # story-698 — 51 kills, 0 burst visuel et 2 sons de mort
 
-**Statut** : REVIEW — les DEUX correctifs sont livres et testes ; il ne reste que la validation en jeu
+**Statut** : DONE (2026-08-12) — ⚠️ **fermée sans sa run de validation, sur décision explicite d'Antoine.**
+Les deux correctifs sont livrés, testés et commités (`40d34a6` burst, `3999185` son) ; la mesure en jeu
+n'a **pas** été faite. Ce n'est donc pas un DONE prouvé, c'est un DONE **assumé** — la distinction est
+écrite ici pour qu'aucune lecture future ne s'y trompe. La preuve viendra gratuitement : `phase0_check.py`
+juge les deux canaux séparément à la **première run** de la refonte. Si elle contredit, rouvrir.
 **Créée** : 2026-08-12
 **Niveau BMAD** : Quick (deux compteurs à zéro, même cause probable : l'événement de mort)
 **Origine** : run de validation du 2026-08-12, recoupement de trois capteurs.
