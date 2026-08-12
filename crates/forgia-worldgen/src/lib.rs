@@ -146,7 +146,9 @@ impl Plugin for ForgiaWorldgenPlugin {
 
 /// Load the asset registry from RON (workspace root) into a resource.
 fn sys_load_registry(mut commands: Commands) {
-    match std::fs::read_to_string(REGISTRY_PATH) {
+    // def_io : sur wasm, std::fs échoue — le registre vient du pack embarqué
+    // (sinon ERROR rouge à chaque session web, story-695).
+    match forgia_core::def_io::read_def_str(REGISTRY_PATH) {
         Ok(s) => match AssetRegistry::from_ron(&s) {
             Ok(reg) => {
                 info!("[worldgen] registry loaded: {} modules", reg.len());

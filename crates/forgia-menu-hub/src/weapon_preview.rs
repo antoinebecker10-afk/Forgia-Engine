@@ -378,6 +378,15 @@ pub struct CharacterPreviewRtt {
     layers_settled: u16,
 }
 
+impl CharacterPreviewRtt {
+    /// Ce que la dernière construction a réellement monté — 0 = avatar absent.
+    /// Le capteur menu_hub mesurait `is_some()` sur la ressource : vert le
+    /// 2026-08-11 alors qu'aucun avatar n'existait (équipement 0 slot sur web).
+    pub fn parts_count(&self) -> usize {
+        self.parts.len()
+    }
+}
+
 /// OnEnter(Menu) — crée l'aperçu 3D du personnage équipé (layer CHARACTER_LAYER).
 fn sys_spawn_character_preview(
     mut commands: Commands,

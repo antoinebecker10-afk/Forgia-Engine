@@ -128,7 +128,8 @@ impl MushroomsConfig {
     }
 
     fn load_or_default() -> Self {
-        match fs::read_to_string(GENOME_PATH) {
+        // def_io : sur wasm, std::fs échoue → 0 cluster silencieux (2026-08-11).
+        match forgia_core::def_io::read_def_str(GENOME_PATH) {
             Ok(content) => Self::parse_toml(&content),
             Err(_) => Self::default(),
         }
@@ -331,6 +332,20 @@ pub fn sys_reconcile_mushrooms(
     let already = q_existing.iter().next().is_some();
 
     if !cfg.enabled {
+        if already {
+            for e in &q_existing {
+                commands.entity(e).despawn();
+            }
+            watch.mushrooms_spawned = 0;
+            watch.lights_spawned = 0;
+        }
+        return;
+    }
+    // 0 cluster = rien à poser : sortir AVANT la branche (re)spawn. Sans ce
+    // garde, `already` reste false à jamais et la branche ci-dessous re-tourne
+    // (et logge) CHAQUE frame — constaté sur web quand le genome était illisible
+    // (2026-08-11), mais un TOML natif vidé produirait la même boucle.
+    if cfg.clusters.is_empty() {
         if already {
             for e in &q_existing {
                 commands.entity(e).despawn();

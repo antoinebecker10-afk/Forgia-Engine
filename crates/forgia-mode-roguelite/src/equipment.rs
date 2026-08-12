@@ -139,7 +139,10 @@ pub struct EquipmentConfig {
 
 impl EquipmentConfig {
     fn load() -> Self {
-        match std::fs::read_to_string(CONFIG_PATH) {
+        // def_io et non std::fs : sur wasm le fs n'existe pas — sans pack
+        // embarqué, 0 slot → aucun body_model → l'avatar du menu n'existe
+        // jamais (bug testeur web 2026-08-11).
+        match forgia_core::def_io::read_def_str(CONFIG_PATH) {
             Ok(contents) => toml::from_str(&contents).unwrap_or_else(|e| {
                 warn!("[equipment] {CONFIG_PATH} illisible: {e} — équipement désactivé");
                 Self::default()

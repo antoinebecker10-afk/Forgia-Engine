@@ -102,8 +102,10 @@ pub fn sys_write_menu_hub_sensor(
     let backdrop_ready = backdrop_props > 0;
     // L'avatar reste publié à part : c'est lui que le fond FILME (un seul
     // squelette). Sans lui, le décor est là mais le personnage manque —
-    // symptôme distinct, donc champ distinct.
-    let avatar_ready = rtt.is_some();
+    // symptôme distinct, donc champ distinct. On mesure les PIÈCES montées,
+    // pas l'existence de la ressource : `is_some()` est resté vert le
+    // 2026-08-11 pendant que le menu web tournait sans personnage.
+    let avatar_ready = rtt.as_deref().is_some_and(|r| r.parts_count() > 0);
     let last_run_present = meta_save
         .as_deref()
         .is_some_and(|s| s.last_run.is_some());

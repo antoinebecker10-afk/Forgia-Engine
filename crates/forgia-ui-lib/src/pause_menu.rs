@@ -352,13 +352,26 @@ pub fn apply_fov_to_camera(
 
 /// Mappe la string genome-friendly → variante `Tonemapping`. Fallback = Forgia.
 fn tonemapping_from_str(s: &str) -> Tonemapping {
-    match s {
+    let wanted = match s {
         "aces" => Tonemapping::AcesFitted,
         "agx" => Tonemapping::AgX,
         "reinhard" => Tonemapping::ReinhardLuminance,
         "none" => Tonemapping::None,
         _ => Tonemapping::TonyMcMapface,
-    }
+    };
+    // wasm (story-695) : les tonemappers à LUT (KTX2 Rgba16Unorm, sans équivalent
+    // WebGPU) sont neutralisés au boot par forgia-game — les appliquer quand même
+    // rend l'image NOIRE. Résoudre ici, à la source du réglage : ce système
+    // réapplique sa valeur à chaque frame sur toute Camera3d et gagnerait toute
+    // bataille contre une garde aval (écran noir arène web, 2026-08-11).
+    #[cfg(target_arch = "wasm32")]
+    let wanted = match wanted {
+        Tonemapping::TonyMcMapface | Tonemapping::AgX | Tonemapping::BlenderFilmic => {
+            Tonemapping::AcesFitted
+        }
+        other => other,
+    };
+    wanted
 }
 
 /// `UserSettings.tonemapping` → composant `Tonemapping` sur toute `Camera3d`.
