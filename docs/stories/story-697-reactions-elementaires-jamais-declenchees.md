@@ -1,6 +1,6 @@
 # story-697 — Les éléments s'appliquent, mais ne réagissent JAMAIS
 
-**Statut** : DRAFT — diagnostic FAIT 2026-08-12, cause tranchée ; la suite est une décision de design, pas un correctif
+**Statut** : DONE (2026-08-12) — moteur innocenté par la mesure, run boss : 20 réactions
 **Créée** : 2026-08-12
 **Niveau BMAD** : Standard (moteur de réactions + VFX + audio, ≥ 2 crates)
 **Origine** : run de validation du 2026-08-12, lecture des capteurs `elements` et

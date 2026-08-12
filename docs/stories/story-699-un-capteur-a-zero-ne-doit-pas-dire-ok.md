@@ -104,6 +104,28 @@ futures sans que personne ne regarde.
       **Pour que la liste devienne exploitable, il faut la rejouer après une run
       DE COMBAT.** Ceux qui restent à zéro là seront les vrais suspects.
 
+      **REJOUÉ après la run boss (77 morts, 496 tirs) — et deux fois affiné :**
+
+      | | suspects |
+      |---|---|
+      | Run courte, sans combat | 29 |
+      | Après la run boss | **13** |
+      | Après distinction jauge/compteur | **10** |
+
+      La deuxième réduction vient d'un défaut de l'outil, pas du jeu : il
+      confondait **jauges** et **compteurs cumulatifs**. `shots_fired_last_sec`,
+      `active_count`, `registry_size`, `avg_progress` décrivent **l'instant** — à
+      zéro au menu, elles sont parfaitement correctes. Les signaler, c'est crier au
+      loup, et un outil qui crie au loup finit ignoré. Quatre faux suspects
+      éliminés (`forgia_combat`, `head_hitbox` partiel, `enemy_nameplate` partiel,
+      `mesh_fader` partiel).
+
+      **Et ça a fait remonter un vrai** : `forgia_arena_feedback` porte
+      `kill_sounds_played: 0` — un compteur **cumulatif** — après 77 morts. C'est
+      le **cinquième témoin indépendant** du bug de son de kill (story-698),
+      trouvé par l'outil et non par lecture. Pire : `kill_audio_missing: 0` aussi,
+      donc il n'a même pas détecté sa propre absence.
+
 - [ ] Assigner à chaque suspect **sa condition « censé tourner »**
       → c'est le travail qui reste, et il n'est pas automatisable : la condition ne
       se déduit pas du JSON. Il faut lire le producteur. `elements` a pu se faire

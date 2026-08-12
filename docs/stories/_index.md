@@ -8,8 +8,8 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 1 |
-| DRAFT | 2 |
-| DONE | 54 |
+| DRAFT | 1 |
+| DONE | 55 |
 | CANCELLED | 151 |
 | **Total** | **208** |
 
@@ -19,14 +19,13 @@
 | --- | --- | --- |
 | 699 | Un capteur dont le compteur est à zéro ne doit pas dire « ok » | [story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md](./story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md) |
 
-## DRAFT (2)
+## DRAFT (1)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
-| 697 | Les éléments s'appliquent, mais ne réagissent JAMAIS | [story-697-reactions-elementaires-jamais-declenchees.md](./story-697-reactions-elementaires-jamais-declenchees.md) |
 | 698 | 51 kills, 0 burst visuel et 2 sons de mort | [story-698-kills-sans-burst-ni-son.md](./story-698-kills-sans-burst-ni-son.md) |
 
-## DONE (54)
+## DONE (55)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -84,6 +83,7 @@
 | 691 | Hub menu : quick-wins perf (P1 de l'audit 2026-08-07) | [story-691-hub-perf-quickwins.md](./story-691-hub-perf-quickwins.md) |
 | 692 | Hub menu : responsive (P2 de l'audit 2026-08-07) | [story-692-hub-responsive.md](./story-692-hub-responsive.md) |
 | 696 | Le hitstop est retiré définitivement (et il l'était déjà à moitié) | [story-696-hitstop-muet-et-capteur-fige.md](./story-696-hitstop-muet-et-capteur-fige.md) |
+| 697 | Les éléments s'appliquent, mais ne réagissent JAMAIS | [story-697-reactions-elementaires-jamais-declenchees.md](./story-697-reactions-elementaires-jamais-declenchees.md) |
 
 ## CANCELLED (151)
 

@@ -32,9 +32,25 @@ NON_COMPTEURS = {
 SUFFIXES_CONFIG = ("_mult", "_pct", "_m", "_ms", "_secs", "_s", "_max", "_min",
                    "_threshold", "_radius", "_gain", "_volume", "_ratio", "_deg")
 
+# JAUGES vs COMPTEURS — la distinction qui a manqué à la v1 de ce script.
+#
+# Une **jauge** décrit l'instant : `active_count`, `shots_fired_last_sec`,
+# `registry_size`, `avg_progress`. À zéro au menu, elle est parfaitement correcte —
+# la signaler, c'est crier au loup, et un outil qui crie au loup finit ignoré.
+#
+# Un **compteur cumulatif** ne redescend jamais : `kill_sounds_played`,
+# `burns_applied`, `pushes`. À zéro après une run active, il dit quelque chose.
+#
+# Mesuré le 2026-08-12 : sur 13 suspects après la run boss, **4 étaient des jauges**
+# et un seul un vrai compteur muet (`forgia_arena_feedback.kill_sounds_played`,
+# cinquième témoin du bug de son de kill). Sans cette distinction, le vrai se
+# noyait dans les faux.
+MOTIFS_JAUGE = ("_last_sec", "_now", "active_", "avg_", "mean_", "pending_",
+                "_size", "_count", "_left", "_alive", "_current")
+
 
 def compteurs(d, prefixe=""):
-    """Champs numériques qui ressemblent à des COMPTEURS d'activité."""
+    """Champs qui sont des COMPTEURS CUMULATIFS — jauges et config exclues."""
     out = {}
     for k, v in (d or {}).items():
         nom = f"{prefixe}{k}"
@@ -42,7 +58,11 @@ def compteurs(d, prefixe=""):
             out.update(compteurs(v, f"{nom}."))
         elif isinstance(v, bool) or k in NON_COMPTEURS:
             continue
-        elif isinstance(v, int) and not nom.endswith(SUFFIXES_CONFIG):
+        elif not isinstance(v, int) or nom.endswith(SUFFIXES_CONFIG):
+            continue
+        elif any(m in nom for m in MOTIFS_JAUGE):
+            continue  # jauge : zéro au menu est correct, pas suspect
+        else:
             out[nom] = v
     return out
 
