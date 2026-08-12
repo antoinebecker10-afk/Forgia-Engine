@@ -23,7 +23,7 @@
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
-| 696 | Le hitstop ne se déclenche jamais, et son capteur s'est tu | [story-696-hitstop-muet-et-capteur-fige.md](./story-696-hitstop-muet-et-capteur-fige.md) |
+| 696 | Le hitstop n'existe plus : supprimé par ADR-0002, et personne ne l'a vu | [story-696-hitstop-muet-et-capteur-fige.md](./story-696-hitstop-muet-et-capteur-fige.md) |
 | 697 | Les éléments s'appliquent, mais ne réagissent JAMAIS | [story-697-reactions-elementaires-jamais-declenchees.md](./story-697-reactions-elementaires-jamais-declenchees.md) |
 | 698 | 51 kills, 0 burst visuel et 2 sons de mort | [story-698-kills-sans-burst-ni-son.md](./story-698-kills-sans-burst-ni-son.md) |
 
