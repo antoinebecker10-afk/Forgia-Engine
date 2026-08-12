@@ -3284,6 +3284,7 @@ dependencies = [
  "bevy",
  "serde",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
