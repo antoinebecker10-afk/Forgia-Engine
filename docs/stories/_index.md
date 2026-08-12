@@ -8,11 +8,11 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 47 |
-| REVIEW | 46 |
+| REVIEW | 45 |
 | BLOCKED | 5 |
 | DRAFT | 34 |
 | UNKNOWN | 11 |
-| DONE | 49 |
+| DONE | 50 |
 | CANCELLED | 12 |
 | **Total** | **204** |
 
@@ -70,7 +70,7 @@
 | 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
 | 694 | Hub menu : architecture (P3 de l'audit 2026-08-07) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
 
-## REVIEW (46)
+## REVIEW (45)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -99,7 +99,6 @@
 | 617 | Roguelite : nettoyage de l'écran de sélection (Lobby) « quick wins » | [story-617-roguelite-lobby-ui-cleanup.md](./story-617-roguelite-lobby-ui-cleanup.md) |
 | 618 | FOV viewmodel séparé (2e caméra + RenderLayers) + placement bras réglable | [story-618-viewmodel-separate-fov-camera.md](./story-618-viewmodel-separate-fov-camera.md) |
 | 624 | Hub d'accueil Roguelite à onglets (P2) | [story-624-roguelite-home-hub-tabs.md](./story-624-roguelite-home-hub-tabs.md) |
-| 626 | Roguelite : étalement du spawn décor (fix freeze 65 ms entrée de stage) | [story-626-roguelite-decor-spawn-stagger.md](./story-626-roguelite-decor-spawn-stagger.md) |
 | 627 | Roguelite : pré-chauffe shaders (réduction des freezes first-use) | [story-627-roguelite-shader-prewarm.md](./story-627-roguelite-shader-prewarm.md) |
 | 628 | Placement des mains AUTO par-arme + géométrie bras améliorée | [story-628-viewmodel-arms-per-weapon-placement.md](./story-628-viewmodel-arms-per-weapon-placement.md) |
 | 629 | Roguelite : capteur de charge combat `perf_diag` (vision complète freezes) | [story-629-roguelite-perf-diag-sensor.md](./story-629-roguelite-perf-diag-sensor.md) |
@@ -186,7 +185,7 @@
 | 654 | Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut | [story-654-nameplate-v2-plaques-icones.md](./story-654-nameplate-v2-plaques-icones.md) |
 | 695 | La cible web (wasm/WebGPU) devient un build officiel de Forgia | [story-695-web-target-officielle.md](./story-695-web-target-officielle.md) |
 
-## DONE (49)
+## DONE (50)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -229,6 +228,7 @@
 | 620 | Hygiène sensors : registre complet + gates verts en CI (Phase 0.6) | [story-620-sensor-registry-hygiene.md](./story-620-sensor-registry-hygiene.md) |
 | 621 | forgia2_health.json actif en Roguelite (RGL-1/RGL-2) | [story-621-roguelite-health-checks.md](./story-621-roguelite-health-checks.md) |
 | 622 | Réveil du bus QA : pont santé → BugReport + sensor forgia2_qa | [story-622-qa-bus-producers.md](./story-622-qa-bus-producers.md) |
+| 626 | Roguelite : étalement du spawn décor (fix freeze 65 ms entrée de stage) | [story-626-roguelite-decor-spawn-stagger.md](./story-626-roguelite-decor-spawn-stagger.md) |
 | 639 | État Ultime (F) + techniques signature par arme + VFX | [story-639-ultimate-techniques-vfx.md](./story-639-ultimate-techniques-vfx.md) |
 | 640 | P0-2 : défense tri-couche Vie / Bouclier / Armure | [story-640-p0-2-defense-layer-shield-armor.md](./story-640-p0-2-defense-layer-shield-armor.md) |
 | 641 | P0-3 : moteur de réactions générique + Element::Shock (Électrique) | [story-641-p0-3-reactions-engine-shock-element.md](./story-641-p0-3-reactions-engine-shock-element.md) |

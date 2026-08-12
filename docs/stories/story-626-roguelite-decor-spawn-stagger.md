@@ -1,6 +1,7 @@
 # Story-626 — Roguelite : étalement du spawn décor (fix freeze 65 ms entrée de stage)
 
-> **Statut** : CODE-COMPLETE (2026-06-25) — validation runtime user en attente
+> **Statut** : DONE (2026-08-12) — AC écrits et vérifiés depuis les capteurs, cf ci-dessous.
+> Le code était livré depuis le 2026-06-25 ; il manquait des critères pour le constater.
 > **Niveau BMAD** : Quick (3 fichiers : decor.rs + lib.rs + genome TOML)
 > **Origine** : diagnostic story-629 (`perf_diag` + `load_timing` concordants).
 
@@ -49,6 +50,37 @@ progressif des props lointains/proches), **0 freeze**.
 - `plan_decor_set_deterministic_and_budgetable` — même seed → même nb de props,
   plan > 100 props, budget < total (drainage multi-frames garanti).
 - `cargo test -p forgia-mode-roguelite` : 147 verts. clippy 0 warning (decor.rs).
+
+## Critères d'acceptation (écrits le 2026-08-12, depuis les capteurs)
+
+La story n'en avait **aucun** — c'est ce qui l'a laissée ouverte 48 jours alors que
+le code était livré et vivant. Dérivés de la section « Validation runtime »
+ci-dessous, évalués sur la run du 2026-08-12 (t≈400 s).
+
+- [x] `plan_decor_set` ne fait que du RNG, `DecorSpawnQueue` draine par frame
+      (`decor.rs:736` et `decor.rs:1432`) — livré 2026-06-25
+- [x] Layout décor strictement inchangé (stream RNG préservé) — test
+      `plan_decor_set_deterministic_and_budgetable`
+- [x] Budget en couche definition : gène `decor_spawn_budget_per_frame`
+      (`roguelite_decor.toml:183`), défaut 12, clamp min 1
+- [x] **Le bloc de ~800 props a disparu.** Le freeze d'origine était **65 ms pour
+      +797 entités** à l'entrée de stage. Sur la run du 12-08, aucun
+      `scene_spawn_gltf` ne dépasse **+73 entités** — l'instanciation décor en bloc
+      n'existe plus.
+- [x] **Le « Suivi » de la story est CONFIRMÉ par les données.** Il prévoyait :
+      *« si des freezes mid-combat persistent, vagues qui spawnent leur GLB en
+      bloc, même traitement à appliquer — à confirmer via `perf_diag` (`enemies`
+      haut cette fois) »*. C'est exactement ce qu'on mesure : 3 freezes
+      `scene_spawn_gltf` restants (t = 171,9 · 308,9 · 379,8 s ; 46-52 ms pour
+      +58, +69, +73 entités) et `perf_diag` donne `enemies` = 13, 18, 8 à ces
+      instants. → story dédiée pour `waves.rs`/`enemies.rs`, hors scope ici.
+
+> **Ce qu'il ne faut PAS attribuer à cette story** : sur les **17 freezes** de la
+> run, **14 sont `unattributed_cpu_or_gpu` avec un churn d'entités NUL** (delta 0
+> ou ±3), dont un à **103 ms**. Ils corrèlent avec l'intensité de combat
+> (`enemies` 14-18, `status_auras`, `element_sparks` 33, **`point_lights` 95-103**),
+> pas avec l'instanciation. C'est la classe de freeze **dominante aujourd'hui**, et
+> elle est ailleurs.
 
 ## Validation runtime (à faire par l'user)
 
