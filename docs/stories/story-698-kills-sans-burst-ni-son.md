@@ -1,6 +1,6 @@
 # story-698 — 51 kills, 0 burst visuel et 2 sons de mort
 
-**Statut** : DRAFT — diagnostic FAIT 2026-08-12 ; reste 1 correctif de mesure + 1 de son
+**Statut** : REVIEW — les DEUX correctifs sont livres et testes ; il ne reste que la validation en jeu
 **Créée** : 2026-08-12
 **Niveau BMAD** : Quick (deux compteurs à zéro, même cause probable : l'événement de mort)
 **Origine** : run de validation du 2026-08-12, recoupement de trois capteurs.
@@ -121,9 +121,27 @@ zéro qu'on lit comme une absence, alors qu'il n'a jamais compté quoi que ce so
       diagnostic l'avait prévu.
       *L'écart de 7 reste à expliquer si ça compte : morts hors chemin hitscan
       (roquette, mêlée, DoT) qui ne passent pas par `spawn_kill_burst`.*
-- [ ] `roguelite_audio.kills` ≈ nombre de morts — **CAUSE A CONFIRMÉE, non
-      corrigée** : **8 sons pour 77 morts (10 %)**. C'est tout ce qui reste de
-      cette story.
+- [~] `roguelite_audio.kills` ≈ nombre de morts — **CORRECTIF LIVRÉ, validation en
+      attente.** Mesure avant : **8 sons pour 77 morts (10 %)**.
+
+      La cause A est passée d'hypothèse à **preuve** sans avoir besoin du log :
+      `despawn_dead_cubes` tourne en `GameSet::Combat`, `sys_sfx_on_combat_hit` en
+      `GameSet::Effects`, et Combat passe **avant** dans la chaîne. L'entité est
+      donc despawnée dans la même frame. Le résidu de 8 le confirme au lieu de le
+      contredire : ce sont les morts survenues **après** le set Combat (roquette,
+      DoT), qui survivent jusqu'à la frame suivante — un blocage total aurait
+      donné 0.
+
+      Corrigé sans toucher à l'ordonnancement (le déplacer coupleraient deux crates
+      pour un son) : cible introuvable + coup fatal + attaquant ≠ cible ⇒ ennemi.
+      499 tests verts, clippy 0.
+
+      **Il ne reste QUE la mesure**, et elle vient gratuitement à la première run
+      de la refonte : `phase0_check.py` juge les deux canaux séparément.
+- [x] **5ᵉ témoin trouvé par l'outil** — `forgia_arena_feedback.kill_sounds_played:
+      0` après 77 morts, un compteur cumulatif. Il corrobore la cause A, et son
+      `kill_audio_missing: 0` montre qu'il n'a même pas détecté sa propre absence.
+      À revérifier après le correctif : il devrait suivre lui aussi.
 - [x] **story-652 est validée sur pièces** — le VFX de kill fonctionne. Ce qui
       manquait n'était pas l'effet, c'était la preuve.
 

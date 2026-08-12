@@ -8,10 +8,10 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 1 |
-| DRAFT | 1 |
+| REVIEW | 2 |
 | DONE | 55 |
 | CANCELLED | 151 |
-| **Total** | **208** |
+| **Total** | **209** |
 
 ## IN_PROGRESS (1)
 
@@ -19,11 +19,12 @@
 | --- | --- | --- |
 | 699 | Un capteur dont le compteur est à zéro ne doit pas dire « ok » | [story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md](./story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md) |
 
-## DRAFT (1)
+## REVIEW (2)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
 | 698 | 51 kills, 0 burst visuel et 2 sons de mort | [story-698-kills-sans-burst-ni-son.md](./story-698-kills-sans-burst-ni-son.md) |
+| 700 | E1 inc.1 : le navmesh existe, compile et répond | [story-700-navmesh-fondation-compagnon.md](./story-700-navmesh-fondation-compagnon.md) |
 
 ## DONE (55)
 
