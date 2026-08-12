@@ -75,6 +75,12 @@ pub struct TacticalTuning {
     /// Distance à laquelle un point du chemin est considéré atteint (m). Trop
     /// petit = le bot tourne autour sans jamais valider ; trop grand = il coupe
     /// les virages et frotte les murs que le chemin contournait.
+    ///
+    /// 2026-08-13 — **abaissé de 1,0 à 0,35 m** après « les mobs se bloquent dans les
+    /// portes ». Une porte fait 4 m, dilatée à 3 m de passage utile : valider son point
+    /// à 1 m de distance faisait couper le virage en plein dans le montant. 0,35 m
+    /// reste au-dessus du pas d'une frame (un grunt à 9 m/s parcourt 0,15 m à 60 fps),
+    /// donc le bot ne peut pas orbiter autour du point sans jamais le valider.
     pub waypoint_arrive_m: f32,
     /// Délai minimum entre deux recalculs de chemin (s). Le chemin est du travail
     /// de PLANIFICATION, pas de frame : N bots qui retriangulent chaque frame
@@ -105,10 +111,7 @@ impl Default for TacticalTuning {
             stuck_progress_frac: 0.25,
             stuck_after_secs: 0.7,
             unstick_secs: 0.9,
-            // Dérivé du gabarit : la capsule d'un bot fait ~0,6 m de diamètre, on
-            // valide donc un point dès qu'il est sous le mètre — sans couper au point
-            // de frotter le mur que le chemin contournait.
-            waypoint_arrive_m: 1.0,
+            waypoint_arrive_m: 0.35,
             // 2 Hz : un grunt à 9 m/s parcourt 4,5 m entre deux calculs, très en deçà
             // de la maille d'une arène. `target_moved_repath_m` rattrape le reste.
             repath_period_secs: 0.5,
@@ -137,6 +140,12 @@ pub struct BotAiSensor {
     /// chien de garde a servi. Un compteur qui ne sait répondre à sa propre
     /// question est aveugle, pas vert.
     pub unstick_triggered_session: u32,
+    /// Chemins trouvés depuis le lancement.
+    pub paths_ok_session: u32,
+    /// **Chemins REFUSÉS par le maillage.** Un échec renvoie le bot en ligne droite,
+    /// c'est-à-dire au comportement d'avant le navmesh — donc « bloqué à cet endroit
+    /// précis ». Sans ce compteur, le symptôme se devine ; avec, il se mesure.
+    pub paths_failed_session: u32,
 }
 
 // ─── Phase 2 — LOS check ───────────────────────────────────────────────
@@ -556,14 +565,42 @@ pub fn bot_tactical_movement(
             })
             .filter(|d| d.length_squared() > 0.0)
             .unwrap_or(straight);
+
+        // Story-700 inc.3b — TRAVERSER n'est pas ENGAGER.
+        //
+        // Symptôme du 2026-08-13 : « les mobs se bloquent dans les portes et les
+        // couloirs ». Trois forces poussaient le bot hors de son chemin, et toutes les
+        // trois ont été conçues pour un bot QUI N'EN AVAIT PAS :
+        //
+        //   strafe            ±1,80 m  — dans une porte de 4 m dilatée à 3 m de passage
+        //                                utile, il garantit de toucher le montant
+        //   évitement local    2,50 m  — il voit les DEUX montants et fuit le passage
+        //                                que le chemin lui désigne
+        //   rayon d'arrivée    1,00 m  — validait la porte de loin, d'où le virage coupé
+        //                                en plein dans le cadre (corrigé à 0,35 m)
+        //
+        // Tant qu'il reste un tronçon APRÈS celui-ci, le bot traverse : le chemin est
+        // déjà sans collision (obstacles dilatés du rayon d'agent), donc on le suit au
+        // pied de la lettre. Sur le DERNIER tronçon il engage, et strafe et évitement
+        // reprennent la main — c'est là qu'ils servent, en terrain ouvert face au joueur.
+        let en_traversee = nav_path.is_some_and(|p| !p.is_final_leg());
         let strafe = compute_strafe_offset(&mut bot, fwd_dir, &tuning, dt);
-        let desired = (fwd_dir + strafe.normalize_or_zero() * 0.4).normalize_or_zero();
+        let desired = if en_traversee {
+            fwd_dir
+        } else {
+            (fwd_dir + strafe.normalize_or_zero() * 0.4).normalize_or_zero()
+        };
         // Phase 3 obstacle avoidance.
         // En sortie d'obstacle on LONGE au lieu de foncer : l'évitement local a
         // déjà échoué (son repli est `fwd_dir`, c'est-à-dire droit dans le mur).
         let final_dir = if bot.unstick_left > 0.0 {
             let cote = unstick_side(bot.strafe_noise_seed);
             Vec3::new(-fwd_dir.z, 0.0, fwd_dir.x).normalize_or_zero() * cote
+        } else if en_traversee {
+            // On fait confiance au chemin. L'évitement local est le repli de celui qui
+            // n'en a pas — le laisser corriger un trajet déjà valide, c'est exactement
+            // ce qui refermait les portes.
+            fwd_dir
         } else {
             pick_avoid_direction(
                 xf.translation,
@@ -868,7 +905,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_failed_session":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -879,6 +916,8 @@ pub fn write_bot_ai_sensor(
         unsticking,
         stalling,
         sensor.unstick_triggered_session,
+        sensor.paths_ok_session,
+        sensor.paths_failed_session,
         sensor.los_checks_session,
         sensor.alerts_triggered_session,
         tuning.los_check_hz,

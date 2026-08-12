@@ -43,6 +43,18 @@ impl BotPath {
         self.waypoints.get(self.cursor).copied()
     }
 
+    /// Sommes-nous sur le DERNIER tronçon du chemin ?
+    ///
+    /// C'est la frontière entre **traverser** et **engager**, et elle décide de tout le
+    /// comportement (cf. `bot_tactical_movement`) : en traversée on suit le chemin au
+    /// pied de la lettre, à l'engagement on rend la main au strafe et à l'évitement.
+    ///
+    /// Un chemin vide compte comme final : sans chemin, il n'y a rien à traverser.
+    #[must_use]
+    pub fn is_final_leg(&self) -> bool {
+        self.cursor + 1 >= self.waypoints.len()
+    }
+
     /// Avance le curseur au-delà des points déjà atteints.
     ///
     /// Boucle plutôt que test simple : un bot rapide peut franchir deux points serrés
@@ -107,6 +119,7 @@ pub fn sys_bot_navpath(
     nav: Res<ActiveNavMesh>,
     tuning: Res<TacticalTuning>,
     time: Res<Time>,
+    mut sensor: ResMut<crate::tactical::BotAiSensor>,
 ) {
     let Some(target_tf) = targets.iter().next() else {
         return;
@@ -148,16 +161,23 @@ pub fn sys_bot_navpath(
 
         match nav.path(pos, target) {
             Some(found) => {
+                sensor.paths_ok_session = sensor.paths_ok_session.saturating_add(1);
                 path.waypoints.clear();
                 path.waypoints.extend(found.path.iter().copied());
                 path.cursor = 0;
                 // Le premier point peut être déjà atteint (le bot est dessus).
                 path.advance(pos, tuning.waypoint_arrive_m);
             }
-            // Aucun trajet : la cible est hors du maillage, ou dans un îlot fermé.
-            // On vide plutôt que de garder un chemin périmé — le repli en ligne
-            // droite, avec le désenlisement existant, reste meilleur qu'un chemin faux.
-            None => path.clear(),
+            // Aucun trajet : le bot ou la cible est HORS du maillage — au-delà du bord,
+            // ou à l'intérieur d'un obstacle dilaté. On vide plutôt que de garder un
+            // chemin périmé, mais il faut voir ce cas : le repli est la ligne droite,
+            // c'est-à-dire le comportement d'AVANT le navmesh. Un bot qui échoue
+            // toujours au même endroit y est donc bloqué comme avant, et c'est
+            // exactement le « ils se bloquent à certains endroits » du 2026-08-13.
+            None => {
+                sensor.paths_failed_session = sensor.paths_failed_session.saturating_add(1);
+                path.clear();
+            }
         }
     }
 }
