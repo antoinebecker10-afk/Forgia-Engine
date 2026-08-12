@@ -130,6 +130,21 @@ impl AmmoSlot {
         }
     }
 
+    /// Recharge le slot à bloc **en conservant sa config** — chargeur plein, réserve
+    /// pleine, rechargement en cours annulé.
+    ///
+    /// Existe parce que `full_from_config` ne sert QUE pour un slot absent : au
+    /// second lancement d'une run les slots survivent, `sync_ammo_slot_from_config`
+    /// part alors sur la branche `apply_config`, qui **préserve** `current_mag` et
+    /// `reserve` (c'est voulu pour le hot-reload de génome). Sans cette méthode, une
+    /// run relancée démarrait avec les munitions de la précédente — rapporté en jeu
+    /// le 2026-08-12, capteur à l'appui : `ModernAR current_mag: 0, reserve: 0/84`.
+    pub fn refill(&mut self) {
+        self.current_mag = self.config.mag_size;
+        self.reserve = self.config.reserve_max;
+        self.reload_state = ReloadState::Idle;
+    }
+
     /// Synchronise un slot existant avec une nouvelle config (hot-reload genome).
     /// - Clamp `current_mag` au nouveau `mag_size`.
     /// - Clamp `reserve` au nouveau `reserve_max`.
@@ -519,6 +534,47 @@ mod tests {
         } else {
             panic!("should still be reloading");
         }
+    }
+
+    /// Le défaut rapporté le 2026-08-12 : une run relancée héritait des munitions
+    /// de la précédente. Ce test fige les DEUX moitiés du contrat — `apply_config`
+    /// préserve (hot-reload génome), `refill` remplit (nouvelle run).
+    #[test]
+    fn refill_remplit_la_ou_apply_config_preserve() {
+        let config = AmmoConfig {
+            mag_size: 12,
+            reserve_max: 84,
+            ..AmmoConfig::default()
+        };
+        let mut slot = AmmoSlot::full_from_config(config);
+        slot.current_mag = 0;
+        slot.reserve = 0;
+
+        // Hot-reload génome : la config repasse, l'état du joueur est PRÉSERVÉ.
+        slot.apply_config(config);
+        assert_eq!(
+            (slot.current_mag, slot.reserve),
+            (0, 0),
+            "apply_config ne doit PAS recharger — sinon un hot-reload en pleine \
+             partie offrirait des munitions gratuites"
+        );
+
+        // Nouvelle run : on remplit.
+        slot.refill();
+        assert_eq!((slot.current_mag, slot.reserve), (12, 84));
+        assert!(matches!(slot.reload_state, ReloadState::Idle));
+    }
+
+    #[test]
+    fn refill_annule_un_rechargement_en_cours() {
+        let mut slot = AmmoSlot::full_from_config(AmmoConfig::default());
+        slot.current_mag = 1;
+        assert!(slot.try_start_reload(), "le rechargement doit démarrer");
+        slot.refill();
+        assert!(
+            matches!(slot.reload_state, ReloadState::Idle),
+            "une nouvelle run ne doit pas démarrer avec le rechargement de l'ancienne"
+        );
     }
 
     #[test]

@@ -894,6 +894,31 @@ pub fn sys_start_run(
             }
         });
 
+        // 2026-08-12 — MUNITIONS : même classe de défaut que les atouts ci-dessus,
+        // même remède. Rapporté en jeu (« quand je recommence, les munitions ne se
+        // rechargent pas »), capteur à l'appui : `forgia2_combat.json` donnait
+        // `ModernAR current_mag: 0, reserve: 0` sur un `reserve_max` de 84.
+        //
+        // Cause : `sync_ammo_slot_from_config` ne remplit un slot QUE s'il est
+        // absent (`full_from_config`). Au relancement, les slots survivent — la
+        // Resource `EquippedWeapons` n'est pas state-scopée — donc la branche
+        // `apply_config` s'applique, et elle PRÉSERVE `current_mag`/`reserve` (c'est
+        // voulu : c'est le chemin du hot-reload de génome, qui ne doit pas recharger
+        // l'arme du joueur en pleine partie). Personne ne rechargeait à l'entrée.
+        //
+        // `commands.queue` pour la raison déjà exposée : 16 SystemParams, plafond atteint.
+        commands.queue(|world: &mut World| {
+            if let Some(mut weapons) =
+                world.get_resource_mut::<forgia_combat::weapons::EquippedWeapons>()
+            {
+                let n = weapons.refill_all();
+                // Le compte distingue « rechargé » de « rien à recharger » : à 0, le
+                // génome n'était pas encore arrivé et les slots seront créés pleins
+                // par `full_from_config` — pas un bug, mais il faut pouvoir le lire.
+                info!("[roguelite] sys_start_run — {n} arme(s) rechargée(s) à bloc (nouvelle run)");
+            }
+        });
+
         commands.insert_resource(RunSeed {
             seed,
             stage_count: total_stages,

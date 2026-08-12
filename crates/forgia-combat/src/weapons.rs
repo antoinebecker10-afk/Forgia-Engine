@@ -155,6 +155,21 @@ impl EquippedWeapons {
         self.slots.get(&w).copied().unwrap_or_default()
     }
 
+    /// Recharge **toutes** les armes à bloc et rend le nombre de slots touchés.
+    ///
+    /// À appeler au démarrage d'une run. Les slots survivent d'une run à l'autre
+    /// (la Resource n'est pas state-scopée), donc sans ceci une run relancée
+    /// hérite des munitions de la précédente — cf `AmmoSlot::refill`.
+    ///
+    /// Rend un compte plutôt que rien : c'est ce qui permet au log de distinguer
+    /// « rechargé 4 armes » de « 0 slot, le génome n'était pas encore arrivé ».
+    pub fn refill_all(&mut self) -> usize {
+        for slot in self.slots.values_mut() {
+            slot.refill();
+        }
+        self.slots.len()
+    }
+
     /// Iter slots existants (pour HUD slot strip).
     pub fn iter_slots(&self) -> impl Iterator<Item = (WeaponType, &AmmoSlot)> {
         self.slots.iter().map(|(w, s)| (*w, s))
