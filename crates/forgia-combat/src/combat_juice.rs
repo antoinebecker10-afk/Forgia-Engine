@@ -149,20 +149,24 @@ pub struct PrevHealth(pub f32);
 
 // â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// ⚠ HITSTOP : LA FEATURE N'EXISTE PLUS (constaté 2026-08-12, story-696).
+// ⛔ HITSTOP : RETIRÉ DÉFINITIVEMENT — décision Antoine, 2026-08-12.
 //
-// Historique : `HitStopState` a été migré vers une crate `forgia-juice-hit-stop`
-// le 2026-05-17 (Tier 1D). Cette crate a été SUPPRIMÉE neuf jours plus tard par
-// ADR-0002 (cleanup 266 → 62). Personne ne l'a vu.
+// « On le retire, je n'en veux pas, jamais. »
 //
-// Vérifiable : `crates/forgia-juice-hit-stop` absente · `forgia-juice-lib/src/`
-// n'a pas de `hit_stop.rs` · zéro dépendance `juice-hit-stop` au workspace.
+// Ce n'est pas un manque à combler, c'est un choix de game feel. Il avait déjà été
+// désactivé le 2026-07-20 pour une raison mesurée : **micro-freezes ressentis en
+// tir soutenu**, invisibles aux capteurs de frame-time. Un gel par-hit à 16 tirs/s
+// ne se lit pas dans une moyenne de frame — il se sent, et il gênait.
 //
-// Les anciennes lignes de ce commentaire disaient d'importer
-// `forgia_juice_lib::hit_stop::HitStopState` — un chemin qui n'existe pas. Elles
-// sont retirées : un commentaire faux coûte plus cher que pas de commentaire.
-// Avant de reconstruire, chercher le CONCEPT (gel du temps à l'impact), pas le
-// nom `hit_stop` : une réimplémentation sous un autre nom passerait inaperçue.
+// Historique, pour que personne ne le redécouvre : `HitStopState` avait été migré
+// vers une crate `forgia-juice-hit-stop` le 2026-05-17, supprimée neuf jours plus
+// tard par ADR-0002. Les gènes `wfx_hit_stop_*` ont été retirés des génomes le
+// 2026-08-12 (ils n'avaient aucun lecteur).
+//
+// NE PAS LE RECRÉER, ni sous ce nom ni sous un autre (« freeze frame », « impact
+// pause », « gel d'impact »). Si le besoin de poids à l'impact revient, la réponse
+// est ailleurs : knockback, screenshake, flash — tous présents dans
+// `forgia-juice-lib`, tous sans gel du temps.
 
 #[derive(Resource, Default)]
 pub struct CameraTrauma {
@@ -204,10 +208,9 @@ pub struct HitFlashTimer {
 // TODO: combat_juice_event_system requires FpsTuning + ChromaticAberration (Bevy pp) + HitFlashCache
 // pub fn combat_juice_event_system(...) { ... }
 
-// ⚠ `hitstop_tick_system` : PARTI AVEC LA CRATE SUPPRIMÉE (cf en-tête, story-696).
-// La ligne précédente affirmait « Wiring : ForgiaJuiceHitStopPlugin ajouté
-// idempotent dans ForgiaCombatPlugin » — ce plugin n'existe nulle part. Aucun
-// système de hitstop ne tourne aujourd'hui.
+// ⛔ `hitstop_tick_system` : retiré définitivement — cf en-tête « HITSTOP ».
+// L'ancienne ligne affirmait « Wiring : ForgiaJuiceHitStopPlugin ajouté idempotent
+// dans ForgiaCombatPlugin ». Ce plugin n'existe nulle part, et ne doit pas revenir.
 
 pub fn trauma_decay_system(time: Res<Time>, mut trauma: ResMut<CameraTrauma>) {
     if trauma.trauma > 0.001 {

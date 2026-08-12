@@ -10,8 +10,10 @@
 //! `Transform` chaque frame — ADDITIF, il compose avec le mouvement incrémental
 //! des bots (forgia-ai-arena-bot) sans le combattre.
 //!
-//! Tuning genome plat `roguelite_gamefeel.toml` (hot-reload 1Hz, même fichier
-//! que les paliers hitstop — watcher mtime séparé, doublon assumé et borné).
+//! Tuning genome plat `roguelite_gamefeel.toml` (hot-reload 1Hz, watcher mtime
+//! séparé — doublon assumé et borné). Ce fichier portait aussi les paliers du
+//! hitstop, **retiré définitivement le 2026-08-12** ; le knockback en est
+//! désormais le seul consommateur côté impact.
 //! Capteur : `forgia2_knockback.json`.
 
 use bevy::prelude::*;
@@ -191,8 +193,12 @@ impl Plugin for ForgiaJuiceKnockbackPlugin {
 }
 
 /// Déplace les entités poussées + décroissance exp + retrait quand fini.
-/// `Res<Time>` (virtuel) → gèle en pause et pendant le hitstop (relâche
-/// dramatique après le freeze du kill — voulu).
+///
+/// `Res<Time>` (virtuel) → **gèle en pause**. La version d'origine ajoutait « et
+/// pendant le hitstop (relâche dramatique après le freeze du kill) » : le hitstop
+/// a été **retiré définitivement** le 2026-08-12 (cf `forgia-combat/combat_juice.rs`,
+/// en-tête « HITSTOP »). Le temps virtuel reste le bon choix pour la pause ; il n'y
+/// a simplement plus de freeze à composer avec.
 fn sys_tick_knockback(
     time: Res<Time>,
     mut commands: Commands,

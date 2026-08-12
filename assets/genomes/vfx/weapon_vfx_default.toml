@@ -211,41 +211,22 @@ max = 30.0
 default = 12.0
 layer = "screen"
 
-# === Hit-Stop (story-432 V2 — gunfeel framework) ===
-# Pause virtuelle gameplay (Time<Virtual>) sur impact lourd. Migration des
-# hardcodes de combat_juice.rs (was 50ms / threshold 20 / scale 0.0).
-[[genes]]
-id = "wfx_hit_stop_ms"
-label = "Hit-Stop Duration (ms)"
-chromosome = "GunfeelImpact"
-target = "Value"
-min = 0.0
-max = 200.0
-# 2026-07-20 — hitstop DESACTIVE (demande user : micro-freezes ressentis en tir
-# soutenu = le hitstop par-hit, invisible aux capteurs frame-time). Was 50.0.
-# Pour re-tuner : paliers crit/kill dans roguelite_gamefeel.toml.
-default = 0.0
-layer = "hit_stop"
+# === Hit-Stop — RETIRE DEFINITIVEMENT (decision Antoine, 2026-08-12) ===
+# « On le retire, je n'en veux pas, jamais. »
+#
+# Le hitstop (micro-gel du temps a l'impact) a ete desactive une premiere fois le
+# 2026-07-20 pour une raison mesuree : micro-freezes ressentis en tir soutenu,
+# invisibles aux capteurs de frame-time. La crate qui le portait
+# (`forgia-juice-hit-stop`) avait deja ete supprimee par ADR-0002 le 2026-05-26.
+#
+# Les 3 genes `wfx_hit_stop_ms` / `_threshold_dmg` / `_scale` sont supprimes ici :
+# ils n'avaient AUCUN lecteur dans le code, et une valeur morte finit toujours par
+# se lire comme un TODO. Ne pas les recreer.
+#
+# CE QUE CA CHANGE AILLEURS : le « kill satisfaisant (mort en 4 temps) » de la
+# ROADMAP comptait le hitstop comme son 1er temps (anticipation). Il n'en a plus
+# que trois — burst, debris, permanence — et c'est voulu.
 
-[[genes]]
-id = "wfx_hit_stop_threshold_dmg"
-label = "Hit-Stop Threshold (dmg)"
-chromosome = "GunfeelImpact"
-target = "Value"
-min = 5.0
-max = 100.0
-default = 20.0
-layer = "hit_stop"
-
-[[genes]]
-id = "wfx_hit_stop_scale"
-label = "Hit-Stop Time Scale"
-chromosome = "GunfeelImpact"
-target = "Value"
-min = 0.0
-max = 0.5
-default = 0.0
-layer = "hit_stop"
 
 # === Camera Recoil (story-432 V2 — distinct from viewmodel kick) ===
 # Apex/COD pattern : pitch push haut + yaw petit random, recover spring.

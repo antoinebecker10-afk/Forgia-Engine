@@ -1,6 +1,6 @@
-# story-696 — Le hitstop n'existe plus : supprimé par ADR-0002, et personne ne l'a vu
+# story-696 — Le hitstop est retiré définitivement (et il l'était déjà à moitié)
 
-**Statut** : DRAFT — **réécrite le 2026-08-12**, le diagnostic initial était faux
+**Statut** : DONE (2026-08-12) — décision prise : le hitstop est **retiré définitivement**
 **Créée** : 2026-08-12
 **Niveau BMAD** : Standard (une feature à restaurer + un défaut de classe à instruire)
 **Origine** : run de validation du 2026-08-12. La première version accusait le
@@ -72,16 +72,26 @@ C'est directement le risque n°1 de [`REFONTE_GDD.md`](../REFONTE_GDD.md) §6
 
 - [x] La cause est **nommée et prouvée** — crate supprimée par ADR-0002, capteur
       orphelin depuis le 2026-07-21, zéro producteur dans le code
+- [x] **DÉCISION PRISE — 2026-08-12, Antoine : « on le retire, je n'en veux pas,
+      jamais. »**
+      Ce n'est pas un manque à combler, c'est un **choix de game feel**. Et il
+      **réaffirme** un choix déjà pris le 2026-07-20 pour une raison mesurée :
+      *micro-freezes ressentis en tir soutenu, invisibles aux capteurs de
+      frame-time*. Un gel par-hit à 16 tirs/s ne se lit pas dans une moyenne de
+      frame — il se sent. C'est aussi ce qui explique que la suppression de mai
+      soit passée inaperçue : la feature était déjà éteinte en data.
+- [x] Le hitstop est **retiré de la couche definition** : 3 gènes
+      `wfx_hit_stop_ms` / `_threshold_dmg` / `_scale`, sans aucun lecteur, effacés
+      des **deux** génomes. `validate-genomes` : 135 fichiers, 1883 gènes, OK.
+- [x] Les commentaires menteurs sont **devenus des interdits explicites** —
+      `combat_juice.rs` (×2), `combat-lib.rs`, `knockback.rs` (×2). Ils nomment la
+      décision, sa date, son motif, et interdisent la recréation **sous un autre
+      nom** (« freeze frame », « impact pause », « gel d'impact »).
+- [x] `forgia2_gamefeel.json` orphelin **supprimé du dépôt de travail**
 - [ ] **Inventaire** des 44 citations de crates supprimées, séparées en deux :
-      note historique inoffensive / **référence sans code d'accueil**
-- [ ] Les commentaires menteurs de `combat_juice.rs` et `lib.rs` sont corrigés ou
-      supprimés — un commentaire faux coûte plus cher que pas de commentaire
-- [ ] **Décision** : le hitstop est-il restauré, et où ? (`forgia-juice-lib` est le
-      foyer naturel, il porte déjà les 4 autres effets de juice)
-- [ ] S'il est restauré : son capteur est **déclaré au registre** et surveillé, sinon
-      la prochaine suppression sera tout aussi silencieuse
-- [ ] `forgia2_gamefeel.json` orphelin **supprimé du dépôt de travail** — tant qu'il
-      traîne, il se lit comme une donnée
+      note historique inoffensive / **référence sans code d'accueil**.
+      *Seul AC restant — c'est la partie « classe de défaut », indépendante du
+      hitstop lui-même.*
 
 ## Conséquences sur d'autres tickets
 
