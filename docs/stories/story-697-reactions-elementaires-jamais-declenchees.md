@@ -1,6 +1,6 @@
 # story-697 — Les éléments s'appliquent, mais ne réagissent JAMAIS
 
-**Statut** : DRAFT
+**Statut** : DRAFT — diagnostic FAIT 2026-08-12, cause tranchée ; la suite est une décision de design, pas un correctif
 **Créée** : 2026-08-12
 **Niveau BMAD** : Standard (moteur de réactions + VFX + audio, ≥ 2 crates)
 **Origine** : run de validation du 2026-08-12, lecture des capteurs `elements` et
@@ -40,7 +40,93 @@ C'est aussi la deuxième moitié d'un constat déjà connu : `forgia2_power.json
 donne `boon_damage_count: 0` (courbe de dégâts plate). Deux systèmes de montée en
 puissance inertes en même temps.
 
-## Pistes, à falsifier — ne pas patcher avant d'avoir mesuré
+## DIAGNOSTIC — 2026-08-12. Deux causes indépendantes, aucune n'est un bug du moteur
+
+**Le moteur de réactions est correct.** `ReactionTable::triggered` est testée
+(`reaction_table_all_statuses_*`), `had_burn`/`had_poison`/`had_shock` lisent bien
+les statuts **pré-hit** (`elements.rs:1188-1194`), les durées tiennent (burn 3 s,
+shock 4 s, poison 4 s) et `[surcharge] enabled = true` dans le génome. Rien de tout
+cela n'est en cause.
+
+Les trois paires exigent chacune **deux éléments co-présents sur la même cible** :
+
+| Réaction | Paire | Armes porteuses |
+|---|---|---|
+| Combustion | Feu + **Poison** | AssaultRifle + **Boucherie** |
+| Miasma | Choc + **Poison** | ModernAR + **Boucherie** |
+| Surcharge | Feu + Choc | AssaultRifle + ModernAR |
+
+### Fausse piste écartée — le garde `ev.damage > 0.0`
+
+> Consignée parce qu'elle était **convaincante et fausse**, et que la prochaine
+> lecture la retrouvera.
+>
+> Le génome porte `[weapons.boucherie] damage = 0.0` (*« projectile : dégâts portés
+> par l'explosion AOE »*), et `elements.rs:1285` garde tout sur `ev.damage > 0.0`
+> avec un commentaire qui cite ce cas. Tout concordait : la Boucherie est **l'unique
+> source de poison** (`roguelite_elements.toml:26`), donc le garde semblait la
+> débrancher et tuer deux réactions sur trois.
+>
+> **Vérifié dans le code de l'explosion, c'est faux** : `boucherie_rocket.rs:290`
+> émet un `CombatHitEvent { damage: EXPLOSION_DAMAGE, weapon: Some(RocketLauncher) }`.
+> Le poison a donc bien un chemin. Lire la ligne au lieu de raisonner sur le
+> commentaire aurait évité l'aller-retour.
+>
+> Si `poisons_applied: 1`, c'est simplement que **la Boucherie n'a tiré que 3 fois
+> en 400 s** (log : 3 × `[boucherie] BOUM ! roquette → 1 touchés`).
+
+### La cause, unique — une arme = un élément, et l'ennemi meurt avant le changement
+
+Surcharge (Feu + Choc) est le cas qui tranche : **192 hits feu, 133 hits choc**,
+aucun problème d'application, et pourtant **zéro réaction**. Il faut toucher **la
+même cible** avec deux armes différentes en moins de 3-4 s. Or le TTK est de
+**0,18 s** sur un grunt (30 pv / 168 dps) et le log montre **3 changements d'arme
+sur 400 s**.
+
+Les trois réactions échouent donc pour la **même** raison, et le poison rare n'en
+est qu'un symptôme aggravant.
+
+Ce n'est pas un défaut d'implémentation : c'est ce que le GDD prévoit.
+
+> *« Chaque acteur porte **un** élément à la fois. Les grosses réactions exigent
+> deux poseurs : l'un applique, l'autre détone. **En solo, le compagnon est le
+> second élément.** »* — GDD §4
+
+## Conséquence sur l'ordre des phases — à trancher, c'est une décision de design
+
+`REFONTE_GDD.md` place ce ticket en **Phase 0**, avec pour jalon *« une réaction se
+déclenche, se voit et s'entend »*. Or **rien dans `elements.rs` ne peut satisfaire
+ce jalon** : le code y est juste. Le remède nommé par le GDD est le **compagnon
+comme second poseur** — c'est-à-dire la **Phase 1**.
+
+**Phase 0 dépend donc de Phase 1**, ce que le document ne prévoit pas.
+
+Trois issues possibles, toutes des décisions de game design, aucune n'est un
+correctif :
+
+1. **Déplacer ce ticket en Phase 1** et laisser Phase 0 à 696/698 (hitstop, kill).
+   Le plus honnête : on ne prétend pas réparer ce qui n'est pas cassé.
+2. **Rendre les réactions atteignables en solo mono-arme** — par exemple une arme
+   qui pose deux éléments, ou un élément qui persiste au changement d'arme. C'est
+   un changement de design, contraire au *« chaque acteur porte un élément »* du GDD.
+3. **Un ennemi assez robuste pour survivre à un changement d'arme.** Le TTK de
+   0,18 s sur un grunt est le vrai verrou ; un élite (120 pv, 0,71 s) laisse déjà
+   plus de marge, un boss encore plus. Le jalon pourrait se mesurer **sur un boss**
+   plutôt qu'en combat courant.
+
+**Recommandation** : l'option 3 pour le jalon (elle ne change aucun design et se
+teste tout de suite), puis l'option 1 pour la suite du ticket.
+
+## Ce qu'il ne faut PAS faire
+
+- **Ne pas toucher `elements.rs`.** `ReactionTable` est testée, `had_*` lit les
+  statuts pré-hit, les durées tiennent, `[surcharge] enabled = true`. Un correctif
+  ici chercherait un bug qui n'existe pas.
+- **Ne pas retoucher les dégâts des DoT** : le `next_step` du capteur le dit déjà.
+- **Ne pas supprimer le garde `ev.damage > 0.0`** : la fausse piste ci-dessus a
+  montré qu'il ne bloque rien, et il protège d'un vrai défaut.
+
+## Pistes initiales, désormais tranchées
 
 1. **Un seul élément par acteur à la fois ?** Le GDD dit qu'une grosse réaction
    « exige deux poseurs ». Si un ennemi ne peut porter qu'un statut, la condition
@@ -55,7 +141,9 @@ puissance inertes en même temps.
 
 ## Critères d'acceptation
 
-- [ ] La cause est **nommée et prouvée** par une mesure, pas déduite
+- [x] La cause est **nommée et prouvée** par une mesure — une arme = un élément,
+      TTK 0,18 s, 3 changements d'arme en 400 s. Le moteur, lui, est juste.
+      Une fausse piste (le garde `ev.damage > 0`) est consignée comme telle.
 - [ ] `reactions.combustions` > 0 après une run où feu et choc sont posés
 - [ ] `element_vfx.reaction_bursts` > 0 en même temps (le visuel suit la logique)
 - [ ] Un test couvre la condition de déclenchement, pas seulement l'application
