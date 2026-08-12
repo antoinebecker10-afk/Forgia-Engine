@@ -37,12 +37,16 @@ hide_support_hand = true        # pistolet une-main : pas de main gauche (story-
 offset_x = 0.22
 offset_y = -0.35
 offset_z = -1.30
-# Rotations à ZÉRO en mode sprite : le quad doit rester face caméra. Le -90° en
-# yaw servait à orienter le GLB ; appliqué à un quad il le met de chant, donc
-# invisible. Valeurs GLB conservées ici pour un retour arrière :
-#   rotation_y_deg = -90.0
+# ⚠ Ces rotations dépendent du MODE, et se contredisent d'un mode à l'autre :
+#   - GLB 3D (mode actuel, sprite_dir vide) : yaw **-90°** oriente le maillage.
+#     À 0°, l'arme se voit DE PROFIL — c'est la régression du 2026-08-11.
+#   - Quad sprite : yaw **0°** obligatoire, sinon le quad est de chant (invisible).
+# Restauré à -90.0 le 2026-08-12 (rapporté en jeu : « l'arme est vue du côté »).
+# Valeur d'origine confirmée par git : `beac5c8` avait fait passer -90.0 → 0.0
+# pour le sprite ; le revert `46e8808` avait vidé sprite_dir sans remettre l'angle.
+# Si le pixel art est réactivé un jour, ce yaw doit repasser à 0.0 EN MÊME TEMPS.
 rotation_x_deg = 0.0
-rotation_y_deg = 0.0
+rotation_y_deg = -90.0
 rotation_z_deg = 0.0
 hipfire_tilt_y_deg = 5.0
 fallback_scale = 1.0
