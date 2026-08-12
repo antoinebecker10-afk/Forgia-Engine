@@ -1,6 +1,6 @@
 # story-699 — Un capteur dont le compteur est à zéro ne doit pas dire « ok »
 
-**Statut** : DRAFT
+**Statut** : IN_PROGRESS (2026-08-12 — helper livré + 1 capteur sur 3 converti)
 **Créée** : 2026-08-12
 **Niveau BMAD** : Standard (règle transverse à ~30 capteurs de feature)
 **Origine** : tentative de tri automatique des 89 stories ouvertes. L'heuristique
@@ -80,12 +80,30 @@ futures sans que personne ne regarde.
 
 - [ ] Les ~30 capteurs de feature sont **inventoriés** avec, pour chacun, le
       compteur qui prouve son activité et la condition « censé tourner »
-- [ ] Un helper partagé porte la règle, plutôt qu'une re-implémentation par capteur
-- [ ] `gamefeel`, `weapon_vfx`, `elements` passent en `warn` quand leur compteur
-      reste à 0 en combat — vérifié sur une run réelle
-- [ ] Aucun `warn` au menu ou hors du contexte d'attente (pas de faux positif)
-- [ ] Un test par capteur corrigé couvre les deux sens : inactif-en-contexte →
-      `warn`, inactif-hors-contexte → `info`
+      → **c'est le vrai travail restant**, et il est par capteur : la condition
+      « censé tourner » n'est pas déductible des données pour la plupart d'entre
+      eux (cf `weapon_vfx` ci-dessous).
+- [x] **Un helper partagé porte la règle** — `forgia_core::sensor_activity`
+      (2026-08-12), dans la seule crate dont dépendent les trois concernées.
+      Trois verdicts : `Ok` / **`Blind`** (rien n'était attendu → `info`, ni vert
+      ni rouge) / `Inert` (attendu, grâce dépassée, rien produit → `warn`).
+      5 tests.
+- [~] `gamefeel`, `weapon_vfx`, `elements` passent en `warn` en combat
+      → **1 sur 3 fait : `elements`.** Choisi en premier parce que c'est le défaut
+      le plus grave (story-697, le moteur de réactions est le cœur coop du GDD)
+      **et** parce que son contexte d'attente se déduit de ses propres données :
+      une réaction exige deux éléments distincts, donc `distinct >= 2` suffit,
+      sans paramètre nouveau.
+      **Restent `gamefeel` et `weapon_vfx`** : leur contexte n'est pas déductible.
+      `weapon_vfx` compte des `kill_bursts` mais **ignore combien de kills ont eu
+      lieu** — il lui faut une source extérieure. C'est précisément pourquoi le
+      1er AC ci-dessus est le vrai travail.
+- [ ] Aucun `warn` au menu ou hors du contexte d'attente — **à vérifier sur une
+      run réelle**, pas seulement en test. Le chien de garde a montré le même jour
+      qu'un faux positif ne se voit qu'en jeu.
+- [~] Un test par capteur corrigé couvre les deux sens
+      → fait pour `elements` : deux éléments sans réaction → `warn` ;
+      un seul élément → `info` (aveugle).
 
 ## Cross-refs
 

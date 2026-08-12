@@ -7,18 +7,18 @@
 
 | Statut | Nombre |
 | --- | --- |
-| IN_PROGRESS | 47 |
+| IN_PROGRESS | 48 |
 | REVIEW | 42 |
 | BLOCKED | 5 |
-| DRAFT | 38 |
+| DRAFT | 37 |
 | UNKNOWN | 11 |
 | DONE | 53 |
 | CANCELLED | 12 |
 | **Total** | **208** |
 
-> 🚨 **47 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
+> 🚨 **48 stories `IN_PROGRESS` > limite WIP 3.** *Stop starting, start finishing.*
 
-## IN_PROGRESS (47)
+## IN_PROGRESS (48)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -69,6 +69,7 @@
 | 666 | Fenêtre unique du Forgeron : achat souris + Trempe + dialogue E | [story-666-forge-shop-unified-window.md](./story-666-forge-shop-unified-window.md) |
 | 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
 | 694 | Hub menu : architecture (P3 de l'audit 2026-08-07) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
+| 699 | Un capteur dont le compteur est à zéro ne doit pas dire « ok » | [story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md](./story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md) |
 
 ## REVIEW (42)
 
@@ -127,7 +128,7 @@
 | 623 | Parcours joueur Roguelite : Identité + Progression + Onboarding | [story-623-roguelite-player-journey-identity-progression-onboarding.md](./story-623-roguelite-player-journey-identity-progression-onboarding.md) |
 | 679 | Manette au menu : valider ce qui a été livré sans manette | [story-679-manette-menu-validation.md](./story-679-manette-menu-validation.md) |
 
-## DRAFT (38)
+## DRAFT (37)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -168,7 +169,6 @@
 | 696 | Le hitstop ne se déclenche jamais, et son capteur s'est tu | [story-696-hitstop-muet-et-capteur-fige.md](./story-696-hitstop-muet-et-capteur-fige.md) |
 | 697 | Les éléments s'appliquent, mais ne réagissent JAMAIS | [story-697-reactions-elementaires-jamais-declenchees.md](./story-697-reactions-elementaires-jamais-declenchees.md) |
 | 698 | 51 kills, 0 burst visuel et 2 sons de mort | [story-698-kills-sans-burst-ni-son.md](./story-698-kills-sans-burst-ni-son.md) |
-| 699 | Un capteur dont le compteur est à zéro ne doit pas dire « ok » | [story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md](./story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md) |
 
 ## UNKNOWN (11)
 
