@@ -1,5 +1,23 @@
 # Story-491 — Workspace Re-compile : API bridge voicelines/loot/music/waves
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_health.json`, fichier `character.rs`, symbole `sys_apply_stage_toggles`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > ✅ **RÉSOLU 2026-05-21 plus simplement que prévu** : `cargo check --workspace` était déjà vert (les stubs no-op des fonctions `parse_music_state` / `sys_apply_stage_toggles` / `draw_portal_overlay` / `draw_bark_bubble` / `draw_stage_notification` sont définis IN-CRATE, pas références d'APIs cassées). L'audit avait extrapolé "workspace cassé" depuis les commentaires TODO, conclusion erronée.
 >
 > Seuls **5 warnings clippy `-D warnings`** bloquaient `cargo clippy --workspace` :

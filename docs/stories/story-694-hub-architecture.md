@@ -1,10 +1,27 @@
 # story-694 — Hub menu : architecture (P3 de l'audit 2026-08-07)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (fichier `hub.rs`, symbole `MenuPage`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > Renumérotée 693 → 694 le 2026-08-09 : l'autre terminal avait déjà pris 693
 > (viewmodel pixel-art Pépin). Les commentaires code « story-693 » de l'incrément 1
 > (hub.rs, identity.rs, weapon_select.rs) désignent CETTE story.
-
-**Statut** : IN_PROGRESS
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS
 **Niveau BMAD** : Enterprise (cross-crates, multi-incréments)
 **Origine** : audit 2026-08-07, constats architecture n°1 (frontière inversée : forgia-ui
 dépend de forgia-mode-roguelite), n°2 (god-file lib.rs > 2 800 l., 6 responsabilités),

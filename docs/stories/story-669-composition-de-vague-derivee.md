@@ -1,6 +1,23 @@
 # story-669 — La composition de vague redevient une dérivation
 
-**Statut** : IN_PROGRESS (implémentation livrée, validation runtime en attente)
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_roguelite_state.json`, fichier `graph.rs`, symbole `sys_start_run`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS (implémentation livrée, validation runtime en attente)
 **Niveau BMAD** : Standard (1 nouveau module + 1 genome + 4 fichiers touchés, 1 crate)
 **Date** : 2026-07-31
 **Related** : [rapport des boucles](../design/boucles-roguelite-etat-et-benchmarks-2026-07-31.md), story-668 (Vague 0), story-646 (multi-salles + choix de porte), story-470 (StageGraph)

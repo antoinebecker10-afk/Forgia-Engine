@@ -1,8 +1,26 @@
 # Story-646 — R2 : consommer le stage-graph (multi-salles clear-to-progress)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (fichier `graph.rs`, symbole `sys_stage_dispatch`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > **Source** : rapport `rapport-gunfire-like-identite-2026-07-02.md` §R2 + masterplan P2-1/P2-2.
 > **Scale BMAD** : Enterprise (forgia-stage + forgia-mode-roguelite, machine d'états run).
-> **Statut** : IN_PROGRESS — Inc.1 en cours.
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS — Inc.1 en cours.
 
 ## Constat (cartographie)
 `sys_stage_dispatch` (run.rs:130) charge déjà l'arène selon `InRun{stage}/Boss{stage}` et

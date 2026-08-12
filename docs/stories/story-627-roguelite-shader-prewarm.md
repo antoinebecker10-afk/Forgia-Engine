@@ -1,6 +1,24 @@
 # Story-627 — Roguelite : pré-chauffe shaders (réduction des freezes first-use)
 
-> **Statut** : CODE-COMPLETE (2026-06-24) — validation runtime à faire
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_load_timing.json`, fichier `weapon_preview.rs`, symbole `Hidden`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : CODE-COMPLETE (2026-06-24) — validation runtime à faire
 > **Niveau BMAD** : Standard (`weapon_select.rs`)
 > **Origine** : freezes signalés « combat et en me déplaçant ». Diagnostic via
 > `forgia2_load_timing.json` : 45-140 ms, `cause=gpu_or_shader_compile`, `entity_delta:0`

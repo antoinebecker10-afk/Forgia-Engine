@@ -1,5 +1,20 @@
 # Story-495 — Process gate anti-fictive-DONE
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : aucune trace.** Ni fichier, ni capteur, ni symbole
+> parmi ceux qu'elle cite n'existe dans le dépôt. Le travail n'a pas été fait.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 **Status:** DRAFT
 **Scale:** BMAD Standard (~5-6 fichiers : 1 script gate + 1 rule + 1 hook + .bmad config + checklist update)
 **Created:** 2026-05-21

@@ -20,7 +20,7 @@
 >
 > **Vrai statut : DRAFT**. Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 22/22 tests verts, 0 clippy `-D warnings`, scaffold 16 LOC → ~620 LOC peuplé. Selection logic deterministe testable. Tier 2 (wiring audio playback `bevy_kira_audio::play`) = story suivante.
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 22/22 tests verts, 0 clippy `-D warnings`, scaffold 16 LOC → ~620 LOC peuplé. Selection logic deterministe testable. Tier 2 (wiring audio playback `bevy_kira_audio::play`) = story suivante.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit maturité crates 2026-05-19 — **P0 vrai ship-blocker** : sans ça "armes parlantes" = mensonge marketing

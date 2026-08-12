@@ -1,11 +1,29 @@
 # Story-642 — P0-4 : affinité élément ↔ couche de défense (matchup → DefenseLayer)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (fichier `elements.rs`, symbole `ElementAffinity`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > **Source** : masterplan `docs/audit/forgia-gunfire-masterplan-2026-07-01.md` §5, item **P0-4**.
 > Suite de [story-640](story-640-p0-2-defense-layer-shield-armor.md) (P0-2) et
 > [story-641](story-641-p0-3-reactions-engine-shock-element.md) (P0-3).
 > **Scale BMAD** : Enterprise (rewire du chemin combat committé, cross-crate
 > `forgia-damage` + `forgia-mode-roguelite` + `forgia-fps`).
-> **Statut** : IN_PROGRESS — **Inc.1 FAIT** (non commité) : `ElementAffinity` +
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS — **Inc.1 FAIT** (non commité) : `ElementAffinity` +
 > `absorb_elemental` (forgia-damage, pur) + genome `[affinity.*]` + le bonus de matchup
 > route via `DefenseLayer` (affinité par couche) + sensor `bonus_absorbed`. **259 tests
 > verts** (forgia-damage 24 + forgia-mode-roguelite 235), clippy 0-warn sur fichiers

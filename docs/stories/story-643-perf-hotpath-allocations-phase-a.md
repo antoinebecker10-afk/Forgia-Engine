@@ -1,6 +1,23 @@
 # Story-643 — Perf pass : allocations hot-path (Phase A) + backlog Phase B runtime-gated
 
-**Statut** : 🚧 IN_PROGRESS (Phase A livrée & compilée ; Phase B différée jusqu'au push du terminal 2)
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (fichier `decor.rs`, symbole `BotTracerAssets`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+> **État d'origine (périmé, cf bandeau)** : 🚧 IN_PROGRESS (Phase A livrée & compilée ; Phase B différée jusqu'au push du terminal 2)
 **Créée** : 2026-07-01
 **Source** : audit perf `docs/audit/audit-2026-07-01-perfs-jeu-vs-industrie.md`
 **BMAD** : Standard (cross-crate à terme) — Phase A livrée = 1 crate / 2 fichiers (Quick)

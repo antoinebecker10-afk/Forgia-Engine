@@ -21,7 +21,7 @@
 > **Vrai statut : BLOCKED** (par re-impl story-472 / story-491). Voir
 > `feedback_fictive_done_status_2026_05_21.md` + audit story-gate §détail.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 3 fichiers + Cargo deps, 2/2 tests `weapon_to_speaker`, clippy `-D warnings` vert sur forgia-mode-roguelite + forgia-audio-voicelines + forgia-game
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 3 fichiers + Cargo deps, 2/2 tests `weapon_to_speaker`, clippy `-D warnings` vert sur forgia-mode-roguelite + forgia-audio-voicelines + forgia-game
 > **Scale BMAD** : Standard (3 fichiers)
 > **Date** : 2026-05-20
 > **Origine** : Story-472 Tier 1 livré mais Plugin jamais plugé + 0 producteur `BarkEvent` → sensor `forgia_voicelines.json` n'apparaît pas, logique non testable runtime

@@ -19,7 +19,7 @@
 >
 > **Vrai statut : DRAFT**. Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 12 tests / 0 clippy. ~290 LOC.
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 12 tests / 0 clippy. ~290 LOC.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit P0 #4. Dépend conceptuellement de loot-tables mais code-wise indépendant.

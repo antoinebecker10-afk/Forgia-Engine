@@ -20,7 +20,7 @@
 >
 > **Vrai statut : DRAFT**. Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 30/30 tests voicelines + 5/5 tests speaker mapping verts, clippy `-D warnings` vert sur les 3 crates
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 30/30 tests voicelines + 5/5 tests speaker mapping verts, clippy `-D warnings` vert sur les 3 crates
 > **Scale BMAD** : Standard (3 fichiers)
 > **Date** : 2026-05-20
 > **Origine** : Story-481 wire-up live (12 barks runtime). Tier 2 audio bloqué (0 WAV, 0 audio_path TOML). Pivot recommandé : retour utilisateur visuel via egui bubble.

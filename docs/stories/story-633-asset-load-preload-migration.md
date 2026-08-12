@@ -1,6 +1,21 @@
 # Story-633 — Dette : migrer les asset loads ad-hoc vers GameAssets (Lock L1)
 
-> **Statut** : 🟡 BACKLOG (dette identifiée 2026-06-25, créée au moment du rebaseline asset-load).
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : trace partielle** (fichier `boss_portal.rs`) — une partie de ce
+> qu'elle décrit existe, le reste n'a pas été retrouvé.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : 🟡 BACKLOG (dette identifiée 2026-06-25, créée au moment du rebaseline asset-load).
 > **Niveau BMAD** : Standard (5+ fichiers). **Origine** : pre-push asset-load gate.
 
 ## Contexte

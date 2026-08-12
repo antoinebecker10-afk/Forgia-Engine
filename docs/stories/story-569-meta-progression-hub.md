@@ -1,5 +1,20 @@
 # Story-569 — Méta-progression hub (la boucle de retour)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : trace partielle** (fichier `hub.rs`) — une partie de ce
+> qu'elle décrit existe, le reste n'a pas été retrouvé.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > **Status** : DRAFT (2026-05-29)
 > **Scale** : Standard→Enterprise (~6-9 fichiers — nouvel état hub + persistance)
 > **Owner** : Claude Opus 4.8 (1M)

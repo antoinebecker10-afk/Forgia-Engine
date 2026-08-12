@@ -19,7 +19,7 @@
 >
 > **Vrai statut : DRAFT**. Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 17 tests / 0 clippy. ~390 LOC. Tier 2 (kira wiring) = story suivante.
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 17 tests / 0 clippy. ~390 LOC. Tier 2 (kira wiring) = story suivante.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit P0 #2 (paire avec music-state story-477). Sidechain music quand voiceline active.

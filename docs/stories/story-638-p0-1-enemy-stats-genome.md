@@ -1,12 +1,30 @@
 # Story-638 — P0-1 : stats ennemis data-driven (genome + sensor)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_enemies.json`, fichier `elements.rs`, symbole `EnemyStatsConfig`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > **Source** : plan de production `docs/audit/forgia-gunfire-masterplan-2026-07-01.md` §5,
 > Phase P0, item **P0-1**. Direction : `docs/design/direction-forgia-gunfire.md`.
 > **Pourquoi** : les stats ennemis sont hardcodées (`enemies.rs::stats_for`/`bot_shoot_for`) —
 > le commentaire L13 note déjà « Hot-reload TOML : reporté M2 step 3 ». C'est le **prérequis
 > du scaling de difficulté** (P0-2 défense tri-couche + paliers) et ça respecte `no-hardcode`.
 > **Scale BMAD** : Standard (≥2 crates : `forgia-mode-roguelite` + genome). **Date** : 2026-07-01.
-> **Statut** : IN_PROGRESS.
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS.
 
 ## Objectif
 Extraire les stats des 4 archétypes (Tank/Runner/Sniper/Boss) vers un genome

@@ -1,5 +1,23 @@
 # Story-592 — M0 « Filet » post-audit (P0 + crash + stutter + CI)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_lag_events.json`, fichier `lib.rs`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > **Source** : [audit complet 2026-06-10](../audit/audit-2026-06-10-full-codebase.md) +
 > [roadmap post-audit](../ROADMAP_POST_AUDIT_2026-06-10.md) jalon M0.
 > **Scale BMAD** : Standard (6 fichiers, 4 crates orthogonales au WIP de l'autre terminal).

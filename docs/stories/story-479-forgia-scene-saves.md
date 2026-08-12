@@ -19,7 +19,7 @@
 >
 > **Vrai statut : DRAFT**. Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 17 tests / 0 clippy. ~620 LOC. Re-purpose scaffold → saves RON versionné réussi.
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 17 tests / 0 clippy. ~620 LOC. Re-purpose scaffold → saves RON versionné réussi.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit P0 #7. Re-purpose scaffold `forgia-scene` (16 LOC) → saves système.

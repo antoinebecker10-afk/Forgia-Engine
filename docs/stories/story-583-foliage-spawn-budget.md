@@ -1,8 +1,22 @@
 # Story-583 — Budget par frame du spawn de foliage (anti-stutter chargement)
 
-> (Renuméroté 582→583 : 582 pris par story-582-weapon-elements de l'autre terminal.)
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : trace partielle** (fichier `lib.rs`) — une partie de ce
+> qu'elle décrit existe, le reste n'a pas été retrouvé.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
 
-**Statut** : EN COURS. **Scale** : Quick (forgia-foliage/src/lib.rs, 1 fichier).
+> (Renuméroté 582→583 : 582 pris par story-582-weapon-elements de l'autre terminal.)
+> **État d'origine (périmé, cf bandeau)** : EN COURS. **Scale** : Quick (forgia-foliage/src/lib.rs, 1 fichier).
 **Date** : 2026-06-07
 **Lignée** : Phase B reciblée du chantier loading. Le monitor story-581 a prouvé que le stutter (cluster 55-103ms) n'est PAS la génération de chunks (`gen_ms p99=1.0ms`) mais le **spawn de foliage non budgété**.
 

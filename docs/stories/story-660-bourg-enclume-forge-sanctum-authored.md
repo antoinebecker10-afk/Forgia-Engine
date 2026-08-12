@@ -1,10 +1,25 @@
 # Story-660 — « Le Bourg de l'Enclume » : DA authored pour forge_sanctum (salle 2)
 
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : aucune trace.** Ni fichier, ni capteur, ni symbole
+> parmi ceux qu'elle cite n'existe dans le dépôt. Le travail n'a pas été fait.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
 > **Demande user 2026-07-02** : « une vraie pièce avec sa propre direction artistique,
 > différente de la première, avec d'autres packs d'assets ». Cible = `forge_sanctum`
 > (la salle 2 du multi-salles story-646), jusque-là 100 % procédurale et fade.
 > **Scale BMAD** : Standard (data-only : arena_layouts.toml ; 0 code Rust).
-> **Statut** : LIVRÉ (non commité→commit suivant) — à valider runtime.
+> **État d'origine (périmé, cf bandeau)** : LIVRÉ (non commité→commit suivant) — à valider runtime.
 
 ## Direction artistique
 **Place de village-forge DIURNE** — kit **medieval_hexagon** (église/taverne/marché/

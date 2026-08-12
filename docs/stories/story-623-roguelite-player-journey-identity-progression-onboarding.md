@@ -1,6 +1,23 @@
 # Story-623 — Parcours joueur Roguelite : Identité + Progression + Onboarding
 
-**Statut** : EN COURS — **Phase E (identité MVP) livrée** 2026-06-25 (`identity.rs` isolé : nom par défaut + édition non-bloquante par presets/texte + couleurs cosmétiques, save `identity_save.toml`, presets `roguelite_identity.toml`, sensor `forgia2_identity.json`, 5 tests verts). **Reste MVP : Phase G (juice Âmes)**. (Design original révisé 2026-06-25 après critique adversariale.)
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_ftue.json`, fichier `ftue.rs`, symbole `ElementUnlocks`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+> **État d'origine (périmé, cf bandeau)** : EN COURS — **Phase E (identité MVP) livrée** 2026-06-25 (`identity.rs` isolé : nom par défaut + édition non-bloquante par presets/texte + couleurs cosmétiques, save `identity_save.toml`, presets `roguelite_identity.toml`, sensor `forgia2_identity.json`, 5 tests verts). **Reste MVP : Phase G (juice Âmes)**. (Design original révisé 2026-06-25 après critique adversariale.)
 **Niveau BMAD** : Enterprise (≥2 crates touchées, 6 phases livrables séparément). **MVP** = Standard (E-min + G-min, ~2 modules + 2 fichiers existants).
 **Vision** : SHIP Roguelite (priorité 1). Un nouveau joueur — profil casual/kid style Roblox — doit pouvoir se sentir **propriétaire** de son personnage (nom + couleur simple), choisir son arme, **collecter ses Âmes avec plaisir** et (plus tard) **voir son niveau monter**, le tout cousu dans un onboarding qui ne perd personne.
 

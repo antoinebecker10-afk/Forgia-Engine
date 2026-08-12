@@ -1,6 +1,24 @@
 # Story-636 — Animation squelettique + rig de contrôle sur les ennemis Roguelite
 
-> **Statut** : 🟡 IN_PROGRESS (créée 2026-06-29).
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_enemy_anim.json`, fichier `enemy_anim.rs`, symbole `SceneRoot`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : 🟡 IN_PROGRESS (créée 2026-06-29).
 > **Niveau BMAD** : Standard/Enterprise (6 fichiers). **Crate** : `forgia-mode-roguelite`.
 
 ## Contexte

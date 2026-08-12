@@ -1,6 +1,24 @@
 # Story — Menu-titre devient le hub roguelite complet
 
-> **Statut** : DRAFT / plan (2026-07-21). Décision user validée : « le menu-titre devient le hub complet ».
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (fichier `hub.rs`, symbole `MetaSouls`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : DRAFT / plan (2026-07-21). Décision user validée : « le menu-titre devient le hub complet ».
 > **Scale BMAD** : Enterprise (2 crates, machine à états, 3D→image, flux de lancement).
 > **Parent DA** : reskin « Verre & Braise » livré (commits a5d8e48→9a728de). Voir memory `reference_ui_da_verre_braise_reskin`.
 

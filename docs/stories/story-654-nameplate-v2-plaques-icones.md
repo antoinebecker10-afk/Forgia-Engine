@@ -1,6 +1,21 @@
 # Story-654 — Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut
 
-> **Statut** : IN_PROGRESS (validation visuelle user en attente)
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : trace partielle** (fichier `status.rs`) — une partie de ce
+> qu'elle décrit existe, le reste n'a pas été retrouvé.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS (validation visuelle user en attente)
 > **Niveau BMAD** : Standard (5 fichiers)
 > **Origine** : feedback user 2026-07-03 — « on ne doit voir que la vie [sur la barre], le reste ça doit ressembler à des plaques de bouclier comme dans d'autres jeux, et les dots doivent se voir comme une icône poison/feu/électrique à côté de la barre HP ». + « VFX trop opaques ».
 

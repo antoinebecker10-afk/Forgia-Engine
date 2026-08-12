@@ -1,6 +1,24 @@
 # Story-599 — Réglages graphiques Tier 1 (VSync / MSAA / Tonemapping) dans le menu ESC
 
-> **Statut** : RÉ-IMPLANTATION PROGRESSIVE 2026-06-16 sur base stable (post story-600 qui a corrigé
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia_pause_menu.json`, fichier `character.rs`, symbole `Camera3d`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : RÉ-IMPLANTATION PROGRESSIVE 2026-06-16 sur base stable (post story-600 qui a corrigé
 > la vraie cause des écrans cassés = stage orphelin, PAS les réglages). Ordre incrémental validé un
 > par un : **inc.1 Tonemapping ✅** → **inc.2 MSAA ✅** → **inc.3 VSync ✅** — TOUS validés runtime
 > (sensor objectif : `fps_camera_msaa_actual:[8]`=réglage, `present_mode_actual:AutoVsync`=réglage,

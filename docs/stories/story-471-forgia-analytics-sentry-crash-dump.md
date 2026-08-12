@@ -23,7 +23,7 @@
 > **Vrai statut : DRAFT** (planification valide, implémentation non réalisée).
 > Voir `feedback_fictive_done_status_2026_05_21.md` + `docs/audit/audit-rpg-roguelite-2026-05-21.md` §9 R10.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — crate peuplé, 12/12 tests verts, 0 clippy warning, binary compile.
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — crate peuplé, 12/12 tests verts, 0 clippy warning, binary compile.
 > **Reste** : wiring `app.add_plugins(ForgiaAnalyticsPlugin)` dans `forgia-game` (Quick BMAD séparée, hors scope cette story).
 > **Scale BMAD** : Standard (~5 fichiers : Cargo + lib + genome + story + checklist)
 > **Date** : 2026-05-19

@@ -1,6 +1,23 @@
 # Story-588 — VFX colorés des éléments (rendre le système d'éléments visible)
 
-**Statut** : EN COURS
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_element_vfx.json`, fichier `element_vfx.rs`, symbole `ElementVfxAssets`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+> **État d'origine (périmé, cf bandeau)** : EN COURS
 **Niveau BMAD** : Standard
 **Date** : 2026-06-09
 **Cible** : SHIP Roguelite — "A5-bis" de [[project-roguelite-element-progression-design]]. Le design dit explicitement : **VFX de Phase A AVANT** de câbler la progression (Phase B). Aujourd'hui les éléments (feu/poison/explosif/perforant) tournent (story-582) mais sont **invisibles** → un système qu'on ne voit pas n'existe pas (`observability-required`).

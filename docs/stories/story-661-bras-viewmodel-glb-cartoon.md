@@ -1,6 +1,23 @@
 # Story 661 — Bras viewmodel GLB cartoon (remplace les poings procéduraux)
 
-**Statut** : IN_PROGRESS
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_viewmodel_arms.json`, fichier `arms.rs`, symbole `ArmCosmetics`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+> **État d'origine (périmé, cf bandeau)** : IN_PROGRESS
 **Niveau BMAD** : Standard
 **Créée** : 2026-07-19
 **Audit source** : [audit-2026-07-19-bras-viewmodel-blender-cartoon.md](../audit/audit-2026-07-19-bras-viewmodel-blender-cartoon.md)

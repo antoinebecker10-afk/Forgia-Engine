@@ -1,6 +1,24 @@
 # Story-634 — Keystone : simulation déterministe (FixedUpdate + RunRng)
 
-> **Statut** : 🔵 IN_PROGRESS — 0.1a-1 fait ; 0.1a-2 slice 2 + **slices 3 & 4 faits** (mouvement+PHYSIQUE
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (capteur `forgia2_roguelite_state.json`, fichier `dash.rs`, symbole `ActionState`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+
+> **État d'origine (périmé, cf bandeau)** : 🔵 IN_PROGRESS — 0.1a-1 fait ; 0.1a-2 slice 2 + **slices 3 & 4 faits** (mouvement+PHYSIQUE
 > + tir+ammo en FixedUpdate, Rapier migré, feel validé) ; **0.1b-1 fait** (RNG combat hors horloge + fix
 > boons). Reste : slice 5 (damage+waves) en FixedUpdate, 0.1b-2 ordre d'itération, harness `run()==run()`.
 >

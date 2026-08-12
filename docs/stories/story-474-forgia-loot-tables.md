@@ -13,7 +13,7 @@
 > **Statut** : CANCELLED
 
 
-> **Statut d'origine (périmé, cf bandeau)** : ⏸️ SKIP / coordination requise — l'autre terminal a livré 130 LOC (Souls + Pickup walk-over M2 step 3) avec note "Drop pools rarity reportés step 4+". Mon design weighted-rarity + pity timer reste valide mais doit être mergé en additif après leur step 4. Re-traiter quand leur terminal libère la crate.
+> **État d'origine (périmé, cf bandeau)** : ⏸️ SKIP / coordination requise — l'autre terminal a livré 130 LOC (Souls + Pickup walk-over M2 step 3) avec note "Drop pools rarity reportés step 4+". Mon design weighted-rarity + pity timer reste valide mais doit être mergé en additif après leur step 4. Re-traiter quand leur terminal libère la crate.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit maturité crates 2026-05-19 — P0 #3 (bloque M2 gameplay loop)

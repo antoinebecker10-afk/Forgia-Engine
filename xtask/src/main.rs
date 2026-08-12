@@ -2097,11 +2097,43 @@ fn line_words(line: &str) -> Vec<String> {
 /// Classe le statut depuis l'en-tête : on cherche d'abord une LIGNE de statut
 /// explicite (contient « statut »/« status ») puis on la classe du signal le plus
 /// fort au plus faible. Aucune ligne de statut → UNKNOWN (le board les remonte).
+/// Une ligne DÉCLARE-t-elle un statut, ou mentionne-t-elle juste le mot ?
+///
+/// **Corrige un défaut constaté le 2026-08-12** : l'ancien test se contentait de
+/// `contains("statut") || contains("status")`, et prenait donc la PREMIÈRE ligne
+/// contenant le mot — souvent le titre. Trois stories étaient inclassables par
+/// construction :
+///
+/// - `# Story-476 — \`forgia-status-effects\`` — le nom de la crate
+/// - `# Story-654 — … icônes de statut` — le sujet de la story
+/// - une ligne de corps citant le symbole `StatusShock` ou le fichier `status.rs`
+///
+/// Elles tombaient en `UNKNOWN` **quel que soit leur vrai statut**, y compris après
+/// avoir été explicitement marquées. Un index qui ment sur 3 stories est un index
+/// dont on doute sur les 208.
+///
+/// Règle : le mot doit être suivi d'un **deux-points**, à travers l'habillage
+/// markdown (`**`, backticks, espaces). C'est ce qui distingue une déclaration
+/// (`**Statut** : DONE`) d'une mention (`icônes de statut`).
+fn is_status_declaration(line: &str) -> bool {
+    let lc = line.to_lowercase();
+    for key in ["statut", "status"] {
+        let mut from = 0usize;
+        while let Some(rel) = lc[from..].find(key) {
+            let after = from + rel + key.len();
+            // Saute l'habillage entre le mot et le deux-points.
+            let rest = lc[after..].trim_start_matches(['*', '`', '_', ' ', ')', ']']);
+            if rest.starts_with(':') || rest.starts_with('\u{ff1a}') {
+                return true;
+            }
+            from = after;
+        }
+    }
+    false
+}
+
 fn classify_status(head: &str) -> StoryStatus {
-    let Some(line) = head.lines().take(40).find(|l| {
-        let lc = l.to_lowercase();
-        lc.contains("statut") || lc.contains("status")
-    }) else {
+    let Some(line) = head.lines().take(40).find(|l| is_status_declaration(l)) else {
         return StoryStatus::Unknown;
     };
     let lc = line.to_lowercase();
@@ -2561,6 +2593,33 @@ mod tests {
         );
         assert_eq!(classify_status("Status: READY"), StoryStatus::Ready);
         assert_eq!(classify_status("Statut : DRAFT"), StoryStatus::Draft);
+    }
+
+    /// Les trois stories inclassables du 2026-08-12 : le mot « statut » apparaît
+    /// AVANT la vraie déclaration, dans un titre, un nom de crate ou un symbole.
+    #[test]
+    fn une_mention_du_mot_statut_nest_pas_une_declaration() {
+        assert!(!is_status_declaration(
+            "# Story-476 — `forgia-status-effects` (P0 V7)"
+        ));
+        assert!(!is_status_declaration(
+            "# Story-654 — Nameplate v2 : icônes de statut"
+        ));
+        assert!(!is_status_declaration("> … symbole `StatusShock`."));
+        assert!(!is_status_declaration("(fichier `status.rs`)"));
+
+        assert!(is_status_declaration("> **Statut** : CANCELLED"));
+        assert!(is_status_declaration("Statut : EN COURS"));
+        assert!(is_status_declaration("Status: DONE"));
+        assert!(is_status_declaration("**Status**: Review"));
+    }
+
+    /// Le cas complet : un titre piégeur suivi d'une vraie déclaration. Avant le
+    /// correctif, cette story ressortait UNKNOWN quel que soit son statut.
+    #[test]
+    fn un_titre_piegeur_ne_masque_plus_le_vrai_statut() {
+        let head = "# Story-476 — `forgia-status-effects` (P0 V7)\n\n> **Statut** : CANCELLED";
+        assert_eq!(classify_status(head), StoryStatus::Cancelled);
     }
 
     #[test]

@@ -23,7 +23,7 @@
 > À commit + lock sa visibilité (cf story-491 coordination autre terminal).
 > Voir `feedback_fictive_done_status_2026_05_21.md`.
 
-> **Statut d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 24/24 tests verts, 0 clippy `-D warnings` premier coup. Crate NEW créée + workspace mis à jour. ~530 LOC.
+> **État d'origine (périmé, cf bandeau)** : ✅ DONE 2026-05-20 — 24/24 tests verts, 0 clippy `-D warnings` premier coup. Crate NEW créée + workspace mis à jour. ~530 LOC.
 > **Scale BMAD** : Standard
 > **Date** : 2026-05-20
 > **Origine** : Audit maturité crates 2026-05-19 — **P0 vrai ship-blocker** : sans graph, pas de structure de run roguelite.

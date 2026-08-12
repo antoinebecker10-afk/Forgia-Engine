@@ -1,6 +1,23 @@
 # Story-624 — Hub d'accueil Roguelite à onglets (P2)
 
-**Statut** : 🚧 IN_PROGRESS (code livré, compile + clippy + tests verts — ⏳ validation runtime user)
+> ⛔ **CANCELLED 2026-08-12 — purge de refonte**
+>
+> Cette story est close par la refonte décrite dans [`REFONTE_GDD.md`](../REFONTE_GDD.md),
+> qui redéfinit le jeu vers *Forgia: The Spared*. Sa §7 pose la règle : **les stories
+> des phases se créent au fur et à mesure, aucune n'est présumée exister.** Les 143
+> stories ouvertes partaient d'un plan que la refonte remplace.
+>
+> **Ce qu'on sait de son code : il EXISTE et tourne toujours.** Les fichiers, capteurs
+> ou symboles qu'elle cite ont été retrouvés dans le dépôt (fichier `hub.rs`, symbole `HubPlugin`).
+> Elle n'est pas marquée DONE pour autant : **personne ne l'a jamais validée**, et
+> se l'accorder maintenant serait la DONE fictive que la purge du batch V7 a
+> nettoyée le matin même. Le code reste, la promesse de validation tombe.
+>
+> **Rien n'est supprimé.** Ce fichier reste lisible : si son sujet revient dans une
+> phase de la refonte, il sert de matière première — pas de ticket à rouvrir.
+>
+> **Statut** : CANCELLED
+> **État d'origine (périmé, cf bandeau)** : 🚧 IN_PROGRESS (code livré, compile + clippy + tests verts — ⏳ validation runtime user)
 **Niveau BMAD** : Standard (5 fichiers)
 **Design** : `docs/design/roguelite-home-hub-proposal-2026-06-26.md` §4.3, §6 (P2)
 **Dépend de** : story menu P1 (commit 5eb95c8, fix curseur Lobby) — sans curseur libre, hub non cliquable.
