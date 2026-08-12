@@ -169,6 +169,32 @@ braise rougeoie quand elles prennent la parole.
   silhouettes semées par la génération. Ce sont des variantes, jamais de la puissance brute.
   Un Épargné recueilli ne « drope » pas : il **se sauve**, et rejoint le Hall.
 
+### Et plus tard — l'Arène 5v5
+
+> ⚠️ **Décidé, pas commencé.** Zéro ligne de code en v1. Ce qui suit est une direction
+> assumée, pas une promesse de contenu.
+
+Un **MOBA en vue FPS** — trois lignes, jungle, sbires, tours, boutique en cours de partie
+— débloqué à un niveau joueur donné, et bâti sur le contenu déjà payé par les deux modes
+principaux : mêmes armes, mêmes éléments, mêmes ultimes, même économie.
+
+**Son principe fondateur : dix *slots*, pas dix humains.** Tout slot vide est tenu par un
+compagnon, via exactement l'interface décrite plus haut. Un humain contre neuf bots, trois
+contre trois plus quatre bots, ou dix joueurs : toutes les combinaisons sont jouables. Sans
+ça, un mode 5v5 meurt en file d'attente avant même d'être jugé sur son design.
+
+Trois adaptations non triviales du modèle MOBA à la vue FPS :
+
+- **Le last-hit** est impossible au réticule. L'or **jaillit** du sbire mourant, à récupérer
+  — ou à refuser à l'adversaire — en tirant dessus dans une fenêtre courte.
+- **Le brouillard de guerre** est redondant quand on ne voit déjà que devant soi. Ce qui
+  survit : une minimap limitée à la vision de l'équipe, et des balises déployables.
+- **Les lignes gagnent la verticalité** que le genre vu de dessus ne peut pas exploiter.
+
+Et l'atout qui n'appartient qu'à nous : **les réactions élémentaires deviennent une méta de
+draft**. « L'un applique, l'autre détone » à deux, c'est de l'entraide ; à cinq, c'est une
+composition d'équipe. Aucun MOBA-FPS n'a cet axe — et il est déjà à moitié construit.
+
 **Le GDD complet** : [`docs/design/gdd-forgia-the-spared.md`](docs/design/gdd-forgia-the-spared.md)
 
 ---
