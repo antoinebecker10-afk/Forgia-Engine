@@ -70,6 +70,20 @@ const STALLED_THRESHOLD_SECS: u64 = 60;
 /// **promis une cadence**. À 1, on ne sait pas s'il est périodique ou `once`.
 const LIVE_AFTER_UPDATES: u32 = 2;
 
+/// Multiplicateur appliqué au plus long intervalle DÉJÀ observé pour décider
+/// qu'un capteur s'est tu.
+///
+/// **Corrige un faux positif constaté en jeu le 2026-08-12**, une heure après la
+/// livraison de la première version : le seuil fixe de 60 s signalait
+/// `forgia2_load_timing.json`, un capteur **événementiel** qui n'écrit qu'au
+/// moment d'un freeze. Deux freezes espacés de ~50 s le faisaient passer pour
+/// périodique, puis son silence parfaitement normal le faisait passer pour arrêté.
+///
+/// En jugeant chaque capteur à **sa propre cadence observée**, un événementiel
+/// erratique se donne lui-même une tolérance large, tandis qu'un capteur 1 Hz
+/// reste détecté en une minute de silence. Toujours aucune liste à tenir.
+const STALLED_GAP_FACTOR: u64 = 5;
+
 /// Ce qu'on sait d'un fichier capteur observé pendant la session.
 #[derive(Debug, Clone)]
 pub struct Observed {
@@ -78,13 +92,22 @@ pub struct Observed {
     pub updates: u32,
     /// Quand ce changement a été constaté (horloge murale).
     pub last_change: SystemTime,
+    /// Plus long silence DÉJÀ observé entre deux écritures, en secondes.
+    /// C'est la cadence que le capteur s'est lui-même donnée.
+    pub longest_gap_secs: u64,
 }
 
 impl Observed {
     /// Un capteur « vivant » a montré une cadence : il est légitime d'attendre
-    /// qu'il continue. Les `once` et les événementiels n'entrent jamais ici.
+    /// qu'il continue. Les `once` n'entrent jamais ici.
     pub fn is_live(&self) -> bool {
         self.updates >= LIVE_AFTER_UPDATES
+    }
+
+    /// Seuil de silence propre à CE capteur : jamais moins que le plancher, et
+    /// sinon un multiple de son plus long intervalle déjà vu.
+    pub fn stalled_threshold(&self, floor_secs: u64) -> u64 {
+        floor_secs.max(self.longest_gap_secs.saturating_mul(STALLED_GAP_FACTOR))
     }
 }
 
@@ -116,12 +139,21 @@ pub fn observe(
                     last_mtime: mtime,
                     updates: 1,
                     last_change: now,
+                    longest_gap_secs: 0,
                 },
             );
             false
         }
         Some(obs) => {
             if obs.last_mtime != mtime {
+                // Le silence qui vient de s'achever devient la cadence de
+                // référence s'il est le plus long vu jusqu'ici. C'est ainsi qu'un
+                // capteur événementiel se donne lui-même sa tolérance.
+                let gap = now
+                    .duration_since(obs.last_change)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                obs.longest_gap_secs = obs.longest_gap_secs.max(gap);
                 obs.last_mtime = mtime;
                 obs.updates = obs.updates.saturating_add(1);
                 obs.last_change = now;
@@ -130,8 +162,9 @@ pub fn observe(
             if !obs.is_live() {
                 return false;
             }
+            let threshold = obs.stalled_threshold(threshold_secs);
             now.duration_since(obs.last_change)
-                .map(|d| d.as_secs() > threshold_secs)
+                .map(|d| d.as_secs() > threshold)
                 .unwrap_or(false)
         }
     }
@@ -385,6 +418,54 @@ mod tests {
         // Nouveau mtime : le capteur est reparti.
         assert!(!observe(&mut seen, "forgia2_x.json", t(202), t(202), 60));
         assert!(!observe(&mut seen, "forgia2_x.json", t(202), t(230), 60));
+    }
+
+    /// LE faux positif du 2026-08-12, constaté en jeu une heure après la v1 :
+    /// `forgia2_load_timing.json` n'écrit qu'au moment d'un freeze. Deux freezes
+    /// espacés de 50 s le faisaient passer pour périodique, puis son silence
+    /// normal le faisait passer pour arrêté.
+    #[test]
+    fn un_capteur_evenementiel_espace_nest_pas_pris_pour_un_capteur_mort() {
+        let mut seen = HashMap::new();
+        // Deux écritures espacées de 50 s : c'est SA cadence, pas une anomalie.
+        observe(&mut seen, "forgia2_load_timing.json", t(0), t(0), 60);
+        observe(&mut seen, "forgia2_load_timing.json", t(50), t(50), 60);
+        assert_eq!(seen["forgia2_load_timing.json"].longest_gap_secs, 50);
+        // Son seuil propre : 50 × 5 = 250 s, pas le plancher de 60.
+        assert_eq!(seen["forgia2_load_timing.json"].stalled_threshold(60), 250);
+
+        // 100 s de silence : la v1 criait ici. Plus maintenant.
+        assert!(!observe(
+            &mut seen,
+            "forgia2_load_timing.json",
+            t(50),
+            t(150),
+            60
+        ));
+        // 300 s : là, même pour un événementiel, quelque chose ne va pas.
+        assert!(observe(
+            &mut seen,
+            "forgia2_load_timing.json",
+            t(50),
+            t(351),
+            60
+        ));
+    }
+
+    /// Le plancher protège l'autre bout : un capteur 1 Hz ne doit pas hériter
+    /// d'une tolérance ridicule sous prétexte que ses intervalles sont courts.
+    #[test]
+    fn un_capteur_rapide_garde_le_plancher_comme_seuil() {
+        let mut seen = HashMap::new();
+        observe(&mut seen, "forgia2_perf.json", t(0), t(0), 60);
+        observe(&mut seen, "forgia2_perf.json", t(1), t(1), 60);
+        // gap observé = 1 s → 5 s, mais le plancher de 60 s l'emporte.
+        assert_eq!(seen["forgia2_perf.json"].stalled_threshold(60), 60);
+        assert!(!observe(&mut seen, "forgia2_perf.json", t(1), t(30), 60));
+        // Le silence se compte depuis la DERNIÈRE écriture (t=1), pas depuis 0 :
+        // à t=61 il vaut exactement 60 s, et le seuil est strict (`> 60`).
+        assert!(!observe(&mut seen, "forgia2_perf.json", t(1), t(61), 60));
+        assert!(observe(&mut seen, "forgia2_perf.json", t(1), t(62), 60));
     }
 
     #[test]
