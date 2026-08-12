@@ -1,6 +1,7 @@
 # story-700 — E1 inc.1 : le navmesh existe, compile et répond
 
-**Statut** : REVIEW (2026-08-12 — livré, compilé, 11 tests verts, clippy 0 ; reste la validation en jeu)
+**Statut** : IN_PROGRESS — ✅ **incréments 1 à 3 VALIDÉS EN JEU le 2026-08-13 00:03.**
+Reste l'incrément 4 (le compagnon, sous-découpé 4a-4d ; **4a livré**).
 **Créée** : 2026-08-12
 **Niveau BMAD** : Standard (crate neuve + génome + câblage workspace)
 **Origine** : [REFONTE_GDD.md](../REFONTE_GDD.md) Phase 1 — épic **E1 Compagnon**.
@@ -220,6 +221,51 @@ Aucun test headless ne dit qu'un bot *se sent* mieux. Le juge est le capteur :
 **`unstick_triggered_session` doit chuter** entre une run d'avant et une run d'après, et
 `forgia2_navmesh.json` doit montrer `obstacles_kept > 0` sur la même run. Les deux chiffres
 existent déjà — il ne manque que la run.
+
+---
+
+## ✅ VALIDATION EN JEU — 2026-08-13, 00:03
+
+La run que quatre incréments attendaient. **Trois résultats, trois natures de preuve.**
+
+### 1. Le maillage se construit — capteur
+
+```json
+"severity": "ok", "built": true, "source": "forge_sanctum",
+"discs_seen": 166, "obstacles_kept": 13, "blind": false,
+"build_ms": 0.52, "builds_session": 1
+```
+
+**0,52 ms** de construction, et `builds_session` — le compteur ajouté le soir même — répond
+enfin à la question pour laquelle le capteur existait.
+
+### 2. Les bots suivent le chemin — mesure normalisée
+
+| | Run 21:56 (avant) | **Run 00:03 (après)** |
+| --- | --- | --- |
+| Checks LOS — *l'activité des bots* | 695 | **1 248** |
+| **Désenlisements déclenchés** | 18 | **2** |
+| Un désenlisement tous les… | 39 checks | **624 checks** |
+
+L'activité a **doublé** pendant que les blocages étaient divisés par 9 : normalisé,
+**16× moins de blocages**. Comparer les compteurs bruts aurait été trompeur — c'est le
+ratio qui prouve, parce qu'il est insensible à la durée de la run.
+
+### 3. Les ennemis ne naissent plus dans les bâtiments — l'œil
+
+> *« Non, ils n'étaient plus dans un mur ou bâtiment. »* — Antoine, 2026-08-13
+
+**Aucun capteur ne pouvait rendre ce verdict.** C'est précisément ce que
+[`REFONTE_GDD.md`](../REFONTE_GDD.md) §3 dit du palier de validation : *la seule chose
+qu'aucun test ne peut faire, confronter le code à la réalité.*
+
+### La réserve honnête
+
+`obstacles_kept: 13` **sur 166 solides soumis** — les 153 autres passent sous le ressaut de
+0,45 m. Et ça recoupe l'alerte `stage_layout` : *« sous-couverte d'un facteur 11,6 : 13
+abris pour 151 attendus »*. Le maillage fonctionne, mais **l'arène ne lui donne pas
+grand-chose à contourner**. Défaut de contenu connu et antérieur — la preuve est réelle,
+l'épreuve est plus douce qu'elle ne le sera dans une vraie salle.
 
 ---
 

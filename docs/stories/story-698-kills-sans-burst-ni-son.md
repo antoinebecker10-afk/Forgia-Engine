@@ -1,10 +1,19 @@
 # story-698 — 51 kills, 0 burst visuel et 2 sons de mort
 
-**Statut** : DONE (2026-08-12) — ⚠️ **fermée sans sa run de validation, sur décision explicite d'Antoine.**
+**Statut** : DONE — ✅ **PREUVE ARRIVÉE le 2026-08-13 00:03.** `phase0_check.py` sur run fraîche :
+**burst 9/9 (100 %) · son 9/9 (100 %)**, contre 70/77 et 8/77 au diagnostic. Le DONE assumé
+ci-dessous est devenu un DONE **prouvé** — la boucle d'honnêteté est fermée, sans avoir eu à
+rouvrir la story.
+
+<details><summary>Statut d'origine, conservé — il documente une décision, pas une erreur</summary>
+
+⚠️ **fermée sans sa run de validation, sur décision explicite d'Antoine.**
 Les deux correctifs sont livrés, testés et commités (`40d34a6` burst, `3999185` son) ; la mesure en jeu
 n'a **pas** été faite. Ce n'est donc pas un DONE prouvé, c'est un DONE **assumé** — la distinction est
 écrite ici pour qu'aucune lecture future ne s'y trompe. La preuve viendra gratuitement : `phase0_check.py`
 juge les deux canaux séparément à la **première run** de la refonte. Si elle contredit, rouvrir.
+
+</details>
 **Créée** : 2026-08-12
 **Niveau BMAD** : Quick (deux compteurs à zéro, même cause probable : l'événement de mort)
 **Origine** : run de validation du 2026-08-12, recoupement de trois capteurs.
