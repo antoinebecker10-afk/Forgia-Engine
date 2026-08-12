@@ -88,10 +88,27 @@ C'est directement le risque n°1 de [`REFONTE_GDD.md`](../REFONTE_GDD.md) §6
       décision, sa date, son motif, et interdisent la recréation **sous un autre
       nom** (« freeze frame », « impact pause », « gel d'impact »).
 - [x] `forgia2_gamefeel.json` orphelin **supprimé du dépôt de travail**
-- [ ] **Inventaire** des 44 citations de crates supprimées, séparées en deux :
-      note historique inoffensive / **référence sans code d'accueil**.
-      *Seul AC restant — c'est la partie « classe de défaut », indépendante du
-      hitstop lui-même.*
+- [x] **Inventaire fait, et outillé** — `tools/ai/dead_crate_refs.py`, rejouable :
+      **44 citations → 28 inoffensives, 16 à instruire.**
+
+      Le discriminant est le **concept**, pas le nom : `forgia-juice-camera-shake`
+      est cité dans un fichier `camera_shake.rs` qui existe → le code a survécu à
+      la suppression de la crate. `forgia-juice-hit-stop` n'a **aucun**
+      `hit_stop.rs` → il est parti. 28 cas relèvent du premier, ce sont de simples
+      notes historiques.
+
+      Les 16 restants, à vérifier un par un — **aucun n'est urgent, aucun n'est
+      prouvé perdu** : `audio-core`, `camera`, `camera-fps`, `cloth`, `crafting`,
+      `engine`, `genome-economy`, **`juice-hit-stop` (tranché : retiré)**,
+      `memory-probe`, `qa-invariants`, `qa-telemetry`, `quest-objects`, `sensors`,
+      `stage-arena`, `village-npc-spawner`, `weather`.
+
+      ⚠️ **L'outil sur-signale par construction** : une réimplémentation sous un
+      autre nom compte comme orpheline (`forgia-memory-probe` est probablement
+      devenu `memory_sensor.rs`). C'est le bon sens de l'erreur — mieux vaut
+      vérifier à tort que rater un second hitstop. Corrigé une fois déjà : les
+      modules **inline** (`pub mod sensor_io {`) n'étaient pas détectés et
+      `forgia-sensor-io` passait pour perdu.
 
 ## Conséquences sur d'autres tickets
 
