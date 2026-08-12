@@ -5,7 +5,7 @@
 > runtime) et **data-driven** (~105 genomes TOML hot-reload) conçu pour être piloté par
 > agents IA de façon fiable.
 
-## État actuel (2026-06-10)
+## État actuel (mis à jour 2026-08-12)
 
 **Priorité Phase 0 : SHIPPER le Roguelite** — FPS roguelite type Gunfire Reborn
 (`crates/forgia-mode-roguelite`). Boucle jouable : vagues + boss → Victoire/Défaite,
@@ -14,9 +14,15 @@ boons, éléments par arme, méta-progression persistée. Ship-readiness ≈ 55-
 Le mode RPG OpenWorld (`forgia-rpg`) est le **track FORGE** : banc d'essai des outils
 (terrain streamé, auto-rig, villages procéduraux) qui refluent vers le Roguelite.
 
-- **62 crates**, ~88k LOC, 1 000+ tests — voir [ARCHITECTURE.md](ARCHITECTURE.md)
+- **66 crates** — voir [ARCHITECTURE.md](ARCHITECTURE.md) (le gate `xtask arch-drift` garantit
+  que la liste y est exacte)
 - Vision : [docs/vision/FORGIA_VISION_2026-06-04.md](docs/vision/FORGIA_VISION_2026-06-04.md)
-- Roadmap exécution : [docs/ROADMAP_POST_AUDIT_2026-06-10.md](docs/ROADMAP_POST_AUDIT_2026-06-10.md)
+- **Design** : [docs/design/gdd-forgia-the-spared.md](docs/design/gdd-forgia-the-spared.md) — le GDD
+  maître (2026-08-09). Le roguelite décrit ci-dessus y devient **l'Abîme**, un des trois modes.
+- **Pilotage** : [docs/ROADMAP.md](docs/ROADMAP.md) — source unique, Now/Next/Later.
+  *(Les fichiers `ROADMAP_*.md` sont archivés et ne font plus autorité.)*
+- **Chemin de refonte** : [docs/REFONTE_GDD.md](docs/REFONTE_GDD.md) — phases et jalons
+  falsifiables pour aller de l'état actuel à la v1 du GDD
 
 ## Quickstart
 
@@ -60,11 +66,11 @@ cargo run --profile release-fast
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — les 62 crates réelles, assemblage, GameSet, sensors
+- [ARCHITECTURE.md](ARCHITECTURE.md) — les 66 crates réelles, assemblage, GameSet, sensors
 - [CONTRIBUTING.md](CONTRIBUTING.md) — setup, conventions, workflow BMAD
 - [CLAUDE.md](CLAUDE.md) — contrat IA du workspace
 - [docs/audit/audit-2026-06-10-full-codebase.md](docs/audit/audit-2026-06-10-full-codebase.md) — dernier audit complet (16 domaines)
-- [docs/ROADMAP_ROGUELITE.md](docs/ROADMAP_ROGUELITE.md) — design/contenu Roguelite
+- [docs/ROADMAP_ROGUELITE.md](docs/ROADMAP_ROGUELITE.md) — 🗄️ archivé, mais garde une référence de fond utile (§ ship-gap)
 - ADR : [docs/adr/](docs/adr/) — décisions structurantes
 
 ## Jalons (roadmap post-audit)
