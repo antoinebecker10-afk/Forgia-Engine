@@ -50,11 +50,26 @@ cela n'est en cause.
 
 Les trois paires exigent chacune **deux éléments co-présents sur la même cible** :
 
-| Réaction | Paire | Armes porteuses |
+| Réaction | Paire | Armes porteuses (nom en jeu) |
 |---|---|---|
-| Combustion | Feu + **Poison** | AssaultRifle + **Boucherie** |
-| Miasma | Choc + **Poison** | ModernAR + **Boucherie** |
-| Surcharge | Feu + Choc | AssaultRifle + ModernAR |
+| Combustion | Feu + **Poison** | **Bourrasque** + **Boucherie** |
+| Miasma | Choc + **Poison** | **Pépin** + **Boucherie** |
+| **Surcharge** | Feu + Choc | **Bourrasque + Pépin** — les deux premières touches |
+
+> ⚠️ **Trois vocabulaires pour les mêmes quatre armes**, et aucun ne ressemble aux
+> autres. C'est le piège de lecture le plus coûteux du sujet :
+>
+> | Nom en jeu | Enum Rust | Clé du capteur `elements.mapping` | Touche |
+> |---|---|---|---|
+> | **Pépin** (revolver) | `WeaponType::ModernAR` | `pistol` | 1 |
+> | **Bourrasque** (SMG) | `WeaponType::AssaultRifle` | `smg` | 2 |
+> | **Madame Lenoir** (sniper) | `WeaponType::Shotgun` | `sniper` | 3 |
+> | **Boucherie** (lance-roquettes) | `WeaponType::RocketLauncher` | `pompe` | 4 |
+>
+> Deux clés sont carrément trompeuses : `WeaponType::Shotgun` **est le sniper**, et
+> `pompe` (= fusil à pompe) **est le lance-roquettes**. Toujours vérifier le mapping
+> dans `roguelite_elements.toml` avant de raisonner sur une arme par son nom.
+> Source de vérité des stats : `viewmodel_arena.toml`, jamais `roguelite_weapons.toml`.
 
 ### Fausse piste écartée — le garde `ev.damage > 0.0`
 
@@ -116,6 +131,26 @@ correctif :
 
 **Recommandation** : l'option 3 pour le jalon (elle ne change aucun design et se
 teste tout de suite), puis l'option 1 pour la suite du ticket.
+
+### Le protocole de run qui prouve ou infirme, en une fois
+
+1. **Rebuild** (`cargo run -p forgia`) — sans ça, les capteurs décrivent l'ancien code.
+2. Aller sur un **boss**, ou au minimum un **élite** (120 pv → TTK 0,71 s, contre
+   0,18 s sur un grunt : c'est ce délai qui rend le second élément possible).
+3. **Toucher LA MÊME cible avec les deux premières touches** :
+   **Pépin (1, choc)** puis **Bourrasque (2, feu)** — c'est la paire **Surcharge**.
+   L'ordre n'importe pas ; ce qui compte est que le second tir arrive **avant que le
+   premier statut expire** (choc 4 s, brûlure 3 s) et **avant que la cible meure**.
+4. Retour au menu, puis `python tools/ai/phase0_check.py`.
+
+**Ce qu'on apprend dans les deux cas** — c'est ce qui rend ce test utile :
+
+- `reactions.surcharges > 0` → le moteur est **innocenté en jeu**, et la cause est
+  bien « le combat courant ne produit jamais la situation ». Phase 0 franchie sur
+  cette base, la suite passe en Phase 1 avec le compagnon.
+- Toujours **0** avec deux éléments posés sur une cible vivante → le diagnostic
+  ci-dessus est **faux** et il faut rouvrir le moteur. Ce serait une surprise :
+  `ReactionTable` est testée. Mais c'est exactement pour ça qu'on mesure.
 
 ## Ce qu'il ne faut PAS faire
 

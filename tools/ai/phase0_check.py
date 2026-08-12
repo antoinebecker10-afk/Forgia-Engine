@@ -92,7 +92,9 @@ def check_697(S):
                        "aucune réaction n'était POSSIBLE. Ce n'est pas un échec.")
     if total == 0:
         return FAIL, (f"{detail} — 2+ éléments ont touché, aucune réaction. "
-                      "Cf story-697 : alterner 2 armes SUR LA MÊME CIBLE, un boss de préférence.")
+                      "Il faut les poser SUR LA MÊME CIBLE vivante : Pépin (touche 1, "
+                      "choc) puis Bourrasque (touche 2, feu) sur un boss ou un élite. "
+                      "Cf story-697.")
     if bursts == 0:
         return FAIL, f"{detail} — la logique part mais le VISUEL ne suit pas"
     return PASS, detail
@@ -237,9 +239,27 @@ def main():
         print(f"     {verdict:8} {detail}\n")
 
     print(f"── {resume[PASS]} PASS · {resume[FAIL]} ECHEC · {resume[BLIND]} AVEUGLE ──")
-    if resume[BLIND]:
-        print("AVEUGLE n'est pas un échec : c'est « la run n'a pas produit la situation »."
-              "\nVoir le protocole de run dans story-697 (alterner 2 armes sur un boss).")
+    if resume[BLIND] or resume[FAIL]:
+        print("""
+AVEUGLE n'est pas un échec : c'est « la run n'a pas produit la situation ».
+
+PROTOCOLE DE RUN qui couvre les 4 stories en une fois :
+  1. Rebuild — `cargo run -p forgia`. Sinon les capteurs décrivent l'ancien code.
+  2. Tuer beaucoup                          -> 696 (hitstop) et 698 (burst + son)
+  3. Sur un BOSS ou un ÉLITE, toucher la MÊME cible avec
+     Pépin (touche 1, choc) PUIS Bourrasque (touche 2, feu)   -> 697 (Surcharge)
+     Un grunt meurt en 0,18 s : trop vite pour poser 2 éléments. Un élite tient
+     0,71 s, un boss bien plus — c'est là que la fenêtre existe.
+  4. Retour au menu, puis relancer ce script -> 699 se vérifie tout seul
+
+LES QUATRE ARMES — trois vocabulaires pour les mêmes objets, attention :
+     en jeu            enum Rust                  capteur   touche  élément
+     Pépin             WeaponType::ModernAR       pistol      1     choc
+     Bourrasque        WeaponType::AssaultRifle   smg         2     feu
+     Madame Lenoir     WeaponType::Shotgun (!)    sniper      3     perforant
+     Boucherie         WeaponType::RocketLauncher pompe (!)   4     poison
+  Les deux (!) sont des pièges : `Shotgun` EST le sniper, `pompe` EST le
+  lance-roquettes. Vérifier `roguelite_elements.toml` avant de conclure.""")
 
 
 if __name__ == "__main__":
