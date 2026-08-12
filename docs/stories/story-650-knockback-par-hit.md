@@ -1,6 +1,6 @@
 # Story-650 — Knockback par hit : les ennemis encaissent physiquement
 
-> **Statut** : IN_PROGRESS (validation feel user en attente)
+> **Statut** : DONE (2026-08-12 — validé manette en main + preuve capteur)
 > **Niveau BMAD** : Standard (5 fichiers)
 > **Origine** : audit VFX 2026-07-02 §P0-4 (trick Vlambeer : « chaque balle qui touche pousse physiquement l'ennemi dans la direction du tir ; la mort donne une impulse plus forte »).
 
@@ -34,10 +34,10 @@ Les ennemis sont **`RigidBody::KinematicPositionBased`** (`waves.rs:173`) → `E
       (base 0,30 · kill ×3 · plafond 2,5 m). Recoupé par
       `forgia2_fps_feel.json::hit_feedbacks_total: 420` — deux compteurs
       indépendants qui concordent à 1 près.
-- [ ] **Validation feel user** : les ennemis « encaissent », la Boucherie projette, pas d'éjection hors arène ni de clipping mur visible
-      → *reste ouvert à dessein : un compteur ne dit pas si ça fait du bien.
-      Le plafond à 2,5 m rend l'éjection hors arène improbable, mais ça se
-      constate manette en main, pas dans un JSON.*
+- [x] **Validation feel user** — 2026-08-12, manette en main. Question posée :
+      « les ennemis encaissent visiblement quand tu tires, sans être éjectés hors
+      arène ? » Réponse d'Antoine, verbatim : **« 1 oui »**.
+      Aucune éjection ni clipping mur rapporté ; le plafond à 2,5 m tient.
 - [x] `cargo check` + clippy 0 warning introduit + tests verts
 
 ## Risques connus (à observer runtime)

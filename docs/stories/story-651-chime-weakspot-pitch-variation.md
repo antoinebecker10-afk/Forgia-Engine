@@ -1,6 +1,6 @@
 # Story-651 — Chime weakspot + variation de pitch (l'oreille distingue hit/tête/kill)
 
-> **Statut** : IN_PROGRESS (validation oreille user en attente)
+> **Statut** : DONE (2026-08-12 — validé à l'oreille + preuve capteur)
 > **Niveau BMAD** : Quick (1 fichier code + 1 asset + 2 TOML/docs)
 > **Origine** : audit VFX 2026-07-02 §P0-5 — pattern Gunfire Reborn : « UN son unique réservé au weakspot, jamais utilisé ailleurs ; la cohérence croisée son/couleur crée le réflexe pavlovien de viser la tête ».
 
@@ -29,9 +29,13 @@ tir (pitch varié) < impact hit (pitch varié) < **tink weakspot (fixe)** < thum
 - [x] Asset CC0 documenté (CREDITS.md) ; genome hot-reload ; capteur `weakspots`
 - [x] **Le son part** — run du 2026-08-12, `forgia2_roguelite_audio.json` :
       `weakspots: 192` sur `impacts: 369` (52 %), au sein de `sfx_played: 2075`.
-- [ ] **Validation oreille user** : le « tink » installe l'envie de viser la tête ; le full-auto ne fait plus métronome
-      → *reste ouvert à dessein : la variation de pitch et l'effet « métronome »
-      ne s'entendent pas dans un compteur.*
+- [x] **Validation oreille user** — 2026-08-12. Question posée : « le "tink" te
+      donne envie de viser la tête, **et** le full-auto ne fait pas métronome ? »
+      Réponse d'Antoine, **verbatim** : **« 2 oui et non métronome »**.
+      Lu comme : oui pour le tink, **et pas d'effet métronome** — les deux moitiés
+      de l'AC passent. Le verbatim est conservé tel quel : si la lecture était
+      inverse (« oui pour le tink, mais ça fait métronome »), rouvrir la story
+      plutôt que de réinterpréter cette ligne.
       ⚠️ **Anomalie voisine relevée au passage** (hors scope de cette story) :
       `roguelite_audio.kills: 2` alors que `knockback.kill_pushes: 51`. Le son de
       mort ne part quasiment jamais — cf story de défaut ouverte le 2026-08-12.

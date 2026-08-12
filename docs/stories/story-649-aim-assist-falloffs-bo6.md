@@ -1,6 +1,6 @@
 # Story-649 — Aim assist cohérent : falloffs gradués façon CoD BO6
 
-> **Statut** : IN_PROGRESS (validation feel user en attente)
+> **Statut** : DONE (2026-08-12 — validé manette en main + preuve capteur)
 > **Niveau BMAD** : Quick (2 fichiers + TOML)
 > **Origine** : feedback user 2026-07-03 « l'aim assist est trop importante, rends-la cohérente, regarde les CoD récents ». Mesure capteur : **45 % des tirs corrigés** (17/38), jusqu'à 5° de courbure.
 
@@ -34,9 +34,10 @@ Aide **binaire** : une cible à 6.9° du réticule (bord du cône de 7°) receva
       Réglages actifs : `strength 0.50`, `cone 3.5°`, `max_correction 2.0°`,
       `engage_distance 40 m`. Recoupé par
       `forgia2_fps_feel.json::aim_assist_engagements_total: 156`.
-- [ ] **Validation feel user** : plus aucun « raté net mais touché »
-      → *reste ouvert à dessein : c'est la moitié subjective, et aucun compteur
-      ne distingue une correction légitime d'une correction volée.*
+- [x] **Validation feel user** — 2026-08-12, manette en main. Question posée :
+      « plus de "j'ai clairement raté et ça a touché" ? » Réponse d'Antoine,
+      verbatim : **« 3 c'est bon »**. La moitié subjective rejoint donc la moitié
+      mesurée (31 % de tirs corrigés contre ~45 % avant).
 
 ## Rollback / tuning
 

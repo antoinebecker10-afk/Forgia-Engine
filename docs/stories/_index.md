@@ -8,11 +8,11 @@
 | Statut | Nombre |
 | --- | --- |
 | IN_PROGRESS | 47 |
-| REVIEW | 45 |
+| REVIEW | 42 |
 | BLOCKED | 5 |
 | DRAFT | 37 |
 | UNKNOWN | 11 |
-| DONE | 50 |
+| DONE | 53 |
 | CANCELLED | 12 |
 | **Total** | **207** |
 
@@ -70,7 +70,7 @@
 | 678 | Hub Premium : le menu devient un vrai hub de roguelite | [story-678-hub-premium.md](./story-678-hub-premium.md) |
 | 694 | Hub menu : architecture (P3 de l'audit 2026-08-07) | [story-694-hub-architecture.md](./story-694-hub-architecture.md) |
 
-## REVIEW (45)
+## REVIEW (42)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -104,9 +104,6 @@
 | 629 | Roguelite : capteur de charge combat `perf_diag` (vision complète freezes) | [story-629-roguelite-perf-diag-sensor.md](./story-629-roguelite-perf-diag-sensor.md) |
 | 631 | Présence viewmodel : sway/bob + bras cartoon procéduraux | [story-631-viewmodel-presence-sway-bob-procedural-arms.md](./story-631-viewmodel-presence-sway-bob-procedural-arms.md) |
 | 648 | Paliers de hitstop : hit < crit < kill < multikill | [story-648-hitstop-paliers-kill-feel.md](./story-648-hitstop-paliers-kill-feel.md) |
-| 649 | Aim assist cohérent : falloffs gradués façon CoD BO6 | [story-649-aim-assist-falloffs-bo6.md](./story-649-aim-assist-falloffs-bo6.md) |
-| 650 | Knockback par hit : les ennemis encaissent physiquement | [story-650-knockback-par-hit.md](./story-650-knockback-par-hit.md) |
-| 651 | Chime weakspot + variation de pitch (l'oreille distingue hit/tête/kill) | [story-651-chime-weakspot-pitch-variation.md](./story-651-chime-weakspot-pitch-variation.md) |
 | 652 | VFX visibles : multiplicateurs genome + burst de kill | [story-652-vfx-visibles-kill-burst.md](./story-652-vfx-visibles-kill-burst.md) |
 | 653 | Aura électrique : l'ennemi choqué grésille (identité Pépin) | [story-653-aura-shock-arcs-electriques.md](./story-653-aura-shock-arcs-electriques.md) |
 | 655 | Fin des sphères procédurales : bursts hanabi texturés par élément | [story-655-fin-des-spheres-bursts-elementaires.md](./story-655-fin-des-spheres-bursts-elementaires.md) |
@@ -188,7 +185,7 @@
 | 654 | Nameplate v2 : vie seule, plaques de bouclier/armure, icônes de statut | [story-654-nameplate-v2-plaques-icones.md](./story-654-nameplate-v2-plaques-icones.md) |
 | 695 | La cible web (wasm/WebGPU) devient un build officiel de Forgia | [story-695-web-target-officielle.md](./story-695-web-target-officielle.md) |
 
-## DONE (50)
+## DONE (53)
 
 | ID | Titre | Fichier |
 | --- | --- | --- |
@@ -236,6 +233,9 @@
 | 640 | P0-2 : défense tri-couche Vie / Bouclier / Armure | [story-640-p0-2-defense-layer-shield-armor.md](./story-640-p0-2-defense-layer-shield-armor.md) |
 | 641 | P0-3 : moteur de réactions générique + Element::Shock (Électrique) | [story-641-p0-3-reactions-engine-shock-element.md](./story-641-p0-3-reactions-engine-shock-element.md) |
 | 645 | R3 : sceller la boucle (Victory + maîtrise + best-run + boons pondérés) | [story-645-r3-seal-the-loop.md](./story-645-r3-seal-the-loop.md) |
+| 649 | Aim assist cohérent : falloffs gradués façon CoD BO6 | [story-649-aim-assist-falloffs-bo6.md](./story-649-aim-assist-falloffs-bo6.md) |
+| 650 | Knockback par hit : les ennemis encaissent physiquement | [story-650-knockback-par-hit.md](./story-650-knockback-par-hit.md) |
+| 651 | Chime weakspot + variation de pitch (l'oreille distingue hit/tête/kill) | [story-651-chime-weakspot-pitch-variation.md](./story-651-chime-weakspot-pitch-variation.md) |
 | 664 | Warmup des pipelines PBR au Lobby (anti-freeze « tourner la caméra ») | [story-664-pipeline-warmup-pbr-lobby.md](./story-664-pipeline-warmup-pbr-lobby.md) |
 | 674 | L'aménagement se DÉRIVE : bruit bleu + compte depuis l'aire | [story-674-amenagement-derive-bruit-bleu.md](./story-674-amenagement-derive-bruit-bleu.md) |
 | 677 | La boucle de rounds et son mur | [story-677-boucle-de-rounds-et-mur.md](./story-677-boucle-de-rounds-et-mur.md) |
