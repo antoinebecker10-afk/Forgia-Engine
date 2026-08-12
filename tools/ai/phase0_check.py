@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """phase0_check.py — une run, un verdict par story ouverte.
 
-Les 4 stories ouvertes (696, 697, 698, 699) se vérifient toutes dans les capteurs
+Les stories ouvertes se vérifient toutes dans les capteurs
 déjà écrits par le jeu. Ce script les rassemble et applique, pour chacune, SON
 critère d'acceptation — pas la valeur brute.
 
@@ -56,22 +56,7 @@ def g(d, *path, default=0):
     return d
 
 
-# ── Les 4 contrôles ─────────────────────────────────────────────────────────
-
-
-def check_696(S):
-    """Le hitstop se déclenche-t-il, et son capteur suit-il la run ?"""
-    d, age = S["gamefeel"]
-    if d is None:
-        return BLIND, "forgia2_gamefeel.json absent — le producteur n'a jamais tourné"
-    del age  # la fraîcheur est jugée globalement, au même titre que les autres
-    c = g(d, "hitstop_counts", default={})
-    total = sum(v for v in c.values() if isinstance(v, int))
-    detail = (f"hit {c.get('hit',0)} · crit {c.get('crit',0)} · "
-              f"kill {c.get('kill',0)} · multi {c.get('multikill',0)}")
-    if total == 0:
-        return FAIL, f"{detail} — zéro hitstop alors que le capteur suit la run : hypothèse (a)"
-    return PASS, f"{detail} — dernier palier « {g(d,'last_tier',default='?')} »"
+# ── Les contrôles ─────────────────────────────────────────────────────────
 
 
 def check_697(S):
@@ -101,24 +86,32 @@ def check_697(S):
 
 
 def check_698(S):
-    """Les morts produisent-elles un burst et un son ?"""
-    morts = {
-        "knockback.kill_pushes": g(S["knockback"][0] or {}, "kill_pushes"),
-        "audio.kills": g(S["audio"][0] or {}, "kills"),
-        "elements.executes": g(S["elements"][0] or {}, "executes"),
-    }
+    """Les morts produisent-elles un burst et un son ?
+
+    La référence des morts est `knockback.kill_pushes` : il incrémente sur
+    `ev.is_kill` sans autre condition (tranché le 2026-08-12, cf story-698).
+    `elements.executes` ne compte QUE les exécutions par seuil de PV — le prendre
+    pour un compteur de morts était mon erreur de lecture initiale.
+
+    Les deux canaux sont jugés SÉPARÉMENT : la première version comparait les
+    compteurs entre eux et criait « ils divergent », ce qui masquait le fait que
+    l'un des deux allait très bien.
+    """
+    morts = g(S["knockback"][0] or {}, "kill_pushes")
     bursts = g(S["weapon_vfx"][0] or {}, "kill_bursts")
-    ref = max(morts.values())
-    detail = " · ".join(f"{k} {v}" for k, v in morts.items()) + f" · kill_bursts {bursts}"
-    if ref == 0:
-        return BLIND, f"{detail} — aucune mort enregistrée : rien à juger"
-    # Le doute de la story : ces compteurs ne comptent peut-être pas la même chose.
-    ecart = max(morts.values()) - min(morts.values())
-    if ecart > max(2, ref * 0.25):
-        return FAIL, (f"{detail} — les compteurs de morts DIVERGENT (écart {ecart}). "
-                      "Établir d'abord lequel dit vrai : c'est le 1er AC de story-698.")
-    if bursts == 0:
-        return FAIL, f"{detail} — {ref} morts, zéro burst"
+    sons = g(S["audio"][0] or {}, "kills")
+    if morts == 0:
+        return BLIND, "aucune mort enregistrée (knockback.kill_pushes = 0) : rien à juger"
+
+    def taux(n):
+        return f"{n}/{morts} ({100*n//morts} %)"
+
+    detail = f"burst {taux(bursts)} · son {taux(sons)}"
+    manque = [nom for nom, n in (("le BURST", bursts), ("le SON", sons))
+              if n < morts * 0.5]
+    if manque:
+        return FAIL, (f"{detail} — {' et '.join(manque)} ne suit pas les morts. "
+                      "Le canal à ~90 % fonctionne ; c'est l'autre qu'il faut corriger.")
     return PASS, detail
 
 
@@ -154,17 +147,19 @@ def check_699(S):
 # La 4ᵉ colonne n'est pas décorative : si l'un de ces fichiers est périmé, le
 # contrôle ne peut pas rendre ECHEC — il rend AVEUGLE. Juger un jeu sur un fichier
 # de la semaine dernière, c'est le défaut que cette journée entière a traqué.
+# story-696 (hitstop) est RETIRÉE de cette liste depuis le 2026-08-12 : le hitstop
+# a été supprimé définitivement sur décision, son capteur avec. Un contrôle qui
+# teste une feature qu'on ne veut plus n'apporte que du bruit — et il rendait
+# « AVEUGLE : capteur absent » à chaque exécution, ce qui se lit comme un problème.
 CHECKS = [
-    ("696", "Le hitstop se déclenche", check_696, ["gamefeel"]),
     ("697", "Une réaction élémentaire part", check_697, ["elements", "element_vfx"]),
     ("698", "Une mort produit burst + son", check_698,
-     ["knockback", "audio", "weapon_vfx", "elements"]),
+     ["knockback", "audio", "weapon_vfx"]),
     ("699", "Les capteurs avouent leur inactivité", check_699,
      ["elements", "sensor_health"]),
 ]
 
 FICHIERS = {
-    "gamefeel": "forgia2_gamefeel.json",
     "elements": "forgia2_elements.json",
     "element_vfx": "forgia2_element_vfx.json",
     "weapon_vfx": "forgia2_weapon_vfx.json",
@@ -243,9 +238,9 @@ def main():
         print("""
 AVEUGLE n'est pas un échec : c'est « la run n'a pas produit la situation ».
 
-PROTOCOLE DE RUN qui couvre les 4 stories en une fois :
+PROTOCOLE DE RUN qui couvre les stories ouvertes en une fois :
   1. Rebuild — `cargo run -p forgia`. Sinon les capteurs décrivent l'ancien code.
-  2. Tuer beaucoup                          -> 696 (hitstop) et 698 (burst + son)
+  2. Tuer beaucoup                                            -> 698 (burst + son)
   3. Sur un BOSS ou un ÉLITE, toucher la MÊME cible avec
      Pépin (touche 1, choc) PUIS Bourrasque (touche 2, feu)   -> 697 (Surcharge)
      Un grunt meurt en 0,18 s : trop vite pour poser 2 éléments. Un élite tient

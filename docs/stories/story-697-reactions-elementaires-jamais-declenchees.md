@@ -179,10 +179,32 @@ teste tout de suite), puis l'option 1 pour la suite du ticket.
 - [x] La cause est **nommée et prouvée** par une mesure — une arme = un élément,
       TTK 0,18 s, 3 changements d'arme en 400 s. Le moteur, lui, est juste.
       Une fausse piste (le garde `ev.damage > 0`) est consignée comme telle.
-- [ ] `reactions.combustions` > 0 après une run où feu et choc sont posés
-- [ ] `element_vfx.reaction_bursts` > 0 en même temps (le visuel suit la logique)
-- [ ] Un test couvre la condition de déclenchement, pas seulement l'application
-- [ ] story-611 peut être validée ou infirmée sur pièces
+- [x] **Une réaction se déclenche** — run boss du 2026-08-12 :
+      `surcharges: 16` (Feu + Choc = **Bourrasque + Pépin**), `miasmas: 4`
+      (Choc + Poison). **20 réactions.**
+      *L'AC d'origine disait « `combustions` > 0 après une run où feu et choc sont
+      posés » — il était mal écrit : feu + choc donne une **Surcharge**, pas une
+      Combustion. C'est cette dernière qui est mesurée, et elle part.*
+- [x] **Le visuel suit la logique** — `element_vfx.reaction_bursts: 16`, soit
+      exactement le nombre de surcharges. Le Miasma n'y figure pas, et c'est
+      correct : c'est un DoT sur la cible, pas un burst de zone.
+- [x] **Le diagnostic est validé par la mesure, dans les deux sens.** Le protocole
+      prévoyait que `surcharges > 0` innocenterait le moteur et que `0` le rouvrirait.
+      Il est innocenté : le code était juste, c'est le combat courant qui ne
+      produisait jamais deux éléments sur une cible vivante. Le boss a donné la
+      fenêtre (TTK long) que le grunt à 0,18 s ne donne jamais.
+- [~] `combustions: 0` subsiste — **échantillon trop petit pour conclure** : 7 hits
+      poison seulement sur la run (la Boucherie a peu tiré). Ni prouvé cassé, ni
+      prouvé sain. À revoir si ça persiste avec du poison abondant.
+- [~] story-611 (Combustion) — reste ouverte pour la même raison, et n'est **pas**
+      bloquée par un défaut de moteur : celui-ci est démontré fonctionnel.
+
+## Ce qui reste vrai, et qui n'est pas un bug
+
+En **combat courant**, les réactions resteront rares : une arme = un élément, et un
+grunt meurt en 0,18 s. C'est le design du GDD (« en solo, le compagnon est le second
+élément ») et la Phase 1 est ce qui les rendra ordinaires. Ce ticket ne demande plus
+rien au moteur — il documente pourquoi la Phase 1 compte.
 
 ## Cross-refs
 

@@ -114,9 +114,18 @@ zéro qu'on lit comme une absence, alors qu'il n'a jamais compté quoi que ce so
 - [x] Hypothèse de la cause commune **RÉFUTÉE** : deux causes sans rapport — le son
       est gardé par une requête sur une cible despawnée, le burst n'a simplement
       aucun compteur.
-- [ ] `weapon_vfx.kill_bursts` ≈ nombre de morts après correction
-- [ ] `roguelite_audio.kills` ≈ nombre de morts après correction
-- [ ] story-652 peut être validée ou infirmée sur pièces
+- [x] **`weapon_vfx.kill_bursts` ≈ nombre de morts** — run boss du 2026-08-12 :
+      **70 bursts pour 77 morts (91 %)**. La **cause B est RÉFUTÉE** : le burst
+      partait depuis toujours, seul le compteur manquait. Le titre de cette story
+      — « 0 burst visuel » — était bien un **artefact de mesure**, comme le
+      diagnostic l'avait prévu.
+      *L'écart de 7 reste à expliquer si ça compte : morts hors chemin hitscan
+      (roquette, mêlée, DoT) qui ne passent pas par `spawn_kill_burst`.*
+- [ ] `roguelite_audio.kills` ≈ nombre de morts — **CAUSE A CONFIRMÉE, non
+      corrigée** : **8 sons pour 77 morts (10 %)**. C'est tout ce qui reste de
+      cette story.
+- [x] **story-652 est validée sur pièces** — le VFX de kill fonctionne. Ce qui
+      manquait n'était pas l'effet, c'était la preuve.
 
 ## Cross-refs
 
