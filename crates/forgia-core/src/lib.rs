@@ -263,6 +263,132 @@ pub mod sensor_io {
     }
 }
 
+/// story-699 — la sévérité d'un capteur de feature doit regarder l'INACTIVITÉ,
+/// pas seulement l'erreur.
+///
+/// ## Le défaut que ce module corrige
+///
+/// Le 2026-08-12, trois capteurs rapportaient `severity: "ok"` alors que leur
+/// sujet était mort :
+///
+/// | Capteur | severity | contenu réel |
+/// |---|---|---|
+/// | `forgia2_gamefeel` | ok | `hitstop_counts` tous à 0, sur 51 kills |
+/// | `forgia2_weapon_vfx` | ok | `kill_bursts: 0` |
+/// | `forgia2_elements` | ok | `combustions/miasmas/surcharges` tous à 0 |
+///
+/// **Le capteur disait « ok » parce que rien n'avait échoué. Or rien ne s'était
+/// produit non plus.** Un système inerte ne lève aucune erreur : c'est ce qui le
+/// rend invisible. Pire, ces trois `ok` ont failli faire fermer automatiquement
+/// trois stories prouvées cassées le matin même.
+///
+/// `map-design-patterns.md` §13 énonçait déjà la règle pour la géométrie —
+/// « zéro mesuré n'est pas vert, c'est **aveugle** » — mais elle n'avait jamais
+/// été appliquée aux capteurs de feature.
+///
+/// ## Le piège symétrique, que ce module évite
+///
+/// Passer tout compteur à zéro en `warn` serait pire : au menu, un compteur de
+/// combat à zéro est parfaitement normal, et un chien qui crie au loup finit
+/// ignoré. **La sévérité doit donc regarder le CONTEXTE d'attente**, pas la seule
+/// valeur du compteur.
+pub mod sensor_activity {
+    /// Ce qu'on peut honnêtement dire d'un compteur de feature.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Activity {
+        /// Le système a produit — il fonctionne.
+        Ok,
+        /// Rien n'était attendu (mauvais mode, hors combat, système coupé).
+        /// **Ce n'est pas un feu vert** : c'est l'absence d'information.
+        Blind,
+        /// Attendu, actif depuis assez longtemps, et **toujours rien produit**.
+        /// C'est un défaut.
+        Inert,
+    }
+
+    impl Activity {
+        /// Sévérité au format capteur Forgia.
+        pub fn severity(self) -> &'static str {
+            match self {
+                Activity::Ok => "ok",
+                Activity::Blind => "info",
+                Activity::Inert => "warn",
+            }
+        }
+    }
+
+    /// Pur — juge un compteur de feature.
+    ///
+    /// - `context_active` : le système est-il **censé** produire en ce moment ?
+    ///   (en combat pour un compteur de combat, en arène pour un compteur d'arène…)
+    /// - `count` : combien il a produit depuis le début de la session.
+    /// - `active_secs` : depuis combien de temps le contexte est actif.
+    /// - `grace_secs` : délai laissé au système pour démarrer avant de le juger.
+    ///
+    /// Le délai de grâce n'est pas du confort : sans lui, la première seconde
+    /// d'un combat déclencherait une alerte à chaque round.
+    pub fn judge(context_active: bool, count: u64, active_secs: f32, grace_secs: f32) -> Activity {
+        if !context_active {
+            return Activity::Blind;
+        }
+        if count > 0 {
+            return Activity::Ok;
+        }
+        if active_secs < grace_secs {
+            return Activity::Ok;
+        }
+        Activity::Inert
+    }
+
+    /// Délai de grâce par défaut : un système de combat qui n'a rien produit
+    /// après **15 s de combat effectif** ne démarre pas — il est mort.
+    pub const DEFAULT_GRACE_SECS: f32 = 15.0;
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        /// LE cas du 2026-08-12 : 51 kills, `kill_bursts: 0`, capteur qui dit « ok ».
+        #[test]
+        fn un_compteur_a_zero_en_plein_contexte_est_un_defaut() {
+            assert_eq!(judge(true, 0, 60.0, 15.0), Activity::Inert);
+            assert_eq!(judge(true, 0, 60.0, 15.0).severity(), "warn");
+        }
+
+        /// Le piège symétrique : au menu, zéro ne veut RIEN dire. Ni vert ni rouge.
+        #[test]
+        fn hors_contexte_le_capteur_est_aveugle_pas_vert() {
+            assert_eq!(judge(false, 0, 999.0, 15.0), Activity::Blind);
+            assert_eq!(
+                judge(false, 0, 999.0, 15.0).severity(),
+                "info",
+                "un capteur sans rien a mesurer ne doit pas se declarer OK — \
+                 c'est exactement le mensonge que ce module corrige"
+            );
+        }
+
+        #[test]
+        fn le_delai_de_grace_evite_de_crier_au_demarrage() {
+            // 2 s de combat, rien encore produit : normal.
+            assert_eq!(judge(true, 0, 2.0, 15.0), Activity::Ok);
+            // 16 s plus tard, toujours rien : anormal.
+            assert_eq!(judge(true, 0, 16.0, 15.0), Activity::Inert);
+        }
+
+        #[test]
+        fn produire_une_seule_fois_suffit_a_prouver_que_ca_marche() {
+            assert_eq!(judge(true, 1, 999.0, 15.0), Activity::Ok);
+        }
+
+        /// Le contexte prime sur tout : meme inerte depuis longtemps, hors
+        /// contexte on se tait. Sinon chaque retour au menu leverait une alerte.
+        #[test]
+        fn le_contexte_prime_sur_l_anciennete() {
+            assert_eq!(judge(false, 0, 10_000.0, 15.0), Activity::Blind);
+        }
+    }
+}
+
 pub mod hud_visibility {
     use bevy::prelude::*;
 

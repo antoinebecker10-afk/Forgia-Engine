@@ -1508,6 +1508,57 @@ pub fn sys_tick_element_status(
 
 // ─── Sensor forgia2_elements.json ───────────────────────────────────────────
 
+/// Pur — sévérité du capteur éléments.
+///
+/// **story-699.** Ce capteur rapportait `severity: "ok"` le 2026-08-12 alors que
+/// `reactions: {combustions: 0, miasmas: 0, surcharges: 0}` après une run avec
+/// **176 combustions posées et 102 chocs**. Il ne regardait que « un élément
+/// est-il armé ? » — jamais « le moteur de réactions produit-il quelque chose ? ».
+/// Un système inerte ne lève aucune erreur : c'est ce qui l'avait rendu invisible.
+///
+/// Le contexte d'attente se déduit ici des **propres données du capteur**, sans
+/// paramètre supplémentaire : une réaction exige deux éléments distincts sur la
+/// cible, donc tant qu'un seul type d'élément a touché, l'absence de réaction ne
+/// prouve rien. C'est le `Blind` de [`forgia_core::sensor_activity`] — ni vert,
+/// ni rouge : aveugle.
+pub fn severity_for_elements(
+    any_element_armed: bool,
+    hits_per_element: [u32; 4],
+    reactions_total: u32,
+    elapsed_secs: f32,
+) -> (&'static str, &'static str) {
+    use forgia_core::sensor_activity::{judge, Activity};
+
+    if !any_element_armed {
+        return (
+            "warn",
+            "0 élément armé — départ-armé KO (EquippedWeapons absent/non mappé au reset Roguelite)",
+        );
+    }
+
+    // Deux types d'élément ont touché ⇒ une réaction était possible. C'est la
+    // condition « censé tourner » : sans elle, on crierait dès le premier tir.
+    let distinct = hits_per_element.iter().filter(|h| **h > 0).count();
+    let reactions_possible = distinct >= 2;
+
+    match judge(
+        reactions_possible,
+        u64::from(reactions_total),
+        elapsed_secs,
+        forgia_core::sensor_activity::DEFAULT_GRACE_SECS,
+    ) {
+        Activity::Inert => (
+            "warn",
+            "Les elements s'appliquent mais ne REAGISSENT jamais : 2+ types ont touche, 0 reaction. Le moteur de reactions est inerte — cf story-697. Ne pas retoucher les degats des DoT, le defaut est au declenchement.",
+        ),
+        Activity::Blind => (
+            "info",
+            "Un seul type d'element a touche pour l'instant : l'absence de reaction ne prouve rien. Le capteur est AVEUGLE sur ce point, pas vert.",
+        ),
+        Activity::Ok => ("ok", ""),
+    }
+}
+
 /// Écrit `forgia2_elements.json` 1Hz : mapping par arme, hits par élément, DoT
 /// actifs, executes, **éléments armés** (story-589). Severity `warn` si aucun
 /// élément armé hors mode dev (le départ-armé a échoué → progression cassée).
@@ -1535,14 +1586,17 @@ pub fn sys_write_elements_sensor(
     let active_miasmas = q_miasma.iter().count();
     let active_miasma_stacks: u32 = q_miasma.iter().map(|m| m.stacks).sum();
 
-    let (severity, next_step) = if config.always_on || unlocks.count() >= 1 {
-        ("ok", "")
-    } else {
-        (
-            "warn",
-            "0 élément armé — départ-armé KO (EquippedWeapons absent/non mappé au reset Roguelite)",
-        )
-    };
+    let (severity, next_step) = severity_for_elements(
+        config.always_on || unlocks.count() >= 1,
+        [
+            stats.hits_fire,
+            stats.hits_poison,
+            stats.hits_shock,
+            stats.hits_armor_pierce,
+        ],
+        stats.combustions + stats.miasmas + stats.surcharges,
+        time.elapsed_secs(),
+    );
 
     let json = format!(
         r#"{{"id":"elements","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"always_on":{},"base_hit_affinity":{},"unlocked":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"unlocked_count":{},"mapping":{{"pistol":"{}","smg":"{}","sniper":"{}","pompe":"{}"}},"hits":{{"fire":{},"poison":{},"shock":{},"armor_pierce":{}}},"burns_applied":{},"poisons_applied":{},"shocks_applied":{},"aoe_hits":{},"executes":{},"elem_absorbed":{:.0},"reactions":{{"combustions":{},"miasmas":{},"surcharges":{}}},"active_burns":{active_burns},"active_poisons":{active_poisons},"active_poison_stacks":{active_stacks},"active_shocks":{active_shocks},"active_miasmas":{active_miasmas},"active_miasma_stacks":{active_miasma_stacks}}}"#,
@@ -1583,6 +1637,47 @@ pub fn sys_write_elements_sensor(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// LE cas du 2026-08-12 : 192 hits feu + 133 hits choc, zéro réaction, et le
+    /// capteur disait « ok ». Il doit désormais crier.
+    #[test]
+    fn deux_elements_qui_touchent_sans_aucune_reaction_est_un_defaut() {
+        let (sev, next) = severity_for_elements(true, [192, 1, 133, 13], 0, 300.0);
+        assert_eq!(sev, "warn");
+        assert!(next.contains("inerte"));
+    }
+
+    /// Le piège symétrique : un seul type d'élément ne PEUT pas produire de
+    /// réaction. Crier ici apprendrait à ignorer l'alerte.
+    #[test]
+    fn un_seul_element_qui_touche_rend_le_capteur_aveugle_pas_rouge() {
+        let (sev, next) = severity_for_elements(true, [192, 0, 0, 0], 0, 300.0);
+        assert_eq!(sev, "info");
+        assert!(next.contains("AVEUGLE"));
+    }
+
+    #[test]
+    fn une_seule_reaction_suffit_a_prouver_que_le_moteur_tourne() {
+        assert_eq!(
+            severity_for_elements(true, [10, 0, 10, 0], 1, 300.0).0,
+            "ok"
+        );
+    }
+
+    #[test]
+    fn le_delai_de_grace_couvre_le_debut_de_run() {
+        // 5 s de jeu, deux éléments viennent de toucher : trop tôt pour juger.
+        assert_eq!(severity_for_elements(true, [1, 0, 1, 0], 0, 5.0).0, "ok");
+    }
+
+    /// L'ancien contrôle reste prioritaire : sans élément armé, le reste est
+    /// sans objet.
+    #[test]
+    fn aucun_element_arme_reste_le_defaut_prioritaire() {
+        let (sev, next) = severity_for_elements(false, [0, 0, 0, 0], 0, 300.0);
+        assert_eq!(sev, "warn");
+        assert!(next.contains("depart-arme") || next.contains("départ-armé"));
+    }
 
     #[test]
     fn default_maps_weapons_to_signature_elements() {
