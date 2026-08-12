@@ -55,8 +55,10 @@ pub mod prelude {
         ARENA_V1_WEAPONS,
     };
     pub use crate::{ForgiaCombatPlugin, Health};
-    // HitStopState : migré vers forgia-juice-hit-stop (Tier 1D 2026-05-17).
-    // Importer directement : `use forgia_juice_lib::hit_stop::HitStopState;`
+    // ⚠ HitStopState N'EXISTE PLUS — la crate qui l'hébergeait a été supprimée par
+    // ADR-0002 le 2026-05-26 (story-696). Ne pas chercher à l'importer : l'ancien
+    // commentaire indiquait `forgia_juice_lib::hit_stop::HitStopState`, un chemin
+    // mort. Détail et marche à suivre dans `combat_juice.rs`, en-tête « HITSTOP ».
 }
 
 // =============================================================================

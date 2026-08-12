@@ -149,9 +149,20 @@ pub struct PrevHealth(pub f32);
 
 // â”€â”€ Resources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// HitStopState : migré vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
-// Migration legacy re-export retirée 2026-05-18 — consommateurs DOIVENT importer direct :
-//   use forgia_juice_lib::hit_stop::HitStopState;
+// ⚠ HITSTOP : LA FEATURE N'EXISTE PLUS (constaté 2026-08-12, story-696).
+//
+// Historique : `HitStopState` a été migré vers une crate `forgia-juice-hit-stop`
+// le 2026-05-17 (Tier 1D). Cette crate a été SUPPRIMÉE neuf jours plus tard par
+// ADR-0002 (cleanup 266 → 62). Personne ne l'a vu.
+//
+// Vérifiable : `crates/forgia-juice-hit-stop` absente · `forgia-juice-lib/src/`
+// n'a pas de `hit_stop.rs` · zéro dépendance `juice-hit-stop` au workspace.
+//
+// Les anciennes lignes de ce commentaire disaient d'importer
+// `forgia_juice_lib::hit_stop::HitStopState` — un chemin qui n'existe pas. Elles
+// sont retirées : un commentaire faux coûte plus cher que pas de commentaire.
+// Avant de reconstruire, chercher le CONCEPT (gel du temps à l'impact), pas le
+// nom `hit_stop` : une réimplémentation sous un autre nom passerait inaperçue.
 
 #[derive(Resource, Default)]
 pub struct CameraTrauma {
@@ -193,8 +204,10 @@ pub struct HitFlashTimer {
 // TODO: combat_juice_event_system requires FpsTuning + ChromaticAberration (Bevy pp) + HitFlashCache
 // pub fn combat_juice_event_system(...) { ... }
 
-// hitstop_tick_system : extrait vers `forgia-juice-hit-stop` (Tier 1D, 2026-05-17).
-// Wiring : `forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin` ajouté idempotent dans `ForgiaCombatPlugin`.
+// ⚠ `hitstop_tick_system` : PARTI AVEC LA CRATE SUPPRIMÉE (cf en-tête, story-696).
+// La ligne précédente affirmait « Wiring : ForgiaJuiceHitStopPlugin ajouté
+// idempotent dans ForgiaCombatPlugin » — ce plugin n'existe nulle part. Aucun
+// système de hitstop ne tourne aujourd'hui.
 
 pub fn trauma_decay_system(time: Res<Time>, mut trauma: ResMut<CameraTrauma>) {
     if trauma.trauma > 0.001 {

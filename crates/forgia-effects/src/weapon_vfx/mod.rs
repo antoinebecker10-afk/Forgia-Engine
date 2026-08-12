@@ -13,7 +13,7 @@ pub mod tracer;
 use bevy::prelude::*;
 use bevy_hanabi::prelude::*;
 use forgia_combat::weapons::WeaponType;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 // TODO: port from V1 — components::Lifetime
 // use forgia_core::components::Lifetime;
@@ -208,7 +208,26 @@ impl VfxTuning {
 pub struct VfxGenomeWatch {
     pub last_mtime: Option<std::time::SystemTime>,
     pub reload_count: u32,
-    pub kill_bursts: u64,
+}
+
+/// Nombre de bursts de kill réellement déclenchés depuis le lancement.
+///
+/// **story-698.** Ce compteur était auparavant un champ de [`VfxGenomeWatch`] —
+/// déclaré, sérialisé dans le capteur… et **jamais incrémenté**, parce que
+/// `spawn_kill_burst` n'a pas accès à cette `Resource` et que son appelant
+/// (`forgia-fps`) ne la porte pas non plus. Résultat : `kill_bursts: 0` en
+/// permanence, lu pendant des semaines comme « le burst ne part pas » alors que
+/// rien ne prouvait quoi que ce soit.
+///
+/// Il est désormais **dans la fonction qui fait la chose**, donc il ne peut plus
+/// diverger de l'acte qu'il mesure. Un atomique plutôt qu'un paramètre de plus :
+/// même idiome que les compteurs de `forgia_core::sensor_io`, et zéro plomberie à
+/// travers deux crates pour une valeur de diagnostic.
+static KILL_BURSTS: AtomicU64 = AtomicU64::new(0);
+
+/// Lecture du compteur, pour le capteur.
+pub fn kill_bursts_total() -> u64 {
+    KILL_BURSTS.load(Ordering::Relaxed)
 }
 
 /// Textures particules Kenney Particle Pack (CC0) — story-647.
@@ -742,7 +761,7 @@ pub fn sys_write_weapon_vfx_sensor(
         t.size_mult,
         t.count_mult,
         t.lifetime_mult,
-        w.kill_bursts,
+        kill_bursts_total(),
         w.reload_count,
     );
     if let Err(e) = forgia_core::sensor_io::enqueue(VFX_SENSOR_PATH, json) {
@@ -761,6 +780,10 @@ pub fn spawn_kill_burst(
     shot_dir: Vec3,
     weapon: &WeaponType,
 ) {
+    // story-698 : compté ICI, dans la fonction qui déclenche le burst. Le compteur
+    // ne peut plus rester à zéro pendant que l'effet part.
+    KILL_BURSTS.fetch_add(1, Ordering::Relaxed);
+
     // Offset hors-surface vers le tireur (cf spawn_impact_vfx) — le burst de
     // kill doit s'ouvrir DEVANT le corps, pas dedans.
     let pos = pos - shot_dir.normalize_or_zero() * effects.impact_offset_m;
