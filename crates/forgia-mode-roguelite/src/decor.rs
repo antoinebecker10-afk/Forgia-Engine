@@ -583,22 +583,53 @@ impl DecorSpec {
 /// et ce sont les points d'apparition qui cherchent une place libre dedans.
 #[derive(Resource, Debug, Clone, Default)]
 pub struct DecorObstacles {
-    /// (centre au sol, rayon d'emprise) de chaque prop SOLIDE.
+    /// (centre au sol, rayon d'emprise) de chaque prop SOLIDE **du décor**.
+    ///
+    /// Rempli par `sys_reconcile_decor` au moment du PLAN, avant instanciation.
     pub discs: Vec<(Vec2, f32)>,
+    /// (centre au sol, rayon) des solides de l'ARÈNE : murs de pièces, modules de
+    /// layout, **bâtiments autorés**, remparts.
+    ///
+    /// # Pourquoi ce champ existe (2026-08-12, rapporté en jeu)
+    ///
+    /// « Certains ennemis spawnent dans un bâtiment et restent bloqués dedans, je les
+    /// vois à travers. » Cause : la recherche de place libre ne consultait que `discs`,
+    /// c'est-à-dire **le décor procédural seul**. Le marqueur `SolidDecorObstacle`
+    /// n'existe que dans ce fichier — vérifié, zéro occurrence ailleurs dans les 66
+    /// crates. Un bâtiment autoré n'existait donc tout simplement pas pour le spawn.
+    ///
+    /// La source est `forgia_stage::ArenaGeometry`, la **même que le maillage de
+    /// navigation** : une seule vérité pour « qu'est-ce qui est solide », au lieu de
+    /// deux listes qui divergent. Un champ séparé plutôt qu'un mélange dans `discs`
+    /// parce que chacun garde alors un producteur unique — `discs` au décor, `arena`
+    /// à la géométrie — et qu'aucune écriture n'écrase l'autre.
+    pub arena: Vec<(Vec2, f32)>,
 }
 
 impl DecorObstacles {
+    /// TOUS les solides — décor **et** arène. C'est le seul itérateur que les tests
+    /// de dégagement doivent utiliser : en oublier un est précisément le défaut du
+    /// 2026-08-12 (ennemis nés dans les bâtiments autorés).
+    pub fn solides(&self) -> impl Iterator<Item = &(Vec2, f32)> {
+        self.discs.iter().chain(self.arena.iter())
+    }
+
+    /// Combien de solides sont réellement pris en compte. **Zéro n'est pas « dégagé »,
+    /// c'est aveugle** — et c'est exactement l'état dans lequel le spawn a vécu.
+    pub fn mesures(&self) -> usize {
+        self.discs.len() + self.arena.len()
+    }
+
     /// PUR — cette position est-elle libre pour un corps de rayon `body_radius` ?
     pub fn is_clear(&self, pos: Vec2, body_radius: f32) -> bool {
         let r = body_radius.max(0.0);
-        !self.discs.iter().any(|(c, rad)| pos.distance(*c) < rad + r)
+        !self.solides().any(|(c, rad)| pos.distance(*c) < rad + r)
     }
 
     /// Distance au bord de l'obstacle le plus proche (négatif = à l'intérieur).
     /// Sert de score pour choisir « le moins mauvais » quand tout est encombré.
     pub fn clearance(&self, pos: Vec2, body_radius: f32) -> f32 {
-        self.discs
-            .iter()
+        self.solides()
             .map(|(c, rad)| pos.distance(*c) - rad - body_radius.max(0.0))
             .fold(f32::INFINITY, f32::min)
     }
@@ -1091,22 +1122,80 @@ pub fn sys_decor_build_hull_colliders(
 /// Footprint approx d'un bot (XZ) pour le clear-spawn.
 const BOT_FOOTPRINT_M: f32 = 0.5;
 
-/// Empêche un ennemi de RESTER apparu dans un décor solide : si un bot chevauche
-/// le footprint d'un `SolidDecorObstacle`, on le pousse juste au bord (nudge
-/// radial minimal → ne casse pas le cover). Robuste au timing (positions
-/// d'entités, pas de test physique async). Gated Roguelite.
+/// Recopie les solides de l'ARÈNE dans [`DecorObstacles::arena`].
+///
+/// # Le défaut que ce système corrige (2026-08-12)
+///
+/// La recherche de place libre ne voyait que le décor procédural. Les bâtiments
+/// autorés, les murs de pièces et les remparts lui étaient **invisibles** — d'où des
+/// ennemis nés à l'intérieur, définitivement bloqués.
+///
+/// `ArenaGeometry` publie tout, **au moment du plan**, ce que `spawn-clearance.md` §3
+/// exige justement : interroger les entités déjà spawnées donne une liste incomplète et
+/// un résultat qui dépend du timing — ce qui explique le « certains » du rapport.
+///
+/// Les tronçons (murs) deviennent des disques qui se chevauchent : une
+/// sur-approximation assumée. Un ennemi repoussé un peu trop loin coûte un placement
+/// médiocre ; un ennemi né dans un mur coûte un ennemi retiré du combat.
+pub fn sys_sync_arena_solids(
+    geometry: Option<Res<forgia_stage::ArenaGeometry>>,
+    cfg: Res<forgia_navmesh::NavmeshBuild>,
+    mut obstacles: ResMut<DecorObstacles>,
+) {
+    let Some(geo) = geometry else {
+        if !obstacles.arena.is_empty() {
+            obstacles.arena.clear();
+        }
+        return;
+    };
+    if !geo.is_changed() {
+        return;
+    }
+    // `clear()` garde la capacité : une arène en repose quelques centaines.
+    obstacles.arena.clear();
+
+    // Même prédicat que le maillage de navigation — sinon on aurait une TROISIÈME
+    // notion de « solide » dans le projet, et elles divergeraient toutes les trois.
+    for d in &geo.discs {
+        if forgia_navmesh::blocks_agent(d.h, cfg.step_height_m) {
+            obstacles.arena.push((Vec2::new(d.x, d.z), d.r));
+        }
+    }
+    for s in &geo.segs {
+        if !forgia_navmesh::blocks_agent(s.h, cfg.step_height_m) {
+            continue;
+        }
+        let a = Vec2::new(s.x0, s.z0);
+        let b = Vec2::new(s.x1, s.z1);
+        let r = s.half_thick_m.max(0.1);
+        let len = a.distance(b);
+        // Pas = le rayon : les disques se chevauchent, aucun trou entre eux.
+        let n = (len / r).ceil().max(1.0) as u32;
+        for i in 0..=n {
+            let t = i as f32 / n as f32;
+            obstacles.arena.push((a.lerp(b, t), r));
+        }
+    }
+}
+
+/// Empêche un ennemi de RESTER apparu dans un solide : s'il chevauche une emprise,
+/// on le pousse juste au bord (nudge radial minimal → ne casse pas le cover).
+///
+/// 2026-08-12 — lisait auparavant les entités `SolidDecorObstacle`, donc **le décor
+/// procédural seul** : le filet de sécurité était aussi aveugle que le spawn qu'il
+/// devait rattraper. Il lit maintenant [`DecorObstacles`], décor **et** arène.
 pub fn sys_unstick_bots_from_decor(
     mut q_bots: Query<&mut Transform, With<ArenaBot>>,
-    q_obstacles: Query<(&Transform, &SolidDecorObstacle), Without<ArenaBot>>,
+    obstacles: Res<DecorObstacles>,
 ) {
-    if q_obstacles.is_empty() {
+    if obstacles.mesures() == 0 {
         return;
     }
     for mut tf in &mut q_bots {
-        for (otf, obs) in &q_obstacles {
-            let dx = tf.translation.x - otf.translation.x;
-            let dz = tf.translation.z - otf.translation.z;
-            let clear = obs.radius + BOT_FOOTPRINT_M;
+        for (centre, rayon) in obstacles.solides() {
+            let dx = tf.translation.x - centre.x;
+            let dz = tf.translation.z - centre.y;
+            let clear = rayon + BOT_FOOTPRINT_M;
             let d2 = dx * dx + dz * dz;
             if d2 < clear * clear {
                 let d = d2.sqrt();
@@ -2081,6 +2170,7 @@ default = 40.0
         // Un anneau de 25 m encombré d'un gros prop à l'angle 0.
         let obstacles = DecorObstacles {
             discs: vec![(Vec2::new(25.0, 0.0), 6.0)],
+            ..Default::default()
         };
         let body = 0.5;
         let a = obstacles.clear_angle_on_ring(25.0, 0.0, body, 24);
@@ -2089,6 +2179,39 @@ default = 40.0
             obstacles.is_clear(p, body),
             "l'angle retenu doit être libre (retenu {a:.2} rad)"
         );
+    }
+
+    #[test]
+    fn un_ennemi_ne_nait_pas_dans_un_batiment_de_l_arene() {
+        // LE bug rapporte en jeu le 2026-08-12 : « certains ennemis spawnent dans un
+        // batiment et restent bloques dedans, je les vois a travers ».
+        //
+        // Avant le correctif, ce test passait a cote : la recherche de place libre
+        // n'iterait que `discs` (le decor procedural), et un batiment autore vit dans
+        // `arena`. Le decor est ici VIDE — seul un batiment de 8 m barre l'anneau.
+        let obstacles = DecorObstacles {
+            discs: Vec::new(),
+            arena: vec![(Vec2::new(25.0, 0.0), 8.0)],
+        };
+        assert_eq!(obstacles.mesures(), 1, "un solide est bien pris en compte");
+
+        let body = 0.5;
+        let a = obstacles.clear_angle_on_ring(25.0, 0.0, body, 24);
+        let p = Vec2::new(25.0 * a.cos(), 25.0 * a.sin());
+        assert!(
+            obstacles.is_clear(p, body),
+            "l'angle retenu tombe dans le batiment (retenu {a:.2} rad) — \
+             c'est exactement l'ennemi coince dedans"
+        );
+    }
+
+    #[test]
+    fn zero_solide_mesure_n_est_pas_un_terrain_degage() {
+        // Un spawn qui ne connait AUCUN solide se croit libre partout. C'est l'etat
+        // dans lequel le jeu a vecu : `mesures()` le rend visible au lieu de le taire.
+        let vide = DecorObstacles::default();
+        assert_eq!(vide.mesures(), 0);
+        assert!(vide.is_clear(Vec2::new(25.0, 0.0), 0.5), "rien ne bloque, faute de rien savoir");
     }
 
     #[test]
@@ -2101,7 +2224,10 @@ default = 40.0
         }
         // …sauf un trou volontairement plus dégagé.
         discs[7].1 = 0.2;
-        let obstacles = DecorObstacles { discs };
+        let obstacles = DecorObstacles {
+            discs,
+            ..Default::default()
+        };
         let a = obstacles.clear_angle_on_ring(25.0, 0.0, 0.5, 24);
         let p = Vec2::new(25.0 * a.cos(), 25.0 * a.sin());
         let best = obstacles.clearance(p, 0.5);

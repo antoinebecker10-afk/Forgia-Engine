@@ -651,7 +651,12 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 decor::sys_drain_decor_queue.after(decor::sys_reconcile_decor),
                 decor::sys_calibrate_decor,
                 decor::sys_decor_build_hull_colliders,
-                decor::sys_unstick_bots_from_decor,
+                // 2026-08-12 — les solides de l'ARÈNE (bâtiments autorés, murs de
+                // pièces, remparts) entrent dans la carte d'obstacles AVANT que le
+                // filet ne s'en serve. Sans ce système, le spawn ne voyait que le
+                // décor procédural : d'où les ennemis nés dans les bâtiments.
+                decor::sys_sync_arena_solids,
+                decor::sys_unstick_bots_from_decor.after(decor::sys_sync_arena_solids),
             )
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),

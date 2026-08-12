@@ -278,12 +278,30 @@ pub struct ActiveNavMesh {
     pub source: String,
     pub seed: u64,
     pub build_ms: f32,
+    // ── Cumulés de session ──────────────────────────────────────────────
+    //
+    // 2026-08-12, première run réelle : le capteur rapportait `built: false,
+    // blind: true` — et c'était **inexploitable**. Le maillage est effacé quand
+    // l'arène est démontée, donc un instantané pris au menu ne dit RIEN de ce qui
+    // s'est passé pendant la partie. Le capteur ne pouvait pas répondre à la seule
+    // question pour laquelle il existait.
+    //
+    // Ces deux compteurs survivent au démontage. C'est la leçon
+    // `feedback_les_agregats_cachent_la_chronologie_tranche` prise à l'envers :
+    // un instantané sans cumul ne prouve rien non plus.
+    /// Nombre de maillages bâtis depuis le lancement. **0 = jamais bâti**, et là
+    /// seulement on peut l'affirmer.
+    pub builds_session: u32,
+    /// Le plus grand nombre d'obstacles retenus sur un bâti de la session.
+    pub max_obstacles_session: usize,
 }
 
 impl ActiveNavMesh {
     /// Remplace le maillage courant. `source` = `stage_id` en arène, nom de zone ailleurs.
     pub fn set(&mut self, mesh: NavMesh, report: BuildReport, source: &str, seed: u64, build_ms: f32) {
         self.mesh = Some(mesh);
+        self.builds_session = self.builds_session.saturating_add(1);
+        self.max_obstacles_session = self.max_obstacles_session.max(report.obstacles_kept);
         self.report = report;
         self.source.clear();
         self.source.push_str(source);
@@ -367,6 +385,10 @@ struct NavmeshSensor<'a> {
     /// `true` = rien n'a été mesuré. Distinct de « rien n'a été retenu ».
     blind: bool,
     build_ms: f32,
+    /// **Le champ qui compte pour une lecture APRÈS la run.** L'instantané ci-dessus
+    /// décrit l'instant présent — souvent le menu, où le maillage a été effacé.
+    builds_session: u32,
+    max_obstacles_session: usize,
     agent_radius_m: f32,
     step_height_m: f32,
 }
@@ -402,6 +424,8 @@ pub fn sys_write_navmesh_sensor(
         obstacles_kept: r.obstacles_kept,
         blind: r.is_blind(),
         build_ms: active.build_ms,
+        builds_session: active.builds_session,
+        max_obstacles_session: active.max_obstacles_session,
         agent_radius_m: cfg.agent_radius_m,
         step_height_m: cfg.step_height_m,
     };
@@ -625,6 +649,31 @@ mod tests {
         let active = ActiveNavMesh::default();
         assert!(!active.is_built());
         assert!(active.path(Vec2::ZERO, Vec2::new(5.0, 0.0)).is_none());
+    }
+
+    #[test]
+    fn les_cumules_survivent_au_demontage_de_l_arene() {
+        // LE defaut du 2026-08-12 : le capteur lu apres la run disait
+        // « built: false, blind: true » — inexploitable, parce que le maillage est
+        // efface au demontage. Un instantane pris au menu ne dit RIEN de la partie.
+        // Ces deux compteurs repondent a la seule question qui comptait.
+        let c = cfg();
+        let discs = [disc(0.0, 0.0, 3.0, 4.0)];
+        let (mesh, report) = build(hexagon_edge(20.0, c.agent_radius_m), &discs, &[], &c);
+        let mut active = ActiveNavMesh::default();
+        assert_eq!(active.builds_session, 0, "rien de bati au depart");
+
+        active.set(mesh, report, "forge_sanctum", 1, 0.0);
+        assert_eq!(active.builds_session, 1);
+        assert_eq!(active.max_obstacles_session, 1);
+
+        active.clear();
+        assert!(!active.is_built(), "l'instantane est bien remis a zero");
+        assert_eq!(
+            active.builds_session, 1,
+            "mais le CUMULE survit — sinon on ne peut rien conclure apres coup"
+        );
+        assert_eq!(active.max_obstacles_session, 1);
     }
 
     #[test]

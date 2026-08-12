@@ -12,6 +12,9 @@ web-time = { workspace = true }
 bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
+# 2026-08-12 — `blocks_agent` + `NavmeshBuild` : le spawn et la navigation partagent
+# LE MEME predicat de solidite. Sans ca, une troisieme notion de « solide » diverge.
+forgia-navmesh = { workspace = true }
 # Story-470 M2 step 1 — réutilise ArenaBot AI + Health/Mortal damage path
 forgia-ai-arena-bot = { workspace = true }
 forgia-damage = { workspace = true }

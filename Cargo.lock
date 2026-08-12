@@ -3626,6 +3626,7 @@ dependencies = [
  "forgia-enemy-nameplate",
  "forgia-input",
  "forgia-mode-fps-arena",
+ "forgia-navmesh",
  "forgia-player",
  "forgia-postprocess",
  "forgia-rpg-data",
