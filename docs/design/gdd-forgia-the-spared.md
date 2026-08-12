@@ -1,7 +1,8 @@
 # GDD — Forgia: The Spared
 
 > **Type** : looter-FPS d'exploration en duo, cœur FPS roguelite · **Plateforme** : PC 1920×1080
-> **Statut** : v1 — gravé depuis la session design du 2026-08-09
+> **Statut** : v1 — gravé depuis la session design du 2026-08-09 · mis à jour 2026-08-12
+> (HUD duo §4, arène 5v5 post-v1 §6, portes d'architecture §10)
 > **Relation aux GDD existants** : [gdd-roguelite-v1.md](gdd-roguelite-v1.md) (missions FPS, boons par arme) et
 > [gdd-run-structure-weapon-progression.md](gdd-run-structure-weapon-progression.md) restent valides pour le
 > moment-à-moment combat — ils décrivent ce qui devient ici **l'Abîme**. Ce document les chapeaute :
@@ -48,7 +49,9 @@ vous, vos armes, le Hall, les créatures rares que vous recueillez. Vérifié sa
   courbe de boons plate, pas de raison de revenir). Ce GDD installe l'ascension verticale (puissance),
   le cycle horizontal (Expéditions ↔ Abîme) et trois chasses à horizons étagés.
 - **Décision de scope v1** : ship = Expédition solo+compagnon + Abîme existant + Forge + puissance +
-  loot. Coop humain temps réel = post-validation (§13).
+  loot. Coop humain temps réel = post-validation (§13). **Arène 5v5 = endgame post-v1**
+  (§6 Mode 3, E10, décidée 2026-08-12) : elle ne consomme aucun budget v1, mais fixe trois
+  contraintes d'architecture à tenir dès maintenant (§10).
 
 ---
 
@@ -126,6 +129,23 @@ applicateurs d'élément de masse — le moment de spectacle.
 Existant : leafwing-input-manager, AZERTY (`KeybindRegistry`). Neuf : 1 touche « ordre au compagnon »
 (contextuelle : le verbe dépend de la cible visée) — gene `companion_order_key`.
 
+### HUD duo (décidé 2026-08-12)
+
+Deux besoins distincts, deux surfaces distinctes — ne jamais les fusionner :
+
+- **Les PV du compagnon** : bande permanente à l'écran (modèle Left 4 Dead), **jamais sur la carte**.
+  Une carte, ça s'ouvre ; des PV, ça se lit sans rien ouvrir. À deux acteurs, une seule barre suffit.
+- **La carte** : minimap permanente, qui sert autant à **donner des ordres** (« va tenir là »,
+  « poste-toi ici ») qu'à situer. Elle rend *spatial* l'ordre aujourd'hui limité à la cible visée —
+  c'est le seul emprunt au genre MOBA qui transfère réellement en vue FPS. Base : la minimap à
+  révélation du V1, à porter selon la doctrine §11 (**porter = corriger**).
+- ⚠ **Afficher l'IA monte la barre de qualité qu'on lui demande.** Un mob coincé à 40 m passe
+  inaperçu ; un compagnon dont le point ne bouge plus sur la carte se voit toutes les trois secondes.
+  La carte rend le navmesh (E1) et un chien de garde de désenlisement non négociables — cf.
+  [spawn-clearance.md](../../.claude/rules/spawn-clearance.md) §5, qui documente déjà l'absence des deux.
+
+Carte plein écran : décision ouverte **D5** (§14).
+
 ---
 
 ## 5. Armes & combat
@@ -173,6 +193,34 @@ justifiée par le lore). Qualité = noblesse du matériau (le légendaire est fo
 Le mode arène actuel (stages, vagues, boons) **reprofilé en descente infinie**. Fiction : le creuset
 primordial sous la Forge, où les premiers mondes ont été fondus — on n'y gagne rien, on s'y trempe.
 Récompense unique : XP d'arme. Tableau de rang de profondeur sans loot pour les joueurs maîtrise.
+
+### Mode 3 — L'Arène 5v5 (post-v1, E10)
+
+Débloquée au niveau joueur (gene `arena_5v5_unlock_player_level`, cible indicative : 30) — donc
+nourrie par les deux modes v1, jamais séparée d'eux. Un MOBA **en vue FPS** : 3 lanes, jungle,
+sbires, tours, boutique en match — construit sur le contenu déjà payé (armes, éléments, ultimes,
+économie), pas sur du contenu neuf.
+
+**Principe fondateur : 10 *slots*, pas 10 humains.** Tout slot vide est tenu par un compagnon, via
+l'interface du §10. Le bot n'est pas un mode dégradé, c'est l'architecture : 1 humain + 9 bots,
+3v3 + 4 bots, ou 10 humains — toutes les combinaisons sont valides et jouables. Sans ça le mode
+meurt en file d'attente, ce qui a tué Battleborn et Gigantic bien avant leur design.
+
+**Adaptations non triviales du modèle MOBA à la vue FPS** :
+
+| Élément | Adaptation |
+| --- | --- |
+| **Last-hit** | Impossible au réticule. L'or **jaillit** du sbire mourant : à récupérer — ou à refuser à l'adversaire — en tirant dessus dans une fenêtre courte |
+| **Brouillard de guerre** | Redondant en FPS (on ne voit déjà que devant soi). Ce qui survit : minimap limitée à la vision de l'équipe + wards = capteurs déployables |
+| **Lanes** | **Verticalité** : lanes étagées, jungle en dessous. L'axe que le genre top-down ne peut pas exploiter |
+| **Composition d'équipe** | Les **réactions élémentaires** (§4) : « je pose, tu détones » à deux devient une méta de draft à cinq. Aucun MOBA-FPS n'a cet axe — c'est notre différenciant, et il est déjà à moitié construit |
+| Sbires, tours, niveaux, boutique en match | Transfèrent tels quels |
+
+**Dépendances** : navmesh (livré par E1 — les sbires en sont les premiers consommateurs), notion
+d'équipe (§10), netcode (E9). **Rien de tout cela n'est codé en v1.**
+
+⚠ Point de funnel à trancher le moment venu : gater le seul mode PvP derrière 30 niveaux de PvE
+fait rebondir les joueurs venus pour le PvP. La version à bots permet de les laisser entrer plus tôt.
 
 ### Génération & seed
 
@@ -295,14 +343,43 @@ l'œil), thème du Hall = le foyer.
   insuffisant en terrain d'expédition. Déclencheur du chantier **vleue_navigator 0.15** (navmesh
   polyanya, compatible bevy ^0.18 — veille 2026-08-06, sans migration). Navmesh généré depuis le
   terrain d'expédition ; régénération par chunk streamé à évaluer.
-- **Le compagnon = contrat d'interface du coop** : ses verbes (tenir, activer, porter, se poster)
-  définissent l'API des interactions duo. Le futur joueur humain (E9) consomme la même interface.
-- **Netcode** : hors v1. Aucune décision d'architecture réseau dans ce GDD — mais toute sim de
-  gameplay reste en FixedUpdate déterministe (fondation existante) pour ne pas fermer la porte.
+- **Le compagnon = contrat d'interface d'un *slot*** : ses verbes (tenir, activer, porter, se
+  poster) définissent l'API des interactions duo. Le futur joueur humain (E9) consomme la même
+  interface — et l'arène 5v5 (E10) la consomme **N fois**. À spécifier « occupe un slot », jamais
+  « l'allié du joueur » : la nuance est gratuite maintenant, structurelle plus tard.
+- **Notion d'équipe / faction sur les entités** : un codebase qui suppose « le joueur contre les
+  ennemis » ne se rétrofite pas en 5v5. Un composant faction posé tôt ne coûte presque rien ; posé
+  après, c'est une refonte transverse. Porte à ne pas fermer, même si E10 est lointain.
+- **Netcode** : hors v1 **en code**, mais l'architecture est **décidée** (2026-08-12) :
+  **P2P / listen-server** — une machine joueur héberge, aucun serveur à payer. État réel vérifié le
+  2026-08-12 : V2 ne contient **aucune dépendance réseau** (lightyear 0.26.4 n'a jamais quitté V1,
+  cf. `.claude/rules/build-stack.md` qui décrit encore le stack V1) — le choix est donc ouvert et
+  sans coût de sortie.
+  - **La condition qui rend le choix réversible** : la simulation est **autoritative d'un seul
+    côté, les clients envoient des inputs**. « Le serveur » devient alors un choix de
+    *déploiement*, pas d'architecture : même code en listen-server chez un joueur (E9, gratuit) ou
+    en binaire dédié (E10, si la population le justifie). Une autorité **partagée/confiante** entre
+    pairs interdit définitivement ce passage.
+  - **L'avantage de l'hôte se traite, il ne se subit pas** — trois techniques éprouvées :
+    (a) **délai d'input local** sur l'hôte, aligné sur le RTT moyen des autres ; (b) **lag
+    compensation** au tir — le serveur rembobine à la vue du tireur, donc chacun touche ce qu'il
+    voit ; (c) **même buffer d'interpolation pour tout le monde, hôte compris** — sans quoi l'hôte
+    voit l'état du monde avant les autres, un avantage d'*information* que le délai d'input ne
+    corrige pas.
+  - ⚠ Ces techniques règlent l'**équité**, jamais l'**intégrité** : l'hôte fait autorité, donc reste
+    capable de tricher. Sans conséquence en PvE (E9) ; à re-trancher pour le PvP de E10.
+  - Transport : **Steam Datagram Relay** (gratuit avec Steamworks) — NAT punch-through et IP des
+    joueurs masquées (le P2P brut les expose).
+  - Toute sim de gameplay reste en **FixedUpdate déterministe** (fondation existante).
 - **GameSet** : les systèmes compagnon en `GameSet::AI`, extraction/objectifs en gameplay standard,
   capteurs en `GameSet::Sensors` (chaîne L7 respectée).
 - **Budget frame** : la propagation d'Oubli (front visuel) doit être chunk-locale et dirty-flagged —
   jamais un repaint global par frame (hot path check §3.4 concept-first).
+
+> **Les quatre portes à ne pas fermer** (décidé 2026-08-12, en vue de E9/E10) : le **contrat de
+> slot**, la **notion de faction**, la **sim en FixedUpdate déterministe**, et l'**autorité d'un
+> seul côté** (jamais d'autorité partagée entre pairs). Aucune ligne de code réseau ni MOBA n'est
+> écrite en v1 — seules ces quatre contraintes sont tenues, et elles ne coûtent rien aujourd'hui.
 
 ---
 
@@ -322,6 +399,7 @@ l'œil), thème du Hall = le foyer.
 | **E7 Hall des Épargnés** | piédestaux, refuge des créatures, trophées (éditeur existant story-665) | à créer | |
 | **E8 Narratif** | Livre (10 chapitres existants) recâblé sur l'arc l'Oubli, barks contextuels | à créer | |
 | **E9 Coop humain** | netcode duo, rattrapage (D3) | à créer | post-validation |
+| **E10 Arène 5v5** | MOBA en vue FPS (lanes verticales, jungle, sbires, tours, boutique), 10 slots humains/bots, déblocage niveau joueur | à créer | post-v1 — endgame (§6 Mode 3) |
 
 Existant réutilisé : story-597 (FTUE), story-665 (éditeur Hall), story-690 (ArenaGeometry),
 GDD v1 missions 1-2 (combat core).
@@ -365,7 +443,9 @@ dispersés (ruines/camps/tours), placement procédural de loot/coffres, quêtes 
 - **Montures** (traversée + trophée — « à terme », système entier)
 - **Perks sur épique/légendaire** (la qualité v1 = points seulement)
 - **Marketplace pour ultra-rares** (jamais — un trophée acheté ne vaut rien au Hall)
-- **PvP**, mode spectateur, cross-save
+- **PvP en v1** — l'arène 5v5 est **décidée** (§6 Mode 3, E10) mais post-v1 : zéro ligne de code en
+  v1, seules les trois portes d'architecture (§10) sont tenues
+- Mode spectateur, cross-save
 - Récompenses dans l'Abîme au-delà de la trempe (le tableau de rang est un affichage, pas un système)
 
 ## 14. Hypothèses, dépendances & décisions ouvertes
@@ -383,6 +463,8 @@ dispersés (ruines/camps/tours), placement procédural de loot/coffres, quêtes 
   XP gardés. À valider manette en main.
 - **D3** — Mécanisme de rattrapage duo — à trancher avant E9 seulement.
 - **D4** — Noms définitifs FR/EN des univers 7+ et de leurs archétypes.
+- **D5** — Carte plein écran en plus de la minimap permanente (§4 HUD duo) ? Se tranche manette en
+  main, jamais depuis un tableau (`map-design-intention.md` §5.3).
 
 ---
 
