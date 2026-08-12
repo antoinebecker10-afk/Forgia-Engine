@@ -98,6 +98,12 @@ futures sans que personne ne regarde.
       `weapon_vfx` compte des `kill_bursts` mais **ignore combien de kills ont eu
       lieu** — il lui faut une source extérieure. C'est précisément pourquoi le
       1er AC ci-dessus est le vrai travail.
+- [ ] **4ᵉ mode de défaillance, découvert le 2026-08-12** : un **fichier capteur
+      orphelin, sans aucun producteur dans le code**, se lit comme une donnée
+      vivante.  date du 21 juillet et rien ne l'écrit plus
+      (cf story-696) — ni le chien de garde (il ne juge que ce qu'il a vu
+      tictaquer) ni la sévérité vide ne l'attrapent. Il faut croiser le registre
+      avec les producteurs RÉELS, pas avec les fichiers présents.
 - [ ] Aucun `warn` au menu ou hors du contexte d'attente — **à vérifier sur une
       run réelle**, pas seulement en test. Le chien de garde a montré le même jour
       qu'un faux positif ne se voit qu'en jeu.

@@ -1,61 +1,100 @@
-# story-696 — Le hitstop ne se déclenche jamais, et son capteur s'est tu
+# story-696 — Le hitstop n'existe plus : supprimé par ADR-0002, et personne ne l'a vu
 
-**Statut** : DRAFT
+**Statut** : DRAFT — **réécrite le 2026-08-12**, le diagnostic initial était faux
 **Créée** : 2026-08-12
-**Niveau BMAD** : Quick (diagnostic d'abord — la correction dépend de ce qu'on trouve)
-**Origine** : run de validation du 2026-08-12, lecture des capteurs de game feel.
-**Bloque** : [story-648](story-648-paliers-hitstop.md) (paliers de hitstop), qui ne
-peut pas être validée tant que l'effet ne part pas.
+**Niveau BMAD** : Standard (une feature à restaurer + un défaut de classe à instruire)
+**Origine** : run de validation du 2026-08-12. La première version accusait le
+hitstop de « ne pas se déclencher ». La mesure dit tout autre chose.
 
 ---
 
-## Symptôme, mesuré
+## Ce que disait la v1, et pourquoi c'était faux
 
-`forgia2_gamefeel.json`, après une run complète avec **51 kills** et **419 hits** :
+> *« `hitstop_counts: {hit:0, crit:0, kill:0, multikill:0}` sur une run à 51 kills.
+> Le hitstop ne part jamais. »*
 
-```json
-"hitstop_counts": { "hit": 0, "crit": 0, "kill": 0, "multikill": 0 },
-"last_tier": "none",
-"last_duration_ms": 0
+Deux erreurs, découvertes en écrivant `tools/ai/phase0_check.py` :
+
+1. **`forgia2_gamefeel.json` date du 2026-07-21** — vingt-deux jours. Les zéros lus
+   et relus toute la journée sont un artefact de juillet, pas une mesure.
+2. **Aucun code n'écrit ce fichier.** C'est un **orphelin** : son producteur
+   n'existe plus. Le lire revenait à interroger un mort.
+
+## Ce qui s'est réellement passé
+
+| Date | Événement |
+|---|---|
+| **2026-05-17** | `HitStopState` et `hitstop_tick_system` **migrés** de `forgia-combat` vers une crate dédiée `forgia-juice-hit-stop` (Tier 1D) |
+| **2026-05-26** | [ADR-0002](../adr/ADR-0002-cleanup-crates-266-to-62.md) supprime ~200 crates. `forgia-juice-hit-stop` en fait partie — **neuf jours après la migration** |
+| depuis | La feature n'existe plus. Les commentaires, si |
+
+Preuves, toutes vérifiables en une commande :
+
+- `crates/forgia-juice-hit-stop` — **absente**
+- `forgia-juice-lib/src/` contient `camera_shake`, `fov_punch`, `knockback`,
+  `recoil` — **pas de `hit_stop.rs`**
+- **zéro dépendance** `juice-hit-stop` dans tout le workspace
+- `grep -rn "HitStopState\|hitstop_tick"` sur `crates/` → **uniquement des commentaires**
+
+Et ces commentaires **mentent encore aujourd'hui** :
+
+```rust
+// combat_juice.rs:152  HitStopState : migré vers `forgia-juice-hit-stop` (Tier 1D).
+// combat_juice.rs:197  Wiring : `forgia_juice_lib::hit_stop::ForgiaJuiceHitStopPlugin`
+//                      ajouté idempotent dans `ForgiaCombatPlugin`.
+// lib.rs:59            Importer directement : `use forgia_juice_lib::hit_stop::HitStopState;`
 ```
 
-**Zéro hitstop sur toute la run.** Les paliers sont pourtant chargés et lisibles
-dans le même capteur (`crit_mult 1.50`, `kill_mult 2.50`, `multikill_mult 4.00`),
-donc la configuration arrive — c'est le déclenchement qui manque.
+Aucun de ces trois chemins n'existe. Un lecteur — humain ou IA — qui les croit
+conclura que le hitstop est câblé.
 
-## Le piège : deux hypothèses, et le capteur ne les départage pas
+> **Réserve honnête** : une réimplémentation sous un autre nom n'aurait pas été
+> attrapée par ces greps. Avant de reconstruire, chercher le **concept** (gel du
+> temps à l'impact), pas le nom `hit_stop` — c'est la leçon de story-626.
 
-`timestamp_secs: 218.4` alors que les capteurs voisins sont à **419,5**. Le fichier
-a cessé d'être écrit à mi-run. Donc :
+## Le vrai sujet : la classe de défaut
 
-- **(a)** le hitstop ne se déclenche jamais → compteurs à 0, c'est un vrai défaut ;
-- **(b)** le producteur a cessé de tourner à t=218 → les compteurs sont un
-  instantané périmé, et l'effet marche peut-être depuis.
+Ce n'est pas un bug de gameplay, c'est une **perte silencieuse au cleanup**. ADR-0002
+a supprimé ~200 crates, dont la quasi-totalité étaient des scaffolds vides — mais au
+moins une contenait du code vivant, et rien ne l'a signalé.
 
-**Les deux lectures sont compatibles avec la donnée.** C'est exactement pourquoi le
-chien de garde a été étendu le même jour (`sensor_health` surveille désormais les
-128 capteurs, pas 13) : cet arrêt-là n'avait déclenché **aucune** alerte.
+Mesuré le 2026-08-12 : **44 crates supprimées sont encore citées dans le code**.
+La plupart sont des notes historiques inoffensives (`forgia-juice-camera-shake` est
+cité dans `juice-lib/src/camera_shake.rs` — le code y est bien). Le danger est le
+cas `hit_stop` : **cité, mais sans fichier d'accueil**. Ce sont ceux-là qu'il faut
+lister.
 
-## Marche à suivre
-
-1. **Relancer une run après le fix du chien de garde.** Si `sensor_health` signale
-   `forgia2_gamefeel.json` dans `stalled_paths`, l'hypothèse (b) est confirmée et
-   le vrai bug est dans le système qui écrit le capteur, pas dans le hitstop.
-2. Si le capteur suit la run et que les compteurs restent à 0 → hypothèse (a),
-   chercher le producteur des `hitstop_counts` et pourquoi il n'incrémente pas.
-3. **Ne pas toucher aux multiplicateurs** (`crit_mult`, `kill_mult`,
-   `multikill_mult`) : rien ne dit qu'ils sont en cause, et ils sont chargés
-   correctement. Cf `no-speculative-fix.md`.
+C'est directement le risque n°1 de [`REFONTE_GDD.md`](../REFONTE_GDD.md) §6
+(« reconstruire ce qui existe »), pris **par l'autre bout** : reconstruire ce qui a
+été supprimé sans le savoir, ou pire, croire que ça tourne encore.
 
 ## Critères d'acceptation
 
-- [ ] L'hypothèse (a) ou (b) est **tranchée par une mesure**, pas supposée
-- [ ] `hitstop_counts.hit` > 0 après une run de combat
-- [ ] Les paliers se distinguent : `kill` déclenche une durée > `hit`
-- [ ] `forgia2_gamefeel.json` suit la run de bout en bout (plus d'arrêt à mi-course)
-- [ ] story-648 peut alors être validée ou infirmée sur pièces
+- [x] La cause est **nommée et prouvée** — crate supprimée par ADR-0002, capteur
+      orphelin depuis le 2026-07-21, zéro producteur dans le code
+- [ ] **Inventaire** des 44 citations de crates supprimées, séparées en deux :
+      note historique inoffensive / **référence sans code d'accueil**
+- [ ] Les commentaires menteurs de `combat_juice.rs` et `lib.rs` sont corrigés ou
+      supprimés — un commentaire faux coûte plus cher que pas de commentaire
+- [ ] **Décision** : le hitstop est-il restauré, et où ? (`forgia-juice-lib` est le
+      foyer naturel, il porte déjà les 4 autres effets de juice)
+- [ ] S'il est restauré : son capteur est **déclaré au registre** et surveillé, sinon
+      la prochaine suppression sera tout aussi silencieuse
+- [ ] `forgia2_gamefeel.json` orphelin **supprimé du dépôt de travail** — tant qu'il
+      traîne, il se lit comme une donnée
+
+## Conséquences sur d'autres tickets
+
+- **story-698** (kill sans burst ni son) invoquait « les ingrédients livrés
+  (648/650/655) ». Le 648 était les **paliers de hitstop** — donc un des trois
+  ingrédients du « kill satisfaisant » n'existe plus. Sa prémisse est à corriger.
+- **story-699** gagne un quatrième mode de défaillance des capteurs : au-delà du
+  chien de garde (fraîcheur) et de la sévérité vide (vacuité), un **fichier
+  orphelin sans producteur** se lit comme une donnée vivante.
 
 ## Cross-refs
 
-- `crates/forgia-observability/src/sensor_health_sensor.rs` — le chien de garde étendu
-- `.claude/rules/observability-required.md` · `map-design-patterns.md` §13
+- [ADR-0002](../adr/ADR-0002-cleanup-crates-266-to-62.md) — le cleanup 266 → 62
+- `tools/ai/phase0_check.py` — l'outil qui a révélé l'orphelin
+- `.claude/rules/fine-grained-crates.md` — la doctrine d'après le cleanup
+- story-699 (capteurs qui mentent) · story-698 (kill satisfaisant)
