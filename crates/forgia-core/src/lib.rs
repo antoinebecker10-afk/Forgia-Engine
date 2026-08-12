@@ -84,11 +84,119 @@ pub mod asset_paths {
 
 pub mod prelude {
     pub use crate::cosmetics::{ArmCosmetics, ArmStyle, UiStudioCamera, ViewmodelForcedVisible};
+    pub use crate::faction::Faction;
     pub use crate::fps_feel::FpsFeelMetrics;
     pub use crate::hud_visibility::{gameplay_hud_visible, GameplayHudVisible};
     pub use crate::states::{AppMode, GameMode, WorldMode};
     pub use crate::system_set::GameSet;
     pub use crate::ForgiaCorePlugin;
+}
+
+/// À quel camp appartient une entité.
+///
+/// # Pourquoi ça vit ici, et pourquoi maintenant
+///
+/// Un codebase qui suppose « le joueur contre les ennemis » ne se rétrofite pas en duo ni
+/// en 5v5 : la supposition est partout, implicite, et chaque site la ré-encode à sa façon.
+/// Poser le concept tôt ne coûte presque rien ; le poser après coup est une refonte
+/// transverse. C'est l'une des **quatre portes à ne pas fermer** du GDD §10.
+///
+/// `forgia-core` est le bon toit : zéro dépendance workspace, donc n'importe quelle crate
+/// peut en parler sans créer de cycle.
+///
+/// # Ce que ce type ne décide PAS
+///
+/// Il nomme les camps, il n'arbitre rien : ni les dégâts, ni le ciblage, ni l'aggro. Ces
+/// règles appartiennent aux systèmes qui les appliquent, et les y laisser évite qu'une
+/// table centrale devienne le passage obligé de tout le gameplay.
+pub mod faction {
+    use bevy::prelude::*;
+
+    #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub enum Faction {
+        /// Le joueur humain.
+        #[default]
+        Player,
+        /// Alliés du joueur — compagnon-bot aujourd'hui, coéquipier humain demain (E9),
+        /// coéquipiers d'une équipe 5v5 plus tard (E10). Le même camp, trois sources.
+        Allied,
+        /// Ce qui attaque le joueur.
+        Hostile,
+        /// Ni allié ni hostile : PNJ, faune, décor animé.
+        Neutral,
+    }
+
+    impl Faction {
+        /// Deux camps sont-ils du même bord ?
+        ///
+        /// `Player` et `Allied` sont distincts — un compagnon n'est pas le joueur, et
+        /// certaines règles (le loot personnel, la caméra, les combos élémentaires du
+        /// GDD §4) doivent pouvoir les séparer — mais ils sont **du même bord**.
+        #[must_use]
+        pub fn is_friendly_to(self, other: Self) -> bool {
+            use Faction::{Allied, Hostile, Neutral, Player};
+            match (self, other) {
+                (Neutral, _) | (_, Neutral) => false,
+                (Player | Allied, Player | Allied) => true,
+                (Hostile, Hostile) => true,
+                _ => false,
+            }
+        }
+
+        /// Doivent-ils se prendre pour cible ?
+        ///
+        /// Neutre n'est hostile à personne : c'est ce qui distingue « pas mon allié » de
+        /// « ma cible ». Confondre les deux ferait tirer les bots sur la faune.
+        #[must_use]
+        pub fn is_hostile_to(self, other: Self) -> bool {
+            use Faction::Neutral;
+            self != Neutral && other != Neutral && !self.is_friendly_to(other)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::Faction;
+        use super::Faction::{Allied, Hostile, Neutral, Player};
+
+        #[test]
+        fn le_joueur_et_son_compagnon_sont_du_meme_bord() {
+            assert!(Player.is_friendly_to(Allied));
+            assert!(Allied.is_friendly_to(Player));
+            assert!(!Player.is_hostile_to(Allied));
+        }
+
+        #[test]
+        fn les_hostiles_ne_se_tirent_pas_dessus() {
+            assert!(Hostile.is_friendly_to(Hostile));
+            assert!(!Hostile.is_hostile_to(Hostile));
+        }
+
+        #[test]
+        fn le_joueur_et_les_hostiles_se_ciblent() {
+            assert!(Hostile.is_hostile_to(Player));
+            assert!(Player.is_hostile_to(Hostile));
+            assert!(Hostile.is_hostile_to(Allied));
+        }
+
+        #[test]
+        fn neutre_n_est_l_allie_ni_la_cible_de_personne() {
+            // La distinction qui compte : « pas mon allié » n'est PAS « ma cible ».
+            // Les confondre ferait tirer les bots sur la faune.
+            for autre in [Player, Allied, Hostile, Neutral] {
+                assert!(!Neutral.is_friendly_to(autre), "{autre:?}");
+                assert!(!Neutral.is_hostile_to(autre), "{autre:?}");
+                assert!(!autre.is_hostile_to(Neutral), "{autre:?}");
+            }
+        }
+
+        #[test]
+        fn le_defaut_est_le_joueur() {
+            // Un composant oublie doit produire l'entite la plus inoffensive du jeu,
+            // pas un hostile qui attaquerait tout le monde.
+            assert_eq!(Faction::default(), Player);
+        }
+    }
 }
 
 /// Écriture asynchrone et bornée des capteurs de diagnostic.

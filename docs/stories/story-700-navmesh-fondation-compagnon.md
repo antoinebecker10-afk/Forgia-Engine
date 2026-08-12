@@ -87,7 +87,7 @@ Volontairement hors scope, chacun étant un incrément à part :
 | --- | --- |
 | ~~2~~ | ✅ **LIVRÉ 2026-08-12** — cf. section ci-dessous |
 | ~~3~~ | ✅ **LIVRÉ 2026-08-12** — cf. section ci-dessous |
-| **4** | Le compagnon : suivre, se poster, barre PV permanente |
+| **4** | Le compagnon — **découpé en 4 sous-incréments**, cf. ci-dessous. **4a livré.** |
 | **5** | Le compagnon porte le **second élément** → jalon hérité de [story-697](story-697-reactions-elementaires-jamais-declenchees.md) : les réactions partent en combat ordinaire, plus seulement sur boss |
 
 ---
@@ -220,6 +220,59 @@ Aucun test headless ne dit qu'un bot *se sent* mieux. Le juge est le capteur :
 **`unstick_triggered_session` doit chuter** entre une run d'avant et une run d'après, et
 `forgia2_navmesh.json` doit montrer `obstacles_kept > 0` sur la même run. Les deux chiffres
 existent déjà — il ne manque que la run.
+
+---
+
+## Incrément 4 — le compagnon, découpé (2026-08-12)
+
+Tel qu'écrit — *suivre, se poster, barre PV* — l'incrément touchait **trois zones à la
+fois** : une crate neuve, le spawn dans une crate de mode, et `hud.rs` (2 671 lignes,
+god-file, zone possible de l'autre terminal). C'est le format d'incrément qui part en
+vrille et qu'on n'ose plus committer. Découpé :
+
+| Sous-inc. | Contenu | Zone | État |
+| --- | --- | --- | --- |
+| **4a** | `Faction` | `forgia-core` | ✅ **livré** |
+| **4b** | Crate `forgia-companion` : suivre, se poster, capteur `forgia2_companion.json` | Neuve, isolée | ⬜ |
+| **4c** | Le spawn — le compagnon devient **visible** | Crate de mode | ⬜ |
+| **4d** | Barre PV permanente (GDD §4 HUD duo) | `hud.rs` — **à coordonner** | ⬜ |
+
+### 4a — `Faction`, la porte qu'il fallait ouvrir maintenant
+
+Quatre camps : `Player`, `Allied`, `Hostile`, `Neutral`. Dans `forgia-core` parce qu'il a
+**zéro dépendance workspace** : n'importe quelle crate peut en parler sans créer de cycle.
+
+C'est l'une des **quatre portes à ne pas fermer** du [GDD §10](../design/gdd-forgia-the-spared.md),
+et trois chantiers en dépendent — le compagnon (E1), le coéquipier humain (E9), les équipes
+du 5v5 (E10). *Le même camp, trois sources.*
+
+**Deux décisions :**
+
+- **`Player` et `Allied` sont distincts mais du même bord.** Un compagnon n'est pas le
+  joueur : le loot personnel, la caméra et surtout les **combos élémentaires** du GDD §4
+  doivent pouvoir les séparer. Mais ils ne se tirent pas dessus.
+- **`Neutral` n'est ni allié ni cible de personne.** *« Pas mon allié » n'est pas « ma
+  cible »* — les confondre ferait tirer les bots sur la faune. Un test l'exige.
+
+Le défaut est `Player` : **un composant oublié produit l'entité la plus inoffensive du
+jeu**, pas un hostile qui attaquerait tout le monde.
+
+Le type **nomme les camps, il n'arbitre rien** — ni dégâts, ni ciblage, ni aggro. Ces
+règles restent aux systèmes qui les appliquent, pour qu'une table centrale ne devienne pas
+le passage obligé de tout le gameplay.
+
+**Vérifications** : 5 tests verts · clippy 0 warning.
+
+> ⚠️ **Leçon de méthode.** `cargo check -p forgia-core` est passé au vert alors que le
+> module de tests ne compilait pas — il ne construit pas la cible test. C'est
+> `--all-targets` qui l'a attrapé. Un check qui ne compile pas ce qu'on prétend vérifier
+> est le même défaut qu'un capteur à zéro qui dit « ok » ([story-699](story-699-un-capteur-a-zero-ne-doit-pas-dire-ok.md)).
+
+### La dette d'observabilité de cette story
+
+**Trois incréments de suite sans rien de visible en jeu** (1, 2, 3), et le 4a n'y change
+rien. C'est assumé et écrit à chaque fois — mais ça ne peut pas durer. **Le 4c est celui
+qui doit tomber** pour qu'un joueur voie enfin quelque chose bouger.
 
 ---
 
