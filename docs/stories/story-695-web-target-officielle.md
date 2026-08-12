@@ -17,8 +17,9 @@ depuis `main`/branche, pas depuis un worktree patché à la main.
 | 2 | Sink d'observabilité web (capteurs → mémoire + `forgia_dump_sensors()` + bouton 📋 Diag) | ✅ DONE 2026-08-11 |
 | 3 | Persistance web (localStorage via `persist.rs` : Enclume, équipement, identité, FTUE) | ✅ DONE 2026-08-11 |
 | 4 | (fusionné dans inc.1 : graine + timestamps via web-time) | DONE-par-1 |
+| 4b | **Parité découverte au playtest testeur** (2026-08-11 après-midi) : écran noir arène = bataille de tonemapping (`apply_tonemapping_to_cameras` réapplique TonyMcMapface — LUT neutralisée sur wasm — contre la garde AcesFitted ; l'ordre des systèmes décidait du gagnant) → résolu À LA SOURCE (`tonemapping_from_str` ne rend jamais une LUT sur wasm). Avatar menu absent = `roguelite_equipment.toml` lu via `std::fs` → 0 slot → pas de body_model → `forgia_core::def_io` : pack genomes+registry EMBARQUÉ à la compilation (build.rs, 1,1 Mo TOML) ; equipment + mushrooms migrés. Boucle re-spawn mushrooms chaque frame gardée (0 cluster). Capteur `avatar_ready` mesurait `is_some()` → mesure les pièces montées. Shaders `.wgsl` ajoutés au bundle (toon postprocess silencieusement absent). | ✅ DONE 2026-08-11 |
 | 5 | Manifeste d'assets déclaré + validé au build (fin du grep) ; vidéo menu → .webm | TODO |
-| 6 | Matrice de parité web/natif complète (amorce dans l'audit §2) | TODO |
+| 6 | Matrice de parité web/natif complète (amorce dans l'audit §2). **Reste connu** : ~30 lecteurs `std::fs` de genomes non migrés vers `def_io` (ambiances, weapon_vfx, death_ascension, knockback, color_grading, foliage, castle_*, gait, items…) — en défauts silencieux sur web ; textures KTX2 UASTC (jolcham_oak) intranscodables sans basis ; UserSettings (pause_menu) non persistés sur web. | TODO |
 | 7 | Pipeline de publication GitHub Pages versionné | TODO |
 
 ## Acceptance criteria — incrément 1

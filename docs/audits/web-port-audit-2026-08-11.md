@@ -105,3 +105,30 @@ automatique GitHub Pages, https, URL stable). Une commande depuis le PC, credent
 ---
 
 *Rédigé pendant la traque, build 11 en compilation. Mesures « APRÈS » à compléter à chaud.*
+
+## 8. Addendum après-midi — playtest testeur #1 + diagnostic headless piloté (CDP)
+
+Antoine (testeur #1, Chrome desktop) rapporte : pas de personnage au menu,
+écran noir en arène, Hall vide. Reproduit et diagnostiqué SANS devtools main
+dans la main : Chrome headless piloté par CDP (screenshots + clics + dump
+`forgia_dump_sensors()` — l'inc.2 a payé le jour même).
+
+| Symptôme | Cause MESURÉE | Fix |
+|---|---|---|
+| Écran noir arène (jeu vivant, 983/1043 meshes « visibles ») | Capteur render : les 2 caméras 3D en `TonyMcMapface` — `apply_tonemapping_to_cameras` (pause_menu) réapplique le réglage défaut chaque frame et bat la garde wasm `AcesFitted` ; LUT neutralisée → image noire. L'ordre des systèmes décidait du gagnant (la nuit de validation, la garde gagnait). | `tonemapping_from_str` ne rend JAMAIS une LUT sur wasm — résolu à la source, plus de bataille |
+| Avatar absent au menu (décor RTT présent, 17 props) | `roguelite_equipment.toml` lu via `std::fs` → « operation not supported » → 0 slot → pas de `body_model` → `spawn_equipped_avatar` ne monte rien. Le capteur `avatar_ready` disait true (`is_some()` sur la ressource). | `forgia_core::def_io` : genomes+registry EMBARQUÉS à la compilation (build.rs, 1,1 Mo) ; equipment+mushrooms migrés ; capteur mesure les pièces |
+| Log `[mushrooms] posés — 0` CHAQUE frame | 0 cluster ⇒ rien spawné ⇒ `already` jamais vrai ⇒ branche re-spawn en boucle. Latent en natif aussi (TOML vidé). | Garde 0-cluster avec despawn miroir |
+| Toon absent sur web (pas signalé, vu au diagnostic) | `toon.wgsl` hors bundle (extension inconnue du sync) — le node FullscreenMaterial se saute proprement, pas de crash | `assets/shaders` copiés par build-web.ps1 |
+| Hall vide | ~20 `.gltf` kaykit sans leurs `.bin` dans le bundle publié (le fix « dossier entier » d'ad69543 n'avait jamais été re-synchronisé) | resync complet via le script corrigé |
+
+**Classe de défaut ouverte (inc.6)** : ~30 lecteurs `std::fs` de genomes encore
+non migrés vers `def_io` — chacun est un système en défauts SILENCIEUX sur web
+(ambiances, weapon_vfx, death_ascension, knockback, color_grading, foliage,
+castle_*, gait, items, UserSettings…). Et les KTX2 UASTC restent intranscodables
+sans basis (jolcham_oak : écorces des arbres).
+
+**Observé aussi en headless** : un crash GPU process Chrome (74 s, menu) a figé
+le canvas pendant que le compteur FPS JS (rAF, indépendant du jeu) continuait —
+un « écran noir à 54 fps » chez un testeur peut aussi être CE mode de panne.
+À surveiller via 📋 Diag (un dump qui répond = jeu vivant, tonemapping ; un
+clipboard mort = device lost).

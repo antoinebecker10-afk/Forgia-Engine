@@ -85,7 +85,10 @@ if (-not $ServeOnly) {
         }
     }
     Copy-Item "$Root\assets\genomes" "$Demo\assets\" -Recurse -Force
-    Write-Host "  $n assets + genomes synchronises"
+    # Shaders runtime (.wgsl, charges par AssetServer — ex. post_process/toon.wgsl) :
+    # extension absente du grep ci-dessus, leur oubli = toon silencieusement absent.
+    Copy-Item "$Root\assets\shaders" "$Demo\assets\" -Recurse -Force
+    Write-Host "  $n assets + genomes + shaders synchronises"
 
     if (-not (Test-Path "$Demo\index.html")) {
         Copy-Item "$Root\tools\web\index.html" "$Demo\index.html"
