@@ -78,11 +78,38 @@ futures sans que personne ne regarde.
 
 ## Critères d'acceptation
 
-- [ ] Les ~30 capteurs de feature sont **inventoriés** avec, pour chacun, le
-      compteur qui prouve son activité et la condition « censé tourner »
-      → **c'est le vrai travail restant**, et il est par capteur : la condition
-      « censé tourner » n'est pas déductible des données pour la plupart d'entre
-      eux (cf `weapon_vfx` ci-dessous).
+- [~] Les capteurs de feature sont **inventoriés** — outillé, pas rédigé à
+      l'estime : `tools/ai/sensor_honesty.py`, rejouable après chaque run.
+
+      Mesure du 2026-08-12 sur **127 capteurs** :
+
+      | | n | ce que ça veut dire |
+      |---|---|---|
+      | **Suspects** | **29** | `severity: ok` avec **tous** leurs compteurs à zéro |
+      | Sans compteur | 2 | ne peuvent pas prouver leur activité, quoi qu'il arrive |
+      | Actifs | 58 | au moins un compteur non nul → honnêtes sur ce run |
+      | Non réécrits | 37 | mode non joué (RPG, terrain) ou producteur mort |
+
+      Les 29 : `auto_rig`, `boucherie`, `bourrasque`, `coffre`, `editor`,
+      `element_vfx`, `enemy_scaling`, `fps_feel`, `ftue`, `health`, `input`,
+      `inventory`, `knockback`, `lenoir`, `lifecycle`, `pipeline_warmup`,
+      `player_state`, `qa`, `rpg_health`, `ultimate`, `ultimate_tech`,
+      `weapon_vfx`, `bot_ai`, `combat`, `enemy_nameplate`, `mesh_fader`, +3.
+
+      ⚠️ **Ce n'est PAS une liste de défauts, et il faut le dire fort** : la run
+      mesurée était courte et sans combat. `knockback` y apparaît à zéro alors
+      qu'il affichait 419 poussées deux heures plus tôt. Un zéro en sortie de menu
+      est normal — c'est exactement l'ambiguïté que cette story existe pour lever.
+
+      **Pour que la liste devienne exploitable, il faut la rejouer après une run
+      DE COMBAT.** Ceux qui restent à zéro là seront les vrais suspects.
+
+- [ ] Assigner à chaque suspect **sa condition « censé tourner »**
+      → c'est le travail qui reste, et il n'est pas automatisable : la condition ne
+      se déduit pas du JSON. Il faut lire le producteur. `elements` a pu se faire
+      sans paramètre nouveau (2 éléments distincts ⇒ réaction possible) ;
+      `weapon_vfx` ne le peut pas — il compte des `kill_bursts` mais ignore combien
+      de morts ont eu lieu.
 - [x] **Un helper partagé porte la règle** — `forgia_core::sensor_activity`
       (2026-08-12), dans la seule crate dont dépendent les trois concernées.
       Trois verdicts : `Ok` / **`Blind`** (rien n'était attendu → `info`, ni vert
