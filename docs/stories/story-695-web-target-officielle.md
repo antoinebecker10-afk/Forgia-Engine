@@ -1,7 +1,7 @@
 # Story-695 — La cible web (wasm/WebGPU) devient un build officiel de Forgia
 
-**Statut** : ⏸️ EN PAUSE (décision Antoine 2026-08-12 — reprise quand son fichier
-d'exigences web existera ; alors gate 3 étages puis migration « quand c'est propre »).
+**Statut** : ⏸️ STOPPÉE (décision Antoine 2026-08-12 — reprise APRÈS le redesign
+du concept du jeu ; alors gate 3 étages puis migration « quand c'est propre »).
 inc.1+2+3+4b ✅ livrés — restent : 5 manifeste, 6 parité, 7 pipeline (entamé).
 ⚠️ Au gel : le site public porte un build qui panique à 1-3 min (RenderDiagnostics/
 WebGPU) ; le fix est commité (forgia-observability) mais PAS publié — bundle
