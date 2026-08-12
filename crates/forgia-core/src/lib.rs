@@ -613,3 +613,70 @@ pub mod web_storage {
         }
     }
 }
+
+/// Lecture des fichiers de DÉFINITION (genomes TOML, registres RON) — story-695.
+///
+/// Natif : filesystem, source de vérité, hot-reload possible. wasm : pack
+/// embarqué à la compilation par `build.rs` (le web n'a pas de fs ; chaque
+/// `std::fs::read_to_string` y échoue en « operation not supported » et le
+/// système tombe en défauts EN SILENCE — équipement désactivé, avatar absent,
+/// 0 cluster champignons, constaté 2026-08-11). Le pack suit le versioning de
+/// publication : un build web fige les définitions du commit qui l'a produit.
+pub mod def_io {
+    #[cfg(target_arch = "wasm32")]
+    mod pack {
+        include!(concat!(env!("OUT_DIR"), "/web_defs.rs"));
+    }
+
+    /// Clé de pack : portion du chemin depuis `genomes/` ou `registry/`,
+    /// séparateurs normalisés. Les call sites écrivent leurs chemins de formes
+    /// variées (`assets/genomes/...`, chemin absolu joint, backslashes Windows).
+    #[cfg(any(target_arch = "wasm32", test))]
+    fn pack_key(path: &str) -> Option<String> {
+        let norm = path.replace('\\', "/");
+        ["genomes/", "registry/"]
+            .iter()
+            .find_map(|root| norm.find(root).map(|i| norm[i..].to_string()))
+    }
+
+    /// Équivalent `std::fs::read_to_string` pour un fichier de définition.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn read_def_str(path: &str) -> std::io::Result<String> {
+        std::fs::read_to_string(path)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn read_def_str(path: &str) -> std::io::Result<String> {
+        if let Some(key) = pack_key(path) {
+            if let Some((_, contents)) = pack::WEB_DEFS.iter().find(|(k, _)| *k == key) {
+                return Ok((*contents).to_string());
+            }
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("définition absente du pack web embarqué: {path}"),
+        ))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::pack_key;
+
+        #[test]
+        fn pack_key_normalise_les_formes_de_chemins() {
+            assert_eq!(
+                pack_key("assets/genomes/roguelite/roguelite_equipment.toml").as_deref(),
+                Some("genomes/roguelite/roguelite_equipment.toml")
+            );
+            assert_eq!(
+                pack_key(r"C:\jeu\assets\genomes\arena_waves.toml").as_deref(),
+                Some("genomes/arena_waves.toml")
+            );
+            assert_eq!(
+                pack_key("assets/registry/asset_meta.ron").as_deref(),
+                Some("registry/asset_meta.ron")
+            );
+            assert_eq!(pack_key("assets/models/foo.glb"), None);
+        }
+    }
+}
