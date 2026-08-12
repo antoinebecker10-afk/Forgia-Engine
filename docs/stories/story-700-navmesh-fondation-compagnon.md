@@ -85,10 +85,66 @@ Volontairement hors scope, chacun étant un incrément à part :
 
 | Inc. | Contenu |
 | --- | --- |
-| **2** | Brancher `ArenaGeometry` → `forgia-navmesh` : ressource maillage reconstruite au bâti du stage, capteur `forgia2_companion.json` (dont **temps bloqué**) |
+| ~~2~~ | ✅ **LIVRÉ 2026-08-12** — cf. section ci-dessous |
 | **3** | `forgia-ai-arena-bot` suit le chemin au lieu de la ligne droite + chien de garde de désenlisement |
 | **4** | Le compagnon : suivre, se poster, barre PV permanente |
 | **5** | Le compagnon porte le **second élément** → jalon hérité de [story-697](story-697-reactions-elementaires-jamais-declenchees.md) : les réactions partent en combat ordinaire, plus seulement sur boss |
+
+---
+
+## Incrément 2 — le maillage se bâtit tout seul depuis l'arène (2026-08-12)
+
+`forgia-stage` appelle désormais `forgia-navmesh`. **Le sens de la dépendance est
+délibéré** : la crate de navigation ne connaît ni les arènes ni leur cycle de vie, ce qui
+lui permettra de servir le terrain d'expédition (Phase 2) sans être réécrite.
+
+### Les deux gardes, et pourquoi aucune n'est optionnelle
+
+1. **Debounce d'une frame.** Les solides sont déposés par une demi-douzaine de producteurs
+   (murs de pièces, modules, pièces autorées, décor du mode roguelite). Rebâtir à chaque
+   dépôt triangulerait N fois la même arène pour un seul résultat utile. On attend donc la
+   première frame **stable** après la dernière modification.
+2. **`authored_pending == 0`.** Les pièces autorées arrivent avec leur GLB, en asynchrone.
+   Un maillage bâti pendant leur chargement ignorerait leurs emprises et laisserait des
+   agents traverser des murs bien réels — **et le défaut serait invisible, puisque la
+   construction réussit**. `ArenaGeometry` documente exactement ce piège pour son propre
+   capteur ; il vaut ici à l'identique.
+
+Troisième garde, moins évidente : une arène dont le rayon jouable ne dépasse pas l'emprise
+de l'agent (le cas au `reset()`, entre deux stages) fait **oublier** le maillage au lieu
+d'en bâtir un vide. Router sur une géométrie démontée enverrait les agents à travers des
+murs qui n'existent plus.
+
+### Le capteur `forgia2_navmesh.json`
+
+Il expose la **provenance** (`source` + `seed`), pas seulement le résultat : un maillage
+qui survit à un changement de stage est un bug silencieux, et c'est ce champ qui le rend
+visible. Plus `discs_seen` / `segs_seen` / `obstacles_kept` / `blind` / `build_ms`.
+
+**Un maillage bâti n'est jamais `ok` par défaut.** Deux façons de « réussir » à vide, et
+chacune a son alerte distincte :
+
+| Cas | Severity | Ce que le `next_step` pointe |
+| --- | --- | --- |
+| Aucune zone bâtie | `info` | Normal hors arène |
+| Bâti sur **zéro solide soumis** | `warn` | La géométrie était vide/incomplète (`authored_pending`) |
+| Solides soumis, **zéro retenu** | `warn` | Le gène `agent.step_height_m` rejette tout |
+
+### Vérifications
+
+- `cargo test -p forgia-navmesh -p forgia-stage` — **verts** (exit 0)
+- `cargo clippy --all-targets` sur les deux crates — **0 warning** (vrai cargo, pas RTK)
+- `xtask sensor-audit` — **OK**, 132 déclarés = 132 produits, 0 orphelin, 0 manquant
+- ⚠️ `xtask verify-sensors-format` échoue sur `forgia2_arena.json` — **pré-existant et sans
+  rapport** : c'est un artefact runtime non suivi par git, absent parce que le jeu n'a pas
+  tourné en mode arène.
+
+### Toujours pas de consommateur
+
+`forgia-ai-arena-bot` avance encore en ligne droite. Le maillage existe et se construit
+maintenant tout seul, mais **personne ne le suit** — c'est l'inc. 3.
+
+---
 
 ## Test runtime
 

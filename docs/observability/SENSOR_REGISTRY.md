@@ -76,6 +76,7 @@
 | `forgia2_lifecycle.json` | T0 | forgia-observability | `src/lifecycle_sensor.rs:93` | 1Hz | players/bots/target_cubes added/removed/inserted | active |
 | `forgia2_memory.json` | T0 | forgia-observability | `src/memory_sensor.rs:69` | 1Hz | RAM RSS, VRAM (when available) | active |
 | `forgia2_migration_baseline.json` | T0 | forgia-observability | `src/migration_baseline.rs:33` | once | baseline E1/E2 forgia_*→forgia2_* migration tracking | active |
+| `forgia2_navmesh.json` | T0 | forgia-navmesh | `src/lib.rs:374` | 1Hz | maillage de navigation : provenance (source+seed), solides soumis vs obstacles retenus, `blind`, temps de construction (story-700 inc.2) | active |
 | `forgia2_perf.json` | T0 | forgia-observability | `src/perf_sensor.rs:73` | 1Hz | FPS, frame_time, smooth | active |
 | `forgia2_physics.json` | T0 | forgia-observability | `src/physics_sensor.rs` | 1Hz | rigid bodies par type, colliders, sensors, KCC, joints — story-540 KCC stuck, story-545 raycast self-hit | active |
 | `forgia2_qa.json` | T0 | forgia-observability | `src/qa_bridge.rs:130` | 1Hz | activité bus QA : emitted_total, bus_ingested, dedup_hits + dernière émission (pont santé→BugReport, story-622) | active |

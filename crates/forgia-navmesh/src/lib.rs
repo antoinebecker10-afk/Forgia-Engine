@@ -27,12 +27,15 @@
 
 use bevy::prelude::*;
 use forgia_core::layout::{SolidDisc, SolidSeg};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
-use vleue_navigator::NavMesh;
+use vleue_navigator::{NavMesh, Path};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 /// Chemin vers la couche definition. Aucune valeur numérique ne vit dans ce fichier.
 const GENOME_PATH: &str = "assets/genomes/navmesh.toml";
+const SENSOR_PATH: &str = "forgia2_navmesh.json";
+const SENSOR_WRITE_PERIOD_SEC: f32 = 1.0;
 
 // ─────────────────────────────── Réglages ───────────────────────────────
 
@@ -260,6 +263,175 @@ pub fn build(
     (NavMesh::from_edge_and_obstacles(edge, obstacles), report)
 }
 
+// ─────────────────────────── Le maillage courant ───────────────────────────
+
+/// Le maillage de la zone courante, et **d'où il vient**.
+///
+/// La provenance (`source`, `seed`) n'est pas décorative : deux arènes de même `stage_id`
+/// diffèrent par leur graine, et un maillage qui reste en place après un changement de
+/// stage enverrait les agents à travers des murs qui n'existent plus. Le capteur l'expose
+/// pour qu'une désynchronisation se voie au lieu de se deviner.
+#[derive(Resource, Default)]
+pub struct ActiveNavMesh {
+    mesh: Option<NavMesh>,
+    pub report: BuildReport,
+    pub source: String,
+    pub seed: u64,
+    pub build_ms: f32,
+}
+
+impl ActiveNavMesh {
+    /// Remplace le maillage courant. `source` = `stage_id` en arène, nom de zone ailleurs.
+    pub fn set(&mut self, mesh: NavMesh, report: BuildReport, source: &str, seed: u64, build_ms: f32) {
+        self.mesh = Some(mesh);
+        self.report = report;
+        self.source.clear();
+        self.source.push_str(source);
+        self.seed = seed;
+        self.build_ms = build_ms;
+    }
+
+    /// Oublie le maillage — à appeler quand la zone est démontée. Mieux vaut aucun
+    /// chemin qu'un chemin calculé sur une géométrie disparue.
+    pub fn clear(&mut self) {
+        self.mesh = None;
+        self.report = BuildReport::default();
+        self.source.clear();
+        self.seed = 0;
+        self.build_ms = 0.0;
+    }
+
+    #[must_use]
+    pub fn is_built(&self) -> bool {
+        self.mesh.is_some()
+    }
+
+    /// Chemin de `from` à `to`, ou `None` si le maillage manque ou si aucun trajet
+    /// n'existe. L'appelant DOIT distinguer les deux cas : « pas encore de maillage »
+    /// et « cette destination est inatteignable » n'appellent pas la même réaction.
+    #[must_use]
+    pub fn path(&self, from: Vec2, to: Vec2) -> Option<Path> {
+        self.mesh.as_ref()?.path(from, to)
+    }
+}
+
+// ─────────────────────────── Capteur ───────────────────────────
+
+/// Pur, testable headless.
+///
+/// **Un maillage bâti n'est jamais `ok` par défaut.** Deux façons de « réussir » à vide :
+/// aucun solide soumis (la géométrie n'était pas prête), ou aucun retenu (le ressaut est
+/// mal réglé et tout passe). Les deux produisent un plan où les agents traversent le
+/// décor sans qu'aucune erreur ne soit levée — donc les deux alertent.
+#[must_use]
+pub fn severity_for_navmesh(
+    built: bool,
+    solids_seen: usize,
+    obstacles_kept: usize,
+) -> (&'static str, &'static str) {
+    if !built {
+        return (
+            "info",
+            "aucune zone batie — le maillage se construit a l'arrivee d'une arene",
+        );
+    }
+    if solids_seen == 0 {
+        return (
+            "warn",
+            "AVEUGLE : maillage bati sur zero solide soumis — ArenaGeometry etait vide \
+             ou incomplete au moment de l'appel (cf. authored_pending)",
+        );
+    }
+    if obstacles_kept == 0 {
+        return (
+            "warn",
+            "0 obstacle retenu alors que des solides ont ete soumis — tous sous le \
+             ressaut ? verifier agent.step_height_m dans assets/genomes/navmesh.toml",
+        );
+    }
+    ("ok", "")
+}
+
+#[derive(Serialize)]
+struct NavmeshSensor<'a> {
+    id: &'a str,
+    severity: &'a str,
+    next_step: &'a str,
+    timestamp_unix: u64,
+    built: bool,
+    source: &'a str,
+    seed: u64,
+    discs_seen: usize,
+    segs_seen: usize,
+    obstacles_kept: usize,
+    /// `true` = rien n'a été mesuré. Distinct de « rien n'a été retenu ».
+    blind: bool,
+    build_ms: f32,
+    agent_radius_m: f32,
+    step_height_m: f32,
+}
+
+pub fn sys_write_navmesh_sensor(
+    time: Res<Time>,
+    active: Res<ActiveNavMesh>,
+    cfg: Res<NavmeshBuild>,
+    mut accum: Local<f32>,
+) {
+    *accum += time.delta_secs();
+    if *accum < SENSOR_WRITE_PERIOD_SEC {
+        return;
+    }
+    *accum = 0.0;
+
+    let r = &active.report;
+    let solids_seen = r.discs_seen + r.segs_seen;
+    let (severity, next_step) = severity_for_navmesh(active.is_built(), solids_seen, r.obstacles_kept);
+
+    let payload = NavmeshSensor {
+        id: "navmesh",
+        severity,
+        next_step,
+        timestamp_unix: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs()),
+        built: active.is_built(),
+        source: &active.source,
+        seed: active.seed,
+        discs_seen: r.discs_seen,
+        segs_seen: r.segs_seen,
+        obstacles_kept: r.obstacles_kept,
+        blind: r.is_blind(),
+        build_ms: active.build_ms,
+        agent_radius_m: cfg.agent_radius_m,
+        step_height_m: cfg.step_height_m,
+    };
+
+    match serde_json::to_string(&payload) {
+        Ok(json) => {
+            if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
+                warn!("[navmesh] ecriture capteur echouee: {e}");
+            }
+        }
+        Err(e) => warn!("[navmesh] serialisation capteur echouee: {e}"),
+    }
+}
+
+/// Insère les ressources et le capteur. **Ne bâtit rien** : c'est à la crate qui possède
+/// la géométrie d'appeler [`build`] et [`ActiveNavMesh::set`] — `forgia-navmesh` ne
+/// connaît ni les arènes ni le terrain, et c'est ce qui lui permet de servir les deux.
+pub struct ForgiaNavmeshPlugin;
+
+impl Plugin for ForgiaNavmeshPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(NavmeshBuild::load_or_default())
+            .init_resource::<ActiveNavMesh>()
+            .add_systems(
+                Update,
+                sys_write_navmesh_sensor.in_set(forgia_core::prelude::GameSet::Sensors),
+            );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -413,6 +585,78 @@ mod tests {
     }
 
     // ── Réglages ────────────────────────────────────────────────────────
+
+    // ── Le capteur ne ment pas ──────────────────────────────────────────
+
+    #[test]
+    fn pas_de_maillage_est_une_info_pas_une_erreur() {
+        let (sev, next) = severity_for_navmesh(false, 0, 0);
+        assert_eq!(sev, "info");
+        assert!(!next.is_empty(), "meme une info doit dire quoi attendre");
+    }
+
+    #[test]
+    fn un_maillage_bati_sur_zero_solide_alerte_au_lieu_de_dire_ok() {
+        // Le cas vicieux : la construction « reussit », le plan est vide, les agents
+        // traversent tout, et aucune erreur n'est levee.
+        let (sev, next) = severity_for_navmesh(true, 0, 0);
+        assert_eq!(sev, "warn");
+        assert!(next.contains("AVEUGLE"));
+    }
+
+    #[test]
+    fn des_solides_soumis_mais_aucun_retenu_alerte_aussi() {
+        // Distinct du precedent : ici la geometrie etait la, c'est le seuil qui l'a
+        // toute rejetee — donc le next_step pointe le gene, pas la geometrie.
+        let (sev, next) = severity_for_navmesh(true, 42, 0);
+        assert_eq!(sev, "warn");
+        assert!(next.contains("step_height_m"));
+    }
+
+    #[test]
+    fn un_maillage_avec_des_obstacles_est_ok() {
+        assert_eq!(severity_for_navmesh(true, 42, 17).0, "ok");
+    }
+
+    // ── La ressource ────────────────────────────────────────────────────
+
+    #[test]
+    fn la_ressource_vide_ne_rend_aucun_chemin() {
+        let active = ActiveNavMesh::default();
+        assert!(!active.is_built());
+        assert!(active.path(Vec2::ZERO, Vec2::new(5.0, 0.0)).is_none());
+    }
+
+    #[test]
+    fn clear_oublie_le_maillage_et_sa_provenance() {
+        let c = cfg();
+        let (mesh, report) = build(hexagon_edge(20.0, c.agent_radius_m), &[], &[], &c);
+        let mut active = ActiveNavMesh::default();
+        active.set(mesh, report, "forge_sanctum", 42, 1.5);
+        assert!(active.is_built());
+        assert_eq!(active.source, "forge_sanctum");
+
+        // Une zone demontee ne doit plus repondre : mieux vaut aucun chemin qu'un
+        // chemin calcule sur une geometrie qui n'existe plus.
+        active.clear();
+        assert!(!active.is_built());
+        assert!(active.source.is_empty());
+        assert_eq!(active.seed, 0);
+        assert!(active.path(Vec2::ZERO, Vec2::new(5.0, 0.0)).is_none());
+    }
+
+    #[test]
+    fn la_ressource_rend_le_chemin_du_maillage_qu_on_lui_donne() {
+        let c = cfg();
+        let discs = [disc(0.0, 0.0, 3.0, 4.0)];
+        let (mesh, report) = build(hexagon_edge(20.0, c.agent_radius_m), &discs, &[], &c);
+        let mut active = ActiveNavMesh::default();
+        active.set(mesh, report, "test", 1, 0.0);
+        let from = Vec2::new(-10.0, 0.0);
+        let to = Vec2::new(10.0, 0.0);
+        let path = active.path(from, to).expect("le pilier se contourne");
+        assert!(path.length > from.distance(to));
+    }
 
     #[test]
     fn les_valeurs_par_defaut_refletent_le_toml() {

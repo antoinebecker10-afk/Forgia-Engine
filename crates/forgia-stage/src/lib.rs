@@ -35,6 +35,7 @@ pub mod floor_merge;
 pub mod graph;
 pub mod layout;
 pub mod layout_sensor;
+pub mod navmesh_build;
 pub mod rooms;
 
 /// Sol de REPLI de l'arène — celui d'avant story-676, quand c'était le seul.
@@ -489,6 +490,13 @@ impl Plugin for ForgiaStageArenaPlugin {
         if !app.is_plugin_added::<forgia_anchor::ForgiaAnchorPlugin>() {
             app.add_plugins(forgia_anchor::ForgiaAnchorPlugin);
         }
+        // Story-700 inc.2 — c'est ce plugin qui insère `ActiveNavMesh` et `NavmeshBuild`.
+        // On l'ajoute ici, et pas dans l'orchestrateur : `sys_rebuild_navmesh_from_arena`
+        // ci-dessous en dépend, et un système qui panique sur une ressource absente est
+        // un couplage qu'il vaut mieux rendre explicite que documenter.
+        if !app.is_plugin_added::<forgia_navmesh::ForgiaNavmeshPlugin>() {
+            app.add_plugins(forgia_navmesh::ForgiaNavmeshPlugin);
+        }
         if !app.is_plugin_added::<forgia_prefab::ForgiaPrefabPlugin>() {
             app.add_plugins(forgia_prefab::ForgiaPrefabPlugin);
         }
@@ -553,6 +561,16 @@ impl Plugin for ForgiaStageArenaPlugin {
             .add_systems(
                 Update,
                 write_stage_sensor.in_set(forgia_core::prelude::GameSet::Sensors),
+            )
+            // Story-700 inc.2 — le maillage de navigation se rebâtit quand la géométrie
+            // a FINI de bouger. En `Movement` et non `Sensors` : c'est une production,
+            // pas une mesure, et le capteur de forgia-navmesh doit lire le résultat de
+            // la frame courante (Movement précède Sensors dans la chaîne L7).
+            .add_systems(
+                Update,
+                navmesh_build::sys_rebuild_navmesh_from_arena
+                    .in_set(forgia_core::prelude::GameSet::Movement)
+                    .after(spawn_stage_arena_on_request),
             )
             .add_systems(
                 Update,

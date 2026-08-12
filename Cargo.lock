@@ -3644,8 +3644,10 @@ dependencies = [
  "bevy",
  "forgia-core",
  "serde",
+ "serde_json",
  "toml",
  "vleue_navigator",
+ "web-time",
 ]
 
 [[package]]
@@ -3894,6 +3896,7 @@ dependencies = [
  "forgia-core",
  "forgia-genome-core",
  "forgia-level-presets",
+ "forgia-navmesh",
  "forgia-prefab",
  "serde",
  "serde_json",

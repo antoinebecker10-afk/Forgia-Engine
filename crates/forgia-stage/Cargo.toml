@@ -13,6 +13,7 @@ bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
 forgia-anchor = { workspace = true }
+forgia-navmesh = { workspace = true }
 forgia-level-presets = { workspace = true }
 forgia-prefab = { workspace = true }
 forgia-genome-core = { workspace = true }
