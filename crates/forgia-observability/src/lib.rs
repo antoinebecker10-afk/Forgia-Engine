@@ -176,6 +176,12 @@ impl Plugin for ForgiaObservabilityPlugin {
         );
         // Story-469 V5 Session C — lifecycle / watchdog / audio / input / sensor_health.
         // Story-526 — player_state (movement + KCC collision) + lag_events writer.
+        //
+        // 2026-08-12 : `SensorWatch` porte la mémoire du chien de garde entre deux
+        // ticks (quel capteur tictaque, depuis quand il s'est tu). Volontairement
+        // PAS state-scopée : remise à zéro à chaque changement de mode, plus aucun
+        // capteur n'atteindrait jamais le seuil « vivant ».
+        app.init_resource::<sensor_health_sensor::SensorWatch>();
         app.add_systems(
             Update,
             (
