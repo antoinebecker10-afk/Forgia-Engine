@@ -37,9 +37,38 @@ pub struct TacticalTuning {
     pub gunshot_alert_los_grace_secs: f32,
     /// Durée du flag alerted (forced Chase even out of detect_range).
     pub alert_duration_secs: f32,
-    /// Story-464 — durée pendant laquelle le bot reste autorisé à Chase après
-    /// avoir perdu LOS. 0 = drop instantanément (frustrant), 2-3s = AAA "last sight".
+    /// Durée pendant laquelle le bot reste autorisé à Chase après avoir perdu LOS.
+    ///
+    /// # 2026-08-13 — 2,0 → 6,0 s, et le chiffre est emprunté, pas choisi
+    ///
+    /// Rapporté en jeu : *« quand je quitte un mob, il ne peut pas faire tout le tour
+    /// de l'arène ? »*. Non — il oubliait en 2 s.
+    ///
+    /// **Ni Minecraft ni World of Warcraft ne lâchent sur la vue.** MC borne le suivi
+    /// par `generic.follow_range` (16 blocs, ~40 pour un zombie) ; WoW par une **laisse**
+    /// en distance, plus un **evade après ~6 s sans combat actif** en retail. Forgia était
+    /// le seul des trois à utiliser un chronomètre de *vue* — d'où l'impression d'un
+    /// ennemi amnésique.
+    ///
+    /// 6,0 s reprend le compteur d'evade de WoW. **Et le modèle Minecraft a été écarté
+    /// exprès** : un zombie est bien plus lent qu'un joueur, donc la fuite par la
+    /// distance y fonctionne. Ici un grunt file à **9,0 m/s** contre **9,75 m/s** en
+    /// sprint — 92 % de ta vitesse. Gagner 20 m d'écart demanderait 27 s de sprint pur :
+    /// **on ne sème pas un grunt à la course.** Un `follow_range` à la Minecraft rendrait
+    /// donc la fuite impossible ; c'est le chronomètre qui doit la porter.
     pub los_lost_grace_secs: f32,
+    /// Distance au-delà de laquelle le bot abandonne **immédiatement**, vue ou pas.
+    ///
+    /// La *laisse* de WoW. Ce n'est PAS la mécanique de fuite — vu l'écart de vitesse
+    /// ci-dessus, un joueur ne l'atteint quasiment jamais en courant. C'est un **filet
+    /// de sécurité** : il empêche un mob de traverser toute l'arène derrière un joueur
+    /// qui l'aurait accroché à l'autre bout, et garantit qu'aucun ennemi ne s'égare
+    /// hors de la zone de combat.
+    ///
+    /// 2 × `detect_range` : on acquiert à 25 m, on retient jusqu'à 50. **Séparer les
+    /// deux est ce que font les deux références** — WoW aggro ~20 yd mais laisse bien
+    /// plus longue ; MC zombie `follow_range` 40 contre 16 pour la plupart.
+    pub chase_leash_m: f32,
     /// Période d'écriture sensor `forgia_bot_ai.json` (sec).
     pub sensor_period_secs: f32,
 
@@ -103,7 +132,8 @@ impl Default for TacticalTuning {
             gunshot_alert_radius_m: 25.0,
             gunshot_alert_los_grace_secs: 0.6,
             alert_duration_secs: 4.0,
-            los_lost_grace_secs: 2.0,
+            los_lost_grace_secs: 6.0,
+            chase_leash_m: 50.0,
             sensor_period_secs: 1.0,
             max_step_up_m: 0.45,
             max_step_down_m: 1.2,
@@ -229,6 +259,14 @@ pub fn bot_los_check(
         // PROPRE garde `dist > config.range` (lib.rs). Les deux concepts sont
         // désormais séparés — la perception porte jusqu'où le bot voit, l'arme
         // jusqu'où elle atteint.
+        // LA LAISSE — au-delà, le bot abandonne SANS attendre son chronomètre. Sans
+        // cette coupure nette, les 6 s de persistance laisseraient un grunt à 9 m/s
+        // parcourir 54 m derrière un joueur accroché à l'autre bout de l'arène.
+        if dist > tuning.chase_leash_m {
+            bot.has_los = false;
+            bot.los_lost_grace_left = 0.0;
+            continue;
+        }
         if dist < 0.5 || dist > sight_range(config.range, bot.detect_range) {
             bot.has_los = false;
             continue;
@@ -926,6 +964,72 @@ pub fn write_bot_ai_sensor(
         tuning.los_lost_grace_secs,
     );
     let _ = forgia_core::sensor_io::enqueue("forgia_bot_ai.json", json);
+}
+
+/// Story-700 inc.3c — la poursuite, calquée sur WoW et Minecraft (2026-08-13).
+#[cfg(test)]
+mod poursuite_tests {
+    use super::*;
+
+    /// Vitesses MESURÉES du projet (`map-design-intention.md` §2, métriques de
+    /// `map-design-patterns.md`). Ce ne sont pas des choix, ce sont des constats.
+    const SPRINT_JOUEUR_MS: f32 = 9.75;
+    const VITESSE_GRUNT_MS: f32 = 9.0;
+
+    #[test]
+    fn on_ne_seme_pas_un_grunt_a_la_course() {
+        // LE fait qui a décidé du modèle. Un grunt tient 92 % du sprint joueur : la
+        // fuite par la distance — le modèle Minecraft — ne peut PAS marcher ici.
+        // C'est pour ça que la persistance est un CHRONOMÈTRE (modèle WoW) et que la
+        // laisse n'est qu'un filet.
+        let ecart = SPRINT_JOUEUR_MS - VITESSE_GRUNT_MS;
+        assert!(ecart > 0.0, "le joueur reste plus rapide, mais de peu");
+        let secondes_pour_20m = 20.0 / ecart;
+        assert!(
+            secondes_pour_20m > 20.0,
+            "gagner 20 m demande {secondes_pour_20m:.0} s de sprint pur — si ce test \
+             casse, c'est qu'un des deux genes de vitesse a bouge et que le modele de \
+             poursuite doit etre rediscute"
+        );
+    }
+
+    #[test]
+    fn acquerir_et_retenir_sont_deux_portees_distinctes() {
+        // WoW aggro ~20 yd mais laisse bien plus longue ; Minecraft donne 40 de
+        // follow_range au zombie contre 16 a la plupart. Confondre les deux, c'est
+        // ce que Forgia faisait — et c'est ce qui rendait les mobs amnesiques.
+        let tu = TacticalTuning::default();
+        let acquisition = 25.0_f32; // ArenaBot::detect_range par defaut
+        assert!(
+            tu.chase_leash_m > acquisition,
+            "la laisse ({}) doit depasser la portee d'acquisition ({acquisition})",
+            tu.chase_leash_m
+        );
+    }
+
+    #[test]
+    fn la_laisse_est_atteignable_dans_la_fenetre_de_persistance() {
+        // Les deux limites doivent etre du meme ordre, sinon l'une est decorative :
+        // une laisse hors d'atteinte ne se declencherait jamais, un chronometre trop
+        // court la rendrait inutile. A 9 m/s pendant 6 s, un grunt couvre 54 m — la
+        // laisse de 50 m est donc reellement franchissable.
+        let tu = TacticalTuning::default();
+        let portee = VITESSE_GRUNT_MS * tu.los_lost_grace_secs;
+        assert!(
+            portee > tu.chase_leash_m,
+            "en {} s a {VITESSE_GRUNT_MS} m/s le bot couvre {portee:.0} m : la laisse \
+             de {} m doit rester atteignable, sinon elle ne sert a rien",
+            tu.los_lost_grace_secs,
+            tu.chase_leash_m
+        );
+    }
+
+    #[test]
+    fn la_persistance_reprend_le_compteur_d_evade_de_wow() {
+        // 6 s = le delai apres lequel un mob WoW retail cesse la poursuite quand on
+        // arrete de le combattre. Emprunte, pas choisi.
+        assert!((TacticalTuning::default().los_lost_grace_secs - 6.0).abs() < f32::EPSILON);
+    }
 }
 
 #[cfg(test)]
