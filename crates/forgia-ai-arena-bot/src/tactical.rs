@@ -545,13 +545,75 @@ pub fn resolve_step_altitude(
     max_up: f32,
     max_down: f32,
 ) -> Option<f32> {
-    let g = ground_y?;
+    match resolve_step(current_y, ground_y, foot_offset, max_up, max_down) {
+        StepVerdict::Accepte { y, .. } => Some(y),
+        StepVerdict::Refuse(_) => None,
+    }
+}
+
+/// Pourquoi un pas a été refusé. **Trois causes, trois remèdes opposés.**
+///
+/// Elles étaient toutes écrasées en un `None` muet, donc un bot planté par une paroi
+/// et un bot planté par un trou étaient rigoureusement indiscernables — y compris
+/// quand la sonde elle-même était fausse (défaut du 2026-08-13 : elle ne descendait
+/// que 10 cm, donc tout ressemblait à `SolAbsent`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StepRefusal {
+    /// Aucun sol sous le pas dans la portée de la sonde. Trou, bord d'arène — ou
+    /// sonde trop courte, ce qui est un défaut d'outil, pas de décor.
+    SolAbsent,
+    /// Le sol monte plus que `max_step_up_m` : c'est une paroi. Le bot n'a ni saut
+    /// ni grimpe, il doit CONTOURNER — donc si ça persiste, c'est le maillage qui
+    /// aurait dû déclarer cet obstacle et ne l'a pas fait.
+    ParoiTropHaute { montee_m: f32 },
+    /// Le sol descend plus que `max_step_down_m` : un vide. Refuser est correct,
+    /// sinon un bot sortirait de l'arène par le premier rebord.
+    VideTropProfond { descente_m: f32 },
+}
+
+/// Le verdict complet d'un pas — l'altitude ET, en cas de refus, sa cause.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StepVerdict {
+    Accepte {
+        /// Altitude d'arrivée du CENTRE.
+        y: f32,
+        /// Dénivelé franchi (positif = montée), en mètres.
+        denivele_m: f32,
+    },
+    Refuse(StepRefusal),
+}
+
+/// Même décision que [`resolve_step_altitude`], mais qui **dit pourquoi**.
+///
+/// C'est la fonction de vérité ; `resolve_step_altitude` n'en est que la projection
+/// historique. Séparer les deux garde les tests existants valides tout en rendant la
+/// cause observable — sans elle, `forgia2_bot_traces.json` ne pourrait afficher qu'un
+/// « refusé » qui ne guide vers rien.
+#[must_use]
+pub fn resolve_step(
+    current_y: f32,
+    ground_y: Option<f32>,
+    foot_offset: f32,
+    max_up: f32,
+    max_down: f32,
+) -> StepVerdict {
+    let Some(g) = ground_y else {
+        return StepVerdict::Refuse(StepRefusal::SolAbsent);
+    };
     let feet = current_y - foot_offset;
     let delta = g - feet;
-    if delta > max_up || delta < -max_down {
-        return None;
+    if delta > max_up {
+        return StepVerdict::Refuse(StepRefusal::ParoiTropHaute { montee_m: delta });
     }
-    Some(g + foot_offset)
+    if delta < -max_down {
+        return StepVerdict::Refuse(StepRefusal::VideTropProfond {
+            descente_m: -delta,
+        });
+    }
+    StepVerdict::Accepte {
+        y: g + foot_offset,
+        denivele_m: delta,
+    }
 }
 
 /// Valide un déplacement XZ contre les murs solides. Retourne le déplacement
@@ -624,6 +686,7 @@ pub fn bot_tactical_movement(
             &mut ArenaBot,
             &mut Transform,
             Option<&crate::navpath::BotPath>,
+            Option<&mut BotTrace>,
         ),
         Without<BotTarget>,
     >,
@@ -640,7 +703,7 @@ pub fn bot_tactical_movement(
     let Ok(ctx) = rapier.single() else { return };
     let dt = time.delta_secs();
 
-    for (bot_entity, mut bot, mut xf, nav_path) in &mut bots {
+    for (bot_entity, mut bot, mut xf, nav_path, mut trace) in &mut bots {
         if bot.state == BotState::Dead {
             continue;
         }
@@ -734,19 +797,29 @@ pub fn bot_tactical_movement(
             xf.translation.y,
             xf.translation.z + safe.z,
         );
+        // Ce que le mur a laissé passer, avant même la question du sol. Une butée
+        // franche (frac ≈ 0) et un pas refusé en altitude produisent le même
+        // `parcouru == 0` — les séparer est tout l'objet de la trace.
+        let vise_xz = step.with_y(0.0).length();
+        let mur_frac = if vise_xz > 1.0e-5 {
+            safe.with_y(0.0).length() / vise_xz
+        } else {
+            1.0
+        };
         let ground = ground_under(next, bot.foot_offset_m, &ctx, bot_entity, &tuning);
         // `None` = pas REFUSÉ : paroi trop haute, vide trop profond, ou pas de
         // sol. Le bot reste sur place plutôt que d'escalader (il n'a ni saut ni
         // grimpe) ou de sortir de l'arène par un rebord. `bot_separation` et
         // l'évitement le feront glisser au tick suivant.
         let avant = xf.translation;
-        if let Some(y) = resolve_step_altitude(
+        let verdict = resolve_step(
             xf.translation.y,
             ground,
             bot.foot_offset_m,
             tuning.max_step_up_m,
             tuning.max_step_down_m,
-        ) {
+        );
+        if let StepVerdict::Accepte { y, .. } = verdict {
             xf.translation.x = next.x;
             xf.translation.z = next.z;
             xf.translation.y = y;
@@ -755,6 +828,13 @@ pub fn bot_tactical_movement(
         // altitude vaut zéro ici — c'est justement un des deux chemins qui
         // laissaient un bot planté sans que rien ne le voie.
         let parcouru = (xf.translation - avant).with_y(0.0).length();
+        if let Some(trace) = trace.as_mut() {
+            trace.mur_frac = mur_frac;
+            if let StepVerdict::Refuse(cause) = verdict {
+                trace.dernier_refus = Some(cause);
+            }
+            trace.tick(xf.translation, parcouru, dt);
+        }
         let etat = unstick_step(
             StuckState {
                 stuck_secs: bot.stuck_secs,
@@ -772,6 +852,108 @@ pub fn bot_tactical_movement(
         }
         bot.stuck_secs = etat.stuck_secs;
         bot.unstick_left = etat.unstick_left;
+    }
+}
+
+// ─── Trace individuelle ──────────────────────────────────────────────────────
+
+/// Fenêtre d'observation de la progression (s). Assez longue pour qu'un
+/// contournement normal ne passe pas pour un piétinement (faire le tour d'un
+/// bâtiment de 12 m à 3,5 m/s prend ~7 s), assez courte pour qu'un blocage se voie
+/// dans la seconde qui suit.
+const FENETRE_PROGRESSION_S: f32 = 3.0;
+
+/// Ce que fait UN bot, tick après tick. Sans ça, seul l'agrégat existe — et
+/// l'agrégat ne sait pas distinguer « 5 bots qui vont bien » de « 4 qui vont bien
+/// et 1 planté depuis 30 s ».
+///
+/// # La distinction que ce composant existe pour rendre
+///
+/// Rapporté en jeu le 2026-08-13 : *« ceux qui avancent mais ne bougent pas »*.
+/// C'est une observation précise, et elle décrit **deux pannes différentes** que
+/// `parcouru` seul confond :
+///
+/// | `parcouru` cumulé | déplacement NET | ce que c'est |
+/// |---|---|---|
+/// | ~0 | ~0 | **figé** — le pas est refusé (voir `dernier_refus`) |
+/// | élevé | ~0 | **il piétine** — il marche, mais oscille ou tourne en rond |
+/// | élevé | élevé | il progresse, tout va bien |
+///
+/// Le second cas ne déclenche PAS le chien de garde actuel, qui ne regarde que la
+/// distance parcourue par tick : un bot qui fait des allers-retours de 5 cm le
+/// satisfait pleinement. C'est très probablement ce qui reste après le correctif
+/// de la sonde de sol.
+#[derive(Component, Debug, Clone)]
+pub struct BotTrace {
+    /// Distance réellement parcourue depuis le début de la fenêtre (m).
+    pub cumul_m: f32,
+    /// Position au début de la fenêtre — sert au déplacement NET.
+    pub ancre: Vec3,
+    /// Temps écoulé dans la fenêtre courante (s).
+    pub fenetre_s: f32,
+    /// Déplacement net sur la DERNIÈRE fenêtre close (m).
+    pub net_m: f32,
+    /// Distance parcourue sur la dernière fenêtre close (m).
+    pub cumul_clos_m: f32,
+    /// Dernière cause de refus de pas, s'il y en a eu une dans la fenêtre.
+    pub dernier_refus: Option<StepRefusal>,
+    /// Fraction du pas voulu que `collide_and_slide` a laissé passer, au dernier
+    /// tick. 0 = butée franche contre un mur, 1 = rien ne gênait.
+    pub mur_frac: f32,
+}
+
+impl Default for BotTrace {
+    fn default() -> Self {
+        Self {
+            cumul_m: 0.0,
+            ancre: Vec3::ZERO,
+            fenetre_s: 0.0,
+            net_m: -1.0, // -1 = jamais mesuré, à distinguer de « 0 mesuré »
+            cumul_clos_m: -1.0,
+            dernier_refus: None,
+            mur_frac: 1.0,
+        }
+    }
+}
+
+impl BotTrace {
+    /// Ferme la fenêtre si elle est échue et publie net/cumul. Pur hors de `pos`.
+    pub fn tick(&mut self, pos: Vec3, parcouru_m: f32, dt: f32) {
+        self.cumul_m += parcouru_m;
+        self.fenetre_s += dt;
+        if self.fenetre_s >= FENETRE_PROGRESSION_S {
+            self.net_m = (pos - self.ancre).with_y(0.0).length();
+            self.cumul_clos_m = self.cumul_m;
+            self.ancre = pos;
+            self.cumul_m = 0.0;
+            self.fenetre_s = 0.0;
+            self.dernier_refus = None;
+        }
+    }
+
+    /// **Il marche sans avancer** : il a parcouru de la distance, mais n'a
+    /// pratiquement pas bougé de place. `None` tant qu'aucune fenêtre n'est close —
+    /// « pas encore mesuré » n'est pas « tout va bien » (`map-design-patterns.md` §13).
+    #[must_use]
+    pub fn pietine(&self, vitesse_m_s: f32) -> Option<bool> {
+        if self.cumul_clos_m < 0.0 {
+            return None;
+        }
+        // Seuils DÉRIVÉS, pas choisis : « il a marché » = au moins la moitié de ce
+        // que sa vitesse permettait sur la fenêtre ; « il n'a pas avancé » = moins
+        // d'une seconde de marche de déplacement net.
+        let a_marche = self.cumul_clos_m > vitesse_m_s * FENETRE_PROGRESSION_S * 0.5;
+        let n_a_pas_avance = self.net_m < vitesse_m_s;
+        Some(a_marche && n_a_pas_avance)
+    }
+
+    /// **Il est figé** : il n'a même pas marché. Le pas lui est refusé.
+    #[must_use]
+    pub fn fige(&self, vitesse_m_s: f32) -> Option<bool> {
+        if self.cumul_clos_m < 0.0 {
+            return None;
+        }
+        Some(self.cumul_clos_m < vitesse_m_s * FENETRE_PROGRESSION_S * 0.1)
     }
 }
 
@@ -995,6 +1177,135 @@ pub fn bot_separation(
 
 // ─── Sensor `forgia_bot_ai.json` ───────────────────────────────────────
 
+/// Attache une [`BotTrace`] à tout bot qui n'en a pas — même raison que
+/// `sys_attach_bot_path` : les bots naissent dans plusieurs crates de mode, et un bot
+/// sans trace reste parfaitement fonctionnel, il est juste invisible au diagnostic.
+pub fn sys_attach_bot_trace(
+    mut commands: Commands,
+    sans_trace: Query<(Entity, &Transform), (With<ArenaBot>, Without<BotTrace>)>,
+) {
+    for (e, xf) in &sans_trace {
+        commands.entity(e).insert(BotTrace {
+            ancre: xf.translation,
+            ..Default::default()
+        });
+    }
+}
+
+/// `forgia2_bot_traces.json` — **ce que fait CHAQUE bot**, un par ligne.
+///
+/// # Pourquoi un capteur de plus
+///
+/// `forgia_bot_ai.json` agrège, et l'agrégat a atteint sa limite : après le correctif
+/// de la sonde de sol il annonce 0 chemin refusé, 0 bot hors maillage, et **3
+/// désenlisements quand même**. Il ne peut pas dire lequel, ni pourquoi. Demandé en
+/// jeu le 2026-08-13 : *« regarde individuellement la trajectoire de chaque mob […]
+/// ceux qui avancent mais ne bougent pas »*.
+///
+/// Chaque ligne porte les deux verdicts dérivés — `fige` (le pas est refusé) et
+/// `pietine` (il marche mais tourne en rond) — plus la **cause nommée** du dernier
+/// refus. Les trois ensemble désignent le remède ; aucun ne le fait seul.
+pub fn write_bot_traces_sensor(
+    time: Res<Time>,
+    tuning: Res<TacticalTuning>,
+    bots: Query<(Entity, &ArenaBot, &Transform, &BotTrace, Option<&crate::navpath::BotPath>)>,
+    mut last_write: Local<f32>,
+    // Tampon réutilisé : 0 allocation par écriture (`scalability.md`).
+    mut buf: Local<String>,
+) {
+    let now = time.elapsed_secs();
+    if now - *last_write < tuning.sensor_period_secs.max(0.1) {
+        return;
+    }
+    *last_write = now;
+
+    buf.clear();
+    let (mut figes, mut pietinants, mut aveugles) = (0u32, 0u32, 0u32);
+    for (e, bot, xf, trace, path) in &bots {
+        if bot.state == BotState::Dead {
+            continue;
+        }
+        let fige = trace.fige(bot.speed);
+        let pietine = trace.pietine(bot.speed);
+        match (fige, pietine) {
+            (None, _) => aveugles += 1,
+            (Some(true), _) => figes += 1,
+            (Some(false), Some(true)) => pietinants += 1,
+            _ => {}
+        }
+        let cause = match trace.dernier_refus {
+            None => "aucun".to_string(),
+            Some(StepRefusal::SolAbsent) => "sol_absent".to_string(),
+            Some(StepRefusal::ParoiTropHaute { montee_m }) => {
+                format!("paroi_{montee_m:.2}m")
+            }
+            Some(StepRefusal::VideTropProfond { descente_m }) => {
+                format!("vide_{descente_m:.2}m")
+            }
+        };
+        if !buf.is_empty() {
+            buf.push(',');
+        }
+        // `net`/`cumul` à -1 = fenêtre jamais close. « Pas encore mesuré » n'est pas
+        // « tout va bien » — `map-design-patterns.md` §13.
+        buf.push_str(&format!(
+            r#"{{"e":{},"pos":[{:.1},{:.1},{:.1}],"etat":"{:?}","net_m":{:.2},"cumul_m":{:.2},"fige":{},"pietine":{},"refus":"{}","mur_frac":{:.2},"wp":{},"wp_total":{},"stuck_s":{:.1}}}"#,
+            e.index(),
+            xf.translation.x,
+            xf.translation.y,
+            xf.translation.z,
+            bot.state,
+            trace.net_m,
+            trace.cumul_clos_m,
+            fige.map_or("null".into(), |b| b.to_string()),
+            pietine.map_or("null".into(), |b| b.to_string()),
+            cause,
+            trace.mur_frac,
+            path.map_or(0, |p| p.cursor),
+            path.map_or(0, |p| p.waypoints.len()),
+            bot.stuck_secs,
+        ));
+    }
+
+    let (severity, next_step) = if aveugles > 0 && figes == 0 && pietinants == 0 {
+        (
+            "info",
+            "AVEUGLE : aucune fenetre de progression close. Le capteur ne dit PAS que \
+             tout va bien, il dit qu'il n'a rien encore mesure. Laisser tourner 3 s."
+                .to_string(),
+        )
+    } else if figes > 0 {
+        (
+            "error",
+            format!(
+                "{figes} bot(s) FIGES : leur pas est refuse. Lire `refus` — `paroi_*` = \
+                 un solide que le maillage aurait du declarer obstacle (h > step_height) \
+                 et n'a pas declare ; `vide_*` = un rebord, refus correct ; `sol_absent` \
+                 = trou OU sonde trop courte. Croiser avec `mur_frac` proche de 0, qui \
+                 designerait un mur et non le sol."
+            ),
+        )
+    } else if pietinants > 0 {
+        (
+            "warn",
+            format!(
+                "{pietinants} bot(s) PIETINENT : ils marchent sans progresser. Le chien \
+                 de garde actuel ne les voit PAS, il ne regarde que la distance par tick. \
+                 Cause probable : oscillation entre deux waypoints, ou strafe qui annule \
+                 l'avance. Lire `wp`/`wp_total` — un curseur qui n'avance pas le confirme."
+            ),
+        )
+    } else {
+        ("ok", "tous les bots progressent".to_string())
+    };
+
+    let lignes: &str = &buf;
+    let json = format!(
+        r#"{{"id":"bot_traces","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{now:.2},"figes":{figes},"pietinants":{pietinants},"aveugles":{aveugles},"bots":[{lignes}]}}"#
+    );
+    let _ = forgia_core::sensor_io::enqueue("forgia2_bot_traces.json", json);
+}
+
 pub fn write_bot_ai_sensor(
     time: Res<Time>,
     tuning: Res<TacticalTuning>,
@@ -1080,6 +1391,157 @@ pub fn write_bot_ai_sensor(
         tuning.los_lost_grace_secs,
     );
     let _ = forgia_core::sensor_io::enqueue("forgia_bot_ai.json", json);
+}
+
+/// La trace individuelle — « ceux qui avancent mais ne bougent pas » (2026-08-13).
+#[cfg(test)]
+mod trace_tests {
+    use super::*;
+
+    const V: f32 = 3.5; // vitesse d'un bot d'arène (m/s)
+
+    fn trace_a(pos: Vec3) -> BotTrace {
+        BotTrace {
+            ancre: pos,
+            ..Default::default()
+        }
+    }
+
+    /// Fait tourner `n` ticks de `dt`, en avancant de `pas` metres a chaque fois
+    /// dans la direction donnee.
+    fn simule(t: &mut BotTrace, depart: Vec3, dir: Vec3, pas: f32, n: u32, dt: f32) -> Vec3 {
+        let mut p = depart;
+        for _ in 0..n {
+            p += dir * pas;
+            t.tick(p, pas, dt);
+        }
+        p
+    }
+
+    #[test]
+    fn tant_qu_aucune_fenetre_n_est_close_le_verdict_est_none_pas_ok() {
+        // `map-design-patterns.md` §13 : zero mesure n'est pas vert, c'est aveugle.
+        // Un capteur qui repondrait « tout va bien » avant d'avoir mesure quoi que
+        // ce soit est exactement le capteur menteur que ce projet traque.
+        let t = trace_a(Vec3::ZERO);
+        assert_eq!(t.fige(V), None);
+        assert_eq!(t.pietine(V), None);
+    }
+
+    #[test]
+    fn un_bot_qui_progresse_n_est_ni_fige_ni_pietinant() {
+        let mut t = trace_a(Vec3::ZERO);
+        // 3,5 m/s pendant 3 s en ligne droite = 10,5 m parcourus, 10,5 m nets.
+        simule(&mut t, Vec3::ZERO, Vec3::X, V * 0.05, 70, 0.05);
+        assert_eq!(t.fige(V), Some(false));
+        assert_eq!(t.pietine(V), Some(false));
+    }
+
+    #[test]
+    fn un_bot_dont_le_pas_est_refuse_est_fige() {
+        // Le cas que le correctif de la sonde de sol adresse : `parcouru == 0` a
+        // chaque tick parce que `resolve_step` refuse.
+        let mut t = trace_a(Vec3::ZERO);
+        for _ in 0..70 {
+            t.tick(Vec3::ZERO, 0.0, 0.05);
+        }
+        assert_eq!(t.fige(V), Some(true));
+        // Il n'a pas marche, donc il ne « pietine » pas — les deux verdicts sont
+        // exclusifs, sinon le message de remediation designerait la mauvaise cause.
+        assert_eq!(t.pietine(V), Some(false));
+    }
+
+    #[test]
+    fn un_bot_qui_fait_des_allers_retours_pietine_sans_etre_fige() {
+        // LE cas rapporte en jeu : « ceux qui avancent mais ne bougent pas ». Le
+        // chien de garde actuel ne le voit PAS — il ne regarde que la distance par
+        // tick, et un aller-retour de 17 cm par tick le satisfait pleinement.
+        let mut t = trace_a(Vec3::ZERO);
+        let pas = V * 0.05;
+        let mut p = Vec3::ZERO;
+        for i in 0..70 {
+            let dir = if i % 2 == 0 { Vec3::X } else { -Vec3::X };
+            p += dir * pas;
+            t.tick(p, pas, 0.05);
+        }
+        assert_eq!(
+            t.fige(V),
+            Some(false),
+            "il a bel et bien parcouru de la distance"
+        );
+        assert_eq!(
+            t.pietine(V),
+            Some(true),
+            "mais son deplacement net est nul : c'est le symptome decrit"
+        );
+    }
+
+    #[test]
+    fn contourner_un_batiment_ne_compte_pas_comme_pietiner() {
+        // Le faux positif a eviter : un detour LEGITIME parcourt beaucoup de
+        // distance pour un deplacement net modeste. Si le seuil le confondait avec
+        // un blocage, le capteur crierait a chaque contournement — donc plus
+        // personne ne le lirait.
+        let mut t = trace_a(Vec3::ZERO);
+        let pas = V * 0.05;
+        let mut p = Vec3::ZERO;
+        // Quart de cercle de rayon 6 m : deplacement net ~8,5 m sur 10,5 parcourus.
+        for i in 0..70 {
+            let a = std::f32::consts::FRAC_PI_2 * i as f32 / 70.0;
+            let dir = Vec3::new(a.cos(), 0.0, a.sin());
+            p += dir * pas;
+            t.tick(p, pas, 0.05);
+        }
+        assert_eq!(
+            t.pietine(V),
+            Some(false),
+            "un contournement normal ne doit pas lever l'alerte"
+        );
+    }
+
+    #[test]
+    fn les_causes_de_refus_sont_distinctes_et_chiffrees() {
+        // Trois causes, trois remedes opposes — et elles etaient toutes ecrasees en
+        // un `None` muet.
+        let (up, down, off) = (0.45, 1.2, 1.10);
+        assert_eq!(
+            resolve_step(10.0, None, off, up, down),
+            StepVerdict::Refuse(StepRefusal::SolAbsent)
+        );
+        // Sol 80 cm au-dessus des pieds (pieds a 8,90) -> paroi. Comparaison
+        // APPROCHEE : `10.0 - 1.10` vaut 8,900001 en f32, donc l'egalite stricte
+        // sur la montee echouerait pour une raison qui n'a rien a voir avec la
+        // regle testee.
+        match resolve_step(10.0, Some(9.70), off, up, down) {
+            StepVerdict::Refuse(StepRefusal::ParoiTropHaute { montee_m }) => {
+                assert!((montee_m - 0.80).abs() < 1.0e-4, "montee {montee_m}");
+            }
+            autre => panic!("attendu ParoiTropHaute, obtenu {autre:?}"),
+        }
+        // Sol 2 m sous les pieds -> vide.
+        match resolve_step(10.0, Some(6.90), off, up, down) {
+            StepVerdict::Refuse(StepRefusal::VideTropProfond { descente_m }) => {
+                assert!((descente_m - 2.00).abs() < 1.0e-4, "descente {descente_m}");
+            }
+            autre => panic!("attendu VideTropProfond, obtenu {autre:?}"),
+        }
+    }
+
+    #[test]
+    fn le_verdict_detaille_et_la_forme_historique_disent_la_meme_chose() {
+        // `resolve_step_altitude` est desormais une projection de `resolve_step` :
+        // si les deux divergeaient, la trace decrirait un mouvement qui n'a pas eu
+        // lieu. C'est la classe de defaut n°1 du projet, prevenue par un test.
+        let (up, down, off) = (0.45, 1.2, 1.10);
+        for sol in [None, Some(9.70), Some(6.90), Some(8.90), Some(9.20)] {
+            let a = resolve_step_altitude(10.0, sol, off, up, down);
+            let b = match resolve_step(10.0, sol, off, up, down) {
+                StepVerdict::Accepte { y, .. } => Some(y),
+                StepVerdict::Refuse(_) => None,
+            };
+            assert_eq!(a, b, "divergence sur sol={sol:?}");
+        }
+    }
 }
 
 /// La sonde de sol — le défaut « les mobs se bloquent dans les passages » (2026-08-13).

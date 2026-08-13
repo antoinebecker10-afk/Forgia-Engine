@@ -26,6 +26,7 @@
 | `forgia_bone_trace.json` | T1 | forgia-anim-debug | `src/bone_trace.rs:265,345` | event | bone transform NaN, skinning broken | active |
 | `forgia_bone_trace_health.json` | T2 | forgia-anim-debug | `src/bone_trace.rs:273,290` | 1Hz | bone_trace sensor liveness | active |
 | `forgia_bot_ai.json` | T1 | forgia-ai-arena-bot | `src/tactical.rs:471` | 1Hz | bot LOS, alert, chase, shoot — **story-545 candidat** | active |
+| `forgia2_bot_traces.json` | T1 | forgia-ai-arena-bot | `src/tactical.rs:write_bot_traces_sensor` | 1Hz | **par bot** : figé (pas refusé, cause nommée) vs piétine (marche sans progresser) — l'agrégat ne distinguait pas | active |
 | `forgia_chunk_stream.json` | T1 | forgia-streaming | `src/lib.rs:460` | 1Hz | chunk load/unload, streaming budget | active |
 | `forgia_chunk_stream_health.json` | T2 | forgia-streaming | `src/lib.rs:461` | 1Hz | chunk_stream sensor liveness | active |
 | `forgia_chunks_snapshot.json` | T1 | forgia-rpg | `src/lib.rs:1007` | 1Hz | terrain chunks count, vegetation_total — story-502 | active |

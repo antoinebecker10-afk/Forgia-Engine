@@ -262,6 +262,7 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     // systèmes sont quasi gratuits et le mouvement retombe en ligne
                     // droite : le comportement d'avant est le repli, pas l'exception.
                     navpath::sys_attach_bot_path,
+                    tactical::sys_attach_bot_trace,
                     navpath::sys_bot_navpath,
                     // Phase 3 tactical_movement run APRÈS state_machine pour override le
                     // mouvement basique chase forward avec strafe + obstacle avoidance.
@@ -277,6 +278,7 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     // `on_bot_death` (cf .add_observer ci-dessous).
                     tick_respawns,
                     tactical::write_bot_ai_sensor,
+                    tactical::write_bot_traces_sensor,
                 )
                     .chain(),
             )
