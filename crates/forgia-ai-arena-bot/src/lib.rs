@@ -60,6 +60,35 @@ pub struct ArenaBot {
     /// sur l'altitude du sol l'enterrerait de ~90 cm. Le suivi de sol pose donc
     /// `y = sol + foot_offset_m`.
     pub foot_offset_m: f32,
+    /// Rayon d'emprise au sol (m) — la dimension HORIZONTALE, jumelle de
+    /// `foot_offset_m`.
+    ///
+    /// # Pourquoi ce champ existe (2026-08-13)
+    ///
+    /// Il n'existait pas : la validation contre les murs utilisait une constante
+    /// unique `BOT_BODY_RADIUS_M = 0.4`, commentée « valeur moyenne, marge
+    /// conservatrice ». Elle n'est conservatrice pour personne :
+    ///
+    /// | archétype | rayon réel | ce que le code croyait | écart |
+    /// |---|---|---|---|
+    /// | sniper | 0,30 m | 0,40 m | +0,10 (s'arrête trop tôt) |
+    /// | runner | 0,32 m | 0,40 m | +0,08 (s'arrête trop tôt) |
+    /// | tank   | 0,55 m | 0,40 m | **−0,15 (pénètre)** |
+    /// | boss   | 1,40 m | 0,40 m | **−1,00 (traverse)** |
+    ///
+    /// Les gros entraient dans la géométrie, les petits s'arrêtaient net au lieu de
+    /// longer le mur — leur test de glissement échouait sur une largeur qu'ils
+    /// n'avaient pas. Deux symptômes opposés, une seule cause.
+    ///
+    /// Même discipline que `foot_offset_m` : **une seule source**, le génome.
+    pub body_radius_m: f32,
+    /// Temps restant à TRAVERSER les obstacles (s). > 0 ⇒ collision ignorée.
+    ///
+    /// Filet de dernier recours, demandé en jeu le 2026-08-13 : un mob bloqué en
+    /// poursuite finit par franchir ce qui le bloque, plutôt que de rester planté
+    /// à la vue du joueur. Trois gardes le tiennent (durée de blocage, poursuite
+    /// active, durée bornée) — cf. `arena_bots.toml` [ai] `phase_after_secs`.
+    pub phase_left: f32,
 }
 
 impl Default for ArenaBot {
@@ -86,6 +115,11 @@ impl Default for ArenaBot {
             // Valeur plausible pour une capsule d'humanoïde ; les spawns qui
             // connaissent leur capsule la remplacent par la vraie.
             foot_offset_m: 0.9,
+            // Reflet de la capsule d'`arena_bots.toml` (`body_radius`). Les spawns
+            // qui connaissent leur capsule la remplacent par la vraie — et ils la
+            // connaissent tous, cf. `EnemyStats::capsule_radius`.
+            body_radius_m: 0.40,
+            phase_left: 0.0,
             stuck_secs: 0.0,
             unstick_left: 0.0,
         }

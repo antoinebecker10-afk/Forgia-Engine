@@ -226,6 +226,11 @@ impl EnemyStatsConfig {
             // une seule source, sinon les deux divergent et le bot s'enterre ou
             // flotte d'un demi-corps.
             foot_offset_m: s.foot_offset_m(),
+            // Jumelle horizontale du champ ci-dessus, MÊME source. Avant, la
+            // validation contre les murs prenait 0,40 m pour tout le monde : le
+            // tank (0,55) pénétrait, le boss (1,40) traversait, et les petits
+            // s'arrêtaient 10 cm trop tôt sans pouvoir glisser.
+            body_radius_m: s.capsule_radius,
             ..ArenaBot::default()
         }
     }

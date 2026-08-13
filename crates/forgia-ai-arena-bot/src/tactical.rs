@@ -88,6 +88,18 @@ pub struct TacticalTuning {
     /// Hauteur au-dessus du bot d'où part le rayon vers le sol (m). Doit
     /// dépasser `max_step_up_m`, sinon une marche montante ne serait jamais vue.
     pub ground_probe_height_m: f32,
+
+    // ── Traversée d'exception (2026-08-13) ──────────────────────────────────
+    /// Durée de blocage, EN POURSUITE, après laquelle le bot traverse l'obstacle.
+    ///
+    /// C'est un **filet**, pas une mécanique. Il rend le jeu jouable quand la
+    /// géométrie ou la navigation échoue ; il ne les répare pas. La mesure qui
+    /// compte est `phase_triggered_session` : s'il monte, un défaut subsiste
+    /// dessous.
+    pub phase_after_secs: f32,
+    /// Durée maximale d'une traversée (s). Bornée : de quoi franchir un prop,
+    /// pas de quoi remonter un couloir à travers les murs.
+    pub phase_max_secs: f32,
     /// Fraction du pas VOULU en dessous de laquelle on considère qu'un bot
     /// n'avance pas. Il ne suffit pas de tester « déplacement nul » : un bot
     /// qui rabote un mur en glissant avance encore un peu tout en tournant en
@@ -138,6 +150,13 @@ impl Default for TacticalTuning {
             max_step_up_m: 0.45,
             max_step_down_m: 1.2,
             ground_probe_height_m: 1.0,
+            // Reflet d'`arena_bots.toml` — c'est LUI la source de vérité, le
+            // génome écrase cette Resource à chaque chargement
+            // (`sync_tactical_tuning_from_genome`). Changer ces lignes SEULES
+            // serait inerte : erreur commise le 2026-08-13 sur
+            // `los_lost_grace_secs`, rattrapée par le capteur.
+            phase_after_secs: 2.5,
+            phase_max_secs: 1.0,
             stuck_progress_frac: 0.25,
             stuck_after_secs: 0.7,
             unstick_secs: 0.9,
@@ -170,6 +189,14 @@ pub struct BotAiSensor {
     /// chien de garde a servi. Un compteur qui ne sait répondre à sa propre
     /// question est aveugle, pas vert.
     pub unstick_triggered_session: u32,
+    /// Traversées d'exception DÉCLENCHÉES depuis le lancement.
+    ///
+    /// ⚠️ **Ce compteur n'est pas une réussite.** Chaque incrément dit qu'un bot est
+    /// resté bloqué en poursuite assez longtemps pour qu'on doive lui faire franchir
+    /// un solide. Le filet rend le jeu jouable ; il ne répare rien. S'il monte, un
+    /// défaut de géométrie ou de navigation subsiste dessous — croiser avec
+    /// `forgia2_bot_traces.json` pour savoir lequel.
+    pub phase_triggered_session: u32,
     /// Chemins trouvés depuis le lancement (recalés compris).
     pub paths_ok_session: u32,
     /// Parmi eux, ceux obtenus **après recalage d'une extrémité sur le maillage**.
@@ -513,9 +540,17 @@ fn pick_avoid_direction(
 // (`exclude_sensors` → on ignore les autres ennemis), clamp conservateur (jamais
 // de pénétration) + slide le long de la surface pour contourner.
 
-/// Rayon approximatif de la capsule du bot pour la validation murs (les vrais
-/// rayons par archétype ~0.3-0.5 ; 0.4 = valeur moyenne, marge conservatrice).
-const BOT_BODY_RADIUS_M: f32 = 0.4;
+// 2026-08-13 — `BOT_BODY_RADIUS_M = 0.4` a été SUPPRIMÉE.
+//
+// Elle se disait « valeur moyenne, marge conservatrice ». Elle n'était
+// conservatrice pour personne : le tank (0,55) et le boss (1,40) pénétraient la
+// géométrie, le runner (0,32) et le sniper (0,30) s'arrêtaient 10 cm trop tôt ET
+// rataient leur glissement, parce que le test de dégagement latéral demandait une
+// largeur qu'ils n'avaient pas. Deux symptômes opposés, une seule cause : une
+// grandeur écrite deux fois — une fois en génome, une fois en dur.
+//
+// Le rayon vient désormais d'`ArenaBot::body_radius_m`, lu du même génome que le
+// collider lui-même.
 /// Marge anti-pénétration : le bord du bot s'arrête à cette distance du mur.
 const COLLIDE_SKIN_M: f32 = 0.08;
 
@@ -621,6 +656,9 @@ pub fn resolve_step(
 fn collide_and_slide(
     origin: Vec3,
     step: Vec3,
+    body_radius_m: f32,
+    foot_offset_m: f32,
+    max_step_up_m: f32,
     rapier: &RapierContext,
     self_entity: Entity,
 ) -> Vec3 {
@@ -632,9 +670,38 @@ fn collide_and_slide(
     let dir = flat / len;
     let pred = |e: Entity| e != self_entity;
     let filter = QueryFilter::default().exclude_sensors().predicate(&pred);
-    let probe = origin + Vec3::Y * 0.5;
-    let lateral = Vec3::new(-dir.z, 0.0, dir.x) * BOT_BODY_RADIUS_M;
-    let max_toi = len + BOT_BODY_RADIUS_M + COLLIDE_SKIN_M;
+    // La sonde de mur se pose JUSTE AU-DESSUS du ressaut franchissable.
+    //
+    // # Ce que cette hauteur décide, et pourquoi c'est le bon seuil (2026-08-13)
+    //
+    // Un solide plus bas que `max_step_up_m` n'est pas un mur : c'est une MARCHE.
+    // Le bot doit monter dessus, pas s'arrêter devant. Un solide plus haut est un
+    // mur : il doit le contourner. Poser la sonde à `pieds + max_step_up` fait
+    // exactement ce tri, **sans interroger la moindre entité** — ce qui est au-
+    // dessus est touché, ce qui est en dessous passe sous le rayon.
+    //
+    // C'est aussi la SEULE façon d'aligner les trois consommateurs du même seuil :
+    //
+    // | qui | ce qu'il en fait |
+    // |---|---|
+    // | maillage (`blocks_agent`) | `h > step` ⇒ obstacle à contourner |
+    // | sonde de sol (`resolve_step`) | montée ≤ `step` ⇒ pas accepté |
+    // | **cette sonde de mur** | plus haut que `step` ⇒ mur |
+    //
+    // Avant : `origin + Y * 0.5`, où `origin` est le CENTRE. Soit 1,60 m au-dessus
+    // des pieds pour un bot d'arène — la sonde ne voyait donc aucun prop sous
+    // 1,60 m, alors que le maillage en déclare obstacle dès 0,45 m. Un prop entre
+    // les deux était contourné par le chemin, invisible à la collision, et refusé
+    // par la sonde de sol : le bot gelait avec `ParoiTropHaute` sans qu'aucune des
+    // trois pièces ne soit d'accord avec les autres.
+    //
+    // Pente maximale que ce choix laisse passer : `atan(max_step_up / max_toi)`,
+    // soit ~30° pour nos valeurs. Les rampes du projet sont à 14° (dérivées de
+    // `MAX_SLOPE_DEG` puis arrondies au module) — marge confortable.
+    let pieds_y = origin.y - foot_offset_m;
+    let probe = Vec3::new(origin.x, pieds_y + max_step_up_m + COLLIDE_SKIN_M, origin.z);
+    let lateral = Vec3::new(-dir.z, 0.0, dir.x) * body_radius_m;
+    let max_toi = len + body_radius_m + COLLIDE_SKIN_M;
     // 3 rayons parallèles : centre + bords gauche/droit (couvre la largeur capsule
     // → ne franchit pas un coin de mur qu'un rayon central seul manquerait).
     let mut best: Option<(f32, Vec3)> = None; // (time_of_impact, normale XZ)
@@ -652,7 +719,7 @@ fn collide_and_slide(
         return step; // rien devant → déplacement complet
     };
     // Conservateur : on retire rayon + skin → le bord ne pénètre jamais le mur.
-    let allowed = (toi - BOT_BODY_RADIUS_M - COLLIDE_SKIN_M).clamp(0.0, len);
+    let allowed = (toi - body_radius_m - COLLIDE_SKIN_M).clamp(0.0, len);
     let mut moved = dir * allowed;
     // Slide : projette le reste sur la tangente du mur, si le couloir est dégagé.
     if normal != Vec3::ZERO {
@@ -663,11 +730,11 @@ fn collide_and_slide(
                 .cast_ray(
                     probe,
                     slide_dir,
-                    remaining + BOT_BODY_RADIUS_M + COLLIDE_SKIN_M,
+                    remaining + body_radius_m + COLLIDE_SKIN_M,
                     true,
                     filter,
                 )
-                .is_none_or(|(_, t)| t > BOT_BODY_RADIUS_M + COLLIDE_SKIN_M);
+                .is_none_or(|(_, t)| t > body_radius_m + COLLIDE_SKIN_M);
             if slide_clear {
                 moved += slide_dir * remaining;
             }
@@ -784,9 +851,50 @@ pub fn bot_tactical_movement(
             .unwrap_or(fwd_dir) // fallback forward simple si tous bloqués
         };
         let step = final_dir * bot.speed * dt;
+
+        // ── Traversée d'exception ────────────────────────────────────────────
+        //
+        // Demandé en jeu le 2026-08-13 : un mob bloqué depuis 2-3 s par un objet,
+        // ALORS QU'IL POURSUIT, finit par le franchir. Mieux vaut un ennemi qui
+        // traverse un prop qu'un ennemi planté que le joueur contemple.
+        //
+        // Les trois gardes sont la raison pour laquelle ça reste acceptable :
+        //  - `stuck_secs` accumule la NON-PROGRESSION, pas la présence d'un
+        //    obstacle : frôler un mur en avançant ne compte pas ;
+        //  - `en_poursuite` : un bot au repos coincé le reste. Le voir traverser
+        //    un mur pour rien serait pire que le bug qu'on corrige ;
+        //  - `phase_max_secs` borne l'épisode à ~3,5 m — l'épaisseur d'un prop,
+        //    pas la longueur d'un couloir.
+        let (phase_left, declenche) = phase_step(
+            bot.phase_left,
+            bot.stuck_secs,
+            bot.state == BotState::Chase,
+            dt,
+            &tuning,
+        );
+        if declenche {
+            bot.stuck_secs = 0.0;
+            sensor.phase_triggered_session = sensor.phase_triggered_session.saturating_add(1);
+        }
+        bot.phase_left = phase_left;
+        let traverse = phase_left > 0.0;
+
         // Anti-traversée : clamp/slide le déplacement contre les murs solides
-        // (le kinematic ne s'arrête pas tout seul sur du Fixed).
-        let safe = collide_and_slide(xf.translation, step, &ctx, bot_entity);
+        // (le kinematic ne s'arrête pas tout seul sur du Fixed). Sauf pendant une
+        // traversée d'exception, où le pas passe tel quel.
+        let safe = if traverse {
+            step
+        } else {
+            collide_and_slide(
+                xf.translation,
+                step,
+                bot.body_radius_m,
+                bot.foot_offset_m,
+                tuning.max_step_up_m,
+                &ctx,
+                bot_entity,
+            )
+        };
         // Story-685 — SUIVI DE SOL. Le pas est d'abord résolu en XZ, puis on
         // cherche le sol à l'arrivée. Avant, le commentaire disait « Y stays at
         // spawn » et c'était exact : un bot restait à son altitude de naissance
@@ -819,10 +927,22 @@ pub fn bot_tactical_movement(
             tuning.max_step_up_m,
             tuning.max_step_down_m,
         );
-        if let StepVerdict::Accepte { y, .. } = verdict {
-            xf.translation.x = next.x;
-            xf.translation.z = next.z;
-            xf.translation.y = y;
+        match verdict {
+            StepVerdict::Accepte { y, .. } => {
+                xf.translation.x = next.x;
+                xf.translation.z = next.z;
+                xf.translation.y = y;
+            }
+            // Pendant une traversée, le sol refuserait aussi le pas — le sommet du
+            // prop qu'on franchit est justement trop haut. On force donc le XZ,
+            // mais on GARDE l'altitude courante au lieu de l'ignorer : traverser un
+            // caisson ne doit pas devenir tomber d'un rebord. Le pas suivant hors
+            // traversée remettra le bot sur son sol.
+            StepVerdict::Refuse(_) if traverse => {
+                xf.translation.x = next.x;
+                xf.translation.z = next.z;
+            }
+            StepVerdict::Refuse(_) => {}
         }
         // Ce qu'il a RÉELLEMENT parcouru, pas ce qu'il visait. Un pas refusé en
         // altitude vaut zéro ici — c'est justement un des deux chemins qui
@@ -853,6 +973,42 @@ pub fn bot_tactical_movement(
         bot.stuck_secs = etat.stuck_secs;
         bot.unstick_left = etat.unstick_left;
     }
+}
+
+// ─── Traversée d'exception ───────────────────────────────────────────────────
+
+/// Décide de la traversée d'un obstacle — **PUR**, donc testable sans moteur.
+///
+/// Rend `(temps de traversée restant, déclenchement à l'instant)`. Le second sert
+/// au compteur : on compte les DÉCLENCHEMENTS, pas les frames passées à traverser,
+/// sinon le nombre dirait la durée.
+///
+/// # Les trois gardes, et pourquoi chacun
+///
+/// 1. **`stuck_secs >= phase_after_secs`** — il faut une non-progression soutenue.
+///    `stuck_secs` mesure l'absence d'avance, pas la présence d'un obstacle :
+///    frôler un mur en avançant ne l'alimente pas.
+/// 2. **`en_poursuite`** — un bot au repos coincé le reste. Le voir franchir un mur
+///    sans raison serait plus dommageable que le blocage qu'on corrige.
+/// 3. **`phase_max_secs`** — l'épisode est borné à ~3,5 m à 3,5 m/s : l'épaisseur
+///    d'un prop, pas la longueur d'un couloir.
+///
+/// Une traversée en cours ne se re-déclenche pas : le premier test exige
+/// `phase_left <= 0`, sinon un bot toujours bloqué renouvellerait indéfiniment son
+/// laissez-passer et traverserait l'arène entière.
+#[must_use]
+pub fn phase_step(
+    phase_left: f32,
+    stuck_secs: f32,
+    en_poursuite: bool,
+    dt: f32,
+    tuning: &TacticalTuning,
+) -> (f32, bool) {
+    if phase_left <= 0.0 && en_poursuite && stuck_secs >= tuning.phase_after_secs {
+        // Déclenché À L'INSTANT : la durée pleine, moins ce tick.
+        return ((tuning.phase_max_secs - dt).max(0.0), true);
+    }
+    ((phase_left - dt).max(0.0), false)
 }
 
 // ─── Trace individuelle ──────────────────────────────────────────────────────
@@ -1118,8 +1274,9 @@ const SEPARATION_MAX_DIST_M: f32 = 1.2;
 const SEPARATION_PUSH_STRENGTH: f32 = 0.5;
 
 pub fn bot_separation(
-    mut bots: Query<(Entity, &mut Transform), (With<ArenaBot>, Without<BotTarget>)>,
+    mut bots: Query<(Entity, &ArenaBot, &mut Transform), Without<BotTarget>>,
     rapier: ReadRapierContext,
+    tuning: Res<TacticalTuning>,
     // Perf (audit 2026-07-01) : buffers scratch réutilisés au lieu de Vec::new()/
     // HashMap::new() par frame — 0 alloc/frame, conforme scalability.md.
     mut positions: Local<Vec<(Entity, Vec3)>>,
@@ -1130,7 +1287,7 @@ pub fn bot_separation(
     };
     // Snapshot positions pour comparaison stable (sinon mutation iterative biaise).
     positions.clear();
-    positions.extend(bots.iter().map(|(e, tf)| (e, tf.translation)));
+    positions.extend(bots.iter().map(|(e, _, tf)| (e, tf.translation)));
     deltas.clear();
     for i in 0..positions.len() {
         for j in (i + 1)..positions.len() {
@@ -1160,12 +1317,17 @@ pub fn bot_separation(
             }
         }
     }
-    for (entity, mut tf) in &mut bots {
+    for (entity, bot, mut tf) in &mut bots {
         if let Some(delta) = deltas.get(&entity) {
-            // Anti-traversée : la poussée de séparation respecte aussi les murs.
+            // Anti-traversée : la poussée de séparation respecte aussi les murs, et
+            // avec le rayon RÉEL du bot poussé — sinon la séparation replacerait un
+            // tank dans le mur dont le mouvement venait de l'écarter.
             let safe = collide_and_slide(
                 tf.translation,
                 Vec3::new(delta.x, 0.0, delta.y),
+                bot.body_radius_m,
+                bot.foot_offset_m,
+                tuning.max_step_up_m,
                 &ctx,
                 entity,
             );
@@ -1362,7 +1524,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_snapped_bot_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"phase_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_snapped_bot_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -1373,6 +1535,7 @@ pub fn write_bot_ai_sensor(
         unsticking,
         stalling,
         sensor.unstick_triggered_session,
+        sensor.phase_triggered_session,
         sensor.paths_ok_session,
         sensor.paths_snapped_session,
         sensor.paths_snapped_bot_session,
@@ -1561,6 +1724,175 @@ mod sonde_de_sol_tests {
 
     fn foot_offset(rayon: f32, demi_h: f32) -> f32 {
         demi_h + rayon + 0.05
+    }
+
+    /// Rayon d'agent du maillage — `assets/genomes/navmesh.toml` [agent].radius_m.
+    /// Miroir inevitable (autre crate), donc teste, comme `spawn-clearance.md` §4bis
+    /// l'exige.
+    const NAVMESH_AGENT_RADIUS_M: f32 = 0.30;
+
+    // ── La traversée d'exception ────────────────────────────────────────────
+
+    #[test]
+    fn un_bot_bloque_en_poursuite_finit_par_traverser() {
+        let t = TacticalTuning::default();
+        let (reste, declenche) = phase_step(0.0, t.phase_after_secs, true, 0.016, &t);
+        assert!(declenche, "bloque depuis {} s en poursuite", t.phase_after_secs);
+        assert!(reste > 0.0);
+    }
+
+    #[test]
+    fn un_bot_au_repos_coince_ne_traverse_jamais() {
+        // Garde n°2. Un ennemi qui franchit un mur sans raison visible est plus
+        // dommageable que le blocage qu'on corrige : le joueur ne voit pas le
+        // blocage d'un bot au repos, il verrait la triche.
+        let t = TacticalTuning::default();
+        let (_, declenche) = phase_step(0.0, 999.0, false, 0.016, &t);
+        assert!(!declenche, "hors poursuite, on reste coince");
+    }
+
+    #[test]
+    fn un_bloquage_court_ne_declenche_rien() {
+        // Garde n°1. Un contournement serre coute une seconde d'avance : sous le
+        // seuil, on ne doit pas confondre les deux.
+        let t = TacticalTuning::default();
+        let (_, declenche) = phase_step(0.0, t.phase_after_secs - 0.5, true, 0.016, &t);
+        assert!(!declenche);
+    }
+
+    #[test]
+    fn une_traversee_en_cours_ne_se_renouvelle_pas() {
+        // LE garde qui evite qu'un bot toujours bloque traverse l'arene entiere en
+        // renouvelant son laissez-passer a chaque frame. Sans lui, le filet
+        // deviendrait un mode de deplacement.
+        let t = TacticalTuning::default();
+        let (_, declenche) = phase_step(0.5, 999.0, true, 0.016, &t);
+        assert!(!declenche, "deja en traversee : pas de renouvellement");
+    }
+
+    #[test]
+    fn la_traversee_s_epuise_et_ne_dure_pas_plus_que_son_budget() {
+        // Garde n°3, verifie dans le temps : on simule jusqu'a extinction et on
+        // compare la duree reelle au budget.
+        let t = TacticalTuning::default();
+        let dt = 0.016;
+        let (mut reste, _) = phase_step(0.0, t.phase_after_secs, true, dt, &t);
+        let mut duree = dt;
+        let mut gardefou = 0;
+        while reste > 0.0 && gardefou < 10_000 {
+            // `stuck_secs` a zero : le bot avance, il n'y a rien a renouveler.
+            let (r, _) = phase_step(reste, 0.0, true, dt, &t);
+            reste = r;
+            duree += dt;
+            gardefou += 1;
+        }
+        assert!(
+            (duree - t.phase_max_secs).abs() < 0.05,
+            "traversee de {duree:.2} s pour un budget de {:.2} s",
+            t.phase_max_secs
+        );
+        // A 3,5 m/s, la distance franchie doit couvrir un prop (rayon max ~3 m)
+        // sans permettre de remonter un batiment.
+        let distance = 3.5 * duree;
+        assert!(
+            (3.0..=8.0).contains(&distance),
+            "distance traversee {distance:.1} m hors de la bande utile"
+        );
+    }
+
+    #[test]
+    fn le_genome_est_la_source_de_verite_pour_la_traversee() {
+        // Meme piege que `los_lost_grace_secs` le matin meme : le genome ecrase la
+        // Resource a chaque chargement, donc changer le defaut Rust seul est INERTE.
+        // Ce test lit le TOML et compare.
+        let toml = include_str!("../../../assets/genomes/arena_bots.toml");
+        for (cle, attendu) in [
+            ("phase_after_secs", TacticalTuning::default().phase_after_secs),
+            ("phase_max_secs", TacticalTuning::default().phase_max_secs),
+        ] {
+            let ligne = toml
+                .lines()
+                .find(|l| l.trim_start().starts_with(cle))
+                .unwrap_or_else(|| panic!("{cle} absent d'arena_bots.toml"));
+            let valeur: f32 = ligne
+                .split('=')
+                .nth(1)
+                .and_then(|v| v.split('#').next())
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or_else(|| panic!("valeur illisible pour {cle} : {ligne}"));
+            assert!(
+                (valeur - attendu).abs() < 1.0e-6,
+                "{cle} : le genome dit {valeur}, le defaut Rust {attendu} — le \
+                 genome GAGNE au chargement, donc le defaut serait inerte"
+            );
+        }
+    }
+
+    #[test]
+    fn le_maillage_ne_promet_pas_des_couloirs_ou_le_bot_ne_passe_pas() {
+        // Ce test N'EST PAS un garde qui bloque : il DOCUMENTE une contrainte de
+        // design, chiffree, pour qu'elle cesse d'etre implicite.
+        //
+        // Le maillage dilate chaque obstacle du rayon d'agent, donc il garantit des
+        // couloirs de `2 x radius_m` = 60 cm. Un archetype plus large que ce rayon
+        // se voit tracer des chemins qu'il ne peut PAS emprunter — il y va, il bute,
+        // il pousse indefiniment. C'est le « les mobs se bloquent dans les
+        // passages » rapporte en jeu le 2026-08-13.
+        //
+        //   archetype  rayon   couloir requis   maillage promet
+        //   sniper     0,30 m      0,60 m           0,60 m   OK
+        //   runner     0,32 m      0,64 m           0,60 m   limite
+        //   tank       0,55 m      1,10 m           0,60 m   x1,8
+        //   boss       1,40 m      2,80 m           0,60 m   x4,7
+        //
+        // Corriger cela demande une DECISION (batir le maillage pour le plus gros,
+        // ou sortir le boss du pathfinding) — pas un reglage. Tant qu'elle n'est pas
+        // prise, ce test tient le chiffre a jour et empeche qu'on l'oublie.
+        let mut trop_larges: Vec<(&str, f32, f32)> = Vec::new();
+        for (nom, rayon, _) in CAPSULES {
+            if *rayon > NAVMESH_AGENT_RADIUS_M + 1.0e-6 {
+                trop_larges.push((nom, *rayon, 2.0 * rayon));
+            }
+        }
+        println!(
+            "ARCHETYPES PLUS LARGES QUE LE MAILLAGE ({:.2} m) : {trop_larges:?} — \
+             couloir promis {:.2} m",
+            NAVMESH_AGENT_RADIUS_M,
+            2.0 * NAVMESH_AGENT_RADIUS_M
+        );
+        // Le sniper au moins doit passer, sinon le maillage ne sert a personne.
+        assert!(
+            CAPSULES
+                .iter()
+                .any(|(_, r, _)| *r <= NAVMESH_AGENT_RADIUS_M + 1.0e-6),
+            "AUCUN archetype ne tient dans les couloirs du maillage : le rayon \
+             d'agent de navmesh.toml ne decrit plus aucun ennemi du jeu"
+        );
+    }
+
+    #[test]
+    fn chaque_archetype_porte_son_propre_rayon_et_pas_une_moyenne() {
+        // La constante `BOT_BODY_RADIUS_M = 0.4` se disait « marge conservatrice ».
+        // Ce test montre qu'elle ne l'etait pour personne : pour le tank et le boss
+        // elle SOUS-estime (penetration), pour le runner et le sniper elle SUR-estime
+        // (arret premature + glissement rate). Une moyenne n'est pas une marge.
+        const ANCIENNE_MOYENNE: f32 = 0.40;
+        let (mut sous, mut sur) = (0, 0);
+        for (nom, rayon, _) in CAPSULES {
+            let ecart = ANCIENNE_MOYENNE - rayon;
+            if ecart < -1.0e-6 {
+                sous += 1;
+                println!("{nom} : SOUS-estime de {:.2} m -> penetre", -ecart);
+            } else if ecart > 1.0e-6 {
+                sur += 1;
+                println!("{nom} : SUR-estime de {ecart:.2} m -> s'arrete trop tot");
+            }
+        }
+        assert!(
+            sous > 0 && sur > 0,
+            "si une valeur unique convenait a tous, ce champ serait inutile — \
+             or elle se trompe dans LES DEUX SENS ({sous} sous, {sur} sur)"
+        );
     }
 
     #[test]

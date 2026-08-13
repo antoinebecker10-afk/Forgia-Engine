@@ -81,6 +81,30 @@ los_lost_grace_secs = 6.0           # ★ 2026-08-13 — 2.0 → 6.0. « Quand j
                                      # seul est INERTE — erreur commise le 2026-08-13, rattrapée
                                      # par le capteur qui affichait encore 2.00.
 
+# ── Traversée d'exception (2026-08-13) ───────────────────────────────────────
+# « Si le mob est bloqué plus de 2 ou 3 s à cause d'un objet, il pourrait
+# exceptionnellement le traverser pour se débloquer, surtout s'il est dans la
+# zone d'aggro. »
+#
+# C'est un FILET, pas une mécanique. Un ennemi qui traverse un mur se voit, et
+# se voit mal. Trois gardes le tiennent :
+#   1. il faut avoir été bloqué `phase_after_secs` d'affilée — pas un à-coup ;
+#   2. il faut POURSUIVRE (aggro). Un bot au repos coincé reste coincé : il
+#      n'ennuie personne, et le voir traverser un mur pour rien serait pire ;
+#   3. la traversée dure au plus `phase_max_secs`, de quoi franchir un prop,
+#      pas de quoi remonter un couloir.
+#
+# ⚠️ Le compteur `phase_triggered_session` de forgia_bot_ai.json est la vraie
+# mesure : s'il monte, ce n'est PAS que le filet marche bien, c'est qu'un défaut
+# de géométrie ou de navigation reste à corriger en dessous. Le filet le rend
+# jouable, il ne le répare pas.
+phase_after_secs = 2.5      # ★ milieu de la fourchette demandée (2-3 s). Sous 2 s
+                             # on attraperait des à-coups normaux : un contournement
+                             # serré fait perdre l'avance une seconde entière.
+phase_max_secs = 1.0         # à 3,5 m/s = 3,5 m parcourus, soit largement plus que
+                             # l'épaisseur d'un prop (rayon max mesuré ~3 m) et bien
+                             # moins que la longueur d'un bâtiment.
+
 # ── Suivi de sol (story-685) ─────────────────────────────────────────────────
 # Avant, `bot_tactical_movement` travaillait en XZ pur : un bot restait au Y où
 # il était né, donc il flottait sur le relief et traversait les escaliers. Ces

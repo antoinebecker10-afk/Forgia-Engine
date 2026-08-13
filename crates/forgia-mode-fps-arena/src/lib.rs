@@ -149,6 +149,23 @@ pub struct BotAi {
     /// Hauteur de départ du rayon vers le sol (m). Doit dépasser `max_step_up_m`.
     #[serde(default = "default_ground_probe_height_m")]
     pub ground_probe_height_m: f32,
+    // ── Traversée d'exception (2026-08-13) ──────────────────────────────────
+    /// Durée de blocage EN POURSUITE avant que le bot franchisse l'obstacle (s).
+    #[serde(default = "default_phase_after_secs")]
+    pub phase_after_secs: f32,
+    /// Durée maximale d'une traversée (s).
+    #[serde(default = "default_phase_max_secs")]
+    pub phase_max_secs: f32,
+}
+
+// Les replis LISENT le défaut Rust au lieu de le recopier. Une valeur écrite deux
+// fois finit toujours par diverger — et ici la divergence serait SILENCIEUSE : le
+// gène absent du TOML prendrait une valeur différente de celle du code, sans erreur.
+fn default_phase_after_secs() -> f32 {
+    forgia_ai_arena_bot::TacticalTuning::default().phase_after_secs
+}
+fn default_phase_max_secs() -> f32 {
+    forgia_ai_arena_bot::TacticalTuning::default().phase_max_secs
 }
 
 fn default_max_step_up_m() -> f32 {
@@ -254,6 +271,8 @@ fn default_arena_bots() -> ArenaBotsGenome {
         debug_color: [1.0, 0.0, 0.0],
         show_collider_debug: true,
         ai: BotAi {
+            phase_after_secs: default_phase_after_secs(),
+            phase_max_secs: default_phase_max_secs(),
             shot_range: 35.0,
             shot_cooldown_secs: 1.5,
             shot_damage: 12.0,
@@ -441,6 +460,11 @@ fn sync_tactical_tuning_from_genome(
     // grand que la sonde rendrait toute marche montante invisible, et le gène
     // aurait l'air de marcher tout en ne faisant rien.
     tuning.max_step_up_m = ai.max_step_up_m.clamp(0.0, 3.0);
+    // Bornes NON décoratives : sous 1 s la traversée se déclencherait sur un
+    // contournement normal (un virage serré coûte une seconde d'avance), et une
+    // traversée de plus de 3 s laisserait un bot franchir un bâtiment entier.
+    tuning.phase_after_secs = ai.phase_after_secs.clamp(1.0, 10.0);
+    tuning.phase_max_secs = ai.phase_max_secs.clamp(0.1, 3.0);
     tuning.max_step_down_m = ai.max_step_down_m.clamp(0.0, 20.0);
     tuning.ground_probe_height_m = ai
         .ground_probe_height_m

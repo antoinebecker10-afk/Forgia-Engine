@@ -355,6 +355,9 @@ pub fn spawn_wave_bots(
                 // Visibility::default() supprimé — fourni par #[require(Visibility)] sur TargetCube.
                 Health::new(hp),
                 ArenaBot {
+                    // Idem pour la traversée d'exception : on ne naît pas en train
+                    // de franchir un mur.
+                    phase_left: 0.0,
                     // Le chien de garde de désenlisement démarre à zéro : c'est
                     // le déplacement qui le nourrit, jamais la naissance.
                     stuck_secs: 0.0,
@@ -374,6 +377,9 @@ pub fn spawn_wave_bots(
                     // donc l'offset est nul ici : les enterrer serait le défaut
                     // symétrique de celui du roguelite.
                     foot_offset_m: 0.0,
+                    // Ces bots portent la capsule d'`arena_bots.toml`. Lue, pas
+                    // supposée — c'est le même génome qui définit le collider.
+                    body_radius_m: bots_data.body_radius,
                     // Story-456 Phase 2-4 — tactical state (init défaut, populated runtime
                     // par tactical::bot_los_check / bot_perception_alert / bot_tactical_movement).
                     has_los: false,
