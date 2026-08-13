@@ -331,18 +331,10 @@ mod tests {
         }
     }
 
-    /// Longueur d'un module de mur (m) et nombre de modules par face, tels que
-    /// `ramparts_hex_tiled_positions` les pose : `ceil(cote / longueur_module)`.
-    ///
-    /// **4,0 m MESURÉ**, pas choisi : `kaykit_dungeon/wall.glb` fait 4,00 m de
-    /// large (`asset_registry.toml`, story-673) et son facteur d'échelle vaut 1
-    /// (4,00 m de haut pour une enceinte de 4,00 m). Une première version de ce
-    /// test disait 8,0 — un nombre INVENTÉ, qui annonçait une porte de 16 m au
-    /// lieu de 8. Exactement le défaut que ce fichier reproche partout ailleurs.
-    const MODULE_LEN_M: f32 = 4.0;
-    fn modules_par_face(l: &SectorLayout) -> u32 {
-        ((l.hex_side_len_m() / MODULE_LEN_M).ceil() as u32).max(1)
-    }
+    // AUCUNE constante de longueur de module ici — deux versions s'y sont
+    // trompées, et la seconde était pire que la première parce qu'elle avait
+    // l'air sourcée. Les tests balaient la plage plausible : voir
+    // `le_passage_mesure_n_est_jamais_plus_etroit_que_la_porte_nominale`.
 
     // ── Le découpage ────────────────────────────────────────────────────
 
@@ -608,29 +600,52 @@ mod tests {
         // LE test qui compte. On retire des modules ENTIERS : le trou obtenu
         // n'est pas l'ouverture nominale, il est plus large. C'est ce trou-la que
         // l'agent franchit, donc c'est lui qu'on compare a son gabarit.
+        //
+        // # Le test BALAIE au lieu de fixer une longueur de module
+        //
+        // Deux versions se sont trompees sur cette constante. D'abord 8,0 m,
+        // devine. Puis 4,0 m, lu dans `kaykit_dungeon` — exact, mais pour un
+        // AUTRE kit que celui de forge_sanctum. Mesure en jeu : 66 modules sur
+        // 6 faces, soit 11 par face, donc 80/11 = 7,27 m.
+        //
+        // Remplacer un nombre invente par un nombre exact pour le mauvais objet
+        // est PIRE que le deviner : ca a l'air source. Le test ne fixe donc plus
+        // aucune longueur — il verifie la PROPRIETE sur toute la plage plausible,
+        // et reste juste quel que soit le kit.
         let l = camembert();
-        let n = modules_par_face(&l);
-        let mesure = l.measured_door_width_m(n, MODULE_LEN_M);
-        println!(
-            "PORTE : nominale {:.2} m - mesuree {mesure:.2} m ({n} modules de {MODULE_LEN_M} m)",
-            l.door_width_m
-        );
-        assert!(
-            mesure >= l.door_width_m,
-            "{mesure:.2} m mesures pour {:.2} annonces",
-            l.door_width_m
-        );
-        assert!(mesure > 0.0, "aucun module retire : il n'y a pas de porte");
+        for module_len in [2.0_f32, 4.0, 6.0, 7.27, 8.0, 12.0] {
+            let n = ((l.hex_side_len_m() / module_len).ceil() as u32).max(1);
+            let mesure = l.measured_door_width_m(n, module_len);
+            println!(
+                "PORTE : modules de {module_len:.2} m ({n}/face) -> passage {mesure:.2} m \
+                 pour {:.2} nominal",
+                l.door_width_m
+            );
+            assert!(
+                mesure >= l.door_width_m,
+                "modules de {module_len} m : {mesure:.2} m mesures pour {:.2} annonces",
+                l.door_width_m
+            );
+            assert!(
+                mesure > 0.0,
+                "modules de {module_len} m : aucun module retire, il n'y a pas de porte"
+            );
+        }
     }
 
     #[test]
-    fn le_passage_mesure_admet_le_boss() {
+    fn le_passage_mesure_admet_le_boss_quel_que_soit_le_kit() {
+        // Meme discipline : la garantie doit tenir pour toute taille de module,
+        // pas pour celle que j'aurais devinee.
         let l = camembert();
-        let n = modules_par_face(&l);
-        assert!(
-            l.measured_door_width_m(n, MODULE_LEN_M) >= SectorLayout::door_width_for(1.40),
-            "le boss ne passe pas"
-        );
+        let requis = SectorLayout::door_width_for(1.40);
+        for module_len in [2.0_f32, 4.0, 7.27, 12.0] {
+            let n = ((l.hex_side_len_m() / module_len).ceil() as u32).max(1);
+            assert!(
+                l.measured_door_width_m(n, module_len) >= requis,
+                "le boss ne passe pas avec des modules de {module_len} m"
+            );
+        }
     }
 
     #[test]
