@@ -39,7 +39,9 @@ pub struct SectorsConfig {
 impl Default for SectorsConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            // Coupé le 2026-08-13 : les murs ont été livrés avant ce qui les rend
+            // jouables. Voir le génome pour le détail mesuré — 18 s de survie.
+            enabled: false,
             count: 3,
             atrium_radius_m: 20.0,
             door_agent_radius_m: 1.40,
@@ -244,6 +246,55 @@ mod tests {
         assert!(
             l.door_width_m > 2.0 * c.door_agent_radius_m,
             "une porte de 2r a un couloir navigable NUL"
+        );
+    }
+
+    /// Anneaux de spawn de `roguelite_waves.toml [ring]` — miroir inévitable
+    /// (autre crate), donc testé, comme `spawn-clearance.md` §4bis l'exige.
+    const ANNEAUX_SPAWN: &[(&str, f32)] = &[
+        ("tank", 12.0),
+        ("runner", 25.0),
+        ("sniper", 42.0),
+        ("boss", 12.0),
+    ];
+
+    #[test]
+    fn l_atrium_ne_doit_pas_couper_les_anneaux_de_spawn() {
+        // LE test qui manquait, et qui a coûté une run le 2026-08-13.
+        //
+        // L'atrium de 20 m a été posé sans regarder OÙ les ennemis apparaissent.
+        // Le tank et le boss sortent à 12 m — donc DANS l'atrium, enfermés avec
+        // le joueur — pendant que le runner (25 m) et le sniper (42 m) restaient
+        // dehors. Mesuré en jeu : « Player died — DEFEAT » 18 s après le spawn,
+        // deux fois de suite.
+        //
+        // La géométrie était juste. C'est l'ORDRE qui était faux : bâtir les murs
+        // n'est pas jouable tant que les packs ne sont pas postés dans leurs
+        // parts (incrément 3). Ce test refuse désormais la combinaison, au lieu
+        // de laisser la découverte à une partie perdue.
+        let c = SectorsConfig::default();
+        if !c.enabled {
+            // Coupé : rien à vérifier, et surtout pas un faux vert.
+            println!("SECTEURS COUPES — ce test se rearmera avec `enabled = true`");
+            return;
+        }
+        let dedans: Vec<&str> = ANNEAUX_SPAWN
+            .iter()
+            .filter(|(_, r)| *r < c.atrium_radius_m)
+            .map(|(n, _)| *n)
+            .collect();
+        let dehors: Vec<&str> = ANNEAUX_SPAWN
+            .iter()
+            .filter(|(_, r)| *r >= c.atrium_radius_m)
+            .map(|(n, _)| *n)
+            .collect();
+        assert!(
+            dedans.is_empty() || dehors.is_empty(),
+            "l'atrium de {:.0} m COUPE les anneaux de spawn : {dedans:?} naissent \
+             dedans, {dehors:?} dehors. Soit tous les packs sont postés dans les \
+             parts (increment 3), soit l'atrium doit passer sous {:.0} m.",
+            c.atrium_radius_m,
+            ANNEAUX_SPAWN.iter().map(|(_, r)| *r).fold(f32::MAX, f32::min)
         );
     }
 

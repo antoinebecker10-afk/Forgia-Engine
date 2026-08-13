@@ -15,7 +15,24 @@
 # c'est le repli qui rend cet incrément livrable sans risque, pas une option de
 # confort. Un changement de géométrie de cette ampleur doit pouvoir s'annuler
 # sans rebuild.
-enabled = true
+#
+# ⛔ COUPÉ le 2026-08-13 au soir, après une run. Les murs ont été livrés AVANT ce
+# qui les rend jouables, et l'arène est devenue un piège :
+#
+#   · le tank et le boss apparaissent à 12 m (`roguelite_waves.toml [ring]`),
+#     donc DANS l'atrium de 20 m, enfermés avec le joueur ;
+#   · le runner (25 m) et le sniper (42 m) restent dehors, dans les parts ;
+#   · les POI passent derrière les murs — la Forge est à 44 m ;
+#   · mesuré : « Player died — DEFEAT » 18 s après le spawn de la vague, deux
+#     fois de suite.
+#
+# La faute n'est pas dans la géométrie, qui est juste et mesurée : elle est dans
+# l'ORDRE. L'incrément « bâtir les murs » n'est pas jouable seul — il suppose que
+# les packs soient postés dans leurs parts (incrément 3) et que les anneaux de
+# spawn soient dérivés de l'atrium au lieu de le traverser.
+#
+# Remettre à `true` quand l'incrément 3 pose les packs.
+enabled = false
 
 # Nombre de parts. 3 = le camembert de story-703. Le code n'en suppose aucun :
 # `span_rad`, l'aggro et la poche sûre se dérivent tous de ce nombre.
