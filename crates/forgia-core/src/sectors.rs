@@ -184,6 +184,138 @@ impl SectorLayout {
     pub fn door_admits(&self, agent_radius_m: f32) -> bool {
         self.door_width_m >= Self::door_width_for(agent_radius_m)
     }
+
+    /// Demi-ouverture angulaire d'une porte percée dans l'anneau de l'atrium (rad).
+    ///
+    /// Dérivée pour que la **corde** entre les deux montants vaille exactement
+    /// `door_width_m` : `2·R·sin(θ) = largeur`. Prendre l'arc au lieu de la corde
+    /// donnerait une porte plus étroite que voulu — et c'est la corde que l'agent
+    /// franchit.
+    #[must_use]
+    pub fn door_half_angle_rad(&self) -> f32 {
+        if self.atrium_radius_m <= 0.0 {
+            return 0.0;
+        }
+        (self.door_width_m / (2.0 * self.atrium_radius_m)).clamp(-1.0, 1.0).asin()
+    }
+
+    /// Les cloisons radiales : de l'atrium à l'enceinte, aux frontières de parts.
+    ///
+    /// Elles séparent deux parts — donc elles se posent aux frontières, jamais sur
+    /// un axe. Une cloison sur un axe couperait une part en deux au lieu d'en
+    /// séparer deux.
+    #[must_use]
+    pub fn partition_walls(&self) -> Vec<WallSeg> {
+        self.partition_angles()
+            .map(|a| {
+                let d = Vec2::new(a.cos(), a.sin());
+                WallSeg {
+                    a: d * self.atrium_radius_m,
+                    b: d * self.outer_radius_m,
+                }
+            })
+            .collect()
+    }
+
+    /// L'anneau de l'atrium, **percé d'une porte par part**.
+    ///
+    /// Approximé par des cordes de `chord_rad` d'ouverture. Les segments qui
+    /// tomberaient dans une porte sont omis — c'est cette omission qui EST la
+    /// porte, il n'y a pas d'entité « porte » à ce stade.
+    ///
+    /// `chord_rad` fin rend l'anneau plus rond mais multiplie les colliders ; le
+    /// caller arbitre. Le contrat tenu ici : **aucun segment ne mord dans le
+    /// passage utile**, vérifié par test.
+    #[must_use]
+    pub fn atrium_walls(&self, chord_rad: f32) -> Vec<WallSeg> {
+        let pas = chord_rad.max(1.0e-3);
+        let n = (TAU / pas).ceil() as u32;
+        let demi_porte = self.door_half_angle_rad();
+        let mut murs = Vec::new();
+        for i in 0..n {
+            let a0 = TAU * i as f32 / n as f32;
+            let a1 = TAU * (i + 1) as f32 / n as f32;
+            // Un segment est écarté dès qu'il TOUCHE une porte, même
+            // partiellement : garder un bout de mur dans l'ouverture la
+            // rétrécirait sous sa largeur nominale, et « le nom est un contrat »
+            // (`map-design-intention.md` §5.1).
+            let mord = (0..self.count).any(|s| {
+                let axe = self.axis_rad(s);
+                Self::ecart_angulaire(a0, axe).abs() < demi_porte
+                    || Self::ecart_angulaire(a1, axe).abs() < demi_porte
+                    // le segment enjambe entièrement la porte
+                    || (Self::ecart_angulaire(a0, axe) < 0.0
+                        && Self::ecart_angulaire(a1, axe) > 0.0)
+            });
+            if mord {
+                continue;
+            }
+            let r = self.atrium_radius_m;
+            murs.push(WallSeg {
+                a: Vec2::new(a0.cos(), a0.sin()) * r,
+                b: Vec2::new(a1.cos(), a1.sin()) * r,
+            });
+        }
+        murs
+    }
+
+    /// Passage libre RÉELLEMENT laissé par l'anneau autour de l'axe de la part
+    /// `sector` — la distance entre les deux montants les plus proches.
+    ///
+    /// **Se mesure, ne se suppose pas.** Un anneau approximé par des cordes ne
+    /// laisse pas exactement l'ouverture nominale : c'est ce nombre-là que
+    /// l'agent franchit, et c'est donc lui qu'il faut comparer à son gabarit.
+    #[must_use]
+    pub fn measured_door_width_m(&self, sector: u32, chord_rad: f32) -> f32 {
+        let axe = self.axis_rad(sector);
+        let murs = self.atrium_walls(chord_rad);
+        // Le montant de gauche et celui de droite : les extrémités de mur les
+        // plus proches de l'axe, de part et d'autre.
+        let (mut gauche, mut droite) = (f32::INFINITY, f32::INFINITY);
+        for m in &murs {
+            for p in [m.a, m.b] {
+                let d = Self::ecart_angulaire(p.y.atan2(p.x), axe);
+                if d >= 0.0 {
+                    gauche = gauche.min(d);
+                } else {
+                    droite = droite.min(-d);
+                }
+            }
+        }
+        if !gauche.is_finite() || !droite.is_finite() {
+            // Aucun mur : l'anneau est entièrement ouvert.
+            return f32::INFINITY;
+        }
+        // Corde entre les deux montants.
+        2.0 * self.atrium_radius_m * ((gauche + droite) * 0.5).sin()
+    }
+}
+
+/// Un tronçon de mur en plan, d'extrémité à extrémité. Orientation quelconque —
+/// les cloisons sont radiales, elles ne sont donc jamais alignées sur un axe.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WallSeg {
+    pub a: Vec2,
+    pub b: Vec2,
+}
+
+impl WallSeg {
+    #[must_use]
+    pub fn length_m(&self) -> f32 {
+        self.a.distance(self.b)
+    }
+
+    #[must_use]
+    pub fn center(&self) -> Vec2 {
+        self.a.midpoint(self.b)
+    }
+
+    /// Lacet (rad) pour orienter un pavé le long du tronçon.
+    #[must_use]
+    pub fn yaw_rad(&self) -> f32 {
+        let d = self.b - self.a;
+        d.y.atan2(d.x)
+    }
 }
 
 #[cfg(test)]
@@ -364,6 +496,109 @@ mod tests {
         };
         assert!(etroite.door_admits(0.30));
         assert!(!etroite.door_admits(1.40), "une porte de sniper laisse passer un boss ?");
+    }
+
+    // ── Les murs bâtis ──────────────────────────────────────────────────
+
+    /// Finesse de l'anneau : 5° par corde. Le caller arbitre, mais les tests
+    /// doivent tourner sur une valeur realiste — un anneau a 90° serait un
+    /// triangle et masquerait tous les defauts d'arrondi.
+    const CORDE: f32 = TAU / 72.0;
+
+    #[test]
+    fn trois_cloisons_radiales_aux_frontieres() {
+        let l = camembert();
+        let murs = l.partition_walls();
+        assert_eq!(murs.len(), 3);
+        for m in &murs {
+            assert!((m.a.length() - l.atrium_radius_m).abs() < 1.0e-3);
+            assert!((m.b.length() - l.outer_radius_m).abs() < 1.0e-3);
+            // Radiale : les deux extremites sur le meme rayon.
+            let da = Vec2::new(m.a.x, m.a.y).normalize();
+            let db = Vec2::new(m.b.x, m.b.y).normalize();
+            assert!(da.dot(db) > 0.999, "cloison non radiale");
+        }
+    }
+
+    #[test]
+    fn l_anneau_laisse_bien_trois_ouvertures() {
+        // Une porte par part. Zero ouverture = l'atrium est une prison ; quatre =
+        // une cloison a ete mangee.
+        let l = camembert();
+        let murs = l.atrium_walls(CORDE);
+        // Compte les ruptures de continuite angulaire.
+        let mut angles: Vec<f32> = murs
+            .iter()
+            .map(|m| m.center().y.atan2(m.center().x).rem_euclid(TAU))
+            .collect();
+        angles.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let trous = angles
+            .windows(2)
+            .filter(|w| w[1] - w[0] > CORDE * 1.5)
+            .count()
+            // le trou qui enjambe 0 rad
+            + usize::from(angles[0] + TAU - angles[angles.len() - 1] > CORDE * 1.5);
+        assert_eq!(trous, 3, "attendu 3 portes, mesure {trous}");
+    }
+
+    #[test]
+    fn le_passage_mesure_n_est_jamais_plus_etroit_que_la_porte_nominale() {
+        // LE test qui compte, et celui que « le nom est un contrat »
+        // (map-design-intention §5.1) exige : on MESURE l'ouverture reellement
+        // laissee entre les deux montants, on ne suppose pas qu'elle vaut la
+        // valeur nominale. Un anneau approxime par des cordes ne la donne pas
+        // exactement — et c'est cette corde-la que l'agent franchit.
+        let l = camembert();
+        for s in 0..l.count {
+            let mesure = l.measured_door_width_m(s, CORDE);
+            println!("PORTE {s} : nominale {:.2} m · mesuree {mesure:.2} m", l.door_width_m);
+            assert!(
+                mesure >= l.door_width_m - 1.0e-3,
+                "porte {s} : {mesure:.2} m mesures pour {:.2} m annonces — \
+                 l'anneau mord dans le passage",
+                l.door_width_m
+            );
+        }
+    }
+
+    #[test]
+    fn le_passage_mesure_admet_le_boss() {
+        // La consequence qui interesse le jeu : le plus gros agent passe VRAIMENT,
+        // pas seulement sur le papier.
+        let l = camembert();
+        let requis = SectorLayout::door_width_for(1.40);
+        for s in 0..l.count {
+            assert!(
+                l.measured_door_width_m(s, CORDE) >= requis,
+                "le boss ne passe pas la porte {s}"
+            );
+        }
+    }
+
+    #[test]
+    fn un_anneau_grossier_ne_ment_pas_sur_son_passage() {
+        // Le test negatif de la mesure : avec des cordes ENORMES, l'ouverture
+        // reelle s'ecarte du nominal. `measured_door_width_m` doit le REFLETER
+        // (valeur differente), pas rendre docilement la valeur nominale — sinon
+        // il ne mesure rien et le test precedent ne prouve rien.
+        let l = camembert();
+        let fin = l.measured_door_width_m(0, TAU / 72.0);
+        let grossier = l.measured_door_width_m(0, TAU / 8.0);
+        assert!(
+            (fin - grossier).abs() > 0.5,
+            "la mesure ne reagit pas a la finesse de l'anneau ({fin:.2} vs {grossier:.2})"
+        );
+    }
+
+    #[test]
+    fn un_troncon_donne_son_centre_sa_longueur_et_son_lacet() {
+        let s = WallSeg {
+            a: Vec2::new(0.0, 0.0),
+            b: Vec2::new(10.0, 0.0),
+        };
+        assert!((s.length_m() - 10.0).abs() < 1.0e-4);
+        assert!((s.center() - Vec2::new(5.0, 0.0)).length() < 1.0e-4);
+        assert!(s.yaw_rad().abs() < 1.0e-4);
     }
 
     #[test]

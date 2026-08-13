@@ -37,6 +37,7 @@ pub mod layout;
 pub mod layout_sensor;
 pub mod navmesh_build;
 pub mod rooms;
+pub mod sectors_build;
 
 /// Sol de REPLI de l'arène — celui d'avant story-676, quand c'était le seul.
 ///
@@ -1445,6 +1446,55 @@ fn spawn_stage_arena_on_request(
         centers: room_plan.doors.clone(),
         clearance_m: rooms_cfg.corridor_width_m() * 0.5,
     });
+    // ── Story-703 inc.2 — l'arène en parts ──────────────────────────────────
+    //
+    // Posé AVANT le décor et les pièces : ces murs sont structurels, et le semis
+    // de props doit pouvoir les voir dans `ArenaGeometry` pour ne pas boucher les
+    // portes. L'ordre inverse reproduirait « des props dans un couloir ».
+    //
+    // L'interrupteur `enabled` du génome n'est pas une commodité : c'est le repli
+    // qui rend un changement de géométrie de cette ampleur livrable sans risque.
+    {
+        let cfg = sectors_build::SectorsConfig::load_or_default();
+        if cfg.enabled {
+            let rayon = layout::HEX_INSCRIBED_RATIO * extent;
+            let geometry = &mut layout_params.geometry;
+            let bati = sectors_build::build_sector_walls(
+                &mut commands,
+                &cfg,
+                rayon,
+                |seg, h, demi_ep| {
+                    // Le solide déclaré sort des MÊMES variables que le collider
+                    // — c'est P2 pris à la source (cf. `sectors_build`).
+                    geometry.segs.push(forgia_core::layout::SolidSeg {
+                        x0: seg.a.x,
+                        z0: seg.a.y,
+                        x1: seg.b.x,
+                        z1: seg.b.y,
+                        half_thick_m: demi_ep,
+                        h,
+                    });
+                },
+            );
+            info!(
+                "[sectors] {} parts — {} cloisons + {} troncons d'anneau, \
+                 portes mesurees {:?} m (nominale {:.2})",
+                cfg.count,
+                bati.partitions,
+                bati.atrium_segments,
+                bati
+                    .measured_doors_m
+                    .iter()
+                    .map(|m| (m * 100.0).round() / 100.0)
+                    .collect::<Vec<_>>(),
+                cfg.layout(rayon).door_width_m,
+            );
+            commands.insert_resource(bati);
+        } else {
+            info!("[sectors] desactive (genome) — l'arene reste inchangee");
+        }
+    }
+
     if !room_plan.walls.is_empty() {
         let room_wall_glb = ramparts_wall_glb("kaykit_dungeon");
         let room_scene: Handle<Scene> = asset_server.load(format!("{room_wall_glb}#Scene0"));

@@ -1,0 +1,71 @@
+# Forgia V2 — Arène en parts (story-703)
+#
+# Le camembert : un atrium central où le joueur combat, N parts autour, chacune
+# fermée par une porte percée dans l'anneau de l'atrium, et une cloison radiale
+# entre deux parts voisines.
+#
+# ⚠️ AUCUNE valeur ici n'est libre. Chacune est soit une conséquence chiffrée
+# (la largeur de porte vient du plus gros agent), soit un curseur de difficulté
+# assumé (le débordement d'aggro). Si un nombre ne se rattache à rien, c'est un
+# défaut : il doit se lire comme une dérivation.
+
+[sectors]
+
+# Interrupteur maître. À `false`, l'arène reste exactement ce qu'elle était —
+# c'est le repli qui rend cet incrément livrable sans risque, pas une option de
+# confort. Un changement de géométrie de cette ampleur doit pouvoir s'annuler
+# sans rebuild.
+enabled = true
+
+# Nombre de parts. 3 = le camembert de story-703. Le code n'en suppose aucun :
+# `span_rad`, l'aggro et la poche sûre se dérivent tous de ce nombre.
+count = 3
+
+# Rayon de l'atrium (m) — l'espace commun, où le joueur reçoit les packs.
+#
+# 20 m est un POINT DE DÉPART à jouer, pas une dérivation. Repères mesurés :
+#   · le tank s'arrête à 3,0 m, le runner à 6,0 — l'atrium doit les contenir ;
+#   · le sniper s'arrête à 22,0 m : à 20 m d'atrium il tire DEPUIS sa part,
+#     ce qui est voulu (il menace sans entrer) ;
+#   · dégâts joueur pleins jusqu'à 30 m, donc un atrium de 40 m de diamètre
+#     tient entier dans la bande de pleine puissance.
+atrium_radius_m = 20.0
+
+# Rayon d'agent qui DIMENSIONNE les portes (m). 1,40 = le boss, le plus gros du
+# jeu (`roguelite_enemies.toml`). La largeur utile en découle : 4 × ce rayon,
+# soit 5,60 m — voir `SectorLayout::door_width_for`, et surtout NE PAS mettre
+# 2 × : le maillage rétrécit les obstacles du rayon d'agent, donc une porte de
+# 2r a un couloir navigable de largeur NULLE. Infranchissable par construction.
+door_agent_radius_m = 1.40
+
+# Finesse de l'anneau de l'atrium : un tronçon de mur tous les N degrés.
+# Plus fin = plus rond, mais un collider de plus par tronçon. À 5°, l'anneau
+# fait 72 tronçons moins les 3 portes. Mesuré à cette finesse : les portes
+# laissent 6,95 m utiles pour 5,60 nominaux — l'approximation ouvre PLUS que
+# le nominal, jamais moins, ce qui est le bon sens d'erreur.
+chord_deg = 5.0
+
+# Hauteur des cloisons et de l'anneau (m). 4,0 = `RAMPARTS_WALL_HEIGHT_M`, la
+# hauteur des enceintes existantes.
+#
+# C'est elle qui décide de TOUT : au-dessus de l'œil du joueur (1,70 m) elle
+# casse la ligne de vue entre parts — la condition sans laquelle « éviter en
+# restant à l'écart » ne veut rien dire (story-703 §4). Et bien au-dessus du
+# ressaut franchissable (0,45 m), donc les bots contournent au lieu de grimper.
+wall_height_m = 4.0
+
+# Épaisseur des murs (m). 0,4 = `RAMPARTS_WALL_THICKNESS_M`.
+wall_thickness_m = 0.4
+
+# Débordement de l'aggro sur CHAQUE part voisine, en fraction de part.
+#
+# ★ CURSEUR DE DIFFICULTÉ À PART ENTIÈRE. À 0,25 sur des parts de 120°, le cône
+# d'un pack couvre 120 + 2×30 = 180°. Conséquence MESURÉE par
+# `la_poche_sure_retrecit_a_chaque_porte_ouverte` :
+#
+#   1 porte ouverte → 180° sûrs · 2 portes → 61° · 3 portes → 0°
+#
+# La poche est donc divisée par ~3 à chaque porte, puis disparaît. Plus large =
+# plus dur. (La story annonçait 120/60/0 « divisé par deux » : c'était faux des
+# deux côtés, le test l'a corrigée.)
+aggro_sector_spill_frac = 0.25
