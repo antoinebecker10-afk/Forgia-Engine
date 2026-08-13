@@ -214,6 +214,9 @@ pub fn bot_los_check(
     time: Res<Time>,
     mut sensor: ResMut<BotAiSensor>,
     q_child_of: Query<&ChildOf>,
+    // `Local` réutilisé plutôt qu'un `Vec::new()` par frame : ce système tourne à
+    // 8 Hz par bot sur un chemin déjà chargé (`scalability.md`).
+    mut fratrie: Local<Vec<Entity>>,
 ) {
     let Some((target_entity, target_tf)) = targets.iter().next() else {
         return;
@@ -222,6 +225,24 @@ pub fn bot_los_check(
     let dt = time.delta_secs();
     let check_interval = 1.0 / tuning.los_check_hz.max(0.1);
     let target_pos = target_tf.translation();
+
+    // 2026-08-13 — UN BOT NE FAIT PAS DE L'OMBRE À UN AUTRE.
+    //
+    // Rapporté en jeu : « ils ont un périmètre d'action autour d'eux au spawn et
+    // restent bloqués dedans ». Les capteurs ont tranché : 7 bots vivants, **1 seul**
+    // avec ligne de vue, **1 seul** en poursuite — et aucun signalé coincé. Ils
+    // n'étaient pas bloqués, ils étaient AVEUGLES, donc `Idle`, donc immobiles là où
+    // ils étaient nés.
+    //
+    // Le rayon de perception n'excluait que le bot qui le lance. Dans une grappe,
+    // celui de devant voyait le joueur et **masquait tous ceux de derrière**. Plus le
+    // groupe est dense, moins il engage — l'inverse exact de ce qu'on attend d'une
+    // vague.
+    //
+    // Les alliés ne bloquent donc plus la perception. Le TIR, lui, garde ses propres
+    // gardes : voir n'est pas tirer, la distinction est déjà posée plus bas.
+    fratrie.clear();
+    fratrie.extend(bots.iter().map(|(e, ..)| e));
 
     for (bot_entity, mut bot, bot_tf, config) in &mut bots {
         if bot.state == BotState::Dead {
@@ -281,7 +302,27 @@ pub fn bot_los_check(
         // Story-545 (2026-05-27) — exclude_rigid_body traverse chaîne complète
         // collider→RigidBody (vs predicate root-only). Fix Roguelite enemies
         // skeleton child collider qui faisaient échouer le LOS sur self-hit.
-        let filter = QueryFilter::default().exclude_rigid_body(bot_entity);
+        // Un candidat appartient-il à un ALLIÉ ? Le collider touché peut être un
+        // enfant du bot (colliders de squelette), d'où la remontée de hiérarchie —
+        // même précaution que la résolution de la cible juste en dessous.
+        let est_un_allie = |e: Entity| -> bool {
+            let mut cur = e;
+            for _ in 0..5 {
+                if fratrie.contains(&cur) {
+                    return true;
+                }
+                match q_child_of.get(cur) {
+                    Ok(co) => cur = co.parent(),
+                    Err(_) => break,
+                }
+            }
+            false
+        };
+        // `let` séparé : le prédicat doit vivre aussi longtemps que le filtre.
+        let pas_un_allie = |e: Entity| !est_un_allie(e);
+        let filter = QueryFilter::default()
+            .exclude_rigid_body(bot_entity)
+            .predicate(&pas_un_allie);
         let hit = ctx.cast_ray(origin, dir, dist, true, filter);
         let new_los = match hit {
             None => true,
