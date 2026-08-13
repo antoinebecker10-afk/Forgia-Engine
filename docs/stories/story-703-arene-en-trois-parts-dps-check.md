@@ -1,7 +1,34 @@
 # story-703 — L'arène en trois parts : le chronomètre devient l'épreuve
 
-**Statut** : DRAFT — design arrêté, rien d'implémenté
-**Créée** : 2026-08-13
+**Statut** : ⏸️ **EN PAUSE** — incréments 1 et 2 livrés et validés en jeu, 3 à 5 non commencés
+**Créée** : 2026-08-13 · **Mise en pause** : 2026-08-14 (bascule sur la migration expédition)
+
+| # | Incrément | État |
+|---|---|---|
+| 1 | Géométrie des parts (`forgia_core::sectors`) | ✅ poussé — 51 tests |
+| 2 | Portes percées dans l'enceinte | ✅ **validé en jeu** — 3 portes à 0°/120°/240°, passage mesuré **7,27 m** |
+| 3 | Les packs entrent en marchant par leur porte | ⬜ non commencé |
+| 4 | Chronomètre / DPS check | ⬜ non commencé — **décision D1 en attente** |
+| 5 | Packs moins nombreux, 350-650 PV | ⬜ non commencé — **décision D2 en attente** |
+
+**Décision prise le 2026-08-14** : le pack **entre en marchant** (il franchit la
+porte, traverse, va tenir son poste), il n'apparaît pas déjà en place. Voir le
+pack arriver est ce qui laisse au joueur le choix de son engagement.
+
+**Ce que l'incrément 3 devra faire, et qui est déjà cartographié** :
+1. **Percer la frontière du maillage** aux trois portes. Le maillage s'arrête au
+   mur depuis le réalignement de l'hexagone (commit `b8085b4`) — un chemin ne
+   franchira jamais une porte que la géométrie ignore.
+2. Poser les packs **dehors**, devant leur porte, au lieu des anneaux à
+   12 / 25 / 42 m de `roguelite_waves.toml`.
+3. Le comportement **« se poster »** — entrer, rejoindre son poste, tenir. Même
+   verbe que le compagnon d'E1 (GDD §10), donc à concevoir comme une primitive
+   partagée.
+
+**Acquis de côté pendant ce chantier** (ils servent quel que soit l'ordre de reprise) :
+le maillage et l'enceinte sont enfin le même hexagone (**−6,5× de recalages**),
+l'hystérésis de route supprime ~23 % de demi-tours, le combat rapproché bouge,
+et `forgia2_bot_traces.json` + les gizmos F10 rendent tout ça lisible.
 **Niveau BMAD** : Enterprise (géométrie + IA + vagues + capteur, ≥ 4 crates)
 **Origine** : session de design du 2026-08-13 avec Antoine, après la run où **6 mobs sur 7
 étaient aveugles** ([commit `0cd2899`](../../)) — c'est en regardant des ennemis plantés
