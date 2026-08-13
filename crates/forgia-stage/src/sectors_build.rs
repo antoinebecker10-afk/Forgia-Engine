@@ -194,6 +194,67 @@ mod tests {
     }
 
     #[test]
+    fn le_maillage_et_l_enceinte_sont_le_meme_hexagone() {
+        // LE test miroir. `forgia-navmesh` ne peut pas dependre de `forgia-stage`
+        // (la dependance va dans l'autre sens), donc les deux hexagones sont
+        // decrits deux fois — et `spawn-clearance.md` §4bis exige alors un test
+        // qui les compare.
+        //
+        // Mesure du 2026-08-14, AVANT correctif : `hexagon_edge` posait ses
+        // sommets a 0+60i, `ramparts_hex_positions` a 30+60i. Deux hexagones de
+        // memes dimensions, tournes de 30° l'un par rapport a l'autre, donc un
+        // ecart ALTERNE de ±10,72 m sur un rayon de 69,28 :
+        //
+        //   · dans chaque COIN, 10,7 m de sol reel hors maillage — le joueur y
+        //     etait injoignable ;
+        //   · au MILIEU de chaque face, le maillage depassait le mur d'autant —
+        //     il promettait des chemins dans la pierre.
+        //
+        // Aucune erreur n'etait levee : deux hexagones justes, mal orientes.
+        let extent = 80.0_f32;
+        let apotheme = crate::layout::HEX_INSCRIBED_RATIO * extent;
+        // Rayon d'agent nul : on compare les GEOMETRIES, pas le retrecissement.
+        let maillage = forgia_navmesh::hexagon_edge(apotheme, 0.0);
+        let enceinte = crate::ramparts_hex_segment_midpoints(extent);
+        assert_eq!(maillage.len(), 6);
+        assert_eq!(enceinte.len(), 6);
+
+        // Les MILIEUX de face de l'enceinte doivent tomber sur les milieux de
+        // face du maillage : meme orientation, meme apotheme.
+        for (mid, _) in &enceinte {
+            let angle_mur = mid.z.atan2(mid.x);
+            let plus_proche = maillage
+                .iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let b = maillage[(i + 1) % 6];
+                    let m = (*a + b) * 0.5;
+                    let d = (m.y.atan2(m.x) - angle_mur).rem_euclid(std::f32::consts::TAU);
+                    let d = if d > std::f32::consts::PI {
+                        std::f32::consts::TAU - d
+                    } else {
+                        d
+                    };
+                    (d, m)
+                })
+                .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+                .unwrap();
+            assert!(
+                plus_proche.0.to_degrees() < 1.0,
+                "milieu de face du mur a {:.1}deg sans milieu de maillage en face \
+                 (le plus proche est a {:.1}deg) : les deux hexagones sont desalignes",
+                angle_mur.to_degrees(),
+                plus_proche.0.to_degrees()
+            );
+            let ecart_radial = (plus_proche.1.length() - Vec2::new(mid.x, mid.z).length()).abs();
+            assert!(
+                ecart_radial < 0.05,
+                "meme direction mais {ecart_radial:.2} m d'ecart radial"
+            );
+        }
+    }
+
+    #[test]
     fn les_trois_portes_sont_dans_trois_directions_opposees() {
         let c = SectorsConfig::default();
         let l = c.layout(EXTENT_M);

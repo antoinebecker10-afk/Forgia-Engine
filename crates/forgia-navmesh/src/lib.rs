@@ -154,7 +154,24 @@ pub fn hexagon_edge(apothem_m: f32, agent_radius_m: f32) -> Vec<Vec2> {
     let circumradius = apothem / (PI / 6.0).cos();
     (0..6)
         .map(|i| {
-            let a = PI / 3.0 * i as f32;
+            // ★ 2026-08-14 — le décalage de π/6 N'EST PAS décoratif.
+            //
+            // Sans lui, ce maillage était tourné de 30° par rapport à l'enceinte
+            // réelle du jeu (`ramparts_hex_positions`, sommets à 30° + 60°·i).
+            // Deux hexagones de mêmes dimensions mais désalignés, donc un écart
+            // de ±10,72 m ALTERNÉ sur un rayon de 69,28 :
+            //
+            //   · dans chaque COIN de l'arène, 10,7 m de sol réel tombaient HORS
+            //     du maillage — le joueur y était injoignable, et c'est une part
+            //     des `paths_snapped` mesurés toute la journée ;
+            //   · au MILIEU de chaque face, le maillage dépassait le mur d'autant,
+            //     donc il promettait des chemins dans la pierre.
+            //
+            // Le défaut ne levait aucune erreur : deux hexagones justes, mal
+            // orientés l'un par rapport à l'autre. Le test miroir
+            // `le_maillage_et_l_enceinte_sont_le_meme_hexagone` (forgia-stage) le
+            // compare désormais à la source, sommet par sommet.
+            let a = PI / 6.0 + PI / 3.0 * i as f32;
             Vec2::new(circumradius * a.cos(), circumradius * a.sin())
         })
         .collect()
@@ -974,18 +991,21 @@ mod reproduction_terrain {
     }
 
     #[test]
-    fn la_cible_mesuree_en_jeu_le_2026_08_13_est_desormais_joignable() {
-        // Les coordonnees EXACTES du dernier refus releve dans forgia_bot_ai.json.
-        // Cible a 69,95 m du centre pour un bord de maillage a 69,67 m sous cet
-        // angle : 28 cm dehors.
+    fn une_cible_dans_la_bande_abandonnee_reste_joignable() {
+        // # Ce test a change d'ancrage le 2026-08-14, et voici pourquoi
         //
-        // Ce test compare le maillage TEL QUE POLYANYA LE LIVRE (portee 0,01 x 2 =
-        // 2 cm) au notre. C'est la seule facon honnete de prouver la correction : sur
-        // le maillage corrige, `path()` brut passe deja — donc affirmer « le brut
-        // refuse » serait faux, et une version anterieure de ce test l'affirmait.
-        let from = Vec2::new(44.7, -1.6);
-        let to = Vec2::new(64.9, 26.1);
+        // Il utilisait la coordonnee EXACTE relevee en jeu la veille —
+        // [64,9 ; 26,1], mesuree 28 cm hors du maillage. Cet ancrage est devenu
+        // FAUX quand l'hexagone du maillage a ete realigne sur l'enceinte (il
+        // etait tourne de 30°) : le meme point tombe desormais franchement a
+        // l'interieur, et le test affirmait un refus qui n'a plus lieu.
+        //
+        // Une coordonnee relevee prouve un defaut DANS LA GEOMETRIE OU ELLE A ETE
+        // RELEVEE. Quand la geometrie change, elle ne prouve plus rien — elle
+        // teste un monde disparu. On DERIVE donc le point : juste au-dela du bord,
+        // quelle que soit l'orientation de l'hexagone.
         let c = NavmeshBuild::default();
+        let apothem = 69.28203_f32;
         let discs: Vec<SolidDisc> = (0..13)
             .map(|i| {
                 let a = std::f32::consts::TAU * i as f32 / 13.0;
@@ -997,28 +1017,34 @@ mod reproduction_terrain {
                 }
             })
             .collect();
+        let obstacles: Vec<Vec<Vec2>> = discs
+            .iter()
+            .map(|d| disc_to_obstacle(d, c.agent_radius_m, c.disc_segments))
+            .collect();
 
-        // AVANT — la portee que polyanya pose lui-meme.
+        // Un point dans la bande que le maillage abandonne : sur une direction
+        // d'APOTHEME (le bord y est le plus proche), a mi-bande.
+        let bord = apothem - c.agent_radius_m;
+        let dehors = Vec2::new(bord + c.agent_radius_m * 0.5, 0.0);
+        let bot = Vec2::new(30.0, 8.0);
+
+        // AVANT — la portee que polyanya pose lui-meme : 0,01 x 2 = 2 cm.
         let mut origine =
-            NavMesh::from_edge_and_obstacles(hexagon_edge(69.28203, c.agent_radius_m), {
-                let mut o = Vec::new();
-                for d in &discs {
-                    o.push(disc_to_obstacle(d, c.agent_radius_m, c.disc_segments));
-                }
-                o
-            });
+            NavMesh::from_edge_and_obstacles(hexagon_edge(apothem, c.agent_radius_m), obstacles);
+        origine.set_search_delta(0.01);
         origine.set_search_steps(2);
         assert!(
-            origine.path(from, to).is_none(),
-            "sans la portee corrigee, cette cible DOIT etre refusee — c'est le \
-             defaut mesure en jeu, et sans lui ce test ne prouve rien"
+            origine.path(bot, dehors).is_none(),
+            "sans la portee corrigee, un point a {:.2} m dans la bande DOIT etre \
+             refuse — sinon ce test ne prouve rien",
+            c.agent_radius_m * 0.5
         );
 
         // APRES — le maillage que `build` produit reellement.
         let (nav, _) = maillage_forge_sanctum();
-        let ecart = match nav.route(from, to) {
+        let ecart = match nav.route(bot, dehors) {
             PathOutcome::Direct(_) => 0.0,
-            PathOutcome::Snapped { snapped_to, .. } => snapped_to.distance(to),
+            PathOutcome::Snapped { snapped_to, .. } => snapped_to.distance(dehors),
             autre => panic!("cible toujours injoignable : {autre:?}"),
         };
         assert!(
