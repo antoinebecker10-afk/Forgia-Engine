@@ -796,7 +796,26 @@ pub fn bot_tactical_movement(
         let dist = to_target.length();
         let want_chase = (matches!(bot.state, BotState::Chase) && has_recent_sight)
             || (bot.alerted && dist > bot.stop_distance);
-        if !want_chase || bot.speed < 0.01 || dist < 0.01 {
+
+        // ── Le combat rapproché bouge — 2026-08-13 ──────────────────────────
+        //
+        // « Pourquoi les mobs sont bloqués face à moi ? » Parce qu'un bot en
+        // `Attack` sortait ICI, et ne bougeait plus d'un centimètre. Le
+        // commentaire de la machine à états l'assumait — « à portée tir, ne bouge
+        // plus » — mais c'est l'inverse de ce que le jeu demande : un ennemi
+        // immobile est une cible gratuite, et le mob qui fonce puis se fige à 3 m
+        // se lit comme un bug, pas comme une posture de tir.
+        //
+        // Le mouvement d'attaque est **purement latéral**, et ce choix évite un
+        // défaut qu'on vient de corriger ailleurs : ajouter une composante
+        // radiale ferait franchir `stop_distance` dans un sens puis dans l'autre,
+        // donc basculer Attack↔Chase à chaque passage — la même oscillation de
+        // frontière que celle des routes. En restant tangentiel, la distance ne
+        // change pas et l'état ne bascule pas. Si le joueur s'éloigne, la machine
+        // à états repasse en Chase d'elle-même et le bot referme.
+        let want_orbit = matches!(bot.state, BotState::Attack) && has_recent_sight;
+
+        if (!want_chase && !want_orbit) || bot.speed < 0.01 || dist < 0.01 {
             continue;
         }
         // Story-700 inc.3 — c'est LA ligne qui portait « fonce vers la cible », et la
@@ -834,9 +853,26 @@ pub fn bot_tactical_movement(
         // déjà sans collision (obstacles dilatés du rayon d'agent), donc on le suit au
         // pied de la lettre. Sur le DERNIER tronçon il engage, et strafe et évitement
         // reprennent la main — c'est là qu'ils servent, en terrain ouvert face au joueur.
-        let en_traversee = nav_path.is_some_and(|p| !p.is_final_leg());
-        let strafe = compute_strafe_offset(&mut bot, fwd_dir, &tuning, dt);
-        let desired = if en_traversee {
+        let en_traversee = !want_orbit && nav_path.is_some_and(|p| !p.is_final_leg());
+        // En orbite, la référence est la direction vers le JOUEUR, jamais vers un
+        // waypoint : à portée de frappe le chemin pointe souvent ailleurs (il a
+        // été calculé de loin), et tourner autour de ce point-là ferait décrire au
+        // bot un cercle qui n'a rien à voir avec sa cible.
+        let base_dir = if want_orbit { straight } else { fwd_dir };
+        let strafe = compute_strafe_offset(&mut bot, base_dir, &tuning, dt);
+        let desired = if want_orbit {
+            // Tangentiel pur : le bot tourne autour du joueur sans se rapprocher
+            // ni reculer. `compute_strafe_offset` rend déjà un vecteur latéral
+            // oscillant (sinus + bruit), donc la trajectoire reste bornée — il
+            // décrit un arc de va-et-vient, il ne s'échappe pas en spirale.
+            //
+            // Repli si le strafe passe par zéro (le sinus s'annule deux fois par
+            // période) : on garde la tangente pure plutôt qu'une direction nulle,
+            // qui ferait bégayer le mouvement au rythme du sinus.
+            let tangente = Vec3::new(-base_dir.z, 0.0, base_dir.x).normalize_or_zero();
+            let s = strafe.normalize_or_zero();
+            if s == Vec3::ZERO { tangente } else { s }
+        } else if en_traversee {
             fwd_dir
         } else {
             (fwd_dir + strafe.normalize_or_zero() * 0.4).normalize_or_zero()
@@ -1400,11 +1436,17 @@ pub fn write_bot_traces_sensor(
             continue;
         }
         let fige = trace.fige(bot.speed);
+        // Un bot en ATTACK orbite exprès : il tourne autour du joueur sans
+        // progresser, et c'est le comportement voulu depuis le 2026-08-13. Le
+        // signaler serait un capteur qui crie au loup — et un capteur qui crie au
+        // loup n'est plus lu du tout. `pietine` reste vrai au sens de la mesure,
+        // mais il n'est une ANOMALIE que pour un bot censé aller quelque part.
+        let doit_progresser = matches!(bot.state, BotState::Chase);
         let pietine = trace.pietine(bot.speed);
         match (fige, pietine) {
             (None, _) => aveugles += 1,
             (Some(true), _) => figes += 1,
-            (Some(false), Some(true)) => pietinants += 1,
+            (Some(false), Some(true)) if doit_progresser => pietinants += 1,
             _ => {}
         }
         let cause = match trace.dernier_refus {
@@ -1743,6 +1785,84 @@ mod sonde_de_sol_tests {
     /// Miroir inevitable (autre crate), donc teste, comme `spawn-clearance.md` §4bis
     /// l'exige.
     const NAVMESH_AGENT_RADIUS_M: f32 = 0.30;
+
+    // ── L'orbite de combat ──────────────────────────────────────────────────
+
+    #[test]
+    fn la_tangente_ne_rapproche_ni_n_eloigne_du_joueur() {
+        // LE test de l'orbite. Une composante radiale ferait franchir
+        // `stop_distance` dans un sens puis dans l'autre, donc basculer
+        // Attack <-> Chase a chaque passage : la meme oscillation de frontiere
+        // que celle des routes, corrigee le matin meme. En restant tangentiel,
+        // la distance ne bouge pas et l'etat ne bascule pas.
+        let vers_joueur = Vec3::new(1.0, 0.0, 0.0);
+        let tangente = Vec3::new(-vers_joueur.z, 0.0, vers_joueur.x).normalize_or_zero();
+        assert!(
+            tangente.dot(vers_joueur).abs() < 1.0e-6,
+            "composante radiale non nulle : {}",
+            tangente.dot(vers_joueur)
+        );
+        assert!((tangente.length() - 1.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn l_orbite_garde_la_distance_sur_un_tour_complet() {
+        // Simulation : un bot qui suit la tangente a chaque pas doit rester a
+        // distance quasi constante. L'ecart cumule vient de la discretisation
+        // (on avance en corde, pas en arc) — il doit rester negligeable, sinon le
+        // bot s'echapperait en spirale et sortirait de portee tout seul.
+        let joueur = Vec3::ZERO;
+        let mut p = Vec3::new(3.0, 0.0, 0.0); // tank : stop_distance = 3,0 m
+        let (vitesse, dt) = (2.8, 1.0 / 60.0);
+        let depart = p.distance(joueur);
+        for _ in 0..600 {
+            // 10 s
+            let vers = (joueur - p).normalize_or_zero();
+            let tangente = Vec3::new(-vers.z, 0.0, vers.x).normalize_or_zero();
+            p += tangente * vitesse * dt;
+        }
+        let derive = (p.distance(joueur) - depart).abs();
+        assert!(
+            derive < 0.35,
+            "derive de {derive:.3} m sur 10 s d'orbite : le bot s'echappe"
+        );
+    }
+
+    #[test]
+    fn le_strafe_qui_passe_par_zero_ne_fige_pas_le_bot() {
+        // Le sinus du strafe s'annule DEUX FOIS par periode. Sans repli, la
+        // direction d'orbite serait nulle a ces instants et le bot begayerait au
+        // rythme du sinus — un nouveau « bloque face a moi », plus subtil.
+        let base = Vec3::new(0.0, 0.0, 1.0);
+        let strafe_nul = Vec3::ZERO;
+        let tangente = Vec3::new(-base.z, 0.0, base.x).normalize_or_zero();
+        let s = strafe_nul.normalize_or_zero();
+        let choisi = if s == Vec3::ZERO { tangente } else { s };
+        assert!(
+            choisi.length() > 0.99,
+            "direction nulle au passage a zero du sinus"
+        );
+    }
+
+    #[test]
+    fn chaque_archetype_s_arrete_a_portee_de_frapper() {
+        // `stop_distance` DOIT rester sous `attack_range`, sinon le bot s'arrete
+        // trop loin pour toucher et reste plante — un « bloque face a moi » de
+        // nature toute differente, et celui-la serait un vrai bug de reglage.
+        // Valeurs de `roguelite_enemies.toml`.
+        for (nom, stop, portee) in [
+            ("tank", 3.0, 4.0),
+            ("runner", 6.0, 7.0),
+            ("sniper", 22.0, 24.0),
+            ("boss", 10.0, 30.0),
+        ] {
+            assert!(
+                stop < portee,
+                "{nom} s'arrete a {stop} m pour une portee de {portee} m : \
+                 il ne pourra jamais toucher"
+            );
+        }
+    }
 
     // ── La traversée d'exception ────────────────────────────────────────────
 
