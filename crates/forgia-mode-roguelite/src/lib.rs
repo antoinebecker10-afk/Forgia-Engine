@@ -888,16 +888,28 @@ impl Plugin for ForgiaModeRoguelitePlugin {
     }
 }
 
-/// Debug : toggle l'affichage fil-de-fer des colliders physiques (F10). Permet
-/// de voir si les colliders (murs ramparts, salles, props) sont présents et
-/// alignés avec les meshes visuels — diagnostic des traversées de murs.
+/// Debug : F10 fait CYCLER les couches de diagnostic.
+///
+/// `OFF → BOTS → BOTS + COLLIDERS → OFF`
+///
+/// Un cycle et non deux bascules, parce que le projet interdit deux handlers sur
+/// la même touche (anti-trap « 2 handlers ESC ») et parce que le fil-de-fer des
+/// colliders Rapier est visuellement bruyant : le vouloir en même temps que les
+/// gizmos de bots n'est vrai qu'une fois sur trois.
+///
+/// La couche BOTS a été demandée en jeu le 2026-08-13 — « tout ce qui gravite
+/// autour d'eux, des couleurs différentes pour que je m'y retrouve ». La couche
+/// COLLIDERS reste ce qu'elle était : confronter le collider réel à l'emprise
+/// déclarée, qui est la classe de défaut n°1 de ce projet.
 fn sys_toggle_collider_debug(
     keys: Res<ButtonInput<KeyCode>>,
     mut ctx: ResMut<bevy_rapier3d::render::DebugRenderContext>,
+    mut mode: ResMut<forgia_ai_arena_bot::gizmos::BotGizmoMode>,
 ) {
     if keys.just_pressed(KeyCode::F10) {
-        ctx.enabled = !ctx.enabled;
-        info!("[roguelite] Rapier collider debug render = {}", ctx.enabled);
+        *mode = mode.suivant();
+        ctx.enabled = mode.dessine_les_colliders();
+        info!("[roguelite] F10 — diagnostic = {}", mode.libelle());
     }
 }
 

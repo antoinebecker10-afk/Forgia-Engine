@@ -9,6 +9,7 @@ use bevy_rapier3d::prelude::*;
 use forgia_core::prelude::GameMode;
 use forgia_damage::{DamageEvent, DamageKind, DeathEvent, ForgiaDamagePlugin, Health, Mortal};
 
+pub mod gizmos;
 pub mod navpath;
 pub mod tactical;
 pub use navpath::BotPath;
@@ -282,6 +283,7 @@ impl Plugin for ForgiaAiArenaBotPlugin {
             .init_resource::<BotShootRng>()
             .init_resource::<TacticalTuning>()
             .init_resource::<BotAiSensor>()
+            .init_resource::<gizmos::BotGizmoMode>()
             .add_systems(Startup, setup_bot_fireball_assets)
             .add_systems(
                 Update,
@@ -315,6 +317,12 @@ impl Plugin for ForgiaAiArenaBotPlugin {
                     tactical::write_bot_traces_sensor,
                 )
                     .chain(),
+            )
+            // Gizmos de debug : coût NUL quand F10 est sur Off — un gizmo par bot
+            // et par frame ne se paie pas pour rien.
+            .add_systems(
+                Update,
+                gizmos::sys_bot_gizmos.run_if(|m: Res<gizmos::BotGizmoMode>| m.dessine_les_bots()),
             )
             .add_observer(on_bot_death);
     }
