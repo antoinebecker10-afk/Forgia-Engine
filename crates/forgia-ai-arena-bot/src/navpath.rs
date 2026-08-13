@@ -72,6 +72,63 @@ impl BotPath {
         self.waypoints.clear();
         self.cursor = 0;
     }
+
+    /// Longueur qu'il reste à parcourir sur CE chemin, depuis `pos`.
+    ///
+    /// Sert à décider s'il vaut la peine d'en changer ([`vaut_la_peine_de_changer`]).
+    /// Un chemin vide ou épuisé rend `+∞` : « pas de route » doit toujours perdre
+    /// face à une route réelle, jamais gagner par un zéro trompeur.
+    #[must_use]
+    pub fn remaining_length(&self, pos: Vec2) -> f32 {
+        let Some(premier) = self.current() else {
+            return f32::INFINITY;
+        };
+        let mut total = pos.distance(premier);
+        for paire in self.waypoints[self.cursor..].windows(2) {
+            total += paire[0].distance(paire[1]);
+        }
+        total
+    }
+}
+
+/// Faut-il abandonner la route courante pour la nouvelle ? **PUR**, donc testable.
+///
+/// # Le défaut que cette fonction corrige — mesuré en jeu le 2026-08-13
+///
+/// `sys_bot_navpath` remettait `cursor = 0` à CHAQUE recalcul, toutes les 0,5 s.
+/// Quand deux routes ont un coût quasi égal — contourner un pilier par la gauche
+/// ou par la droite — le moindre déplacement du bot fait basculer polyanya de
+/// l'une à l'autre. Le bot repart alors en sens inverse avant d'avoir atteint son
+/// premier point, et recommence.
+///
+/// Relevé sur quatre bots à la fois : **8 à 20 m parcourus pour 1 à 17 cm de
+/// déplacement net**, curseur bloqué à 0 sur des chemins de 3 et 4 points, sans
+/// le moindre mur ni refus de pas. Le chien de garde ne voyait rien : ils
+/// avançaient, à pleine vitesse.
+///
+/// # La marge se DÉRIVE, elle ne se choisit pas
+///
+/// La source du bruit est connue : entre deux recalculs, le bot s'est déplacé de
+/// `vitesse × période`. C'est exactement ce qui fait basculer deux routes
+/// équivalentes. On n'accepte donc une nouvelle route que si elle économise
+/// **plus que ce déplacement** — en deçà, le gain est indiscernable du bruit qui
+/// l'a produit.
+///
+/// À 3,5 m/s et 0,5 s de période, la marge vaut 1,75 m. Aucun gène nouveau : elle
+/// sort de deux valeurs qui existent déjà.
+#[must_use]
+pub fn vaut_la_peine_de_changer(
+    restant_actuel_m: f32,
+    nouveau_m: f32,
+    vitesse_m_s: f32,
+    periode_recalcul_s: f32,
+) -> bool {
+    // Pas de route actuelle : toute route réelle vaut mieux.
+    if !restant_actuel_m.is_finite() {
+        return true;
+    }
+    let marge = vitesse_m_s * periode_recalcul_s;
+    nouveau_m + marge < restant_actuel_m
 }
 
 /// Faut-il recalculer ? Pur, testable headless.
@@ -173,20 +230,42 @@ pub fn sys_bot_navpath(
             continue;
         }
         path.repath_left = tuning.repath_period_secs;
+        // La cible a-t-elle bougé ? À lire AVANT d'écraser `planned_for` — c'est
+        // ce qui distingue « rafraîchissement périodique » de « la cible a fui ».
+        // Sur une fuite, la route actuelle mène au mauvais endroit : on l'adopte
+        // sans discuter. L'hystérésis ne doit jamais retenir un chemin périmé.
+        let cible_a_bouge = path.planned_for.distance(target) > tuning.target_moved_repath_m;
         path.planned_for = target;
+        let restant_avant = path.remaining_length(pos);
 
-        let poser = |found: &forgia_navmesh::Path, path: &mut BotPath| {
+        let poser = |found: &forgia_navmesh::Path, path: &mut BotPath| -> bool {
+            // Hystérésis — cf. `vaut_la_peine_de_changer`. Sans elle, deux routes
+            // de coût équivalent s'alternent toutes les 0,5 s et le bot fait du
+            // sur-place : 20 m parcourus pour 7 cm nets, mesurés en jeu.
+            if !cible_a_bouge
+                && !vaut_la_peine_de_changer(
+                    restant_avant,
+                    found.length,
+                    bot.speed,
+                    tuning.repath_period_secs,
+                )
+            {
+                return false;
+            }
             path.waypoints.clear();
             path.waypoints.extend(found.path.iter().copied());
             path.cursor = 0;
             // Le premier point peut être déjà atteint (le bot est dessus).
             path.advance(pos, tuning.waypoint_arrive_m);
+            true
         };
 
         match nav.route(pos, target) {
             PathOutcome::Direct(found) => {
                 sensor.paths_ok_session = sensor.paths_ok_session.saturating_add(1);
-                poser(&found, &mut path);
+                if !poser(&found, &mut path) {
+                    sensor.paths_kept_session = sensor.paths_kept_session.saturating_add(1);
+                }
             }
             // Le joueur était dans la bande que le maillage abandonne le long des murs
             // et autour des obstacles — le cas le plus courant, et celui qui coûtait
@@ -210,7 +289,9 @@ pub fn sys_bot_navpath(
                     sensor.paths_snapped_bot_session =
                         sensor.paths_snapped_bot_session.saturating_add(1);
                 }
-                poser(&found, &mut path);
+                if !poser(&found, &mut path) {
+                    sensor.paths_kept_session = sensor.paths_kept_session.saturating_add(1);
+                }
             }
             // Aucun trajet, même après recalage. Le repli est la ligne droite, c'est-à-
             // dire le comportement d'AVANT le navmesh — un bot qui échoue toujours au
@@ -264,6 +345,104 @@ mod tests {
              TacticalTuning::max_step_up_m — sinon le maillage promet des chemins \
              que le bot ne peut pas suivre"
         );
+    }
+
+    // ── L'hystérésis de route ───────────────────────────────────────────
+
+    const V: f32 = 3.5; // vitesse d'un bot d'arène (m/s)
+    const PERIODE: f32 = 0.5; // repath_period_secs
+
+    #[test]
+    fn deux_routes_equivalentes_ne_font_pas_changer_d_avis() {
+        // LE test du defaut mesure le 2026-08-13. Contourner un pilier par la
+        // gauche ou par la droite coute presque pareil ; le moindre deplacement du
+        // bot fait basculer polyanya de l'une a l'autre, et il repart en sens
+        // inverse. Quatre bots ont ainsi parcouru 8 a 20 m pour 1 a 17 cm nets.
+        //
+        // 20,0 m contre 19,8 m : un gain de 20 cm ne justifie pas un demi-tour.
+        assert!(
+            !vaut_la_peine_de_changer(20.0, 19.8, V, PERIODE),
+            "un gain de 20 cm ne doit pas declencher un changement de route"
+        );
+    }
+
+    #[test]
+    fn une_route_franchement_meilleure_est_adoptee() {
+        // L'hysteresis ne doit pas rendre le bot bete : une porte qui s'ouvre, un
+        // raccourci qui apparait, ca se prend.
+        assert!(vaut_la_peine_de_changer(20.0, 5.0, V, PERIODE));
+    }
+
+    #[test]
+    fn sans_route_actuelle_toute_route_est_bonne() {
+        // `remaining_length` rend +inf quand il n'y a pas de chemin. « Pas de
+        // route » doit PERDRE contre une route reelle, jamais gagner par un zero
+        // trompeur — d'ou l'infini plutot que zero.
+        assert!(vaut_la_peine_de_changer(f32::INFINITY, 999.0, V, PERIODE));
+    }
+
+    #[test]
+    fn la_marge_vaut_exactement_ce_que_le_bot_parcourt_entre_deux_recalculs() {
+        // La marge se DERIVE de la source du bruit, elle ne se choisit pas : entre
+        // deux recalculs le bot s'est deplace de `vitesse x periode`, et c'est
+        // precisement ce deplacement qui fait basculer deux routes equivalentes.
+        // Un gain inferieur est indiscernable du bruit qui l'a produit.
+        let marge = V * PERIODE; // 1,75 m
+        assert!(
+            !vaut_la_peine_de_changer(20.0, 20.0 - marge + 0.01, V, PERIODE),
+            "juste sous la marge : on garde"
+        );
+        assert!(
+            vaut_la_peine_de_changer(20.0, 20.0 - marge - 0.01, V, PERIODE),
+            "juste au-dessus : on change"
+        );
+    }
+
+    #[test]
+    fn un_bot_rapide_est_plus_stable_qu_un_bot_lent() {
+        // Consequence directe et voulue de la derivation : un grunt a 9 m/s bouge
+        // plus entre deux recalculs, donc son bruit est plus grand, donc il exige
+        // un gain plus grand. Ce n'est pas un reglage, c'est la meme regle.
+        let gain_moyen = 20.0 - 3.0;
+        assert!(
+            vaut_la_peine_de_changer(20.0, gain_moyen, 3.5, PERIODE),
+            "bot lent : 3 m de gain suffisent"
+        );
+        assert!(
+            !vaut_la_peine_de_changer(20.0, gain_moyen, 9.0, PERIODE),
+            "bot rapide : 3 m de gain sont dans son bruit"
+        );
+    }
+
+    #[test]
+    fn la_longueur_restante_ignore_les_points_deja_franchis() {
+        // Comparer la nouvelle route a la route COMPLETE au lieu du RESTANT ferait
+        // paraitre toute nouvelle route meilleure a mesure qu'on avance — et
+        // relancerait exactement l'oscillation qu'on corrige.
+        let path = BotPath {
+            waypoints: vec![
+                Vec2::new(0.0, 0.0),
+                Vec2::new(10.0, 0.0),
+                Vec2::new(20.0, 0.0),
+            ],
+            cursor: 2,
+            ..Default::default()
+        };
+        let restant = path.remaining_length(Vec2::new(19.0, 0.0));
+        assert!(
+            (restant - 1.0).abs() < 1.0e-4,
+            "restant {restant} : seul le dernier troncon compte"
+        );
+    }
+
+    #[test]
+    fn un_chemin_epuise_rend_l_infini_et_pas_zero() {
+        let mut path = BotPath {
+            waypoints: vec![Vec2::new(1.0, 0.0)],
+            ..Default::default()
+        };
+        path.advance(Vec2::new(1.0, 0.0), 0.5);
+        assert!(path.remaining_length(Vec2::ZERO).is_infinite());
     }
 
     // ── Le curseur ──────────────────────────────────────────────────────

@@ -215,6 +215,18 @@ pub struct BotAiSensor {
     /// **collider**. C'est la classe de défaut de `spawn-clearance.md` §4, et aucun
     /// recalage ne la corrige : elle se corrige à la source des emprises.
     pub paths_snapped_bot_session: u32,
+    /// Recalculs dont le résultat a été REJETÉ par l'hystérésis.
+    ///
+    /// C'est la mesure de l'oscillation de route. Chaque incrément est un
+    /// changement de trajet que le bot AURAIT fait et qui ne lui aurait rien
+    /// rapporté — un demi-tour gratuit. Avant l'hystérésis, ces demi-tours
+    /// étaient tous appliqués : quatre bots parcouraient 8 à 20 m pour 1 à 17 cm
+    /// de déplacement net.
+    ///
+    /// Un compteur élevé n'est PAS un problème : c'est le nombre d'oscillations
+    /// évitées. Il devient un signal quand il approche `paths_ok_session`, ce qui
+    /// voudrait dire que le maillage hésite en permanence — géométrie ambiguë.
+    pub paths_kept_session: u32,
     /// **Chemins REFUSÉS par le maillage.** Un échec renvoie le bot en ligne droite,
     /// c'est-à-dire au comportement d'avant le navmesh — donc « bloqué à cet endroit
     /// précis ». Sans ce compteur, le symptôme se devine ; avec, il se mesure.
@@ -1524,7 +1536,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"phase_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_snapped_bot_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"phase_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_snapped_bot_session":{},"paths_kept_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -1539,6 +1551,7 @@ pub fn write_bot_ai_sensor(
         sensor.paths_ok_session,
         sensor.paths_snapped_session,
         sensor.paths_snapped_bot_session,
+        sensor.paths_kept_session,
         sensor.paths_failed_session,
         sensor.last_fail_from.0,
         sensor.last_fail_from.1,
