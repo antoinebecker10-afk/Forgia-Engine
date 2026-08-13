@@ -1418,7 +1418,19 @@ pub fn sys_attach_bot_trace(
 pub fn write_bot_traces_sensor(
     time: Res<Time>,
     tuning: Res<TacticalTuning>,
-    bots: Query<(Entity, &ArenaBot, &Transform, &BotTrace, Option<&crate::navpath::BotPath>)>,
+    // `Name` porte l'archétype (`RogueliteEnemy_W1_tank_0`), et c'est le SEUL
+    // chemin sans couplage : `EnemyArchetype` vit dans `forgia-mode-roguelite`,
+    // qui dépend de cette crate — la dépendance inverse est interdite. Sans ce
+    // champ, la trace ne peut pas répondre à « lequel des archétypes marche
+    // moins bien », qui est la question posée en jeu le 2026-08-13.
+    bots: Query<(
+        Entity,
+        &ArenaBot,
+        &Transform,
+        &BotTrace,
+        Option<&crate::navpath::BotPath>,
+        Option<&Name>,
+    )>,
     mut last_write: Local<f32>,
     // Tampon réutilisé : 0 allocation par écriture (`scalability.md`).
     mut buf: Local<String>,
@@ -1431,7 +1443,7 @@ pub fn write_bot_traces_sensor(
 
     buf.clear();
     let (mut figes, mut pietinants, mut aveugles) = (0u32, 0u32, 0u32);
-    for (e, bot, xf, trace, path) in &bots {
+    for (e, bot, xf, trace, path, nom) in &bots {
         if bot.state == BotState::Dead {
             continue;
         }
@@ -1465,8 +1477,9 @@ pub fn write_bot_traces_sensor(
         // `net`/`cumul` à -1 = fenêtre jamais close. « Pas encore mesuré » n'est pas
         // « tout va bien » — `map-design-patterns.md` §13.
         buf.push_str(&format!(
-            r#"{{"e":{},"pos":[{:.1},{:.1},{:.1}],"etat":"{:?}","net_m":{:.2},"cumul_m":{:.2},"fige":{},"pietine":{},"refus":"{}","mur_frac":{:.2},"wp":{},"wp_total":{},"stuck_s":{:.1}}}"#,
+            r#"{{"e":{},"qui":"{}","pos":[{:.1},{:.1},{:.1}],"etat":"{:?}","net_m":{:.2},"cumul_m":{:.2},"fige":{},"pietine":{},"refus":"{}","mur_frac":{:.2},"wp":{},"wp_total":{},"stuck_s":{:.1}}}"#,
             e.index(),
+            nom.map_or("?", |n| n.as_str()),
             xf.translation.x,
             xf.translation.y,
             xf.translation.z,
