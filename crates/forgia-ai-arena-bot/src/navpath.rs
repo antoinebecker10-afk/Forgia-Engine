@@ -21,7 +21,7 @@
 use crate::tactical::TacticalTuning;
 use crate::{ArenaBot, BotState, BotTarget};
 use bevy::prelude::*;
-use forgia_navmesh::ActiveNavMesh;
+use forgia_navmesh::{ActiveNavMesh, PathOutcome};
 
 /// Le chemin courant d'un bot vers sa cible.
 #[derive(Component, Default)]
@@ -175,30 +175,51 @@ pub fn sys_bot_navpath(
         path.repath_left = tuning.repath_period_secs;
         path.planned_for = target;
 
-        match nav.path(pos, target) {
-            Some(found) => {
+        let poser = |found: &forgia_navmesh::Path, path: &mut BotPath| {
+            path.waypoints.clear();
+            path.waypoints.extend(found.path.iter().copied());
+            path.cursor = 0;
+            // Le premier point peut être déjà atteint (le bot est dessus).
+            path.advance(pos, tuning.waypoint_arrive_m);
+        };
+
+        match nav.route(pos, target) {
+            PathOutcome::Direct(found) => {
                 sensor.paths_ok_session = sensor.paths_ok_session.saturating_add(1);
-                path.waypoints.clear();
-                path.waypoints.extend(found.path.iter().copied());
-                path.cursor = 0;
-                // Le premier point peut être déjà atteint (le bot est dessus).
-                path.advance(pos, tuning.waypoint_arrive_m);
+                poser(&found, &mut path);
             }
-            // Aucun trajet : le bot ou la cible est HORS du maillage — au-delà du bord,
-            // ou à l'intérieur d'un obstacle dilaté. On vide plutôt que de garder un
-            // chemin périmé, mais il faut voir ce cas : le repli est la ligne droite,
-            // c'est-à-dire le comportement d'AVANT le navmesh. Un bot qui échoue
-            // toujours au même endroit y est donc bloqué comme avant, et c'est
-            // exactement le « ils se bloquent à certains endroits » du 2026-08-13.
-            None => {
+            // Le joueur était dans la bande que le maillage abandonne le long des murs
+            // et autour des obstacles — le cas le plus courant, et celui qui coûtait
+            // 13,5 % de refus le 2026-08-13. Le chemin s'arrête à un rayon d'agent de
+            // lui ; le dernier mètre revient à la ligne droite, comme tout dernier
+            // tronçon. Compté à part : si ce compteur explose, ce n'est plus un bord
+            // qu'on rattrape, c'est une géométrie qui ne correspond plus au maillage.
+            PathOutcome::Snapped { path: found, .. } => {
+                sensor.paths_ok_session = sensor.paths_ok_session.saturating_add(1);
+                sensor.paths_snapped_session = sensor.paths_snapped_session.saturating_add(1);
+                poser(&found, &mut path);
+            }
+            // Aucun trajet, même après recalage. Le repli est la ligne droite, c'est-à-
+            // dire le comportement d'AVANT le navmesh — un bot qui échoue toujours au
+            // même endroit y est bloqué comme avant.
+            PathOutcome::NoRoute {
+                from_off_mesh,
+                to_off_mesh,
+            } => {
                 sensor.paths_failed_session = sensor.paths_failed_session.saturating_add(1);
-                // OÙ ça a échoué, pas seulement combien. Le compteur seul a dit
-                // « 98,5 % de refus » sans permettre de trancher entre « le bot est
-                // hors du maillage » et « la cible l'est » — deux causes opposées.
+                // OÙ, et surtout LEQUEL DES DEUX BOUTS. Le compteur seul a dit
+                // « 105 refus » sans permettre de trancher entre « le bot est hors du
+                // maillage », « la cible l'est » et « les deux sont navigables mais
+                // rien ne les relie » — trois causes, trois remèdes opposés.
                 sensor.last_fail_from = (pos.x, pos.y);
                 sensor.last_fail_to = (target.x, target.y);
+                sensor.last_fail_bot_off_mesh = from_off_mesh;
+                sensor.last_fail_target_off_mesh = to_off_mesh;
                 path.clear();
             }
+            // Pas de maillage : déjà traité en amont par `is_built()`, mais on ne
+            // compte surtout pas un chargement comme un échec de navigation.
+            PathOutcome::NoMesh => path.clear(),
         }
     }
 }

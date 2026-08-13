@@ -170,8 +170,16 @@ pub struct BotAiSensor {
     /// chien de garde a servi. Un compteur qui ne sait répondre à sa propre
     /// question est aveugle, pas vert.
     pub unstick_triggered_session: u32,
-    /// Chemins trouvés depuis le lancement.
+    /// Chemins trouvés depuis le lancement (recalés compris).
     pub paths_ok_session: u32,
+    /// Parmi eux, ceux obtenus **après recalage d'une extrémité sur le maillage**.
+    ///
+    /// Le maillage abandonne une bande d'un rayon d'agent le long de chaque mur : un
+    /// joueur qui s'y colle y est injoignable tel quel. Ce compteur mesure à quel point
+    /// ça arrive. Quelques pour cent = normal, un joueur longe les murs. **Une majorité
+    /// = le maillage ne décrit plus la zone jouable**, et c'est la géométrie qu'il faut
+    /// regarder, pas le recalage.
+    pub paths_snapped_session: u32,
     /// **Chemins REFUSÉS par le maillage.** Un échec renvoie le bot en ligne droite,
     /// c'est-à-dire au comportement d'avant le navmesh — donc « bloqué à cet endroit
     /// précis ». Sans ce compteur, le symptôme se devine ; avec, il se mesure.
@@ -182,6 +190,14 @@ pub struct BotAiSensor {
     pub last_fail_from: (f32, f32),
     /// (x, z) du dernier refus — position de la CIBLE.
     pub last_fail_to: (f32, f32),
+    /// Au dernier refus, le BOT était-il hors du maillage ?
+    pub last_fail_bot_off_mesh: bool,
+    /// Au dernier refus, la CIBLE était-elle hors du maillage ?
+    ///
+    /// Les deux à `false` disent la troisième cause, et la plus grave : les deux points
+    /// sont navigables mais **aucun trajet ne les relie**. C'est une poche isolée — un
+    /// défaut de géométrie, pas de navigation, et aucun recalage ne le corrigera.
+    pub last_fail_target_off_mesh: bool,
 }
 
 // ─── Phase 2 — LOS check ───────────────────────────────────────────────
@@ -990,7 +1006,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -1002,11 +1018,14 @@ pub fn write_bot_ai_sensor(
         stalling,
         sensor.unstick_triggered_session,
         sensor.paths_ok_session,
+        sensor.paths_snapped_session,
         sensor.paths_failed_session,
         sensor.last_fail_from.0,
         sensor.last_fail_from.1,
         sensor.last_fail_to.0,
         sensor.last_fail_to.1,
+        sensor.last_fail_bot_off_mesh,
+        sensor.last_fail_target_off_mesh,
         sensor.los_checks_session,
         sensor.alerts_triggered_session,
         tuning.los_check_hz,

@@ -29,7 +29,10 @@ use bevy::prelude::*;
 use forgia_core::layout::{SolidDisc, SolidSeg};
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
-use vleue_navigator::{NavMesh, Path};
+use vleue_navigator::NavMesh;
+/// Ré-export : [`PathOutcome`] porte un `Path` dans ses variantes, donc l'appelant
+/// doit pouvoir le nommer sans dépendre de `vleue_navigator` en direct.
+pub use vleue_navigator::Path;
 use web_time::{SystemTime, UNIX_EPOCH};
 
 /// Chemin vers la couche definition. Aucune valeur numérique ne vit dans ce fichier.
@@ -260,7 +263,58 @@ pub fn build(
         segs_seen: segs.len(),
         obstacles_kept: obstacles.len(),
     };
-    (NavMesh::from_edge_and_obstacles(edge, obstacles), report)
+    let mut mesh = NavMesh::from_edge_and_obstacles(edge, obstacles);
+    tune_search_reach(&mut mesh, cfg.agent_radius_m);
+    (mesh, report)
+}
+
+/// Portée de la recherche « point navigable le plus proche », **dérivée** du rayon
+/// d'agent.
+///
+/// # Pourquoi ce réglage existe — mesuré le 2026-08-13
+///
+/// `from_edge_and_obstacles` pose `search_delta = 0,01` et laisse `search_steps = 2` :
+/// la recherche porte donc à **2 cm**. Or le maillage est volontairement rétréci de
+/// `agent_radius_m` (30 cm) sur son bord *et* autour de chaque obstacle — c'est cette
+/// bande qui garantit qu'un agent ne frotte pas les murs.
+///
+/// Le JOUEUR, lui, entre dans cette bande. Relevé en jeu : une cible à `[64,9 ; 26,1]`,
+/// soit **69,95 m** du centre, pour un bord de maillage à **69,67 m** sous cet angle —
+/// **28 cm dehors**. Une recherche de 2 cm ne la rattrape pas, `path()` rend `None`, et
+/// tous les bots qui poursuivent un joueur collé au mur perdent leur chemin d'un coup.
+/// C'est ce qui a produit **13,5 % de refus** sur la run de 10:53.
+///
+/// La portée n'est donc pas un réglage de confort : sa borne basse est **la largeur de
+/// la bande abandonnée**, c'est-à-dire `agent_radius_m`. On prend le double par marge
+/// (flottants, chevauchement de deux dilatations), découpé en 4 pas pour la précision.
+fn tune_search_reach(mesh: &mut NavMesh, agent_radius_m: f32) {
+    const STEPS: u32 = 4;
+    // portée = STEPS × delta = 2 × agent_radius_m
+    mesh.set_search_delta(agent_radius_m * 2.0 / STEPS as f32);
+    mesh.set_search_steps(STEPS);
+}
+
+/// Ce qu'une demande de trajet a réellement donné.
+///
+/// Un `Option<Path>` ne savait pas dire *pourquoi* il était vide, et le capteur qui en
+/// découlait a coûté une session de diagnostic : « 105 refus » ne permet pas de trancher
+/// entre « la cible est hors du maillage » (rattrapable) et « aucun trajet ne relie les
+/// deux » (poche isolée, vrai défaut de géométrie). Deux causes opposées, un seul
+/// compteur — c'est le capteur aveugle que `map-design-patterns.md` §13 interdit.
+#[derive(Debug)]
+pub enum PathOutcome {
+    /// Trajet trouvé tel quel.
+    Direct(Path),
+    /// Trajet trouvé après avoir **ramené une extrémité sur le maillage**. Le chemin
+    /// s'arrête à `snapped_to`, à moins d'un rayon d'agent de la cible demandée : le
+    /// dernier mètre revient à la ligne droite, exactement comme le dernier tronçon
+    /// d'un chemin ordinaire.
+    Snapped { path: Path, snapped_to: Vec2 },
+    /// Aucun trajet. Les deux drapeaux disent **lequel des bouts** est en cause ;
+    /// tous deux `false` = les deux points sont navigables mais rien ne les relie.
+    NoRoute { from_off_mesh: bool, to_off_mesh: bool },
+    /// Pas de maillage (hors zone, chargement). N'est **pas** un échec.
+    NoMesh,
 }
 
 // ─────────────────────────── Le maillage courant ───────────────────────────
@@ -327,9 +381,106 @@ impl ActiveNavMesh {
     /// Chemin de `from` à `to`, ou `None` si le maillage manque ou si aucun trajet
     /// n'existe. L'appelant DOIT distinguer les deux cas : « pas encore de maillage »
     /// et « cette destination est inatteignable » n'appellent pas la même réaction.
+    ///
+    /// Forme brute, sans recalage : préférer [`Self::route`], qui rattrape le cas
+    /// courant d'une cible dans la bande abandonnée et dit *pourquoi* quand il échoue.
     #[must_use]
     pub fn path(&self, from: Vec2, to: Vec2) -> Option<Path> {
         self.mesh.as_ref()?.path(from, to)
+    }
+
+    /// Trajet de `from` à `to`, en **ramenant sur le maillage** l'extrémité qui en sort.
+    ///
+    /// # Pourquoi le recalage n'est pas une commodité
+    ///
+    /// Le maillage abandonne une bande de `agent_radius_m` le long de chaque mur et
+    /// autour de chaque obstacle. Le joueur, lui, y entre — il a sa propre collision, et
+    /// rien ne l'empêche de se coller à une paroi. **Toute position qu'il occupe dans
+    /// cette bande est hors maillage**, donc injoignable telle quelle.
+    ///
+    /// Sans recalage, se coller à un mur suffit à faire perdre son chemin à *tous* les
+    /// poursuivants d'un coup. Mesuré le 2026-08-13 : 105 refus sur 776 demandes en 31 s
+    /// de jeu, et 2 désenlisements. Avec [`tune_search_reach`], la recherche porte à
+    /// deux rayons d'agent — assez pour la bande, pas assez pour téléporter la cible.
+    ///
+    /// Le chemin rendu s'arrête au point recalé ; le bot finit en ligne droite, ce qu'il
+    /// fait déjà sur le dernier tronçon de n'importe quel chemin.
+    #[must_use]
+    pub fn route(&self, from: Vec2, to: Vec2) -> PathOutcome {
+        let Some(mesh) = self.mesh.as_ref() else {
+            return PathOutcome::NoMesh;
+        };
+        if let Some(p) = mesh.path(from, to) {
+            return PathOutcome::Direct(p);
+        }
+        let from_off_mesh = !mesh.is_in_mesh(from);
+        let to_off_mesh = !mesh.is_in_mesh(to);
+        // Les deux bouts sont navigables et pourtant rien ne les relie : c'est une poche
+        // isolée, un vrai défaut de géométrie. Le recalage n'y peut rien, et le dire
+        // vaut mieux que le masquer par une retouche qui ne changerait rien.
+        if !from_off_mesh && !to_off_mesh {
+            return PathOutcome::NoRoute {
+                from_off_mesh: false,
+                to_off_mesh: false,
+            };
+        }
+        let inner = mesh.get();
+        // Deux recours, dans cet ordre.
+        //
+        // 1. `get_closest_point` — le vrai plus proche, mais son echantillonnage a un
+        //    trou : `get_closest_point_inner` parcourt `0..=(sample*step)` avec un pas
+        //    de `TAU/(sample*(step+1))`, donc il ne boucle JAMAIS le cercle entier et
+        //    laisse toujours un secteur non teste. Mesure ici : il rate le sommet de
+        //    l'hexagone, a 35 cm, alors que sa portee est de 60 cm.
+        //
+        // 2. Le repli par bissection vers un point CONNU dedans. Geometriquement
+        //    garanti : un segment dont une extremite est dans le maillage et l'autre
+        //    dehors traverse la frontiere, donc la bissection converge. Ce n'est pas
+        //    le point le plus proche dans l'absolu, mais c'est un point navigable
+        //    dans la direction utile — celle d'ou vient le poursuivant.
+        let vers_le_maillage = |dehors: Vec2, dedans: Vec2| -> Vec2 {
+            let (mut ko, mut ok) = (dehors, dedans);
+            // 8 pas : l'ecart initial vaut au plus la portee de l'arene, 1/256e de
+            // 80 m = 31 cm — sous le rayon d'agent, donc sans effet visible.
+            for _ in 0..8 {
+                let milieu = ko.midpoint(ok);
+                if mesh.is_in_mesh(milieu) {
+                    ok = milieu;
+                } else {
+                    ko = milieu;
+                }
+            }
+            ok
+        };
+        let nearest = |p: Vec2, dehors: bool, ancre: Option<Vec2>| -> Option<Vec2> {
+            if !dehors {
+                return Some(p);
+            }
+            inner
+                .get_closest_point(p)
+                .map(|c| c.position())
+                .or_else(|| ancre.map(|a| vers_le_maillage(p, a)))
+        };
+        // L'ancre n'existe que si l'autre bout est, lui, dans le maillage.
+        let (Some(f), Some(t)) = (
+            nearest(from, from_off_mesh, (!to_off_mesh).then_some(to)),
+            nearest(to, to_off_mesh, (!from_off_mesh).then_some(from)),
+        ) else {
+            return PathOutcome::NoRoute {
+                from_off_mesh,
+                to_off_mesh,
+            };
+        };
+        match mesh.path(f, t) {
+            Some(path) => PathOutcome::Snapped {
+                path,
+                snapped_to: t,
+            },
+            None => PathOutcome::NoRoute {
+                from_off_mesh,
+                to_off_mesh,
+            },
+        }
     }
 }
 
@@ -763,5 +914,171 @@ mod reproduction_terrain {
         }
         println!("ECHELLE REELLE : {ok} chemins OK, {ko} refuses");
         assert!(ko == 0, "{ko}/200 chemins refuses a l'echelle reelle");
+    }
+
+    // ── La bande abandonnee : ce que le test ci-dessus ne pouvait pas voir ──
+    //
+    // Le tirage ci-dessus va de 10 a 50 m sur un rayon jouable de 69,28 : il
+    // n'approche JAMAIS le mur. Il rendait donc 200/200 et innocentait le maillage
+    // pendant que le jeu refusait 13,5 % des chemins. Un echantillon qui evite la
+    // zone du defaut ne prouve rien — il rassure, ce qui est pire.
+
+    /// Le maillage bati pour forge_sanctum, tel qu'en jeu.
+    fn maillage_forge_sanctum() -> (ActiveNavMesh, f32) {
+        let c = NavmeshBuild::default();
+        let apothem = 69.28203_f32;
+        let discs: Vec<SolidDisc> = (0..13)
+            .map(|i| {
+                let a = std::f32::consts::TAU * i as f32 / 13.0;
+                SolidDisc {
+                    x: 25.0 * a.cos(),
+                    z: 25.0 * a.sin(),
+                    r: 3.0,
+                    h: 3.0,
+                }
+            })
+            .collect();
+        let (mesh, report) = build(hexagon_edge(apothem, c.agent_radius_m), &discs, &[], &c);
+        let mut active = ActiveNavMesh::default();
+        active.set(mesh, report, "forge_sanctum", 7, 0.3);
+        (active, apothem)
+    }
+
+    #[test]
+    fn la_portee_de_recherche_couvre_la_bande_abandonnee() {
+        // LA borne. `from_edge_and_obstacles` laisse 0,01 x 2 = 2 cm, alors que le
+        // maillage abandonne `agent_radius_m` = 30 cm. Si cette inegalite casse, le
+        // recalage redevient inoperant — en SILENCE, comme le 2026-08-13.
+        let c = NavmeshBuild::default();
+        let (mesh, _) = build(hexagon_edge(69.28203, c.agent_radius_m), &[], &[], &c);
+        let portee = mesh.search_delta() * mesh.search_steps() as f32;
+        assert!(
+            portee >= c.agent_radius_m,
+            "portee de recherche {portee:.3} m < bande abandonnee {:.3} m : \
+             une cible collee au mur restera injoignable",
+            c.agent_radius_m
+        );
+    }
+
+    #[test]
+    fn la_cible_mesuree_en_jeu_le_2026_08_13_est_desormais_joignable() {
+        // Les coordonnees EXACTES du dernier refus releve dans forgia_bot_ai.json.
+        // Cible a 69,95 m du centre pour un bord de maillage a 69,67 m sous cet
+        // angle : 28 cm dehors.
+        //
+        // Ce test compare le maillage TEL QUE POLYANYA LE LIVRE (portee 0,01 x 2 =
+        // 2 cm) au notre. C'est la seule facon honnete de prouver la correction : sur
+        // le maillage corrige, `path()` brut passe deja — donc affirmer « le brut
+        // refuse » serait faux, et une version anterieure de ce test l'affirmait.
+        let from = Vec2::new(44.7, -1.6);
+        let to = Vec2::new(64.9, 26.1);
+        let c = NavmeshBuild::default();
+        let discs: Vec<SolidDisc> = (0..13)
+            .map(|i| {
+                let a = std::f32::consts::TAU * i as f32 / 13.0;
+                SolidDisc {
+                    x: 25.0 * a.cos(),
+                    z: 25.0 * a.sin(),
+                    r: 3.0,
+                    h: 3.0,
+                }
+            })
+            .collect();
+
+        // AVANT — la portee que polyanya pose lui-meme.
+        let mut origine =
+            NavMesh::from_edge_and_obstacles(hexagon_edge(69.28203, c.agent_radius_m), {
+                let mut o = Vec::new();
+                for d in &discs {
+                    o.push(disc_to_obstacle(d, c.agent_radius_m, c.disc_segments));
+                }
+                o
+            });
+        origine.set_search_steps(2);
+        assert!(
+            origine.path(from, to).is_none(),
+            "sans la portee corrigee, cette cible DOIT etre refusee — c'est le \
+             defaut mesure en jeu, et sans lui ce test ne prouve rien"
+        );
+
+        // APRES — le maillage que `build` produit reellement.
+        let (nav, _) = maillage_forge_sanctum();
+        let ecart = match nav.route(from, to) {
+            PathOutcome::Direct(_) => 0.0,
+            PathOutcome::Snapped { snapped_to, .. } => snapped_to.distance(to),
+            autre => panic!("cible toujours injoignable : {autre:?}"),
+        };
+        assert!(
+            ecart <= c.agent_radius_m * 2.0,
+            "le point atteint est a {ecart:.2} m de la cible : le bot irait \
+             ailleurs qu'au joueur"
+        );
+    }
+
+    #[test]
+    fn un_joueur_qui_longe_le_mur_reste_poursuivable_tout_du_long() {
+        // Le cas general dont la coordonnee ci-dessus n'est qu'un exemplaire : le
+        // joueur peut longer TOUTE l'enceinte. Sans recalage, chaque pas dans la
+        // bande fait perdre son chemin a tous ses poursuivants d'un coup.
+        let (nav, apothem) = maillage_forge_sanctum();
+        let mut brut_ko = 0;
+        let mut route_ko = 0;
+        let mut details: Vec<(usize, f32, f32)> = Vec::new();
+        for i in 0..360 {
+            let a = std::f32::consts::TAU * i as f32 / 360.0;
+            // Sur le bord de l'hexagone du SOL (apotheme non rétréci), donc dans la
+            // bande de 30 cm que le maillage abandonne.
+            let bord = apothem / (((a % (std::f32::consts::PI / 3.0)) - std::f32::consts::PI / 6.0).cos());
+            let joueur = Vec2::new(bord * a.cos(), bord * a.sin());
+            let bot = Vec2::new(20.0 * (a + 2.0).cos(), 20.0 * (a + 2.0).sin());
+            if nav.path(bot, joueur).is_none() {
+                brut_ko += 1;
+            }
+            if matches!(nav.route(bot, joueur), PathOutcome::NoRoute { .. }) {
+                route_ko += 1;
+                details.push((i, joueur.length(), bord));
+            }
+        }
+        println!("LE LONG DU MUR : brut {brut_ko}/360 refuses, route {route_ko}/360 — {details:?}");
+        assert!(
+            brut_ko > 0,
+            "sans refus brut ce test ne mesure rien — l'echantillon rate la bande"
+        );
+        assert_eq!(
+            route_ko, 0,
+            "{route_ko}/360 positions le long du mur restent injoignables"
+        );
+    }
+
+    #[test]
+    fn une_poche_isolee_se_distingue_d_une_cible_hors_maillage() {
+        // Les deux causes que l'ancien compteur unique confondait. Ici les deux
+        // points sont navigables : le recalage n'y peut rien, et `route` doit le
+        // DIRE (drapeaux a false) au lieu de laisser croire a un bord.
+        let (nav, _) = maillage_forge_sanctum();
+        let dedans = Vec2::new(5.0, 5.0);
+        match nav.route(dedans, Vec2::new(-5.0, -5.0)) {
+            PathOutcome::Direct(_) | PathOutcome::Snapped { .. } => {}
+            PathOutcome::NoRoute {
+                from_off_mesh,
+                to_off_mesh,
+            } => {
+                assert!(
+                    !from_off_mesh && !to_off_mesh,
+                    "deux points au centre ne peuvent pas etre hors maillage"
+                );
+            }
+            PathOutcome::NoMesh => panic!("maillage bati, NoMesh impossible"),
+        }
+    }
+
+    #[test]
+    fn sans_maillage_route_dit_no_mesh_et_pas_un_echec() {
+        // La distinction qui evite de compter un chargement comme un defaut.
+        let nav = ActiveNavMesh::default();
+        assert!(matches!(
+            nav.route(Vec2::ZERO, Vec2::new(1.0, 1.0)),
+            PathOutcome::NoMesh
+        ));
     }
 }
