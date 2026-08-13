@@ -309,7 +309,18 @@ pub enum PathOutcome {
     /// s'arrête à `snapped_to`, à moins d'un rayon d'agent de la cible demandée : le
     /// dernier mètre revient à la ligne droite, exactement comme le dernier tronçon
     /// d'un chemin ordinaire.
-    Snapped { path: Path, snapped_to: Vec2 },
+    ///
+    /// Les deux drapeaux disent **lequel des bouts** sortait, et ce n'est pas un
+    /// détail : « la cible sortait » veut dire que le joueur longeait un mur, ce qui
+    /// est normal ; « l'agent sortait » veut dire que le bot lui-même se tient dans
+    /// une zone que le maillage lui interdit — donc que l'emprise déclarée d'un
+    /// obstacle ne correspond pas à son collider. Deux diagnostics opposés.
+    Snapped {
+        path: Path,
+        snapped_to: Vec2,
+        from_off_mesh: bool,
+        to_off_mesh: bool,
+    },
     /// Aucun trajet. Les deux drapeaux disent **lequel des bouts** est en cause ;
     /// tous deux `false` = les deux points sont navigables mais rien ne les relie.
     NoRoute { from_off_mesh: bool, to_off_mesh: bool },
@@ -475,6 +486,8 @@ impl ActiveNavMesh {
             Some(path) => PathOutcome::Snapped {
                 path,
                 snapped_to: t,
+                from_off_mesh,
+                to_off_mesh,
             },
             None => PathOutcome::NoRoute {
                 from_off_mesh,

@@ -194,9 +194,22 @@ pub fn sys_bot_navpath(
             // lui ; le dernier mètre revient à la ligne droite, comme tout dernier
             // tronçon. Compté à part : si ce compteur explose, ce n'est plus un bord
             // qu'on rattrape, c'est une géométrie qui ne correspond plus au maillage.
-            PathOutcome::Snapped { path: found, .. } => {
+            PathOutcome::Snapped {
+                path: found,
+                from_off_mesh,
+                ..
+            } => {
                 sensor.paths_ok_session = sensor.paths_ok_session.saturating_add(1);
                 sensor.paths_snapped_session = sensor.paths_snapped_session.saturating_add(1);
+                // Le BOT hors du maillage est un tout autre diagnostic que le joueur
+                // hors du maillage : cela veut dire qu'il se tient là où le maillage
+                // le lui interdit, donc que l'emprise déclarée d'un obstacle ne
+                // correspond pas à son collider. Sans ce partage, « 34,6 % de
+                // recalages » ne se lit pas.
+                if from_off_mesh {
+                    sensor.paths_snapped_bot_session =
+                        sensor.paths_snapped_bot_session.saturating_add(1);
+                }
                 poser(&found, &mut path);
             }
             // Aucun trajet, même après recalage. Le repli est la ligne droite, c'est-à-

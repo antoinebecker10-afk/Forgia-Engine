@@ -180,6 +180,14 @@ pub struct BotAiSensor {
     /// = le maillage ne décrit plus la zone jouable**, et c'est la géométrie qu'il faut
     /// regarder, pas le recalage.
     pub paths_snapped_session: u32,
+    /// Parmi les recalages, ceux où c'est **le BOT** qui était hors du maillage.
+    ///
+    /// La distinction décide du remède. Le joueur hors maillage est normal : il longe
+    /// les murs. Le BOT hors maillage veut dire qu'il se tient là où le maillage le lui
+    /// interdit — donc que l'**emprise déclarée** d'un obstacle ne correspond pas à son
+    /// **collider**. C'est la classe de défaut de `spawn-clearance.md` §4, et aucun
+    /// recalage ne la corrige : elle se corrige à la source des emprises.
+    pub paths_snapped_bot_session: u32,
     /// **Chemins REFUSÉS par le maillage.** Un échec renvoie le bot en ligne droite,
     /// c'est-à-dire au comportement d'avant le navmesh — donc « bloqué à cet endroit
     /// précis ». Sans ce compteur, le symptôme se devine ; avec, il se mesure.
@@ -726,7 +734,7 @@ pub fn bot_tactical_movement(
             xf.translation.y,
             xf.translation.z + safe.z,
         );
-        let ground = ground_under(next, &ctx, bot_entity, &tuning);
+        let ground = ground_under(next, bot.foot_offset_m, &ctx, bot_entity, &tuning);
         // `None` = pas REFUSÉ : paroi trop haute, vide trop profond, ou pas de
         // sol. Le bot reste sur place plutôt que d'escalader (il n'a ni saut ni
         // grimpe) ou de sortir de l'arène par un rebord. `bot_separation` et
@@ -862,19 +870,56 @@ pub fn unstick_side(seed: u32) -> f32 {
 /// montante : parti de ses pieds, il manquerait toute élévation.
 fn ground_under(
     pos: Vec3,
+    foot_offset_m: f32,
     rapier: &RapierContext,
     self_entity: Entity,
     tuning: &TacticalTuning,
 ) -> Option<f32> {
     let pred = |e: Entity| e != self_entity;
     let filter = QueryFilter::default().exclude_sensors().predicate(&pred);
-    // La sonde part au-dessus des PIEDS, pas du centre : sinon sa portée serait
-    // décalée d'une demi-capsule et une marche montante passerait inaperçue.
-    let from = pos + Vec3::Y * tuning.ground_probe_height_m;
-    let max_toi = tuning.ground_probe_height_m + tuning.max_step_down_m;
+    // La sonde part au-dessus des PIEDS, pas du centre.
+    //
+    // # Le défaut corrigé le 2026-08-13 — « les mobs se bloquent dans les passages »
+    //
+    // Ce commentaire disait déjà « pas du centre », et le code passait pourtant
+    // `pos.y`, qui EST le centre. Comme la longueur du rayon reste
+    // `probe + max_step_down`, tout le décalage était mangé sur le BAS : le rayon
+    // s'arrêtait `foot_offset` trop haut.
+    //
+    // | archétype | `foot_offset` | descente sondée | voulue |
+    // |---|---|---|---|
+    // | runner | 0,75 m | 0,45 m | 1,20 m |
+    // | sniper | 0,82 m | 0,38 m | 1,20 m |
+    // | tank   | 1,03 m | 0,17 m | 1,20 m |
+    // | boss   | 1,80 m | **−0,60 m** | 1,20 m |
+    //
+    // Conséquence : un tank ne pouvait pas descendre une marche de 20 cm, et le
+    // rayon du boss finissait 60 cm AU-DESSUS de ses propres pieds — il ne
+    // trouvait donc jamais de sol, et chacun de ses pas était refusé.
+    //
+    // C'est la classe de défaut n°1 du projet, prise à l'envers :
+    // `resolve_step_altitude` deux fonctions plus haut prévient explicitement que
+    // « confondre les deux enterre chaque bot de la hauteur de sa capsule ». Le
+    // garde était écrit ; il n'était pas appliqué ici.
+    let (origin_y, max_toi) = ground_ray(pos.y, foot_offset_m, tuning);
+    let from = Vec3::new(pos.x, origin_y, pos.z);
     rapier
         .cast_ray(from, Vec3::NEG_Y, max_toi, true, filter)
         .map(|(_, toi)| from.y - toi)
+}
+
+/// Origine (Y) et longueur du rayon de sol — **PUR**, donc vérifiable sans moteur.
+///
+/// Extrait exprès : le défaut ci-dessus vivait dans deux lignes que rien ne pouvait
+/// interroger. Un test qui réénoncerait `max_step_down_m` ne prouverait rien ; celui
+/// qui appelle CETTE fonction mesure le rayon réellement lancé, pour chaque archétype.
+#[must_use]
+pub fn ground_ray(center_y: f32, foot_offset_m: f32, tuning: &TacticalTuning) -> (f32, f32) {
+    let pieds_y = center_y - foot_offset_m;
+    (
+        pieds_y + tuning.ground_probe_height_m,
+        tuning.ground_probe_height_m + tuning.max_step_down_m,
+    )
 }
 
 // ─── Separation steering (story-517) ──────────────────────────────────
@@ -1006,7 +1051,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_snapped_session":{},"paths_snapped_bot_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"last_fail_bot_off_mesh":{},"last_fail_target_off_mesh":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -1019,6 +1064,7 @@ pub fn write_bot_ai_sensor(
         sensor.unstick_triggered_session,
         sensor.paths_ok_session,
         sensor.paths_snapped_session,
+        sensor.paths_snapped_bot_session,
         sensor.paths_failed_session,
         sensor.last_fail_from.0,
         sensor.last_fail_from.1,
@@ -1034,6 +1080,85 @@ pub fn write_bot_ai_sensor(
         tuning.los_lost_grace_secs,
     );
     let _ = forgia_core::sensor_io::enqueue("forgia_bot_ai.json", json);
+}
+
+/// La sonde de sol — le défaut « les mobs se bloquent dans les passages » (2026-08-13).
+#[cfg(test)]
+mod sonde_de_sol_tests {
+    use super::*;
+
+    /// Les capsules RÉELLES de `roguelite_enemies.toml`, et celle d'`arena_bots.toml`.
+    /// `foot_offset = demi_hauteur + rayon + 0,05` (`EnemyStats::foot_offset_m`).
+    const CAPSULES: &[(&str, f32, f32)] = &[
+        ("tank", 0.55, 0.43),
+        ("runner", 0.32, 0.38),
+        ("sniper", 0.30, 0.47),
+        ("boss", 1.4, 0.35),
+        ("capsule arena_bots", 0.40, 0.65),
+    ];
+
+    fn foot_offset(rayon: f32, demi_h: f32) -> f32 {
+        demi_h + rayon + 0.05
+    }
+
+    #[test]
+    fn la_sonde_descend_bien_max_step_down_sous_les_pieds_pour_chaque_archetype() {
+        // LE test qui manquait. Le rayon partait du CENTRE alors que sa longueur
+        // était calculée pour partir des PIEDS : tout le décalage était mangé sur le
+        // bas. Mesuré avant correctif — tank 0,17 m au lieu de 1,20, et le boss
+        // -0,60 m, c'est-à-dire un rayon qui finit AU-DESSUS de ses propres pieds,
+        // donc aucun sol trouvé et chaque pas refusé.
+        //
+        // Aucune erreur n'était levée : un bot planté ressemble à un bot qui attend.
+        let t = TacticalTuning::default();
+        for (nom, rayon, demi_h) in CAPSULES {
+            let off = foot_offset(*rayon, *demi_h);
+            let centre_y = 10.0; // altitude quelconque : le résultat doit en être indépendant
+            let (origine, longueur) = ground_ray(centre_y, off, &t);
+            let pieds = centre_y - off;
+            let profondeur = pieds - (origine - longueur);
+            assert!(
+                (profondeur - t.max_step_down_m).abs() < 1.0e-5,
+                "{nom} (foot_offset {off:.2} m) : la sonde descend {profondeur:.2} m \
+                 sous les pieds au lieu de {:.2} — toute marche plus profonde sera \
+                 refusee et le bot restera plante",
+                t.max_step_down_m
+            );
+        }
+    }
+
+    #[test]
+    fn la_sonde_part_assez_haut_pour_voir_une_marche_montante() {
+        // L'autre bout du meme rayon : partir sous `max_step_up_m` rendrait une
+        // marche montante invisible, et le bot buterait dessus sans jamais la gravir.
+        let t = TacticalTuning::default();
+        for (nom, rayon, demi_h) in CAPSULES {
+            let off = foot_offset(*rayon, *demi_h);
+            let (origine, _) = ground_ray(0.0, off, &t);
+            let hauteur_vue = origine - (0.0 - off);
+            assert!(
+                hauteur_vue > t.max_step_up_m,
+                "{nom} : la sonde ne voit que {hauteur_vue:.2} m au-dessus des pieds, \
+                 moins que le ressaut franchissable {:.2} m",
+                t.max_step_up_m
+            );
+        }
+    }
+
+    #[test]
+    fn la_sonde_ne_depend_pas_de_l_altitude_du_bot() {
+        // Une sonde dont la portee varie avec l'altitude marcherait au sol et pas a
+        // l'etage — exactement le genre de defaut intermittent qui passe les tests.
+        let t = TacticalTuning::default();
+        let off = foot_offset(0.40, 0.65);
+        let (o1, l1) = ground_ray(0.0, off, &t);
+        let (o2, l2) = ground_ray(100.0, off, &t);
+        assert!((l1 - l2).abs() < 1.0e-6, "longueur dependante de l'altitude");
+        assert!(
+            ((o2 - o1) - 100.0).abs() < 1.0e-4,
+            "l'origine doit suivre le bot exactement, pas derivement"
+        );
+    }
 }
 
 /// Story-700 inc.3c — la poursuite, calquée sur WoW et Minecraft (2026-08-13).
