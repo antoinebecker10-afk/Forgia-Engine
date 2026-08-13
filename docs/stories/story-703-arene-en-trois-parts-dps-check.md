@@ -150,6 +150,44 @@ de tir pur, soit **20-25 s réels** avec déplacements et rechargements. Un chro
 - [ ] PV de mob dans la bande **350-650**, dérivés de la fenêtre de réaction
 - [ ] Une réaction élémentaire part **en combat ordinaire**, plus seulement sur boss
 
+## 8 bis. Deux prérequis hérités du chantier navmesh (2026-08-13)
+
+Ils ne sont pas facultatifs : cette story **multiplie** les passages étroits, donc
+elle amplifie les deux défauts restants au lieu de les contourner.
+
+### P1 — Les couloirs du maillage sont plus étroits que la moitié des ennemis
+
+Le maillage dilate chaque obstacle du rayon d'agent (**0,30 m**), il garantit donc
+des couloirs de **0,60 m**. Or :
+
+| archétype | rayon | couloir requis | verdict |
+|---|---|---|---|
+| sniper | 0,30 m | 0,60 m | ✅ |
+| runner | 0,32 m | 0,64 m | limite |
+| **tank** | 0,55 m | **1,10 m** | **×1,8** |
+| **boss** | 1,40 m | **2,80 m** | **×4,7** |
+
+Symptôme correspondant, rapporté en jeu : *« les dps ça a l'air bien mais les
+autres ça marche moins bien »*.
+
+**Décision à prendre** : un maillage par classe de gabarit (la solution standard,
+coût de bâti négligeable — 0,3 ms), ou sortir le boss du pathfinding. Tant qu'elle
+n'est pas prise, **toute porte dessinée pour cette story doit faire ≥ 2,80 m de
+passage utile** si un boss doit la franchir.
+
+Garde en place : test `le_maillage_ne_promet_pas_des_couloirs_ou_le_bot_ne_passe_pas`.
+
+### P2 — La hauteur déclarée d'un prop ne vaut pas son collider
+
+Mesuré : un bot bloqué par une **paroi de 0,60 m** alors que le maillage n'avait
+retenu que **13 obstacles sur 166 disques soumis** — donc les 153 autres se
+déclaraient `h ≤ 0,45 m`. Le maillage trace droit à travers un solide que la
+physique arrête.
+
+Même classe de défaut que le rayon d'emprise, sur l'autre axe. **Non tranché.**
+Il devient bloquant ici : les cloisons de §4 sont précisément des solides dont la
+hauteur décide s'ils coupent la ligne de vue *et* s'ils bloquent le pas.
+
 ## 9. Décisions ouvertes
 
 - **D1** — La valeur du chronomètre. Se tranche manette en main, avec le capteur.
