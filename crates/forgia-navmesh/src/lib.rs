@@ -719,3 +719,49 @@ mod tests {
         assert_eq!(file.quality.disc_segments, Some(d.disc_segments));
     }
 }
+
+#[cfg(test)]
+mod reproduction_terrain {
+    use super::*;
+
+    /// Reproduit l'ECHELLE REELLE mesuree en jeu le 2026-08-13 : forge_sanctum,
+    /// rayon jouable 69,28 m, 13 obstacles retenus — et 98,5 % de chemins refuses.
+    /// Mes tests d'origine tournaient sur 20 m avec 2 obstacles : ils ne pouvaient
+    /// pas voir le defaut.
+    #[test]
+    fn a_l_echelle_reelle_les_chemins_passent_ils() {
+        let c = NavmeshBuild::default();
+        let apothem = 69.28203_f32;
+        // 13 abris disperses, comme le capteur les compte.
+        let discs: Vec<SolidDisc> = (0..13)
+            .map(|i| {
+                let a = std::f32::consts::TAU * i as f32 / 13.0;
+                SolidDisc {
+                    x: 25.0 * a.cos(),
+                    z: 25.0 * a.sin(),
+                    r: 3.0,
+                    h: 3.0,
+                }
+            })
+            .collect();
+        let (mesh, report) = build(hexagon_edge(apothem, c.agent_radius_m), &discs, &[], &c);
+        assert_eq!(report.obstacles_kept, 13);
+
+        // 200 tirages joueur->bot repartis dans l'arene.
+        let mut ok = 0;
+        let mut ko = 0;
+        for i in 0..200 {
+            let a = std::f32::consts::TAU * i as f32 / 200.0;
+            let rayon = 10.0 + (i % 5) as f32 * 10.0; // 10..50 m
+            let from = Vec2::new(rayon * a.cos(), rayon * a.sin());
+            let to = Vec2::new(5.0 * (a + 1.0).cos(), 5.0 * (a + 1.0).sin());
+            if mesh.path(from, to).is_some() {
+                ok += 1;
+            } else {
+                ko += 1;
+            }
+        }
+        println!("ECHELLE REELLE : {ok} chemins OK, {ko} refuses");
+        assert!(ko == 0, "{ko}/200 chemins refuses a l'echelle reelle");
+    }
+}

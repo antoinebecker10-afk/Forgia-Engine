@@ -176,6 +176,12 @@ pub struct BotAiSensor {
     /// c'est-à-dire au comportement d'avant le navmesh — donc « bloqué à cet endroit
     /// précis ». Sans ce compteur, le symptôme se devine ; avec, il se mesure.
     pub paths_failed_session: u32,
+    /// (x, z) du dernier refus — position du BOT. Un compte dit *combien*, ces deux
+    /// points disent *où*, et permettent de trancher entre « le bot est hors du
+    /// maillage » et « la cible l'est ». Deux causes opposées, un seul compteur.
+    pub last_fail_from: (f32, f32),
+    /// (x, z) du dernier refus — position de la CIBLE.
+    pub last_fail_to: (f32, f32),
 }
 
 // ─── Phase 2 — LOS check ───────────────────────────────────────────────
@@ -943,7 +949,7 @@ pub fn write_bot_ai_sensor(
     sensor.bots_chasing = chasing;
     sensor.bots_attacking = attacking;
     let json = format!(
-        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_failed_session":{},"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
+        r#"{{"timestamp_secs":{:.2},"bots_alive":{},"bots_with_los":{},"bots_in_grace":{},"bots_alerted":{},"bots_chasing":{},"bots_attacking":{},"bots_unsticking":{},"bots_stalling":{},"unstick_triggered_session":{},"paths_ok_session":{},"paths_failed_session":{},"last_fail_from":[{:.1},{:.1}],"last_fail_to":[{:.1},{:.1}],"los_checks_session":{},"alerts_triggered_session":{},"tuning":{{"los_hz":{:.1},"strafe_amp_m":{:.2},"alert_radius_m":{:.1},"los_lost_grace_secs":{:.2}}}}}"#,
         now,
         alive,
         with_los,
@@ -956,6 +962,10 @@ pub fn write_bot_ai_sensor(
         sensor.unstick_triggered_session,
         sensor.paths_ok_session,
         sensor.paths_failed_session,
+        sensor.last_fail_from.0,
+        sensor.last_fail_from.1,
+        sensor.last_fail_to.0,
+        sensor.last_fail_to.1,
         sensor.los_checks_session,
         sensor.alerts_triggered_session,
         tuning.los_check_hz,

@@ -79,6 +79,18 @@ impl BotPath {
 /// Trois raisons, et pas une de plus : plus de chemin, la cible a bougé au-delà du seuil,
 /// ou le délai est écoulé. Recalculer chaque frame pour N bots trianguleraient l'arène en
 /// boucle — le chemin est du travail de planification, pas du travail de frame.
+/// # 2026-08-13 — le délai PRIME, sans exception
+///
+/// La version d'origine renvoyait `true` dès que le chemin était vide, **avant** de
+/// regarder le délai. Or un chemin refusé par le maillage est justement vidé : un bot
+/// dans cette situation re-demandait donc un chemin **à chaque frame**.
+///
+/// Mesuré en jeu : 30 700 requêtes en 166 s pour 7 bots — **26 par bot et par seconde**,
+/// contre les 2 Hz voulus. Treize fois trop, sur le chemin le plus coûteux du système,
+/// et le capteur `perf_diag` signalait un micro-stutter dans la même run.
+///
+/// Le délai est désormais le garde maître : un bot sans chemin attend au plus une
+/// période avant de retenter. C'est exactement ce que le throttle est censé garantir.
 #[must_use]
 pub fn needs_repath(
     path: &BotPath,
@@ -86,13 +98,17 @@ pub fn needs_repath(
     moved_threshold_m: f32,
     cooldown_elapsed: bool,
 ) -> bool {
-    if path.current().is_none() {
+    // Délai écoulé : rafraîchissement périodique, même si rien n'a bougé. C'est lui
+    // qui redonne sa chance à un bot dont le chemin a été refusé — sous 0,5 s, pas
+    // sous 16 ms.
+    if cooldown_elapsed {
         return true;
     }
-    if path.planned_for.distance(target) > moved_threshold_m {
-        return true;
-    }
-    cooldown_elapsed
+    // Avant le délai, une seule urgence : la cible a franchi le seuil. Et comme
+    // `planned_for` est réécrit à CHAQUE tentative — réussie **ou refusée** — elle doit
+    // re-parcourir tout le seuil pour redéclencher. À 9,75 m/s, franchir 2 m prend
+    // 0,2 s : le pire cas est donc borné à 5 Hz, jamais 60.
+    path.planned_for.distance(target) > moved_threshold_m
 }
 
 /// Attache un [`BotPath`] à tout bot qui n'en a pas.
@@ -176,6 +192,11 @@ pub fn sys_bot_navpath(
             // exactement le « ils se bloquent à certains endroits » du 2026-08-13.
             None => {
                 sensor.paths_failed_session = sensor.paths_failed_session.saturating_add(1);
+                // OÙ ça a échoué, pas seulement combien. Le compteur seul a dit
+                // « 98,5 % de refus » sans permettre de trancher entre « le bot est
+                // hors du maillage » et « la cible l'est » — deux causes opposées.
+                sensor.last_fail_from = (pos.x, pos.y);
+                sensor.last_fail_to = (target.x, target.y);
                 path.clear();
             }
         }
@@ -248,13 +269,27 @@ mod tests {
     // ── La décision de recalcul ─────────────────────────────────────────
 
     #[test]
-    fn sans_chemin_on_recalcule_toujours() {
+    fn un_bot_sans_chemin_ne_martele_pas_le_maillage() {
+        // LE test qui aurait evite la tempete du 2026-08-13. Un chemin refuse est
+        // vide ; si « vide » suffisait a redemander, le bot re-interrogerait polyanya
+        // A CHAQUE FRAME. Mesure en jeu avant correctif : 26 requetes par bot et par
+        // seconde pour 2 Hz voulus.
         let path = BotPath::default();
-        assert!(needs_repath(&path, Vec2::ZERO, 5.0, false));
+        assert!(
+            !needs_repath(&path, Vec2::ZERO, 5.0, false),
+            "delai non ecoule : on attend, meme sans chemin"
+        );
+        assert!(
+            needs_repath(&path, Vec2::ZERO, 5.0, true),
+            "delai ecoule : on retente"
+        );
     }
 
     #[test]
-    fn une_cible_qui_a_bouge_declenche_le_recalcul() {
+    fn une_cible_qui_a_bouge_declenche_le_recalcul_sans_attendre() {
+        // La cible qui franchit le seuil reste une urgence : c'est ce qui garde la
+        // poursuite reactive malgre le throttle. Elle ne peut pas provoquer de tempete
+        // parce que `planned_for` est reecrit a chaque tentative, meme refusee.
         let path = BotPath {
             waypoints: vec![Vec2::new(1.0, 0.0)],
             planned_for: Vec2::ZERO,
