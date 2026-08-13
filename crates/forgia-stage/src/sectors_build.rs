@@ -1,53 +1,52 @@
-//! sectors_build.rs — l'arène en parts, bâtie (story-703 incrément 2).
+//! sectors_build.rs — les portes de l'enceinte (story-703 incrément 2).
 //!
-//! Prend la géométrie pure de [`forgia_core::sectors`] et en fait des colliders,
-//! des solides déclarés et un capteur. **Rien n'est calculé ici** : ce fichier
-//! traduit, il ne décide pas. C'est ce qui garde la géométrie testable sans
-//! moteur, et c'est délibéré — les sept défauts du chantier navmesh du
+//! # Ce que cet incrément fait, après s'être trompé une fois
+//!
+//! Une première version bâtissait un atrium central de 20 m avec des cloisons
+//! radiales. Retirée le 2026-08-13 après une run : le tank et le boss
+//! apparaissent à 12 m (`roguelite_waves.toml [ring]`), donc **dans** l'anneau,
+//! enfermés avec le joueur — « Player died » 18 s après le spawn, deux fois.
+//!
+//! La géométrie était juste et mesurée ; c'est l'intention qui était fausse.
+//! **La seule cage, pour le joueur comme pour les ennemis, est l'enceinte
+//! extérieure.** On la perce, on n'ajoute rien.
+//!
+//! # La géométrie du kit donnait la réponse
+//!
+//! L'enceinte est un hexagone : les milieux de ses 6 faces tombent à 0°, 60°,
+//! 120°, 180°, 240°, 300°. « Trois portes dans trois directions opposées » est
+//! donc exactement **une face sur deux** — et elles s'alignent d'elles-mêmes sur
+//! les axes de parts. Aucun décalage à retenir, aucune constante à choisir.
+//!
+//! # Rien n'est calculé ici
+//!
+//! Ce fichier traduit [`forgia_core::sectors`] en décisions de spawn. Le calcul
+//! reste testable sans moteur — les sept défauts du chantier navmesh du
 //! 2026-08-13 vivaient tous dans du code qu'aucun test ne pouvait interroger.
-//!
-//! # La hauteur déclarée EST la hauteur physique
-//!
-//! Chaque mur publie sa `SolidSeg` et son collider **depuis la même variable**.
-//! C'est le prérequis P2 de la story, pris à la source plutôt que contourné : le
-//! défaut mesuré en jeu — une paroi de 0,60 m que le maillage croyait
-//! franchissable parce qu'elle se déclarait sous 0,45 — vient précisément d'une
-//! hauteur déclarée ailleurs que là où le collider est créé.
 
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
-use forgia_core::sectors::{SectorLayout, WallSeg};
+use forgia_core::sectors::SectorLayout;
 use serde::Deserialize;
 
 const GENOME_PATH: &str = "assets/genomes/arena_sectors.toml";
 
-/// Réglages lus depuis [`GENOME_PATH`]. Aucune valeur numérique ne vit dans ce
-/// fichier — les défauts ci-dessous sont le reflet du TOML, pas une source
-/// concurrente : quand les deux divergent, c'est le TOML qui gagne.
+/// Réglages lus depuis [`GENOME_PATH`]. Les défauts ci-dessous sont le reflet du
+/// TOML, pas une source concurrente : quand les deux divergent, c'est le TOML qui
+/// gagne, et un test vérifie qu'ils ne divergent pas.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub struct SectorsConfig {
     pub enabled: bool,
     pub count: u32,
-    pub atrium_radius_m: f32,
     pub door_agent_radius_m: f32,
-    pub chord_deg: f32,
-    pub wall_height_m: f32,
-    pub wall_thickness_m: f32,
     pub aggro_sector_spill_frac: f32,
 }
 
 impl Default for SectorsConfig {
     fn default() -> Self {
         Self {
-            // Coupé le 2026-08-13 : les murs ont été livrés avant ce qui les rend
-            // jouables. Voir le génome pour le détail mesuré — 18 s de survie.
-            enabled: false,
+            enabled: true,
             count: 3,
-            atrium_radius_m: 20.0,
             door_agent_radius_m: 1.40,
-            chord_deg: 5.0,
-            wall_height_m: 4.0,
-            wall_thickness_m: 0.4,
             aggro_sector_spill_frac: 0.25,
         }
     }
@@ -62,18 +61,14 @@ struct SectorsToml {
 struct SectorsBlock {
     enabled: Option<bool>,
     count: Option<u32>,
-    atrium_radius_m: Option<f32>,
     door_agent_radius_m: Option<f32>,
-    chord_deg: Option<f32>,
-    wall_height_m: Option<f32>,
-    wall_thickness_m: Option<f32>,
     aggro_sector_spill_frac: Option<f32>,
 }
 
 impl SectorsConfig {
     /// Lit le génome. **`def_io`, pas `std::fs`** : sur wasm un `std::fs` échoue
     /// en silence et le jeu tourne avec les défauts sans qu'aucune erreur ne le
-    /// dise — c'est le mur n°9 du portage web, déjà payé une fois.
+    /// dise — mur n°9 du portage web, déjà payé une fois.
     #[must_use]
     pub fn load_or_default() -> Self {
         match forgia_core::def_io::read_def_str(GENOME_PATH) {
@@ -91,22 +86,13 @@ impl SectorsConfig {
         let s = t.sectors;
         Self {
             enabled: s.enabled.unwrap_or(d.enabled),
-            // ≥ 2 : une seule part n'a ni frontière ni voisine, donc ni cloison
-            // ni poche sûre. Le concept n'existe pas sous 2.
-            count: s.count.unwrap_or(d.count).max(2),
-            atrium_radius_m: s.atrium_radius_m.unwrap_or(d.atrium_radius_m).max(1.0),
+            // Au-delà de 6 parts, deux d'entre elles se disputeraient la même
+            // face d'hexagone : il n'y a que six faces à percer.
+            count: s.count.unwrap_or(d.count).clamp(2, 6),
             door_agent_radius_m: s
                 .door_agent_radius_m
                 .unwrap_or(d.door_agent_radius_m)
                 .clamp(0.1, 5.0),
-            // Sous 1° l'anneau coûterait 360 colliders pour un gain invisible ;
-            // au-delà de 30° ce n'est plus un anneau, c'est un polygone grossier
-            // dont les portes ne veulent plus rien dire.
-            chord_deg: s.chord_deg.unwrap_or(d.chord_deg).clamp(1.0, 30.0),
-            // Doit dépasser l'œil du joueur (1,70 m), sinon la cloison ne casse
-            // aucune ligne de vue et toute la mécanique d'évitement tombe.
-            wall_height_m: s.wall_height_m.unwrap_or(d.wall_height_m).max(1.8),
-            wall_thickness_m: s.wall_thickness_m.unwrap_or(d.wall_thickness_m).max(0.1),
             aggro_sector_spill_frac: s
                 .aggro_sector_spill_frac
                 .unwrap_or(d.aggro_sector_spill_frac)
@@ -114,107 +100,58 @@ impl SectorsConfig {
         }
     }
 
-    /// La disposition géométrique correspondante.
+    /// La disposition correspondante. `extent_m` est le rayon **circonscrit** de
+    /// l'enceinte hexagonale — celui que `spawn_stage_arena` appelle `extent`.
     #[must_use]
-    pub fn layout(&self, outer_radius_m: f32) -> SectorLayout {
+    pub fn layout(&self, extent_m: f32) -> SectorLayout {
         SectorLayout {
             count: self.count,
-            atrium_radius_m: self.atrium_radius_m,
-            outer_radius_m,
+            outer_radius_m: extent_m,
             door_width_m: SectorLayout::door_width_for(self.door_agent_radius_m),
         }
     }
-
-    #[must_use]
-    pub fn chord_rad(&self) -> f32 {
-        self.chord_deg.to_radians()
-    }
 }
 
-/// Ce qui a été bâti — publié pour le capteur et pour les consommateurs à venir
+/// Ce qui a été percé — publié pour le capteur et pour les consommateurs à venir
 /// (postes des packs, ouverture des portes, aggro angulaire).
 #[derive(Resource, Debug, Clone, Default)]
 pub struct BuiltSectors {
     pub layout: Option<SectorLayout>,
-    pub partitions: u32,
-    pub atrium_segments: u32,
-    /// Passage utile RÉELLEMENT mesuré à chaque porte (m). **Mesuré, pas
-    /// nominal** : l'anneau est approximé par des cordes, et c'est cette
-    /// ouverture-là que l'agent franchit.
-    pub measured_doors_m: Vec<f32>,
-}
-
-/// Marqueur sur les murs de parts, pour les distinguer du reste au démontage.
-#[derive(Component)]
-pub struct SectorWall;
-
-/// Bâtit cloisons et anneau. Rend le nombre de tronçons posés.
-///
-/// `pousser_solide` reçoit chaque tronçon pour le déclarer à `ArenaGeometry` —
-/// passé en fermeture plutôt qu'en `&mut ArenaGeometry` pour que cette fonction
-/// reste indépendante du type qui la porte, et donc testable.
-pub fn build_sector_walls(
-    commands: &mut Commands,
-    cfg: &SectorsConfig,
-    outer_radius_m: f32,
-    mut pousser_solide: impl FnMut(&WallSeg, f32, f32),
-) -> BuiltSectors {
-    let layout = cfg.layout(outer_radius_m);
-    let chord = cfg.chord_rad();
-    let mut bati = BuiltSectors {
-        layout: Some(layout),
-        ..Default::default()
-    };
-
-    let mut poser = |seg: &WallSeg, nom: &'static str| {
-        let c = seg.center();
-        let demi_long = seg.length_m() * 0.5;
-        // MÊME hauteur pour le collider et pour le solide déclaré — P2 pris à la
-        // source. Les deux sortent de la même variable, ils ne peuvent pas
-        // diverger.
-        let h = cfg.wall_height_m;
-        let demi_ep = cfg.wall_thickness_m * 0.5;
-        commands.spawn((
-            Name::new(nom),
-            SectorWall,
-            crate::StageArenaMarker,
-            Transform::from_xyz(c.x, h * 0.5, c.y)
-                .with_rotation(Quat::from_rotation_y(-seg.yaw_rad())),
-            GlobalTransform::default(),
-            RigidBody::Fixed,
-            Collider::cuboid(demi_long, h * 0.5, demi_ep),
-        ));
-        pousser_solide(seg, h, demi_ep);
-    };
-
-    for seg in &layout.partition_walls() {
-        poser(seg, "SectorPartition");
-        bati.partitions += 1;
-    }
-    for seg in &layout.atrium_walls(chord) {
-        poser(seg, "SectorAtriumWall");
-        bati.atrium_segments += 1;
-    }
-    bati.measured_doors_m = (0..layout.count)
-        .map(|s| layout.measured_door_width_m(s, chord))
-        .collect();
-    bati
+    /// Indices des faces d'hexagone percées.
+    pub doored_faces: Vec<usize>,
+    /// Passage utile RÉELLEMENT laissé (m). **Mesuré, pas nominal** : on retire
+    /// des modules entiers, donc le trou est plus large que l'ouverture voulue.
+    /// C'est ce nombre-là que l'agent franchit.
+    pub measured_door_m: f32,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Anneaux de spawn de `roguelite_waves.toml [ring]` — miroir inévitable
+    /// (autre crate), donc testé, comme `spawn-clearance.md` §4bis l'exige.
+    const ANNEAUX_SPAWN: &[(&str, f32)] = &[
+        ("tank", 12.0),
+        ("runner", 25.0),
+        ("sniper", 42.0),
+        ("boss", 12.0),
+    ];
+    /// `kaykit_dungeon/wall.glb` mesuré : 4,00 m de large, échelle 1.
+    const MODULE_LEN_M: f32 = 4.0;
+    const EXTENT_M: f32 = 80.0;
+
     #[test]
     fn le_repli_reflete_exactement_le_toml() {
-        // Le piege paye le 2026-08-13 sur `los_lost_grace_secs` : le genome
-        // ecrase le defaut Rust, donc changer le Rust seul est INERTE. Ici c'est
-        // l'inverse qui menace — un defaut Rust qui s'ecarte du TOML rendrait le
-        // repli (fichier absent, wasm sans pack) different du jeu normal, et le
-        // defaut ne se verrait qu'en production.
+        // Le piège payé le 2026-08-13 sur `los_lost_grace_secs` : quand le TOML
+        // et le défaut Rust divergent, le repli (fichier absent, wasm sans pack)
+        // devient différent du jeu normal — et le défaut ne se voit qu'en prod.
         let toml = include_str!("../../../assets/genomes/arena_sectors.toml");
-        let lu = SectorsConfig::parse_toml(toml);
-        assert_eq!(lu, SectorsConfig::default(), "TOML et defaut Rust divergent");
+        assert_eq!(
+            SectorsConfig::parse_toml(toml),
+            SectorsConfig::default(),
+            "TOML et defaut Rust divergent"
+        );
     }
 
     #[test]
@@ -226,90 +163,60 @@ mod tests {
     }
 
     #[test]
-    fn les_bornes_ne_sont_pas_decoratives() {
-        // Une part unique n'a ni frontiere ni voisine : ni cloison, ni poche
-        // sure. Un mur sous l'oeil du joueur (1,70 m) ne casse aucune ligne de
-        // vue, donc toute la mecanique d'evitement tombe — en silence.
-        let c = SectorsConfig::parse_toml(
-            "[sectors]\ncount = 1\nwall_height_m = 0.5\nchord_deg = 90.0\n",
-        );
-        assert!(c.count >= 2, "une seule part n'a pas de frontiere");
-        assert!(c.wall_height_m > 1.70, "un mur sous l'oeil ne cache rien");
-        assert!(c.chord_deg <= 30.0, "au-dela ce n'est plus un anneau");
+    fn on_ne_peut_pas_demander_plus_de_parts_que_l_hexagone_n_a_de_faces() {
+        // Au-dela de 6, deux parts se disputeraient la meme face : l'une n'aurait
+        // pas de porte et son pack resterait enferme dehors, EN SILENCE.
+        let c = SectorsConfig::parse_toml("[sectors]\ncount = 12\n");
+        assert!(c.count <= 6);
+        let c = SectorsConfig::parse_toml("[sectors]\ncount = 1\n");
+        assert!(c.count >= 2, "une seule part n'a ni voisine ni frontiere");
     }
 
     #[test]
-    fn la_porte_derivee_admet_le_boss_et_refuse_de_valoir_deux_rayons() {
-        let c = SectorsConfig::default();
-        let l = c.layout(69.28);
-        assert!(l.door_admits(1.40), "le boss doit passer");
-        assert!(
-            l.door_width_m > 2.0 * c.door_agent_radius_m,
-            "une porte de 2r a un couloir navigable NUL"
-        );
-    }
-
-    /// Anneaux de spawn de `roguelite_waves.toml [ring]` — miroir inévitable
-    /// (autre crate), donc testé, comme `spawn-clearance.md` §4bis l'exige.
-    const ANNEAUX_SPAWN: &[(&str, f32)] = &[
-        ("tank", 12.0),
-        ("runner", 25.0),
-        ("sniper", 42.0),
-        ("boss", 12.0),
-    ];
-
-    #[test]
-    fn l_atrium_ne_doit_pas_couper_les_anneaux_de_spawn() {
-        // LE test qui manquait, et qui a coûté une run le 2026-08-13.
+    fn les_portes_percees_n_enferment_personne() {
+        // LE test qui a manque, et qui a coute une run. La version precedente
+        // posait un atrium de 20 m sans regarder OU les ennemis apparaissent :
+        // tank et boss a 12 m se retrouvaient enfermes DEDANS avec le joueur.
         //
-        // L'atrium de 20 m a été posé sans regarder OÙ les ennemis apparaissent.
-        // Le tank et le boss sortent à 12 m — donc DANS l'atrium, enfermés avec
-        // le joueur — pendant que le runner (25 m) et le sniper (42 m) restaient
-        // dehors. Mesuré en jeu : « Player died — DEFEAT » 18 s après le spawn,
-        // deux fois de suite.
-        //
-        // La géométrie était juste. C'est l'ORDRE qui était faux : bâtir les murs
-        // n'est pas jouable tant que les packs ne sont pas postés dans leurs
-        // parts (incrément 3). Ce test refuse désormais la combinaison, au lieu
-        // de laisser la découverte à une partie perdue.
+        // Percer l'enceinte ne peut plus produire ca — par construction, il n'y a
+        // qu'une enceinte et tout le monde est du meme cote. Ce test le grave :
+        // aucun anneau de spawn ne doit tomber au-dela de l'apotheme, sinon on
+        // ferait naitre un ennemi DANS le mur ou dehors.
         let c = SectorsConfig::default();
-        if !c.enabled {
-            // Coupé : rien à vérifier, et surtout pas un faux vert.
-            println!("SECTEURS COUPES — ce test se rearmera avec `enabled = true`");
-            return;
-        }
-        let dedans: Vec<&str> = ANNEAUX_SPAWN
-            .iter()
-            .filter(|(_, r)| *r < c.atrium_radius_m)
-            .map(|(n, _)| *n)
-            .collect();
-        let dehors: Vec<&str> = ANNEAUX_SPAWN
-            .iter()
-            .filter(|(_, r)| *r >= c.atrium_radius_m)
-            .map(|(n, _)| *n)
-            .collect();
-        assert!(
-            dedans.is_empty() || dehors.is_empty(),
-            "l'atrium de {:.0} m COUPE les anneaux de spawn : {dedans:?} naissent \
-             dedans, {dehors:?} dehors. Soit tous les packs sont postés dans les \
-             parts (increment 3), soit l'atrium doit passer sous {:.0} m.",
-            c.atrium_radius_m,
-            ANNEAUX_SPAWN.iter().map(|(_, r)| *r).fold(f32::MAX, f32::min)
-        );
-    }
-
-    #[test]
-    fn le_passage_mesure_tient_la_promesse_du_genome() {
-        // Bout en bout : du genome jusqu'a l'ouverture reellement laissee entre
-        // deux montants. C'est le seul chiffre que l'agent rencontre.
-        let c = SectorsConfig::default();
-        let l = c.layout(69.28);
-        for s in 0..l.count {
-            let m = l.measured_door_width_m(s, c.chord_rad());
+        let l = c.layout(EXTENT_M);
+        for (nom, r) in ANNEAUX_SPAWN {
             assert!(
-                m >= l.door_width_m,
-                "porte {s} : {m:.2} m mesures pour {:.2} annonces",
-                l.door_width_m
+                *r < l.apothem_m(),
+                "{nom} nait a {r} m, l'enceinte est a {:.1} m — hors de l'arene",
+                l.apothem_m()
+            );
+        }
+    }
+
+    #[test]
+    fn les_trois_portes_sont_dans_trois_directions_opposees() {
+        let c = SectorsConfig::default();
+        let l = c.layout(EXTENT_M);
+        let faces = l.doored_hex_faces();
+        assert_eq!(faces.len(), 3);
+        let mut vues = faces.clone();
+        vues.sort_unstable();
+        vues.dedup();
+        assert_eq!(vues.len(), 3, "deux parts partagent une porte : {faces:?}");
+    }
+
+    #[test]
+    fn le_passage_mesure_admet_les_quatre_archetypes() {
+        // Bout en bout : du genome jusqu'a l'ouverture reellement laissee entre
+        // deux modules. C'est le seul chiffre que l'agent rencontre.
+        let c = SectorsConfig::default();
+        let l = c.layout(EXTENT_M);
+        let n = ((l.hex_side_len_m() / MODULE_LEN_M).ceil() as u32).max(1);
+        let mesure = l.measured_door_width_m(n, MODULE_LEN_M);
+        for (nom, r) in [("sniper", 0.30), ("runner", 0.32), ("tank", 0.55), ("boss", 1.40)] {
+            assert!(
+                mesure >= SectorLayout::door_width_for(r),
+                "{nom} (rayon {r} m) ne passe pas les {mesure:.2} m mesures"
             );
         }
     }

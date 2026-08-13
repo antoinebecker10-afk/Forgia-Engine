@@ -1,78 +1,50 @@
-# Forgia V2 — Arène en parts (story-703)
+# Forgia V2 — Portes de l'enceinte (story-703)
 #
-# Le camembert : un atrium central où le joueur combat, N parts autour, chacune
-# fermée par une porte percée dans l'anneau de l'atrium, et une cloison radiale
-# entre deux parts voisines.
+# L'arène est une enceinte hexagonale. On la PERCE de trois portes, dans trois
+# directions opposées, par lesquelles les packs entrent. C'est tout.
 #
-# ⚠️ AUCUNE valeur ici n'est libre. Chacune est soit une conséquence chiffrée
-# (la largeur de porte vient du plus gros agent), soit un curseur de difficulté
-# assumé (le débordement d'aggro). Si un nombre ne se rattache à rien, c'est un
-# défaut : il doit se lire comme une dérivation.
+# ⚠️ Il n'y a NI atrium, NI cloison intérieure. Une première version en posait,
+# et elle a enfermé le joueur : le tank et le boss apparaissent à 12 m
+# (`roguelite_waves.toml [ring]`), donc dans l'anneau central, avec lui —
+# « Player died » 18 s après le spawn de la vague, deux fois de suite.
+#
+# La seule cage, pour le joueur COMME pour les ennemis, est l'enceinte.
+#
+# ⚠️ AUCUNE valeur ici n'est libre : chacune est soit une conséquence chiffrée,
+# soit un curseur de difficulté assumé. Si un nombre ne se rattache à rien,
+# c'est un défaut — il doit se lire comme une dérivation.
 
 [sectors]
 
-# Interrupteur maître. À `false`, l'arène reste exactement ce qu'elle était —
-# c'est le repli qui rend cet incrément livrable sans risque, pas une option de
-# confort. Un changement de géométrie de cette ampleur doit pouvoir s'annuler
-# sans rebuild.
-#
-# ⛔ COUPÉ le 2026-08-13 au soir, après une run. Les murs ont été livrés AVANT ce
-# qui les rend jouables, et l'arène est devenue un piège :
-#
-#   · le tank et le boss apparaissent à 12 m (`roguelite_waves.toml [ring]`),
-#     donc DANS l'atrium de 20 m, enfermés avec le joueur ;
-#   · le runner (25 m) et le sniper (42 m) restent dehors, dans les parts ;
-#   · les POI passent derrière les murs — la Forge est à 44 m ;
-#   · mesuré : « Player died — DEFEAT » 18 s après le spawn de la vague, deux
-#     fois de suite.
-#
-# La faute n'est pas dans la géométrie, qui est juste et mesurée : elle est dans
-# l'ORDRE. L'incrément « bâtir les murs » n'est pas jouable seul — il suppose que
-# les packs soient postés dans leurs parts (incrément 3) et que les anneaux de
-# spawn soient dérivés de l'atrium au lieu de le traverser.
-#
-# Remettre à `true` quand l'incrément 3 pose les packs.
-enabled = false
+# Interrupteur maître. À `false`, l'enceinte reste pleine et l'arène est
+# exactement ce qu'elle était. Ce n'est pas une commodité : c'est le repli qui
+# rend un changement de géométrie livrable sans risque — et il a servi.
+enabled = true
 
-# Nombre de parts. 3 = le camembert de story-703. Le code n'en suppose aucun :
-# `span_rad`, l'aggro et la poche sûre se dérivent tous de ce nombre.
+# Nombre de portes. 3 = « trois directions opposées ».
+#
+# L'enceinte est un hexagone, dont les milieux de faces tombent à 0°, 60°, 120°,
+# 180°, 240° et 300°. Trois portes à 120° sont donc exactement UNE FACE SUR
+# DEUX, et elles s'alignent d'elles-mêmes sur les axes de parts. La géométrie du
+# kit a donné la réponse ; on ne l'a pas choisie.
+#
+# Borné à 6 : au-delà, deux parts se disputeraient la même face, et l'une
+# n'aurait pas de porte du tout — son pack resterait dehors, en silence.
 count = 3
-
-# Rayon de l'atrium (m) — l'espace commun, où le joueur reçoit les packs.
-#
-# 20 m est un POINT DE DÉPART à jouer, pas une dérivation. Repères mesurés :
-#   · le tank s'arrête à 3,0 m, le runner à 6,0 — l'atrium doit les contenir ;
-#   · le sniper s'arrête à 22,0 m : à 20 m d'atrium il tire DEPUIS sa part,
-#     ce qui est voulu (il menace sans entrer) ;
-#   · dégâts joueur pleins jusqu'à 30 m, donc un atrium de 40 m de diamètre
-#     tient entier dans la bande de pleine puissance.
-atrium_radius_m = 20.0
 
 # Rayon d'agent qui DIMENSIONNE les portes (m). 1,40 = le boss, le plus gros du
 # jeu (`roguelite_enemies.toml`). La largeur utile en découle : 4 × ce rayon,
-# soit 5,60 m — voir `SectorLayout::door_width_for`, et surtout NE PAS mettre
-# 2 × : le maillage rétrécit les obstacles du rayon d'agent, donc une porte de
-# 2r a un couloir navigable de largeur NULLE. Infranchissable par construction.
-door_agent_radius_m = 1.40
-
-# Finesse de l'anneau de l'atrium : un tronçon de mur tous les N degrés.
-# Plus fin = plus rond, mais un collider de plus par tronçon. À 5°, l'anneau
-# fait 72 tronçons moins les 3 portes. Mesuré à cette finesse : les portes
-# laissent 6,95 m utiles pour 5,60 nominaux — l'approximation ouvre PLUS que
-# le nominal, jamais moins, ce qui est le bon sens d'erreur.
-chord_deg = 5.0
-
-# Hauteur des cloisons et de l'anneau (m). 4,0 = `RAMPARTS_WALL_HEIGHT_M`, la
-# hauteur des enceintes existantes.
+# soit 5,60 m.
 #
-# C'est elle qui décide de TOUT : au-dessus de l'œil du joueur (1,70 m) elle
-# casse la ligne de vue entre parts — la condition sans laquelle « éviter en
-# restant à l'écart » ne veut rien dire (story-703 §4). Et bien au-dessus du
-# ressaut franchissable (0,45 m), donc les bots contournent au lieu de grimper.
-wall_height_m = 4.0
-
-# Épaisseur des murs (m). 0,4 = `RAMPARTS_WALL_THICKNESS_M`.
-wall_thickness_m = 0.4
+# NE PAS mettre 2 × : le maillage rétrécit les obstacles du rayon d'agent, donc
+# une porte de 2r a un couloir navigable de largeur NULLE — infranchissable par
+# construction, pas par malchance.
+#
+# En pratique l'ouverture réelle est plus large : on retire des modules de mur
+# ENTIERS (4,00 m mesurés pour `kaykit_dungeon`), ce qui donne 8,00 m utiles sur
+# une face de 80 m. L'approximation ouvre toujours PLUS que le nominal, jamais
+# moins — le bon sens d'erreur.
+door_agent_radius_m = 1.40
 
 # Débordement de l'aggro sur CHAQUE part voisine, en fraction de part.
 #

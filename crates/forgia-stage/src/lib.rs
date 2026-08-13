@@ -1242,26 +1242,60 @@ fn spawn_stage_arena_on_request(
         _ => wall_natural_len_for_kit(&stage_def.ramparts_kit),
     } * wall_scale;
     let hex_side_len = extent;
-    // 1 collider per segment (midpoint + rotation).
+    // Story-703 inc.2 — les PORTES de l'enceinte.
+    //
+    // On perce l'enceinte existante ; on n'ajoute aucun mur. La version qui
+    // bâtissait un atrium central a enfermé le joueur avec le tank et le boss
+    // (spawn à 12 m) — « Player died » 18 s après le spawn. La seule cage, pour
+    // lui comme pour eux, est cette enceinte-ci.
+    let sectors_cfg = sectors_build::SectorsConfig::load_or_default();
+    let sectors_layout = sectors_cfg.enabled.then(|| sectors_cfg.layout(extent));
+    let faces_percees: Vec<usize> = sectors_layout
+        .as_ref()
+        .map(forgia_core::sectors::SectorLayout::doored_hex_faces)
+        .unwrap_or_default();
+
+    // 1 collider per segment (midpoint + rotation) — ou DEUX pour une face
+    // percée, laissant l'ouverture au milieu.
     for (i, (mid, rot)) in ramparts_hex_segment_midpoints(extent)
         .into_iter()
         .enumerate()
     {
+        let demi_h = RAMPARTS_WALL_HEIGHT_M * 0.5;
+        let demi_ep = RAMPARTS_WALL_THICKNESS_M * 0.5;
+        if let (true, Some(l)) = (faces_percees.contains(&i), sectors_layout.as_ref()) {
+            // Deux demi-panneaux au lieu d'un. Le décalage est porté par l'axe
+            // LOCAL X du mur (convention KayKit : X = largeur), donc appliqué
+            // APRÈS rotation — sinon les panneaux glisseraient hors de la face.
+            let (demi_long, decalage) = l.pierced_panels();
+            for signe in [-1.0_f32, 1.0] {
+                let d = rot * Vec3::X * (decalage * signe);
+                commands.spawn((
+                    Name::new(format!("RampartCollider_{i}_{}", if signe < 0.0 { "a" } else { "b" })),
+                    StageArenaMarker,
+                    Transform {
+                        translation: mid + d + Vec3::Y * demi_h,
+                        rotation: rot,
+                        scale: Vec3::ONE,
+                    },
+                    GlobalTransform::default(),
+                    RigidBody::Fixed,
+                    Collider::cuboid(demi_long, demi_h, demi_ep),
+                ));
+            }
+            continue;
+        }
         commands.spawn((
             Name::new(format!("RampartCollider_{i}")),
             StageArenaMarker,
             Transform {
-                translation: mid + Vec3::new(0.0, RAMPARTS_WALL_HEIGHT_M * 0.5, 0.0),
+                translation: mid + Vec3::new(0.0, demi_h, 0.0),
                 rotation: rot,
                 scale: Vec3::ONE,
             },
             GlobalTransform::default(),
             RigidBody::Fixed,
-            Collider::cuboid(
-                hex_side_len * 0.5,
-                RAMPARTS_WALL_HEIGHT_M * 0.5,
-                RAMPARTS_WALL_THICKNESS_M * 0.5,
-            ),
+            Collider::cuboid(hex_side_len * 0.5, demi_h, demi_ep),
         ));
     }
     // N walls tilés par segment (visual seulement, pas de collider — physics
@@ -1272,9 +1306,28 @@ fn spawn_stage_arena_on_request(
     // compte plus les murs (fusionnés hors prefab pipeline, assumé).
     let tiled = ramparts_hex_tiled_positions(extent, wall_len);
     let wall_scene: Handle<Scene> = asset_server.load(format!("{wall_glb}#Scene0"));
+    // Les modules qui tombent dans une porte sont RETIRÉS. `ramparts_hex_tiled_positions`
+    // les pose dans l'ordre des faces, `modules_par_face` par face — d'où
+    // l'index → (face, fraction le long de la face). Un module qui CHEVAUCHE
+    // l'ouverture part aussi : le garder rétrécirait le passage sous sa valeur
+    // annoncée, et « le nom est un contrat ».
+    let modules_par_face = ((hex_side_len / wall_len).ceil() as usize).max(1);
     let wall_instances: Vec<(u8, Transform)> = tiled
         .iter()
-        .map(|(pos, rot)| {
+        .enumerate()
+        .filter(|(idx, _)| {
+            let Some(l) = sectors_layout.as_ref() else {
+                return true;
+            };
+            let face = idx / modules_par_face;
+            if !faces_percees.contains(&face) {
+                return true;
+            }
+            let j = idx % modules_par_face;
+            let t = (j as f32 + 0.5) / modules_par_face as f32;
+            !l.module_in_door(t, wall_len)
+        })
+        .map(|(_, (pos, rot))| {
             (
                 0u8,
                 Transform::from_translation(*pos)
@@ -1283,6 +1336,33 @@ fn spawn_stage_arena_on_request(
             )
         })
         .collect();
+    if let Some(l) = sectors_layout.as_ref() {
+        let mesure = l.measured_door_width_m(modules_par_face as u32, wall_len);
+        info!(
+            "[sectors] {} portes percees dans l'enceinte (faces {:?}, milieux \
+             {:?} deg) — passage mesure {mesure:.2} m pour {:.2} nominal, \
+             {} modules retires sur {}",
+            faces_percees.len(),
+            faces_percees,
+            faces_percees
+                .iter()
+                .map(|f| forgia_core::sectors::SectorLayout::hex_face_mid_rad(*f)
+                    .to_degrees()
+                    .rem_euclid(360.0)
+                    .round())
+                .collect::<Vec<_>>(),
+            l.door_width_m,
+            tiled.len() - wall_instances.len(),
+            tiled.len(),
+        );
+        commands.insert_resource(sectors_build::BuiltSectors {
+            layout: Some(*l),
+            doored_faces: faces_percees,
+            measured_door_m: mesure,
+        });
+    } else {
+        info!("[sectors] desactive (genome) — enceinte pleine");
+    }
     props_spawned += wall_instances.len() as u32;
     floor_merge::spawn_static_merge(
         &mut commands,
@@ -1446,55 +1526,6 @@ fn spawn_stage_arena_on_request(
         centers: room_plan.doors.clone(),
         clearance_m: rooms_cfg.corridor_width_m() * 0.5,
     });
-    // ── Story-703 inc.2 — l'arène en parts ──────────────────────────────────
-    //
-    // Posé AVANT le décor et les pièces : ces murs sont structurels, et le semis
-    // de props doit pouvoir les voir dans `ArenaGeometry` pour ne pas boucher les
-    // portes. L'ordre inverse reproduirait « des props dans un couloir ».
-    //
-    // L'interrupteur `enabled` du génome n'est pas une commodité : c'est le repli
-    // qui rend un changement de géométrie de cette ampleur livrable sans risque.
-    {
-        let cfg = sectors_build::SectorsConfig::load_or_default();
-        if cfg.enabled {
-            let rayon = layout::HEX_INSCRIBED_RATIO * extent;
-            let geometry = &mut layout_params.geometry;
-            let bati = sectors_build::build_sector_walls(
-                &mut commands,
-                &cfg,
-                rayon,
-                |seg, h, demi_ep| {
-                    // Le solide déclaré sort des MÊMES variables que le collider
-                    // — c'est P2 pris à la source (cf. `sectors_build`).
-                    geometry.segs.push(forgia_core::layout::SolidSeg {
-                        x0: seg.a.x,
-                        z0: seg.a.y,
-                        x1: seg.b.x,
-                        z1: seg.b.y,
-                        half_thick_m: demi_ep,
-                        h,
-                    });
-                },
-            );
-            info!(
-                "[sectors] {} parts — {} cloisons + {} troncons d'anneau, \
-                 portes mesurees {:?} m (nominale {:.2})",
-                cfg.count,
-                bati.partitions,
-                bati.atrium_segments,
-                bati
-                    .measured_doors_m
-                    .iter()
-                    .map(|m| (m * 100.0).round() / 100.0)
-                    .collect::<Vec<_>>(),
-                cfg.layout(rayon).door_width_m,
-            );
-            commands.insert_resource(bati);
-        } else {
-            info!("[sectors] desactive (genome) — l'arene reste inchangee");
-        }
-    }
-
     if !room_plan.walls.is_empty() {
         let room_wall_glb = ramparts_wall_glb("kaykit_dungeon");
         let room_scene: Handle<Scene> = asset_server.load(format!("{room_wall_glb}#Scene0"));
