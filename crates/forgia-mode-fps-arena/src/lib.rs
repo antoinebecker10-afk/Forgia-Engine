@@ -194,8 +194,12 @@ fn default_gunshot_alert_los_grace_secs() -> f32 {
 fn default_alert_duration_secs() -> f32 {
     4.0
 }
+/// ⚠️ **Troisième copie de la même grandeur.** Elle vit dans
+/// `assets/genomes/arena_bots.toml` (source de vérité), dans
+/// `TacticalTuning::default()`, et ici comme repli serde. Les trois doivent valoir
+/// pareil — un test le vérifie plus bas.
 fn default_los_lost_grace_secs() -> f32 {
-    2.0
+    forgia_ai_arena_bot::TacticalTuning::default().los_lost_grace_secs
 }
 
 #[derive(Deserialize, TypePath, Clone)]
@@ -980,6 +984,51 @@ mod tests {
             ARENA_SIZE % 2,
             1,
             "ARENA_SIZE must be odd for centered grid"
+        );
+    }
+}
+
+/// La même grandeur vit à TROIS endroits — le génome, le défaut Rust, le repli serde.
+/// Ces tests interdisent qu'ils divergent.
+#[cfg(test)]
+mod miroir_tuning_tests {
+    /// Le repli serde doit valoir le défaut Rust.
+    ///
+    /// Sans ça : un génome qui omet la clé retombe sur une valeur DIFFÉRENTE de celle
+    /// que le code annonce, et personne ne le voit — c'est exactement ce qui s'est
+    /// passé le 2026-08-13, où le capteur affichait encore 2.00 alors que le Rust
+    /// disait 6.0.
+    #[test]
+    fn le_repli_serde_suit_le_defaut_rust() {
+        let rust = forgia_ai_arena_bot::TacticalTuning::default().los_lost_grace_secs;
+        assert!(
+            (super::default_los_lost_grace_secs() - rust).abs() < f32::EPSILON,
+            "repli serde {} != defaut Rust {rust}",
+            super::default_los_lost_grace_secs()
+        );
+    }
+
+    /// Le GÉNOME est la source de vérité — c'est lui que
+    /// `sync_tactical_tuning_from_genome` pousse dans la Resource à chaque chargement.
+    /// Changer le Rust seul est INERTE en jeu ; ce test le rappelle en cassant.
+    #[test]
+    fn le_genome_est_la_source_de_verite_et_dit_la_meme_chose() {
+        let toml_src = include_str!("../../../assets/genomes/arena_bots.toml");
+        let ligne = toml_src
+            .lines()
+            .find(|l| l.trim_start().starts_with("los_lost_grace_secs"))
+            .expect("le gene doit exister dans arena_bots.toml");
+        let valeur: f32 = ligne
+            .split('=')
+            .nth(1)
+            .and_then(|s| s.split('#').next())
+            .and_then(|s| s.trim().parse().ok())
+            .expect("valeur numerique lisible");
+        let rust = forgia_ai_arena_bot::TacticalTuning::default().los_lost_grace_secs;
+        assert!(
+            (valeur - rust).abs() < f32::EPSILON,
+            "arena_bots.toml dit {valeur}, le defaut Rust dit {rust} — le GENOME gagne \
+             en jeu, donc changer le Rust seul ne fait RIEN"
         );
     }
 }

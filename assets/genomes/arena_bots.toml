@@ -51,12 +51,35 @@ local_avoid_dist_m = 2.5            # ray length context steering 3-ray
 gunshot_alert_radius_m = 25.0       # bots dans 25m alerted on player fire
 gunshot_alert_los_grace_secs = 0.6  # +600ms warmup si alerted-not-yet-seen (look around feel)
 alert_duration_secs = 4.0           # durée flag alerted post-tir player
-los_lost_grace_secs = 2.0           # ★ Story-464 — grace post-LOS perdu avant drop Chase.
-                                     # Sans ce gene, bots chassaient à travers murs tant que
-                                     # distance ≤ detect_range. 2.0s = pattern AAA "last sight
-                                     # timer" (F.E.A.R. SAPI Orkin GDC 2006). Combiné avec
-                                     # alert (4s forced Chase post-tir player), comportement
-                                     # crédible : bot mémorise 2s, puis Idle si rien ne le ré-alerte.
+los_lost_grace_secs = 6.0           # ★ 2026-08-13 — 2.0 → 6.0. « Quand je quitte un mob, il
+                                     # ne peut pas faire tout le tour de l'arène ? » Non : il
+                                     # oubliait en 2 s.
+                                     #
+                                     # NI MINECRAFT NI WOW NE LÂCHENT SUR LA VUE. MC borne par
+                                     # generic.follow_range (16 blocs, ~40 pour un zombie) ;
+                                     # WoW par une LAISSE en distance + un evade après ~6 s
+                                     # sans combat actif. Forgia était le seul des trois à
+                                     # utiliser un chronomètre de VUE — d'où l'ennemi amnésique.
+                                     # 6.0 reprend le compteur d'evade de WoW retail.
+                                     #
+                                     # ET LE MODÈLE MINECRAFT EST ÉCARTÉ EXPRÈS : un zombie est
+                                     # bien plus lent qu'un joueur, donc la fuite par la
+                                     # distance y marche. Ici un grunt file à 9,0 m/s contre
+                                     # 9,75 en sprint — 92 % de la vitesse joueur. Gagner 20 m
+                                     # d'écart demanderait 27 s de sprint pur : ON NE SÈME PAS
+                                     # UN GRUNT À LA COURSE. C'est le chronomètre qui doit
+                                     # porter la fuite, pas la distance.
+                                     #
+                                     # Historique (story-464) : ce gène existe parce que sans
+                                     # lui les bots chassaient à travers les murs. Il garde ce
+                                     # rôle — seule sa durée change.
+                                     #
+                                     # ⚠️ CE FICHIER EST LA SOURCE DE VÉRITÉ. `TacticalTuning`
+                                     # porte le même défaut en Rust, mais
+                                     # `sync_tactical_tuning_from_genome` (forgia-mode-fps-arena)
+                                     # écrase la Resource à chaque chargement. Changer le Rust
+                                     # seul est INERTE — erreur commise le 2026-08-13, rattrapée
+                                     # par le capteur qui affichait encore 2.00.
 
 # ── Suivi de sol (story-685) ─────────────────────────────────────────────────
 # Avant, `bot_tactical_movement` travaillait en XZ pur : un bot restait au Y où
