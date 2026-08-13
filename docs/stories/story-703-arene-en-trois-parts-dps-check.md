@@ -49,17 +49,23 @@ Un seul instrument, trois axes. C'est plus honnête que trois jauges séparées,
 Rayon d'aggro d'un pack = **sa part + un quart de chaque part voisine**, soit **180°** sur
 des parts de 120°.
 
-Conséquence, vérifiée :
+Conséquence — **mesurée** par `forgia_core::sectors`, incrément 1 (2026-08-13) :
 
-| Portes ouvertes | Zone sûre restante |
-| --- | --- |
-| 1 | Une part entière — **120°** |
-| 2 | Le cœur de la dernière part — **60°** |
-| 3 | **Aucune** |
+| Portes ouvertes | Zone sûre restante | ce que la story annonçait |
+| --- | --- | --- |
+| 1 | **180°** | ~~120°~~ |
+| 2 | **61°** | 60° ✅ |
+| 3 | **0°** | 0° ✅ |
 
-**L'espace sûr est divisé par deux à chaque porte, puis disparaît.** C'est une escalade que
-le joueur voit et sent, sans une ligne d'interface. Un joueur assez rapide n'en a jamais
-besoin : c'est celui qui traîne qu'on accule, progressivement et lisiblement.
+> ⚠️ **La première rédaction de ce §3 était fausse sur deux points**, et le test
+> `la_poche_sure_retrecit_a_chaque_porte_ouverte` les a corrigés au lieu de les répéter :
+> la poche après une porte vaut **180°, pas 120** (la géométrie laisse une part et
+> **demie**, pas une part), et elle est divisée par **~3**, pas par 2.
+
+**L'escalade réelle est donc plus brutale que celle qui était écrite** : on passe d'une
+demi-arène libre à un sixième, puis à rien. C'est vraisemblablement meilleur en jeu — mais
+ça se tranche manette en main (§5.3), pas sur le papier. Un joueur assez rapide n'a jamais
+besoin de la poche : c'est celui qui traîne qu'on accule.
 
 > ⚠️ **Notion ANGULAIRE, pas un rayon.** L'aggro est aujourd'hui une distance
 > (`detect_range`, 50 m — plus large qu'une part, donc entrer dans un secteur réveillerait

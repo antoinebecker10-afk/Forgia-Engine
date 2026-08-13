@@ -10,6 +10,7 @@ use bevy::prelude::*;
 
 /// Story-674 — primitives d'aménagement partagées (bruit bleu, compte d'abris).
 pub mod layout;
+pub mod sectors;
 
 /// Canonical filesystem resolution for shipped and development assets.
 pub mod asset_paths {
