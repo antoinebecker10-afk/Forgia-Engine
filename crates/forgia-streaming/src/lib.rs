@@ -28,6 +28,8 @@ use std::collections::VecDeque;
 use std::path::Path;
 use thiserror::Error;
 
+pub mod cells;
+
 pub mod prelude {
     pub use crate::{
         EvictionEvent, EvictionReason, FoliageCoverageReport, ForgiaStreamingPlugin,

@@ -373,6 +373,15 @@ pub(crate) fn sys_menu_root_dashboard(
                             action = MenuAction::Launch(GameMode::Roguelite);
                         }
                         ui.add_space(8.0);
+                        // Story-703bis / migration E2 (2026-08-14) — « Le Vallon »,
+                        // la première carte AUTORÉE du projet. story-704 gardait
+                        // Expéditions verrouillé « tant que E2 n'existe pas » : il
+                        // existe. Bouton posé dans le moule des deux autres pour que
+                        // la refonte en cartes de mode le remplace sans conflit.
+                        if glass_btn(ui, "🏕  Expédition · Le Vallon").clicked() {
+                            action = MenuAction::Launch(GameMode::Expedition);
+                        }
+                        ui.add_space(8.0);
                         if glass_btn(ui, "🏰  Hall de Forgia").clicked() {
                             action = MenuAction::Launch(GameMode::CastleHub);
                         }

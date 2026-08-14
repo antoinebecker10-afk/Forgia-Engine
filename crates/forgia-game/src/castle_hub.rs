@@ -39,6 +39,18 @@ use forgia_player::prelude::Player;
 use serde::Deserialize;
 use std::collections::HashSet;
 
+// 2026-08-14 — le format de manifeste et le calcul de distance vivent desormais
+// dans `forgia_streaming::cells`, parce que la carte d'expedition « Le Vallon »
+// utilise EXACTEMENT le meme format (48 cellules, `schema_version = 1`,
+// `cell_size_m = 40`). Les dupliquer aurait ete la classe de defaut n°1 du
+// projet — une grandeur ecrite deux fois — appliquee au format d'un FICHIER,
+// c'est-a-dire a l'endroit ou une divergence se voit le plus tard.
+//
+// Les alias gardent le code ci-dessous lisible sans le reecrire.
+use forgia_streaming::cells::{
+    horizontal_distance as horizontal_distance_to_stream_cell, StreamCell as CastleStreamCellManifest,
+};
+
 /// Découpage offline du château visuel. Chaque cellule est un glTF séparé : le
 /// runtime n'instancie jamais plus le GLB monolithique de 7 453 pièces.
 const CASTLE_STREAM_MANIFEST: &str = include_str!(
@@ -173,19 +185,9 @@ struct CastleHubStreamCell {
 struct CellCollisionPending;
 
 #[derive(Clone, Debug, Deserialize)]
-struct CastleStreamCellManifest {
-    id: String,
-    render: String,
-    bounds_min_m: [f32; 3],
-    bounds_max_m: [f32; 3],
-}
 
-#[derive(Debug, Deserialize)]
-struct CastleStreamManifest {
-    schema_version: u32,
-    cell_size_m: f32,
-    cells: Vec<CastleStreamCellManifest>,
-}
+
+
 
 /// Etat runtime des cellules : le plan est cuit hors-ligne, la décision de
 /// présence est faite à partir de la position du joueur sans relire le disque.
@@ -331,7 +333,7 @@ fn spawn_castle_hub(
     telemetry.first_colliders_ready_secs = 0.0;
     telemetry.streamed_cells = 0;
     telemetry.stream_plan_cells = 0;
-    match toml::from_str::<CastleStreamManifest>(CASTLE_STREAM_MANIFEST) {
+    match forgia_streaming::cells::parse_manifest(CASTLE_STREAM_MANIFEST) {
         Ok(manifest) if manifest.schema_version == 1 && !manifest.cells.is_empty() => {
             let cells = manifest.cells;
             let cell_count = cells.len();
@@ -412,26 +414,6 @@ fn spawn_castle_hub(
     );
 }
 
-/// Distance XZ entre le joueur et l'AABB d'une cellule : nulle lorsque le
-/// joueur est dans l'emprise de la cellule. On ignore Y, car les tours et les
-/// falaises peuvent être hautes sans devoir charger davantage de décor au sol.
-fn horizontal_distance_to_stream_cell(position: Vec3, cell: &CastleStreamCellManifest) -> f32 {
-    let dx = if position.x < cell.bounds_min_m[0] {
-        cell.bounds_min_m[0] - position.x
-    } else if position.x > cell.bounds_max_m[0] {
-        position.x - cell.bounds_max_m[0]
-    } else {
-        0.0
-    };
-    let dz = if position.z < cell.bounds_min_m[2] {
-        cell.bounds_min_m[2] - position.z
-    } else if position.z > cell.bounds_max_m[2] {
-        position.z - cell.bounds_max_m[2]
-    } else {
-        0.0
-    };
-    dx.hypot(dz)
-}
 
 /// Rend le château par cellules, avec une cadence bornée. Les colliders restent
 /// volontairement séparés et complets : aucun changement de cellule ne peut
@@ -1344,7 +1326,11 @@ mod tests {
 
     #[test]
     fn streamed_castle_manifest_is_versioned_and_contains_the_hall_cell() {
-        let manifest: CastleStreamManifest = toml::from_str(CASTLE_STREAM_MANIFEST)
+        // Passe par le lecteur PARTAGE (`forgia_streaming::cells`) : ce test
+        // verifie desormais que le manifeste du chateau reste lisible par le
+        // meme code que celui de l'expedition. Une divergence de format se
+        // verrait ici, pas en jeu avec un chateau vide.
+        let manifest = forgia_streaming::cells::parse_manifest(CASTLE_STREAM_MANIFEST)
             .expect("checked-in castle streaming manifest must parse");
         assert_eq!(manifest.schema_version, 1);
         assert_eq!(manifest.cell_size_m, 32.0);

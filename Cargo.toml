@@ -33,6 +33,7 @@ members = [
     "crates/forgia-level-presets",
     "crates/forgia-mesh-voxelizer",
     "crates/forgia-medial-axis",
+    "crates/forgia-mode-expedition",
     "crates/forgia-navmesh",
     "crates/forgia-skeleton-embedder",
     "crates/forgia-skeleton-template",
@@ -173,6 +174,7 @@ forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
 forgia-level-presets = { path = "crates/forgia-level-presets" }
 forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
 forgia-medial-axis = { path = "crates/forgia-medial-axis" }
+forgia-mode-expedition = { path = "crates/forgia-mode-expedition" }
 forgia-navmesh = { path = "crates/forgia-navmesh" }
 forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
 forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }

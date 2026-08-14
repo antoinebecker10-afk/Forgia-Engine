@@ -665,6 +665,15 @@ pub mod states {
         /// level design : on joue la forme avant de l'habiller.
         /// Géré par `forgia_game::arena_test::ArenaTestPlugin`.
         ArenaTest,
+        /// Expédition (2026-08-14) — une carte **autorée sous Blender**, chargée
+        /// depuis ses deux manifestes (cellules glTF + gameplay) au lieu d'être
+        /// générée. Première carte : « Le Vallon », 280 × 200 m, 3 campements
+        /// jalonnant un chemin de 358,7 m.
+        ///
+        /// C'est le mode E2 du GDD, celui que story-704 garde verrouillé au menu
+        /// tant qu'il n'existe pas. Géré par
+        /// `forgia_mode_expedition::ForgiaExpeditionPlugin`.
+        Expedition,
     }
 
     /// WorldMode — gate la simulation (Editor désactive AI/physics).

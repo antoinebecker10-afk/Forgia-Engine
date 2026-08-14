@@ -82,6 +82,7 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 |---|---|---|---|
 | forgia-mode-roguelite | 11379 | **LE jeu à shipper** : run/vagues/boss, boons, éléments, méta-shop persisté, parcours, HUD | ✅ |
 | forgia-mode-fps-arena | 1335 | Arena KayKit (plus un produit ; dépendance structurelle du Roguelite : TargetCube/spawn) | ✦ |
+| forgia-mode-expedition | 400 | **Cartes autorées sous Blender** : manifeste de gameplay + conversion de repère Blender→Bevy. 1re carte « Le Vallon » (280×200 m, 48 cellules, 943 colliders, 3 campements) | 🚧 |
 | forgia-rpg | 3896 | Track FORGE : open world, village hex, PNJ, interactions | ✅ |
 | forgia-rpg-data | 2125 | Data layer : inventory (LOCK-INV-1 80 slots), quests, loot, XP, dialogue | ✅ |
 

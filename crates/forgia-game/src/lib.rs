@@ -321,6 +321,15 @@ pub fn run_game() -> AppExit {
     // Géométrie 100 % data-driven (`assets/genomes/arena_test.toml`, hot-reload).
     app.add_plugins(arena_test::ArenaTestPlugin);
 
+    // 7e-decies. Expédition (2026-08-14) — la première carte AUTORÉE du projet,
+    // « Le Vallon » (280 × 200 m), bâtie sous Blender et chargée depuis ses deux
+    // manifestes au lieu d'être générée. C'est le mode E2 du GDD, celui que
+    // story-704 garde verrouillé au menu tant qu'il n'existe pas.
+    //
+    // Self-contained comme Arena Test : `GameMode::Expedition` et rien d'autre,
+    // donc aucun risque pour ce qui tourne déjà.
+    app.add_plugins(forgia_mode_expedition::ForgiaExpeditionPlugin);
+
     // 7f. Color grading filmique par mode (story-602) — ColorGrading par GameMode,
     // hot-reload assets/genomes/color_grading.toml. Sensor forgia2_color_grading.json.
     app.add_plugins(color_grading::ColorGradingPlugin);

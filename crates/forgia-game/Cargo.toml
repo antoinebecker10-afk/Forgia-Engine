@@ -48,6 +48,7 @@ forgia-audio = { workspace = true }
 forgia-qa-core = { workspace = true }
 forgia-qa-replay = { workspace = true }
 forgia-asset-registry = { workspace = true }
+forgia-mode-expedition = { workspace = true }
 forgia-streaming = { workspace = true }
 forgia-fps = { workspace = true }
 forgia-viewmodel = { workspace = true }
