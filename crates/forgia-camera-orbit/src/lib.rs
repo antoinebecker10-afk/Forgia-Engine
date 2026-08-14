@@ -53,6 +53,19 @@ pub struct OrbitCamera {
     pub yaw_offset: f32,
     /// Sensibilité mouse X → yaw_offset quand LMB held.
     pub yaw_sensitivity: f32,
+    /// Décalage LATÉRAL de la caméra (m), positif = à droite du personnage.
+    ///
+    /// # C'est le seul terme qui sépare une orbite d'une vue Fortnite
+    ///
+    /// Une orbite classique cadre le personnage **au centre** : le regard est
+    /// centré, et ce qu'il vise est masqué par son propre corps. Les jeux
+    /// « par-dessus l'épaule » (Fortnite, Gears of War, Resident Evil 4) le
+    /// décalent latéralement pour **libérer l'axe de visée** — c'est fonctionnel
+    /// avant d'être esthétique.
+    ///
+    /// 0 = orbite cinématique (le Hall, le RPG, CyberCity gardent ce défaut et
+    /// ne changent donc pas de comportement).
+    pub shoulder_offset: f32,
 }
 
 impl OrbitCamera {
@@ -72,6 +85,42 @@ impl OrbitCamera {
             zoom_sensitivity: 0.5,
             yaw_offset: 0.0,
             yaw_sensitivity: 0.005,
+            // 0 = orbite centrée. Le Hall, le RPG et CyberCity gardent ce
+            // comportement : ajouter le champ ne change rien pour eux.
+            shoulder_offset: 0.0,
+        }
+    }
+
+    /// Préréglage **par-dessus l'épaule**, façon Fortnite.
+    ///
+    /// # Ce qui fait la différence, et pourquoi ces valeurs-là
+    ///
+    /// Une orbite cinématique cadre le personnage entier à 7 m : c'est beau et
+    /// c'est injouable pour viser, parce que le corps du joueur masque
+    /// exactement ce qu'il regarde. Trois termes règlent ça, et chacun se dérive
+    /// d'une contrainte, pas d'un goût :
+    ///
+    /// | terme | valeur | d'où elle vient |
+    /// |---|---|---|
+    /// | `distance` | **3,2 m** | le personnage fait 2,0 m ; en deçà de ~3 m il remplit l'écran, au-delà de ~4 m on perd la lisibilité de ses gestes |
+    /// | `shoulder_offset` | **0,65 m** | la capsule fait 0,30 m de rayon : il faut plus du double pour dégager l'axe de visée, sinon l'épaule reste dedans |
+    /// | `height_offset` | **1,55 m** | hauteur d'épaule d'un personnage de 2,0 m dont l'origine est au centre — donc pieds à −1,0, épaule à ~+0,55 |
+    ///
+    /// Le zoom reste possible mais **borné serré** (2,2 – 4,5 m) : laisser
+    /// reculer jusqu'à 18 m redonnerait la caméra cinématique et annulerait le
+    /// préréglage sans que personne ne comprenne pourquoi la visée a changé.
+    pub fn over_shoulder(target: Entity) -> Self {
+        Self {
+            distance: 3.2,
+            min_distance: 2.2,
+            max_distance: 4.5,
+            // Presque à l'horizontale : on vise devant soi, pas ses pieds.
+            pitch: -0.12,
+            min_pitch: -0.9,
+            max_pitch: 0.7,
+            height_offset: 1.55,
+            shoulder_offset: 0.65,
+            ..Self::new(target)
         }
     }
 }
@@ -309,7 +358,17 @@ fn orbit_follow(
             total_yaw.cos() * cos_pitch,
         );
 
-        let look_target = target_pos + Vec3::Y * orbit.height_offset;
+        // Le décalage d'épaule est LATÉRAL par rapport au regard, pas aligné sur
+        // un axe du monde : sans ça, tourner sur soi-même ferait passer la
+        // caméra de l'épaule droite à la gauche, puis devant.
+        //
+        // `back` est horizontalement dirigé selon `total_yaw` ; sa perpendiculaire
+        // dans le plan XZ donne la droite de la caméra. On la calcule directement
+        // depuis l'angle plutôt qu'avec un produit vectoriel, qui dégénérerait
+        // quand le pitch approche la verticale.
+        let droite = Vec3::new(total_yaw.cos(), 0.0, -total_yaw.sin());
+        let look_target =
+            target_pos + Vec3::Y * orbit.height_offset + droite * orbit.shoulder_offset;
 
         // Anti-clip (2026-06-16) : raycast depuis le point visé vers la position
         // caméra souhaitée. Si un collider est touché avant `distance`, on
@@ -331,6 +390,82 @@ fn orbit_follow(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Le préréglage par-dessus l'épaule ───────────────────────────────
+
+    #[test]
+    fn l_orbite_par_defaut_reste_centree() {
+        // Le champ `shoulder_offset` est ajoute POUR l'Expedition. Le Hall, le
+        // RPG et CyberCity ne doivent rien voir changer — un decalage non nul
+        // par defaut deplacerait trois cameras existantes sans que personne ne
+        // l'ait demande.
+        let mut w = World::new();
+        let t = w.spawn_empty().id();
+        assert_eq!(OrbitCamera::new(t).shoulder_offset, 0.0);
+    }
+
+    #[test]
+    fn le_decalage_d_epaule_degage_vraiment_l_axe_de_visee() {
+        // La capsule du joueur fait 0,30 m de rayon. Un decalage inferieur
+        // laisserait la camera DANS l'epaule : le corps masquerait encore ce
+        // qu'on vise, et le prereglage ne servirait a rien.
+        const RAYON_CAPSULE_M: f32 = 0.30;
+        let mut w = World::new();
+        let t = w.spawn_empty().id();
+        let c = OrbitCamera::over_shoulder(t);
+        assert!(
+            c.shoulder_offset > RAYON_CAPSULE_M * 2.0,
+            "decalage {} m : l'epaule reste dans le champ",
+            c.shoulder_offset
+        );
+    }
+
+    #[test]
+    fn la_camera_d_epaule_est_proche_et_le_reste() {
+        // Laisser reculer jusqu'a 18 m redonnerait la camera cinematique et
+        // annulerait le prereglage — la visee changerait sans que personne ne
+        // comprenne pourquoi.
+        let mut w = World::new();
+        let t = w.spawn_empty().id();
+        let c = OrbitCamera::over_shoulder(t);
+        let cine = OrbitCamera::new(t);
+        assert!(c.distance < cine.distance * 0.5, "pas assez proche");
+        assert!(
+            c.max_distance < cine.max_distance * 0.35,
+            "le zoom arriere redonne la camera cinematique ({} m)",
+            c.max_distance
+        );
+        assert!(c.min_distance < c.distance && c.distance < c.max_distance);
+    }
+
+    #[test]
+    fn elle_regarde_devant_pas_les_pieds() {
+        // Un pitch pique cadre le personnage entier — c'est cinematique et ca
+        // empeche de viser. Presque a l'horizontale, on voit ou on va.
+        let mut w = World::new();
+        let t = w.spawn_empty().id();
+        let c = OrbitCamera::over_shoulder(t);
+        assert!(
+            c.pitch.abs() < 0.25,
+            "pitch {} rad : la camera regarde le sol",
+            c.pitch
+        );
+    }
+
+    #[test]
+    fn la_hauteur_visee_tombe_bien_sur_l_epaule() {
+        // Le personnage fait 2,0 m, origine au CENTRE (donc pieds a -1,0). Son
+        // epaule est donc vers +0,55 depuis l'origine, soit 1,55 depuis les
+        // pieds. Viser le centre cadrerait le ventre.
+        let mut w = World::new();
+        let t = w.spawn_empty().id();
+        let c = OrbitCamera::over_shoulder(t);
+        assert!(
+            (1.3..=1.8).contains(&c.height_offset),
+            "hauteur de visee {} m hors de la bande epaule",
+            c.height_offset
+        );
+    }
 
     #[test]
     fn orbit_camera_defaults_reasonable() {

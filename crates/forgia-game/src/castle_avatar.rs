@@ -71,8 +71,38 @@ struct HallAvatarShown(Option<String>);
 /// Bascule le Hall en 3ᵉ personne. Idempotent et réessayé : le joueur est spawné
 /// par un autre plugin (`OnEnter(AppMode::InGame)`), donc il peut ne pas encore
 /// exister à l'entrée du mode.
+/// Les modes qui se jouent **à la 3ᵉ personne**.
+///
+/// Centralisé ici plutôt que répété sur chaque système : c'est exactement la
+/// mécanique par laquelle un mode finit à moitié câblé — la leçon que
+/// `fps_combat_mode` porte déjà côté FPS, et qui a coûté une session le
+/// 2026-08-14 quand l'Expédition s'est retrouvée sans contrôleur.
+fn mode_troisieme_personne(mode: Res<State<GameMode>>) -> bool {
+    matches!(mode.get(), GameMode::CastleHub | GameMode::Expedition)
+}
+
+/// La caméra que ce mode mérite.
+///
+/// Le Hall est un **lieu** : on s'y promène, on regarde le château, la caméra
+/// cinématique à 7 m cadre le personnage entier et c'est ce qu'on veut.
+///
+/// L'Expédition est un **parcours avec du combat** : on y vise. Une caméra
+/// centrée place le corps du joueur exactement devant ce qu'il regarde, donc
+/// elle est injouable — d'où le préréglage par-dessus l'épaule.
+fn camera_du_mode(mode: &GameMode, joueur: Entity) -> OrbitCamera {
+    match mode {
+        GameMode::Expedition => OrbitCamera::over_shoulder(joueur),
+        _ => {
+            let mut c = OrbitCamera::new(joueur);
+            c.height_offset = CAMERA_SHOULDER_OFFSET_M;
+            c
+        }
+    }
+}
+
 fn sys_setup_third_person(
     mut commands: Commands,
+    mode: Res<State<GameMode>>,
     q_player: Query<Entity, With<Player>>,
     q_existing: Query<(), With<HallOrbitCamera>>,
     mut q_fps: Query<&mut Camera, (With<FpsCamera>, Without<ViewmodelCamera>)>,
@@ -95,8 +125,8 @@ fn sys_setup_third_person(
         cam.is_active = false;
     }
 
-    let mut orbit = OrbitCamera::new(player);
-    orbit.height_offset = CAMERA_SHOULDER_OFFSET_M;
+    let orbit = camera_du_mode(mode.get(), player);
+    let epaule = orbit.shoulder_offset;
     commands.spawn((
         HallOrbitCamera,
         Camera3d::default(),
@@ -109,7 +139,10 @@ fn sys_setup_third_person(
         Name::new("HallOrbitCamera"),
     ));
     info!(
-        "[castle-avatar] Hall en 3ᵉ personne — FpsCamera et viewmodel coupés, visée à {CAMERA_SHOULDER_OFFSET_M:.2} m"
+        "[avatar-3p] {:?} en 3e personne — FpsCamera et viewmodel coupes, \
+         visee a {:.2} m, epaule {epaule:.2} m",
+        mode.get(),
+        CAMERA_SHOULDER_OFFSET_M
     );
 }
 
@@ -423,10 +456,11 @@ impl Plugin for CastleAvatarPlugin {
                     sys_drive_avatar_walk,
                 )
                     .chain()
-                    .run_if(in_state(GameMode::CastleHub))
+                    .run_if(mode_troisieme_personne)
                     .run_if(in_state(AppMode::InGame)),
             )
             .add_systems(OnExit(GameMode::CastleHub), sys_teardown_third_person)
+            .add_systems(OnExit(GameMode::Expedition), sys_teardown_third_person)
             .add_systems(
                 Update,
                 sys_write_castle_avatar_sensor.in_set(GameSet::Sensors),
