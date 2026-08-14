@@ -23,6 +23,24 @@ const MANIFESTE_GAMEPLAY: &str = "assets/models/environment/expedition/expeditio
 const MANIFESTE_CELLULES: &str =
     "assets/models/environment/expedition/vallon_stream_cells/vallon_stream_cells.toml";
 
+/// Le SOL collidable — un maillage unique, décimé, réservé à la physique.
+///
+/// # Pourquoi il ne se déduit pas des cellules
+///
+/// Les 48 cellules du décor portent le champ `render` : elles sont **du rendu
+/// pur**. Et les 943 cylindres du manifeste sont les *props* — troncs, rochers,
+/// murs. Aucun des deux n'est le terrain.
+///
+/// Sans ce fichier, le joueur apparaît au bon endroit et **traverse le monde** :
+/// relevé en jeu le 2026-08-14, spawn correct à (-124,0 ; 4,5 ; 10,0) et chute
+/// immédiate. Le symptôme — « je suis sous la map » — n'évoque pas un asset
+/// manquant, il évoque un mauvais spawn. C'est ce qui le rend coûteux.
+///
+/// Même montage que le Château (`castle_ground.rs`) : un `AsyncSceneCollider` en
+/// TriMesh sur une version décimée, invisible. Un seul collider au lieu des
+/// milliers que produirait le GLB complet.
+const SOL_COLLISION: &str = "models/environment/expedition/expedition_vallon_collision.glb#Scene0";
+
 /// Rayon de chargement des cellules (m).
 ///
 /// **Dérivé de l'emprise**, pas choisi : la carte fait 280 × 200 m, sa
@@ -82,19 +100,35 @@ pub struct ForgiaExpeditionPlugin;
 
 impl Plugin for ForgiaExpeditionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameMode::Expedition), setup_expedition)
-            .add_systems(OnExit(GameMode::Expedition), teardown_expedition)
-            .add_systems(
-                Update,
-                (place_player_when_ready, stream_expedition_cells)
-                    .chain()
-                    .run_if(in_state(GameMode::Expedition)),
-            );
+        app.add_systems(
+            OnEnter(GameMode::Expedition),
+            (setup_expedition, crate::lighting::setup_expedition_lighting).chain(),
+        )
+        .add_systems(
+            OnExit(GameMode::Expedition),
+            (
+                teardown_expedition,
+                crate::lighting::teardown_expedition_lighting,
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                place_player_when_ready,
+                stream_expedition_cells,
+                // Le cycle APRES le placement : la progression se lit sur la
+                // position REELLE du joueur, pas sur celle d'avant son spawn.
+                crate::lighting::update_expedition_cycle,
+                crate::lighting::update_expedition_ambiance,
+            )
+                .chain()
+                .run_if(in_state(GameMode::Expedition)),
+        );
     }
 }
 
 /// Charge les deux manifestes, pose les colliders, place le joueur.
-fn setup_expedition(mut commands: Commands) {
+fn setup_expedition(mut commands: Commands, asset_server: Res<AssetServer>) {
     // `def_io` et non `std::fs` : sur wasm un `std::fs` échoue EN SILENCE et le
     // jeu tournerait sur une carte vide sans qu'aucune erreur ne le dise.
     let gameplay = match forgia_core::def_io::read_def_str(MANIFESTE_GAMEPLAY)
@@ -118,6 +152,22 @@ fn setup_expedition(mut commands: Commands) {
         }
     };
 
+    // LE SOL. Posé en premier : sans lui tout le reste flotte, et le joueur
+    // traverse le monde (mesuré le 2026-08-14). Invisible — le décor visible
+    // vient des cellules ; celui-ci n'existe que pour la physique.
+    commands.spawn((
+        Name::new("ExpeditionGroundCollision"),
+        ExpeditionMarker,
+        SceneRoot(asset_server.load(SOL_COLLISION)),
+        Transform::IDENTITY,
+        RigidBody::Fixed,
+        AsyncSceneCollider {
+            shape: Some(ComputedColliderShape::TriMesh(default())),
+            ..default()
+        },
+        Visibility::Hidden,
+    ));
+
     // Les colliders : 943 cylindres, posés une fois. Ils ne streament PAS —
     // retirer une collision sous les pieds du joueur parce qu'il s'est éloigné
     // du décor visuel serait le pire échange possible (même choix que le
@@ -135,7 +185,7 @@ fn setup_expedition(mut commands: Commands) {
         poses += 1;
     }
 
-    let depart = gameplay.spawn_bevy();
+    let depart = gameplay.spawn_player_origin();
 
     // Le contrôle de conception qui ne peut pas vivre dans un test : un
     // campement dont la plus longue ligne dépasse la vision de ses ennemis leur
@@ -159,8 +209,8 @@ fn setup_expedition(mut commands: Commands) {
 
     let radii = StreamRadii::from_load(RAYON_CHARGEMENT_M, cells.cell_size_m);
     info!(
-        "[expedition] « {} » chargee — {} cellules de {:.0} m, {poses} colliders, \
-         chemin {:.1} m, spawn ({:.1}, {:.1}, {:.1}), rayons {:.0}/{:.0} m",
+        "[expedition] « {} » chargee — sol {SOL_COLLISION}, {} cellules de {:.0} m, \
+         {poses} props, chemin {:.1} m, spawn ({:.1}, {:.1}, {:.1}), rayons {:.0}/{:.0} m",
         gameplay.carte,
         cells.cells.len(),
         cells.cell_size_m,
@@ -199,7 +249,7 @@ fn place_player_when_ready(
     let Ok(mut xf) = q_player.single_mut() else {
         return; // pas encore né — on retentera la frame suivante
     };
-    let depart = active.gameplay.spawn_bevy();
+    let depart = active.gameplay.spawn_player_origin();
     let regard = active.gameplay.regard_bevy();
     *xf = Transform::from_translation(depart)
         .looking_at(Vec3::new(regard.x, depart.y, regard.y), Vec3::Y);

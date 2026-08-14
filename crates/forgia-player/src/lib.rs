@@ -243,6 +243,30 @@ struct SkyboxPending {
     handle: Handle<Image>,
 }
 
+// ─── La capsule du joueur ────────────────────────────────────────────────────
+//
+// 2026-08-14 — ces deux valeurs étaient un littéral dans `spawn_player`, donc
+// invisibles à qui doit POSER le joueur quelque part. Le mode Expédition a placé
+// le joueur à l'altitude du SOL en croyant poser ses pieds : l'origine du
+// `Transform` est le CENTRE de la capsule, donc les pieds se sont retrouvés un
+// mètre sous le terrain. Symptôme : `grounded: true`, 20 contacts KCC, et un
+// joueur qui ne peut plus bouger — un diagnostic qui n'évoque ni le spawn ni la
+// géométrie de la capsule.
+//
+// C'est la classe de défaut n°1 du projet : une grandeur écrite deux fois. Elles
+// sont donc publiques, et `PLAYER_FOOT_OFFSET_M` porte la dérivation une seule
+// fois pour tout le monde — jumelle exacte du `foot_offset_m` des bots.
+
+/// Demi-hauteur cylindrique de la capsule (m), hors hémisphères.
+pub const PLAYER_CAPSULE_HALF_HEIGHT_M: f32 = 0.7;
+/// Rayon de la capsule (m).
+pub const PLAYER_CAPSULE_RADIUS_M: f32 = 0.3;
+/// Distance des PIEDS au centre du `Transform` (m) — donc 1,0 m ici.
+///
+/// Poser un joueur sur un sol d'altitude `y` demande `y + PLAYER_FOOT_OFFSET_M`,
+/// jamais `y`. Confondre les deux l'enterre de la moitié de sa capsule.
+pub const PLAYER_FOOT_OFFSET_M: f32 = PLAYER_CAPSULE_HALF_HEIGHT_M + PLAYER_CAPSULE_RADIUS_M;
+
 /// Player marker — entité joueur principale.
 ///
 /// Story-461 (Vague 3 Bevy 0.18 idioms) : `#[require(Transform, Visibility)]`
@@ -381,7 +405,7 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         Transform::from_xyz(0.0, 2.0, 0.0),
         // Visibility::default() supprimé — fourni par #[require(Visibility)] sur Player.
         RigidBody::KinematicPositionBased,
-        Collider::capsule_y(0.7, 0.3),
+        Collider::capsule_y(PLAYER_CAPSULE_HALF_HEIGHT_M, PLAYER_CAPSULE_RADIUS_M),
         // Phase I : Player health + BotTarget marker pour les enemies arena.
         DamageHealth::new(100.0),
         Mortal,

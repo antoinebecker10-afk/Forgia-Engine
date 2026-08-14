@@ -14,8 +14,12 @@
 //! Le second par [`manifest`], qui porte **la seule conversion de repère du
 //! projet** — cf. sa documentation pour la raison.
 
+pub mod cycle;
+pub mod lighting;
 pub mod manifest;
 pub mod plugin;
 
+pub use cycle::{CycleConfig, EtatCycle};
+pub use lighting::CycleState;
 pub use manifest::{ExpeditionManifest, ExpeditionManifestError};
 pub use plugin::{ActiveExpedition, ExpeditionMarker, ForgiaExpeditionPlugin};

@@ -179,10 +179,41 @@ impl ExpeditionManifest {
         Ok(m)
     }
 
-    /// Position de départ du joueur, **en repère Bevy**.
+    /// Position de départ **au SOL**, en repère Bevy — l'altitude de la dalle,
+    /// pas celle du joueur. Voir [`Self::spawn_player_origin`].
     #[must_use]
     pub fn spawn_bevy(&self) -> Vec3 {
         blender_to_bevy(self.spawn.xyz)
+    }
+
+    /// Où poser l'ORIGINE du `Transform` du joueur pour que ses pieds reposent
+    /// sur la dalle de départ.
+    ///
+    /// # Le défaut que cette fonction existe pour empêcher
+    ///
+    /// Mesuré en jeu le 2026-08-14 : le joueur posé directement à `spawn_bevy()`
+    /// s'est retrouvé **un mètre sous le terrain**, parce que l'origine de son
+    /// `Transform` est le CENTRE de sa capsule, pas ses pieds. Symptôme relevé —
+    /// `grounded: true`, **20 contacts KCC**, et impossible de bouger. Ni le
+    /// « grounded » ni le nombre de contacts n'évoquent une erreur d'altitude :
+    /// on cherche un blocage de contrôleur, et on cherche longtemps.
+    ///
+    /// Deux hauteurs s'additionnent, et **aucune des deux ne se devine** :
+    ///
+    /// | terme | source | valeur |
+    /// |---|---|---|
+    /// | dessus de la dalle | `spawn.dalle_demi[2]`, le manifeste | 0,25 m |
+    /// | pieds → centre de capsule | `PLAYER_FOOT_OFFSET_M`, `forgia-player` | 1,00 m |
+    ///
+    /// La seconde était un littéral enfoui dans `spawn_player` ; elle est
+    /// désormais publique, pour que personne n'ait à la recopier.
+    #[must_use]
+    pub fn spawn_player_origin(&self) -> Vec3 {
+        let sol = self.spawn_bevy();
+        // `dalle_demi` est en repère Blender : son 3e terme est la demi-épaisseur
+        // verticale, qui devient bien une hauteur en Bevy.
+        let dessus_dalle = self.spawn.dalle_demi[2];
+        sol + Vec3::Y * (dessus_dalle + forgia_player::PLAYER_FOOT_OFFSET_M)
     }
 
     /// Vers où il regarde au départ, **en repère Bevy**.
@@ -325,6 +356,31 @@ mod tests {
             (l - 358.7).abs() < 2.0,
             "chemin recalcule a {l:.1} m, Blender annonce 358,7"
         );
+    }
+
+    #[test]
+    fn le_joueur_se_pose_sur_la_dalle_et_pas_dedans() {
+        // LE test du defaut du 2026-08-14. L'origine du Transform du joueur est
+        // le CENTRE de sa capsule : le poser a l'altitude du sol l'enterre d'un
+        // metre. Releve en jeu : grounded true, 20 contacts KCC, immobile.
+        let m = vallon();
+        let sol = m.spawn_bevy();
+        let joueur = m.spawn_player_origin();
+        let ecart = joueur.y - sol.y;
+        let attendu = m.spawn.dalle_demi[2] + forgia_player::PLAYER_FOOT_OFFSET_M;
+        assert!(
+            (ecart - attendu).abs() < 1.0e-4,
+            "ecart {ecart:.3} m au lieu de {attendu:.3} (dalle + demi-capsule)"
+        );
+        // Et surtout : les PIEDS doivent etre AU-DESSUS du sol, jamais dedans.
+        let pieds = joueur.y - forgia_player::PLAYER_FOOT_OFFSET_M;
+        assert!(
+            pieds > sol.y,
+            "pieds a {pieds:.2} m pour un sol a {:.2} : le joueur est enterre",
+            sol.y
+        );
+        // Le XZ ne bouge pas — on ne corrige qu'une altitude.
+        assert!((joueur.x - sol.x).abs() < 1.0e-6 && (joueur.z - sol.z).abs() < 1.0e-6);
     }
 
     #[test]

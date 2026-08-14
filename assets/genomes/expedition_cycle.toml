@@ -1,0 +1,89 @@
+# Forgia V2 — Le cycle jour/nuit d'une expédition
+#
+# « Plus je me rapproche du village, plus il fait nuit, et à la fin on voit
+# encore un peu mais c'est sombre. Pas mode horreur. »
+#
+# ⚠️ LA NUIT TOMBE AVEC LA DISTANCE, PAS AVEC LE TEMPS. C'est la marche qui fait
+# descendre le soleil : au départ il est haut, au village il est sous l'horizon.
+# Un joueur qui traîne ne se retrouve donc pas dans le noir sur place, et un
+# joueur rapide voit quand même la nuit tomber — le trajet EST le cycle.
+#
+# La progression se lit sur le chemin autoré (91 points, 359,8 m) : on projette
+# le joueur dessus et on prend la fraction d'abscisse curviligne parcourue.
+# Aucune horloge, donc aucune dérive entre deux parties.
+
+[cycle]
+
+# ── Le soleil ────────────────────────────────────────────────────────────────
+
+# Élévation du soleil au DÉPART (degrés au-dessus de l'horizon).
+#
+# 32° = milieu d'après-midi. Assez haut pour que le relief se lise et que les
+# ombres portent sans écraser, assez bas pour qu'on sente déjà la journée
+# décliner — on part en fin de journée, on n'arrive pas à midi.
+soleil_depart_deg = 32.0
+
+# Élévation à l'ARRIVÉE (négatif = sous l'horizon).
+#
+# −8° est le crépuscule civil : le soleil est couché mais le ciel diffuse encore.
+# C'est exactement « on voit encore un peu mais c'est sombre ». Descendre à −18°
+# (nuit astronomique) donnerait le noir total, donc le mode horreur qu'on ne veut
+# pas.
+soleil_arrivee_deg = -8.0
+
+# Azimut du soleil au départ et à l'arrivée (degrés).
+#
+# Il tourne de 48° pendant la marche : c'est ce qui fait BOUGER les ombres.
+# Sans rotation d'azimut le soleil descendrait tout droit, ce qui ne se lit pas
+# comme un coucher — les ombres s'allongeraient sans jamais pivoter.
+#
+# Le chemin va d'ouest en est ; le soleil part donc dans le dos du joueur et
+# finit devant lui, ce qui met le village à contre-jour au moment où on l'atteint.
+soleil_azimut_depart_deg = 250.0
+soleil_azimut_arrivee_deg = 298.0
+
+# Puissance du soleil (lux) au départ et à l'arrivée.
+#
+# 11 000 lux = fin d'après-midi couvert. À l'arrivée il ne reste presque rien du
+# direct : la lumière vient du ciel et des feux du village.
+soleil_lux_depart = 11000.0
+soleil_lux_arrivee = 250.0
+
+# ── La lumière du ciel ───────────────────────────────────────────────────────
+
+# Ambiante (lux) au départ et à l'arrivée.
+#
+# ★ `ambiante_arrivee_lux` EST LE PLANCHER DE LISIBILITÉ. C'est lui qui garantit
+# « on voit encore un peu ». Le mettre à 0 donnerait le noir absolu dès que le
+# soleil passe sous l'horizon — le mode horreur écarté explicitement.
+#
+# 320 lux ≈ un extérieur sous pleine lune, mais rehaussé : on distingue le relief
+# et la silhouette d'un ennemi à une vingtaine de mètres, on ne lit pas une carte.
+ambiante_depart_lux = 900.0
+ambiante_arrivee_lux = 320.0
+
+# ── Le brouillard ────────────────────────────────────────────────────────────
+#
+# Il se resserre avec la nuit : c'est lui qui fait sentir l'enfermement sans
+# baisser la lumière. Jouer sur la portée plutôt que sur la luminosité est ce qui
+# distingue « le soir tombe » de « on n'y voit plus rien ».
+
+# Début et fin du fondu (m) au départ de l'expédition.
+brouillard_debut_depart_m = 90.0
+brouillard_fin_depart_m = 420.0
+# Et à l'arrivée — deux fois plus serré.
+brouillard_debut_arrivee_m = 35.0
+brouillard_fin_arrivee_m = 180.0
+
+# ── La courbe ────────────────────────────────────────────────────────────────
+
+# Exposant appliqué à la progression avant interpolation.
+#
+# ★ 1,8 : la nuit tombe TARD et VITE, comme un vrai crépuscule. À 1,0 (linéaire)
+# la lumière baisse dès le premier pas, ce qui se lit comme un fondu d'écran
+# plutôt que comme un coucher de soleil. Au-dessus de ~3 la bascule devient
+# brutale et le joueur la subit au lieu de la voir venir.
+#
+# Concrètement à 1,8 : à mi-chemin il reste 71 % de la lumière du départ, et
+# c'est sur le dernier tiers du trajet que la nuit s'installe.
+courbe_exposant = 1.8
