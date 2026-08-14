@@ -66,6 +66,27 @@ pub struct OrbitCamera {
     /// 0 = orbite cinématique (le Hall, le RPG, CyberCity gardent ce défaut et
     /// ne changent donc pas de comportement).
     pub shoulder_offset: f32,
+    /// La souris est-elle **capturée en permanence** (visée type FPS/Fortnite) ?
+    ///
+    /// # Le défaut que ce drapeau corrige — mesuré en jeu le 2026-08-14
+    ///
+    /// Deux systèmes se contredisaient dans l'Expédition, et le commentaire de
+    /// `mouse_look` avait décrit le piège sans prévoir ce cas :
+    ///
+    /// - `mouse_look` (forgia-player) ne prend la branche « 3ᵉ personne, tourne
+    ///   seulement si RMB tenu » que pour `Rpg | CastleHub`. L'Expédition tombait
+    ///   donc dans la branche FPS : **la souris tournait le personnage en
+    ///   permanence** ;
+    /// - `orbit_cursor_grab` (ici) relâchait le curseur dès qu'aucun bouton
+    ///   n'était tenu.
+    ///
+    /// Résultat rapporté : « la souris ne suit pas le réticule ». Un curseur
+    /// libre se promenait à l'écran pendant que le personnage pivotait, et le
+    /// réticule au centre ne désignait plus rien.
+    ///
+    /// `false` = commandes WoW (curseur libre, clic maintenu pour regarder) —
+    /// ce que le Hall, le RPG et CyberCity gardent.
+    pub mouselook_permanent: bool,
 }
 
 impl OrbitCamera {
@@ -88,6 +109,7 @@ impl OrbitCamera {
             // 0 = orbite centrée. Le Hall, le RPG et CyberCity gardent ce
             // comportement : ajouter le champ ne change rien pour eux.
             shoulder_offset: 0.0,
+            mouselook_permanent: false,
         }
     }
 
@@ -120,6 +142,11 @@ impl OrbitCamera {
             max_pitch: 0.7,
             height_offset: 1.55,
             shoulder_offset: 0.65,
+            // Le réticule est au centre de l'écran : pour qu'il désigne quelque
+            // chose, la souris doit VISER, donc être capturée. Sans ça le
+            // décalage d'épaule ne sert à rien — on dégage l'axe de visée d'un
+            // joueur qui ne peut pas viser.
+            mouselook_permanent: true,
             ..Self::new(target)
         }
     }
@@ -152,6 +179,7 @@ impl Plugin for ForgiaCameraOrbitPlugin {
 /// (PR #19668) — query directe sur PrimaryWindow.
 fn orbit_cursor_grab(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
+    q_cam: Query<&OrbitCamera>,
     mut q: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     let Ok(mut cursor) = q.single_mut() else {
@@ -159,12 +187,15 @@ fn orbit_cursor_grab(
     };
     let any_held =
         mouse_buttons.pressed(MouseButton::Left) || mouse_buttons.pressed(MouseButton::Right);
-    let desired_grab = if any_held {
+    // En visée permanente le curseur ne se relâche JAMAIS : c'est ce qui fait que
+    // le réticule central désigne enfin quelque chose.
+    let permanent = q_cam.iter().any(|c| c.mouselook_permanent);
+    let desired_grab = if any_held || permanent {
         CursorGrabMode::Locked
     } else {
         CursorGrabMode::None
     };
-    let desired_visible = !any_held;
+    let desired_visible = !(any_held || permanent);
     if cursor.grab_mode != desired_grab {
         cursor.grab_mode = desired_grab;
     }
@@ -209,14 +240,20 @@ fn orbit_input(
         return;
     }
     for mut cam in &mut q {
-        // Pitch : seulement si un bouton souris est tenu (pattern WoW).
-        if any_held && delta_y.abs() > f32::EPSILON {
+        // Pitch : sur bouton tenu (WoW), ou en permanence en visée FPS —
+        // sinon on ne pourrait pas viser haut ou bas.
+        if (any_held || cam.mouselook_permanent) && delta_y.abs() > f32::EPSILON {
             cam.pitch =
                 (cam.pitch - delta_y * cam.pitch_sensitivity).clamp(cam.min_pitch, cam.max_pitch);
         }
         // RMB tenu : la cam suit le yaw du player → reset yaw_offset à 0
         // smooth-lerp pour éviter snap brutal au passage LMB → RMB.
-        if rmb_held {
+        // En visée permanente, c'est `mouse_look` qui tourne le PERSONNAGE et
+        // la caméra le suit : un `yaw_offset` non nul ferait diverger les deux et
+        // le réticule cesserait de désigner ce que vise le personnage.
+        if cam.mouselook_permanent {
+            cam.yaw_offset = 0.0;
+        } else if rmb_held {
             cam.yaw_offset *= 0.85;
             if cam.yaw_offset.abs() < 0.001 {
                 cam.yaw_offset = 0.0;
@@ -402,6 +439,29 @@ mod tests {
         let mut w = World::new();
         let t = w.spawn_empty().id();
         assert_eq!(OrbitCamera::new(t).shoulder_offset, 0.0);
+    }
+
+    #[test]
+    fn la_visee_permanente_va_de_pair_avec_le_decalage_d_epaule() {
+        // Les deux ne se separent pas. Rapporte en jeu le 2026-08-14 : « la
+        // souris ne suit pas le reticule ». Le curseur restait libre pendant que
+        // `mouse_look` tournait deja le personnage — donc un curseur qui se
+        // promene, un perso qui pivote, et un reticule central qui ne designe
+        // rien.
+        //
+        // Sans visee permanente, le decalage d'epaule ne sert a RIEN : on degage
+        // l'axe de visee d'un joueur qui ne peut pas viser.
+        let mut w = World::new();
+        let t = w.spawn_empty().id();
+        let epaule = OrbitCamera::over_shoulder(t);
+        assert!(epaule.mouselook_permanent, "l'epaule sans la visee ne sert a rien");
+        assert!(epaule.shoulder_offset > 0.0);
+
+        // Et l'inverse : l'orbite cinematique garde les commandes WoW, sinon on
+        // changerait celles du Hall, du RPG et de CyberCity sans l'avoir demande.
+        let cine = OrbitCamera::new(t);
+        assert!(!cine.mouselook_permanent);
+        assert_eq!(cine.shoulder_offset, 0.0);
     }
 
     #[test]

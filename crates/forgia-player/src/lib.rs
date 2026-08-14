@@ -770,24 +770,84 @@ fn track_player_speed(
     *last = Some(p);
 }
 
-/// Story-453 floor safety net (2026-05-18) — si le player KinematicCharacterController
-/// rate son snap_to_ground et tombe sous Y=-1.0 (largement sous le sol Y=0), on
-/// teleporte à Y=2.0 sur le même XZ pour récupérer. Cosmétique-debug — vise à
-/// révéler le bug sous-jacent via logs sans crasher la session.
+/// Plancher sous lequel un joueur est considéré comme TOMBÉ (m), et altitude de
+/// rattrapage.
+///
+/// # Ces deux nombres supposaient que le sol est à Y=0 — et ça a mordu
+///
+/// Version d'origine (story-453) : « tombe sous Y=−1,0 (largement sous le sol
+/// Y=0) → téléporte à Y=2,0 ». Vrai dans l'arène, dont le sol EST à zéro.
+///
+/// Faux dès qu'une carte a du relief. Mesuré au Vallon le 2026-08-14 : le
+/// terrain descend à **−5,94 m** au lit de la rivière. Marcher vers la rivière
+/// passait donc sous le seuil **en marchant sur un sol solide**, et déclenchait
+/// une téléportation à Y=2,0 — au-dessus du terrain, donc chute, donc nouveau
+/// déclenchement. **Sept fois en deux secondes**, relevé dans le log.
+///
+/// Le symptôme — « je retombe sans arrêt » — accuse la collision, alors que le
+/// maillage était juste : 280 × 200 m, aligné, même repère. C'est le FILET qui
+/// était mal réglé.
+///
+/// Les bornes sont désormais très en dessous de tout terrain jouable : la carte
+/// la plus basse du projet descend à −5,94, le Château à −59,5. Le filet ne doit
+/// attraper qu'une VRAIE chute hors du monde, jamais une descente.
+const CHUTE_PLANCHER_M: f32 = -200.0;
+/// Où rattraper. Haut exprès : mieux vaut retomber depuis le ciel sur du sol que
+/// se réveiller enterré dans une colline.
+const CHUTE_RATTRAPAGE_M: f32 = 60.0;
+
+/// Story-453 floor safety net — attrape un joueur qui a quitté le monde.
+///
+/// **Cosmétique-debug** : il révèle le bug sous-jacent par le log au lieu de
+/// crasher la session. Il ne doit donc jamais se déclencher en jeu normal — s'il
+/// tourne en boucle, c'est lui le bug, pas le terrain (cf. le Vallon, 2026-08-14).
 fn player_floor_safety_net(mut q: Query<&mut Transform, With<Player>>) {
     let Ok(mut tf) = q.single_mut() else { return };
-    if tf.translation.y < -1.0 {
+    if tf.translation.y < CHUTE_PLANCHER_M {
         warn!(
-            "[player-safety-net] Player sous le sol (Y={:.2}) — teleport Y=2.0",
+            "[player-safety-net] Player HORS DU MONDE (Y={:.2} < {CHUTE_PLANCHER_M}) — \
+             teleport Y={CHUTE_RATTRAPAGE_M}. Si ce message se repete, c'est une carte \
+             sans sol, pas une chute.",
             tf.translation.y
         );
-        tf.translation.y = 2.0;
+        tf.translation.y = CHUTE_RATTRAPAGE_M;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn le_filet_de_chute_ne_se_declenche_pas_sur_du_relief() {
+        // LE defaut du 2026-08-14. Le seuil valait -1,0 m « largement sous le sol
+        // Y=0 » — vrai dans l'arene, faux des qu'une carte a du relief.
+        //
+        // Altitudes MINIMALES mesurees des cartes du projet. Aucune ne doit
+        // declencher le filet : ce sont des sols solides sur lesquels on marche.
+        for (carte, sol_min) in [
+            ("Vallon (lit de la riviere)", -5.94_f32),
+            ("Chateau (falaises)", -59.5),
+            ("arene", 0.0),
+        ] {
+            assert!(
+                sol_min > CHUTE_PLANCHER_M,
+                "{carte} : son sol a {sol_min} m declencherait le filet ({CHUTE_PLANCHER_M} m)"
+            );
+        }
+    }
+
+    #[test]
+    fn le_rattrapage_remet_au_dessus_du_plus_haut_terrain() {
+        // Rattraper trop bas reveillerait le joueur ENTERRE dans une colline —
+        // et il retomberait, en boucle, exactement comme au Vallon. Le point le
+        // plus haut mesure du Vallon est a 40,53 m.
+        const SOMMET_VALLON_M: f32 = 40.53;
+        assert!(
+            CHUTE_RATTRAPAGE_M > SOMMET_VALLON_M,
+            "rattrapage a {CHUTE_RATTRAPAGE_M} m sous le sommet du Vallon ({SOMMET_VALLON_M} m)"
+        );
+    }
 
     #[test]
     fn camera_mode_default_first_person() {

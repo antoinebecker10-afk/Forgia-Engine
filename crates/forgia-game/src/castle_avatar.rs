@@ -379,7 +379,7 @@ fn sys_write_castle_avatar_sensor(
     let (severity, next_step) = if !mounted {
         (
             "info",
-            "avatar non monte — hors Hall ou joueur pas encore spawne",
+            "avatar non monte — hors mode 3e personne (Hall/Expedition) ou joueur pas encore spawne",
         )
     } else if mesh_count == 0 {
         (
