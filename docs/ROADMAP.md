@@ -154,11 +154,38 @@ Listé pour ne pas le redécouvrir à trois semaines du launch — **aucun de ce
   reprise coûte cher — c'est une dette qui grossit toute seule.
 - **Rapport de crash** — le capteur `crash` existe côté dev ; rien ne remonte depuis la machine d'un
   joueur.
-- ⚠️ **Bevy 0.19 — le report TIENT** (revérifié 2026-08-12) : `bevy_rapier3d` n'a **aucune release
-  depuis 0.35.0**, et `rapier3d` est passé d'alpha à **0.35.0-beta.0** — toujours une pré-release.
+- ⚠️ **Bevy 0.19 — le report tient, mais les motifs écrits ici étaient faux.** Corrigé le
+  2026-08-12 au soir, contre crates.io et le CHANGELOG de dimforge — la version précédente de ce
+  paragraphe affirmait trois choses inexactes, dont une qui masquait une mise à jour disponible.
+
+  | Ce qui était écrit | Ce qui est vrai |
+  | --- | --- |
+  | « aucune release depuis 0.35.0 » | **0.36.0 est sortie le 08/08**, ciblant `bevy ^0.19` |
+  | raisonnement sur `bevy_rapier3d` **0.35.0** | **Forgia est sur 0.33.0** (`rapier3d` 0.31.0 verrouillé) — on surveillait une version que le projet n'utilise pas |
+  | « `rapier3d` en **0.35.0-beta.0** » | c'est **`0.35.0-glamx0.2`** : une variante épinglée sur `glam`, plus une alpha (0.35.0 épinglait `0.33.0-alpha`) |
+
+  **Conséquence, et c'est la seule qui compte : il existe une mise à jour DANS la ligne bevy 0.18
+  actuelle.** `bevy_rapier3d` **0.34.0** (14/05) cible `bevy ^0.18.1` + `rapier3d ^0.32.0` —
+  **toute la chaîne en stable ordinaire, aucune pré-release**. Elle porte un correctif nommé :
+  *« Fix context swapping failing when physics runs in a schedule other than `PostUpdate` : a stray
+  run of `sync_removals` was removing handles that had just been added. »* Or
+  `forgia-game/src/lib.rs:172` monte Rapier avec **`.in_fixed_schedule()`**, donc hors `PostUpdate`,
+  et `forgia2_physics.json` est **en alerte** (« Physics world empty »). Trois points concordent —
+  **hypothèse haute confiance, non prouvée** : seuls un `cargo check` et une run la tranchent.
+
+  Coût mesuré sur le code, pas estimé : **0** `linvel`/`angvel`, **0** `Velocity`, **0** `nalgebra`,
+  **0** `Isometry` de Rapier (les 10 occurrences sont `bevy::math::Isometry3d`, l'API gizmo de Bevy).
+  Les ruptures annoncées par 0.34 tombent presque toutes hors de la surface réellement utilisée
+  (`Sensor` 122, `Collider` 105, `RigidBody` 81, `QueryFilter` 28, `KinematicCharacterController` 18).
+
+  **Ordre recommandé** : `0.33 → 0.34` d'abord, en restant sur bevy 0.18.1. La seule rupture de
+  **0.35.0 est « Updated to Bevy 0.19 »** — donc toute la dette d'API rapier est concentrée dans
+  0.34, et l'absorber maintenant rend le futur saut vers 0.19 quasi gratuit côté physique. Faire les
+  deux d'un bloc reviendrait à mélanger deux migrations dans une seule passe de débogage.
+
   La condition #2 de [`migration/bevy-019-blockers.md`](migration/bevy-019-blockers.md) vise un cœur
-  **stable**. *Sa checklist dit littéralement « n'est plus `-alpha` », ce qu'une beta satisfait — à
-  resserrer en « stable », sinon une session future donnera le feu vert sur une beta.*
+  **stable**. *Sa checklist dit littéralement « n'est plus `-alpha` » — ce que `0.35.0-glamx0.2`
+  satisfait déjà. À resserrer en « stable », sinon une session future donnera le feu vert dessus.*
 
 ### Dette technique
 
@@ -170,7 +197,8 @@ Listé pour ne pas le redécouvrir à trois semaines du launch — **aucun de ce
 - Calibration HDR / bloom (checklist prête dans story-647) — débloque le glow émissif.
 - Split des hotspots : `element_vfx.rs`, `weapon_vfx/mod.rs`, `status_vfx.rs`.
 - LOD particules si les FPS chutent en combat dense ; 3 warnings clippy `live` (`status_vfx.rs`).
-- **Bevy 0.19** : migration **possible** (2026-08-05 : `bevy_rapier3d` 0.35.0 cible ^0.19, hanabi/leafwing/scripting ✅) mais **volontairement différée** — cœur `rapier3d` en **alpha** + `bevy_water` dormant. Fenêtre & conditions : [`migration/bevy-019-blockers.md`](migration/bevy-019-blockers.md). **Ne rien bloquer dessus** ; plan B assumé = shipper sur 0.18.1.
+- **`bevy_rapier3d` 0.33 → 0.34** (⬆ remonté en tête de dette le 2026-08-12) : reste sur `bevy ^0.18.1`, passe `rapier3d` 0.31 → 0.32, **toute la chaîne en stable**. Porte le correctif « physics hors `PostUpdate` » qui vise la configuration exacte de Forgia (`.in_fixed_schedule()`), alors que le capteur `physics` est en alerte. Coût mesuré ≈ nul sur la surface utilisée. ⚠️ `Cargo.toml`/`Cargo.lock` sont partagés — **coordonner avec l'autre terminal** avant de bumper. Détail : § Préparation à la publication.
+- **Bevy 0.19** : migration **possible** mais **volontairement différée** — rien de ce qu'elle apporte (scènes BSN, ombres de contact) n'est sur le chemin critique de la v1, et les `Resource` y deviennent des composants d'entités singleton, ce qui touche tout le code qui en manipule. `bevy_water` dormant reste à vérifier. Fenêtre & conditions : [`migration/bevy-019-blockers.md`](migration/bevy-019-blockers.md). **Ne rien bloquer dessus** ; plan B assumé = shipper sur 0.18.1. *Faire 0.34 d'abord (ci-dessus) rend ce saut quasi gratuit côté physique.*
 - **Perf arène** (>60 fps, pas urgent — jeu à la cible) : profilée `cpu_bound` = **scène statique** (13k entités / 2254 meshes visibles), **PAS** les bots ni les VFX → seul levier = réduire la densité d'entités/meshes (merge géométrie statique). L'audit avait misé sur l'IA des bots : **invalidé par le profiling**. Détail : story-643 + `docs/audit/audit-2026-07-01-perfs-jeu-vs-industrie.md`. Outillé : `forgia2_perf.json` expose `bound_hint`/`render_cpu_ratio`.
 - Nettoyage audio : le `set_volume` de canal (forgia-audio) est redondant depuis le fix volume instance-level (bevy_kira_audio 0.25, commit `a8b8d42`).
 - **Trade-offs boons** (R3.4 déféré) : nécessite un schéma multi-effets (`effects: Vec<...>` dans BoonDef) — story dédiée. L'empilement multiplicatif + tirage pondéré par rareté sont FAITS (story-645).

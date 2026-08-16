@@ -174,6 +174,38 @@ justifiée par le lore). Qualité = noblesse du matériau (le légendaire est fo
 
 ## 6. Structure
 
+### L'écran d'accueil — un menu de préparation, pas un lieu (décidé 2026-08-13)
+
+Le Hall comme **lieu** habité (piédestaux, refuge des créatures) part en **post-v1**, avec l'arène 5v5.
+L'accueil de la v1 assume d'être un menu : on s'y prépare, on part vite.
+
+```
+   [ EXPÉDITIONS ]   [ ARÈNES ]   [ 5v5 · prochainement ]
+
+   Inventaire · Armes · Talents · Codex · Forgeron
+                                    [ Château de Forgia · prochainement ]
+```
+
+- **Trois modes visibles d'emblée**, dont un verrouillé. Le joueur voit la forme du jeu au premier
+  écran, sans naviguer.
+- **Le bouton « Château de Forgia »** est la porte du futur Hall. Verrouillé, mais présent : il dit
+  qu'il existe un ailleurs.
+- **Le mode choisi est celui qui se lance.** Aujourd'hui le stage est tiré au `run_seed` sans lire
+  `SelectedChapter` — le menu promet une destination et en livre une autre (bug playtest 2026-08-09).
+- **Le Sac** (page existante) accueille ce que les mobs lâchent, ressources d'arène comprises.
+- **Missions = la boussole de puissance**, pas des défis quotidiens : elle dit où en est la puissance
+  et ce qui manque pour le gate suivant. Elle **lit** le capteur `forgia2_power.json`, qui décompose
+  déjà `boons / perm / mastery / trempe / equip` — elle ne calcule rien.
+  ⚠ **Une mission ne donne aucune récompense** : sinon elle devient une troisième source de monnaie et
+  perce l'étanchéité du §7. Sa récompense est la puissance gagnée et le gate ouvert.
+  ⚠ **Au plus 3 objectifs affichés** — une liste de dix transforme un roguelite en corvée.
+- **Retiré de la nav** : `Succès` (aucun haut fait suivi). Le code reste, seul `in_nav` passe à `false`,
+  comme `ArenaTest` le 2026-07-30. **Marketplace** : laissé de côté, décision reportée.
+- **Le compagnon n'a aucune surface d'accueil** — ni présence, ni état, ni sélection. Manque ouvert (E1).
+
+⚠ **Ce que ces deux « prochainement » engagent** : afficher du contenu verrouillé sur l'écran
+d'accueil est une promesse publique. Elle se tient, ou elle se retire — elle ne se laisse pas pourrir.
+
 ### Mode 1 — Les Expéditions
 
 - **Mondes procéduraux thématiques** sur `forgia-terrain`. Les 6 ambiances existantes
@@ -275,21 +307,71 @@ stuff ← Expéditions · niveau d'armes ← Forge + Abîme · niveau joueur ←
   **en alerte** (« la puissance réelle dépasse le modèle du mur », 2026-08-09) — la refonte E3
   absorbe ce recalibrage au lieu de le patcher isolément.
 
-### Le cap de trempe (cyclique, pas terminal)
+### L'arbre de talents (remplace la trempe — décidé 2026-08-13)
 
-`weapon_level_cap_universe_<n>` : l'univers courant borne le niveau d'arme. Débloquer l'univers
-suivant relève le cap → l'Abîme s'éteint et se **rallume** à chaque étage de l'ascension.
+> **La trempe devient un arbre de talents.** Même rôle — spécialiser une arme — mais on n'achète plus
+> un *niveau*, on achète un **choix**.
+
+**Règle dure : un nœud ne vend jamais un pourcentage.** Chaque nœud est une technique ou un
+comportement (« la foudre chaîne sur 3 cibles », « le rechargement actif accélère le tir suivant »),
+jamais un `+12 % dégâts`.
+
+*Pourquoi cette règle existe.* L'Enclume des Âmes vendait exactement quatre stats — `max_hp`,
+`damage`, `armor`, `gold` — et le capteur `power` est **en alerte** : « la puissance réelle dépasse
+largement le modèle du mur ». C'est le motif que le consensus 2026 désigne comme ce qui tue le genre :
+la réussite devient dépendante du farm, pas de l'habileté. Un arbre chiffré reproduirait le défaut
+en le renommant.
+
+**L'arbre REMPLACE l'Enclume**, il ne s'y ajoute pas : sinon Forgia porte quatre systèmes de
+progression (boons, Enclume, arbre, équipement) dont deux font le même travail.
+
+⚠ **Le piège à éviter dans l'arbre lui-même** : si les avantages *joueur* et les techniques *d'arme*
+partagent la même monnaie, le joueur prendra toujours les avantages joueur d'abord — ils s'appliquent
+partout, tout le temps. Soit deux monnaies, soit les avantages joueur coûtent une ressource
+**spécifique à l'arme**, ce qui force à choisir sa spécialisation pour y accéder.
+
+**Socle déjà construit** : `meta_shop.rs` porte un niveau de maîtrise **par arme** (`+1` par run),
+son plafond, et le clamp de « niveau effectif » qui évite d'afficher « Niveau 13/6 » sur une vieille
+save. L'arbre convertit cet acquis, il ne repart pas de zéro.
+
+### Le cap par univers (cyclique, pas terminal)
+
+`weapon_level_cap_universe_<n>` : l'univers courant borne la spécialisation d'arme. Débloquer
+l'univers suivant relève le cap → l'Abîme s'éteint et se **rallume** à chaque étage de l'ascension.
+
+**C'est ce cap qui empêche l'Abîme de devenir la ferme optimale.** Sans lui, le couloir donnerait la
+même chose que l'Expédition en plus court et plus sûr — c'est le risque « les modes se cannibalisent »
+nommé au §13. Au cap, l'Abîme cesse de lâcher la ressource concernée : *falsifiable au grep des tables*.
 
 ### Rattrapage duo (pour le futur coop humain)
 
 Décision ouverte D3 (§14) — options : l'hôte porte son binôme (loot réduit pour le porté), ou drop
 boosté dans les univers sous sa puissance. À trancher avant E9 (netcode), pas avant.
 
-### Économie
+### Économie — deux monnaies étanches (décidé 2026-08-13)
 
-Existant : Éclats (monnaie), méta « L'Enclume des Âmes », Marketplace cosmétique. Neuf : **matériaux
-de forge** par univers (gene `forge_material_drop_<universe>`), consommés par la trempe. Les
-ultra-rares et reliques restent hors économie marchande (P4/P5).
+| Monnaie | Tombe où | Achète quoi |
+| --- | --- | --- |
+| **Ressources d'arène** (gene `abyss_resource_drop_<universe>`) | mobs de l'Abîme | **la spécialisation d'arme** — les nœuds de l'arbre, et rien d'autre |
+| **Matériaux d'expédition** (gene `forge_material_drop_<universe>`) | Expéditions | **les gates d'univers et l'équipement** |
+
+**Étanches par construction** : aucune ressource d'arène ne peut franchir un gate, aucun matériau
+d'expédition ne peut acheter un nœud d'arbre. C'est ce qui fait tenir le pilier P2 — chaque mode
+garde une raison d'exister, et le jalon se vérifie au grep des tables.
+
+*Précédent maison* : la séparation Âmes / **Éclats**, décidée le 2026-08-06 — « deux monnaies = deux
+lectures qui ne se brouillent pas ». Les Éclats (cosmétique) restent une troisième monnaie.
+
+⚠ **Sa justification écrite meurt avec l'Enclume.** Le code dit aujourd'hui « un cosmétique payé en
+Âmes est un rang d'Enclume non acheté » — faux dès que l'Enclume n'existe plus. La séparation reste
+juste, pour une **autre** raison, à réécrire : cosmétique et puissance ne partagent jamais un
+porte-monnaie, sinon acheter un chapeau coûte une technique.
+
+**Retiré** : « L'Enclume des Âmes » et ses quatre stats — remplacée par l'arbre (§ ci-dessus).
+Les ultra-rares et reliques restent hors économie marchande (P4/P5).
+
+**Décision ouverte D6** — les avantages *joueur* de l'arbre : monnaie séparée, ou ressource
+spécifique à l'arme ? Cf. le piège signalé plus haut. À trancher avant d'écrire les nœuds.
 
 ---
 
@@ -395,8 +477,8 @@ l'œil), thème du Hall = le foyer.
 | **E3 Puissance & gates** | formule, gates univers, scaling en bande, recalibrage `power_gain_per_round` | à créer | |
 | **E4 Loot & chasses** | tables qualité, Épargnés + traces, reliques, journal de collection | à créer | |
 | **E5 L'Oubli** | stades visuels, foyers, purge, propagation | à créer | |
-| **E6 Forge & trempe** | niveaux d'arme, caps par univers, XP par profondeur, matériaux | à créer | |
-| **E7 Hall des Épargnés** | piédestaux, refuge des créatures, trophées (éditeur existant story-665) | à créer | |
+| **E6 Arbre de talents** | *(ex « Forge & trempe », reprofilé 2026-08-13)* nœuds = techniques jamais chiffrées, remplace l'Enclume, cap par univers, ressources d'arène | socle partiel (`meta_shop.rs` : maîtrise par arme + plafond) | v1 |
+| **E7 Hall des Épargnés** | piédestaux, refuge des créatures, trophées (éditeur existant story-665) | à créer | **post-v1** — différé avec E10 le 2026-08-13 ; l'accueil v1 est un menu (§6) |
 | **E8 Narratif** | Livre (10 chapitres existants) recâblé sur l'arc l'Oubli, barks contextuels | à créer | |
 | **E9 Coop humain** | netcode duo, rattrapage (D3) | à créer | post-validation |
 | **E10 Arène 5v5** | MOBA en vue FPS (lanes verticales, jungle, sbires, tours, boutique), 10 slots humains/bots, déblocage niveau joueur | à créer | post-v1 — endgame (§6 Mode 3) |
@@ -463,6 +545,8 @@ dispersés (ruines/camps/tours), placement procédural de loot/coffres, quêtes 
   XP gardés. À valider manette en main.
 - **D3** — Mécanisme de rattrapage duo — à trancher avant E9 seulement.
 - **D4** — Noms définitifs FR/EN des univers 7+ et de leurs archétypes.
+- **D6** — Les avantages *joueur* de l'arbre de talents : monnaie séparée, ou ressource spécifique à
+  l'arme ? Sans réponse, ils écrasent les branches d'arme (cf. §7). À trancher avant d'écrire les nœuds.
 - **D5** — Carte plein écran en plus de la minimap permanente (§4 HUD duo) ? Se tranche manette en
   main, jamais depuis un tableau (`map-design-intention.md` §5.3).
 
