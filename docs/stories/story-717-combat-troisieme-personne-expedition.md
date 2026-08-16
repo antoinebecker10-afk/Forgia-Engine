@@ -102,6 +102,39 @@ Leçon à garder : *une vitesse instantanée échantillonnée à 1 Hz ne peut pa
 réfuter « ça ne bouge jamais »*. Il fallait un **maximum vu**, accumulé à chaque
 frame. Le capteur mesurait le bon concept à la mauvaise cadence.
 
+## Incrément 3 (2026-08-16) — viser : deux tenues, un zoom par arme
+
+Un seul état, `Visee.facteur` (0 = décontracté, 1 = tactique), commande **trois
+choses qui doivent rester d'accord** : la tenue du personnage, le champ de vision
+et le réticule. Les faire lire la même valeur est ce qui évite le défaut
+classique — une vue qui zoome pendant que le personnage garde l'arme au côté.
+
+**La tenue se superpose, elle ne se joue pas.** Le corps porte 9 clips et aucun
+n'est une visée. On ajoute donc une rotation par os **par-dessus** ce que
+l'animation vient d'écrire, entre `AnimationSystems` et `TransformSystems::
+Propagate`. C'est l'aim offset des moteurs du marché, et c'est ce qui permet de
+viser **en courant** : le clip de course continue de jouer dessous.
+
+Le buste porte deux termes : la pose déclarée (l'ouverture vers la cible) et un
+**suivi dérivé du tangage de la caméra**. Sans le second, viser vers le haut
+lèverait le réticule sans lever le canon.
+
+**Zooms demandés** — aucun sur Pépin (pistolet) et Boucherie (le lance-roquettes,
+que l'user appelle « pompe ») ; léger sur Bourrasque (1,25) ; lunette sur Madame
+Lenoir (2,0 — plus fort que « léger », choix assumé : sa portée utile de 300 m
+n'a aucun sens sans resserrement réel). Le champ au repos est **capturé** sur la
+caméra, jamais redéclaré, et rendu tel quel en sortant du mode.
+
+### Le piège TOML que le test a payé
+
+`cacher_dague = true` s'est retrouvé écrit **après** la table
+`[visee.pose_tactique]`. En TOML une clé appartient à la dernière table ouverte :
+il était donc lu comme un os dont la rotation vaudrait `true`, **tout le fichier
+devenait illisible**, et taille / prise / rotations / zooms retombaient
+silencieusement sur leurs défauts. Le test qui lit le génome **depuis le disque**
+l'a attrapé ; un test sur une structure construite en mémoire ne l'aurait jamais
+vu.
+
 ## Critères d'acceptation
 
 - [ ] L'arme équipée est visible dans la main droite, à une taille crédible

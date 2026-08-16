@@ -26,7 +26,7 @@ pub mod skybox_genome;
 pub mod prelude {
     pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
     pub use crate::{
-        CameraFov, CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning,
+        AimCamera, CameraFov, CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning,
         MovementSpeedMultiplier, Player, PlayerLocomotion, PlayerMovementTuning, ViewmodelCamera,
     };
 }
@@ -294,6 +294,26 @@ impl Default for Player {
 #[derive(Component)]
 pub struct FpsCamera;
 
+/// **La caméra depuis laquelle le tir part.**
+///
+/// # Pourquoi un marqueur, et pas « la FpsCamera » comme avant
+///
+/// Le chemin de tir lisait sa direction sur `FpsCamera`. Tant que le jeu était
+/// intégralement en vue subjective, les deux notions se confondaient. Elles ont
+/// divergé le jour où l'Expédition est passée à la 3ᵉ personne : `castle_avatar`
+/// y **désactive** la `FpsCamera` et rend à sa place une caméra orbitale — le
+/// tir aurait continué à suivre une caméra que personne ne regarde.
+///
+/// La règle tient en une phrase : **on tire depuis la caméra qui rend**. Les
+/// deux caméras portent donc ce marqueur, et le chemin de tir prend celle dont
+/// `Camera::is_active` est vrai. C'est ce qui garantit, par construction, que le
+/// réticule au centre de l'écran désigne bien ce que la balle va toucher —
+/// plutôt que de maintenir deux orientations en parallèle et d'espérer qu'elles
+/// restent d'accord (elles ne le restent jamais : sensibilités et bornes de
+/// tangage diffèrent).
+#[derive(Component)]
+pub struct AimCamera;
+
 /// Story-618 — caméra dédiée au rendu du viewmodel (arme + bras) avec un FOV
 /// séparé (RenderLayers::layer(1)), enfant de la FpsCamera. Marquée ici (à côté
 /// de FpsCamera) car forgia-viewmodel (qui la spawn) ET forgia-mode-roguelite
@@ -436,6 +456,10 @@ fn spawn_player(mut commands: Commands, existing: Query<Entity, With<Player>>) {
         Name::new("Player"),
         children![(
             FpsCamera,
+            // On tire depuis la caméra qui rend : en vue subjective, c'est
+            // celle-ci. La caméra 3ᵉ personne porte le même marqueur, et le
+            // chemin de tir départage sur `Camera::is_active`.
+            AimCamera,
             Camera3d::default(),
             // Story-647 : Hdr RETIRÉ (2026-07-02 soir) après essai runtime — le
             // pipeline HDR exige que TOUTES les caméras de la fenêtre soient HDR

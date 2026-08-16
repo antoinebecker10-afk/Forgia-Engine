@@ -42,6 +42,18 @@ pub struct CycleConfig {
     pub brouillard_debut_arrivee_m: f32,
     pub brouillard_fin_arrivee_m: f32,
     pub courbe_exposant: f32,
+    /// Diamètre apparent du disque solaire, en degrés.
+    ///
+    /// Le vrai soleil couvre **0,53°** et se perd à l'écran — on le cherche.
+    /// Le grossir est un choix de lisibilité, pas une erreur : c'est ce que
+    /// fait tout jeu où le coucher de soleil est un moment de la partie.
+    pub soleil_taille_deg: f32,
+}
+
+/// 3° : environ six fois le vrai, assez pour se voir descendre derrière les
+/// crêtes sans occuper le ciel.
+fn soleil_taille_par_defaut() -> f32 {
+    3.0
 }
 
 impl Default for CycleConfig {
@@ -52,14 +64,15 @@ impl Default for CycleConfig {
             soleil_azimut_depart_deg: 250.0,
             soleil_azimut_arrivee_deg: 298.0,
             soleil_lux_depart: 11000.0,
-            soleil_lux_arrivee: 250.0,
+            soleil_lux_arrivee: 70.0,
             ambiante_depart_lux: 900.0,
-            ambiante_arrivee_lux: 320.0,
+            ambiante_arrivee_lux: 110.0,
             brouillard_debut_depart_m: 90.0,
             brouillard_fin_depart_m: 420.0,
             brouillard_debut_arrivee_m: 35.0,
             brouillard_fin_arrivee_m: 180.0,
-            courbe_exposant: 1.8,
+            courbe_exposant: 1.15,
+            soleil_taille_deg: soleil_taille_par_defaut(),
         }
     }
 }
@@ -84,6 +97,7 @@ struct CycleBloc {
     brouillard_debut_arrivee_m: Option<f32>,
     brouillard_fin_arrivee_m: Option<f32>,
     courbe_exposant: Option<f32>,
+    soleil_taille_deg: Option<f32>,
 }
 
 impl CycleConfig {
@@ -138,6 +152,12 @@ impl CycleConfig {
             // elle arriverait d'un bloc à la fin. Les deux se subissent au lieu
             // de se voir venir.
             courbe_exposant: c.courbe_exposant.unwrap_or(d.courbe_exposant).clamp(1.0, 4.0),
+            // Borné : sous le vrai soleil (0,53°) on ne le verrait pas, et
+            // au-delà de 15° il occuperait le ciel au lieu de s'y coucher.
+            soleil_taille_deg: c
+                .soleil_taille_deg
+                .unwrap_or(d.soleil_taille_deg)
+                .clamp(0.53, 15.0),
         }
     }
 }
@@ -412,18 +432,48 @@ mod tests {
     }
 
     #[test]
-    fn la_nuit_tombe_tard_pas_des_le_premier_pas() {
-        // L'effet de la courbe : a mi-chemin il doit rester l'essentiel de la
-        // lumiere. Sinon ca se lit comme un fondu d'ecran, pas comme un coucher.
+    fn le_soir_est_deja_engage_a_mi_chemin() {
+        // 🚨 CE TEST A ÉTÉ RETOURNÉ le 2026-08-14. Il exigeait l'inverse —
+        // « il doit RESTER l'essentiel de la lumière à mi-chemin » — parce que la
+        // demande d'origine était « plus je me rapproche du village, plus il fait
+        // nuit ». La demande a changé : « faire débuter la nuit plus tôt ».
+        //
+        // Un test qui garde une intention périmée est pire qu'aucun test : il
+        // s'oppose au travail en cours en ayant l'air d'avoir raison. On le
+        // retourne, on ne le contourne pas.
         let c = CycleConfig::default();
         let depart = etat_du_cycle(0.0, &c).ambiante_lux;
         let milieu = etat_du_cycle(0.5, &c).ambiante_lux;
-        let reste = (milieu - c.ambiante_arrivee_lux) / (depart - c.ambiante_arrivee_lux);
-        println!("A MI-CHEMIN il reste {:.0}% de la marge de lumiere", reste * 100.0);
+        let fait = 1.0 - (milieu - c.ambiante_arrivee_lux) / (depart - c.ambiante_arrivee_lux);
+        println!("A MI-CHEMIN {:.0}% de l'assombrissement est fait", fait * 100.0);
+        // L'exposant étant borné à [1 ; 4] par `parse_toml`, la part faite à
+        // mi-chemin vaut au plus 50 % (linéaire) et descend vers 6 % à 4. Le
+        // seuil est donc dans la zone que la borne laisse ouverte : il ATTRAPE
+        // vraiment un retour à la courbe lente (1,8 donnait 29 %).
         assert!(
-            reste > 0.6,
-            "a mi-chemin il ne reste que {:.0}% : la nuit tombe trop tot",
-            reste * 100.0
+            fait > 0.40,
+            "a mi-chemin seulement {:.0}% de l'assombrissement est fait : la nuit \
+             attend encore l'approche du village, alors qu'elle doit s'installer \
+             des la premiere moitie du trajet",
+            fait * 100.0
+        );
+    }
+
+    /// Le garde-fou opposé, qui n'a pas changé : la nuit ne doit pas tomber
+    /// **dès le premier pas**. Il ne se lit plus dans le test ci-dessus depuis
+    /// qu'il a été retourné, donc il est écrit ici — sinon la borne basse de
+    /// l'exposant ne serait plus gardée par rien.
+    #[test]
+    fn la_lumiere_ne_chute_pas_des_les_premiers_metres() {
+        let c = CycleConfig::default();
+        let depart = etat_du_cycle(0.0, &c).ambiante_lux;
+        let dixieme = etat_du_cycle(0.1, &c).ambiante_lux;
+        let fait = 1.0 - (dixieme - c.ambiante_arrivee_lux) / (depart - c.ambiante_arrivee_lux);
+        assert!(
+            fait < 0.20,
+            "au dixieme du trajet {:.0}% de l'assombrissement est deja fait : ca se \
+             lit comme un fondu d'ecran, pas comme un coucher de soleil",
+            fait * 100.0
         );
     }
 

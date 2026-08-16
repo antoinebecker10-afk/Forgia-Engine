@@ -118,6 +118,22 @@ pub struct PorteDef {
 ///
 /// Les champs absents ici (`mesures`, diagnostics) sont ignorés volontairement :
 /// ce sont des traces de fabrication, pas des données de jeu.
+/// Un brasier jalonnant le chemin.
+///
+/// `avancee` va de 0 au départ à 1 au village : c'est elle qu'on compare à la
+/// progression du joueur pour allumer de proche en proche quand la nuit tombe.
+/// Sans elle il faudrait recalculer une abscisse curviligne à l'exécution, et
+/// elle divergerait du tracé dès que celui-ci bougerait.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LampeDef {
+    pub xyz: [f32; 3],
+    /// Où poser la lumière : la flamme est à 2,7 m au-dessus du pied. Une
+    /// lumière à l'origine du brasier éclairerait le sol, pas le chemin.
+    pub flamme_xyz: [f32; 3],
+    pub avancee: f32,
+    pub portee_m: f32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExpeditionManifest {
     pub carte: String,
@@ -134,6 +150,10 @@ pub struct ExpeditionManifest {
     pub campements: Vec<CampementDef>,
     /// `[x, y, z, rayon]` en repère Blender. Les troncs, rochers et murs.
     pub colliders_cylindre_xyzr: Vec<[f32; 4]>,
+    /// Les brasiers du chemin. `default` : un manifeste cuit avant leur ajout
+    /// reste lisible, il n'aura simplement pas d'éclairage.
+    #[serde(default)]
+    pub lampes: Vec<LampeDef>,
 }
 
 /// Ce qui peut clocher, **nommé** — un `Option` compilerait mais ne guiderait pas.

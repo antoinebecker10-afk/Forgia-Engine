@@ -41,6 +41,16 @@ const MANIFESTE_CELLULES: &str =
 /// milliers que produirait le GLB complet.
 const SOL_COLLISION: &str = "models/environment/expedition/expedition_vallon_collision.glb#Scene0";
 
+/// Les deux battants de la porte du village.
+///
+/// Comme la rivière, ce fichier est **hors de la grille de streaming** et
+/// n'était cité nulle part : il dormait sur le disque. Il est chargé statique
+/// pour l'instant — l'ouverture au passage du joueur (`porte_village` du
+/// manifeste donne son rayon et sa durée) reste à faire. Le montrer fermé est
+/// déjà mieux que de ne pas le montrer : le village a une entrée lisible.
+const MODELE_PORTES: &str =
+    "models/environment/expedition/vallon_stream_cells/vallon_portes.gltf#Scene0";
+
 /// Rayon de chargement des cellules (m).
 ///
 /// **Dérivé de l'emprise**, pas choisi : la carte fait 280 × 200 m, sa
@@ -100,30 +110,98 @@ pub struct ForgiaExpeditionPlugin;
 
 impl Plugin for ForgiaExpeditionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            OnEnter(GameMode::Expedition),
-            (setup_expedition, crate::lighting::setup_expedition_lighting).chain(),
-        )
-        .add_systems(
-            OnExit(GameMode::Expedition),
-            (
-                teardown_expedition,
-                crate::lighting::teardown_expedition_lighting,
-            ),
-        )
-        .add_systems(
-            Update,
-            (
-                place_player_when_ready,
-                stream_expedition_cells,
-                // Le cycle APRES le placement : la progression se lit sur la
-                // position REELLE du joueur, pas sur celle d'avant son spawn.
-                crate::lighting::update_expedition_cycle,
-                crate::lighting::update_expedition_ambiance,
+        // L'avatar et ses feux vivent dans leur propre plugin : il apporte sa
+        // ressource de réglages, et rien ici n'a besoin de le savoir.
+        // L'arme tenue en main a le sien, pour la même raison — et parce qu'elle
+        // publie la bouche du canon, que le chemin de tir lit sans rien savoir
+        // de l'Expédition.
+        app.add_plugins((
+            crate::avatar_vfx::ExpeditionAvatarPlugin,
+            crate::arme_main::ExpeditionArmeMainPlugin,
+            // La visée lit le génome de l'arme en main : elle vient après, mais
+            // l'ordre d'ajout des plugins ne décide de rien ici — chacun
+            // n'expose que sa ressource.
+            crate::visee::ExpeditionViseePlugin,
+        ))
+            .add_systems(
+                OnEnter(GameMode::Expedition),
+                (
+                    reprendre_la_main_sur_le_reticule,
+                    setup_expedition,
+                    crate::eau::setup_eau,
+                    crate::lighting::setup_expedition_lighting,
+                    // APRÈS `setup_expedition` : les braseros se lisent dans le
+                    // manifeste, que celui-ci vient de charger.
+                    crate::lampes::setup_lampes,
+                )
+                    .chain(),
             )
-                .chain()
-                .run_if(in_state(GameMode::Expedition)),
-        );
+            .add_systems(
+                OnExit(GameMode::Expedition),
+                (
+                    teardown_expedition,
+                    crate::lighting::teardown_expedition_lighting,
+                    // Sans ça, l'Expédition laisse seize points lumineux
+                    // allumés dans l'arène et le Hall.
+                    crate::lampes::teardown_lampes,
+                ),
+            )
+            .add_systems(
+                Update,
+                (
+                    place_player_when_ready,
+                    stream_expedition_cells,
+                    // La rivière : reprendre son matériau dès que sa scène est
+                    // peuplée, puis la faire couler à la vitesse de la carte.
+                    crate::eau::reprendre_materiau_eau,
+                    crate::eau::faire_couler,
+                    // Le cycle APRES le placement : la progression se lit sur la
+                    // position REELLE du joueur, pas sur celle d'avant son spawn.
+                    crate::lighting::update_expedition_cycle,
+                    crate::lighting::update_expedition_ambiance,
+                    // Les braseros APRES le cycle : ils lisent l'élévation du
+                    // soleil et la progression que celui-ci vient d'écrire.
+                    // Avant lui, ils travailleraient sur la frame précédente.
+                    crate::lampes::update_lampes,
+                )
+                    .chain()
+                    .run_if(in_state(GameMode::Expedition)),
+            );
+    }
+}
+
+/// Remet le réticule dans un état que ce mode assume.
+///
+/// # Pourquoi un mode doit déclarer ça lui-même
+///
+/// Deux ressources décident si un réticule s'affiche, et **aucun système de
+/// l'Expédition ne les écrit** :
+///
+/// - `CrosshairHidden` n'a que deux écrivains, tous deux accrochés au Lobby du
+///   Roguelite (`OnEnter/OnExit(RunState::Lobby)`). Rien ne garantit qu'ils
+///   aient rendu la main avant qu'on arrive ici.
+/// - `CrosshairMode` (progression de visée, lunette plein écran) n'est écrite
+///   que par le plugin de pose du viewmodel, gaté `Fps | Roguelite`. En
+///   Expédition elle **garde donc sa dernière valeur** : une partie de Roguelite
+///   terminée l'œil dans la lunette de Madame Lenoir suffit à supprimer le
+///   réticule ici, sans qu'aucun code de ce mode n'ait rien fait.
+///
+/// Un état hérité d'un autre mode est un état que personne ne possède. On le
+/// remet donc à neuf en entrant — même geste que la bouche du canon, remise à
+/// `None` en sortant (`arme_main::retirer_arme`).
+fn reprendre_la_main_sur_le_reticule(
+    cache: Option<ResMut<forgia_crosshair::CrosshairHidden>>,
+    mode: Option<ResMut<forgia_crosshair::CrosshairMode>>,
+) {
+    if let Some(mut c) = cache {
+        c.0 = false;
+    }
+    if let Some(mut m) = mode {
+        // Pas de visée en Expédition : le plugin qui l'anime ne tourne pas ici.
+        // Laisser une progression non nulle ferait disparaître la croix au
+        // profit d'un point rouge, ou d'une lunette, que rien ne ferait revenir.
+        m.ads_progress = 0.0;
+        m.sniper_fullscreen = false;
     }
 }
 
@@ -166,6 +244,16 @@ fn setup_expedition(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         },
         Visibility::Hidden,
+    ));
+
+    // La porte du village. Coordonnées monde Bevy comme les cellules : aucun
+    // placement, elle est déjà à sa place dans le fichier.
+    commands.spawn((
+        Name::new("ExpeditionPortesVillage"),
+        ExpeditionMarker,
+        SceneRoot(asset_server.load(MODELE_PORTES)),
+        Transform::IDENTITY,
+        Visibility::Inherited,
     ));
 
     // Les colliders : 943 cylindres, posés une fois. Ils ne streament PAS —

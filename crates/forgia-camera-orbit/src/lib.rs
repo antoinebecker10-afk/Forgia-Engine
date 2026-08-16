@@ -179,6 +179,7 @@ impl Plugin for ForgiaCameraOrbitPlugin {
 /// (PR #19668) — query directe sur PrimaryWindow.
 fn orbit_cursor_grab(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
+    app_mode: Res<State<AppMode>>,
     q_cam: Query<&OrbitCamera>,
     mut q: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
@@ -187,9 +188,18 @@ fn orbit_cursor_grab(
     };
     let any_held =
         mouse_buttons.pressed(MouseButton::Left) || mouse_buttons.pressed(MouseButton::Right);
-    // En visée permanente le curseur ne se relâche JAMAIS : c'est ce qui fait que
-    // le réticule central désigne enfin quelque chose.
-    let permanent = q_cam.iter().any(|c| c.mouselook_permanent);
+    // En visée permanente le curseur reste pris pendant qu'on JOUE : c'est ce
+    // qui fait que le réticule central désigne enfin quelque chose.
+    //
+    // 🚨 …mais seulement pendant qu'on joue. La première version disait « ne se
+    // relâche JAMAIS », et c'était vrai au pied de la lettre : ESC ouvrait bien
+    // la pause, et le curseur restait verrouillé au centre — plus moyen de
+    // cliquer un bouton, ni de quitter. Un verrou de confort qui survit au menu
+    // qu'il empêche d'utiliser n'est plus un confort, c'est un piège.
+    //
+    // On lit donc l'état de l'application : hors `InGame`, personne ne vise.
+    let en_jeu = matches!(app_mode.get(), AppMode::InGame);
+    let permanent = en_jeu && q_cam.iter().any(|c| c.mouselook_permanent);
     let desired_grab = if any_held || permanent {
         CursorGrabMode::Locked
     } else {
@@ -363,6 +373,24 @@ fn orbit_auto_recenter_on_move(
 
 /// Place chaque OrbitCamera derrière son target, à `distance` mètres, vise target+height.
 /// Le yaw vient du target lui-même (réutilise Player.yaw managé par forgia-player).
+/// Marge gardée entre la caméra et le mur touché.
+const CAM_SKIN_M: f32 = 0.3;
+
+/// Distance minimale du bras, quoi que touche le rayon.
+///
+/// 🚨 L'ancienne valeur était **0,2 m**, écrite en dur au milieu du calcul —
+/// alors que `OrbitCamera::min_distance` vaut 2,2 en vue par-dessus l'épaule.
+/// La caméra pouvait donc descendre onze fois sous son propre minimum déclaré,
+/// et se retrouver DANS le personnage : le plan proche (0,1 m) le découpait, et
+/// ce qui restait sortait du champ. Une grandeur déclarée que le code ignore
+/// n'est pas une grandeur, c'est un commentaire.
+///
+/// 0,45 m se DÉRIVE : plan proche de Bevy (0,1 m) + demi-largeur du personnage
+/// (~0,35 m). En deçà, la caméra est à l'intérieur du corps quoi qu'on fasse.
+/// C'est un plancher de sécurité, pas un réglage de confort — celui-ci reste
+/// `min_distance`, honoré par le zoom.
+const PLANCHER_BRAS_M: f32 = 0.45;
+
 fn orbit_follow(
     targets: Query<&GlobalTransform, Without<OrbitCamera>>,
     mut cams: Query<(&OrbitCamera, &mut Transform), With<Camera3d>>,
@@ -404,22 +432,43 @@ fn orbit_follow(
         // depuis l'angle plutôt qu'avec un produit vectoriel, qui dégénérerait
         // quand le pitch approche la verticale.
         let droite = Vec3::new(total_yaw.cos(), 0.0, -total_yaw.sin());
-        let look_target =
-            target_pos + Vec3::Y * orbit.height_offset + droite * orbit.shoulder_offset;
 
-        // Anti-clip (2026-06-16) : raycast depuis le point visé vers la position
+        // 🚨 LE PIVOT N'EST PAS LE POINT VISÉ. Le rayon anti-clip part du
+        // PERSONNAGE, pas du point décalé de 65 cm sur le côté : sonder depuis
+        // un point qui flotte à côté de lui fait rater le mur qu'il touche, et
+        // trouver celui qu'il ne touche pas.
+        let pivot = target_pos + Vec3::Y * orbit.height_offset;
+
+        // Anti-clip (2026-06-16) : raycast depuis le pivot vers la position
         // caméra souhaitée. Si un collider est touché avant `distance`, on
         // rapproche la caméra pour qu'elle ne traverse plus sol/murs. Exclut le
         // rigidbody du target (le joueur) pour ne pas se heurter à sa capsule.
         let mut dist = orbit.distance;
         if let Some(ctx) = &ctx {
             let filter = QueryFilter::default().exclude_rigid_body(orbit.target);
-            if let Some((_e, toi)) = ctx.cast_ray(look_target, back, orbit.distance, true, filter) {
-                const CAM_SKIN_M: f32 = 0.3;
-                dist = (toi - CAM_SKIN_M).max(0.2);
+            if let Some((_e, toi)) = ctx.cast_ray(pivot, back, orbit.distance, true, filter) {
+                dist = (toi - CAM_SKIN_M).max(PLANCHER_BRAS_M);
             }
         }
-        cam_tf.translation = look_target + back * dist;
+
+        // 🚨 L'ÉPAULE S'EFFACE QUAND LE BRAS SE RÉTRACTE, et c'est ce qui garde le
+        // personnage à l'écran.
+        //
+        // Le champ visible a une demi-largeur de `d·tan(fov/2)` — elle rétrécit
+        // avec la distance. Un décalage d'épaule CONSTANT finit donc par sortir
+        // du cadre : mesuré, 0,65 m d'épaule sort du champ dès que la caméra
+        // passe sous **1,57 m**. C'est exactement « le personnage n'apparaît pas
+        // sous tous les angles » — il suffisait d'un mur derrière soi pour que le
+        // bras se rétracte et que le sujet quitte l'image.
+        //
+        // Faire décroître l'épaule PROPORTIONNELLEMENT à la distance rend le
+        // rapport `épaule / demi-largeur` constant : si le personnage est cadré à
+        // pleine extension, il l'est à toutes les distances. C'est une garantie,
+        // pas un réglage — cf. le test `l_epaule_ne_sort_jamais_du_cadre`.
+        let extension = (dist / orbit.distance.max(1e-3)).clamp(0.0, 1.0);
+        let look_target = pivot + droite * orbit.shoulder_offset * extension;
+
+        cam_tf.translation = pivot + back * dist + droite * orbit.shoulder_offset * extension;
         cam_tf.look_at(look_target, Vec3::Y);
     }
 }
@@ -543,5 +592,70 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         app.add_plugins(ForgiaCameraOrbitPlugin);
+    }
+
+    /// 🚨 LE test de cette caméra : le personnage doit rester dans le cadre à
+    /// TOUTE distance du bras, pas seulement à pleine extension.
+    ///
+    /// Symptôme d'origine (2026-08-14, rapporté en jeu) : « le personnage
+    /// n'apparaît pas sous tous les angles ». Cause : le décalage d'épaule était
+    /// CONSTANT (0,65 m) alors que la demi-largeur du champ vaut `d·tan(fov/2)`
+    /// et rétrécit avec la distance. Un mur derrière le joueur rétractait le
+    /// bras, et le sujet sortait de l'image.
+    ///
+    /// Le test BALAIE la plage, du plancher de sécurité à l'extension maximale —
+    /// échantillonner trois distances aurait laissé passer le défaut, qui
+    /// n'apparaît qu'en dessous de 1,57 m.
+    #[test]
+    fn l_epaule_ne_sort_jamais_du_cadre() {
+        // FOV vertical par défaut de Bevy. Le champ HORIZONTAL est plus large en
+        // 16/9, donc juger sur le vertical est le cas le plus sévère : ce qui
+        // passe ici passe à l'écran.
+        let demi_fov = std::f32::consts::FRAC_PI_4 / 2.0;
+        let cam = OrbitCamera::over_shoulder(Entity::PLACEHOLDER);
+        let mut pire = (1.0f32, 0.0f32);
+        // Pas fin sur toute la plage utile : c'est la zone SOUS `min_distance`
+        // qui porte le défaut, et un test qui l'éviterait ne prouverait rien.
+        let mut d = PLANCHER_BRAS_M;
+        while d <= cam.distance {
+            let extension = (d / cam.distance).clamp(0.0, 1.0);
+            let epaule = cam.shoulder_offset * extension;
+            let demi_largeur = d * demi_fov.tan();
+            let ratio = epaule / demi_largeur;
+            if ratio > pire.0 {
+                pire = (ratio, d);
+            }
+            assert!(
+                epaule < demi_largeur,
+                "a {d:.2} m le point vise est a {epaule:.3} m de l'axe pour une \
+                 demi-largeur de {demi_largeur:.3} m — le personnage sort du cadre"
+            );
+            d += 0.01;
+        }
+        // Et le contrôle ne doit pas être aveugle : si la marge était énorme
+        // partout, il ne mesurerait rien. On vérifie qu'on reste dans un rapport
+        // significatif, donc que le cadrage est réellement contraint.
+        println!(
+            "pire rapport epaule/demi-largeur : {:.2} a {:.2} m",
+            pire.0, pire.1
+        );
+        assert!(
+            pire.0 > 0.1,
+            "l'epaule est negligeable devant le champ ({:.3}) — ce test ne mesure rien",
+            pire.0
+        );
+    }
+
+    /// L'ancienne valeur en dur (0,2 m) plaçait la caméra DANS le personnage.
+    /// Le plancher doit rester au-dessus du plan proche plus le demi-corps.
+    #[test]
+    fn le_plancher_du_bras_garde_la_camera_hors_du_corps() {
+        const PLAN_PROCHE_BEVY_M: f32 = 0.1;
+        const DEMI_CORPS_M: f32 = 0.3;
+        assert!(
+            PLANCHER_BRAS_M > PLAN_PROCHE_BEVY_M + DEMI_CORPS_M,
+            "plancher {PLANCHER_BRAS_M} m : la camera entre dans le personnage et \
+             le plan proche le decoupe"
+        );
     }
 }

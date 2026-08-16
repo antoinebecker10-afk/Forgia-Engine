@@ -9,8 +9,28 @@ workspace = true
 
 [dependencies]
 bevy = { workspace = true }
+# Particules GPU : la trainee de pas et la braise de cape.
+bevy_hanabi = { workspace = true }
 bevy_rapier3d = { workspace = true }
+# La rivière : `StandardWaterMaterial` (profondeur, écume de berge, vagues).
+# On n'utilise PAS ses `WaterTiles` — elles sont un plan horizontal, et notre
+# rivière descend de 7,69 m. Seul le matériau nous sert. Le `WaterPlugin` qui
+# l'enregistre est déjà branché par `forgia_water::ForgiaWaterPlugin`.
+bevy_water = "0.18"
 forgia-core = { workspace = true }
+# La visée : le champ de vision se resserre sur la caméra d'épaule, et le buste
+# suit SON tangage — c'est elle qui dit où on regarde.
+forgia-camera-orbit = { workspace = true }
+# Le réticule : deux ressources dont AUCUN système de ce mode n'est écrivain, et
+# qui arrivent donc ici avec la valeur laissée par le mode précédent.
+forgia-crosshair = { workspace = true }
+# L'arme tenue en main : `EquippedWeapons` (laquelle), `WeaponType::genome_key`
+# (quel fichier), `MuzzleWorld` (où sort la balle à l'écran).
+forgia-combat = { workspace = true }
+# Le génome de l'arme en main est un asset `Genome<T>` — donc rechargé à chaud
+# pendant que le jeu tourne, ce qu'une lecture `def_io` au démarrage ne permet
+# pas. Une orientation d'arme dans un poing se règle à l'œil, en trois essais.
+forgia-genome-core = { workspace = true }
 forgia-player = { workspace = true }
 forgia-streaming = { workspace = true }
 serde = { workspace = true }

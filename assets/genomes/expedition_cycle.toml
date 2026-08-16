@@ -44,10 +44,11 @@ soleil_azimut_arrivee_deg = 298.0
 
 # Puissance du soleil (lux) au départ et à l'arrivée.
 #
-# 11 000 lux = fin d'après-midi couvert. À l'arrivée il ne reste presque rien du
-# direct : la lumière vient du ciel et des feux du village.
+# 11 000 lux = fin d'après-midi couvert. À 70 lux, le direct n'est plus qu'un
+# souvenir : ce qui éclaire encore, c'est le ciel et les braseros du chemin.
+# C'est voulu — c'est ce qui donne son rôle aux feux.
 soleil_lux_depart = 11000.0
-soleil_lux_arrivee = 250.0
+soleil_lux_arrivee = 70.0
 
 # ── La lumière du ciel ───────────────────────────────────────────────────────
 
@@ -57,10 +58,15 @@ soleil_lux_arrivee = 250.0
 # « on voit encore un peu ». Le mettre à 0 donnerait le noir absolu dès que le
 # soleil passe sous l'horizon — le mode horreur écarté explicitement.
 #
-# 320 lux ≈ un extérieur sous pleine lune, mais rehaussé : on distingue le relief
-# et la silhouette d'un ennemi à une vingtaine de mètres, on ne lit pas une carte.
+# 110 lux ≈ une nuit claire de pleine lune, sans rehaussement. On distingue le
+# relief et une silhouette à une dizaine de mètres, plus au-delà. Descendu de 320
+# le 2026-08-14 sur demande (« accentuer la nuit »).
+#
+# 🚨 Le code borne cette valeur à 60 lux MINIMUM, quoi qu'on écrive ici. C'est le
+# seul rempart contre un génome qui éteindrait la carte, et il ne se contourne
+# pas depuis ce fichier.
 ambiante_depart_lux = 900.0
-ambiante_arrivee_lux = 320.0
+ambiante_arrivee_lux = 110.0
 
 # ── Le brouillard ────────────────────────────────────────────────────────────
 #
@@ -79,11 +85,21 @@ brouillard_fin_arrivee_m = 180.0
 
 # Exposant appliqué à la progression avant interpolation.
 #
-# ★ 1,8 : la nuit tombe TARD et VITE, comme un vrai crépuscule. À 1,0 (linéaire)
-# la lumière baisse dès le premier pas, ce qui se lit comme un fondu d'écran
-# plutôt que comme un coucher de soleil. Au-dessus de ~3 la bascule devient
-# brutale et le joueur la subit au lieu de la voir venir.
+# ★ Il décide QUAND la nuit tombe, pas à quel point elle est noire — ça, c'est
+# `ambiante_arrivee_lux`. Deux réglages distincts, souvent confondus.
 #
-# Concrètement à 1,8 : à mi-chemin il reste 71 % de la lumière du départ, et
-# c'est sur le dernier tiers du trajet que la nuit s'installe.
-courbe_exposant = 1.8
+# Ce qu'il donne à mi-chemin, mesuré :
+#
+#   exposant 1,8  → 29 % de l'assombrissement fait   (la nuit attend le dernier tiers)
+#   exposant 1,5  → 35 %
+#   exposant 1,3  → 41 %
+#   exposant 1,15 → 45 %                             ← ici
+#   exposant 1,0  → 50 %                             (linéaire, plancher du code)
+#
+# Passé de 1,8 à 1,15 le 2026-08-14 sur demande (« faire débuter la nuit plus
+# tôt »). Le soir s'installe désormais dès la première moitié du trajet au lieu
+# d'attendre l'approche du village.
+#
+# Le code borne l'exposant à [1 ; 4]. Sous 1 la lumière chuterait dès le premier
+# pas — un fondu d'écran, pas un coucher de soleil.
+courbe_exposant = 1.15

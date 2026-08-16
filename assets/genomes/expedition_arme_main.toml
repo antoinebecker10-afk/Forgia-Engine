@@ -1,0 +1,185 @@
+# expedition_arme_main.toml — L'arme TENUE DANS LA MAIN, vue à la 3ᵉ personne.
+#
+# Chargé en asset `Genome<T>` : il se **recharge à chaud** pendant que le jeu
+# tourne (`file_watcher`). C'est délibéré — l'orientation d'une arme dans un
+# poing se juge à l'œil, en trois essais, pas dans un tableur. Relancer le jeu
+# entre chaque essai transformerait un réglage de deux minutes en une heure.
+#
+# ── Pourquoi ce fichier n'est pas une section de `viewmodel_arena.toml` ──────
+#
+# Le viewmodel FPS est accroché à la CAMÉRA : ses offsets sont exprimés dans le
+# repère de l'écran (« 22 cm à droite de l'œil, 35 cm dessous »). Ici l'arme est
+# accrochée à un OS — `socket_main_droite`, enfant de `RightHand` — donc dans un
+# repère qui TOURNE avec l'animation, et que le socket lui-même fait pivoter de
+# +90° autour de X.
+#
+# Les rotations ci-dessous ressemblent à celles du viewmodel parce qu'elles
+# décrivent le même fait — l'orientation native de chaque GLB, qui diffère d'une
+# arme à l'autre (−90° pour Pépin, +90° pour Lenoir, 180° pour Boucherie). Mais
+# elles sont lues dans un AUTRE repère : ce ne sont pas les mêmes nombres, et les
+# fusionner ferait diverger l'un quand on règle l'autre.
+#
+# ── Ce qui NE se déclare pas ici ────────────────────────────────────────────
+#
+# - **L'échelle** : jamais un facteur en dur sur un GLB importé (`no-hardcode.md`).
+#   On déclare la LONGUEUR RÉELLE voulue (`taille_m`) et le moteur mesure l'AABB
+#   du maillage chargé pour en dériver le facteur.
+# - **La longueur du canon** : elle se déduit de la même AABB, une fois tournée.
+#   La bouche est le point le plus avancé du modèle sur son axe de tir.
+#   Conséquence utile : si une rotation est fausse, le traceur part visiblement
+#   d'ailleurs que du canon. Un seul critère à l'œil valide les deux.
+
+# 🚨 ORDRE — les deux clés de tête viennent AVANT toute table `[...]`.
+# En TOML, une clé écrite après une table appartient à cette table : placer
+# `cacher_dague` plus bas le rangeait sous `[visee.pose_tactique]`, où il était
+# lu comme un os dont la rotation vaudrait `true`. Le fichier entier devenait
+# illisible — donc taille, prise, rotations et zooms retombaient tous sur leurs
+# défauts, en silence. Attrapé par le test qui lit ce fichier sur le disque.
+version = 1
+# La dague du corps d'Expédition est dans la MÊME main (nœud `SM_Dagger`, enfant
+# de `RightHand`). Une arme à feu par-dessus, ce sont deux objets qui
+# s'interpénètrent dans le poing. On la masque tant qu'une arme est tenue.
+cacher_dague = true
+
+# ═════════════════════════════════════════════════════════════════════════════
+# VISER — deux tenues, et un zoom qui dépend de l'arme
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Au repos le personnage tient son arme **décontracté** : bras bas, canon vers
+# le sol. Clic droit maintenu, il passe en **tactique** : arme épaulée, buste
+# tourné vers ce qu'il vise. Entre les deux, un fondu.
+#
+# ── Pourquoi ces poses se DÉCLARENT au lieu de venir d'un clip ──────────────
+#
+# Le corps d'Expédition porte 9 clips (death, hammer_strike, hit_react, idle,
+# jog_backward, jump, run, swim, walk) et **aucun n'est une pose de visée**.
+# Attendre un clip « aim » signifierait ne rien livrer. On superpose donc une
+# rotation d'os PAR-DESSUS le clip qui joue : le personnage continue de marcher
+# et de courir, avec les bras à la bonne place. C'est l'« aim offset » des
+# moteurs du marché, et c'est ce qui permet de viser EN COURANT.
+#
+# Les valeurs sont en degrés, **ajoutées** à ce que l'animation a écrit, et
+# rechargées à chaud : elles se règlent à l'œil en trois essais.
+
+[visee]
+# Temps pour lever l'arme, et pour la rabaisser. Rabaisser est un peu plus lent :
+# lever est une intention, rabaisser un relâchement.
+montee_s = 0.16
+descente_s = 0.24
+
+# De combien le buste suit le tangage de la caméra quand on vise (0 = pas du
+# tout, 1 = entièrement). Ce terme-là n'est PAS une pose figée : il se dérive de
+# l'angle réel de la caméra, sinon viser vers le haut ne lèverait pas le canon.
+suivi_du_buste = 0.75
+
+# ── Tenue décontractée (au repos) ────────────────────────────────────────────
+# Tout à zéro = le clip d'animation tel quel. C'est déjà une tenue relâchée :
+# les bras pendent. Ces lignes existent pour qu'on puisse l'accentuer sans
+# toucher au code.
+[visee.pose_decontractee]
+RightArm = [0.0, 0.0, 0.0]
+RightForeArm = [0.0, 0.0, 0.0]
+LeftArm = [0.0, 0.0, 0.0]
+LeftForeArm = [0.0, 0.0, 0.0]
+Spine2 = [0.0, 0.0, 0.0]
+
+# ── Tenue tactique (clic droit) ──────────────────────────────────────────────
+# 🚨 Points de DÉPART, à régler en jeu. L'orientation locale des os Mixamo ne se
+# devine pas depuis un fichier : l'axe qui lève un bras sur un rig peut le faire
+# pivoter sur un autre. Le fondu et le rechargement à chaud sont là pour que ce
+# réglage coûte trois essais, pas trois relances.
+[visee.pose_tactique]
+# Le bras droit se lève vers l'avant et rentre vers l'axe du corps.
+RightArm = [-55.0, -18.0, 0.0]
+# L'avant-bras se replie pour amener l'arme devant la poitrine.
+RightForeArm = [-35.0, 0.0, 0.0]
+# Le bras gauche vient soutenir : c'est lui qui vend la tenue à deux mains.
+LeftArm = [-45.0, 22.0, 0.0]
+LeftForeArm = [-55.0, 0.0, 0.0]
+# Le buste s'ouvre légèrement vers la cible.
+Spine2 = [0.0, -12.0, 0.0]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Les quatre armes. `taille_m` = longueur réelle de l'arme À L'ÉCRAN, pour un
+# personnage d'1,82 m. Elle est plus courte qu'en vue subjective : un viewmodel
+# est volontairement surdimensionné (il occupe le cadre), une silhouette 3ᵉ
+# personne doit rester crédible à côté d'un corps humain.
+#
+# ── `prise` : OÙ la main tient l'arme ───────────────────────────────────────
+#
+# 0 = la main tient l'ARRIÈRE (la crosse) · 0,5 = le MILIEU · 1 = l'AVANT.
+#
+# Ce réglage existe parce que les quatre GLB sont **centrés sur leur origine**
+# (mesuré : centre à 0,001 m près, emprise 1,911 m pour les quatre). Sans lui,
+# le point d'accroche est donc le milieu de l'arme : la moitié du canon dépasse
+# derrière le poing, et l'arme a l'air de flotter autour de la main au lieu
+# d'être tenue. C'est le premier retour de jeu, le 2026-08-15.
+#
+# 0,30 = un tiers depuis l'arrière, là où se trouve la poignée d'une arme à feu.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── `zoom` : de combien la vue se resserre au clic droit ────────────────────
+#
+# 1,0 = aucun zoom (on gagne la tenue tactique, pas de la portée optique).
+# 1,25 = léger · 2,0 = lunette.
+#
+# C'est un diviseur du champ de vision : zoom 2 montre deux fois moins large.
+# Il ne se règle PAS arme par arme au hasard — il dit ce que l'arme est. Un
+# pistolet et un lance-roquettes se pointent, ils ne se lorgnent pas.
+
+# Pépin — pistolet, tenu à une main. 0,36 m : un pistolet un peu généreux, dans
+# le style trapu du jeu, mais qui reste un pistolet à côté d'un corps d'1,82 m.
+[armes.pepin]
+taille_m = 0.36
+prise = 0.30
+zoom = 1.0
+decalage_x = 0.0
+decalage_y = 0.0
+decalage_z = 0.0
+rotation_x_deg = 0.0
+rotation_y_deg = -90.0
+rotation_z_deg = 0.0
+
+# Bourrasque — le feu nourri, arme d'épaule courte type PM.
+[armes.bourrasque]
+taille_m = 0.52
+prise = 0.30
+# Léger : une arme automatique se stabilise, elle ne s'optique pas.
+zoom = 1.25
+decalage_x = 0.0
+decalage_y = 0.0
+decalage_z = 0.0
+rotation_x_deg = 0.0
+rotation_y_deg = -90.0
+rotation_z_deg = 0.0
+
+# Madame Lenoir — le sniper : canon long, c'est sa silhouette qui le dit. La
+# poignée d'un fusil de précision est plus en arrière que sur une arme courte.
+[armes.madame_lenoir]
+taille_m = 0.90
+prise = 0.25
+# La lunette. Plus fort que « léger » : c'est le fusil de précision, sa portée
+# utile (300 m) n'a aucun sens si la vue ne se resserre pas vraiment. À baisser
+# vers 1,5 si c'est trop en jeu — le fichier se recharge à chaud.
+zoom = 2.0
+decalage_x = 0.0
+decalage_y = 0.0
+decalage_z = 0.0
+rotation_x_deg = 0.0
+rotation_y_deg = 90.0
+rotation_z_deg = 0.0
+
+# Boucherie — le lance-roquettes. Il se tient au tiers avant, le tube reposant
+# sur l'épaule : d'où une prise plus avancée que les autres.
+[armes.boucherie]
+taille_m = 0.80
+prise = 0.40
+# Aucun : un lance-roquettes se pointe. Viser lui donne la tenue tactique et
+# rien d'autre — c'est déjà ce qui change le tir.
+zoom = 1.0
+decalage_x = 0.0
+decalage_y = 0.0
+decalage_z = 0.0
+rotation_x_deg = 0.0
+rotation_y_deg = 180.0
+rotation_z_deg = 0.0

@@ -316,14 +316,12 @@ impl ViewmodelGenomeCtx<'_> {
 /// - `AssaultRifle` → `bourrasque` (SMG full-auto)
 /// - `Shotgun` → `madame_lenoir` (sniper V2)
 /// - `RocketLauncher` → `boucherie` (shotgun pump V2)
+///
+/// La table elle-même vit désormais sur `WeaponType` (`forgia-combat`) : elle
+/// avait deux copies, et l'arme tenue en main à la 3ᵉ personne en réclamait une
+/// troisième. Cette fonction reste pour ses appelants, et délègue.
 pub fn weapon_genome_key(w: WeaponType) -> &'static str {
-    match w {
-        WeaponType::ModernAR => "pepin",
-        WeaponType::AssaultRifle => "bourrasque",
-        WeaponType::Shotgun => "madame_lenoir",
-        WeaponType::RocketLauncher => "boucherie",
-        _ => "pepin",
-    }
+    w.genome_key()
 }
 
 /// Lit l'entry genome pour `w`. None si genome pas encore chargé OU clé absente.

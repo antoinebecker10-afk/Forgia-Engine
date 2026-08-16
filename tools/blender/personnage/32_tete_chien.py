@@ -90,7 +90,28 @@ SPEC = {
         {"nom": "joue_g",    "p": (-0.072, 0.030, -0.038), "a": (0.040, 0.052, 0.045)},
         {"nom": "joue_d",    "p": (0.072, 0.030, -0.038), "a": (0.040, 0.052, 0.045)},
         {"nom": "machoire",  "p": (0.000, 0.082, -0.075), "a": (0.048, 0.052, 0.030)},
+        # Les arcades : deux bosses au-dessus des yeux. Elles donnent au regard
+        # une assise ; sans elles les billes sont posées sur une sphère.
+        {"nom": "arcade_g",  "p": (-0.050, 0.058, 0.062), "a": (0.030, 0.026, 0.020)},
+        {"nom": "arcade_d",  "p": (0.050, 0.058, 0.062), "a": (0.030, 0.026, 0.020)},
+        # 🚨 Masse NÉGATIVE — elle creuse au lieu de gonfler. C'est le « stop »,
+        # la cassure entre le front et le museau : le trait qui sépare un chien
+        # d'une boule à museau. Aucune masse positive ne peut le produire, on ne
+        # fabrique pas un creux en ajoutant de la matière.
+        {"nom": "stop", "negatif": True,
+         "p": (0.000, 0.052, 0.020), "a": (0.052, 0.030, 0.026)},
     ],
+
+    # Le cou. Sans lui la tête flotte au-dessus du col : la tête humaine
+    # portait le cou dans son maillage, la masquer l'a emporté avec elle.
+    # Il plonge SOUS l'écharpe — inutile de le modeler là où rien ne le voit.
+    "cou": {
+        "points": [(0.0, -0.016, 0.010), (0.0, -0.024, -0.052),
+                   (0.0, -0.030, -0.112), (0.0, -0.030, -0.180)],
+        "demi_largeurs": [0.056, 0.047, 0.048, 0.062],
+        "demi_epaisseurs": [0.052, 0.045, 0.046, 0.060],
+        "sections": 14, "cotes": 16,
+    },
 
     # Oreille : cinq points de contrôle POSÉS, pas une formule. Elle part du
     # haut du crâne, s'écarte, puis PEND le long de la joue avec la pointe
@@ -323,6 +344,8 @@ def blocage(matrice):
         el.co = Vector(masse["p"])
         el.radius = plus_grand / FACTEUR_VISIBLE
         el.size_x, el.size_y, el.size_z = (c / plus_grand for c in a)
+        # Une masse négative CREUSE le champ au lieu de l'alimenter.
+        el.use_negative = bool(masse.get("negatif"))
     return obj
 
 
@@ -494,6 +517,19 @@ def oreille(cote, matrice, mats):
     pieces.append(objet_depuis_bmesh(bm_p, f"chien_pavillon_{cote_nom}",
                                      matrice, mats["pavillon"]))
     return pieces
+
+
+def cou(matrice, mat):
+    """Le cou : un balayage conique qui plonge sous le col.
+
+    ⚠️ Il n'était pas là parce que personne ne l'avait retiré : le cou vivait
+    DANS le maillage `SM_Head`. Masquer la tête humaine l'a donc emporté avec
+    elle, en silence. Une pièce absente parce qu'elle appartenait à une autre
+    est la faute la plus discrète d'un remplacement."""
+    c = SPEC["cou"]
+    bm = balayage([Vector(p) for p in c["points"]], c["demi_largeurs"],
+                  c["demi_epaisseurs"], c["sections"], c["cotes"])
+    return objet_depuis_bmesh(bm, "chien_cou", matrice, mat)
 
 
 def touffes(matrice, mat):
@@ -822,7 +858,7 @@ def main():
 
     # 5. les pièces accrochées à la surface — chacune trouvée au rayon, dans le
     #    MÊME repère d'auteur que les masses.
-    pieces = []
+    pieces = [cou(matrice, mats["poil"])]
     for cote in (-1, 1):
         pieces += oreille(cote, matrice, mats)
     pieces += touffes(matrice, mats["poil"])

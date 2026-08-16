@@ -14,13 +14,14 @@
 //! attache des enfants à une entité donnée. Le layer de rendu, la caméra et le
 //! cycle de vie restent la responsabilité de l'appelant.
 
+use bevy::camera::visibility::NoFrustumCulling;
 use bevy::gltf::Gltf;
 use bevy::mesh::skinning::SkinnedMesh;
 use bevy::platform::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use std::time::Duration;
 
-use crate::equipment::{EquipmentConfig, EquipmentSave};
+use crate::equipment::{AvatarAnimCfg, CorpsAvatar, EquipmentConfig, EquipmentSave};
 
 /// Teinte de rareté en attente d'application sur les matériaux d'une pièce.
 ///
@@ -74,20 +75,27 @@ pub fn equipped_key(save: &EquipmentSave) -> String {
 /// survivent au respawn.
 #[derive(Resource, Default)]
 pub struct AvatarBodyHandles {
-    /// (chemin, glTF entier, Scene(0)) — invalidé si le chemin du génome change.
-    cached: Option<(String, Handle<Gltf>, Handle<Scene>)>,
+    /// (chemin, glTF entier, Scene(0)) par corps connu.
+    ///
+    /// 🚨 Une seule entrée ne suffit PAS depuis qu'il y a deux corps (Hall et
+    /// Expédition) : passer de l'un à l'autre lâcherait le handle du premier,
+    /// donc son glTF serait déchargé, et le retour au Hall le rechargerait —
+    /// c'est exactement la ré-instanciation qui figeait l'armure sur des os
+    /// morts. Le cache ne s'invalide jamais : deux corps, deux entrées.
+    cached: Vec<(String, Handle<Gltf>, Handle<Scene>)>,
 }
 
 impl AvatarBodyHandles {
     /// Les handles du corps pour `path`, chargés UNE fois puis réutilisés.
     fn body(&mut self, assets: &AssetServer, path: &str) -> (Handle<Gltf>, Handle<Scene>) {
-        match &self.cached {
-            Some((p, g, s)) if p == path => (g.clone(), s.clone()),
-            _ => {
+        match self.cached.iter().find(|(p, _, _)| p == path) {
+            Some((_, g, s)) => (g.clone(), s.clone()),
+            None => {
                 let gltf: Handle<Gltf> = assets.load(path.to_string());
                 let scene: Handle<Scene> =
                     assets.load(GltfAssetLabel::Scene(0).from_asset(path.to_string()));
-                self.cached = Some((path.to_string(), gltf.clone(), scene.clone()));
+                self.cached
+                    .push((path.to_string(), gltf.clone(), scene.clone()));
                 (gltf, scene)
             }
         }
@@ -106,14 +114,15 @@ pub fn spawn_equipped_avatar(
     assets: &AssetServer,
     handles: &mut AvatarBodyHandles,
     cfg: &EquipmentConfig,
+    corps: &CorpsAvatar,
     save: &EquipmentSave,
     parent: Entity,
     local: Transform,
 ) -> Vec<Entity> {
     let mut spawned = Vec::new();
-    if !cfg.body_model.is_empty() {
+    if !corps.model.is_empty() {
         // Handles issus du cache permanent — cf. [`AvatarBodyHandles`].
-        let (gltf, scene) = handles.body(assets, &cfg.body_model);
+        let (gltf, scene) = handles.body(assets, &corps.model);
         spawned.push(
             commands
                 .spawn((
@@ -121,7 +130,7 @@ pub fn spawn_equipped_avatar(
                     SceneRoot(scene),
                     AvatarBody,
                     // Le glTF complet, pour lire ses clips PAR NOM une fois chargé.
-                    AvatarClips::new(gltf),
+                    AvatarClips::new(gltf, corps.anim.clone(), corps.model.clone()),
                     local,
                     Visibility::Inherited,
                     Name::new("avatar_body"),
@@ -129,6 +138,13 @@ pub fn spawn_equipped_avatar(
                 ))
                 .id(),
         );
+    }
+    // Un corps à son propre squelette ne porte pas l'armure : les pièces sont
+    // riggées sur les os du corps de base et suivraient les mauvais joints —
+    // elles flotteraient dans le monde au lieu de disparaître, donc le défaut
+    // serait visible sans être compris.
+    if !corps.porte_armure {
+        return spawned;
     }
     for (slot_id, rarity_id) in &save.equipped {
         let (Some(slot), Some(rarity)) = (cfg.slot(slot_id), cfg.rarity(rarity_id)) else {
@@ -158,6 +174,52 @@ pub fn spawn_equipped_avatar(
 /// Le matériau du glTF est **partagé** par les cinq pièces (elles sortent du
 /// même jeu de textures) : le muter en place les teindrait toutes pareil. On en
 /// clone donc un par pièce.
+/// Retire le tri par frustum des maillages **skinnés** de l'avatar.
+///
+/// # Le défaut que ça corrige, mesuré le 2026-08-14
+///
+/// Bevy calcule l'`Aabb` d'un maillage depuis ses **sommets en pose de repos**,
+/// puis la transforme par le `GlobalTransform` de l'entité. Or un maillage
+/// skinné n'est PAS placé par son entité : il est déformé par ses **os**. Les
+/// deux n'ont aucune raison de coïncider, et sur ce personnage elles divergent
+/// d'un facteur cent :
+///
+/// | | boîte de tri | géométrie affichée |
+/// |---|---|---|
+/// | `Cloak_low` (la cape) | **4 × 8 × 1 mm** | ~0,4 × 0,8 m |
+///
+/// La cape porte une échelle de 0,01 sur son nœud parent (`root.001`) — sans
+/// effet sur le rendu, qui passe par les os, mais qui **écrase sa boîte de tri**.
+/// Résultat en jeu : elle disparaît dès que ce point de 4 mm sort du champ,
+/// c'est-à-dire à beaucoup d'angles. Rapporté tel quel : « le personnage
+/// n'apparaît pas sous tous les angles… cape et accessoire aussi ».
+///
+/// Le second défaut, plus général : **tous** les clips de ce personnage sont des
+/// rotations pures (0 translation mesurée sur les 9). Les os font donc sortir la
+/// géométrie de la boîte de repos sans jamais la mettre à jour — le cas est
+/// structurel, pas propre à la cape.
+///
+/// # Pourquoi désactiver plutôt que corriger la boîte
+///
+/// Recalculer l'`Aabb` d'un maillage skinné chaque frame demanderait de lire les
+/// matrices de ses joints — un coût par frame pour une dizaine de pièces qui
+/// tiennent de toute façon toutes dans le même mètre cube. Les garder toujours
+/// rendues coûte moins que de les mesurer, et supprime la classe entière.
+pub fn sys_disable_frustum_culling_on_avatar(
+    mut commands: Commands,
+    q_parts: Query<Entity, With<AvatarPart>>,
+    q_children: Query<&Children>,
+    q_skinned: Query<Entity, (With<SkinnedMesh>, Without<NoFrustumCulling>)>,
+) {
+    for part in &q_parts {
+        for descendant in q_children.iter_descendants(part) {
+            if q_skinned.get(descendant).is_ok() {
+                commands.entity(descendant).insert(NoFrustumCulling);
+            }
+        }
+    }
+}
+
 pub fn sys_tint_avatar_pieces(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -411,6 +473,13 @@ fn sys_share_body_skeleton(
 #[derive(Component)]
 pub struct AvatarClips {
     gltf: Handle<Gltf>,
+    /// Les clips ATTENDUS de CE corps. Deux corps n'ont pas les mêmes noms :
+    /// lire un réglage global ici ferait chercher « walk » du trooper dans un
+    /// glTF qui ne l'a pas, et le personnage resterait bras écartés.
+    anim: AvatarAnimCfg,
+    /// Le chemin du corps, uniquement pour le diagnostic : savoir QUEL corps
+    /// n'a pas trouvé ses clips est la moitié de la réponse.
+    modele: String,
     /// Passes écoulées sans avoir trouvé de lecteur d'animation. Même raison que
     /// [`AvatarNeedsSkeletonShare`] : un corps qui n'est jamais câblé reste sur
     /// la pose de repos du glTF — bras écartés — et rien ne le signale.
@@ -418,8 +487,13 @@ pub struct AvatarClips {
 }
 
 impl AvatarClips {
-    pub fn new(gltf: Handle<Gltf>) -> Self {
-        Self { gltf, tries: 0 }
+    pub fn new(gltf: Handle<Gltf>, anim: AvatarAnimCfg, modele: String) -> Self {
+        Self {
+            gltf,
+            anim,
+            modele,
+            tries: 0,
+        }
     }
 }
 
@@ -432,6 +506,8 @@ struct AvatarAnimNodes {
     /// Nœud effectivement joué — évite de relancer le même clip chaque frame,
     /// ce qui le remettrait à zéro et figerait le personnage sur sa 1re pose.
     current: AnimationNodeIndex,
+    /// Seuils et fondu de CE corps — même raison que sur [`AvatarClips`].
+    anim: AvatarAnimCfg,
 }
 
 /// Ce que l'avatar doit jouer. Le Hall y écrit la vitesse mesurée ; l'aperçu du
@@ -439,6 +515,33 @@ struct AvatarAnimNodes {
 #[derive(Resource, Default)]
 pub struct AvatarLocomotion {
     pub speed: f32,
+}
+
+/// Pourquoi l'avatar joue — ou ne joue pas — ses clips.
+///
+/// # Pourquoi cette ressource existe
+///
+/// Le 2026-08-14, l'avatar de l'Expédition est resté en pose de repos, bras
+/// écartés. Le moteur AVAIT la réponse : un `warn!` imprime les clips attendus
+/// et ceux réellement présents. Mais le log n'était pas écrit — le jeu tournait
+/// encore — alors que les 99 capteurs, eux, l'étaient. Le diagnostic existait et
+/// restait hors de portée.
+///
+/// 🚨 La leçon dépasse ce cas : **un diagnostic qui ne vit que dans le log est
+/// indisponible tant que le jeu tourne**, c'est-à-dire exactement quand on en a
+/// besoin. Ce qui doit se lire pendant une partie appartient à un capteur.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct AvatarClipDiag {
+    /// Le corps concerné, pour distinguer Hall et Expédition.
+    pub corps: String,
+    /// Les trois noms cherchés, dans l'ordre repos / marche / course.
+    pub attendus: Vec<String>,
+    /// Ce que le glTF expose réellement. Vide = il n'est pas encore chargé.
+    pub presents: Vec<String>,
+    /// Le graphe a-t-il été câblé sur un lecteur d'animation ?
+    pub lie: bool,
+    /// Passes écoulées à chercher. Grand et `lie == false` = ça ne viendra plus.
+    pub passes: u32,
 }
 
 /// Câble le graphe d'animation dès que la scène d'une pièce expose son lecteur.
@@ -449,7 +552,7 @@ fn sys_bind_avatar_animations(
     mut commands: Commands,
     mut graphs: ResMut<Assets<AnimationGraph>>,
     gltfs: Res<Assets<Gltf>>,
-    cfg: Res<EquipmentConfig>,
+    mut diag: ResMut<AvatarClipDiag>,
     mut q_parts: Query<(Entity, &mut AvatarClips)>,
     q_children: Query<&Children>,
     mut q_player: Query<&mut AnimationPlayer>,
@@ -457,6 +560,17 @@ fn sys_bind_avatar_animations(
     for (part, mut clips) in &mut q_parts {
         clips.tries = clips.tries.saturating_add(1);
         let complain = clips.tries == SKELETON_SHARE_PATIENCE;
+        // Le diagnostic se met à jour à CHAQUE passe, y compris celles où rien
+        // n'aboutit : c'est justement l'état « rien n'aboutit » qu'on veut
+        // pouvoir lire pendant que le jeu tourne.
+        diag.attendus = vec![
+            clips.anim.idle_clip.clone(),
+            clips.anim.walk_clip.clone(),
+            clips.anim.run_clip.clone(),
+        ];
+        diag.passes = clips.tries;
+        diag.lie = false;
+        diag.corps = clips.modele.clone();
         // Le glTF doit être chargé pour qu'on puisse lire ses noms de clips.
         let Some(gltf) = gltfs.get(&clips.gltf) else {
             if complain {
@@ -468,7 +582,13 @@ fn sys_bind_avatar_animations(
             }
             continue;
         };
-        let anim = &cfg.animation;
+        let anim = clips.anim.clone();
+        diag.presents = gltf
+            .named_animations
+            .keys()
+            .map(|k| k.to_string())
+            .collect();
+        diag.presents.sort();
         let pick = |name: &String| gltf.named_animations.get(name.as_str()).cloned();
         let (Some(idle), Some(walk), Some(run)) = (
             pick(&anim.idle_clip),
@@ -498,6 +618,7 @@ fn sys_bind_avatar_animations(
                 walk: graph.add_clip(walk.clone(), 1.0, root),
                 run: graph.add_clip(run.clone(), 1.0, root),
                 current: AnimationNodeIndex::default(),
+                anim: anim.clone(),
             };
             // `AnimationTransitions` est ce qui permet le FONDU. Sans lui, tout
             // changement de clip est une coupure sèche — c'est ce qui trahit le
@@ -521,6 +642,7 @@ fn sys_bind_avatar_animations(
             info!("[avatar] animations câblées sur le corps {part:?}");
             bound = true;
         }
+        diag.lie = bound;
         if bound {
             commands.entity(part).remove::<AvatarClips>();
         } else if complain {
@@ -535,7 +657,6 @@ fn sys_bind_avatar_animations(
 
 /// Choisit le clip depuis la vitesse et enchaîne en fondu.
 fn sys_drive_avatar_locomotion(
-    cfg: Res<EquipmentConfig>,
     loco: Res<AvatarLocomotion>,
     mut q: Query<(
         &mut AnimationPlayer,
@@ -543,9 +664,9 @@ fn sys_drive_avatar_locomotion(
         &mut AvatarAnimNodes,
     )>,
 ) {
-    let anim = &cfg.animation;
-    let cross = Duration::from_millis(anim.crossfade_ms);
     for (mut player, mut transitions, mut nodes) in &mut q {
+        let anim = nodes.anim.clone();
+        let cross = Duration::from_millis(anim.crossfade_ms);
         let next = if loco.speed >= anim.run_speed_min {
             nodes.run
         } else if loco.speed >= anim.walk_speed_min {
@@ -662,10 +783,14 @@ impl Plugin for AvatarPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvatarLocomotion>()
             .init_resource::<AvatarBodyHandles>()
+            .init_resource::<AvatarClipDiag>()
             .add_systems(
             Update,
             (
                 sys_tint_avatar_pieces,
+                // Avant tout le reste : une pièce triée hors du champ ne se voit
+                // pas, quelle que soit la justesse de sa teinte ou de son os.
+                sys_disable_frustum_culling_on_avatar,
                 // Le partage précède le câblage : une pièce encore sur son propre
                 // squelette n'a rien à faire jouer.
                 sys_share_body_skeleton,

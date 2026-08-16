@@ -429,6 +429,11 @@ pub struct HitscanCtx<'w, 's> {
     /// Story-531 — jauge + tuning lus pour le payoff dégâts (neutre hors Pépin).
     pub pepin_conf: Res<'w, forgia_combat::confidence::PepinConfidence>,
     pub pepin_tuning: Res<'w, pepin::PepinTuning>,
+    /// Bouche du canon de l'arme VISIBLE dans le monde (3ᵉ personne). `None` en
+    /// vue subjective → repli sur le calcul viewmodel. Rangée dans ce paquet et
+    /// non en paramètre direct : `fire_weapon_minimal` est déjà à 16 params, la
+    /// limite de Bevy — un 17ᵉ ne compilerait pas.
+    pub muzzle: Option<Res<'w, forgia_combat::weapons::MuzzleWorld>>,
     /// Story-615 — bullet magnetism : cibles candidates (cross-mode, découplé du
     /// type `Health` — `Mortal Without<Player>` matche ennemis FPS + Roguelite).
     pub aim_targets: Query<
@@ -470,10 +475,14 @@ pub fn falloff_multiplier(toi: f32, e: &ViewmodelGenomeEntry) -> f32 {
 ///
 /// `ArenaTest` en fait partie : un blockout qu'on ne peut pas tirer dessus ne se
 /// juge pas. Les distances d'engagement sont la moitié du level design FPS.
+/// `Expedition` en fait partie depuis le 2026-08-14 : elle se joue à la 3ᵉ
+/// personne, mais « à la 3ᵉ personne » ne veut pas dire « sans combat ». Le tir
+/// y part de la caméra par-dessus l'épaule (cf. `AimCamera`), et l'arme
+/// équipée est visible dans la main du personnage.
 fn fps_combat_mode(mode: Res<State<GameMode>>) -> bool {
     matches!(
         mode.get(),
-        GameMode::Fps | GameMode::Roguelite | GameMode::ArenaTest
+        GameMode::Fps | GameMode::Roguelite | GameMode::ArenaTest | GameMode::Expedition
     )
 }
 
@@ -752,7 +761,7 @@ fn fire_allowed(blockers: Res<InputBlockers>) -> bool {
 #[allow(clippy::too_many_arguments)]
 fn fire_weapon_minimal(
     rapier: ReadRapierContext,
-    q_cam: Query<&GlobalTransform, With<FpsCamera>>,
+    q_cam: Query<(&GlobalTransform, &Camera), With<AimCamera>>,
     q_player: Query<Entity, With<Player>>,
     mut hit_ctx: HitApplyCtx,
     mut commands: Commands,
@@ -818,8 +827,21 @@ fn fire_weapon_minimal(
         return;
     }
 
-    let Ok(cam_tf) = q_cam.single() else {
-        warn!("[fire] FpsCamera not found");
+    // On tire depuis la caméra QUI REND. En vue subjective c'est la `FpsCamera` ;
+    // en 3ᵉ personne (Hall, Expédition) `castle_avatar` la désactive et rend une
+    // caméra orbitale — les deux portent `AimCamera`, `is_active` départage.
+    //
+    // Le repli sur la première caméra marquée n'est PAS un détail cosmétique :
+    // sans lui, une frame où aucune caméra n'est encore marquée active avalerait
+    // le tir en silence. On préfère tirer depuis une caméra plausible et le
+    // signaler que ne pas tirer sans rien dire.
+    let Some(cam_tf) = q_cam
+        .iter()
+        .find(|(_, c)| c.is_active)
+        .or_else(|| q_cam.iter().next())
+        .map(|(gt, _)| gt)
+    else {
+        warn!("[fire] aucune AimCamera — ni FpsCamera ni camera 3e personne");
         return;
     };
     let Ok(ctx) = rapier.single() else {
@@ -919,14 +941,20 @@ fn fire_weapon_minimal(
     let cam_up_v = cam_tf.up().as_vec3();
     let barrel_tip =
         origin + direction * forward_dist + cam_right_v * gun_off_x + cam_up_v * gun_off_y;
+    // D'où le TIR SE VOIT partir. Le rayon, lui, part toujours de la caméra —
+    // c'est ce qui fait que le réticule dit vrai. Seul le visuel suit l'arme.
+    //
+    // En vue subjective les deux se confondent (le canon est à 30 cm de l'œil).
+    // En 3ᵉ personne la caméra est 3,2 m derrière le personnage : la lueur et le
+    // traceur sortiraient d'un point vide à côté de son épaule. Le module qui
+    // rend l'arme visible publie donc la position réelle de sa bouche.
+    let bouche = hitscan_ctx
+        .muzzle
+        .as_deref()
+        .and_then(|m| m.0)
+        .unwrap_or(barrel_tip);
     if let Some(vfx) = weapon_vfx.as_deref() {
-        spawn_muzzle_flash(
-            &mut commands,
-            vfx,
-            barrel_tip,
-            direction,
-            &ammo.equipped.current,
-        );
+        spawn_muzzle_flash(&mut commands, vfx, bouche, direction, &ammo.equipped.current);
     }
 
     let range = entry.map(|e| e.range).unwrap_or(100.0);
@@ -997,12 +1025,23 @@ fn fire_weapon_minimal(
         let hit_dist = hit_result.map(|(_, t)| t).unwrap_or(range);
         if !projectile_weapon {
             if let Some(tres) = tracer_res.as_deref() {
+                // Le traceur relie LA BOUCHE au point touché — pas la caméra au
+                // point touché. En vue subjective les deux tracés se
+                // superposent ; en 3ᵉ personne, seul le premier sort de l'arme.
+                // Un vecteur nul (bouche pile sur l'impact, tir à bout portant)
+                // retomberait sur la direction du rayon plutôt que d'exploser en
+                // NaN.
+                let impact = origin + pellet_dir * hit_dist;
+                let (depart_dir, longueur) = (impact - bouche)
+                    .try_normalize()
+                    .map(|d| (d, (impact - bouche).length()))
+                    .unwrap_or((pellet_dir, hit_dist));
                 spawn_hitscan_tracer(
                     &mut commands,
                     tres,
-                    origin,
-                    pellet_dir,
-                    hit_dist,
+                    bouche,
+                    depart_dir,
+                    longueur,
                     &ammo.equipped.current,
                     range.min(120.0),
                     0.30,

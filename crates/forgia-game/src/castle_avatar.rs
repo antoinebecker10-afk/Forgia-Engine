@@ -24,8 +24,8 @@ use bevy_rapier3d::prelude::{
 use forgia_camera_orbit::OrbitCamera;
 use forgia_core::prelude::*;
 use forgia_mode_roguelite::avatar::{equipped_key, spawn_equipped_avatar, AvatarLocomotion};
-use forgia_mode_roguelite::equipment::{EquipmentConfig, EquipmentSave};
-use forgia_player::prelude::{FpsCamera, Player};
+use forgia_mode_roguelite::equipment::{CorpsAvatar, EquipmentConfig, EquipmentSave};
+use forgia_player::prelude::{AimCamera, FpsCamera, Player};
 use forgia_player::ViewmodelCamera;
 
 /// Pieds du personnage sous l'origine du joueur.
@@ -100,6 +100,30 @@ fn camera_du_mode(mode: &GameMode, joueur: Entity) -> OrbitCamera {
     }
 }
 
+/// Une liste de noms en tableau JSON. Les noms de clips viennent d'un glTF,
+/// donc d'un fichier qu'on ne contrôle pas : les guillemets et antislashes
+/// s'échappent, sinon un clip mal nommé casse le capteur ENTIER — et un capteur
+/// illisible se lit comme une absence de problème.
+fn liste_json(v: &[String]) -> String {
+    v.iter()
+        .map(|s| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// Le corps que ce mode porte.
+///
+/// Le Hall montre l'équipement looté : c'est le corps de base, celui sur le
+/// squelette duquel les cinq pièces sont riggées. L'Expédition a son propre
+/// personnage, avec son squelette et ses clips — il ne porte donc pas l'armure,
+/// et c'est déclaré dans le génome, pas ici.
+fn corps_du_mode(mode: &GameMode, cfg: &EquipmentConfig) -> CorpsAvatar {
+    match mode {
+        GameMode::Expedition => cfg.corps_expedition(),
+        _ => cfg.corps_de_base(),
+    }
+}
+
 fn sys_setup_third_person(
     mut commands: Commands,
     mode: Res<State<GameMode>>,
@@ -127,8 +151,20 @@ fn sys_setup_third_person(
 
     let orbit = camera_du_mode(mode.get(), player);
     let epaule = orbit.shoulder_offset;
+    // On LIT la visée sur la caméra choisie. La tracer depuis la constante du
+    // Hall affichait « 0,49 m » en Expédition alors que la caméra y est réglée à
+    // 1,55 : un log qui décrit un autre objet que celui qui tourne coûte plus
+    // cher qu'un log absent, parce qu'on le croit.
+    let visee = orbit.height_offset;
     commands.spawn((
         HallOrbitCamera,
+        // 🚨 Sans ce marqueur, le tir continuerait de suivre la `FpsCamera` —
+        // celle qu'on vient de DÉSACTIVER deux lignes plus haut. Le réticule au
+        // centre de l'écran désignerait alors autre chose que ce que la balle
+        // touche, et l'écart grandirait avec le tangage (les deux caméras n'ont
+        // ni la même sensibilité ni les mêmes bornes). On tire depuis la caméra
+        // qui rend : c'est celle-ci tant que la 3ᵉ personne est montée.
+        AimCamera,
         Camera3d::default(),
         Camera {
             is_active: true,
@@ -140,9 +176,8 @@ fn sys_setup_third_person(
     ));
     info!(
         "[avatar-3p] {:?} en 3e personne — FpsCamera et viewmodel coupes, \
-         visee a {:.2} m, epaule {epaule:.2} m",
-        mode.get(),
-        CAMERA_SHOULDER_OFFSET_M
+         visee a {visee:.2} m, epaule {epaule:.2} m",
+        mode.get()
     );
 }
 
@@ -152,6 +187,7 @@ fn sys_sync_hall_avatar(
     assets: Res<AssetServer>,
     mut body_handles: ResMut<forgia_mode_roguelite::avatar::AvatarBodyHandles>,
     cfg: Res<EquipmentConfig>,
+    mode: Res<State<GameMode>>,
     save: Res<EquipmentSave>,
     q_player: Query<(Entity, &KinematicCharacterController), With<Player>>,
     q_root: Query<Entity, With<HallAvatarRoot>>,
@@ -171,7 +207,11 @@ fn sys_sync_hall_avatar(
         // on ne compense pas plutôt que de compenser faux.
         CharacterLength::Relative(_) => 0.0,
     };
-    let key = equipped_key(&save);
+    let corps = corps_du_mode(mode.get(), &cfg);
+    // Le corps entre dans la clé : sans lui, passer du Hall à l'Expédition ne
+    // ferait rien bouger — l'équipement porté n'a pas changé — et le personnage
+    // du Hall partirait en expédition.
+    let key = format!("{}|{}", corps.model, equipped_key(&save));
     if shown.0.as_deref() == Some(key.as_str()) && !q_root.is_empty() {
         return;
     }
@@ -193,14 +233,20 @@ fn sys_sync_hall_avatar(
         &assets,
         &mut body_handles,
         &cfg,
+        &corps,
         &save,
         root,
         Transform::default(),
     );
     shown.0 = Some(key);
     info!(
-        "[castle-avatar] avatar monté — {} pièce(s) portée(s)",
-        save.equipped.len()
+        "[castle-avatar] avatar monté — corps {}, {} pièce(s) portée(s)",
+        corps.model,
+        if corps.porte_armure {
+            save.equipped.len()
+        } else {
+            0
+        }
     );
 }
 
@@ -287,7 +333,20 @@ fn sys_write_castle_avatar_sensor(
     rapier: ReadRapierContext,
     q_player: Query<Entity, With<Player>>,
     loco: Res<AvatarLocomotion>,
+    diag: Res<forgia_mode_roguelite::avatar::AvatarClipDiag>,
+    mut vitesse_max: Local<f32>,
 ) {
+    // 🚨 AVANT le pas de 1 Hz. La vitesse instantanée échantillonnée une fois
+    // par seconde ne prouve rien : elle vaut 0 dès qu'on lâche la touche, et
+    // « le personnage ne marche jamais » devient indistinguable de « je ne
+    // bougeais pas au moment de la mesure ». Rapporté en jeu le 2026-08-15 :
+    // « j'ai pas d'autre animation que idle ».
+    //
+    // Le maximum vu, lui, tranche : les seuils de clip valent 0,6 m/s (marche)
+    // et 6,0 m/s (course). Un maximum resté sous 0,6 accuse le producteur de
+    // vitesse ; un maximum au-dessus alors que rien ne bouge à l'écran accuse
+    // le choix de clip. Deux causes, une mesure.
+    *vitesse_max = vitesse_max.max(loco.speed);
     *accum += time.delta_secs();
     if *accum < 1.0 {
         return;
@@ -401,6 +460,15 @@ fn sys_write_castle_avatar_sensor(
             "warn",
             "AVATAR_DESYNC : les pieces ne suivent pas le corps — une armature reste en pose de repos, l'armure se detache des bras",
         )
+    } else if anim_players > 0 && anim_playing == 0 && !diag.lie {
+        // Le cas TOTAL se distingue du partiel : aucune pièce ne joue, donc ce
+        // n'est pas une armure qui décroche — c'est le câblage lui-même qui n'a
+        // pas eu lieu. Et le champ `clips_*` du capteur dit pourquoi, sans avoir
+        // à attendre la fermeture du jeu pour lire le log.
+        (
+            "critical",
+            "AVATAR_ANIM_ABSENT : le corps est en pose de repos, bras ecartes — comparer clips_attendus et clips_presents ci-dessous : si un nom manque, corriger le genome ; si presents est vide, le glTF du corps n'expose aucune animation",
+        )
     } else if anim_players > 0 && anim_playing < anim_players {
         (
             "warn",
@@ -416,7 +484,7 @@ fn sys_write_castle_avatar_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"castle_avatar","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"mounted":{},"mesh_count":{},"visible_meshes":{},"camera_distance_m":{:.2},"ground_gap_m":{:.3},"speed_mps":{:.2},"anim_players":{},"anim_playing":{},"bone_copies":{},"desync_m":{:.3},"avatar_pos":[{:.1},{:.1},{:.1}],"camera_pos":[{:.1},{:.1},{:.1}],"equipped_total":{}}}"#,
+        r#"{{"id":"castle_avatar","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"mounted":{},"mesh_count":{},"visible_meshes":{},"camera_distance_m":{:.2},"ground_gap_m":{:.3},"speed_mps":{:.2},"vitesse_max_vue_mps":{:.2},"anim_players":{},"anim_playing":{},"bone_copies":{},"desync_m":{:.3},"avatar_pos":[{:.1},{:.1},{:.1}],"camera_pos":[{:.1},{:.1},{:.1}],"equipped_total":{},"corps":"{}","clips_lies":{},"clips_passes":{},"clips_attendus":[{}],"clips_presents":[{}]}}"#,
         time.elapsed_secs(),
         mounted,
         mesh_count,
@@ -428,6 +496,7 @@ fn sys_write_castle_avatar_sensor(
             -99.0
         },
         loco.speed,
+        *vitesse_max,
         anim_players,
         anim_playing,
         bone_copies,
@@ -439,6 +508,11 @@ fn sys_write_castle_avatar_sensor(
         camera_pos.y,
         camera_pos.z,
         save.equipped.len(),
+        diag.corps,
+        diag.lie,
+        diag.passes,
+        liste_json(&diag.attendus),
+        liste_json(&diag.presents),
     );
     let _ = forgia_core::sensor_io::enqueue("forgia2_castle_avatar.json", json);
 }

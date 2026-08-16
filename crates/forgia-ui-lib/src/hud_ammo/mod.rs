@@ -89,8 +89,15 @@ pub(crate) fn draw_ammo_counter(
     time: Res<Time>,
     mut cache: Local<DrawCache>,
 ) {
+    // `Expedition` (2026-08-14) : elle se joue à la 3ᵉ personne et son combat
+    // consomme les mêmes munitions. Un mode où l'on tire sans compteur de
+    // munitions n'est pas « épuré », il est illisible — on ne sait jamais quand
+    // recharger.
     if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
+        || !matches!(
+            *game_mode.get(),
+            GameMode::Fps | GameMode::Roguelite | GameMode::Expedition
+        )
     {
         return;
     }
@@ -238,8 +245,12 @@ pub(crate) fn draw_slot_strip(
 ) {
     // Story-571 HUD : en Roguelite, les armes sont affichées par
     // `forgia-mode-roguelite::hud::draw_weapon_slots` (noms lore Pépin/Bourrasque/…).
-    // Ce strip vertical n'est donc gardé que pour l'Arena FPS (évite le doublon).
-    if *app_state.get() != AppMode::InGame || !matches!(*game_mode.get(), GameMode::Fps) {
+    // Ce strip vertical est donc gardé pour les modes qui n'ont pas leur propre
+    // affichage d'armes : l'Arena FPS, et l'Expédition (2026-08-14) — où le
+    // changement d'arme est actif et doit donc se voir.
+    if *app_state.get() != AppMode::InGame
+        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Expedition)
+    {
         return;
     }
     if equipped.slots.is_empty() {

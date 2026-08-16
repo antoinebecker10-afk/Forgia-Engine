@@ -14,12 +14,21 @@
 //! Le second par [`manifest`], qui porte **la seule conversion de repère du
 //! projet** — cf. sa documentation pour la raison.
 
+pub mod arme_main;
+pub mod avatar_vfx;
 pub mod cycle;
+pub mod eau;
+pub mod lampes;
 pub mod lighting;
 pub mod manifest;
 pub mod plugin;
+pub mod visee;
 
+pub use arme_main::{ArmeMainGenome, EtatArmeMain, ExpeditionArmeMainPlugin};
+pub use avatar_vfx::{AvatarExpedition, ExpeditionAvatarPlugin};
+pub use lampes::{Brasero, LampesConfig};
 pub use cycle::{CycleConfig, EtatCycle};
 pub use lighting::CycleState;
-pub use manifest::{ExpeditionManifest, ExpeditionManifestError};
+pub use manifest::{ExpeditionManifest, ExpeditionManifestError, LampeDef};
 pub use plugin::{ActiveExpedition, ExpeditionMarker, ForgiaExpeditionPlugin};
+pub use visee::{ExpeditionViseePlugin, Visee, ViseeGenome};

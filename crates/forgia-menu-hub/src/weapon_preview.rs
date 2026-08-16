@@ -489,6 +489,8 @@ fn sys_sync_character_pieces(
         &assets,
         &mut body_handles,
         &cfg,
+        // L'aperçu du menu montre l'équipement : c'est le corps de base.
+        &cfg.corps_de_base(),
         &save,
         holder,
         Transform::default(),

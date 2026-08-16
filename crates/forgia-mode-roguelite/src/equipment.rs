@@ -110,6 +110,30 @@ impl Default for AvatarAnimCfg {
     }
 }
 
+/// Un corps jouable : son modèle, **ses** clips, et s'il porte l'armure lootée.
+///
+/// 🚨 Les clips voyagent avec le corps, jamais dans un réglage global. Deux
+/// corps n'ont ni le même squelette ni les mêmes noms de clips : une config
+/// d'animation unique serait la même grandeur écrite deux fois, et le second
+/// personnage resterait figé sur sa pose de repos sans que rien ne le dise.
+#[derive(Clone, Debug)]
+pub struct CorpsAvatar {
+    pub model: String,
+    pub anim: AvatarAnimCfg,
+    /// Faux quand le corps a son propre squelette : les pièces d'armure sont
+    /// riggées sur celui du corps de base et suivraient les mauvais os.
+    pub porte_armure: bool,
+}
+
+/// Corps alternatif déclaré en couche definition. Absent = ce mode prend le
+/// corps de base.
+#[derive(Deserialize, Clone, Debug)]
+pub struct CorpsAlternatif {
+    pub model: String,
+    #[serde(default)]
+    pub animation: AvatarAnimCfg,
+}
+
 #[derive(Resource, Deserialize, Clone, Debug, Default)]
 pub struct EquipmentConfig {
     #[serde(default)]
@@ -118,6 +142,10 @@ pub struct EquipmentConfig {
     /// pièce n'est équipée).
     #[serde(default)]
     pub body_model: String,
+    /// Le personnage de l'Expédition. Il a son propre squelette et ses propres
+    /// clips, donc il ne porte pas l'armure du Hall.
+    #[serde(default)]
+    pub expedition_body: Option<CorpsAlternatif>,
     /// Emplacement dont la rareté teinte les bras du viewmodel — le seul visible
     /// en combat.
     #[serde(default)]
@@ -151,6 +179,28 @@ impl EquipmentConfig {
                 warn!("[equipment] {CONFIG_PATH} absent: {e} — équipement désactivé");
                 Self::default()
             }
+        }
+    }
+
+    /// Le corps par défaut : celui qui porte l'armure lootée. C'est lui au Hall
+    /// et dans l'aperçu du menu.
+    pub fn corps_de_base(&self) -> CorpsAvatar {
+        CorpsAvatar {
+            model: self.body_model.clone(),
+            anim: self.animation.clone(),
+            porte_armure: true,
+        }
+    }
+
+    /// Le corps de l'Expédition, ou celui de base si le génome n'en déclare pas.
+    pub fn corps_expedition(&self) -> CorpsAvatar {
+        match &self.expedition_body {
+            Some(alt) => CorpsAvatar {
+                model: alt.model.clone(),
+                anim: alt.animation.clone(),
+                porte_armure: false,
+            },
+            None => self.corps_de_base(),
         }
     }
 
@@ -1101,6 +1151,146 @@ mod tests {
                 .expect("le genome d'équipement doit être lisible depuis la crate"),
         )
         .expect("le genome d'équipement doit parser")
+    }
+
+    /// 🚨 Les seuils d'animation SÉPARENT les vitesses réelles du joueur — ils ne
+    /// se choisissent pas.
+    ///
+    /// Le joueur n'a que trois vitesses : arrêt, `speed`, `speed ×
+    /// sprint_multiplier`. Les deux seuils doivent tomber ENTRE elles :
+    ///
+    /// ```text
+    ///     0 < walk_speed_min < speed < run_speed_min < speed × sprint_multiplier
+    /// ```
+    ///
+    /// Défaut réel du 2026-08-15 : `run_speed_min` valait **6,0** pour une marche
+    /// à **6,5 m/s**. Marcher déclenchait donc le clip de course, et `walk` —
+    /// présent dans le GLB, câblé, chargé — n'était **jamais joué**. Rien ne le
+    /// signalait : ce n'est ni une erreur de chargement ni un clip manquant, juste
+    /// deux nombres écrits dans deux fichiers qui ne se parlaient pas.
+    ///
+    /// Ce test les fait se parler : il lit les DEUX génomes.
+    #[test]
+    fn les_seuils_d_animation_separent_les_vitesses_du_joueur() {
+        #[derive(Deserialize)]
+        struct Mouvement {
+            speed: f32,
+            sprint_multiplier: f32,
+        }
+        let m: Mouvement = toml::from_str(
+            &std::fs::read_to_string("../../assets/genomes/player_movement.toml")
+                .expect("le genome de mouvement du joueur doit etre lisible"),
+        )
+        .expect("le genome de mouvement doit parser");
+        let marche = m.speed;
+        let sprint = m.speed * m.sprint_multiplier;
+        assert!(
+            marche > 0.0 && sprint > marche,
+            "vitesses incoherentes : marche {marche}, sprint {sprint}"
+        );
+
+        let c = cfg();
+        for (etiquette, corps) in [
+            ("corps de base", c.corps_de_base()),
+            ("corps d'expedition", c.corps_expedition()),
+        ] {
+            let a = &corps.anim;
+            assert!(
+                a.walk_speed_min < marche,
+                "{etiquette} : walk_speed_min {} >= la marche du joueur ({marche} m/s) — \
+                 le personnage resterait en pose de repos en marchant",
+                a.walk_speed_min
+            );
+            assert!(
+                a.run_speed_min > marche,
+                "{etiquette} : run_speed_min {} <= la marche du joueur ({marche} m/s) — \
+                 marcher declenche la COURSE et le clip de marche devient \
+                 INATTEIGNABLE. C'est le defaut du 2026-08-15.",
+                a.run_speed_min
+            );
+            assert!(
+                a.run_speed_min < sprint,
+                "{etiquette} : run_speed_min {} >= le sprint du joueur ({sprint} m/s) — \
+                 sprinter ne declencherait jamais la course",
+                a.run_speed_min
+            );
+            // Le plafond anti-téléport doit laisser passer le sprint, et rien de
+            // beaucoup plus rapide : trop haut, un pic de replacement fait courir
+            // le personnage à l'arrêt (mesuré : 29,79 m/s pour un plafond à 30).
+            assert!(
+                a.max_sane_speed > sprint && a.max_sane_speed < sprint * 2.0,
+                "{etiquette} : max_sane_speed {} hors de ]{sprint} ; {}[ — trop bas il \
+                 bride le sprint, trop haut il laisse passer les teleports",
+                a.max_sane_speed,
+                sprint * 2.0
+            );
+        }
+    }
+
+    /// Les clips se résolvent PAR NOM au chargement : un nom qui n'existe pas
+    /// dans le GLB laisse le personnage sur sa pose de repos, bras écartés, et
+    /// le seul signal est un `warn!` dans un log de 30 Ko. Ce test lit le VRAI
+    /// fichier et compare les deux listes — la seule façon d'attraper la faute
+    /// de frappe avant qu'elle ne coûte une session.
+    #[test]
+    fn les_clips_declares_existent_dans_le_glb_du_corps() {
+        let c = cfg();
+        let mut mesures = 0;
+        for (etiquette, corps) in [
+            ("corps de base", c.corps_de_base()),
+            ("corps d'expédition", c.corps_expedition()),
+        ] {
+            let chemin = std::path::Path::new("../../assets").join(&corps.model);
+            assert!(
+                chemin.exists(),
+                "{etiquette} : {} est déclaré mais absent du disque",
+                corps.model
+            );
+            // Seul un GLB porte son JSON en clair au même endroit ; un .gltf
+            // externe se lirait tel quel. On ne teste que ce qu'on sait lire.
+            let Some(noms) = clips_du_glb(&chemin) else {
+                continue;
+            };
+            for attendu in [
+                &corps.anim.idle_clip,
+                &corps.anim.walk_clip,
+                &corps.anim.run_clip,
+            ] {
+                assert!(
+                    noms.iter().any(|n| n == attendu),
+                    "{etiquette} : le clip « {attendu} » est déclaré au génome \
+                     mais absent de {} — clips présents : {noms:?}",
+                    corps.model
+                );
+            }
+            mesures += 1;
+        }
+        // Un contrôle qui n'a rien mesuré n'est pas vert, il est aveugle : si
+        // les deux corps devenaient des .gltf externes, la boucle ci-dessus ne
+        // vérifierait plus RIEN tout en passant.
+        assert!(
+            mesures > 0,
+            "aucun corps mesuré — le test ne sait lire que les GLB binaires"
+        );
+    }
+
+    /// Noms des animations d'un GLB, lus dans son chunk JSON. `None` si le
+    /// fichier n'est pas un GLB binaire — on préfère ne rien affirmer plutôt
+    /// que de rendre une liste vide, qui se lirait comme « aucun clip ».
+    fn clips_du_glb(chemin: &std::path::Path) -> Option<Vec<String>> {
+        let d = std::fs::read(chemin).ok()?;
+        if d.len() < 20 || &d[0..4] != b"glTF" {
+            return None;
+        }
+        let taille = u32::from_le_bytes(d[12..16].try_into().ok()?) as usize;
+        let json: serde_json::Value = serde_json::from_slice(d.get(20..20 + taille)?).ok()?;
+        Some(
+            json.get("animations")?
+                .as_array()?
+                .iter()
+                .filter_map(|a| a.get("name")?.as_str().map(str::to_owned))
+                .collect(),
+        )
     }
 
     #[test]

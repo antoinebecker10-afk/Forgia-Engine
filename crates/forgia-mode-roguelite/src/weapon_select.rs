@@ -93,15 +93,13 @@ pub struct WeaponCards {
 }
 
 /// Map `WeaponType` (enum legacy) → clé TOML `[weapons.<key>]` de `viewmodel_arena.toml`.
-/// Miroir de `forgia_viewmodel::weapon_genome_key` (dupliqué pour éviter la dép crate).
+///
+/// N'est plus un miroir : la table vit sur `WeaponType` (`forgia-combat`, déjà
+/// une dépendance d'ici). Elle avait deux copies — celle-ci se déclarait
+/// « dupliquée pour éviter la dép crate » — et une troisième s'annonçait avec
+/// l'arme tenue en main. Cette fonction reste pour ses appelants, et délègue.
 pub fn vm_key(w: WeaponType) -> &'static str {
-    match w {
-        WeaponType::ModernAR => "pepin",
-        WeaponType::AssaultRifle => "bourrasque",
-        WeaponType::Shotgun => "madame_lenoir",
-        WeaponType::RocketLauncher => "boucherie",
-        _ => "pepin",
-    }
+    w.genome_key()
 }
 
 /// DPS soutenu = dégâts × cadence (tirs/s) × pellets. Pur, testable.

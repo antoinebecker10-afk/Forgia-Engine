@@ -151,13 +151,81 @@ run_clip = "walk"
 crossfade_ms = 150
 
 # Seuils de vitesse horizontale (m/s) qui décident du clip.
+#
+# 🚨 Ils se DÉRIVENT de `player_movement.toml` (marche 6,5 · sprint 9,75), ils ne
+# se choisissent pas : `0 < walk_speed_min < marche < run_speed_min < sprint`.
+#
+# `run_speed_min` valait 6,0 — SOUS la vitesse de marche — donc marcher
+# déclenchait la course. Invisible ici tant que `run_clip = "walk"`, mais le
+# défaut serait réapparu le jour où le trooper aura son vrai clip de course.
+# Corrigé le 2026-08-15 en même temps que celui de l'Expédition, où il se voyait.
 walk_speed_min = 0.6
-run_speed_min = 6.0
+run_speed_min = 8.0
 
 # 🚨 Plafond anti-téléport. La vitesse est dérivée du déplacement réel : un
 # replacement au spawn produit un pic de plusieurs centaines de m/s et ferait
 # courir le personnage à l'arrêt. Même garde-fou que les ennemis.
-max_sane_speed = 30.0
+#
+# 15,0 ≈ 1,5 × le sprint. 30 laissait passer des pics mesurés à 29,79 m/s.
+max_sane_speed = 15.0
+
+# ── Le personnage de l'Expédition ────────────────────────────────────────────
+# Un AUTRE personnage, pas une variante du trooper : son propre squelette (62 os
+# en nommage Mixamo) et ses propres clips, fusionnés dans son GLB par
+# `tools/assets/merge_gltf_anims.py`.
+#
+# 🚨 Il ne porte PAS l'armure lootée. Les cinq pièces sont riggées sur les 68 os
+# du trooper ; posées sur ce squelette-ci elles suivraient les mauvais joints et
+# flotteraient dans le monde — un défaut visible sans être compréhensible. Le
+# moteur le sait (`CorpsAvatar::porte_armure`), il n'y a rien à tenter ici.
+#
+# Clips disponibles dans le GLB : death, hammer_strike, hit_react, idle,
+# jog_backward, jump, run, swim, walk. Seuls idle/walk/run sont câblés
+# aujourd'hui — les autres attendent un système qui sache quand les jouer.
+
+[expedition_body]
+# `_complet` et non `_animated` : MÊME corps (62 os Mixamo identiques, mêmes 9
+# clips — vérifié sur les deux GLB), plus la cape à l'ourlet ardent, la dague,
+# et 4 sockets nommés. C'est le seul des deux fichiers qui porte une cape.
+#
+# 🚨 Il contient DEUX squelettes : celui du corps (62 os) et celui de la cape
+# (6 os `cloak_01`…`cloak_06`), donc deux `AnimationPlayer`. `sys_bind_avatar_
+# animations` les câble TOUS (il ne s'arrête pas au premier) — c'est ce qui rend
+# l'échange sûr. Un brancheur qui s'arrêterait au premier lecteur laisserait le
+# corps bras écartés : c'est exactement le défaut qu'a produit une autre version.
+model = "models/characters/stylized/stylized_male_complet.glb"
+
+[expedition_body.animation]
+idle_clip = "idle"
+walk_clip = "walk"
+# Celui-là existe VRAIMENT ici, contrairement au trooper : le personnage court.
+run_clip = "run"
+crossfade_ms = 150
+
+# 🚨 CES DEUX SEUILS SE DÉRIVENT DE `player_movement.toml`, ils ne se choisissent
+# pas. Le joueur n'a que trois vitesses :
+#
+#     arrêt 0 · marche `speed` = 6,5 · sprint `speed × sprint_multiplier` = 9,75
+#
+# Les seuils doivent donc les SÉPARER :
+#
+#     0 < walk_speed_min < 6,5 < run_speed_min < 9,75
+#
+# Défaut corrigé le 2026-08-15 : `run_speed_min` valait **6,0**, c'est-à-dire
+# SOUS la vitesse de marche. Marcher déclenchait donc `run`, et le clip `walk` —
+# pourtant présent dans le GLB — était INATTEIGNABLE. Rapporté en jeu : « les
+# animations ne fonctionnent pas correctement ».
+#
+# 8,0 tombe entre 6,5 et 9,75. Un test lit les DEUX génomes et vérifie
+# l'encadrement : voir `les_seuils_d_animation_separent_les_vitesses_du_joueur`.
+walk_speed_min = 0.6
+run_speed_min = 8.0
+
+# Plafond anti-téléport, lui aussi dérivé : au-delà de ~1,5 × la vitesse de
+# sprint, ce n'est plus du déplacement, c'est un replacement. 30 laissait passer
+# des pics mesurés à 29,79 m/s (capteur `vitesse_max_vue_mps`), qui faisaient
+# courir le personnage sur place au spawn.
+max_sane_speed = 15.0
 
 # Pas de section de cadrage pour l'aperçu 3D : il est rendu hors écran
 # (`forgia_ui::weapon_preview`, comme les bras et les armes) et se cadre TOUT

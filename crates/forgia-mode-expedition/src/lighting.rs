@@ -14,7 +14,10 @@
 //! menu, d'où le « c'est très sombre » rapporté en jeu le 2026-08-14. Ce n'était
 //! pas un réglage à ajuster, c'était une pièce absente.
 
-use bevy::pbr::{DistanceFog, FogFalloff};
+use bevy::camera::RenderTarget;
+use bevy::light::SunDisk;
+use bevy::pbr::{Atmosphere, AtmosphereSettings, DistanceFog, FogFalloff};
+use bevy::render::view::Hdr;
 use bevy::prelude::*;
 use forgia_player::Player;
 
@@ -86,6 +89,18 @@ pub fn setup_expedition_lighting(mut commands: Commands) {
             illuminance: etat.soleil_lux,
             shadows_enabled: true,
             ..default()
+        },
+        // 🚨 CE QUI REND LE SOLEIL VISIBLE. Un `DirectionalLight` seul n'est
+        // qu'une direction : il éclaire sans jamais se montrer. `SunDisk` dit à
+        // l'atmosphère de dessiner l'astre — sans lui, on regarde un ciel vide
+        // en se demandant où est le soleil.
+        //
+        // La taille est un choix de LISIBILITÉ, pas d'astronomie : le vrai
+        // soleil couvre 0,53° et se perd à l'écran. `config.soleil_taille_deg`
+        // le grossit, comme tous les jeux qui veulent qu'on le voie se coucher.
+        SunDisk {
+            angular_size: config.soleil_taille_deg.to_radians(),
+            ..SunDisk::EARTH
         },
         Transform::from_rotation(rotation_soleil(
             etat.soleil_elevation_deg,
@@ -185,7 +200,13 @@ pub fn update_expedition_ambiance(
     mut commands: Commands,
     state: Option<Res<CycleState>>,
     mut q_cam: Query<
-        (Entity, Option<&mut DistanceFog>, Option<&mut AmbientLight>),
+        (
+            Entity,
+            Option<&mut DistanceFog>,
+            Option<&mut AmbientLight>,
+            Has<Atmosphere>,
+            (&Camera, Option<&RenderTarget>),
+        ),
         With<Camera3d>,
     >,
 ) {
@@ -194,7 +215,27 @@ pub fn update_expedition_ambiance(
     let teinte = couleur_ciel(e.soleil_elevation_deg);
     // Reconstruit dans la boucle : `FogFalloff` n'est pas `Copy`, et le sortir
     // le ferait deplacer a la premiere camera — donc rien pour les suivantes.
-    for (entity, fog, ambient) in &mut q_cam {
+    // 🚨 L'ATMOSPHÈRE DE BEVY EST RETIRÉE — deux échecs mesurés en jeu.
+    //
+    // Elle reste la BONNE réponse au « on ne voit pas le soleil » : elle rend le
+    // disque solaire et fait de la teinte du ciel une conséquence de la hauteur
+    // du soleil, au lieu d'une couleur écrite à la main. Mais elle coûte deux
+    // choses que ce projet n'a pas payées :
+    //
+    // 1. **Une seule caméra.** `write_atmosphere_buffer` interroge ses vues avec
+    //    `.single()`. Posée sur toutes les `Camera3d` — comme la brume, qui elle
+    //    le tolère — la requête échoue, le tampon n'est jamais écrit, et le
+    //    groupe de vue tombe à 20 entrées pour 23 attendues. wgpu refuse : le
+    //    jeu PANIQUE au premier rendu.
+    // 2. **`Hdr`**, que son `#[require]` impose. Une fois le point 1 corrigé,
+    //    l'Expédition s'est lancée sur un ÉCRAN NOIR. Le projet a déjà payé ce
+    //    prix (« noir arène », deux écrivains concurrents sur `Tonemapping`) :
+    //    ses caméras ne sont pas réglées pour le HDR, et ça ne se règle pas ici.
+    //
+    // La remettre demande d'abord de traiter le HDR à la source, pour toutes les
+    // caméras du projet — c'est un chantier, pas une ligne. `SunDisk` reste posé
+    // sur le soleil : il ne coûte rien et sera juste le jour où le ciel revient.
+    for (entity, fog, ambient, _, _) in &mut q_cam {
         let falloff = FogFalloff::Linear {
             start: e.brouillard_debut_m,
             end: e.brouillard_fin_m,
@@ -238,7 +279,12 @@ pub fn teardown_expedition_lighting(
     q_cam: Query<Entity, With<Camera3d>>,
 ) {
     for cam in &q_cam {
-        commands.entity(cam).remove::<(DistanceFog, AmbientLight)>();
+        // `Atmosphere` part avec le reste — et `Hdr` avec elle, sinon la caméra
+        // resterait en HDR dans l'arène et le Hall, qui n'ont pas été réglés
+        // pour. Un composant posé par un mode se retire par ce mode.
+        commands
+            .entity(cam)
+            .remove::<(DistanceFog, AmbientLight, Atmosphere, AtmosphereSettings, Hdr)>();
     }
     commands.remove_resource::<CycleState>();
 }

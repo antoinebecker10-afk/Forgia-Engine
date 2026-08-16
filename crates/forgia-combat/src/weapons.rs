@@ -114,6 +114,31 @@ impl WeaponType {
         matches!(self, WeaponType::Chainsaw)
     }
 
+    /// Clé de l'arme dans les génomes ET nom de son GLB
+    /// (`models/weapons/forgia/<clé>.glb`).
+    ///
+    /// # Pourquoi elle vit ICI et pas chez ses lecteurs
+    ///
+    /// Cette table existait en **deux copies** — `forgia_viewmodel::
+    /// weapon_genome_key` et `forgia_mode_roguelite::weapon_select::vm_key`, la
+    /// seconde se déclarant elle-même « dupliquée pour éviter la dép crate ».
+    /// Une troisième copie s'annonçait avec l'arme tenue en main à la 3ᵉ
+    /// personne : le moment de rassembler. `forgia-combat` est déjà la
+    /// dépendance commune des trois, donc l'ajout ne coûte aucun lien nouveau.
+    ///
+    /// Les deux anciennes fonctions restent, et délèguent : leurs appelants
+    /// n'ont pas à savoir que la table a déménagé.
+    pub fn genome_key(self) -> &'static str {
+        match self {
+            WeaponType::AssaultRifle => "bourrasque",
+            WeaponType::Shotgun => "madame_lenoir",
+            WeaponType::RocketLauncher => "boucherie",
+            // Les trois variantes sans arme livrée (AK47, PlasmaRifle,
+            // Chainsaw) retombent sur Pépin, comme les deux tables d'origine.
+            _ => "pepin",
+        }
+    }
+
     // `stats()` + `WeaponData` retirés 2026-05-19 (Vague 2 audit forensic).
     // Code mort confirmé : 0 call-site externe, 0 UFCS, struct non préludée.
     // Le firing path V2 lit damage/fire_rate/range/pellets/spread_deg via
@@ -130,6 +155,27 @@ impl WeaponType {
 // le genome `viewmodel_arena.toml` arrive (Asset Created/Modified). Tant qu'un
 // slot n'est pas présent, `slot_or_default()` retourne un slot par défaut
 // (mag=30, reserve=120, infinite=false) pour éviter les panics dans le UI.
+
+/// Où sort la balle **À L'ÉCRAN** : la bouche du canon de l'arme réellement
+/// visible, en coordonnées monde. `None` = aucune arme visible dans le monde.
+///
+/// # Le défaut que cette ressource évite
+///
+/// En vue subjective, le canon est à quelques centimètres de l'œil : faire
+/// partir la lueur et le traceur de la caméra ne se voit pas. En 3ᵉ personne la
+/// caméra est **3,2 m derrière le personnage** — les balles sortiraient de nulle
+/// part, à côté de son épaule, et le tir cesserait de venir de l'arme qu'on
+/// tient. Le rayon, lui, part toujours de la caméra (c'est ce qui fait que le
+/// réticule dit vrai) : seul le VISUEL suit la main.
+///
+/// C'est la répartition standard des jeux de tir à la 3ᵉ personne : le rayon
+/// décide, le canon raconte.
+///
+/// Écrite par le module qui rend l'arme visible (Expédition), lue par le chemin
+/// de tir. Absente ou `None` en vue subjective → repli sur le calcul caméra,
+/// donc aucun changement pour l'arène.
+#[derive(Resource, Default)]
+pub struct MuzzleWorld(pub Option<Vec3>);
 
 #[derive(Resource, Default)]
 pub struct EquippedWeapons {

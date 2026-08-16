@@ -52,8 +52,14 @@ def cadrer(centre, avant):
     ici cadre l'arrière du crâne, ce qui a l'air d'un bug de placement."""
     droite = Vector((0.0, 0.0, 1.0)).cross(avant).normalized()
     a, e = math.radians(AZIMUT_DEG), math.radians(ELEVATION_DEG)
+    # 🚨 `+ avant`, pas `- avant`. La formule de rendu de `32_tete_chien.py`
+    # s'écrit avec un `-cos(a)` sur l'axe Y du MONDE, parce que le personnage
+    # regarde vers -Y : ce moins EST la conversion vers « devant ». Recopié ici
+    # sur un vecteur déjà orienté devant, il le retourne — la vue s'est cadrée
+    # trois fois de suite sur la nuque. Une formule se relit dans son repère,
+    # elle ne se transcrit pas.
     oeil = centre + (droite * math.sin(a) * math.cos(e)
-                     - avant * math.cos(a) * math.cos(e)
+                     + avant * math.cos(a) * math.cos(e)
                      + Vector((0.0, 0.0, 1.0)) * math.sin(e)) * RECUL
 
     vues = 0
@@ -108,7 +114,8 @@ def main():
             bpy.data.objects.remove(obj, do_unlink=True)
             parasites += 1
 
-    # Le repère de la tête, relu sur le corps (jamais supposé).
+    # Le repère de la tête, relu sur le corps (jamais supposé) — et lu AVANT
+    # toute modification de visibilité : voir le bloc suivant.
     arm = next((o for o in bpy.context.scene.objects if o.type == "ARMATURE"), None)
     avants = []
     for cheville, orteil in (("LeftFoot", "LeftToeBase"), ("RightFoot", "RightToeBase")):
@@ -120,6 +127,21 @@ def main():
             if d.length > 1e-4:
                 avants.append(d.normalized())
     avant = (sum(avants, Vector((0, 0, 0))) / len(avants)).normalized()
+
+    # 🚨 Les icosphères grises autour du personnage ne sont PAS des objets : ce
+    # sont les FORMES PERSONNALISÉES des os. Masquer l'objet icosphère ne les
+    # enlève pas — l'armature les dessine quand même. Il faut couper côté
+    # armature.
+    #
+    # 🚨 Et cela vient APRÈS la lecture des orteils. Une armature masquée sort
+    # du depsgraph : ses matrices de pose deviennent périmées, le repère lu
+    # dessus part à l'envers, et la vue s'était cadrée sur la NUQUE. On ne
+    # mesure jamais sur ce qu'on vient de modifier.
+    for autre in bpy.context.scene.objects:
+        if autre.type != "ARMATURE":
+            continue
+        autre.hide_set(True)
+        autre.show_in_front = False
 
     sommets = [o.matrix_world @ v.co for o in pieces for v in o.data.vertices]
     centre = Vector((
