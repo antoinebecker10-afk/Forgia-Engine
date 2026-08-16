@@ -102,3 +102,19 @@ tools/ai/tests/conc*.txt
 
 # Story-695 : sortie du build web (tools/web/build-web.ps1)
 /web-demo/
+
+# Recap Telegram — etat local de poussee et journal (ne doit pas salir git status)
+.claude/veille-pousse.json
+.claude/telegram-recap.log
+.claude/settings.local.json.bak-telegram
+
+# --- Outillage Blender : sorties de travail, jamais des sources -------------
+# 273 rendus de cadrage (385 Mo) produits pendant la construction du Vallon.
+# Ils se régénèrent avec `90_vue.py` ; les VERSIONNER reviendrait à archiver un
+# brouillon. Les scripts qui les produisent, eux, sont suivis.
+tools/blender/expedition/vues/
+# Sauvegarde de scène prise avant une reconstruction (22 Mo). La scène se
+# rebâtit à l'identique depuis `vallon.py` (graine fixe 20260813) — c'est le
+# script qui est la source, pas le .blend.
+tools/blender/**/_avant_rebuild.blend
+tools/blender/**/__pycache__/

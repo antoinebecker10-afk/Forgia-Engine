@@ -1,0 +1,5954 @@
+[
+ {
+  "file": "bed.glb",
+  "nom": "bed",
+  "famille": "bed",
+  "meshes": 1,
+  "tris": 268,
+  "dim": [
+   0.3349,
+   0.7473,
+   0.2737
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2237,
+  "materiaux": [
+   "leafsDark",
+   "wood",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "bed_floor.glb",
+  "nom": "bed_floor",
+  "famille": "bed",
+  "meshes": 1,
+  "tris": 124,
+  "dim": [
+   0.3203,
+   0.7473,
+   0.0921
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0421,
+  "materiaux": [
+   "_defaultMat",
+   "leafsDark",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "bridge_center_stone.glb",
+  "nom": "bridge_center_stone",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   1.0,
+   1.0,
+   0.3
+  ],
+  "z_min": -0.05,
+  "z_max": 0.25,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_center_stoneRound.glb",
+  "nom": "bridge_center_stoneRound",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   1.0,
+   1.0,
+   0.2
+  ],
+  "z_min": 0.1,
+  "z_max": 0.3,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_center_wood.glb",
+  "nom": "bridge_center_wood",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   1.0,
+   1.0,
+   0.3
+  ],
+  "z_min": -0.05,
+  "z_max": 0.25,
+  "materiaux": [
+   "stone",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_center_woodRound.glb",
+  "nom": "bridge_center_woodRound",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   1.0,
+   1.0,
+   0.2
+  ],
+  "z_min": 0.1,
+  "z_max": 0.3,
+  "materiaux": [
+   "stone",
+   "stoneDark",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_side_stone.glb",
+  "nom": "bridge_side_stone",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 152,
+  "dim": [
+   1.02,
+   1.04,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_side_stoneRound.glb",
+  "nom": "bridge_side_stoneRound",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 198,
+  "dim": [
+   1.02,
+   1.04,
+   0.45
+  ],
+  "z_min": -0.05,
+  "z_max": 0.4,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_side_wood.glb",
+  "nom": "bridge_side_wood",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 136,
+  "dim": [
+   1.02,
+   1.04,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_side_woodRound.glb",
+  "nom": "bridge_side_woodRound",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 190,
+  "dim": [
+   1.02,
+   1.04,
+   0.45
+  ],
+  "z_min": -0.05,
+  "z_max": 0.4,
+  "materiaux": [
+   "stone",
+   "stoneDark",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_stone.glb",
+  "nom": "bridge_stone",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 252,
+  "dim": [
+   1.04,
+   1.04,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_stoneNarrow.glb",
+  "nom": "bridge_stoneNarrow",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 252,
+  "dim": [
+   1.04,
+   0.84,
+   0.35
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_stoneRound.glb",
+  "nom": "bridge_stoneRound",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 360,
+  "dim": [
+   1.04,
+   1.04,
+   0.45
+  ],
+  "z_min": -0.05,
+  "z_max": 0.4,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_stoneRoundNarrow.glb",
+  "nom": "bridge_stoneRoundNarrow",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 360,
+  "dim": [
+   1.04,
+   0.84,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "bridge_wood.glb",
+  "nom": "bridge_wood",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 220,
+  "dim": [
+   1.04,
+   1.04,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_woodNarrow.glb",
+  "nom": "bridge_woodNarrow",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 220,
+  "dim": [
+   1.04,
+   0.84,
+   0.35
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3,
+  "materiaux": [
+   "stone",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_woodRound.glb",
+  "nom": "bridge_woodRound",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 336,
+  "dim": [
+   1.04,
+   1.04,
+   0.45
+  ],
+  "z_min": -0.05,
+  "z_max": 0.4,
+  "materiaux": [
+   "stone",
+   "stoneDark",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "bridge_woodRoundNarrow.glb",
+  "nom": "bridge_woodRoundNarrow",
+  "famille": "bridge",
+  "meshes": 1,
+  "tris": 336,
+  "dim": [
+   1.04,
+   0.84,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "stoneDark",
+   "wood",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "cactus_short.glb",
+  "nom": "cactus_short",
+  "famille": "cactus",
+  "meshes": 1,
+  "tris": 116,
+  "dim": [
+   0.3417,
+   0.2972,
+   0.533
+  ],
+  "z_min": -0.05,
+  "z_max": 0.483,
+  "materiaux": [
+   "leafsGreen"
+  ]
+ },
+ {
+  "file": "cactus_tall.glb",
+  "nom": "cactus_tall",
+  "famille": "cactus",
+  "meshes": 1,
+  "tris": 122,
+  "dim": [
+   0.3962,
+   0.3391,
+   0.75
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7,
+  "materiaux": [
+   "leafsGreen"
+  ]
+ },
+ {
+  "file": "campfire_bricks.glb",
+  "nom": "campfire_bricks",
+  "famille": "campfire",
+  "meshes": 1,
+  "tris": 120,
+  "dim": [
+   0.4692,
+   0.4692,
+   0.0676
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0176,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "campfire_logs.glb",
+  "nom": "campfire_logs",
+  "famille": "campfire",
+  "meshes": 1,
+  "tris": 112,
+  "dim": [
+   0.2919,
+   0.2919,
+   0.0626
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0126,
+  "materiaux": [
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "campfire_planks.glb",
+  "nom": "campfire_planks",
+  "famille": "campfire",
+  "meshes": 1,
+  "tris": 108,
+  "dim": [
+   0.35,
+   0.35,
+   0.04
+  ],
+  "z_min": -0.05,
+  "z_max": -0.01,
+  "materiaux": [
+   "woodBark"
+  ]
+ },
+ {
+  "file": "campfire_stones.glb",
+  "nom": "campfire_stones",
+  "famille": "campfire",
+  "meshes": 1,
+  "tris": 264,
+  "dim": [
+   0.5408,
+   0.5155,
+   0.0778
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0278,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "canoe.glb",
+  "nom": "canoe",
+  "famille": "canoe",
+  "meshes": 1,
+  "tris": 200,
+  "dim": [
+   0.3,
+   1.15,
+   0.1825
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1325,
+  "materiaux": [
+   "leafsFall",
+   "wood"
+  ]
+ },
+ {
+  "file": "canoe_paddle.glb",
+  "nom": "canoe_paddle",
+  "famille": "canoe",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.0767,
+   0.5902,
+   0.0361
+  ],
+  "z_min": -0.05,
+  "z_max": -0.0139,
+  "materiaux": [
+   "wood"
+  ]
+ },
+ {
+  "file": "cliff_blockCave_rock.glb",
+  "nom": "cliff_blockCave_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 56,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockCave_stone.glb",
+  "nom": "cliff_blockCave_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 56,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_blockDiagonal_rock.glb",
+  "nom": "cliff_blockDiagonal_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 8,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockDiagonal_stone.glb",
+  "nom": "cliff_blockDiagonal_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 8,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_blockHalf_rock.glb",
+  "nom": "cliff_blockHalf_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   1.0,
+   1.0,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockHalf_stone.glb",
+  "nom": "cliff_blockHalf_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   1.0,
+   1.0,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_blockQuarter_rock.glb",
+  "nom": "cliff_blockQuarter_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   1.0,
+   1.0,
+   0.25
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockQuarter_stone.glb",
+  "nom": "cliff_blockQuarter_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   1.0,
+   1.0,
+   0.25
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_blockSlopeHalfWalls_rock.glb",
+  "nom": "cliff_blockSlopeHalfWalls_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 106,
+  "dim": [
+   1.0,
+   1.0,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockSlopeHalfWalls_stone.glb",
+  "nom": "cliff_blockSlopeHalfWalls_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 106,
+  "dim": [
+   1.0,
+   1.0,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_blockSlopeWalls_rock.glb",
+  "nom": "cliff_blockSlopeWalls_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 106,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockSlopeWalls_stone.glb",
+  "nom": "cliff_blockSlopeWalls_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 106,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_blockSlope_rock.glb",
+  "nom": "cliff_blockSlope_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 70,
+  "dim": [
+   1.2,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_blockSlope_stone.glb",
+  "nom": "cliff_blockSlope_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 70,
+  "dim": [
+   1.2,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_block_rock.glb",
+  "nom": "cliff_block_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_block_stone.glb",
+  "nom": "cliff_block_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_cave_rock.glb",
+  "nom": "cliff_cave_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   1.0,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_cave_stone.glb",
+  "nom": "cliff_cave_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   1.0,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_cornerInnerLarge_rock.glb",
+  "nom": "cliff_cornerInnerLarge_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_cornerInnerLarge_stone.glb",
+  "nom": "cliff_cornerInnerLarge_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_cornerInnerTop_rock.glb",
+  "nom": "cliff_cornerInnerTop_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 89,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_cornerInnerTop_stone.glb",
+  "nom": "cliff_cornerInnerTop_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 89,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_cornerInner_rock.glb",
+  "nom": "cliff_cornerInner_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 56,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_cornerInner_stone.glb",
+  "nom": "cliff_cornerInner_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 112,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_cornerLarge_rock.glb",
+  "nom": "cliff_cornerLarge_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   0.4185,
+   0.4185,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_cornerLarge_stone.glb",
+  "nom": "cliff_cornerLarge_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 24,
+  "dim": [
+   0.4185,
+   0.4185,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_cornerTop_rock.glb",
+  "nom": "cliff_cornerTop_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.2685,
+   0.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_cornerTop_stone.glb",
+  "nom": "cliff_cornerTop_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.2685,
+   0.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_corner_rock.glb",
+  "nom": "cliff_corner_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   0.1685,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_corner_stone.glb",
+  "nom": "cliff_corner_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 12,
+  "dim": [
+   0.1685,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_diagonal_rock.glb",
+  "nom": "cliff_diagonal_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.1685,
+   1.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_diagonal_stone.glb",
+  "nom": "cliff_diagonal_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.1685,
+   1.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_halfCornerInner_rock.glb",
+  "nom": "cliff_halfCornerInner_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 89,
+  "dim": [
+   1.0,
+   1.0,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_halfCornerInner_stone.glb",
+  "nom": "cliff_halfCornerInner_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 89,
+  "dim": [
+   1.0,
+   1.0,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "_defaultMat",
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_halfCorner_rock.glb",
+  "nom": "cliff_halfCorner_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.4185,
+   0.4185,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_halfCorner_stone.glb",
+  "nom": "cliff_halfCorner_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.4185,
+   0.4185,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_half_rock.glb",
+  "nom": "cliff_half_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 53,
+  "dim": [
+   1.0,
+   0.4185,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_half_stone.glb",
+  "nom": "cliff_half_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 53,
+  "dim": [
+   1.0,
+   0.4185,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_large_rock.glb",
+  "nom": "cliff_large_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   1.0,
+   0.4185,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_large_stone.glb",
+  "nom": "cliff_large_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   1.0,
+   0.4185,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_rock.glb",
+  "nom": "cliff_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   1.0,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "cliff_stepsCornerInner_rock.glb",
+  "nom": "cliff_stepsCornerInner_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 213,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_stepsCornerInner_stone.glb",
+  "nom": "cliff_stepsCornerInner_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 213,
+  "dim": [
+   1.0,
+   1.0,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_stepsCorner_rock.glb",
+  "nom": "cliff_stepsCorner_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 245,
+  "dim": [
+   1.05,
+   1.05,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_stepsCorner_stone.glb",
+  "nom": "cliff_stepsCorner_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 245,
+  "dim": [
+   1.05,
+   1.05,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_steps_rock.glb",
+  "nom": "cliff_steps_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 219,
+  "dim": [
+   1.0,
+   1.05,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_steps_stone.glb",
+  "nom": "cliff_steps_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 219,
+  "dim": [
+   1.0,
+   1.05,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_stone.glb",
+  "nom": "cliff_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   1.0,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_topDiagonal_rock.glb",
+  "nom": "cliff_topDiagonal_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 66,
+  "dim": [
+   1.2685,
+   1.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_topDiagonal_stone.glb",
+  "nom": "cliff_topDiagonal_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 132,
+  "dim": [
+   1.2685,
+   1.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_top_rock.glb",
+  "nom": "cliff_top_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 53,
+  "dim": [
+   1.0,
+   0.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "cliff_top_stone.glb",
+  "nom": "cliff_top_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 53,
+  "dim": [
+   1.0,
+   0.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass",
+   "stone"
+  ]
+ },
+ {
+  "file": "cliff_waterfallTop_rock.glb",
+  "nom": "cliff_waterfallTop_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   1.0,
+   0.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "cliff_waterfallTop_stone.glb",
+  "nom": "cliff_waterfallTop_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   1.0,
+   0.2685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "dirtDark",
+   "grass",
+   "stone",
+   "water"
+  ]
+ },
+ {
+  "file": "cliff_waterfall_rock.glb",
+  "nom": "cliff_waterfall_rock",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 34,
+  "dim": [
+   1.0,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "water"
+  ]
+ },
+ {
+  "file": "cliff_waterfall_stone.glb",
+  "nom": "cliff_waterfall_stone",
+  "famille": "cliff",
+  "meshes": 1,
+  "tris": 68,
+  "dim": [
+   1.0,
+   0.1685,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "stone",
+   "water"
+  ]
+ },
+ {
+  "file": "crop_carrot.glb",
+  "nom": "crop_carrot",
+  "famille": "crop",
+  "meshes": 1,
+  "tris": 148,
+  "dim": [
+   0.3431,
+   0.3431,
+   0.6194
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5694,
+  "materiaux": [
+   "grass",
+   "leafsFall"
+  ]
+ },
+ {
+  "file": "crop_melon.glb",
+  "nom": "crop_melon",
+  "famille": "crop",
+  "meshes": 1,
+  "tris": 236,
+  "dim": [
+   0.4176,
+   0.3617,
+   0.348
+  ],
+  "z_min": -0.05,
+  "z_max": 0.298,
+  "materiaux": [
+   "dirt",
+   "grass",
+   "leafsDark"
+  ]
+ },
+ {
+  "file": "crop_pumpkin.glb",
+  "nom": "crop_pumpkin",
+  "famille": "crop",
+  "meshes": 1,
+  "tris": 120,
+  "dim": [
+   0.4413,
+   0.4519,
+   0.3338
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2838,
+  "materiaux": [
+   "grass",
+   "leafsFall"
+  ]
+ },
+ {
+  "file": "crop_turnip.glb",
+  "nom": "crop_turnip",
+  "famille": "crop",
+  "meshes": 1,
+  "tris": 168,
+  "dim": [
+   0.3431,
+   0.3431,
+   0.6607
+  ],
+  "z_min": -0.05,
+  "z_max": 0.6107,
+  "materiaux": [
+   "grass",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "crops_bambooStageA.glb",
+  "nom": "crops_bambooStageA",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 276,
+  "dim": [
+   0.3401,
+   0.308,
+   0.549
+  ],
+  "z_min": -0.05,
+  "z_max": 0.499,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_bambooStageB.glb",
+  "nom": "crops_bambooStageB",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 564,
+  "dim": [
+   0.3401,
+   0.308,
+   0.89
+  ],
+  "z_min": -0.05,
+  "z_max": 0.84,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_cornStageA.glb",
+  "nom": "crops_cornStageA",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 100,
+  "dim": [
+   0.3042,
+   0.3042,
+   0.5
+  ],
+  "z_min": -0.05,
+  "z_max": 0.45,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_cornStageB.glb",
+  "nom": "crops_cornStageB",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 116,
+  "dim": [
+   0.3042,
+   0.3042,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_cornStageC.glb",
+  "nom": "crops_cornStageC",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 148,
+  "dim": [
+   0.3042,
+   0.3042,
+   1.25
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_cornStageD.glb",
+  "nom": "crops_cornStageD",
+  "famille": "crops",
+  "meshes": 5,
+  "tris": 300,
+  "dim": [
+   0.4416,
+   0.4416,
+   1.25
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2,
+  "materiaux": [
+   "corn",
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_dirtDoubleRow.glb",
+  "nom": "crops_dirtDoubleRow",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 88,
+  "dim": [
+   1.0,
+   0.938,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_dirtDoubleRowCorner.glb",
+  "nom": "crops_dirtDoubleRowCorner",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 50,
+  "dim": [
+   0.938,
+   0.938,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_dirtDoubleRowEnd.glb",
+  "nom": "crops_dirtDoubleRowEnd",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   0.6,
+   0.938,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_dirtRow.glb",
+  "nom": "crops_dirtRow",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.0,
+   0.62,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_dirtRowCorner.glb",
+  "nom": "crops_dirtRowCorner",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 19,
+  "dim": [
+   0.779,
+   0.779,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_dirtRowEnd.glb",
+  "nom": "crops_dirtRowEnd",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.6,
+   0.62,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_dirtSingle.glb",
+  "nom": "crops_dirtSingle",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.4,
+   0.3464,
+   0.1
+  ],
+  "z_min": -0.05,
+  "z_max": 0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "crops_leafsStageA.glb",
+  "nom": "crops_leafsStageA",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.3894,
+   0.3894,
+   0.4271
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3771,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_leafsStageB.glb",
+  "nom": "crops_leafsStageB",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 84,
+  "dim": [
+   0.3894,
+   0.3894,
+   0.6771
+  ],
+  "z_min": -0.05,
+  "z_max": 0.6271,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_wheatStageA.glb",
+  "nom": "crops_wheatStageA",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 720,
+  "dim": [
+   0.5396,
+   0.4467,
+   0.3349
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2849,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "crops_wheatStageB.glb",
+  "nom": "crops_wheatStageB",
+  "famille": "crops",
+  "meshes": 1,
+  "tris": 360,
+  "dim": [
+   0.5396,
+   0.4467,
+   0.5349
+  ],
+  "z_min": -0.05,
+  "z_max": 0.4849,
+  "materiaux": [
+   "_defaultMat",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "fence_bend.glb",
+  "nom": "fence_bend",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 240,
+  "dim": [
+   1.0,
+   1.0,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_bendCenter.glb",
+  "nom": "fence_bendCenter",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 298,
+  "dim": [
+   1.0,
+   1.0,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "_defaultMat",
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_corner.glb",
+  "nom": "fence_corner",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 116,
+  "dim": [
+   1.0,
+   1.0,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_gate.glb",
+  "nom": "fence_gate",
+  "famille": "fence",
+  "meshes": 2,
+  "tris": 524,
+  "dim": [
+   1.0,
+   0.07,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "stone",
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_planks.glb",
+  "nom": "fence_planks",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 96,
+  "dim": [
+   1.0,
+   0.0959,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood"
+  ]
+ },
+ {
+  "file": "fence_planksDouble.glb",
+  "nom": "fence_planksDouble",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 152,
+  "dim": [
+   1.0,
+   0.0599,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood"
+  ]
+ },
+ {
+  "file": "fence_simple.glb",
+  "nom": "fence_simple",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   1.0,
+   0.07,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_simpleCenter.glb",
+  "nom": "fence_simpleCenter",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 116,
+  "dim": [
+   1.0,
+   0.07,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_simpleDiagonal.glb",
+  "nom": "fence_simpleDiagonal",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 80,
+  "dim": [
+   1.0,
+   1.0,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_simpleDiagonalCenter.glb",
+  "nom": "fence_simpleDiagonalCenter",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 148,
+  "dim": [
+   1.0,
+   1.0,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "_defaultMat",
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "fence_simpleHigh.glb",
+  "nom": "fence_simpleHigh",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.0412,
+   0.1112,
+   0.345
+  ],
+  "z_min": -0.05,
+  "z_max": 0.295,
+  "materiaux": [
+   "wood"
+  ]
+ },
+ {
+  "file": "fence_simpleLow.glb",
+  "nom": "fence_simpleLow",
+  "famille": "fence",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.0412,
+   0.1112,
+   0.195
+  ],
+  "z_min": -0.05,
+  "z_max": 0.145,
+  "materiaux": [
+   "wood"
+  ]
+ },
+ {
+  "file": "flower_purpleA.glb",
+  "nom": "flower_purpleA",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.1591,
+   0.1811,
+   0.2425
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1925,
+  "materiaux": [
+   "colorPurple",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_purpleB.glb",
+  "nom": "flower_purpleB",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 98,
+  "dim": [
+   0.2073,
+   0.2392,
+   0.2085
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1585,
+  "materiaux": [
+   "colorPurple",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_purpleC.glb",
+  "nom": "flower_purpleC",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.1806,
+   0.1811,
+   0.1825
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1325,
+  "materiaux": [
+   "colorPurple",
+   "colorWhite",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_redA.glb",
+  "nom": "flower_redA",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.1591,
+   0.1811,
+   0.2925
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2425,
+  "materiaux": [
+   "colorRed",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_redB.glb",
+  "nom": "flower_redB",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 98,
+  "dim": [
+   0.2073,
+   0.2392,
+   0.2585
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2085,
+  "materiaux": [
+   "colorRed",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_redC.glb",
+  "nom": "flower_redC",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.1806,
+   0.1811,
+   0.2325
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1825,
+  "materiaux": [
+   "colorRed",
+   "colorWhite",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_yellowA.glb",
+  "nom": "flower_yellowA",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.1591,
+   0.1811,
+   0.1925
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1425,
+  "materiaux": [
+   "colorYellow",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_yellowB.glb",
+  "nom": "flower_yellowB",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 154,
+  "dim": [
+   0.2073,
+   0.2392,
+   0.1585
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1085,
+  "materiaux": [
+   "colorYellow",
+   "grass"
+  ]
+ },
+ {
+  "file": "flower_yellowC.glb",
+  "nom": "flower_yellowC",
+  "famille": "flower",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.1806,
+   0.1811,
+   0.1325
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0825,
+  "materiaux": [
+   "colorWhite",
+   "colorYellow",
+   "grass"
+  ]
+ },
+ {
+  "file": "grass.glb",
+  "nom": "grass",
+  "famille": "grass",
+  "meshes": 1,
+  "tris": 132,
+  "dim": [
+   0.3811,
+   0.3922,
+   0.254
+  ],
+  "z_min": -0.05,
+  "z_max": 0.204,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "grass_large.glb",
+  "nom": "grass_large",
+  "famille": "grass",
+  "meshes": 1,
+  "tris": 224,
+  "dim": [
+   0.409,
+   0.4079,
+   0.254
+  ],
+  "z_min": -0.05,
+  "z_max": 0.204,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "grass_leafs.glb",
+  "nom": "grass_leafs",
+  "famille": "grass",
+  "meshes": 1,
+  "tris": 36,
+  "dim": [
+   0.2345,
+   0.2573,
+   0.1425
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0925,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "grass_leafsLarge.glb",
+  "nom": "grass_leafsLarge",
+  "famille": "grass",
+  "meshes": 1,
+  "tris": 144,
+  "dim": [
+   0.4759,
+   0.4873,
+   0.1425
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0925,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_grass.glb",
+  "nom": "ground_grass",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 2,
+  "dim": [
+   1.0,
+   1.0,
+   0.0
+  ],
+  "z_min": -0.05,
+  "z_max": -0.05,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathBend.glb",
+  "nom": "ground_pathBend",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathBendBank.glb",
+  "nom": "ground_pathBendBank",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 38,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathCorner.glb",
+  "nom": "ground_pathCorner",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 22,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathCornerSmall.glb",
+  "nom": "ground_pathCornerSmall",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 24,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathCross.glb",
+  "nom": "ground_pathCross",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 74,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathEnd.glb",
+  "nom": "ground_pathEnd",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathEndClosed.glb",
+  "nom": "ground_pathEndClosed",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 68,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathOpen.glb",
+  "nom": "ground_pathOpen",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 8,
+  "dim": [
+   1.0,
+   1.0,
+   0.0
+  ],
+  "z_min": -0.1,
+  "z_max": -0.1,
+  "materiaux": [
+   "dirt"
+  ]
+ },
+ {
+  "file": "ground_pathRocks.glb",
+  "nom": "ground_pathRocks",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 102,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathSide.glb",
+  "nom": "ground_pathSide",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 34,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathSideOpen.glb",
+  "nom": "ground_pathSideOpen",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 40,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathSplit.glb",
+  "nom": "ground_pathSplit",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 68,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathStraight.glb",
+  "nom": "ground_pathStraight",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_pathTile.glb",
+  "nom": "ground_pathTile",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 86,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass"
+  ]
+ },
+ {
+  "file": "ground_riverBend.glb",
+  "nom": "ground_riverBend",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 54,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverBendBank.glb",
+  "nom": "ground_riverBendBank",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 54,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverCorner.glb",
+  "nom": "ground_riverCorner",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 40,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverCornerSmall.glb",
+  "nom": "ground_riverCornerSmall",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 26,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverCross.glb",
+  "nom": "ground_riverCross",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 82,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverEnd.glb",
+  "nom": "ground_riverEnd",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverEndClosed.glb",
+  "nom": "ground_riverEndClosed",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 84,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverOpen.glb",
+  "nom": "ground_riverOpen",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 8,
+  "dim": [
+   1.0,
+   1.0,
+   0.0
+  ],
+  "z_min": -0.1,
+  "z_max": -0.1,
+  "materiaux": [
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverRocks.glb",
+  "nom": "ground_riverRocks",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 102,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "stone",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverSide.glb",
+  "nom": "ground_riverSide",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 34,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverSideOpen.glb",
+  "nom": "ground_riverSideOpen",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverSplit.glb",
+  "nom": "ground_riverSplit",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 72,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverStraight.glb",
+  "nom": "ground_riverStraight",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "ground_riverTile.glb",
+  "nom": "ground_riverTile",
+  "famille": "ground",
+  "meshes": 1,
+  "tris": 128,
+  "dim": [
+   1.0,
+   1.0,
+   0.05
+  ],
+  "z_min": -0.1,
+  "z_max": -0.05,
+  "materiaux": [
+   "dirt",
+   "dirtDark",
+   "grass",
+   "water"
+  ]
+ },
+ {
+  "file": "hanging_moss.glb",
+  "nom": "hanging_moss",
+  "famille": "hanging",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   0.1598,
+   0.035,
+   0.4785
+  ],
+  "z_min": -0.05,
+  "z_max": 0.4285,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "lily_large.glb",
+  "nom": "lily_large",
+  "famille": "lily",
+  "meshes": 1,
+  "tris": 86,
+  "dim": [
+   0.2719,
+   0.3139,
+   0.098
+  ],
+  "z_min": -0.05,
+  "z_max": 0.048,
+  "materiaux": [
+   "colorRed",
+   "leafsDark",
+   "leafsGreen"
+  ]
+ },
+ {
+  "file": "lily_small.glb",
+  "nom": "lily_small",
+  "famille": "lily",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   0.1888,
+   0.218,
+   0.04
+  ],
+  "z_min": -0.05,
+  "z_max": -0.01,
+  "materiaux": [
+   "leafsDark",
+   "leafsGreen"
+  ]
+ },
+ {
+  "file": "log.glb",
+  "nom": "log",
+  "famille": "log",
+  "meshes": 1,
+  "tris": 200,
+  "dim": [
+   0.234,
+   0.71,
+   0.1732
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1232,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "log_large.glb",
+  "nom": "log_large",
+  "famille": "log",
+  "meshes": 1,
+  "tris": 96,
+  "dim": [
+   1.0,
+   0.5493,
+   0.4167
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3667,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "log_stack.glb",
+  "nom": "log_stack",
+  "famille": "log",
+  "meshes": 1,
+  "tris": 184,
+  "dim": [
+   0.4247,
+   0.71,
+   0.3464
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2964,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "log_stackLarge.glb",
+  "nom": "log_stackLarge",
+  "famille": "log",
+  "meshes": 1,
+  "tris": 310,
+  "dim": [
+   0.634,
+   0.71,
+   0.3464
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2964,
+  "materiaux": [
+   "woodBark",
+   "woodDark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "mushroom_red.glb",
+  "nom": "mushroom_red",
+  "famille": "mushroom",
+  "meshes": 1,
+  "tris": 48,
+  "dim": [
+   0.174,
+   0.2009,
+   0.2028
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1528,
+  "materiaux": [
+   "_defaultMat",
+   "colorRed"
+  ]
+ },
+ {
+  "file": "mushroom_redGroup.glb",
+  "nom": "mushroom_redGroup",
+  "famille": "mushroom",
+  "meshes": 1,
+  "tris": 144,
+  "dim": [
+   0.2696,
+   0.2542,
+   0.2505
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2005,
+  "materiaux": [
+   "_defaultMat",
+   "colorRed"
+  ]
+ },
+ {
+  "file": "mushroom_redTall.glb",
+  "nom": "mushroom_redTall",
+  "famille": "mushroom",
+  "meshes": 1,
+  "tris": 48,
+  "dim": [
+   0.1235,
+   0.1426,
+   0.2505
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2005,
+  "materiaux": [
+   "_defaultMat",
+   "colorRed"
+  ]
+ },
+ {
+  "file": "mushroom_tan.glb",
+  "nom": "mushroom_tan",
+  "famille": "mushroom",
+  "meshes": 1,
+  "tris": 48,
+  "dim": [
+   0.1914,
+   0.221,
+   0.1539
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1039,
+  "materiaux": [
+   "_defaultMat",
+   "colorTan"
+  ]
+ },
+ {
+  "file": "mushroom_tanGroup.glb",
+  "nom": "mushroom_tanGroup",
+  "famille": "mushroom",
+  "meshes": 1,
+  "tris": 144,
+  "dim": [
+   0.2696,
+   0.2542,
+   0.2505
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2005,
+  "materiaux": [
+   "_defaultMat",
+   "colorTan"
+  ]
+ },
+ {
+  "file": "mushroom_tanTall.glb",
+  "nom": "mushroom_tanTall",
+  "famille": "mushroom",
+  "meshes": 1,
+  "tris": 48,
+  "dim": [
+   0.1235,
+   0.1426,
+   0.2505
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2005,
+  "materiaux": [
+   "_defaultMat",
+   "colorTan"
+  ]
+ },
+ {
+  "file": "path_stone.glb",
+  "nom": "path_stone",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 136,
+  "dim": [
+   1.0,
+   0.5766,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "_defaultMat",
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "path_stoneCircle.glb",
+  "nom": "path_stoneCircle",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 164,
+  "dim": [
+   0.9324,
+   0.8766,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "path_stoneCorner.glb",
+  "nom": "path_stoneCorner",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 112,
+  "dim": [
+   0.7383,
+   0.7784,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "_defaultMat",
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "path_stoneEnd.glb",
+  "nom": "path_stoneEnd",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 92,
+  "dim": [
+   0.6182,
+   0.571,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "_defaultMat",
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "path_wood.glb",
+  "nom": "path_wood",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   1.0,
+   0.5144,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "path_woodCorner.glb",
+  "nom": "path_woodCorner",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   0.75,
+   0.75,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "path_woodEnd.glb",
+  "nom": "path_woodEnd",
+  "famille": "path",
+  "meshes": 1,
+  "tris": 36,
+  "dim": [
+   0.6148,
+   0.5144,
+   0.05
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "dirtDark"
+  ]
+ },
+ {
+  "file": "plant_bush.glb",
+  "nom": "plant_bush",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.396,
+   0.396,
+   0.2444
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1944,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "plant_bushDetailed.glb",
+  "nom": "plant_bushDetailed",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 104,
+  "dim": [
+   0.6025,
+   0.6025,
+   0.3604
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3104,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "plant_bushLarge.glb",
+  "nom": "plant_bushLarge",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   0.3743,
+   0.3357,
+   0.2429
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1929,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "plant_bushLargeTriangle.glb",
+  "nom": "plant_bushLargeTriangle",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 39,
+  "dim": [
+   0.4077,
+   0.4708,
+   0.1693
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1193,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "plant_bushSmall.glb",
+  "nom": "plant_bushSmall",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.383,
+   0.3363,
+   0.2073
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1573,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "plant_bushTriangle.glb",
+  "nom": "plant_bushTriangle",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 30,
+  "dim": [
+   0.3644,
+   0.4136,
+   0.2955
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2455,
+  "materiaux": [
+   "grass"
+  ]
+ },
+ {
+  "file": "plant_flatShort.glb",
+  "nom": "plant_flatShort",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.2776,
+   0.2776,
+   0.2351
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1851,
+  "materiaux": [
+   "leafsGreen"
+  ]
+ },
+ {
+  "file": "plant_flatTall.glb",
+  "nom": "plant_flatTall",
+  "famille": "plant",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.2717,
+   0.2717,
+   0.2843
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2343,
+  "materiaux": [
+   "leafsGreen"
+  ]
+ },
+ {
+  "file": "platform_beach.glb",
+  "nom": "platform_beach",
+  "famille": "platform",
+  "meshes": 1,
+  "tris": 192,
+  "dim": [
+   0.8932,
+   0.7239,
+   0.0825
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0325,
+  "materiaux": [
+   "woodInner"
+  ]
+ },
+ {
+  "file": "platform_grass.glb",
+  "nom": "platform_grass",
+  "famille": "platform",
+  "meshes": 1,
+  "tris": 186,
+  "dim": [
+   0.8932,
+   0.7239,
+   0.0825
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0325,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "platform_stone.glb",
+  "nom": "platform_stone",
+  "famille": "platform",
+  "meshes": 1,
+  "tris": 192,
+  "dim": [
+   0.8932,
+   0.7239,
+   0.0825
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0325,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "pot_large.glb",
+  "nom": "pot_large",
+  "famille": "pot",
+  "meshes": 1,
+  "tris": 68,
+  "dim": [
+   0.5636,
+   0.4881,
+   0.2
+  ],
+  "z_min": -0.05,
+  "z_max": 0.15,
+  "materiaux": [
+   "wood",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "pot_small.glb",
+  "nom": "pot_small",
+  "famille": "pot",
+  "meshes": 1,
+  "tris": 72,
+  "dim": [
+   0.3234,
+   0.2801,
+   0.268
+  ],
+  "z_min": -0.05,
+  "z_max": 0.218,
+  "materiaux": [
+   "_defaultMat",
+   "wood",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "rock_largeA.glb",
+  "nom": "rock_largeA",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 80,
+  "dim": [
+   0.7849,
+   1.0155,
+   0.2598
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2098,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_largeB.glb",
+  "nom": "rock_largeB",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 85,
+  "dim": [
+   0.7667,
+   1.0155,
+   0.4303
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3803,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_largeC.glb",
+  "nom": "rock_largeC",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 72,
+  "dim": [
+   1.0644,
+   1.0157,
+   0.3211
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2711,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_largeD.glb",
+  "nom": "rock_largeD",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 80,
+  "dim": [
+   1.0688,
+   1.0303,
+   0.5683
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5183,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_largeE.glb",
+  "nom": "rock_largeE",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   1.0955,
+   0.9199,
+   0.2922
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2422,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_largeF.glb",
+  "nom": "rock_largeF",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 73,
+  "dim": [
+   1.0955,
+   0.899,
+   0.479
+  ],
+  "z_min": -0.05,
+  "z_max": 0.429,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallA.glb",
+  "nom": "rock_smallA",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.3608,
+   0.3608,
+   0.1912
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1412,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallB.glb",
+  "nom": "rock_smallB",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 24,
+  "dim": [
+   0.3608,
+   0.3608,
+   0.1768
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1268,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallC.glb",
+  "nom": "rock_smallC",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.3608,
+   0.3608,
+   0.1227
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0727,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallD.glb",
+  "nom": "rock_smallD",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.4257,
+   0.3687,
+   0.2309
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1809,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallE.glb",
+  "nom": "rock_smallE",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   0.3608,
+   0.3125,
+   0.2562
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2062,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallF.glb",
+  "nom": "rock_smallF",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   0.3536,
+   0.3062,
+   0.2453
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1953,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallFlatA.glb",
+  "nom": "rock_smallFlatA",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 20,
+  "dim": [
+   0.4958,
+   0.4296,
+   0.0649
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0149,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallFlatB.glb",
+  "nom": "rock_smallFlatB",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.4295,
+   0.4024,
+   0.0649
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0149,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallFlatC.glb",
+  "nom": "rock_smallFlatC",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 40,
+  "dim": [
+   0.4704,
+   0.3603,
+   0.0649
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0149,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallG.glb",
+  "nom": "rock_smallG",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.5937,
+   0.6855,
+   0.2453
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1953,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallH.glb",
+  "nom": "rock_smallH",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   0.4618,
+   0.4618,
+   0.4074
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3574,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallI.glb",
+  "nom": "rock_smallI",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.3583,
+   0.4138,
+   0.2778
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2278,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallTopA.glb",
+  "nom": "rock_smallTopA",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   0.4877,
+   0.4891,
+   0.22
+  ],
+  "z_min": -0.05,
+  "z_max": 0.17,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_smallTopB.glb",
+  "nom": "rock_smallTopB",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.6221,
+   0.6463,
+   0.28
+  ],
+  "z_min": -0.05,
+  "z_max": 0.23,
+  "materiaux": [
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallA.glb",
+  "nom": "rock_tallA",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 136,
+  "dim": [
+   0.9831,
+   0.6832,
+   0.9959
+  ],
+  "z_min": -0.05,
+  "z_max": 0.9459,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallB.glb",
+  "nom": "rock_tallB",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 172,
+  "dim": [
+   0.7648,
+   0.77,
+   0.8838
+  ],
+  "z_min": -0.05,
+  "z_max": 0.8338,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallC.glb",
+  "nom": "rock_tallC",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 37,
+  "dim": [
+   0.4562,
+   0.4365,
+   0.7829
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7329,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallD.glb",
+  "nom": "rock_tallD",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 38,
+  "dim": [
+   0.4428,
+   0.4615,
+   0.7721
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7221,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallE.glb",
+  "nom": "rock_tallE",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 38,
+  "dim": [
+   0.4562,
+   0.5268,
+   0.4438
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3938,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallF.glb",
+  "nom": "rock_tallF",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 46,
+  "dim": [
+   0.4437,
+   0.5123,
+   0.5737
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5237,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallG.glb",
+  "nom": "rock_tallG",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.4249,
+   0.4907,
+   0.7829
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7329,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallH.glb",
+  "nom": "rock_tallH",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.5749,
+   0.6639,
+   0.7108
+  ],
+  "z_min": -0.05,
+  "z_max": 0.6608,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallI.glb",
+  "nom": "rock_tallI",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.4562,
+   0.4644,
+   0.8118
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7618,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "rock_tallJ.glb",
+  "nom": "rock_tallJ",
+  "famille": "rock",
+  "meshes": 1,
+  "tris": 42,
+  "dim": [
+   0.4879,
+   0.5382,
+   0.62
+  ],
+  "z_min": -0.05,
+  "z_max": 0.57,
+  "materiaux": [
+   "_defaultMat",
+   "dirt",
+   "grass"
+  ]
+ },
+ {
+  "file": "sign.glb",
+  "nom": "sign",
+  "famille": "sign",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.3,
+   0.07,
+   0.4088
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3588,
+  "materiaux": [
+   "_defaultMat",
+   "wood",
+   "woodDark"
+  ]
+ },
+ {
+  "file": "statue_block.glb",
+  "nom": "statue_block",
+  "famille": "statue",
+  "meshes": 1,
+  "tris": 140,
+  "dim": [
+   0.4,
+   0.4,
+   0.4
+  ],
+  "z_min": -0.05,
+  "z_max": 0.35,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "statue_column.glb",
+  "nom": "statue_column",
+  "famille": "statue",
+  "meshes": 1,
+  "tris": 122,
+  "dim": [
+   0.3,
+   0.3,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "_defaultMat",
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "statue_columnDamaged.glb",
+  "nom": "statue_columnDamaged",
+  "famille": "statue",
+  "meshes": 1,
+  "tris": 108,
+  "dim": [
+   0.3,
+   0.3,
+   0.7
+  ],
+  "z_min": -0.05,
+  "z_max": 0.65,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "statue_head.glb",
+  "nom": "statue_head",
+  "famille": "statue",
+  "meshes": 1,
+  "tris": 196,
+  "dim": [
+   0.726,
+   0.5544,
+   1.0
+  ],
+  "z_min": -0.05,
+  "z_max": 0.95,
+  "materiaux": [
+   "_defaultMat",
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "statue_obelisk.glb",
+  "nom": "statue_obelisk",
+  "famille": "statue",
+  "meshes": 1,
+  "tris": 38,
+  "dim": [
+   0.307,
+   0.307,
+   0.8754
+  ],
+  "z_min": -0.05,
+  "z_max": 0.8254,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "statue_ring.glb",
+  "nom": "statue_ring",
+  "famille": "statue",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.6,
+   0.4,
+   0.7964
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7464,
+  "materiaux": [
+   "stone",
+   "stoneDark"
+  ]
+ },
+ {
+  "file": "stone_largeA.glb",
+  "nom": "stone_largeA",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 80,
+  "dim": [
+   0.7849,
+   1.0155,
+   0.2598
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2098,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_largeB.glb",
+  "nom": "stone_largeB",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 85,
+  "dim": [
+   0.7667,
+   1.0155,
+   0.4303
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3803,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_largeC.glb",
+  "nom": "stone_largeC",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 72,
+  "dim": [
+   1.0644,
+   1.0157,
+   0.3211
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2711,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_largeD.glb",
+  "nom": "stone_largeD",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 80,
+  "dim": [
+   1.0688,
+   1.0303,
+   0.5683
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5183,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_largeE.glb",
+  "nom": "stone_largeE",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   1.0955,
+   0.9199,
+   0.2922
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2422,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_largeF.glb",
+  "nom": "stone_largeF",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 73,
+  "dim": [
+   1.0955,
+   0.899,
+   0.479
+  ],
+  "z_min": -0.05,
+  "z_max": 0.429,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallA.glb",
+  "nom": "stone_smallA",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.3608,
+   0.3608,
+   0.1912
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1412,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallB.glb",
+  "nom": "stone_smallB",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 24,
+  "dim": [
+   0.3608,
+   0.3608,
+   0.1768
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1268,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallC.glb",
+  "nom": "stone_smallC",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.3608,
+   0.3608,
+   0.1227
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0727,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallD.glb",
+  "nom": "stone_smallD",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.4257,
+   0.3687,
+   0.2309
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1809,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallE.glb",
+  "nom": "stone_smallE",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 64,
+  "dim": [
+   0.3608,
+   0.3125,
+   0.2562
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2062,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallF.glb",
+  "nom": "stone_smallF",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   0.3536,
+   0.3062,
+   0.2453
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1953,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallFlatA.glb",
+  "nom": "stone_smallFlatA",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 20,
+  "dim": [
+   0.4958,
+   0.4296,
+   0.0649
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0149,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallFlatB.glb",
+  "nom": "stone_smallFlatB",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 16,
+  "dim": [
+   0.4295,
+   0.4024,
+   0.0649
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0149,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallFlatC.glb",
+  "nom": "stone_smallFlatC",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 40,
+  "dim": [
+   0.4704,
+   0.3603,
+   0.0649
+  ],
+  "z_min": -0.05,
+  "z_max": 0.0149,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallG.glb",
+  "nom": "stone_smallG",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 32,
+  "dim": [
+   0.5937,
+   0.6855,
+   0.2453
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1953,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallH.glb",
+  "nom": "stone_smallH",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 60,
+  "dim": [
+   0.4618,
+   0.4618,
+   0.4074
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3574,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallI.glb",
+  "nom": "stone_smallI",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.3583,
+   0.4138,
+   0.2778
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2278,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallTopA.glb",
+  "nom": "stone_smallTopA",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 52,
+  "dim": [
+   0.4877,
+   0.4891,
+   0.22
+  ],
+  "z_min": -0.05,
+  "z_max": 0.17,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_smallTopB.glb",
+  "nom": "stone_smallTopB",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 76,
+  "dim": [
+   0.6221,
+   0.6463,
+   0.28
+  ],
+  "z_min": -0.05,
+  "z_max": 0.23,
+  "materiaux": [
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallA.glb",
+  "nom": "stone_tallA",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 136,
+  "dim": [
+   0.9831,
+   0.6832,
+   0.9959
+  ],
+  "z_min": -0.05,
+  "z_max": 0.9459,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallB.glb",
+  "nom": "stone_tallB",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 172,
+  "dim": [
+   0.7648,
+   0.77,
+   0.8838
+  ],
+  "z_min": -0.05,
+  "z_max": 0.8338,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallC.glb",
+  "nom": "stone_tallC",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 37,
+  "dim": [
+   0.4562,
+   0.4365,
+   0.7829
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7329,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallD.glb",
+  "nom": "stone_tallD",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 38,
+  "dim": [
+   0.4428,
+   0.4615,
+   0.7721
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7221,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallE.glb",
+  "nom": "stone_tallE",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 38,
+  "dim": [
+   0.4562,
+   0.5268,
+   0.4438
+  ],
+  "z_min": -0.05,
+  "z_max": 0.3938,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallF.glb",
+  "nom": "stone_tallF",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 46,
+  "dim": [
+   0.4437,
+   0.5123,
+   0.5737
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5237,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallG.glb",
+  "nom": "stone_tallG",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.4249,
+   0.4907,
+   0.7829
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7329,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallH.glb",
+  "nom": "stone_tallH",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.5749,
+   0.6639,
+   0.7108
+  ],
+  "z_min": -0.05,
+  "z_max": 0.6608,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallI.glb",
+  "nom": "stone_tallI",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.4562,
+   0.4644,
+   0.8118
+  ],
+  "z_min": -0.05,
+  "z_max": 0.7618,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stone_tallJ.glb",
+  "nom": "stone_tallJ",
+  "famille": "stone",
+  "meshes": 1,
+  "tris": 42,
+  "dim": [
+   0.4879,
+   0.5382,
+   0.62
+  ],
+  "z_min": -0.05,
+  "z_max": 0.57,
+  "materiaux": [
+   "_defaultMat",
+   "stone"
+  ]
+ },
+ {
+  "file": "stump_old.glb",
+  "nom": "stump_old",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 120,
+  "dim": [
+   0.3565,
+   0.371,
+   0.2665
+  ],
+  "z_min": -0.05,
+  "z_max": 0.2165,
+  "materiaux": [
+   "woodBark"
+  ]
+ },
+ {
+  "file": "stump_oldTall.glb",
+  "nom": "stump_oldTall",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 120,
+  "dim": [
+   0.3565,
+   0.371,
+   0.6665
+  ],
+  "z_min": -0.05,
+  "z_max": 0.6165,
+  "materiaux": [
+   "woodBark"
+  ]
+ },
+ {
+  "file": "stump_round.glb",
+  "nom": "stump_round",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 56,
+  "dim": [
+   0.3213,
+   0.371,
+   0.2065
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1565,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "stump_roundDetailed.glb",
+  "nom": "stump_roundDetailed",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 96,
+  "dim": [
+   0.3565,
+   0.371,
+   0.2065
+  ],
+  "z_min": -0.05,
+  "z_max": 0.1565,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "stump_square.glb",
+  "nom": "stump_square",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 44,
+  "dim": [
+   0.3596,
+   0.3,
+   0.3
+  ],
+  "z_min": -0.05,
+  "z_max": 0.25,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "stump_squareDetailed.glb",
+  "nom": "stump_squareDetailed",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 84,
+  "dim": [
+   0.44,
+   0.44,
+   0.2
+  ],
+  "z_min": -0.05,
+  "z_max": 0.15,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "stump_squareDetailedWide.glb",
+  "nom": "stump_squareDetailedWide",
+  "famille": "stump",
+  "meshes": 1,
+  "tris": 84,
+  "dim": [
+   0.64,
+   0.64,
+   0.2
+  ],
+  "z_min": -0.05,
+  "z_max": 0.15,
+  "materiaux": [
+   "woodBark",
+   "woodInner"
+  ]
+ },
+ {
+  "file": "tent_detailedClosed.glb",
+  "nom": "tent_detailedClosed",
+  "famille": "tent",
+  "meshes": 1,
+  "tris": 228,
+  "dim": [
+   0.8749,
+   0.6364,
+   0.5611
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5111,
+  "materiaux": [
+   "colorRed",
+   "colorRedDark",
+   "wood"
+  ]
+ },
+ {
+  "file": "tent_detailedOpen.glb",
+  "nom": "tent_detailedOpen",
+  "famille": "tent",
+  "meshes": 1,
+  "tris": 232,
+  "dim": [
+   0.8749,
+   0.6664,
+   0.5611
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5111,
+  "materiaux": [
+   "colorRed",
+   "wood"
+  ]
+ },
+ {
+  "file": "tent_smallClosed.glb",
+  "nom": "tent_smallClosed",
+  "famille": "tent",
+  "meshes": 1,
+  "tris": 220,
+  "dim": [
+   0.5476,
+   0.6364,
+   0.5611
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5111,
+  "materiaux": [
+   "_defaultMat",
+   "colorRed",
+   "colorRedDark",
+   "wood"
+  ]
+ },
+ {
+  "file": "tent_smallOpen.glb",
+  "nom": "tent_smallOpen",
+  "famille": "tent",
+  "meshes": 1,
+  "tris": 224,
+  "dim": [
+   0.5476,
+   0.6664,
+   0.5611
+  ],
+  "z_min": -0.05,
+  "z_max": 0.5111,
+  "materiaux": [
+   "colorRed",
+   "colorRedDark",
+   "wood"
+  ]
+ },
+ {
+  "file": "tree_blocks.glb",
+  "nom": "tree_blocks",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 132,
+  "dim": [
+   0.6,
+   0.6,
+   1.185
+  ],
+  "z_min": -0.05,
+  "z_max": 1.135,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_blocks_dark.glb",
+  "nom": "tree_blocks_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 132,
+  "dim": [
+   0.6,
+   0.6,
+   1.185
+  ],
+  "z_min": -0.05,
+  "z_max": 1.135,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_blocks_fall.glb",
+  "nom": "tree_blocks_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 264,
+  "dim": [
+   0.6,
+   0.6,
+   1.185
+  ],
+  "z_min": -0.05,
+  "z_max": 1.135,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_cone.glb",
+  "nom": "tree_cone",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 132,
+  "dim": [
+   0.5297,
+   0.5297,
+   1.4303
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3803,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_cone_dark.glb",
+  "nom": "tree_cone_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 264,
+  "dim": [
+   0.5297,
+   0.5297,
+   1.4303
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3803,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_cone_fall.glb",
+  "nom": "tree_cone_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 132,
+  "dim": [
+   0.5297,
+   0.5297,
+   1.4303
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3803,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_default.glb",
+  "nom": "tree_default",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 114,
+  "dim": [
+   0.755,
+   0.6538,
+   1.7079
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6579,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_default_dark.glb",
+  "nom": "tree_default_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 114,
+  "dim": [
+   0.755,
+   0.6538,
+   1.7079
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6579,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_default_fall.glb",
+  "nom": "tree_default_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 228,
+  "dim": [
+   0.755,
+   0.6538,
+   1.7079
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6579,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_detailed.glb",
+  "nom": "tree_detailed",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 402,
+  "dim": [
+   0.8471,
+   0.7616,
+   1.3324
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2824,
+  "materiaux": [
+   "_defaultMat",
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_detailed_dark.glb",
+  "nom": "tree_detailed_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 402,
+  "dim": [
+   0.8471,
+   0.7616,
+   1.3324
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2824,
+  "materiaux": [
+   "_defaultMat",
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_detailed_fall.glb",
+  "nom": "tree_detailed_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 402,
+  "dim": [
+   0.8471,
+   0.7616,
+   1.3324
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2824,
+  "materiaux": [
+   "_defaultMat",
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_fat.glb",
+  "nom": "tree_fat",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 50,
+  "dim": [
+   0.755,
+   0.6538,
+   1.1504
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1004,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_fat_darkh.glb",
+  "nom": "tree_fat_darkh",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 50,
+  "dim": [
+   0.755,
+   0.6538,
+   1.1504
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1004,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_fat_fall.glb",
+  "nom": "tree_fat_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 50,
+  "dim": [
+   0.755,
+   0.6538,
+   1.1504
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1004,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_oak.glb",
+  "nom": "tree_oak",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 196,
+  "dim": [
+   0.6406,
+   0.7396,
+   1.2262
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1762,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_oak_dark.glb",
+  "nom": "tree_oak_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 196,
+  "dim": [
+   0.6406,
+   0.7396,
+   1.2262
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1762,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_oak_fall.glb",
+  "nom": "tree_oak_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 196,
+  "dim": [
+   0.6406,
+   0.7396,
+   1.2262
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1762,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_palm.glb",
+  "nom": "tree_palm",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 186,
+  "dim": [
+   0.9355,
+   1.0128,
+   1.5146
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4646,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_palmBend.glb",
+  "nom": "tree_palmBend",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 200,
+  "dim": [
+   0.9355,
+   1.0128,
+   1.3799
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3299,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_palmDetailedShort.glb",
+  "nom": "tree_palmDetailedShort",
+  "famille": "tree",
+  "meshes": 3,
+  "tris": 336,
+  "dim": [
+   1.4628,
+   1.4628,
+   1.124
+  ],
+  "z_min": -0.05,
+  "z_max": 1.074,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_palmDetailedTall.glb",
+  "nom": "tree_palmDetailedTall",
+  "famille": "tree",
+  "meshes": 3,
+  "tris": 336,
+  "dim": [
+   1.4628,
+   1.4628,
+   1.4235
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3735,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_palmShort.glb",
+  "nom": "tree_palmShort",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 190,
+  "dim": [
+   1.0343,
+   1.0343,
+   1.0562
+  ],
+  "z_min": -0.05,
+  "z_max": 1.0062,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_palmTall.glb",
+  "nom": "tree_palmTall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 190,
+  "dim": [
+   1.0343,
+   1.0343,
+   1.3557
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3057,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_pineDefaultA.glb",
+  "nom": "tree_pineDefaultA",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 230,
+  "dim": [
+   0.532,
+   0.532,
+   1.5458
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4958,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineDefaultB.glb",
+  "nom": "tree_pineDefaultB",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 246,
+  "dim": [
+   0.532,
+   0.532,
+   1.5457
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4957,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineGroundA.glb",
+  "nom": "tree_pineGroundA",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 82,
+  "dim": [
+   0.4804,
+   0.5547,
+   0.9145
+  ],
+  "z_min": -0.05,
+  "z_max": 0.8645,
+  "materiaux": [
+   "leafsDark"
+  ]
+ },
+ {
+  "file": "tree_pineGroundB.glb",
+  "nom": "tree_pineGroundB",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 82,
+  "dim": [
+   0.4804,
+   0.5547,
+   1.042
+  ],
+  "z_min": -0.05,
+  "z_max": 0.992,
+  "materiaux": [
+   "leafsDark"
+  ]
+ },
+ {
+  "file": "tree_pineRoundA.glb",
+  "nom": "tree_pineRoundA",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 204,
+  "dim": [
+   0.617,
+   0.7125,
+   1.3664
+  ],
+  "z_min": -0.05,
+  "z_max": 1.3164,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineRoundB.glb",
+  "nom": "tree_pineRoundB",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 262,
+  "dim": [
+   0.5322,
+   0.6132,
+   1.1959
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1459,
+  "materiaux": [
+   "_defaultMat",
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineRoundC.glb",
+  "nom": "tree_pineRoundC",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 206,
+  "dim": [
+   0.4804,
+   0.5547,
+   1.2529
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2029,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineRoundD.glb",
+  "nom": "tree_pineRoundD",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 170,
+  "dim": [
+   0.4804,
+   0.5547,
+   1.0817
+  ],
+  "z_min": -0.05,
+  "z_max": 1.0317,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineRoundE.glb",
+  "nom": "tree_pineRoundE",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 198,
+  "dim": [
+   0.532,
+   0.532,
+   1.2546
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2046,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineRoundF.glb",
+  "nom": "tree_pineRoundF",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 214,
+  "dim": [
+   0.532,
+   0.532,
+   1.2545
+  ],
+  "z_min": -0.05,
+  "z_max": 1.2045,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineSmallA.glb",
+  "nom": "tree_pineSmallA",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 164,
+  "dim": [
+   0.5,
+   0.5,
+   0.9672
+  ],
+  "z_min": -0.05,
+  "z_max": 0.9172,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineSmallB.glb",
+  "nom": "tree_pineSmallB",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 86,
+  "dim": [
+   0.3863,
+   0.392,
+   1.0086
+  ],
+  "z_min": -0.05,
+  "z_max": 0.9586,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineSmallC.glb",
+  "nom": "tree_pineSmallC",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 54,
+  "dim": [
+   0.3863,
+   0.3919,
+   1.1231
+  ],
+  "z_min": -0.05,
+  "z_max": 1.0731,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineSmallD.glb",
+  "nom": "tree_pineSmallD",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 54,
+  "dim": [
+   0.357,
+   0.357,
+   0.9556
+  ],
+  "z_min": -0.05,
+  "z_max": 0.9056,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallA.glb",
+  "nom": "tree_pineTallA",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.3863,
+   0.392,
+   1.5296
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4796,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallA_detailed.glb",
+  "nom": "tree_pineTallA_detailed",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 134,
+  "dim": [
+   0.3863,
+   0.392,
+   1.5296
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4796,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallB.glb",
+  "nom": "tree_pineTallB",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 78,
+  "dim": [
+   0.3863,
+   0.392,
+   1.9346
+  ],
+  "z_min": -0.05,
+  "z_max": 1.8846,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallB_detailed.glb",
+  "nom": "tree_pineTallB_detailed",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 166,
+  "dim": [
+   0.3863,
+   0.392,
+   1.9346
+  ],
+  "z_min": -0.05,
+  "z_max": 1.8846,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallC.glb",
+  "nom": "tree_pineTallC",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 98,
+  "dim": [
+   0.4804,
+   0.5547,
+   1.6705
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6205,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallC_detailed.glb",
+  "nom": "tree_pineTallC_detailed",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 154,
+  "dim": [
+   0.4804,
+   0.5547,
+   1.6705
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6205,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallD.glb",
+  "nom": "tree_pineTallD",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 98,
+  "dim": [
+   0.4804,
+   0.5547,
+   2.0755
+  ],
+  "z_min": -0.05,
+  "z_max": 2.0255,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_pineTallD_detailed.glb",
+  "nom": "tree_pineTallD_detailed",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 170,
+  "dim": [
+   0.4804,
+   0.5547,
+   2.0755
+  ],
+  "z_min": -0.05,
+  "z_max": 2.0255,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_plateau.glb",
+  "nom": "tree_plateau",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 215,
+  "dim": [
+   0.6117,
+   0.6549,
+   1.2493
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1993,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_plateau_dark.glb",
+  "nom": "tree_plateau_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 215,
+  "dim": [
+   0.6117,
+   0.6549,
+   1.2493
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1993,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_plateau_fall.glb",
+  "nom": "tree_plateau_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 215,
+  "dim": [
+   0.6117,
+   0.6549,
+   1.2493
+  ],
+  "z_min": -0.05,
+  "z_max": 1.1993,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_simple.glb",
+  "nom": "tree_simple",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.3546,
+   0.4095,
+   1.5194
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4694,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_simple_dark.glb",
+  "nom": "tree_simple_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.3546,
+   0.4095,
+   1.5194
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4694,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_simple_fall.glb",
+  "nom": "tree_simple_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.3546,
+   0.4095,
+   1.5194
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4694,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_small.glb",
+  "nom": "tree_small",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.3546,
+   0.4095,
+   1.11
+  ],
+  "z_min": -0.05,
+  "z_max": 1.06,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_small_dark.glb",
+  "nom": "tree_small_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 124,
+  "dim": [
+   0.3546,
+   0.4095,
+   1.11
+  ],
+  "z_min": -0.05,
+  "z_max": 1.06,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_small_fall.glb",
+  "nom": "tree_small_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 62,
+  "dim": [
+   0.3546,
+   0.4095,
+   1.11
+  ],
+  "z_min": -0.05,
+  "z_max": 1.06,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_tall.glb",
+  "nom": "tree_tall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 72,
+  "dim": [
+   0.3996,
+   0.4614,
+   1.6877
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6377,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_tall_dark.glb",
+  "nom": "tree_tall_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 72,
+  "dim": [
+   0.3996,
+   0.4614,
+   1.6877
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6377,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_tall_fall.glb",
+  "nom": "tree_tall_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 144,
+  "dim": [
+   0.3996,
+   0.4614,
+   1.6877
+  ],
+  "z_min": -0.05,
+  "z_max": 1.6377,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ },
+ {
+  "file": "tree_thin.glb",
+  "nom": "tree_thin",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 228,
+  "dim": [
+   0.6804,
+   0.6165,
+   1.4903
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4403,
+  "materiaux": [
+   "leafsGreen",
+   "woodBark"
+  ]
+ },
+ {
+  "file": "tree_thin_dark.glb",
+  "nom": "tree_thin_dark",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 456,
+  "dim": [
+   0.6804,
+   0.6165,
+   1.4903
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4403,
+  "materiaux": [
+   "leafsDark",
+   "woodBarkDark"
+  ]
+ },
+ {
+  "file": "tree_thin_fall.glb",
+  "nom": "tree_thin_fall",
+  "famille": "tree",
+  "meshes": 1,
+  "tris": 228,
+  "dim": [
+   0.6804,
+   0.6165,
+   1.4903
+  ],
+  "z_min": -0.05,
+  "z_max": 1.4403,
+  "materiaux": [
+   "leafsFall",
+   "woodBirch"
+  ]
+ }
+]
