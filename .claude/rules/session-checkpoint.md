@@ -144,6 +144,38 @@ Pour CHAQUE pattern réutilisable découvert pendant la session :
 
 Garantit : knowledge survit à la compression contexte, nouveau Claude charge auto les memories pertinentes.
 
+### Étape 3 bis — Verser le reste à faire dans l'Établi (adopté 2026-08-12)
+
+**Une tâche qui ne vit que dans une mémoire de session ou dans un message de clôture
+est déjà perdue** : personne ne relit une conversation close, et une mémoire ne se
+lit que si la session suivante pense à la chercher.
+
+Tout ce que l'étape 2 a listé comme « reste à faire » doit donc être versé dans le
+bloc `⟦DETTE-DEBUT⟧ … ⟦DETTE-FIN⟧` de
+[`docs/etabli/etabli-forgia.html`](../../docs/etabli/etabli-forgia.html), puis
+republié sur son URL (cf. `/veille` étape 4 — **toujours avec le paramètre `url:`**,
+sinon on crée un second établi).
+
+Format d'une entrée :
+
+```js
+{t:'chantier'|'story', ref:'<slug court ou n° de story>', fait:false,
+ risque:'haut'|'moyen'|'bas', effort:'~30 min', origine:'session JJ/MM',
+ ti:'<le fait, pas le sujet>', qu:'<pourquoi, et ce que ça débloque>'}
+```
+
+Deux règles :
+
+- **Ne jamais supprimer une ligne faite** — la cocher (`fait: true`). On veut voir
+  ce qui a été soldé, sinon la section ne dit plus que ce qui reste et perd sa valeur
+  de preuve.
+- **Le risque est celui de l'oubli, pas de l'exécution.** Une story dont personne ne
+  sait si elle est faite (statut illisible) est `risque: 'haut'` même si le travail
+  est trivial.
+
+*Origine : le 12/08, onze stories avaient survécu à une purge et cinq chantiers de fin
+de session ne vivaient que dans un message. Aucun tableau ne les montrait.*
+
 ### Étape 4 — Prompt de reprise (bootstrap autonome)
 
 Écrire un prompt **self-contained** que l'user peut copier-coller dans :

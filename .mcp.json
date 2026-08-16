@@ -32,6 +32,15 @@
       "type": "stdio",
       "command": "C:/Users/Antoi/.cargo/bin/bevy_brp_mcp.exe",
       "args": []
+    },
+    "blender": {
+      "type": "stdio",
+      "command": "C:/Users/Antoi/AppData/Local/Programs/Python/Python314/Scripts/uvx.exe",
+      "args": ["blender-mcp"],
+      "env": {
+        "BLENDER_HOST": "localhost",
+        "BLENDER_PORT": "9876"
+      }
     }
   }
 }

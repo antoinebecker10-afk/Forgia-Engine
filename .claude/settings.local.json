@@ -72,6 +72,16 @@
             "statusMessage": "Contrôle des outils de session..."
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"D:/IA Antoine/.claude/hooks/_perf-guard.sh\" 5 \"C:/Users/Antoi/Desktop/Forgia Rewrite/.claude/hooks/telegram-recap.sh\"",
+            "statusMessage": "Recap Telegram..."
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
