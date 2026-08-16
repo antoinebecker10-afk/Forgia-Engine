@@ -1,0 +1,341 @@
+# Généré par tools/blender/expedition/92_cellules.py — ne pas éditer à la main.
+schema_version = 1
+cell_size_m = 40.0
+coordinate_system = "bevy_y_up_meters"
+asset_format = "gltf_separate_shared_texture_library"
+
+[[cells]]
+id = "cell_x-4_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-4_z-3_render.gltf#Scene0"
+bounds_min_m = [-123.747, -0.661, -85.064]
+bounds_max_m = [-119.558, 1.672, -79.727]
+source_meshes = 3
+
+[[cells]]
+id = "cell_x-4_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-4_z-2_render.gltf#Scene0"
+bounds_min_m = [-126.276, 0.264, -80.46]
+bounds_max_m = [-119.288, 12.703, -40.893]
+source_meshes = 25
+
+[[cells]]
+id = "cell_x-4_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-4_z-1_render.gltf#Scene0"
+bounds_min_m = [-126.213, 1.661, -37.661]
+bounds_max_m = [-119.217, 9.471, 0.633]
+source_meshes = 31
+
+[[cells]]
+id = "cell_x-4_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-4_z0_render.gltf#Scene0"
+bounds_min_m = [-142.886, -5.685, -5.449]
+bounds_max_m = [-118.381, 19.685, 41.856]
+source_meshes = 32
+
+[[cells]]
+id = "cell_x-4_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-4_z1_render.gltf#Scene0"
+bounds_min_m = [-125.959, 3.601, 39.409]
+bounds_max_m = [-118.671, 15.263, 79.817]
+source_meshes = 25
+
+[[cells]]
+id = "cell_x-4_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-4_z2_render.gltf#Scene0"
+bounds_min_m = [-124.032, 2.804, 80.57]
+bounds_max_m = [-119.962, 7.2, 84.445]
+source_meshes = 4
+
+[[cells]]
+id = "cell_x-3_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-3_z-3_render.gltf#Scene0"
+bounds_min_m = [-119.757, -0.949, -87.843]
+bounds_max_m = [-81.495, 11.146, -78.8]
+source_meshes = 30
+
+[[cells]]
+id = "cell_x-3_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-3_z-2_render.gltf#Scene0"
+bounds_min_m = [-120.491, -0.202, -80.797]
+bounds_max_m = [-78.993, 10.197, -38.897]
+source_meshes = 246
+
+[[cells]]
+id = "cell_x-3_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-3_z-1_render.gltf#Scene0"
+bounds_min_m = [-120.836, -2.448, -40.734]
+bounds_max_m = [-77.836, 11.42, 1.868]
+source_meshes = 250
+
+[[cells]]
+id = "cell_x-3_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-3_z0_render.gltf#Scene0"
+bounds_min_m = [-121.475, -0.954, -1.284]
+bounds_max_m = [-77.254, 12.686, 42.057]
+source_meshes = 235
+
+[[cells]]
+id = "cell_x-3_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-3_z1_render.gltf#Scene0"
+bounds_min_m = [-120.48, 1.478, 39.08]
+bounds_max_m = [-79.407, 14.445, 82.217]
+source_meshes = 195
+
+[[cells]]
+id = "cell_x-3_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-3_z2_render.gltf#Scene0"
+bounds_min_m = [-119.224, 1.147, 78.479]
+bounds_max_m = [-79.488, 10.005, 86.084]
+source_meshes = 41
+
+[[cells]]
+id = "cell_x-2_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-2_z-3_render.gltf#Scene0"
+bounds_min_m = [-80.572, -7.234, -101.944]
+bounds_max_m = [-34.584, 12.863, -79.437]
+source_meshes = 26
+
+[[cells]]
+id = "cell_x-2_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-2_z-2_render.gltf#Scene0"
+bounds_min_m = [-81.634, -2.625, -81.522]
+bounds_max_m = [-40.023, 11.052, -39.717]
+source_meshes = 207
+
+[[cells]]
+id = "cell_x-2_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-2_z-1_render.gltf#Scene0"
+bounds_min_m = [-81.9, -6.112, -40.177]
+bounds_max_m = [-39.615, 6.092, 0.452]
+source_meshes = 177
+
+[[cells]]
+id = "cell_x-2_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-2_z0_render.gltf#Scene0"
+bounds_min_m = [-81.676, -5.403, -2.447]
+bounds_max_m = [-38.973, 8.834, 40.782]
+source_meshes = 178
+
+[[cells]]
+id = "cell_x-2_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-2_z1_render.gltf#Scene0"
+bounds_min_m = [-82.055, -5.607, 39.03]
+bounds_max_m = [-39.04, 10.701, 81.295]
+source_meshes = 174
+
+[[cells]]
+id = "cell_x-2_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-2_z2_render.gltf#Scene0"
+bounds_min_m = [-80.08, -16.432, 77.937]
+bounds_max_m = [-32.501, 9.057, 103.812]
+source_meshes = 44
+
+[[cells]]
+id = "cell_x-1_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-1_z-3_render.gltf#Scene0"
+bounds_min_m = [-40.857, -9.736, -103.903]
+bounds_max_m = [4.028, 18.33, -79.026]
+source_meshes = 37
+
+[[cells]]
+id = "cell_x-1_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-1_z-2_render.gltf#Scene0"
+bounds_min_m = [-40.649, -1.762, -81.215]
+bounds_max_m = [0.66, 11.855, -38.972]
+source_meshes = 132
+
+[[cells]]
+id = "cell_x-1_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-1_z-1_render.gltf#Scene0"
+bounds_min_m = [-42.593, -6.043, -45.729]
+bounds_max_m = [1.942, 8.468, 2.153]
+source_meshes = 167
+
+[[cells]]
+id = "cell_x-1_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-1_z0_render.gltf#Scene0"
+bounds_min_m = [-125.923, -5.982, -48.2]
+bounds_max_m = [92.2, 13.67, 48.7]
+source_meshes = 162
+
+[[cells]]
+id = "cell_x-1_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-1_z1_render.gltf#Scene0"
+bounds_min_m = [-40.6, -6.0, 38.007]
+bounds_max_m = [2.025, 35.789, 79.962]
+source_meshes = 176
+
+[[cells]]
+id = "cell_x-1_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x-1_z2_render.gltf#Scene0"
+bounds_min_m = [-41.837, -13.353, 78.135]
+bounds_max_m = [-0.139, 16.504, 102.874]
+source_meshes = 37
+
+[[cells]]
+id = "cell_x0_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x0_z-3_render.gltf#Scene0"
+bounds_min_m = [-9.589, -2.126, -103.784]
+bounds_max_m = [39.974, 23.748, -77.206]
+source_meshes = 50
+
+[[cells]]
+id = "cell_x0_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x0_z-2_render.gltf#Scene0"
+bounds_min_m = [-1.24, -1.318, -80.625]
+bounds_max_m = [41.648, 18.946, -39.517]
+source_meshes = 262
+
+[[cells]]
+id = "cell_x0_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x0_z-1_render.gltf#Scene0"
+bounds_min_m = [-2.235, -1.367, -40.948]
+bounds_max_m = [41.21, 12.966, 2.386]
+source_meshes = 298
+
+[[cells]]
+id = "cell_x0_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x0_z0_render.gltf#Scene0"
+bounds_min_m = [-140.0, -5.939, -100.0]
+bounds_max_m = [140.0, 40.535, 100.0]
+source_meshes = 235
+
+[[cells]]
+id = "cell_x0_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x0_z1_render.gltf#Scene0"
+bounds_min_m = [-2.851, 1.569, 37.438]
+bounds_max_m = [41.284, 23.708, 81.13]
+source_meshes = 217
+
+[[cells]]
+id = "cell_x0_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x0_z2_render.gltf#Scene0"
+bounds_min_m = [-0.281, 1.299, 79.358]
+bounds_max_m = [39.945, 20.592, 90.267]
+source_meshes = 37
+
+[[cells]]
+id = "cell_x1_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x1_z-3_render.gltf#Scene0"
+bounds_min_m = [39.719, -3.66, -103.007]
+bounds_max_m = [73.242, 22.837, -79.162]
+source_meshes = 25
+
+[[cells]]
+id = "cell_x1_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x1_z-2_render.gltf#Scene0"
+bounds_min_m = [38.058, -3.464, -82.334]
+bounds_max_m = [81.232, 13.286, -39.319]
+source_meshes = 253
+
+[[cells]]
+id = "cell_x1_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x1_z-1_render.gltf#Scene0"
+bounds_min_m = [38.402, -2.661, -41.027]
+bounds_max_m = [81.411, 7.658, 1.546]
+source_meshes = 195
+
+[[cells]]
+id = "cell_x1_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x1_z0_render.gltf#Scene0"
+bounds_min_m = [40.506, -0.722, -1.788]
+bounds_max_m = [82.384, 14.366, 41.938]
+source_meshes = 142
+
+[[cells]]
+id = "cell_x1_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x1_z1_render.gltf#Scene0"
+bounds_min_m = [38.515, 1.837, 38.366]
+bounds_max_m = [81.4, 19.885, 81.728]
+source_meshes = 277
+
+[[cells]]
+id = "cell_x1_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x1_z2_render.gltf#Scene0"
+bounds_min_m = [35.454, 1.789, 78.578]
+bounds_max_m = [81.141, 32.896, 105.502]
+source_meshes = 40
+
+[[cells]]
+id = "cell_x2_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x2_z-3_render.gltf#Scene0"
+bounds_min_m = [82.092, -1.521, -85.425]
+bounds_max_m = [117.66, 9.532, -79.495]
+source_meshes = 18
+
+[[cells]]
+id = "cell_x2_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x2_z-2_render.gltf#Scene0"
+bounds_min_m = [78.321, -2.776, -82.592]
+bounds_max_m = [121.112, 8.579, -39.265]
+source_meshes = 221
+
+[[cells]]
+id = "cell_x2_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x2_z-1_render.gltf#Scene0"
+bounds_min_m = [79.853, -1.819, -41.301]
+bounds_max_m = [121.507, 9.148, 5.502]
+source_meshes = 166
+
+[[cells]]
+id = "cell_x2_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x2_z0_render.gltf#Scene0"
+bounds_min_m = [78.746, -1.006, -2.252]
+bounds_max_m = [122.316, 10.108, 41.327]
+source_meshes = 221
+
+[[cells]]
+id = "cell_x2_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x2_z1_render.gltf#Scene0"
+bounds_min_m = [78.332, -1.014, 37.531]
+bounds_max_m = [121.929, 12.617, 80.949]
+source_meshes = 284
+
+[[cells]]
+id = "cell_x2_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x2_z2_render.gltf#Scene0"
+bounds_min_m = [83.423, -1.243, 77.698]
+bounds_max_m = [119.689, 8.862, 88.956]
+source_meshes = 32
+
+[[cells]]
+id = "cell_x3_z-3"
+render = "models/environment/expedition/vallon_stream_cells/cell_x3_z-3_render.gltf#Scene0"
+bounds_min_m = [119.781, 3.298, -83.946]
+bounds_max_m = [121.037, 3.813, -82.695]
+source_meshes = 1
+
+[[cells]]
+id = "cell_x3_z-2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x3_z-2_render.gltf#Scene0"
+bounds_min_m = [118.11, -1.266, -75.959]
+bounds_max_m = [124.483, 6.687, -42.417]
+source_meshes = 17
+
+[[cells]]
+id = "cell_x3_z-1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x3_z-1_render.gltf#Scene0"
+bounds_min_m = [119.144, -0.767, -40.364]
+bounds_max_m = [125.47, 3.996, 0.508]
+source_meshes = 25
+
+[[cells]]
+id = "cell_x3_z0"
+render = "models/environment/expedition/vallon_stream_cells/cell_x3_z0_render.gltf#Scene0"
+bounds_min_m = [119.253, -0.828, 0.91]
+bounds_max_m = [125.365, 3.448, 33.914]
+source_meshes = 13
+
+[[cells]]
+id = "cell_x3_z1"
+render = "models/environment/expedition/vallon_stream_cells/cell_x3_z1_render.gltf#Scene0"
+bounds_min_m = [118.813, -0.061, 44.139]
+bounds_max_m = [126.073, 11.301, 79.871]
+source_meshes = 27
+
+[[cells]]
+id = "cell_x3_z2"
+render = "models/environment/expedition/vallon_stream_cells/cell_x3_z2_render.gltf#Scene0"
+bounds_min_m = [120.077, -0.229, 81.265]
+bounds_max_m = [122.128, 0.202, 83.312]
+source_meshes = 1
