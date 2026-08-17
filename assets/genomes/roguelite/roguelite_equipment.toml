@@ -184,16 +184,32 @@ max_sane_speed = 15.0
 # aujourd'hui — les autres attendent un système qui sache quand les jouer.
 
 [expedition_body]
-# `_complet` et non `_animated` : MÊME corps (62 os Mixamo identiques, mêmes 9
-# clips — vérifié sur les deux GLB), plus la cape à l'ourlet ardent, la dague,
-# et 4 sockets nommés. C'est le seul des deux fichiers qui porte une cape.
+# `stylized_male_complet.glb` avec ses CHEVEUX ANIMÉS. Même corps, mêmes 62 os
+# Mixamo, mêmes 9 clips, même cape à l'ourlet ardent, mêmes 4 sockets — plus
+# deux os `cheveux_01`/`cheveux_02` dans la masse capillaire, et leur mouvement
+# cuit dans les neuf actions existantes.
+# Bâti par `tools/blender/personnage/40_cheveux_avatar.py`, rejouable seul.
 #
-# 🚨 Il contient DEUX squelettes : celui du corps (62 os) et celui de la cape
-# (6 os `cloak_01`…`cloak_06`), donc deux `AnimationPlayer`. `sys_bind_avatar_
-# animations` les câble TOUS (il ne s'arrête pas au premier) — c'est ce qui rend
-# l'échange sûr. Un brancheur qui s'arrêterait au premier lecteur laisserait le
-# corps bras écartés : c'est exactement le défaut qu'a produit une autre version.
-model = "models/characters/stylized/stylized_male_complet.glb"
+# 🚨 Le mouvement est DANS les clips, pas à côté. Le moteur joue « run » et les
+# cheveux suivent : aucun système Rust à écrire, aucun clip additif à mélanger.
+# La pointe est en retard de 0,18 tour sur la racine et va 1,35 fois plus loin —
+# c'est ce décalage, et lui seul, qui fait qu'une matière a l'air souple.
+#
+# Mesuré après pesée : à 14°/19° de flexion, le VISAGE ne bouge pas (3,2 mm au
+# pire, 0,02 mm en moyenne) pendant que les pointes balaient 82 mm.
+#
+# 🚨 Il contient DEUX squelettes : celui du corps (64 os) et celui de la cape
+# (6 os `cloak_01`…`cloak_06`), donc deux `AnimationPlayer`.
+# `sys_bind_avatar_animations` les câble TOUS (il ne s'arrête pas au premier) —
+# c'est ce qui rend l'échange sûr. Un brancheur qui s'arrêterait au premier
+# lecteur laisserait le corps bras écartés : c'est exactement le défaut qu'a
+# produit une autre version.
+#
+# Autres corps disponibles, sans changement de code :
+#   · `stylized_male_complet.glb`  — l'original, cheveux figés
+#   · `chien_expedition.glb`       — tête de chien sculptée, oreilles/yeux/
+#     mâchoire animés et clignement en morph (chaîne `32`→`39`)
+model = "models/characters/stylized/stylized_male_cheveux.glb"
 
 [expedition_body.animation]
 idle_clip = "idle"
