@@ -114,10 +114,15 @@ def main():
             bpy.data.objects.remove(obj, do_unlink=True)
             parasites += 1
 
-    # Le repère de la tête, relu sur le corps (jamais supposé) — et lu AVANT
-    # toute modification de visibilité : voir le bloc suivant.
+    # Le cap, relu sur le corps — et AVANT toute modification de visibilité :
+    # voir le bloc suivant.
+    #
+    # 🚨 Les ÉPAULES donnent l'axe, les ORTEILS le sens. Mesuré : le cap des
+    # orteils s'écarte de 14° de celui de la tête (pieds écartés au repos),
+    # celui des épaules de 2,2° seulement. Cadrer sur les pieds montrait un
+    # trois-quarts en croyant montrer une face.
     arm = next((o for o in bpy.context.scene.objects if o.type == "ARMATURE"), None)
-    avants = []
+    grossier = Vector((0.0, 0.0, 0.0))
     for cheville, orteil in (("LeftFoot", "LeftToeBase"), ("RightFoot", "RightToeBase")):
         a, b = arm.pose.bones.get(cheville), arm.pose.bones.get(orteil)
         if a and b:
@@ -125,8 +130,13 @@ def main():
                  - (arm.matrix_world @ a.matrix).translation)
             d.z = 0.0
             if d.length > 1e-4:
-                avants.append(d.normalized())
-    avant = (sum(avants, Vector((0, 0, 0))) / len(avants)).normalized()
+                grossier += d.normalized()
+    lateral = ((arm.matrix_world @ arm.pose.bones["RightArm"].matrix).translation
+               - (arm.matrix_world @ arm.pose.bones["LeftArm"].matrix).translation)
+    lateral.z = 0.0
+    avant = lateral.normalized().cross(Vector((0.0, 0.0, 1.0))).normalized()
+    if grossier.length > 1e-6 and avant.dot(grossier.normalized()) < 0.0:
+        avant = -avant
 
     # 🚨 Les icosphères grises autour du personnage ne sont PAS des objets : ce
     # sont les FORMES PERSONNALISÉES des os. Masquer l'objet icosphère ne les
