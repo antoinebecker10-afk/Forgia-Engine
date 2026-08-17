@@ -22,8 +22,18 @@ CORPS = os.path.join(RACINE, "assets", "models", "characters", "stylized",
 
 
 def vider():
-    bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.object.delete(use_global=False)
+    """Vide la scène pour de bon.
+
+    🚨 PAS `bpy.ops.object.select_all` : il ne sélectionne QUE ce qui est
+    sélectionnable et visible. Tout objet masqué survit à la suppression — et
+    ressort à l'import suivant sous un nom suffixé, pendant que le vrai objet
+    attendu manque. Constaté deux fois : les icosphères de widget qui traînaient
+    depuis le matin, puis l'armature de cape disparue de la scène alors que sa
+    donnée subsistait, laissant `Cloak_low` sans parent et donc affichée à sa
+    taille brute — cent fois trop grande.
+    On supprime donc par la DONNÉE, où rien ne se cache."""
+    for obj in list(bpy.data.objects):
+        bpy.data.objects.remove(obj, do_unlink=True)
     for coll in (bpy.data.meshes, bpy.data.armatures, bpy.data.actions,
                  bpy.data.materials, bpy.data.images, bpy.data.collections):
         for bloc in list(coll):
