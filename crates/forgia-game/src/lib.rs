@@ -421,6 +421,11 @@ fn boot_to_menu(mut app_mode: ResMut<NextState<AppMode>>, mut game: ResMut<NextS
     let demande = std::env::var("FORGIA_BOOT_MODE").unwrap_or_default();
     let direct = match demande.as_str() {
         "arena_test" => Some(GameMode::ArenaTest),
+        // 2026-08-18 — l'Expedition manquait a cette liste depuis sa creation le
+        // 14/08 : la seule facon d'y entrer etait de cliquer dans le menu, donc
+        // aucune verification runtime n'y etait automatisable. Une zone livree
+        // sans porte d'entree directe se teste mal, donc rarement.
+        "expedition" => Some(GameMode::Expedition),
         "roguelite" => Some(GameMode::Roguelite),
         "castle_hub" => Some(GameMode::CastleHub),
         "fps" => Some(GameMode::Fps),

@@ -20,6 +20,20 @@ Quatre controles, quatre classes de defaut deja payees dans ce projet :
   C4 fuites-de-zone     un module public d'une zone importe par une autre crate.
                         La zone est devenue une bibliotheque sans changer de nom.
 
+  C5 types-en-double    le MEME nom de type public declare dans deux crates. Ce
+                        n'est pas toujours un doublon — deux `Severity` peuvent
+                        etre deux idees — mais c'est toujours une question a se
+                        poser, et personne ne se la posait. Mesure au 2026-08-18 :
+                        15, dont `Health` (combat/damage, piege documente),
+                        `Severity` (observability/qa-core), `Rarity`, `KillPopup`,
+                        `Knockback`, `WallSeg`.
+                        NB : ce controle ne voit que les NOMS. Le doublon le plus
+                        couteux du depot — `arme_main.rs` contre la brique
+                        `forgia-viewmodel`, deux « arme dans la main » — lui est
+                        invisible. Pour celui-la, la recherche semantique
+                        (`grepai`, en anglais, sur le COMPORTEMENT) est le seul
+                        outil, et il faut verifier la fraicheur de son index.
+
 Portee declaree (ce controle NE regarde PAS) : la justesse de ce qui est branche,
 les dependances tierces, le contenu des TOML, l'ordre des systemes. Il mesure des
 LIENS, pas de la qualite. Un lien present peut etre mauvais.
@@ -174,6 +188,17 @@ def main():
         for mod in sorted(mods):
             faits.append(("fuite-de-zone", z + "::" + mod, ""))
 
+    # -- C5 ---------------------------------------------------------------
+    types = collections.defaultdict(set)
+    for f, t in src.items():
+        c = crate_de(f)
+        t = re.sub(r"//[^\n]*", "", t)
+        for m in re.finditer(r"pub (?:struct|enum) ([A-Z][A-Za-z0-9_]+)", t):
+            types[m.group(1)].add(c)
+    for nom, crates in sorted(types.items()):
+        if len(crates) > 1:
+            faits.append(("type-en-double", nom, " + ".join(sorted(crates))))
+
     cles = {k + "|" + c for k, c, _ in faits}
 
     base = set()
@@ -204,6 +229,7 @@ def main():
         ("genome-mort", "C2 genomes sans aucun consommateur Rust"),
         ("strate-inversee", "C3 crates partagees qui dependent d'une zone"),
         ("fuite-de-zone", "C4 modules de zone importes du dehors"),
+        ("type-en-double", "C5 types publics du meme nom dans deux crates"),
     ]
     for classe, titre in titres:
         lignes = [(c, d) for k, c, d in faits if k == classe]

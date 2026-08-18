@@ -40,6 +40,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{Collider, RigidBody, Sensor};
 use forgia_combat::{Health, TargetCube};
+use forgia_core::prelude::Faction;
 use forgia_damage::{DefenseLayer, HitZone, HitZoneTag, Mortal};
 
 use crate::head_hitbox::{head_local_y_bind, head_radius, HeadProxy};
@@ -88,6 +89,18 @@ pub fn assembler(
             Name::new(e.nom.to_owned()),
             e.archetype,
             TargetCube,
+            // Le camp. `Faction` existait dans le socle depuis des semaines avec
+            // ZERO consommateur — une des quatre portes du GDD §10, ecrite et
+            // jamais franchie. Elle ne pouvait pas l'etre : chaque zone montait
+            // ses ennemis a sa facon, il n'y avait aucun endroit ou la poser une
+            // seule fois. Depuis que cet assembleur est le passage OBLIGE, c'est
+            // une ligne — et le concept passe de 0 a 1 consommateur reel.
+            //
+            // Personne ne la LIT encore : le ciblage se fait par `BotTarget` et
+            // `TargetCube`. C'est volontaire. On ne rebranche pas le ciblage
+            // aujourd'hui ; on arrete que la porte se referme pendant qu'elle est
+            // ouverte et gratuite. Le 5v5 (E10) la consommera N fois.
+            Faction::Hostile,
             // MÊME source que le `foot_offset_m` de l'`ArenaBot` monté juste en
             // dessous : le suivi de sol repose sur leur égalité.
             Transform::from_xyz(e.sol_xz.x, e.sol_y + stats.foot_offset_m(), e.sol_xz.y),
