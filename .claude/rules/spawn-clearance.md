@@ -163,9 +163,9 @@ l'apparition est garantie et que le reste est ouvert.
 
 ## 7. Cross-refs
 
-- `map-design-intention.md` §2.4 — les arrivées ennemies « ni dans le dos au
+- `on-demand/map-design-intention.md` §2.4 — les arrivées ennemies « ni dans le dos au
   contact, ni hors de vue, **atteignables** »
-- `map-design-patterns.md` §1 — le personnage est un **disque** : les
+- `on-demand/map-design-patterns.md` §1 — le personnage est un **disque** : les
   dégagements se mesurent en distance, jamais en AABB gonflée
 - `feedback_derive_ne_patche_pas_la_geometrie` — traiter la classe, pas le symptôme
 - `observability-required.md` — le nombre de props rejetés doit se voir

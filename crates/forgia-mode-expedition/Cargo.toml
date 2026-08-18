@@ -31,6 +31,25 @@ forgia-combat = { workspace = true }
 # pendant que le jeu tourne, ce qu'une lecture `def_io` au démarrage ne permet
 # pas. Une orientation d'arme dans un poing se règle à l'œil, en trois essais.
 forgia-genome-core = { workspace = true }
+# `forgia-ik` a été retiré ici le 2026-08-18. Son solveur `two_bone_ik` rend une
+# flexion ABSOLUE que le chemin de visée composait comme un delta — d'où les bras
+# en hélice. Il est remplacé par `visee::coude_vise`, qui travaille sur les
+# positions réelles des os. Le manifeste le déclarait encore, avec un commentaire
+# qui décrivait un solveur que le code n'appelle plus : deux fichiers qui se
+# contredisent, et c'est celui qu'on lit en premier qui mentait.
+# S'accroupir et glisser : lire l'action `Crouch` et le sprint.
+forgia-input = { workspace = true }
+leafwing-input-manager = { workspace = true }
+# Publier la cible des mains pour qu'on la VOIE (F3) à côté de la main. Une
+# mesure d'écart se cite ; une cible dessinée se comprend sans être lue.
+forgia-anim-debug = { workspace = true }
+# La cape : ses six os ne sont animes par AUCUN clip du corps. Le solveur
+# d'os-ressorts leur donne le retard qui fait un vetement.
+forgia-secondary-motion = { workspace = true }
+# Les campements : les archetypes d'ennemis, leur assemblage en quatre entites,
+# leur animation et leur hitbox de tete. Brique PARTAGEE avec l'Abime depuis le
+# 2026-08-18 — sans elle il aurait fallu recopier cinq pieges deja payes.
+forgia-enemy-archetypes = { workspace = true }
 forgia-player = { workspace = true }
 forgia-streaming = { workspace = true }
 serde = { workspace = true }

@@ -28,11 +28,9 @@ pub(crate) fn draw_player_hp(
 ) {
     // Roguelite dessine sa propre carte vitals unifiée (portrait + énergie +
     // défense + confiance, sans chevauchement) → cette barre générique sert aux
-    // modes qui n'en ont pas : l'arène Fps (2026-07-22) et l'Expédition
-    // (2026-08-14), qui a un combat et donc des points de vie qui descendent.
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Expedition)
-    {
+    // zones qui n'en ont pas. C'est exactement `capacites().hud_generique` :
+    // deux barres de vie superposées seraient le prix d'une liste mal tenue.
+    if !capacites(game_mode.get()).hud_generique || *app_state.get() != AppMode::InGame {
         return;
     }
     let Ok((health, defense)) = q_player.single() else {

@@ -363,13 +363,10 @@ const CLOUD_ORBIT_SPEED: f32 = 0.025; // rad/s — orbit complet ~4 min
 #[derive(Component)]
 pub struct ArenaMarker;
 
-/// Marker pour les cubes-cibles (testables via fire_weapon_minimal).
-///
-/// Story-461 (Vague 3) : `#[require(Transform, Visibility)]` garantit que tout
-/// spawn de TargetCube insère Transform + Visibility avec Default si non fournis.
-#[derive(Component)]
-#[require(Transform, Visibility)]
-pub struct TargetCube;
+/// Ce qui peut etre tire — **descendu dans `forgia-combat`** le 2026-08-18, avec
+/// le tir qui le lit. Trois crates dependaient de cette zone pour l'obtenir.
+/// Re-export : les appelants ne bougent pas.
+pub use forgia_combat::TargetCube;
 
 /// Cluster nuage en orbit circulaire autour du centre arène (Y axis).
 /// Stocke angle/radius/height pour calcul polaire continu (pas de wrap brusque).

@@ -1,0 +1,14 @@
+# Cliquet des capteurs — ces nombres ne peuvent que DECROITRE.
+#
+# Mesures du 2026-08-18 sur 132 capteurs. Le seuil est la DETTE REELLE, pas
+# zero : un cliquet a zero sur une dette existante ne se branche jamais, et
+# c'est exactement ce qui est arrive a `sensor-sync-writes --strict`.
+#
+# Quand la dette baisse, ABAISSER le plafond ici — sinon elle remonte en
+# silence. Le gate le rappelle a chaque passage.
+
+# Ecrit par `fs::write` au lieu de la file asynchrone : bloque la frame de jeu.
+ecritures_synchrones = 1
+
+# Ne publie aucune `severity` : on ne sait pas si le capteur va bien.
+sans_verdict = 38

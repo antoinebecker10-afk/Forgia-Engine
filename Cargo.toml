@@ -20,6 +20,7 @@ members = [
     "crates/forgia-damage",
     "crates/forgia-debug",
     "crates/forgia-editor",
+    "crates/forgia-enemy-archetypes",
     "crates/forgia-enemy-nameplate",
     "crates/forgia-effects",
     "crates/forgia-foliage",
@@ -161,6 +162,7 @@ forgia-combat = { path = "crates/forgia-combat" }
 forgia-core = { path = "crates/forgia-core" }
 forgia-crosshair = { path = "crates/forgia-crosshair" }
 forgia-damage = { path = "crates/forgia-damage" }
+forgia-enemy-archetypes = { path = "crates/forgia-enemy-archetypes" }
 forgia-enemy-nameplate = { path = "crates/forgia-enemy-nameplate" }
 forgia-effects = { path = "crates/forgia-effects" }
 forgia-foliage = { path = "crates/forgia-foliage" }

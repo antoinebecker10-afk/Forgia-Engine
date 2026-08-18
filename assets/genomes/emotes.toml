@@ -1,0 +1,272 @@
+# emotes.toml — Les danses et poses jouées à la demande, touche par touche.
+#
+# # Pourquoi une danse est de la DONNÉE ici, et pas un fichier d'animation
+#
+# Aucun des 9 clips du personnage n'est une danse — le pack Mixamo importé n'en
+# contient pas. Plutôt que d'exiger un nouvel export à chaque idée, la danse est
+# **décrite** : une liste d'os, chacun oscillant autour d'un axe, avec son
+# amplitude et son décalage de phase. Le moteur en fabrique un `AnimationClip`
+# au chargement.
+#
+# Conséquence directe : ajouter une danse ne demande ni Blender, ni Mixamo, ni
+# recompilation. On écrit une section, on relance.
+#
+# # Comment lire une piste
+#
+#     os        = le nom EXACT de l'os dans le squelette (nommage Mixamo)
+#     axe       = "x" (fléchir avant/arrière) · "y" (pivoter) · "z" (pencher de côté)
+#     amplitude = l'angle maximal atteint, en degrés
+#     phase     = le décalage dans le cycle, en tours (0,5 = à contretemps)
+#     harmonique= 1 = une oscillation par mesure · 2 = deux fois plus vite
+#
+# Un os absent du squelette est ignoré ET signalé — le personnage n'a pas les
+# mêmes os selon le corps porté.
+
+version = 1
+
+# ── La danse du groove ───────────────────────────────────────────────────────
+
+[[emotes]]
+id = "groove"
+label = "Groove"
+# La touche, en notation Bevy. 🚨 `Digit7` sert AUSSI à basculer la catégorie
+# Physique du panneau de débogage (`forgia-debug/bindings.rs`) : les deux
+# répondront tant que ce panneau est actif.
+touche = "Digit7"
+# Durée d'une mesure, en secondes. 0,55 s ≈ 109 battements par minute : le
+# tempo des danses de jeu, assez rapide pour être joyeux sans être crispé.
+mesure_s = 0.55
+# La danse tourne en boucle jusqu'à ce qu'on bouge ou qu'on rappuie.
+boucle = true
+# Fondu à l'entrée et à la sortie. Sans lui, le personnage saute d'un coup dans
+# la pose — et c'est ce qui trahit le plus une animation de jeu.
+fondu_ms = 180
+
+# ── Le cadrage : on se voit DE FACE ──────────────────────────────────────────
+# Sans ça, on danse dos à la caméra et on ne voit rien. C'est la moitié de la
+# demande, et elle n'a rien à voir avec le squelette.
+[emotes.camera]
+# Demi-tour : la caméra passe devant le personnage. En tours, comme les phases.
+demi_tour = 0.5
+# Recul, en mètres, pour cadrer le corps entier plutôt que les épaules.
+distance_m = 4.6
+# Un peu de plongée : on regarde la danse d'un poil au-dessus.
+tangage_deg = -8.0
+# Durée du mouvement de caméra. Plus lent que le fondu d'animation : c'est un
+# geste de mise en scène, il doit se voir.
+transition_ms = 420
+
+# ── Les pistes ───────────────────────────────────────────────────────────────
+# Le bassin donne le battement ; tout le reste s'accroche à lui avec un retard.
+# C'est ce décalage — pas l'amplitude — qui fait qu'un corps a l'air vivant
+# plutôt que mécanique.
+
+[[emotes.pistes]]
+os = "Hips"
+axe = "z"
+amplitude = 11.0
+phase = 0.0
+harmonique = 1
+
+[[emotes.pistes]]
+os = "Hips"
+axe = "y"
+amplitude = 9.0
+phase = 0.25
+harmonique = 1
+
+# Le buste contre-balance le bassin : sans ça le personnage se plie en deux au
+# lieu de se déhancher.
+[[emotes.pistes]]
+os = "Spine"
+axe = "z"
+amplitude = -6.0
+phase = 0.08
+harmonique = 1
+
+[[emotes.pistes]]
+os = "Spine1"
+axe = "y"
+amplitude = -7.0
+phase = 0.30
+harmonique = 1
+
+[[emotes.pistes]]
+os = "Spine2"
+axe = "x"
+amplitude = 5.0
+phase = 0.0
+harmonique = 2
+
+# La tête suit en dernier, avec le plus de retard : c'est ce qui donne le
+# balancement souple plutôt que le hochement de métronome.
+[[emotes.pistes]]
+os = "Neck"
+axe = "z"
+amplitude = -5.0
+phase = 0.18
+harmonique = 1
+
+[[emotes.pistes]]
+os = "Head"
+axe = "x"
+amplitude = 7.0
+phase = 0.12
+harmonique = 2
+
+# Les bras : la signature de la danse. Les deux épaules à CONTRETEMPS (phase
+# décalée d'un demi-tour), ce qui donne le mouvement de pompe alterné.
+[[emotes.pistes]]
+os = "LeftArm"
+axe = "z"
+amplitude = 38.0
+phase = 0.0
+harmonique = 1
+
+[[emotes.pistes]]
+os = "RightArm"
+axe = "z"
+amplitude = -38.0
+phase = 0.5
+harmonique = 1
+
+[[emotes.pistes]]
+os = "LeftForeArm"
+axe = "y"
+amplitude = 30.0
+phase = 0.15
+harmonique = 1
+
+[[emotes.pistes]]
+os = "RightForeArm"
+axe = "y"
+amplitude = -30.0
+phase = 0.65
+harmonique = 1
+
+# Les jambes : deux fois plus vite que le bassin, pour le rebond des genoux.
+# Amplitude modérée — les pieds ne doivent pas traverser le sol.
+[[emotes.pistes]]
+os = "LeftUpLeg"
+axe = "x"
+amplitude = -13.0
+phase = 0.0
+harmonique = 2
+
+[[emotes.pistes]]
+os = "RightUpLeg"
+axe = "x"
+amplitude = -13.0
+phase = 0.5
+harmonique = 2
+
+[[emotes.pistes]]
+os = "LeftLeg"
+axe = "x"
+amplitude = 16.0
+phase = 0.12
+harmonique = 2
+
+[[emotes.pistes]]
+os = "RightLeg"
+axe = "x"
+amplitude = 16.0
+phase = 0.62
+harmonique = 2
+
+# ── Le chien : oreilles et gueule sur la danse — EN ATTENTE ─────────────────
+#
+# 🚨 CE BLOC EST DÉSARMÉ, et il ne demande qu'à être réarmé.
+#
+# Les sept pistes ci-dessous font battre les oreilles et ouvrir la gueule du
+# chien sur la danse. Elles fonctionnent : les os existent dans
+# `chien_expedition.glb`, les axes ont été mesurés dans Blender.
+#
+# Ce qui bloque est un TEST, pas le moteur :
+# `emote::tests::toutes_les_pistes_citent_des_os_qui_existent` compare chaque
+# os cité à une liste de vingt noms Mixamo ÉCRITE EN DUR dans le fichier de
+# test. Les os du chien n'y sont pas, donc le test tombe.
+#
+# Or l'en-tête de ce fichier annonce l'inverse : « Un os absent du squelette
+# est ignoré ET signalé — le personnage n'a pas les mêmes os selon le corps
+# porté ». Le test contredit le contrat que ce fichier publie.
+#
+# POUR RÉARMER, deux gestes :
+#   1. ajouter à `os_du_personnage()` (crates/forgia-mode-roguelite/src/emote.rs)
+#      les sept noms : oreille_g_01, oreille_g_02, oreille_d_01, oreille_d_02,
+#      oeil_g, oeil_d, machoire ;
+#   2. décommenter le bloc ci-dessous.
+#
+# Il reste commenté parce que `emote.rs` est ouvert dans un autre terminal, et
+# qu'un fichier édité à deux mains se paie en conflit — pas parce que le
+# mouvement serait douteux.
+#
+#
+# Ajouté par la passe « tête de chien » (`tools/blender/personnage/32`→`39`).
+# Ces os n'existent QUE sur `chien_expedition.glb` ; sur le corps humain ils
+# sont simplement absents, donc ignorés et signalés — c'est le comportement que
+# ce fichier annonce en tête, et il est ici la raison d'être du choix.
+#
+# Les axes sont ceux MESURÉS dans Blender en faisant tourner chaque os de 10° :
+#   z = balancement avant/arrière · x = battement écarté/plaqué
+# Les signes sont MIROIR entre gauche et droite. Les copier à l'identique
+# donnerait deux oreilles qui partent du même côté — un défaut qui ne se voit
+# pas sur un tableau et saute aux yeux en mouvement.
+#
+# Les oreilles battent à l'HARMONIQUE 2 : deux fois par mesure, comme les
+# jambes. C'est ce qui les accroche au rebond plutôt qu'au déhanché.
+
+# [[emotes.pistes]]
+# os = "oreille_g_01"
+# axe = "z"
+# amplitude = -14.0
+# phase = 0.10
+# harmonique = 2
+
+# [[emotes.pistes]]
+# os = "oreille_d_01"
+# axe = "z"
+# amplitude = 14.0
+# phase = 0.10
+# harmonique = 2
+
+# La pointe suit la base avec un retard de 0,16 tour : c'est ce décalage qui
+# fait pendre l'oreille au lieu de la rendre raide.
+# [[emotes.pistes]]
+# os = "oreille_g_02"
+# axe = "z"
+# amplitude = -10.0
+# phase = 0.26
+# harmonique = 2
+
+# [[emotes.pistes]]
+# os = "oreille_d_02"
+# axe = "z"
+# amplitude = 10.0
+# phase = 0.26
+# harmonique = 2
+
+# Un peu d'écartement, à contretemps du balancement : sans lui les oreilles
+# balaient dans un plan et le mouvement reste plat.
+# [[emotes.pistes]]
+# os = "oreille_g_01"
+# axe = "x"
+# amplitude = -7.0
+# phase = 0.35
+# harmonique = 1
+
+# [[emotes.pistes]]
+# os = "oreille_d_01"
+# axe = "x"
+# amplitude = 7.0
+# phase = 0.35
+# harmonique = 1
+
+# La gueule s'ouvre sur le temps fort. Amplitude modeste : à 24° le menton
+# descend de 5 cm sur un museau qui n'en fait que 12 — mesuré.
+# [[emotes.pistes]]
+# os = "machoire"
+# axe = "x"
+# amplitude = 7.0
+# phase = 0.0
+# harmonique = 1

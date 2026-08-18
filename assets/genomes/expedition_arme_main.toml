@@ -36,10 +36,6 @@
 # illisible — donc taille, prise, rotations et zooms retombaient tous sur leurs
 # défauts, en silence. Attrapé par le test qui lit ce fichier sur le disque.
 version = 1
-# La dague du corps d'Expédition est dans la MÊME main (nœud `SM_Dagger`, enfant
-# de `RightHand`). Une arme à feu par-dessus, ce sont deux objets qui
-# s'interpénètrent dans le poing. On la masque tant qu'une arme est tenue.
-cacher_dague = true
 
 # ═════════════════════════════════════════════════════════════════════════════
 # VISER — deux tenues, et un zoom qui dépend de l'arme
@@ -72,32 +68,130 @@ descente_s = 0.24
 # l'angle réel de la caméra, sinon viser vers le haut ne lèverait pas le canon.
 suivi_du_buste = 0.75
 
-# ── Tenue décontractée (au repos) ────────────────────────────────────────────
-# Tout à zéro = le clip d'animation tel quel. C'est déjà une tenue relâchée :
-# les bras pendent. Ces lignes existent pour qu'on puisse l'accentuer sans
-# toucher au code.
+# ── Les deux seuils d'ALERTE du capteur d'arme ──────────────────────────────
+#
+# Écart, en degrés, entre la direction du canon et le regard de la caméra
+# ACTIVE — celle qui sert aussi d'origine au tir. 0° = l'arme pointe où on
+# regarde ; 180° = elle pointe derrière.
+#
+# 🚨 Ils vivent ici et pas dans le code parce qu'ils décident d'une ALERTE. Un
+# seuil qu'il faut recompiler pour ajuster reste faux : on le contourne au lieu
+# de le corriger. Ici ils se rechargent à chaud, donc on peut les resserrer
+# pendant qu'on regarde le symptôme à l'écran.
+#
+# 90° : un quart de tour. Au-delà, le canon a franchi le plan de l'épaule et ne
+#       peut plus désigner quoi que ce soit de ce que le personnage regarde.
+# 35° : l'écart à partir duquel la lueur de bouche sort visiblement à côté du
+#       réticule. Mesuré le 2026-08-16 : 71,7° donnait « les bras dans le dos ».
+ecart_alerte_deg = 90.0
+ecart_avertit_deg = 35.0
+
+# ── Où vont les MAINS quand on vise ─────────────────────────────────────────
+#
+# 🚨 Ces quatre nombres ont remplacé douze angles d'Euler par os, et c'est la
+# leçon de la journée. Déclarer « le bras droit tourne de −55° autour de X » ne
+# marche pas : l'orientation locale d'un os Mixamo ne se devine pas depuis un
+# fichier, et l'axe qui lève un bras sur un rig le fait pivoter sur un autre. Au
+# 2026-08-16, après trois réglages à l'œil, les bras partaient **dans le dos** et
+# le canon s'écartait de 71,7° du regard.
+#
+# On ne déclare donc plus des ANGLES, on déclare une CIBLE : où la main doit se
+# trouver. Le solveur d'IK à deux os (`forgia-ik`) en déduit les angles — et il
+# les déduit justes sur n'importe quel squelette, parce qu'il travaille sur les
+# positions réelles des os, pas sur une convention supposée.
+#
+# Tout est exprimé en **fraction de la longueur du bras**, donc valable quel que
+# soit le personnage : un chien-guerrier d'1,82 m ou tout autre corps à venir.
+[visee.bras]
+# 🚨 ÉTEINTE depuis le 2026-08-17, et c'est un choix, pas un abandon.
+#
+# Le corps porte maintenant `rifle_aim` : une pose de visée CAPTURÉE. Si l'IK
+# reste active, deux systèmes écrivent les mêmes quatre os — le clip les met où
+# le mocap dit, l'IK les tire vers sa cible calculée. Le plus tardif gagne, et le
+# résultat n'est ni l'un ni l'autre.
+#
+# Une mocap bat une approximation géométrique sur la POSE. Ce qu'elle ne sait pas
+# faire, c'est suivre le tangage de la caméra — viser vers le haut : ça reste le
+# travail de `suivi_du_buste`, qui touche `Spine2` et pas les bras. Les deux ne se
+# disputent donc plus rien.
+#
+# À rallumer pour un corps SANS clip de visée. Les valeurs ci-dessous restent
+# réglées et testées : elles servent le jour où ce cas revient.
+actif = false
+# 0 = main contre l'épaule · 1 = bras tendu à fond. Coude PLIÉ : 0,72 tendait
+# presque le bras, ce qui donne une statue qui présente une arme plutôt que
+# quelqu'un qui vise (retour de jeu du 2026-08-17).
+portee_avant = 0.62
+# Au-dessus de l'épaule (+) ou en dessous (−). À hauteur de poitrine : c'est là
+# que la crosse se cale, pas au-dessus de l'épaule.
+hauteur = 0.02
+# Vers l'axe du corps (−) : l'arme se centre devant le buste. Une arme restée
+# sur le côté, c'est quelqu'un qui la porte, pas qui la pointe.
+ecart_lateral = -0.18
+# La main gauche traverse pour soutenir l'arme. Plus franc qu'avant : à 0,16 elle
+# restait à mi-chemin, ce qui ne lit ni comme une prise à deux mains ni comme un
+# bras libre.
+soutien_lateral = 0.30
+# 🚨 CE réglage est celui qui fait la pose. 0 = les deux coudes pendent tout
+# droit — la silhouette symétrique et molle de quelqu'un qui TIENT une arme.
+# 1 = coude de tir à l'horizontale. Un tireur lève le coude de tir sur le côté
+# pour caler la crosse, et garde l'autre bas SOUS l'arme pour la porter : c'est
+# l'asymétrie qui vend la pose, pas la hauteur des mains.
+coude_ouverture = 0.55
+
+# ── Retouches d'os, pour ce que l'IK ne pilote pas ──────────────────────────
+# Les quatre os des bras sont sous IK : les citer ici les ferait se battre avec
+# elle. Ce qui reste utile, c'est le buste — il ne vise rien, il s'oriente.
 [visee.pose_decontractee]
-RightArm = [0.0, 0.0, 0.0]
-RightForeArm = [0.0, 0.0, 0.0]
-LeftArm = [0.0, 0.0, 0.0]
-LeftForeArm = [0.0, 0.0, 0.0]
 Spine2 = [0.0, 0.0, 0.0]
 
-# ── Tenue tactique (clic droit) ──────────────────────────────────────────────
-# 🚨 Points de DÉPART, à régler en jeu. L'orientation locale des os Mixamo ne se
-# devine pas depuis un fichier : l'axe qui lève un bras sur un rig peut le faire
-# pivoter sur un autre. Le fondu et le rechargement à chaud sont là pour que ce
-# réglage coûte trois essais, pas trois relances.
 [visee.pose_tactique]
-# Le bras droit se lève vers l'avant et rentre vers l'axe du corps.
-RightArm = [-55.0, -18.0, 0.0]
-# L'avant-bras se replie pour amener l'arme devant la poitrine.
-RightForeArm = [-35.0, 0.0, 0.0]
-# Le bras gauche vient soutenir : c'est lui qui vend la tenue à deux mains.
-LeftArm = [-45.0, 22.0, 0.0]
-LeftForeArm = [-55.0, 0.0, 0.0]
-# Le buste s'ouvre légèrement vers la cible.
+# Le buste s'ouvre légèrement vers la cible. S'ajoute au suivi du tangage.
 Spine2 = [0.0, -12.0, 0.0]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LA DAGUE du corps — deux défauts d'asset, corrigés ici en attendant Blender
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Le nœud `SM_Dagger` existe dans le corps et sa TAILLE est juste : 21 cm rendus
+# (emprise brute 413 × 2139 × 693, échelle de nœud 1e-4). On n'y touche pas.
+#
+# Deux choses sont fausses, toutes deux mesurées le 2026-08-16 :
+#
+# 1. **Sa place** : son nœud porte une translation de **1,39 m** dans le repère
+#    de `RightHand`. Elle flotte donc à un mètre quarante de la main. Personne ne
+#    l'avait vu parce qu'on la masquait.
+# 2. **Sa matière** : matériau `Other`, sans `baseColorTexture` ni couleur — donc
+#    une surface blanche mate. Alors que le MÊME fichier contient déjà le jeu
+#    `armor_bc` / `armor_n` / `armor_m-armor_r`, utilisé par le matériau `Armor`.
+#
+# 🚨 C'est un défaut d'ASSET. Sa vraie correction est dans la chaîne Blender
+# (`tools/blender/personnage/32` → `37`), pas ici — ce qui suit est un
+# rattrapage au chargement, qui laisse l'asset fautif intact. À supprimer le jour
+# où la chaîne pose la dague et sa matière correctement.
+#
+# La main droite tient désormais une arme à feu : la dague va donc **à la
+# ceinture**, où elle ne s'interpénètre avec rien. `os` accepte n'importe quel os
+# du squelette — c'est ce qui permet de la remettre en main sans toucher au code.
+
+[dague]
+visible = true
+# Elle ne se masque plus quand on tient une arme : à la ceinture, elle ne gêne
+# plus. Repasser à `true` si on la ramène dans la main.
+masquer_si_arme_en_main = false
+os = "Hips"
+# Nom du matériau à lui donner, tel qu'il est écrit dans le GLB du corps. Repris
+# par NOM et jamais par index : un index se décale en silence au moindre
+# ré-export, un nom manquant se signale.
+materiau = "Armor"
+# À la hanche droite, légèrement vers l'avant. Valeurs à régler à l'œil — les
+# axes locaux d'un os Mixamo ne se devinent pas — et rechargées à chaud.
+decalage_x = 0.14
+decalage_y = 0.06
+decalage_z = 0.10
+rotation_x_deg = 0.0
+rotation_y_deg = 0.0
+rotation_z_deg = 90.0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Les quatre armes. `taille_m` = longueur réelle de l'arme À L'ÉCRAN, pour un

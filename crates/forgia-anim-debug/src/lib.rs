@@ -28,10 +28,13 @@ use forgia_core::prelude::*;
 // wasm : std::time::Instant panique — celui de Bevy (web-time) est portable.
 use bevy::platform::time::Instant;
 
+pub mod anim_sensor;
 pub mod bone_trace;
+pub mod squelette_gizmo;
 
 pub mod prelude {
     pub use crate::bone_trace::{BoneTraceConfig, BoneTracePlugin};
+    pub use crate::squelette_gizmo::{CiblesDebug, SqueletteGizmoPlugin, SqueletteVisible};
     pub use crate::{AnimLayerStats, ForgiaAnimDebugPlugin};
 }
 
@@ -115,9 +118,31 @@ impl Plugin for ForgiaAnimDebugPlugin {
         app.init_resource::<AnimLayerStats>()
             .init_resource::<SensorTimer>()
             .add_plugins(bone_trace::BoneTracePlugin)
+            // VOIR le squelette (F3), en plus de le relever. Le relevé se cite
+            // dans un diagnostic, l'image se lit en une seconde : il fallait les
+            // deux, et il n'y avait que le premier.
+            .add_plugins(squelette_gizmo::SqueletteGizmoPlugin)
+            // Les AABB des maillages skinnés. Bevy ne les recalcule pas (limite
+            // moteur connue, corrigée en 0.19) : sans ça un personnage disparaît
+            // quand son AABB de repos sort du champ — ce que ce dépôt contournait
+            // en DÉSACTIVANT le culling de l'avatar. Le contournement peut
+            // maintenant tomber. `J`/`M` montrent les AABB par joint et par
+            // maillage, ce qui rend un décrochage de peau visible au lieu de
+            // déductible.
+            .add_plugins(bevy_mod_skinned_aabb::SkinnedAabbPlugin)
+            .add_plugins(
+                bevy_mod_skinned_aabb::debug::SkinnedAabbDebugPlugin::disable_by_default(),
+            )
             .add_systems(
                 Update,
-                (reset_stats_each_frame, write_sensor_and_health)
+                (
+                    reset_stats_each_frame,
+                    write_sensor_and_health,
+                    // Le SEUL capteur qui dise QUEL clip joue, sur quel os, et
+                    // avec quel poids. Sans lui, « ca ne bouge pas » a cinq
+                    // causes indiscernables.
+                    anim_sensor::sys_write_anim_sensor,
+                )
                     .chain()
                     .in_set(GameSet::Sensors),
             );
@@ -276,6 +301,12 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         // ForgiaCorePlugin requires StatesPlugin (init_state panics sinon)
         app.add_plugins(bevy::state::app::StatesPlugin);
+        // 🚨 `AssetPlugin` depuis le 2026-08-16 : `SkinnedAabbPlugin` enregistre
+        // un asset, et `MinimalPlugins` n'apporte pas la couche asset. Sans
+        // cette ligne le test panique DANS bevy_asset — un message qui n'évoque
+        // en rien la vraie cause (« il manque un plugin »), et qui coûte cher à
+        // lire pour ce qu'il dit.
+        app.add_plugins(bevy::asset::AssetPlugin::default());
         app.add_plugins(forgia_core::ForgiaCorePlugin);
         app.add_plugins(ForgiaAnimDebugPlugin);
     }

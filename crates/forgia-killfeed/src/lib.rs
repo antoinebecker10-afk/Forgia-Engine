@@ -203,9 +203,11 @@ pub(crate) fn draw_killfeed(
     tuning: Res<KillfeedTuning>,
     time: Res<Time>,
 ) {
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
-    {
+    // Une zone qui tue sans killfeed ne dit jamais QUI est mort. L'Expédition
+    // en était privée depuis le 2026-08-14, parce que la liste de modes vivait
+    // ici, en double avec la bannière de série plus bas. Les deux lisent
+    // maintenant la même capacité — `forgia_core::capacites`.
+    if !capacites(game_mode.get()).retour_de_combat || *app_state.get() != AppMode::InGame {
         return;
     }
     if feed.entries.is_empty() {
@@ -340,9 +342,9 @@ pub(crate) fn draw_multikill_banner(
     tuning: Res<KillfeedTuning>,
     time: Res<Time>,
 ) {
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
-    {
+    // Même capacité que `draw_killfeed`, et désormais la même SOURCE : les deux
+    // listes divergeaient à la main, elles ne le peuvent plus.
+    if !capacites(game_mode.get()).retour_de_combat || *app_state.get() != AppMode::InGame {
         return;
     }
     let Some(banner) = &streak.banner_text else {

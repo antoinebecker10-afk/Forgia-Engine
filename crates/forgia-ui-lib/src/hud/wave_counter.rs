@@ -35,7 +35,10 @@ pub(crate) fn draw_wave_counter(
     wave: Option<Res<WaveState>>,
     anim: Res<WaveCounterAnim>,
 ) {
-    if *app_state.get() != AppMode::InGame || *game_mode.get() != GameMode::Fps {
+    // Seule l'arène Fps compte des vagues. L'écrire en capacité plutôt qu'en
+    // `== GameMode::Fps` ne change rien aujourd'hui — mais le jour où une zone
+    // en aura, c'est la table qui le dira, pas une égalité perdue ici.
+    if !capacites(game_mode.get()).vagues || *app_state.get() != AppMode::InGame {
         return;
     }
     let Some(wave) = wave else { return };

@@ -61,15 +61,44 @@ sniper 300 m — sans spec d'arsenal, c'est juste un nombre.
 
 ## 2. Les ennemis — la contrainte géométrique la plus dure
 
-Les archétypes existent déjà, en couche definition : `assets/genomes/enemies/`.
-Valeurs `default` (chaque gène est borné min/max et hot-reloadable) :
+> ⚠️ **Corrigé le 2026-08-18.** Cette section citait `assets/genomes/enemies/`
+> (grunt / archer / elite). **Ces quatre fichiers n'ont aucun consommateur
+> Rust** — vérifié par `python tools/ai/strates.py` (C2 : 61 génomes morts sur
+> 141). La §2.1 dimensionnait donc des salles contre des ennemis qui n'existent
+> pas, et le résultat avait l'air sourcé. Les valeurs ci-dessous sont celles que
+> le jeu lit vraiment. Détail : `docs/audit/audit-2026-08-18-strates-the-spared.md` §4.
+>
+> **Avant de citer un génome dans un raisonnement de design** :
+> `grep -rl "$(basename FICHIER .toml)" --include=*.rs crates/ src/` — zéro
+> résultat = donnée morte, quelle que soit sa cohérence interne.
 
-| Archétype | pv | vitesse | vision | portée | comportement |
-|---|---|---|---|---|---|
-| **grunt** `enemy_grunt` | 30 | **9,0 m/s** | **20 m** | mêlée 3,0 m | essaim, rush en groupe |
-| **archer** `enemy_archer` | 45 | 5,5 m/s (repli ×0,6) | **35 m** | tir **15 m** | kite, garde ses distances |
-| **elite** `enemy_elite` | 120 | 5,0 m/s (**charge ×2,5 = 12,5**) | **25 m** | mêlée 3,5 m | charge |
-| **boss** `boss_default` | tuné | — | — | — | phases à seuils de % pv |
+Source unique et **vivante** : `assets/genomes/roguelite/roguelite_enemies.toml`
+(hot-reload par poll mtime 1 Hz ; miroir exact des `Default` Rust de
+`forgia-mode-roguelite/src/enemies.rs` — si le fichier disparaît, le jeu retombe
+dessus). L'énumération est `EnemyArchetype { Tank, Runner, Sniper, Boss }`.
+
+| Archétype | pv | vitesse | détection | portée de tir | dégâts | comportement réel |
+|---|---:|---:|---:|---:|---:|---|
+| **tank** | 120 | **2,8 m/s** | 22 m | 5 m (`stop` 3,0) | 25 | avance lentement, frappe au contact |
+| **runner** | 35 | **7,0 m/s** | 40 m | 8 m (`stop` 6,0) | 8 | se rapproche vite, harcèle **à courte portée** |
+| **sniper** | 45 | 3,2 m/s | **55 m** | **28 m** (`stop` 22,0) | 18 | tient ses distances, `jitter` 1,5° |
+| **boss** | 800 | 3,5 m/s | **80 m** | 32 m | 22 | unique, 2 phases (enrage à 50 % pv) |
+
+**Trois écarts au modèle « essaim » que la version précédente supposait, et qui
+changent le dimensionnement** :
+
+1. **Aucun archétype n'est en mêlée pure.** Les quatre tirent
+   (`shoot_damage`/`shoot_range`). Le tank tire à 5 m — c'est du contact, mais
+   c'est un tir : il n'a pas besoin de *toucher* le joueur.
+2. **Le plus lent est le plus résistant** (tank 120 pv à 2,8 m/s), l'inverse du
+   grunt rapide et fragile. Une grande salle ne *supprime* donc pas un
+   archétype ; elle allonge son approche pendant qu'il tire déjà.
+3. **La détection dépasse partout la portée d'attaque** (sniper : 55 vs 28). Le
+   §2.2 « ligne_max ≤ vision » est donc **beaucoup moins contraignant** qu'écrit :
+   le vrai plafond est la portée de tir, pas la vision.
+
+Les raisonnements des §2.1 à §2.6 restent valides **comme méthode** ; leurs
+chiffres d'exemple sont à re-dériver de ce tableau.
 
 ### 2.1 Une salle doit laisser l'archétype ARRIVER
 
@@ -80,43 +109,62 @@ séquence ; pendant qu'il descend la file, les survivants avancent.
 portée_d'engagement_max  =  vitesse × (N × pv / dps) + portée_d'attaque
 ```
 
-Avec le fusil (168 dps) :
+Avec le fusil (168 dps), sur les archétypes **réels** du §2 :
 
-| | TTK unitaire | avance pendant son propre TTK | essaim de 8 |
+| | TTK unitaire | avance pendant son propre TTK | groupe de 8 |
 |---|---|---|---|
-| grunt | 30/168 = **0,18 s** | 1,6 m | avance **12,9 m** → arrive si l'engagement démarre sous **~16 m** |
-| archer | 45/168 = **0,27 s** | 1,5 m | tire dès 15 m, n'a pas besoin d'arriver |
-| elite | 120/168 = **0,71 s** | **8,9 m** en charge | arrive de ~12 m en solo |
+| runner | 35/168 = **0,21 s** | 1,5 m | avance **11,7 m** → sous sa portée de tir (8 m) dès ~20 m |
+| tank | 120/168 = **0,71 s** | 2,0 m | avance **16,0 m** → il tire à 5 m, donc il lui faut ~21 m pour entrer en jeu |
+| sniper | 45/168 = **0,27 s** | 0,9 m | **n'a pas à avancer** : il tire à 28 m |
 
-**Verdict sur la cour** (ligne max mesurée **24,2 m**, médiane 10,8 m) : un essaim
-de 8 grunts lâché à la ligne max **n'atteint jamais le joueur**. La salle est trop
-grande pour son archétype de mêlée. À la médiane, il arrive. Donc soit les grunts
-apparaissent près, soit la salle change de rôle.
+**Ce que ça change par rapport au modèle « essaim de mêlée »** : la question
+n'est plus *« la salle est-elle assez petite pour qu'ils arrivent ? »* mais
+*« la salle place-t-elle le joueur dans la bande de tir de qui ? »*. Un tank
+lâché à 25 m tire quand même — il arrive juste tard. Le seul archétype qu'une
+grande salle neutralise vraiment est le **runner**, dont la portée est de 8 m.
 
-> Une salle trop grande ne rend pas le combat « plus aéré » : elle **supprime**
-> l'archétype de mêlée. C'est un choix de design, pas un réglage de confort.
+> Une salle ne « supprime » pas un archétype par sa taille seule : elle décide
+> **lequel des quatre tire en premier**. C'est un choix de design, pas un réglage
+> de confort.
 
-### 2.2 La plus longue ligne ne doit pas dépasser la vision des ennemis
+### 2.2 La plus longue ligne se compare à la portée de TIR, pas à la vision
 
-Un ennemi dont la portée de vision est inférieure à la plus longue ligne de sa
-salle se fait tirer **sans pouvoir répondre ni réagir**.
+Un ennemi dont la portée d'attaque est inférieure à la plus longue ligne de sa
+salle se fait tirer **sans pouvoir répondre**. Sur les archétypes réels, la
+détection dépasse partout l'attaque (sniper 55 vs 28) — **c'est donc la portée de
+tir qui plafonne**, jamais la vision.
 
-- grunt vision **20 m** vs cour ligne max **24,2 m** → **4 m de tir gratuit**
-- elite vision 25 m → couvert ✓ · archer 35 m → couvert ✓
+- runner tir **8 m** → au-delà, il court sous le feu sans riposter
+- tank tir **5 m** → même chose, en plus lent
+- sniper tir **28 m** · boss **32 m** → seuls à tenir une ligne longue
 
-Règle : `ligne_max(salle) ≤ min(vision des ennemis qui y apparaissent)`, ou bien
-casser la ligne avec de l'occultation.
+Règle : `ligne_max(salle) ≤ max(portée de tir des ennemis qui y apparaissent)`,
+ou bien casser la ligne avec de l'occultation. Corollaire : **une salle de plus
+de ~28 m sans sniper ni boss est un stand de tir.**
 
 ### 2.3 Chaque archétype impose sa géométrie
 
-- **grunt** — lignes courtes et **plusieurs approches** : un essaim qui arrive par
-  un seul goulot se fait faucher en file indienne, ce n'est plus un essaim.
-- **archer** — de la **profondeur de repli derrière lui** (il recule à 3,3 m/s) et
-  de la couverture à sa hauteur. Un archer dos au mur ne kite pas, il meurt.
-- **elite** — une **ligne de charge dégagée** de l'ordre de 10 m. Les couvertures
-  qui cassent cette ligne annulent son archétype.
-- **boss** — de l'espace pour esquiver, une arène **lisible depuis le seuil**,
-  aucune couverture totale qui permette d'attendre la fin des phases à l'abri.
+- **runner** (7,0 m/s, tir 8 m) — lignes courtes et **plusieurs approches** : un
+  groupe qui arrive par un seul goulot se fait faucher en file indienne. C'est le
+  seul archétype qu'une grande salle neutralise vraiment.
+- **tank** (2,8 m/s, 120 pv, tir 5 m) — il lui faut du **temps sous le feu** :
+  une couverture intermédiaire à mi-parcours, sinon il meurt avant d'entrer dans
+  sa portée et n'a servi qu'à absorber des balles.
+- **sniper** (tir 28 m, `stop_distance` 22 m) — une **ligne longue tenue depuis
+  l'arrière** et de la couverture à sa hauteur. Enfermé dans une petite salle il
+  perd son archétype ; il ne recule pas pour le retrouver.
+- **boss** (800 pv, tir 32 m, détection 80 m) — de l'espace pour esquiver, une
+  arène **lisible depuis le seuil**, aucune couverture totale qui permette
+  d'attendre la fin des phases à l'abri.
+
+> **Ce que l'IA sait faire, et rien de plus.** `BotState` n'a que quatre
+> valeurs — `Idle · Chase · Attack · Dead`. Le mouvement (`tactical.rs :
+> bot_tactical_movement`) est une poursuite avec **strafe sinusoïdal**
+> (amplitude 1,8 m, 0,9 Hz, 35 % de bruit — « Doom imp dodge »), évitement
+> d'obstacle, séparation entre bots, et un dés-enlisement. Il n'existe **ni
+> repli, ni kite, ni prise de couverture, ni charge**. Ne pas concevoir une salle
+> autour d'un comportement qu'aucun système ne produit — les différences entre
+> archétypes ci-dessus sont **entièrement portées par les stats**.
 
 ### 2.4 Les arrivées
 
@@ -248,5 +296,10 @@ plus, et cinq chiffres « défaut connu » codés en dur étaient tous faux.*
 
 - [`map-design-patterns.md`](map-design-patterns.md) — les 14 patterns de construction + tableau d'état
 - [Registre des défauts](../../docs/audits/arena-test-registre-defauts.md) — la matière première
-- `assets/genomes/enemies/` — les archétypes · `assets/genomes/arena_waves.toml` — les vagues
+- `assets/genomes/roguelite/roguelite_enemies.toml` — **les archétypes vivants**
+  (`assets/genomes/enemies/` est mort : 0 consommateur Rust, cf. §2)
+- `assets/genomes/arena_waves.toml` — les vagues
+- `tools/ai/strates.py` — **avant de citer un génome ici**, vérifier qu'il est lu
+  (C2 : 61 fichiers morts sur 141 au 2026-08-18)
+- [`docs/audit/audit-2026-08-18-strates-the-spared.md`](../../../docs/audit/audit-2026-08-18-strates-the-spared.md) §4 — pourquoi cette section a été corrigée
 - `no-hardcode.md` · `genome-code.md` — les valeurs vivent en couche definition

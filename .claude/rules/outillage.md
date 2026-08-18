@@ -52,7 +52,7 @@ ranger, quelle leçon mérite une règle. Aucun script ne tranche ça.
 | **grepai** | Recherche sémantique du code | Le watcher meurt → index figé **en silence** |
 | **mempalace** | Mémoire inter-sessions (~11 400 tiroirs) | Un memory ÉDITÉ après classement garde sa version d'origine |
 | **ollama** | Embeddings `nomic-embed-text` | Éteint → grepai n'indexe plus rien |
-| **bevy-brp** | Inspection ECS en direct | Sans `--features dev-brp` |
+| **bevy-brp** | Inspection ECS en direct | Sans `--features dev-brp` — **lancer avec `cargo forgia-dev`, jamais `cargo run -p forgia`** |
 | `tools/ai/forgia_digest.py` | Logs + 98 capteurs → ~2,5 Ko | **Le réflexe sur « regarde »** |
 | `cargo run -p xtask -- <cmd>` | `story-gate`, `no-scaffold`, `arch-drift`… | — |
 
@@ -69,6 +69,22 @@ ls "D:/IA Antoine/logs/breakers/"                        # non vide = un hook co
 `grepai stats` est le seul juge de « est-ce que la recherche sémantique sert
 vraiment ». Un compteur plat sur une session de refactor = protocole sauté.
 
+## 5 bis. Lancer le jeu — une seule commande à retenir
+
+```bash
+cargo forgia-dev      # Tracy (temps) + BRP (état ECS en direct). LA commande de dev.
+cargo run -p forgia   # ❌ ni l'un ni l'autre : on se prive du monde vivant
+```
+
+**Pourquoi c'est une règle et pas une préférence.** L'alias BRP existait depuis
+des mois et n'a jamais servi une seule fois : chaque récap de test disait
+`cargo run -p forgia`. Résultat, le 2026-08-16 — une session à écrire des
+capteurs pour des questions ponctuelles (« où est l'os `RightArm` ? ») auxquelles
+`mcp__bevy-brp__world_query` répond en un appel, sur le monde qui tourne.
+
+Un outil qui a sa propre commande est un outil qu'on oublie. Il est maintenant
+dans celle qu'on tape tous les jours.
+
 ## 6. Ce que cet outillage ne couvre PAS
 
 La justesse de l'index (on mesure sa **date**, pas sa **qualité**) · que le
@@ -79,7 +95,7 @@ grepai sur un grep.
 ## 7. Cross-refs
 
 `log-digest.md` · `session-checkpoint.md` · `multi-terminal-coordination.md` ·
-`map-design-patterns.md` §13-14 (« 0 mesuré n'est pas vert ») ·
+`on-demand/map-design-patterns.md` §13-14 (« 0 mesuré n'est pas vert ») ·
 [tools/ai/tests/LISEZMOI.md](../../tools/ai/tests/LISEZMOI.md) (les 5 défauts
 que les bancs ont trouvés) · `[[reference_outillage_controle_automatique_session]]`
 

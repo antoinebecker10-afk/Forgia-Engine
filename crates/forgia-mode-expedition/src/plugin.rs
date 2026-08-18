@@ -60,13 +60,6 @@ const MODELE_PORTES: &str =
 /// pas séparément.
 const RAYON_CHARGEMENT_M: f32 = 140.0;
 
-/// Hauteur des cylindres de collision (m).
-///
-/// Le manifeste donne `[x, y, z, rayon]` : la base et l'emprise, pas la hauteur.
-/// 6 m couvre un tronc d'arbre du kit (mesuré : `tree_default` 1,708 × 4 = 6,8 m)
-/// et dépasse largement le saut du joueur (1,174 m), donc rien ne se franchit
-/// par le dessus. Un cylindre trop court laisserait sauter par-dessus un arbre.
-const HAUTEUR_COLLIDER_M: f32 = 6.0;
 
 /// Marqueur : tout ce qui appartient à l'expédition, pour un démontage propre.
 #[derive(Component)]
@@ -116,12 +109,31 @@ impl Plugin for ForgiaExpeditionPlugin {
         // publie la bouche du canon, que le chemin de tir lit sans rien savoir
         // de l'Expédition.
         app.add_plugins((
+            // Les campements : trois specs de combat autorees dans le manifeste
+            // depuis le 2026-08-14, sans consommateur jusqu'au 18. Ils s'eveillent
+            // a l'approche et peuplent la carte avec les archetypes PARTAGES.
+            crate::campements::ExpeditionCampementsPlugin,
             crate::avatar_vfx::ExpeditionAvatarPlugin,
             crate::arme_main::ExpeditionArmeMainPlugin,
             // La visée lit le génome de l'arme en main : elle vient après, mais
             // l'ordre d'ajout des plugins ne décide de rien ici — chacun
             // n'expose que sa ressource.
             crate::visee::ExpeditionViseePlugin,
+            // S'accroupir et glisser. Le dash de l'arène reste à l'arène : ici
+            // il est remplacé, pas supprimé — d'où un plugin de mode et non une
+            // modification du contrôleur partagé.
+            crate::posture::ExpeditionPosturePlugin,
+            // La cape : six os que personne n'animait, confies au solveur
+            // d'os-ressorts. Plugin a part parce qu'il ne depend que du
+            // corps charge, ni du joueur ni du manifeste.
+            crate::cape::ExpeditionCapePlugin,
+            // La matiere du decor : six cartes de gris pour 28 aplats. Plugin a
+            // part parce qu'il ne depend de RIEN d'autre — ni du manifeste, ni
+            // du joueur : il reagit aux materiaux qui arrivent par le streaming.
+            crate::matiere::ExpeditionMatierePlugin,
+            // Le vent. Son MASQUE est cuit par Blender dans l'alpha de COLOR_0 ;
+            // ce plugin ne fait que poser le shader et avancer son horloge.
+            crate::vent::ExpeditionVentPlugin,
         ))
             .add_systems(
                 OnEnter(GameMode::Expedition),
@@ -166,7 +178,12 @@ impl Plugin for ForgiaExpeditionPlugin {
                 )
                     .chain()
                     .run_if(in_state(GameMode::Expedition)),
-            );
+            )
+            // Le capteur tourne HORS du `run_if` du mode : il doit pouvoir dire
+            // « la carte n'est pas chargée » depuis le menu. Un capteur qui se
+            // tait quand la feature dort se lit comme « rien à signaler », et
+            // c'est le défaut que `sensor_honesty` traque dans ce projet.
+            .add_systems(Update, crate::capteur::capteur_carte);
     }
 }
 
@@ -260,15 +277,21 @@ fn setup_expedition(mut commands: Commands, asset_server: Res<AssetServer>) {
     // retirer une collision sous les pieds du joueur parce qu'il s'est éloigné
     // du décor visuel serait le pire échange possible (même choix que le
     // Château, cf. `castle_hub`).
+    // Chaque solide porte SA hauteur et SON rayon, mesurés sur la pièce placée
+    // sous Blender. Avant, une constante de 6 m servait pour tout le monde :
+    // généreuse pour un tronc, mensongère pour un éboulis de 80 cm, qui devenait
+    // un mur invisible de 6 m. Le `y` du manifeste est la BASE du cylindre,
+    // Rapier veut son centre — d'où la demi-hauteur ajoutée ici, au seul endroit
+    // qui connaît la convention du moteur physique.
     let mut poses = 0u32;
-    for (centre, rayon) in gameplay.colliders_bevy() {
+    for (famille, base, hauteur, rayon) in gameplay.colliders_bevy() {
         commands.spawn((
-            Name::new("ExpeditionProp"),
+            Name::new(format!("ExpeditionProp_{famille}")),
             ExpeditionMarker,
-            Transform::from_translation(centre + Vec3::Y * (HAUTEUR_COLLIDER_M * 0.5)),
+            Transform::from_translation(base + Vec3::Y * (hauteur * 0.5)),
             GlobalTransform::default(),
             RigidBody::Fixed,
-            Collider::cylinder(HAUTEUR_COLLIDER_M * 0.5, rayon),
+            Collider::cylinder(hauteur * 0.5, rayon),
         ));
         poses += 1;
     }
@@ -293,6 +316,22 @@ fn setup_expedition(mut commands: Commands, asset_server: Res<AssetServer>) {
                 c.ligne_max_m - c.grunt_vision_m
             );
         }
+    }
+    // Un abri sous l'oeil du joueur (1,70 m) masque le corps sans masquer la
+    // vue : il se lit comme une couverture et n'en est pas une. Meme statut que
+    // le tir gratuit — defaut de carte, signale a chaque chargement.
+    for (camp, abri) in gameplay.abris_qui_n_abritent_pas() {
+        warn!(
+            "[expedition] {camp} : abri de {:.2} m — sous l'oeil du joueur, il masque \
+             le corps mais pas la vue. Il compte comme couverture et n'en est pas une.",
+            abri.hauteur_m
+        );
+    }
+    // Ce que la CUISSON a rate. Le manifeste le porte desormais explicitement :
+    // avant, 3 zones de faune et 3 abris manquaient sans qu'aucune sortie ne le
+    // dise, et l'obtenu se lisait comme le plan.
+    for d in &gameplay.defauts {
+        warn!("[expedition] defaut de cuisson de la carte : {d}");
     }
 
     let radii = StreamRadii::from_load(RAYON_CHARGEMENT_M, cells.cell_size_m);
@@ -427,6 +466,13 @@ fn teardown_expedition(mut commands: Commands, q: Query<Entity, With<ExpeditionM
 mod tests {
     use super::*;
 
+    /// Saut du joueur (m) — métrique mesurée du projet.
+    ///
+    /// Vit dans les tests et non dans le module : plus aucune constante de
+    /// hauteur ne sert à DIMENSIONNER quoi que ce soit ici, c'est la carte qui
+    /// donne les hauteurs. Celle-ci ne sert qu'à les juger.
+    const SAUT_JOUEUR_M: f32 = 1.174;
+
     #[test]
     fn le_rayon_de_chargement_couvre_ce_qu_on_voit_sans_charger_toute_la_carte() {
         // Derive de l'emprise : 280 x 200 m, demi-diagonale ~172 m. Le rayon doit
@@ -443,15 +489,28 @@ mod tests {
     }
 
     #[test]
-    fn un_collider_de_prop_ne_se_franchit_pas_au_saut() {
-        // Le joueur saute 1,174 m (metrique mesuree du projet). Un cylindre plus
-        // court se franchirait par le dessus — on passerait a travers un arbre en
-        // sautant, et le symptome serait « les collisions ne marchent pas ».
-        const SAUT_JOUEUR_M: f32 = 1.174;
-        assert!(
-            HAUTEUR_COLLIDER_M > SAUT_JOUEUR_M,
-            "un prop de {HAUTEUR_COLLIDER_M} m se franchit au saut ({SAUT_JOUEUR_M} m)"
-        );
+    fn les_solides_hauts_ne_se_franchissent_pas_au_saut() {
+        // La hauteur ne vient plus d'une constante : chaque piece porte la
+        // sienne, mesuree sous Blender. Ce test verifie donc la CARTE, pas un
+        // litteral — que les familles censees barrer le passage le barrent
+        // vraiment.
+        //
+        // `eboulis` et `rocher` en sont exclus a dessein : ce sont des pieces de
+        // sol, souvent sous le saut, et c'est voulu — on ne veut pas trebucher
+        // sur un caillou. `abri` en revanche DOIT depasser l'oeil (1,70 m),
+        // c'est sa definition meme.
+        let m = ExpeditionManifest::parse(include_str!(
+            "../../../assets/models/environment/expedition/expedition_vallon.json"
+        ))
+        .expect("manifeste lisible");
+        for (famille, _base, hauteur, _r) in m.colliders_bevy() {
+            if matches!(famille, "arbre" | "abri" | "bouchon" | "repere") {
+                assert!(
+                    hauteur > SAUT_JOUEUR_M,
+                    "{famille} de {hauteur:.2} m se franchit au saut ({SAUT_JOUEUR_M} m)"
+                );
+            }
+        }
     }
 
     #[test]

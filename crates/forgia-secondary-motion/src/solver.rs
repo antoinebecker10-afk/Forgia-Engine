@@ -30,8 +30,10 @@ pub fn update_spring_bones(
     )>,
     mut commands: Commands,
     mut stats: ResMut<AnimLayerStats>,
-    // Buffer scratch réutilisé chaque frame (zéro alloc)
+    // Buffers scratch réutilisés chaque frame (zéro alloc, chemin chaud).
     mut scratch_positions: Local<Vec<Vec3>>,
+    mut scratch_axes: Local<Vec<Vec3>>,
+    mut scratch_parent_rots: Local<Vec<Quat>>,
 ) {
     let timer = AnimTimer::start();
     let dt = time.delta_secs();
@@ -139,6 +141,49 @@ pub fn update_spring_bones(
         // 4. Écriture des Transforms locaux : orientation = look vers le bone suivant
         //    Translation locale reste sur l'offset bindpose (Bevy le fournit déjà)
         //    On ne modifie QUE la rotation pour éviter de casser la hiérarchie skinning.
+        // 🚨 Ce que la rotation d'un os exige, et que la version « Phase 1 »
+        // supposait au lieu de le mesurer : son AXE LONG au repos, et le
+        // repère de son PARENT.
+        //
+        // L'audit d'animation du 2026-06-04 a débranché la queue de Rex à cause
+        // de ça (« whip Verlet, queue de travers ») en laissant la consigne de
+        // corriger l'axe supposé +Y. Mesuré le 2026-08-18 sur la cape : sa
+        // chaîne court selon −X (translations −16, −18, −16…), donc l'axe +Y
+        // l'aurait tordue d'un quart de tour, exactement comme la queue.
+        //
+        // Un axe d'os ne se devine pas : il se LIT sur la pose de liaison.
+        scratch_axes.clear();
+        scratch_parent_rots.clear();
+        for (i, _) in chain.bones.iter().enumerate() {
+            // L'axe long d'un os = la direction de l'os SUIVANT, exprimée dans
+            // le repère local de cet os. Le solveur n'écrivant jamais de
+            // translation, cette valeur reste celle de la pose de liaison à
+            // toutes les frames — on peut donc la lire en vol.
+            let axe = chain
+                .bones
+                .get(i + 1)
+                .and_then(|&suivant| bones.get(suivant).ok())
+                .and_then(|(_, _, _, tf)| tf.translation.try_normalize())
+                // Le dernier os n'a pas de suivant dans la chaîne : il hérite de
+                // l'axe de son prédécesseur, une chaîne étant à peu près uniforme.
+                .or_else(|| scratch_axes.last().copied())
+                .unwrap_or(Vec3::Y);
+            scratch_axes.push(axe);
+            // Le repère du parent. Une frame de retard (on tourne avant la
+            // propagation), ce qui est sans conséquence sur du mouvement
+            // secondaire — et sans commune mesure avec l'erreur d'ignorer le
+            // parent, qui est permanente.
+            let rot = if i == 0 {
+                chain_global.rotation()
+            } else {
+                bones
+                    .get(chain.bones[i - 1])
+                    .map(|(_, _, gt, _)| gt.rotation())
+                    .unwrap_or(Quat::IDENTITY)
+            };
+            scratch_parent_rots.push(rot);
+        }
+
         for (i, &bone_entity) in chain.bones.iter().enumerate() {
             let final_pos = scratch_positions[i + 1];
             let parent_pos = scratch_positions[i];
@@ -153,11 +198,13 @@ pub fn update_spring_bones(
                 // mais le rig détermine ça. Phase 1 : on assume forward = direction de la chaîne.
                 let dir = (final_pos - parent_pos).normalize_or_zero();
                 if dir.length_squared() > 0.0 {
-                    // look_to en local : on calcule la rotation monde puis on l'inverse via parent
-                    // Phase 1 simplifiée : on pose juste la rotation locale via Quat::from_rotation_arc
-                    // depuis l'axe Y bindpose vers la direction monde courante.
-                    let rest_axis = Vec3::Y;
-                    local_tf.rotation = Quat::from_rotation_arc(rest_axis, dir);
+                    // La rotation écrite est LOCALE ; la direction visée est
+                    // MONDE. On ramène donc la cible dans le repère du parent
+                    // avant de construire l'arc, sinon l'os vise juste
+                    // uniquement quand son parent est à l'identité.
+                    let axe = scratch_axes[i];
+                    let dir_locale = scratch_parent_rots[i].inverse() * dir;
+                    local_tf.rotation = Quat::from_rotation_arc(axe, dir_locale);
                 }
             }
         }

@@ -100,6 +100,38 @@ fn camera_du_mode(mode: &GameMode, joueur: Entity) -> OrbitCamera {
     }
 }
 
+/// Les fiches d'animation, UNE PAR CORPS.
+///
+/// 🚨 Il y en a toujours au moins deux en vol : l'aperçu du menu (trooper) et le
+/// corps du mode joué. Un capteur qui n'en publiait qu'une affichait la fiche du
+/// trooper pendant qu'on enquêtait sur le personnage de l'Expédition — et on la
+/// croyait, parce qu'elle avait l'air d'une réponse. Les publier toutes coûte
+/// trois lignes et supprime l'ambiguïté.
+fn fiches_json(diag: &forgia_mode_roguelite::avatar::AvatarClipDiag) -> String {
+    diag.par_corps
+        .iter()
+        .map(|f| {
+            format!(
+                // `etat_demande` ET `clip_joue` : c'est leur ÉCART qui informe.
+                // Égaux = le corps a le clip demandé. Différents = un repli a
+                // servi, donc ce corps ne l'a pas. Une seule des deux valeurs
+                // aurait laissé « ne s'accroupit pas » avec quatre causes
+                // indiscernables.
+                r#"{{"modele":"{}","lies":{},"passes":{},"relances":{},"etat_demande":"{}","clip_joue":"{}","attendus":[{}],"presents":[{}]}}"#,
+                f.corps,
+                f.lie,
+                f.passes,
+                f.relances,
+                f.etat_demande,
+                f.clip_joue,
+                liste_json(&f.attendus),
+                liste_json(&f.presents)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 /// Une liste de noms en tableau JSON. Les noms de clips viennent d'un glTF,
 /// donc d'un fichier qu'on ne contrôle pas : les guillemets et antislashes
 /// s'échappent, sinon un clip mal nommé casse le capteur ENTIER — et un capteur
@@ -258,31 +290,64 @@ const DESYNC_PROBE_BONE: &str = "hand_l";
 /// Publie la vitesse horizontale RÉELLE du joueur ; les seuils qui la traduisent
 /// en clip vivent dans le genome (`[animation]`), comme pour les ennemis.
 ///
-/// On dérive la vitesse de la position plutôt que de lire un état du contrôleur :
-/// c'est ce que le personnage fait à l'écran qui doit commander l'animation, pas
-/// ce que l'entrée demande — sinon il marche en poussant contre un mur.
+/// On dérive la vitesse du DÉPLACEMENT RÉEL plutôt que de l'intention d'entrée :
+/// c'est ce que le personnage fait à l'écran qui doit commander l'animation —
+/// sinon il marche en poussant contre un mur.
+///
+/// # 🚨 Mais on ne la mesure PAS ici, et c'est tout le sujet
+///
+/// Cette fonction calculait elle-même `(position − position d'avant) / dt`, en
+/// `Update`. Le joueur avance en `FixedUpdate` à 64 Hz : sur une frame de rendu
+/// sans pas fixe le delta vaut **0**, et sur une frame avec pas fixe il vaut un
+/// pas entier divisé par un `dt` de rendu bien plus court. La « vitesse » n'était
+/// donc pas 6,5 m/s mais un **repliement** oscillant entre 0 et ~15 — à 117 fps,
+/// mesuré : pointes à **14,72 m/s** pour une marche à 6,5.
+///
+/// Et le garde-fou anti-téléport mettait ces pointes à **ZÉRO** au lieu de les
+/// borner. Résultat en jeu, le 2026-08-16 : *« je ne vois que l'animation
+/// idle »* — le personnage marchait, et son animation le croyait immobile.
+///
+/// `forgia_player::PlayerLocomotion` publie déjà cette vitesse, mesurée en
+/// `FixedUpdate` **après le déplacement**. Sa documentation nomme exactement ce
+/// piège : « évite le signal 0/élevé qu'aurait une mesure en Update ». La
+/// recalculer ici était la même grandeur écrite deux fois — et c'est la mauvaise
+/// des deux qui pilotait l'animation.
 fn sys_drive_avatar_walk(
-    time: Res<Time>,
     cfg: Res<EquipmentConfig>,
-    q_player: Query<&GlobalTransform, With<Player>>,
+    joueur: Res<forgia_player::PlayerLocomotion>,
+    posture: Res<forgia_player::Posture>,
+    souris: Res<ButtonInput<MouseButton>>,
     mut loco: ResMut<AvatarLocomotion>,
-    mut last: Local<Option<Vec3>>,
 ) {
-    let Ok(gt) = q_player.single() else {
-        return;
-    };
-    let pos = gt.translation();
-    let dt = time.delta_secs().max(1e-4);
-    let raw = last.map_or(0.0, |p| (pos - p).with_y(0.0).length() / dt);
-    *last = Some(pos);
-    // 🚨 Plafond anti-téléport : un replacement au spawn produit un pic de
-    // plusieurs centaines de m/s, et le personnage se mettrait à courir à
-    // l'arrêt. Même garde-fou que les ennemis (`MAX_SANE_SPEED_MPS`).
-    loco.speed = if raw > cfg.animation.max_sane_speed {
-        0.0
-    } else {
-        raw
-    };
+    let mesuree = joueur.horizontal_speed;
+    // Le plafond garde son rôle — un replacement au spawn produit un pic de
+    // plusieurs centaines de m/s — mais il BORNE au lieu d'annuler. Annuler
+    // faisait passer le personnage pour immobile à chaque pic ; borner le laisse
+    // au pire courir une frame, ce qui ne se voit pas.
+    let plafond = cfg.animation.max_sane_speed;
+    loco.speed = mesuree.min(plafond);
+
+    // Le reste de l'état vient du contrôleur, qui le MESURE là où le delta et le
+    // transform sont sous la main. Ce système ne fait que transporter : refaire
+    // la projection ici en aurait fait une grandeur écrite deux fois.
+    loco.avant = joueur.avant.clamp(-plafond, plafond);
+    loco.lateral = joueur.lateral.clamp(-plafond, plafond);
+    loco.vitesse_verticale = joueur.vertical;
+    loco.au_sol = joueur.au_sol;
+    loco.lacet_rad_s = joueur.lacet_rad_s;
+    loco.depuis_atterrissage_s = joueur.depuis_atterrissage_s;
+
+    // La posture est produite par le mode (l'Expédition), et vaut « debout »
+    // partout ailleurs : le Hall ne change pas de comportement.
+    loco.accroupi = posture.accroupi;
+    loco.glisse = posture.glisse;
+
+    // 🚨 Viser et tirer se lisent sur l'INTENTION, pas sur l'état de l'arme.
+    // Un tir refusé — chargeur vide, cadence non écoulée — doit quand même
+    // épauler le personnage : sinon appuyer sur la gâchette à vide le laisse au
+    // repos, et le joueur croit que son entrée n'est pas passée.
+    loco.vise = souris.pressed(MouseButton::Right);
+    loco.tire = souris.pressed(MouseButton::Left);
 }
 
 /// Sortie du Hall : on rend la vue subjective telle qu'on l'a trouvée.
@@ -460,7 +525,7 @@ fn sys_write_castle_avatar_sensor(
             "warn",
             "AVATAR_DESYNC : les pieces ne suivent pas le corps — une armature reste en pose de repos, l'armure se detache des bras",
         )
-    } else if anim_players > 0 && anim_playing == 0 && !diag.lie {
+    } else if anim_players > 0 && anim_playing == 0 && !diag.par_corps.iter().any(|f| f.lie) {
         // Le cas TOTAL se distingue du partiel : aucune pièce ne joue, donc ce
         // n'est pas une armure qui décroche — c'est le câblage lui-même qui n'a
         // pas eu lieu. Et le champ `clips_*` du capteur dit pourquoi, sans avoir
@@ -468,6 +533,20 @@ fn sys_write_castle_avatar_sensor(
         (
             "critical",
             "AVATAR_ANIM_ABSENT : le corps est en pose de repos, bras ecartes — comparer clips_attendus et clips_presents ci-dessous : si un nom manque, corriger le genome ; si presents est vide, le glTF du corps n'expose aucune animation",
+        )
+    } else if anim_players > 0 && anim_playing == 0 {
+        // 🚨 Câblé ET muet. Ce cas tombait jusqu'ici dans « ANIM_PARTIAL », qui
+        // accuse « des pièces » — alors qu'avec UN lecteur et zéro qui joue, ce
+        // n'est pas une pièce qui décroche : c'est le corps entier qui s'est tu
+        // APRÈS avoir été câblé. Relevé le 2026-08-16 (anim_players 1,
+        // anim_playing 0) pendant que le log montrait le même corps recâblé
+        // trois fois et ses pièces rebranchées quinze fois.
+        //
+        // Ce n'est pas cosmétique : un os que plus rien ne réécrit laisse toute
+        // couche additive (la tenue de visée) s'accumuler sur elle-même.
+        (
+            "critical",
+            "AVATAR_ANIM_MUET : le corps a bien ete cable (clips_lies=true) puis son lecteur s'est TU — plus aucun clip actif. Croiser avec le log : un corps recable plusieurs fois, ou des pieces rebranchees en boucle, signent une reconstruction repetee de l'avatar. Un os que rien ne reecrit fige le personnage ET fait deriver toute pose additive",
         )
     } else if anim_players > 0 && anim_playing < anim_players {
         (
@@ -484,7 +563,7 @@ fn sys_write_castle_avatar_sensor(
     };
 
     let json = format!(
-        r#"{{"id":"castle_avatar","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"mounted":{},"mesh_count":{},"visible_meshes":{},"camera_distance_m":{:.2},"ground_gap_m":{:.3},"speed_mps":{:.2},"vitesse_max_vue_mps":{:.2},"anim_players":{},"anim_playing":{},"bone_copies":{},"desync_m":{:.3},"avatar_pos":[{:.1},{:.1},{:.1}],"camera_pos":[{:.1},{:.1},{:.1}],"equipped_total":{},"corps":"{}","clips_lies":{},"clips_passes":{},"clips_attendus":[{}],"clips_presents":[{}]}}"#,
+        r#"{{"id":"castle_avatar","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"mounted":{},"mesh_count":{},"visible_meshes":{},"camera_distance_m":{:.2},"ground_gap_m":{:.3},"speed_mps":{:.2},"vitesse_max_vue_mps":{:.2},"anim_players":{},"anim_playing":{},"bone_copies":{},"desync_m":{:.3},"avatar_pos":[{:.1},{:.1},{:.1}],"camera_pos":[{:.1},{:.1},{:.1}],"equipped_total":{},"corps":[{}]}}"#,
         time.elapsed_secs(),
         mounted,
         mesh_count,
@@ -508,11 +587,7 @@ fn sys_write_castle_avatar_sensor(
         camera_pos.y,
         camera_pos.z,
         save.equipped.len(),
-        diag.corps,
-        diag.lie,
-        diag.passes,
-        liste_json(&diag.attendus),
-        liste_json(&diag.presents),
+        fiches_json(&diag),
     );
     let _ = forgia_core::sensor_io::enqueue("forgia2_castle_avatar.json", json);
 }

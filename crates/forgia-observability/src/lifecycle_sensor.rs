@@ -17,7 +17,7 @@
 use bevy::prelude::*;
 use forgia_ai_arena_bot::ArenaBot;
 use forgia_enemy_nameplate::NameplateRoot;
-use forgia_mode_fps_arena::TargetCube;
+use forgia_combat::TargetCube;
 use forgia_player::Player;
 
 #[derive(Resource, Default)]

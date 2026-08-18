@@ -6,9 +6,26 @@ collision se cuit HORS LIGNE en un TriMesh à part, la surface jouable se cuit
 séparément (elle ne subit pas la décimation des murs), et un point critique
 repose sur un proxy déterministe, jamais sur le maillage décimé.
 
-  visuel   → expedition_vallon.glb            (fusionné par collection)
-  physique → expedition_vallon_collision.glb  (terrain + bâti + pont)
-  navmesh  → expedition_vallon_walkable.glb   (terrain + chemin seuls)
+  physique → expedition_vallon_collision.glb  (terrain + bâti — PAS le pont)
+  navmesh  → expedition_vallon_walkable.glb   (terrain seul)
+
+Le GLB VISUEL monolithique n'est plus produit. Il pesait 75,6 Mo, il était
+remplacé par les 48 cellules streamées depuis `92_cellules.py`, et **aucun code
+ne le référençait** (vérifié le 2026-08-17 sur `crates/`, `assets/genomes/`,
+`config/`). Un artefact que personne ne consomme n'est pas un artefact, c'est de
+la dette qui pèse dans le dépôt — et qui donne l'illusion d'un chemin de rendu
+qui n'existe plus.
+
+`expedition_vallon_walkable.glb` (1,3 Mo) N'A PAS DE CONSOMMATEUR NON PLUS, et
+on le garde sciemment : c'est l'entrée du navmesh, et l'absence de navmesh est
+un chantier NOMMÉ (les bots vont en ligne droite sur une carte à ceinture de
+26 m, gorge et col). La différence entre les deux n'est pas le nombre d'octets,
+c'est qu'ici on sait pourquoi il existe et ce qui le rendra vivant.
+
+⚠️ Le docstring annonçait « terrain + bâti + pont » alors que le code ne joint
+que `vallon_sol` et `vallon_village` : le pont n'a jamais eu de collision de
+maillage par cette voie. Corrigé ici — un commentaire qui décrit une donnée
+qu'il n'a pas fait chercher le défaut ailleurs.
 
 Les fusions ne sont pas cosmétiques : sans elles, 4 400 objets deviennent
 4 400 nœuds glTF, donc autant d'entités ECS à l'entrée dans la carte.
@@ -121,7 +138,11 @@ def main():
         obj.data.calc_loop_triangles()
         rapport[obj.name]["tris"] = len(obj.data.loop_triangles)
 
-    rapport["visuel_octets"] = exporter(parties, os.path.join(SORTIE, "expedition_vallon.glb"))
+    # Plus d'export monolithique : voir l'en-tete. La fusion par collection reste
+    # necessaire — c'est elle qui produit `vallon_sol` et `vallon_village`, les
+    # deux pieces que la collision joint juste apres.
+    rapport["visuel_octets"] = 0
+    rapport["visuel"] = "non produit — remplace par les cellules de 92_cellules.py"
 
     # --- 2. collision ----------------------------------------------------
     # Terrain + bâti + pont. Les arbres en sont EXCLUS : 1 500 TriMesh d'arbre

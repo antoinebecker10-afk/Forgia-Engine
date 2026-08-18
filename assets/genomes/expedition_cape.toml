@@ -1,0 +1,25 @@
+# Cape du personnage d'Expedition — mouvement secondaire.
+#
+# Les six os `cloak_01`..`cloak_06` ne sont animes par AUCUN des 34 clips du
+# corps : la cape suivait le buste comme une planche. Ils sont maintenant
+# confies au solveur d'os-ressorts (`forgia-secondary-motion`), qui integre leur
+# retard sur le mouvement du personnage.
+#
+# Ces trois nombres se jugent MANETTE EN MAIN, pas dans un tableau. Ils vivent
+# donc ici, rechargeables a chaud pendant qu'on court.
+
+# 0 = molle, elle tombe et traine. 1 = rigide, elle colle au dos.
+# 0,35 laisse la cape retomber franchement tout en revenant se plaquer en course.
+raideur = 0.35
+
+# 0 = oscille longtemps apres l'arret. 1 = figee instantanement.
+# 0,7 : deux ou trois battements apres un demi-tour, puis le calme.
+amorti = 0.7
+
+# La pesanteur vue par le TISSU, pas par le personnage.
+#
+# La vraie (-9,81) donne un rideau : la cape tombe droit et ne vole jamais. Un
+# vetement est porte par l'air autant qu'il est tire vers le bas — d'ou une
+# valeur nettement plus faible. C'est un choix d'allure, pas une approximation
+# physique.
+pesanteur = -4.0

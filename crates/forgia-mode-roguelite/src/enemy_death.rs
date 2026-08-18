@@ -71,7 +71,7 @@ pub fn sys_start_death_ascension(
 
         // 2) Ce qui doit cesser (cf. en-tête du module).
         if let Ok(mut ec) = commands.get_entity(entity) {
-            ec.remove::<forgia_mode_fps_arena::TargetCube>();
+            ec.remove::<forgia_combat::TargetCube>();
             ec.remove::<forgia_ai_arena_bot::ArenaBot>();
             ec.remove::<forgia_ai_arena_bot::BotShootConfig>();
             ec.remove::<bevy_rapier3d::prelude::RigidBody>();

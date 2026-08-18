@@ -118,3 +118,12 @@ tools/blender/expedition/vues/
 # script qui est la source, pas le .blend.
 tools/blender/**/_avant_rebuild.blend
 tools/blender/**/__pycache__/
+
+# Jeton de session Mixamo (tools/assets/mixamo_recolte.py). Un jeton dans un
+# depot est une fuite, meme sur un depot prive : il donne acces au compte Adobe
+# jusqu'a son expiration.
+tools/assets/mixamo.local.toml
+
+# Grenier : assets sortis du jeu mais PAS supprimes. Non suivi, non charge.
+# Voir _grenier/LISEZMOI.md pour la raison de chaque entree.
+_grenier/

@@ -1,5 +1,39 @@
 //! # forgia-pcg-runtime
 //!
+//! # 🚨 CRATE ORPHELINE — aucun consommateur, et une décision à prendre
+//!
+//! Constat du 2026-08-17 (`cargo run -p xtask -- check-orphans`) : **aucune
+//! crate du workspace ne dépend de celle-ci**, et le binaire joueur non plus.
+//! Elle contient pourtant 395 lignes de code réel et testé.
+//!
+//! Le reste de la pile PCG, lui, est vivant :
+//! `forgia-pcg-core` → `forgia-procgen-graph` → `forgia-village-generator`.
+//! C'est **l'adaptateur ECS** qui n'a jamais été branché.
+//!
+//! ## Pourquoi il n'a pas été branché, très probablement
+//!
+//! Le streaming réellement utilisé en jeu est `forgia_streaming::cells` — celui
+//! du Château et de l'Expédition, qui lit un manifeste de cellules autorées
+//! sous Blender. Ce crate-ci fait la même chose pour des cellules **générées**.
+//! Les deux répondent au même besoin par deux chemins : l'un est autoré, l'autre
+//! procédural.
+//!
+//! ## La décision, qui n'est pas technique
+//!
+//! - **Le brancher** n'a de sens que si le jeu doit streamer du contenu
+//!   procédural — donc si la génération de village entre en jeu, et pas
+//!   seulement en outil.
+//! - **Le supprimer** perd un travail fait et testé, et il faudra le réécrire
+//!   le jour où la Phase 1 (« le créateur importe ses assets, l'IA construit »)
+//!   demandera du streaming procédural.
+//! - **Le classer outil autonome** serait faux : l'allowlist de `check-orphans`
+//!   prévient explicitement que ça « masque une vraie crate gameplay orpheline
+//!   derrière une allowlist vague ». Ce n'est pas un outil, c'est une moitié de
+//!   feature.
+//!
+//! Tant que la décision n'est pas prise, **`check-orphans` doit rester rouge sur
+//! cette ligne** : c'est le seul endroit où la question se pose d'elle-même.
+//!
 //! Thin Bevy adapter that **branches an assembled `SpatialPlan` into cell
 //! streaming**. It owns the activation *ordering* — collision/navmesh before
 //! render on load, the reverse on unload — and the destination-cell preload; the

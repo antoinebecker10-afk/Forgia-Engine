@@ -135,6 +135,42 @@ silencieusement sur leurs défauts. Le test qui lit le génome **depuis le disqu
 l'a attrapé ; un test sur une structure construite en mémoire ne l'aurait jamais
 vu.
 
+## Retour de jeu #2 (2026-08-16) — l'hélice, et l'os que plus rien ne réécrit
+
+Symptôme : « regarde ce qu'il se passe avec l'avatar quand je vise ». Capteur au
+même instant : **`anim_playing: 0`** avec `anim_players: 1`, et
+`vitesse_max_vue_mps: 14.12` — donc le producteur de vitesse marche (le champ
+ajouté au retour #1 a servi), mais **le lecteur d'animation s'est tu**.
+
+**Défaut à moi.** `poser_la_tenue` écrivait `tf.rotation *= ajout`. Cette ligne
+suppose que l'animation réécrit l'os à chaque frame, donc que la valeur lue est
+la pose animée nue. Faux dès que l'animation ne l'écrit pas — lecteur arrêté,
+clip qui ne cible pas cet os, avatar en reconstruction. La multiplication porte
+alors sur **ma propre sortie de la frame précédente** : la pose s'ajoute à
+elle-même, le bras part en hélice.
+
+Et le défaut ne se voyait **qu'en visée** : au repos l'ajout vaut l'identité, et
+une identité accumulée reste l'identité. Une couche additive est silencieuse tant
+qu'elle n'ajoute rien.
+
+Correctif : on mémorise la base animée par os. Si l'os porte encore exactement ce
+qu'on y a écrit, personne ne l'a touché → on repart de la base mémorisée ; sinon
+l'animation vient d'écrire → c'est la nouvelle base. On **remplace** au lieu de
+multiplier.
+
+**La leçon de test.** Les 7 tests de l'incrément 3 vérifiaient tous *une frame
+isolée* : ils passaient au vert sur du code qui explose à la 60ᵉ. Deux tests
+ajoutés bouclent 60 frames — l'un sans animation (la pose doit rester exactement
+la pose voulue), l'autre avec une base qui change à chaque frame (la base doit
+suivre, sinon on corrigerait l'hélice en figeant le personnage : plus discret, et
+pire).
+
+**Reste ouvert, pas à moi** : `anim_playing: 0` alors que `clips_lies: true`. Le
+log montre le même corps recâblé **3 fois** et ses pièces rebranchées **15 fois**
+en 17 s — signe d'une reconstruction répétée de l'avatar. Le capteur disait
+« ANIM_PARTIAL : des pièces ne jouent pas », ce qui est faux avec un seul lecteur
+muet : un cas `AVATAR_ANIM_MUET` a été ajouté pour le nommer.
+
 ## Critères d'acceptation
 
 - [ ] L'arme équipée est visible dans la main droite, à une taille crédible

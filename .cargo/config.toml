@@ -2,7 +2,13 @@
 xtask = "run --package xtask --"
 # Commandes de dev : Tracy est systématiquement activé pour diagnostiquer les
 # hitches pendant l'itération. Le build release joueur n'active pas cette feature.
-forgia-dev = "run -p forgia --features profile-tracy --"
+# 🚨 `dev-brp` est ici depuis le 2026-08-16. L'alias `forgia-brp` existait déjà
+# et n'a jamais servi : une commande à part est une commande qu'on oublie, et on
+# a passé des sessions à écrire des capteurs pour des questions ponctuelles
+# qu'une requête BRP règle en un appel. La commande de dev quotidienne porte donc
+# les deux ponts — Tracy pour le temps, BRP pour l'état. Le build joueur n'a ni
+# l'un ni l'autre.
+forgia-dev = "run -p forgia --features profile-tracy,dev-brp --"
 forgia-fast = "run -p forgia --profile release-fast --features profile-tracy --"
 # À lancer seulement pour une enquête mémoire avec le viewer Tracy ouvert.
 forgia-memory = "run -p forgia --profile release-fast --features profile-tracy-memory --"

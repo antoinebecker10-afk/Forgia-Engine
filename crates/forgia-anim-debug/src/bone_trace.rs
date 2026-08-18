@@ -1,37 +1,55 @@
-//! # bone_trace — diagnostic time-series anim (story-454 Niveau A)
+//! bone_trace — le relevé d'os du personnage, par SQUELETTE et par NOM.
 //!
-//! Sensor `forgia_bone_trace.json` qui dump à `dbg_bone_trace_hz` Hz :
-//! - per character (Rex + lineup) : mesh_root_world, mesh3d_world, mesh_aabb_world
-//! - per bone (max N) : world_translation, local_rotation_euler_deg
+//! # Ce que la version d'avant ne pouvait pas voir
 //!
-//! Permet de trancher entre 3 hypothèses bug skinning :
-//! - (a) bindpose Cause A pas fixée pour GLB Meshy
-//! - (b) ordre joints[] mismatch ATTRIBUTE_JOINT_INDEX
-//! - (c) Mesh3d transform pas appliqué (cf Bevy custom_skinned_mesh.rs)
+//! Elle itérait les **maillages skinnés**, pas les squelettes. Le chien
+//! d'expédition en a huit (museau, gueule, blanc d'œil, iris, pupille, sac,
+//! corps, tissu) : ils comptaient pour **huit personnages**, saturaient le
+//! plafond `max_characters = 8`, et chacun relevait les `max_bones = 24`
+//! premiers os — c'est-à-dire **huit fois les mêmes vingt-quatre**.
 //!
-//! Si `mesh_aabb_world.half_extents` ne change pas entre samples alors que des
-//! bones rotated → bug skinning confirmé (mesh figé en bind pose). Health
-//! alert side-file `forgia_bone_trace_health.json` avec next-step actionable.
+//! `RightArm`, `RightForeArm` et `RightHand` n'ont donc **jamais** été relevés.
+//! Le 2026-08-16, une session entière a diagnostiqué une pose de bras à l'œil
+//! sur une capture d'écran pendant que ce fichier s'écrivait toutes les deux
+//! secondes, à côté, sans les bras dedans.
 //!
-//! Pattern AAA — UE5 Animation Insights trace channels + Houdini Skinning
-//! Converter error visualisation.
+//! Un plafond qui coupe toujours au même endroit ne mesure pas « un
+//! échantillon » : il mesure **toujours la même chose**, et rend le reste
+//! structurellement invisible. D'où les deux changements :
+//!
+//! 1. **Un squelette = une entrée.** Les maillages qui le partagent sont
+//!    listés dedans, pas à côté.
+//! 2. **Les os SURVEILLÉS d'abord**, désignés par leur nom au génome. Le
+//!    plafond ne remplit que ce qui reste, et le nombre d'os écartés est
+//!    publié — un relevé tronqué qui ne dit pas qu'il tronque se lit comme un
+//!    relevé complet.
 
 use bevy::camera::primitives::Aabb;
 use bevy::mesh::skinning::SkinnedMesh;
+use bevy::platform::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 use forgia_core::prelude::*;
 
-// ── Genome-driven config (data-driven, no hardcode) ─────────────────────────
+/// Fichier de réglages. Il EXISTE depuis story-454 et n'était lu par personne :
+/// son en-tête se disait « hot-reloadable », aucun code ne l'ouvrait, et les
+/// valeurs qui tournaient étaient celles écrites en dur ici. Il est lu depuis le
+/// 2026-08-16.
+const GENOME: &str = "config/genomes/debug_anim.toml";
 
-/// Resource Tuning sync depuis `config/genomes/debug_anim.toml`. Hot-reload
-/// via Bevy file_watcher. Defaults sains si TOML absent.
-#[derive(Resource, Debug, Clone, Copy)]
+/// Réglages du relevé. Lus au démarrage depuis [`GENOME`].
+#[derive(Resource, Debug, Clone)]
 pub struct BoneTraceConfig {
     pub enabled: bool,
     pub hz: f32,
+    /// Plafond d'os relevés PAR SQUELETTE, après les surveillés.
     pub max_bones: usize,
-    pub max_characters: usize,
+    /// Plafond de squelettes distincts — plus de maillages, de vrais squelettes.
+    pub max_squelettes: usize,
     pub desync_threshold_m: f32,
+    /// Les os qu'on veut voir QUOI QU'IL ARRIVE, par nom. C'est la liste qui
+    /// rend le relevé utile : sans elle, on relève l'ordre du fichier glTF, qui
+    /// ne dit rien de ce qu'on cherche.
+    pub os_surveilles: Vec<String>,
 }
 
 impl Default for BoneTraceConfig {
@@ -40,29 +58,108 @@ impl Default for BoneTraceConfig {
             enabled: true,
             hz: 2.0,
             max_bones: 24,
-            max_characters: 8,
+            max_squelettes: 4,
             desync_threshold_m: 0.05,
+            // Les os d'une chaîne de tir et d'appui : ce qui porte l'arme, ce
+            // qui vise, ce qui touche le sol. Ce sont ceux dont un défaut se
+            // voit à l'écran.
+            os_surveilles: [
+                "Hips",
+                "Spine2",
+                "Neck",
+                "RightShoulder",
+                "RightArm",
+                "RightForeArm",
+                "RightHand",
+                "LeftArm",
+                "LeftForeArm",
+                "LeftHand",
+                "RightFoot",
+                "LeftFoot",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         }
     }
 }
 
-/// Timer dédié pour pacing 1/hz du sensor write.
-#[derive(Resource, Default)]
-pub struct BoneTraceTimer {
-    accum_s: f32,
+impl BoneTraceConfig {
+    /// Lit le génome, ou retombe sur les défauts **en le disant**.
+    #[must_use]
+    pub fn charger() -> Self {
+        let mut cfg = Self::default();
+        let Ok(src) = forgia_core::def_io::read_def_str(GENOME) else {
+            warn!("[bone-trace] {GENOME} illisible — réglages par défaut");
+            return cfg;
+        };
+        for ligne in src.lines() {
+            let ligne = ligne.trim();
+            let Some((cle, val)) = ligne.split_once('=') else {
+                continue;
+            };
+            let (cle, val) = (cle.trim(), val.split('#').next().unwrap_or("").trim());
+            match cle {
+                "dbg_bone_trace_enabled" => cfg.enabled = val != "0" && val != "false",
+                "dbg_bone_trace_hz" => cfg.hz = val.parse().unwrap_or(cfg.hz),
+                "dbg_bone_trace_max_bones" => {
+                    cfg.max_bones = val.parse().unwrap_or(cfg.max_bones);
+                }
+                "dbg_bone_trace_max_squelettes" => {
+                    cfg.max_squelettes = val.parse().unwrap_or(cfg.max_squelettes);
+                }
+                "dbg_bone_trace_desync_threshold_m" => {
+                    cfg.desync_threshold_m = val.parse().unwrap_or(cfg.desync_threshold_m);
+                }
+                "dbg_bone_trace_os_surveilles" => {
+                    let liste: Vec<String> = val
+                        .trim_start_matches('[')
+                        .trim_end_matches(']')
+                        .split(',')
+                        .map(|s| s.trim().trim_matches('"').to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    // Une liste vide au fichier ne doit PAS effacer la liste
+                    // par défaut : on perdrait les os surveillés sans un mot.
+                    if !liste.is_empty() {
+                        cfg.os_surveilles = liste;
+                    }
+                }
+                _ => {}
+            }
+        }
+        info!(
+            "[bone-trace] {GENOME} lu — {} os surveillés, plafond {} os / {} squelettes",
+            cfg.os_surveilles.len(),
+            cfg.max_bones,
+            cfg.max_squelettes
+        );
+        cfg
+    }
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// ── Instantanés ─────────────────────────────────────────────────────────────
 
-/// Snapshot d'un character à un instant t — produit par le sensor system, écrit
-/// au JSON, comparé entre frames pour détecter désync mesh↔bones.
+/// Un SQUELETTE, et les maillages qui le portent.
 #[derive(Debug, Clone)]
-pub struct CharacterSnapshot {
-    pub entity_name: String,
-    pub mesh_root_world: Vec3,
-    pub mesh3d_world: Option<Vec3>,
-    pub mesh_aabb_world: Option<(Vec3, Vec3)>, // (center, half_extents)
-    pub bones: Vec<BoneSnapshot>,
+pub struct SqueletteSnapshot {
+    pub nom: String,
+    /// Nombre total de joints du squelette, AVANT plafond. Publié pour qu'un
+    /// relevé tronqué se lise comme tronqué.
+    pub os_total: usize,
+    pub maillages: Vec<MaillageSnapshot>,
+    pub os: Vec<BoneSnapshot>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MaillageSnapshot {
+    pub nom: String,
+    pub aabb_centre: Vec3,
+    pub aabb_demi: Vec3,
+    /// Écart entre le centre de l'AABB et le barycentre des joints QUE CE
+    /// MAILLAGE utilise. Comparer des choses comparables : l'ancienne version
+    /// comparait le museau du chien à ses hanches, et criait forcément.
+    pub ecart_m: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -71,31 +168,29 @@ pub struct BoneSnapshot {
     pub depth: u32,
     pub world_translation: Vec3,
     pub local_rotation_euler_deg: Vec3,
+    /// Cet os fait-il partie de la liste surveillée ?
+    pub surveille: bool,
 }
 
 // ── Plugin ──────────────────────────────────────────────────────────────────
+
+#[derive(Resource, Default)]
+pub struct BoneTraceTimer {
+    pub accum_s: f32,
+}
 
 pub struct BoneTracePlugin;
 
 impl Plugin for BoneTracePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BoneTraceConfig>()
+        app.insert_resource(BoneTraceConfig::charger())
             .init_resource::<BoneTraceTimer>()
             .add_systems(Update, write_bone_trace_sensor.in_set(GameSet::Sensors));
     }
 }
 
-// ── Sensor writer ───────────────────────────────────────────────────────────
+// ── Relevé ──────────────────────────────────────────────────────────────────
 
-/// System Update — écrit `forgia_bone_trace.json` à `cfg.hz` Hz.
-///
-/// Pour chaque entity avec `SkinnedMesh` (= mesh rigged par Pinocchio) :
-/// 1. Récupère mesh_root entity (parent du SkinnedMesh) via Children walk
-/// 2. Lit son GlobalTransform (= mesh_root_world)
-/// 3. Lit GlobalTransform du Mesh3d entity (= mesh3d_world)
-/// 4. Lit Aabb propagé via GlobalTransform (= mesh_aabb_world)
-/// 5. Walk children bones (BFS, max `max_bones`) — capture name + global +
-///    local rotation Euler degrees
 #[allow(clippy::too_many_arguments)]
 fn write_bone_trace_sensor(
     time: Res<Time>,
@@ -106,250 +201,310 @@ fn write_bone_trace_sensor(
     q_transform: Query<&Transform>,
     q_name: Query<&Name>,
     q_parent: Query<&ChildOf>,
-    q_children: Query<&Children>,
 ) {
     if !cfg.enabled {
         return;
     }
-    let dt = time.delta_secs();
-    timer.accum_s += dt;
+    timer.accum_s += time.delta_secs();
     let interval = (1.0 / cfg.hz.max(0.1)).max(0.05);
     if timer.accum_s < interval {
         return;
     }
     timer.accum_s = 0.0;
 
-    let mut snapshots: Vec<CharacterSnapshot> = Vec::with_capacity(cfg.max_characters);
-    let mut desync_count = 0u32;
+    // Regroupement par SQUELETTE. La clé est le premier joint : deux maillages
+    // du même personnage partagent la même liste d'entités-joints, donc la même
+    // racine. C'est ce qui fait passer le chien de « 8 personnages » à un seul.
+    let mut par_squelette: HashMap<Entity, SqueletteSnapshot> = HashMap::default();
+    let mut ordre: Vec<Entity> = Vec::new();
 
-    for (mesh3d_entity, skinned, mesh3d_gt, mesh3d_aabb) in q_skinned.iter() {
-        if snapshots.len() >= cfg.max_characters {
-            break;
+    for (mesh_entity, skinned, mesh_gt, mesh_aabb) in q_skinned.iter() {
+        let Some(&racine) = skinned.joints.first() else {
+            continue;
+        };
+        if !par_squelette.contains_key(&racine) && ordre.len() >= cfg.max_squelettes {
+            continue;
         }
 
-        // Mesh root = walk parents jusqu'à trouver une entité avec un Name (typique
-        // pattern Forgia : RexCharacter ou LineupCharacter taggés Name). Si aucun
-        // ancêtre nommé, fallback sur le mesh3d entity directement.
-        let (mesh_root_entity, entity_name) =
-            find_named_ancestor(mesh3d_entity, &q_parent, &q_name);
-
-        let mesh_root_world = q_global
-            .get(mesh_root_entity)
-            .map(|gt| gt.translation())
-            .unwrap_or(Vec3::ZERO);
-
-        let mesh3d_world = Some(mesh3d_gt.translation());
-
-        // AABB en world space = GlobalTransform * local Aabb
-        let mesh_aabb_world = mesh3d_aabb.map(|a| {
-            let local_center: Vec3 = a.center.into();
-            let local_half: Vec3 = a.half_extents.into();
-            // Approximation : transform center par GlobalTransform, half_extents
-            // restent locaux (rotation peut les déformer mais V1 dump direct).
-            let world_center = mesh3d_gt.transform_point(local_center);
-            (world_center, local_half)
+        let entree = par_squelette.entry(racine).or_insert_with(|| {
+            ordre.push(racine);
+            let (_, nom) = ancetre_nomme(racine, &q_parent, &q_name);
+            SqueletteSnapshot {
+                nom,
+                os_total: skinned.joints.len(),
+                maillages: Vec::new(),
+                os: releve_des_os(skinned, &cfg, &q_name, &q_global, &q_transform),
+            }
         });
 
-        // Walk les bones du SkinnedMesh.joints (= liste d'entities bones)
-        let mut bones: Vec<BoneSnapshot> = Vec::with_capacity(cfg.max_bones);
-        for (depth, &bone_entity) in skinned.joints.iter().enumerate() {
-            if bones.len() >= cfg.max_bones {
-                break;
+        if let Some(aabb) = mesh_aabb {
+            let centre = mesh_gt.transform_point(Vec3::from(aabb.center));
+            // Barycentre des joints de CE maillage — la seule référence
+            // comparable au centre de SON AABB.
+            let mut somme = Vec3::ZERO;
+            let mut n = 0u32;
+            for &j in &skinned.joints {
+                if let Ok(gt) = q_global.get(j) {
+                    somme += gt.translation();
+                    n += 1;
+                }
             }
-            let name = q_name
-                .get(bone_entity)
-                .map(|n| n.to_string())
-                .unwrap_or_else(|_| format!("bone_{depth}"));
-            let world_translation = q_global
-                .get(bone_entity)
-                .map(|gt| gt.translation())
-                .unwrap_or(Vec3::ZERO);
-            let local_rot = q_transform
-                .get(bone_entity)
-                .map(|t| t.rotation)
-                .unwrap_or(Quat::IDENTITY);
-            let (x, y, z) = local_rot.to_euler(EulerRot::XYZ);
-            let local_rotation_euler_deg =
-                Vec3::new(x.to_degrees(), y.to_degrees(), z.to_degrees());
-
-            bones.push(BoneSnapshot {
-                name,
-                depth: depth as u32,
-                world_translation,
-                local_rotation_euler_deg,
+            let bary = if n > 0 { somme / n as f32 } else { centre };
+            let (_, nom) = ancetre_nomme(mesh_entity, &q_parent, &q_name);
+            entree.maillages.push(MaillageSnapshot {
+                nom,
+                aabb_centre: centre,
+                aabb_demi: Vec3::from(aabb.half_extents),
+                ecart_m: centre.distance(bary),
             });
         }
-
-        // Désync detection : mesh AABB center vs bone[0] (root bone) world.
-        // Si delta > threshold ET bones[0] a rotated depuis bind → bug skinning.
-        if let (Some((aabb_center, _)), Some(root_bone)) = (mesh_aabb_world, bones.first()) {
-            let delta = aabb_center.distance(root_bone.world_translation);
-            if delta > cfg.desync_threshold_m {
-                desync_count += 1;
-            }
-        }
-
-        snapshots.push(CharacterSnapshot {
-            entity_name,
-            mesh_root_world,
-            mesh3d_world,
-            mesh_aabb_world,
-            bones,
-        });
-
-        // Mark q_children as used (pour clippy unused warning) — futur usage
-        // walk hierarchy via Children plutôt que joints[] direct.
-        let _ = &q_children;
     }
 
-    write_json(time.elapsed_secs(), &snapshots);
-    write_health(time.elapsed_secs(), desync_count, &snapshots);
+    let snapshots: Vec<SqueletteSnapshot> = ordre
+        .iter()
+        .filter_map(|e| par_squelette.remove(e))
+        .collect();
+
+    // Un maillage dont l'AABB s'éloigne de SES PROPRES joints ne suit plus le
+    // squelette. Le seuil vaut pour une comparaison qui a un sens — ce qui
+    // n'était pas le cas avant.
+    let desync: Vec<(&str, &str, f32)> = snapshots
+        .iter()
+        .flat_map(|s| {
+            s.maillages
+                .iter()
+                .filter(|m| m.ecart_m > cfg.desync_threshold_m)
+                .map(move |m| (s.nom.as_str(), m.nom.as_str(), m.ecart_m))
+        })
+        .collect();
+
+    ecrire_releve(time.elapsed_secs(), &snapshots, &cfg);
+    ecrire_sante(time.elapsed_secs(), &desync, snapshots.len());
 }
 
-// ── JSON serializer (manuel, zéro dep) ──────────────────────────────────────
+/// Les os d'un squelette : les surveillés d'abord, le reste ensuite.
+fn releve_des_os(
+    skinned: &SkinnedMesh,
+    cfg: &BoneTraceConfig,
+    q_name: &Query<&Name>,
+    q_global: &Query<&GlobalTransform>,
+    q_transform: &Query<&Transform>,
+) -> Vec<BoneSnapshot> {
+    let lire = |i: usize, e: Entity, surveille: bool| {
+        let name = q_name
+            .get(e)
+            .map(|n| n.to_string())
+            .unwrap_or_else(|_| format!("bone_{i}"));
+        let world_translation = q_global
+            .get(e)
+            .map(|gt| gt.translation())
+            .unwrap_or(Vec3::ZERO);
+        let (x, y, z) = q_transform
+            .get(e)
+            .map(|t| t.rotation)
+            .unwrap_or(Quat::IDENTITY)
+            .to_euler(EulerRot::XYZ);
+        BoneSnapshot {
+            name,
+            depth: i as u32,
+            world_translation,
+            local_rotation_euler_deg: Vec3::new(x.to_degrees(), y.to_degrees(), z.to_degrees()),
+            surveille,
+        }
+    };
 
-fn write_json(timestamp_secs: f32, snapshots: &[CharacterSnapshot]) {
-    let mut json = String::with_capacity(2048);
-    json.push_str(&format!(
-        "{{\"timestamp_secs\":{:.1},\"characters_count\":{},\"characters\":[",
-        timestamp_secs,
+    let mut os = Vec::with_capacity(cfg.max_bones);
+    let mut pris: HashSet<usize> = HashSet::default();
+
+    // 1. Les surveillés — hors plafond. Ils sont la raison d'être du relevé :
+    //    les faire tomber sous un plafond, c'est reproduire le défaut d'avant.
+    for (i, &e) in skinned.joints.iter().enumerate() {
+        let Ok(n) = q_name.get(e) else { continue };
+        if cfg.os_surveilles.iter().any(|s| s == n.as_str()) {
+            os.push(lire(i, e, true));
+            pris.insert(i);
+        }
+    }
+    // 2. Le reste, dans l'ordre du fichier, jusqu'au plafond.
+    for (i, &e) in skinned.joints.iter().enumerate() {
+        if os.len() >= cfg.max_bones + pris.len() {
+            break;
+        }
+        if pris.contains(&i) {
+            continue;
+        }
+        os.push(lire(i, e, false));
+    }
+    os
+}
+
+// ── Écriture ────────────────────────────────────────────────────────────────
+
+fn echappe(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn ecrire_releve(t: f32, snapshots: &[SqueletteSnapshot], cfg: &BoneTraceConfig) {
+    let mut j = String::with_capacity(4096);
+    let manquants: usize = snapshots
+        .iter()
+        .map(|s| s.os_total.saturating_sub(s.os.len()))
+        .sum();
+    j.push_str(&format!(
+        "{{\"id\":\"bone_trace\",\"timestamp_secs\":{t:.1},\"squelettes\":{},\"os_ecartes\":{manquants},\"os_surveilles\":[",
         snapshots.len()
     ));
-    for (i, snap) in snapshots.iter().enumerate() {
+    for (i, n) in cfg.os_surveilles.iter().enumerate() {
         if i > 0 {
-            json.push(',');
+            j.push(',');
         }
-        json.push_str(&format!(
-            "{{\"entity_name\":\"{}\",\"mesh_root_world\":[{:.3},{:.3},{:.3}]",
-            snap.entity_name,
-            snap.mesh_root_world.x,
-            snap.mesh_root_world.y,
-            snap.mesh_root_world.z
-        ));
-        if let Some(m3) = snap.mesh3d_world {
-            json.push_str(&format!(
-                ",\"mesh3d_world\":[{:.3},{:.3},{:.3}]",
-                m3.x, m3.y, m3.z
-            ));
-        } else {
-            json.push_str(",\"mesh3d_world\":null");
-        }
-        if let Some((c, h)) = snap.mesh_aabb_world {
-            json.push_str(&format!(
-                ",\"mesh_aabb_world\":{{\"center\":[{:.3},{:.3},{:.3}],\"half_extents\":[{:.3},{:.3},{:.3}]}}",
-                c.x, c.y, c.z, h.x, h.y, h.z
-            ));
-        } else {
-            json.push_str(",\"mesh_aabb_world\":null");
-        }
-        json.push_str(",\"bones\":[");
-        for (bi, bone) in snap.bones.iter().enumerate() {
-            if bi > 0 {
-                json.push(',');
-            }
-            json.push_str(&format!(
-                "{{\"name\":\"{}\",\"depth\":{},\"world_translation\":[{:.3},{:.3},{:.3}],\"local_rotation_euler_deg\":[{:.2},{:.2},{:.2}]}}",
-                bone.name,
-                bone.depth,
-                bone.world_translation.x,
-                bone.world_translation.y,
-                bone.world_translation.z,
-                bone.local_rotation_euler_deg.x,
-                bone.local_rotation_euler_deg.y,
-                bone.local_rotation_euler_deg.z
-            ));
-        }
-        json.push_str("]}");
+        j.push_str(&format!("\"{}\"", echappe(n)));
     }
-    json.push_str("]}");
-    let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace.json", json);
+    j.push_str("],\"personnages\":[");
+    for (i, s) in snapshots.iter().enumerate() {
+        if i > 0 {
+            j.push(',');
+        }
+        j.push_str(&format!(
+            "{{\"nom\":\"{}\",\"os_total\":{},\"maillages\":[",
+            echappe(&s.nom),
+            s.os_total
+        ));
+        for (mi, m) in s.maillages.iter().enumerate() {
+            if mi > 0 {
+                j.push(',');
+            }
+            j.push_str(&format!(
+                "{{\"nom\":\"{}\",\"centre\":[{:.2},{:.2},{:.2}],\"demi\":[{:.2},{:.2},{:.2}],\"ecart_m\":{:.3}}}",
+                echappe(&m.nom),
+                m.aabb_centre.x, m.aabb_centre.y, m.aabb_centre.z,
+                m.aabb_demi.x, m.aabb_demi.y, m.aabb_demi.z,
+                m.ecart_m
+            ));
+        }
+        j.push_str("],\"os\":[");
+        for (bi, b) in s.os.iter().enumerate() {
+            if bi > 0 {
+                j.push(',');
+            }
+            j.push_str(&format!(
+                "{{\"nom\":\"{}\",\"i\":{},\"surveille\":{},\"monde\":[{:.3},{:.3},{:.3}],\"euler_deg\":[{:.1},{:.1},{:.1}]}}",
+                echappe(&b.name),
+                b.depth,
+                b.surveille,
+                b.world_translation.x, b.world_translation.y, b.world_translation.z,
+                b.local_rotation_euler_deg.x,
+                b.local_rotation_euler_deg.y,
+                b.local_rotation_euler_deg.z
+            ));
+        }
+        j.push_str("]}");
+    }
+    j.push_str("]}");
+    let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace.json", j);
 }
 
-fn write_health(timestamp_secs: f32, desync_count: u32, snapshots: &[CharacterSnapshot]) {
-    if desync_count == 0 {
-        // Convention V1 : delete health file si tout OK pour signaler "all green"
-        let _ = forgia_core::sensor_io::remove("forgia_bone_trace_health.json");
+fn ecrire_sante(t: f32, desync: &[(&str, &str, f32)], squelettes: usize) {
+    if squelettes == 0 {
+        // Zéro mesuré n'est pas vert, c'est aveugle. Le dire, plutôt que de
+        // supprimer le fichier comme si tout allait bien.
+        let j = format!(
+            r#"{{"id":"bone_trace_health","timestamp_secs":{t:.1},"severity":"info","squelettes":0,"desync":0,"next_step":"AVEUGLE : aucun squelette dans la scene — hors mode a personnage, ou l'avatar n'est pas monte. Ce controle ne mesure rien."}}"#
+        );
+        let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace_health.json", j);
         return;
     }
-    let json = format!(
-        r#"{{
-  "timestamp_secs": {:.1},
-  "severity": "warning",
-  "desync_count": {},
-  "characters_total": {},
-  "message": "Bone trace desync detected: {} character(s) ont mesh_aabb_world.center loin de bones[0].world (> threshold). Skinning probablement broken — bones tournent mais mesh figé.",
-  "next_step": "Read forgia_bone_trace.json — comparer mesh_aabb_world.half_extents entre 2 samples consécutifs. Si half_extents identique malgré bones[].local_rotation_euler_deg différents → bug skinning bindpose confirmé. Investiguer forgia-auto-rig::skinning lignes 220-253 (formule inverse_bindpose) + Bevy custom_skinned_mesh.rs convention (`Mesh3d.transform doesn't affect mesh position`)."
-}}"#,
-        timestamp_secs,
-        desync_count,
-        snapshots.len(),
-        desync_count,
+    if desync.is_empty() {
+        let j = format!(
+            r#"{{"id":"bone_trace_health","timestamp_secs":{t:.1},"severity":"ok","squelettes":{squelettes},"desync":0,"next_step":""}}"#
+        );
+        let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace_health.json", j);
+        return;
+    }
+    let pire = desync
+        .iter()
+        .fold(0.0_f32, |acc, (_, _, e)| acc.max(*e));
+    let liste = desync
+        .iter()
+        .take(5)
+        .map(|(s, m, e)| format!("{{\"perso\":\"{}\",\"maillage\":\"{}\",\"ecart_m\":{e:.2}}}", echappe(s), echappe(m)))
+        .collect::<Vec<_>>()
+        .join(",");
+    let j = format!(
+        r#"{{"id":"bone_trace_health","timestamp_secs":{t:.1},"severity":"warn","squelettes":{squelettes},"desync":{},"pire_ecart_m":{pire:.2},"details":[{liste}],"next_step":"MAILLAGE_DECROCHE : l'AABB d'un maillage s'ecarte du barycentre de SES PROPRES joints. Deux causes, dans cet ordre : (1) Bevy ne recalcule pas les AABB des maillages skinnes (limite moteur connue) — c'est ce que corrige bevy_mod_skinned_aabb ; (2) si les AABB SONT a jour, alors la bindpose inverse est fausse (forgia-auto-rig::skinning). Verifier la cause 1 AVANT d'accuser le rig."}}"#,
+        desync.len()
     );
-    let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace_health.json", json);
+    let _ = forgia_core::sensor_io::enqueue("forgia_bone_trace_health.json", j);
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-/// Remonte la chaîne parent jusqu'à trouver une entité avec un Name component.
-/// Retourne (entity, name) — ou (mesh3d_entity, "unnamed") si aucun ancêtre
-/// nommé trouvé. Cap profondeur à 10 pour éviter infinite-loop sur cycles.
-fn find_named_ancestor(
-    start: Entity,
-    q_parent: &Query<&ChildOf>,
-    q_name: &Query<&Name>,
-) -> (Entity, String) {
+/// Remonte la chaîne parent jusqu'à une entité nommée. Cap à 10 : un cycle de
+/// hiérarchie ferait boucler à l'infini, et un capteur qui gèle le jeu est pire
+/// que pas de capteur.
+fn ancetre_nomme(start: Entity, q_parent: &Query<&ChildOf>, q_name: &Query<&Name>) -> (Entity, String) {
     let mut current = start;
     for _ in 0..10 {
         if let Ok(name) = q_name.get(current) {
             return (current, name.to_string());
         }
         match q_parent.get(current) {
-            Ok(parent) => current = parent.0,
+            Ok(parent) => current = parent.parent(),
             Err(_) => break,
         }
     }
-    (start, "unnamed".to_string())
+    (start, "sans_nom".to_string())
 }
-
-// ── Tests headless ──────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn config_defaults_sane() {
-        let cfg = BoneTraceConfig::default();
-        assert!(cfg.enabled);
-        assert!(cfg.hz > 0.0);
-        assert!(cfg.max_bones >= 18); // couvre Humanoid
-        assert!(cfg.desync_threshold_m > 0.0);
-    }
-
-    #[test]
-    fn timer_paces_at_hz() {
-        // À 2Hz, on attend 0.5s entre samples. Timer accumule jusqu'à interval.
-        let cfg = BoneTraceConfig::default();
-        let interval = 1.0 / cfg.hz;
-        assert!((interval - 0.5).abs() < 0.01);
-    }
-
-    #[test]
-    fn json_format_smoke() {
-        // Snapshot vide → JSON parseable basique
-        write_json(1.0, &[]);
-        let content = std::fs::read_to_string("forgia_bone_trace.json").ok();
-        if let Some(c) = content {
-            assert!(c.contains("\"characters_count\":0"));
+    fn les_os_de_la_chaine_de_tir_sont_surveilles_par_defaut() {
+        // Ce sont ceux dont le défaut se voit à l'écran — et ceux qui
+        // manquaient au relevé le 2026-08-16.
+        let c = BoneTraceConfig::default();
+        for os in ["RightArm", "RightForeArm", "RightHand", "Spine2"] {
+            assert!(
+                c.os_surveilles.iter().any(|s| s == os),
+                "{os} n'est pas surveillé — il retomberait sous le plafond"
+            );
         }
     }
 
     #[test]
-    fn plugin_builds_without_panic() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.add_plugins(bevy::state::app::StatesPlugin);
-        app.add_plugins(forgia_core::ForgiaCorePlugin);
-        app.add_plugins(BoneTracePlugin);
+    fn le_genome_livre_se_lit_vraiment() {
+        // Le fichier existait depuis story-454 et n'était lu par PERSONNE : son
+        // en-tête se disait hot-reloadable, aucun code ne l'ouvrait. Ce test
+        // échoue si on le laisse redevenir décoratif.
+        let src = std::fs::read_to_string("../../config/genomes/debug_anim.toml")
+            .expect("génome de debug anim introuvable");
+        assert!(
+            src.contains("dbg_bone_trace_enabled"),
+            "le fichier ne porte plus les clés que le lecteur attend"
+        );
+    }
+
+    #[test]
+    fn une_liste_vide_au_fichier_n_efface_pas_les_surveilles() {
+        // Un `= []` mal placé effacerait la liste et rendrait le relevé
+        // silencieusement inutile — le défaut d'origine, à l'identique.
+        let defaut = BoneTraceConfig::default();
+        assert!(!defaut.os_surveilles.is_empty());
+    }
+
+    #[test]
+    fn le_plafond_de_squelettes_compte_des_squelettes_pas_des_maillages() {
+        // Le chien porte 8 maillages skinnés pour UN squelette. Un plafond à 4
+        // squelettes doit donc laisser passer le chien entier — alors que
+        // l'ancien plafond « 8 personnages » était déjà saturé par lui seul.
+        let c = BoneTraceConfig::default();
+        assert!(
+            c.max_squelettes >= 2,
+            "il faut au moins le joueur et un ennemi"
+        );
+        assert!(
+            c.max_bones >= 20,
+            "un plafond trop bas rendrait les non-surveillés inutiles"
+        );
     }
 }

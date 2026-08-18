@@ -22,6 +22,9 @@
 pub mod asset_handles;
 pub mod assets_load_sensor;
 pub mod checks;
+/// Un mode rend-il ce qu'il a pris ? Vérifie qu'aucun composant posé sur une
+/// entité PARTAGÉE (caméra, fenêtre) ne survit à la sortie du mode.
+pub mod contrat_mode;
 pub mod config;
 pub mod exporter;
 pub mod forgia2_aggregator;
@@ -109,6 +112,12 @@ impl Plugin for ForgiaObservabilityPlugin {
         if !app.is_plugin_added::<bevy::render::diagnostic::RenderDiagnosticsPlugin>() {
             app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin);
         }
+
+        // Le contrat de mode : vérifie qu'aucun mode ne lègue au suivant un
+        // composant posé sur une entité partagée. Quatre pannes du 2026-08-14→16
+        // — dont deux qui empêchaient le jeu de démarrer — étaient de cette
+        // forme, et aucune n'a été trouvée par un instrument.
+        app.add_plugins(contrat_mode::ContratDeModePlugin);
 
         app.init_resource::<RpgHealthState>()
             .init_resource::<SensorSnapshots>()

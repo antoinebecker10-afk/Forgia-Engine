@@ -27,7 +27,8 @@ pub mod prelude {
     pub use crate::dash::{DashState, DashTuning, DashUsedEvent};
     pub use crate::{
         AimCamera, CameraFov, CameraMode, ForgiaPlayerPlugin, FpsCamera, MouseLookTuning,
-        MovementSpeedMultiplier, Player, PlayerLocomotion, PlayerMovementTuning, ViewmodelCamera,
+        MovementSpeedMultiplier, Player, PlayerLocomotion, PlayerMovementTuning, Posture,
+        ViewmodelCamera,
     };
 }
 
@@ -105,6 +106,33 @@ fn sync_player_movement_tuning(
 #[derive(Resource, Default, Debug, Clone, Copy)]
 pub struct PlayerLocomotion {
     pub horizontal_speed: f32,
+    /// Vitesse **signée** dans le repère du joueur : positive quand il avance.
+    ///
+    /// # Ce qu'une norme ne peut pas dire
+    ///
+    /// `horizontal_speed` est une longueur : elle ne distingue ni reculer
+    /// d'avancer, ni un pas de côté d'une course. Le 2026-08-17, onze clips
+    /// d'animation ajoutés au corps étaient inatteignables **par construction** —
+    /// pas par oubli de câblage. La projection sur les axes du personnage se
+    /// calcule ici, où le delta et le transform sont déjà sous la main, plutôt
+    /// que d'être refaite par chaque consommateur.
+    pub avant: f32,
+    /// Signée : positive vers sa droite.
+    pub lateral: f32,
+    /// Positive quand il monte. Sépare le saut de la chute.
+    pub vertical: f32,
+    pub au_sol: bool,
+    /// Vitesse de rotation réelle (rad/s) — ce que le corps FAIT, pas ce que la
+    /// souris demande.
+    pub lacet_rad_s: f32,
+    /// Depuis quand il a touché le sol. Ouvre la fenêtre d'atterrissage.
+    pub depuis_atterrissage_s: f32,
+    /// Depuis quand il a QUITTÉ le sol. Remis à zéro dès qu'il le retouche.
+    ///
+    /// Sépare une vraie chute d'un décollement d'une frame sur une bosse — un
+    /// contrôleur à capsule en produit constamment, et `au_sol` seul ne permet
+    /// pas de les distinguer.
+    pub depuis_decollage_s: f32,
 }
 
 /// Multiplicateur global sur la vitesse de déplacement player.
@@ -294,6 +322,34 @@ impl Default for Player {
 #[derive(Component)]
 pub struct FpsCamera;
 
+/// La posture du joueur — debout, accroupi, ou en glissade.
+///
+/// # Pourquoi elle vit ici et pas dans le mode qui la produit
+///
+/// Elle a **deux consommateurs dans deux crates qui ne se voient pas** :
+/// l'Expédition la produit (`posture.rs`), et l'avatar partagé la lit pour
+/// choisir son clip (`forgia-game::castle_avatar` → `forgia-mode-roguelite::
+/// avatar`). `forgia-player` est la seule dépendance commune des trois.
+///
+/// La mettre dans le mode producteur aurait forcé l'avatar partagé à dépendre de
+/// l'Expédition — c'est-à-dire à ce que le Hall dépende d'une carte qu'il ne
+/// charge jamais.
+///
+/// # Elle est INERTE par défaut, et c'est délibéré
+///
+/// Aucun mode n'est obligé de l'écrire. Les modes qui l'ignorent ont un joueur
+/// debout, comme avant — l'arène et le Hall ne changent pas de comportement du
+/// fait que cette ressource existe.
+#[derive(Resource, Default, Debug, Clone, Copy)]
+pub struct Posture {
+    pub accroupi: bool,
+    pub glisse: bool,
+    /// Temps restant de glissade (s). Une glissade est une **durée**, pas un
+    /// état qu'on tient : sinon on glisse indéfiniment en gardant la touche, et
+    /// ça devient un moyen de déplacement gratuit.
+    pub glisse_restant_s: f32,
+}
+
 /// **La caméra depuis laquelle le tir part.**
 ///
 /// # Pourquoi un marqueur, et pas « la FpsCamera » comme avant
@@ -356,6 +412,9 @@ impl Plugin for ForgiaPlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraMode>()
             .init_resource::<CameraFov>()
+            // Inerte tant qu'aucun mode ne l'écrit : l'arène et le Hall gardent
+            // un joueur debout, exactement comme avant.
+            .init_resource::<Posture>()
             .init_resource::<PlayerLocomotion>()
             .init_resource::<MovementSpeedMultiplier>()
             .init_resource::<MouseLookTuning>()
@@ -775,22 +834,72 @@ fn player_movement(
 fn track_player_speed(
     time: Res<Time>,
     q: Query<&Transform, With<Player>>,
+    q_sol: Query<&KinematicCharacterControllerOutput, With<Player>>,
     mut last: Local<Option<Vec3>>,
+    mut dernier_lacet: Local<f32>,
+    mut au_sol_avant: Local<bool>,
     mut loco: ResMut<PlayerLocomotion>,
 ) {
     let Ok(tf) = q.single() else {
         *last = None;
-        loco.horizontal_speed = 0.0;
+        *loco = PlayerLocomotion::default();
         return;
     };
     let p = tf.translation;
     let dt = time.delta_secs().max(1e-5);
-    loco.horizontal_speed = last
-        .map(|lp| {
-            let d = p - lp;
-            Vec2::new(d.x, d.z).length() / dt
-        })
-        .unwrap_or(0.0);
+    let d = last.map(|lp| p - lp).unwrap_or(Vec3::ZERO);
+    loco.horizontal_speed = Vec2::new(d.x, d.z).length() / dt;
+
+    // Projection sur les axes du personnage : deux vitesses SIGNÉES là où il n'y
+    // avait qu'une longueur. C'est ce qui rend « reculer » et « pas de côté »
+    // représentables.
+    let avant_dir = tf.forward().as_vec3().with_y(0.0).normalize_or_zero();
+    let droite_dir = tf.right().as_vec3().with_y(0.0).normalize_or_zero();
+    let plat = Vec3::new(d.x, 0.0, d.z) / dt;
+    loco.avant = plat.dot(avant_dir);
+    loco.lateral = plat.dot(droite_dir);
+    loco.vertical = d.y / dt;
+
+    let (lacet, _, _) = tf.rotation.to_euler(EulerRot::YXZ);
+    let mut ecart = lacet - *dernier_lacet;
+    // 🚨 Le lacet enjambe ±π. Sans ce repli, passer par l'arrière produit un pic
+    // de ~6 rad/s et déclencherait un virage sur place alors qu'on ne tourne pas.
+    if ecart > std::f32::consts::PI {
+        ecart -= std::f32::consts::TAU;
+    } else if ecart < -std::f32::consts::PI {
+        ecart += std::f32::consts::TAU;
+    }
+    *dernier_lacet = lacet;
+    loco.lacet_rad_s = ecart / dt;
+
+    let au_sol = q_sol.single().map(|o| o.grounded).unwrap_or(true);
+    // La fenêtre d'atterrissage s'ouvre au FRONT montant. Si elle se remettait à
+    // zéro tant qu'on est au sol, elle serait toujours ouverte et le clip
+    // d'atterrissage masquerait la marche en permanence.
+    if au_sol && !*au_sol_avant {
+        loco.depuis_atterrissage_s = 0.0;
+    } else {
+        loco.depuis_atterrissage_s += dt;
+    }
+    // 🚨 Le symétrique : depuis quand il a QUITTÉ le sol.
+    //
+    // Sans cette grandeur, un consommateur ne peut distinguer « il tombe » de
+    // « la capsule a perdu le contact une frame ». Or elle le perd sans arrêt :
+    // une bosse, un raccord de dalle, un haut de rampe suffisent. Rapporté en
+    // jeu le 2026-08-18 — « parfois quand je marche, l'animation de chute
+    // s'active ». Le contact n'est pas un booléen, c'est un booléen ET une
+    // durée ; publier le premier sans la seconde force chaque lecteur à
+    // réinventer son propre filtre, ou à s'en passer.
+    if !au_sol && *au_sol_avant {
+        loco.depuis_decollage_s = 0.0;
+    } else if !au_sol {
+        loco.depuis_decollage_s += dt;
+    } else {
+        loco.depuis_decollage_s = 0.0;
+    }
+    *au_sol_avant = au_sol;
+    loco.au_sol = au_sol;
+
     *last = Some(p);
 }
 

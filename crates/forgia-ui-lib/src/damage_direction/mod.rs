@@ -193,9 +193,11 @@ pub(crate) fn draw_damage_arcs(
     arcs: Res<DamageArcsState>,
     tuning: Res<DamageDirTuning>,
 ) {
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
-    {
+    // Savoir d'où vient le coup fait partie du combat, pas du décorum : sans
+    // cet arc, on tourne sur soi-même en cherchant le tireur. L'Expédition en
+    // était privée depuis le 2026-08-14 — même cause que le flash et le
+    // killfeed, une liste de modes tenue à la main. Source unique désormais.
+    if !capacites(game_mode.get()).retour_de_combat || *app_state.get() != AppMode::InGame {
         return;
     }
     if arcs.arcs.is_empty() {

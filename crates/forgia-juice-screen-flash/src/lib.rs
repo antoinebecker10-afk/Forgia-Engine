@@ -228,11 +228,15 @@ pub(crate) fn draw_screen_flash(
     q_player_health: Query<&Health, With<Player>>,
     mut sensor: ResMut<ScreenFlashSensor>,
 ) {
-    // Fix 2026-07-20 : était gaté `GameMode::Fps` seul → flash dégâts/kill +
-    // vignette low-HP INACTIFS en Roguelite (le mode shippé). Étendu aux deux.
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Roguelite)
-    {
+    // Ce flash a été muet DEUX fois pour la même raison : gaté `Fps` seul, il a
+    // raté le Roguelite (corrigé le 2026-07-20), puis l'Expédition (corrigé le
+    // 2026-08-18). Une liste de modes tenue à la main ne casse pas quand on
+    // l'oublie — elle rend la capacité invisible.
+    //
+    // La liste vit désormais dans `forgia_core::capacites`, en un seul exemplaire
+    // et en `match` exhaustif : une zone nouvelle NE COMPILE PAS tant que ses
+    // capacités ne sont pas déclarées. Il n'y aura pas de troisième fois.
+    if !capacites(game_mode.get()).retour_de_combat || *app_state.get() != AppMode::InGame {
         sensor.low_hp_active = false;
         return;
     }

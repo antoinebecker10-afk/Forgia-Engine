@@ -469,6 +469,19 @@ pub fn sys_run_crosschecks(
     // Plus de double-log ici. Local<f32> conservé (préfixe _) pour réserver le slot.
 }
 
+/// Story-695 : `SystemTime::now()` panique sur wasm32 (« time not implemented »).
+/// Repli epoch — les chemins compares sont des mtimes de FICHIERS, morts sur web,
+/// donc le resultat n'y est jamais consomme utilement. On garde std::time ici
+/// (interop fs::metadata) plutot que web-time.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn wall_now() -> SystemTime {
+    SystemTime::now()
+}
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn wall_now() -> SystemTime {
+    SystemTime::UNIX_EPOCH
+}
+
 // ─────────────────────────── Tests ───────────────────────────
 
 #[cfg(test)]
@@ -744,17 +757,4 @@ mod tests {
         assert!(matches!(r.severity, Severity::Ok));
         assert!(r.message.contains("mort"));
     }
-}
-
-/// Story-695 : `SystemTime::now()` panique sur wasm32 (« time not implemented »).
-/// Repli epoch — les chemins compares sont des mtimes de FICHIERS, morts sur web,
-/// donc le resultat n'y est jamais consomme utilement. On garde std::time ici
-/// (interop fs::metadata) plutot que web-time.
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn wall_now() -> SystemTime {
-    SystemTime::now()
-}
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn wall_now() -> SystemTime {
-    SystemTime::UNIX_EPOCH
 }

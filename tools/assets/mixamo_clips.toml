@@ -1,0 +1,179 @@
+# mixamo_clips.toml — les mouvements qu'on veut, et sous quel nom on les range.
+#
+# `nom` = le nom du clip DANS LE JEU. C'est celui que le génome d'équipement
+# citera (`[expedition_body.animation]`), et celui que `merge_gltf_anims.py`
+# donnera au clip d'après son fichier. Le changer casse le génome.
+#
+# `recherche` = le titre EXACT dans le catalogue Mixamo. Le script exige une
+# correspondance exacte, insensible à la casse : « Jump » rend des dizaines de
+# résultats et prendre le premier donnerait un mouvement au hasard. Quand un
+# titre ne colle pas, le script affiche les trois plus proches — on corrige ici,
+# on ne devine pas dans le code.
+#
+# Les cinq premiers clips existent déjà dans le corps ; ils sont listés pour
+# mémoire, et le script les ignore s'ils sont déjà sur le disque.
+
+# ── Déjà présents (ne se re-téléchargent pas) ────────────────────────────────
+[[clips]]
+nom = "idle"
+recherche = "Idle"
+
+[[clips]]
+nom = "walk"
+recherche = "Walking"
+
+[[clips]]
+nom = "run"
+recherche = "Running"
+
+[[clips]]
+nom = "jump"
+recherche = "Jumping"
+
+[[clips]]
+nom = "jog_backward"
+recherche = "Jog Backward"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LE JEU « FUSIL EN MAIN » — trouvé en explorant le catalogue le 2026-08-17
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# 🚨 Ces clips-là valent tous les génériques réunis, et pour une raison simple :
+# le personnage PORTE UNE ARME. Un `Walking` générique balance les deux bras
+# librement ; un `Rifle Walk` garde l'arme épaulée. Aucun réglage de code ne
+# rattrape cette différence — c'est dans la capture ou ça n'y est pas.
+#
+# Deux d'entre eux remplacent du bricolage :
+#
+#   - `Rifle Aiming Idle` est la POSE DE VISÉE capturée. Elle remplace ce que
+#     l'IK approximait à coups de cible dérivée et de pôle de coude. L'IK garde
+#     son rôle — suivre le tangage de la caméra, ce qu'un clip figé ne peut pas
+#     faire — mais elle s'applique désormais PAR-DESSUS une pose juste au lieu
+#     d'en fabriquer une.
+#   - `Firing Rifle` est l'animation de tir, que j'avais annoncée inexistante.
+#
+# Le corps tire son nom du clip depuis son fichier : `rifle_aim.glb` → clip
+# « rifle_aim ». C'est ce nom-là que le génome d'équipement citera.
+
+# ── Debout, arme en main ─────────────────────────────────────────────────────
+[[clips]]
+nom = "rifle_idle"
+recherche = "Rifle Idle"
+
+[[clips]]
+nom = "rifle_aim"
+recherche = "Rifle Aiming Idle"
+
+[[clips]]
+nom = "rifle_fire"
+recherche = "Firing Rifle"
+
+[[clips]]
+nom = "rifle_walk"
+recherche = "Rifle Walk"
+
+[[clips]]
+nom = "rifle_run"
+recherche = "Rifle Run"
+
+[[clips]]
+nom = "rifle_walk_back"
+recherche = "Backwards Rifle Walk"
+
+# Le pas de côté — le mouvement le plus fréquent d'un combat en 3ᵉ personne, et
+# celui dont l'absence se voit le plus (le personnage marche de face en se
+# déplaçant latéralement).
+[[clips]]
+nom = "rifle_strafe"
+recherche = "Rifle Side Step"
+
+# ── Accroupi, arme en main ───────────────────────────────────────────────────
+[[clips]]
+nom = "rifle_crouch_idle"
+recherche = "Rifle Kneel Idle"
+
+[[clips]]
+nom = "rifle_crouch_walk"
+recherche = "Rifle Crouch Walk"
+
+[[clips]]
+nom = "rifle_crouch_back"
+recherche = "Rifle Crouch Backward Walk"
+
+# ── Les transitions, ce qui sépare une locomotion propre d'un patchwork ──────
+# Sans elles, passer de debout à accroupi est une téléportation de la hanche.
+[[clips]]
+nom = "rifle_to_crouch"
+recherche = "Rifle Stand To Kneel"
+
+[[clips]]
+nom = "rifle_to_stand"
+recherche = "Rifle Kneel To Stand"
+
+[[clips]]
+nom = "rifle_start_run"
+recherche = "Rifle Start Run"
+
+[[clips]]
+nom = "rifle_stop"
+recherche = "Rifle Walk To Stop"
+
+[[clips]]
+nom = "rifle_turn"
+recherche = "Rifle Turn"
+
+# ── Générique : ce que le jeu fusil ne couvre pas ───────────────────────────
+
+# S'accroupir. Deux clips, pas un : une pose figée accroupie ne suffit pas dès
+# qu'on avance en restant baissé.
+[[clips]]
+nom = "crouch_idle"
+recherche = "Crouch Idle"
+
+[[clips]]
+nom = "crouch_walk"
+recherche = "Crouched Walking"
+
+# La glissade, qui remplace le dash de l'arène. Mixamo la range sous « Running
+# Slide » — c'est bien un mouvement de course qui finit au sol.
+[[clips]]
+nom = "slide"
+recherche = "Running Slide"
+
+# Les virages. Sans eux, un changement de direction est une rotation instantanée
+# du buste : le personnage pivote sans que ses pieds bougent, et ça se voit.
+[[clips]]
+nom = "turn_left"
+recherche = "Left Turn"
+
+[[clips]]
+nom = "turn_right"
+recherche = "Right Turn"
+
+# Le demi-tour. « Standing Turn 180 » n'existe PAS : le script l'a signalé et a
+# proposé « Standing Torch Turn Left 180 » — un mouvement où le personnage tient
+# une torche. C'est en explorant (`--chercher turn`) qu'on trouve le bon titre.
+[[clips]]
+nom = "turn_180"
+recherche = "Quick 180 Turn"
+
+# Les pas de côté. Le personnage strafe en permanence en combat 3ᵉ personne :
+# sans eux il marche de face en se déplaçant latéralement, ce qui est le défaut
+# le plus visible d'une locomotion incomplète.
+[[clips]]
+nom = "strafe_left"
+recherche = "Left Strafe Walking"
+
+[[clips]]
+nom = "strafe_right"
+recherche = "Right Strafe Walking"
+
+# La chute et l'atterrissage. `jump` seul donne un saut qui se fige en l'air dès
+# que la montée est finie — la carte a des dénivelés de plusieurs mètres.
+[[clips]]
+nom = "fall"
+recherche = "Falling Idle"
+
+[[clips]]
+nom = "land"
+recherche = "Hard Landing"

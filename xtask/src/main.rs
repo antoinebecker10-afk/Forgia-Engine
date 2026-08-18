@@ -31,11 +31,15 @@ fn main() {
         "verify-sensors-format" => verify_sensors_format(),
         "sensor-audit" => sensor_audit(&args),
         "sensor-sync-writes" => sensor_sync_writes(&args),
+        "capteur-gate" => capteur_gate(&args),
+        "strates" => strates(&args),
         "story-gate" => story_gate(&args),
         "no-scaffold" => no_scaffold(&args),
         "context-budget" => context_budget(&args),
         "asset-load" => asset_load(&args),
         "arch-drift" => arch_drift(),
+        "plugin-gate" => plugin_gate(&args),
+        "deps-mortes" => deps_mortes(&args),
         "story-ids" => story_ids(),
         "validate-genomes" => validate_genomes(&args),
         "validate-pcg" => validate_pcg(&args),
@@ -509,6 +513,430 @@ fn story_ids() -> i32 {
 /// Gate anti-dérive documentaire : ARCHITECTURE.md §3 doit lister exactement les
 /// crates membres du workspace. Origine : audit 2026-06-10 — le doc décrivait
 /// 258 crates pour 62 réelles pendant 3 semaines (toxique pour un moteur IA-natif).
+/// Plugins montés par AUCUN `App::new()` de test, et pourquoi c'est admis.
+///
+/// Une exception NOMMÉE vaut mieux qu'un périmètre implicite : la liste ci-dessous
+/// se lit, se discute et se réduit. Un plugin absent du harnais sans figurer ici
+/// fait échouer le cliquet.
+const PLUGIN_GATE_SANS_HARNAIS: &[(&str, &str)] = &[(
+    "ExpeditionVentPlugin",
+    "son MaterialPlugin exige l'app de rendu, qu'un test ne monte pas",
+)];
+
+/// Plugins qui n'ont légitimement pas de capteur.
+const PLUGIN_GATE_SANS_CAPTEUR: &[(&str, &str)] = &[
+    (
+        "ExpeditionMatierePlugin",
+        "reagit aux materiaux qui arrivent par le streaming — couvert par forgia2_textures",
+    ),
+    (
+        "ExpeditionVentPlugin",
+        "pose un shader et avance son horloge : aucun etat qui puisse diverger",
+    ),
+];
+
+/// Un plugin doit avoir un GARDE : monté dans un test qui tourne, et un capteur.
+///
+/// # Pourquoi ce cliquet existe
+///
+/// `check-orphans` vérifie qu'une crate a un consommateur. Il manquait le
+/// contrôle symétrique, un cran plus bas : qu'un **plugin** a de quoi le
+/// surveiller. Deux trous mesurés le 2026-08-18 sur le seul mode Expédition :
+///
+/// - 4 plugins sur 6 n'étaient montés par aucun `App::new()`. Or un conflit
+///   d'accès (`error[B0002]`) panique à la CONSTRUCTION du schedule : `cargo
+///   check`, clippy et 110 tests passent au vert sur un binaire qui ne démarre
+///   pas. Seul un `app.update()` l'attrape, et il ne couvrait qu'un tiers du mode.
+/// - `posture` était branché, data-driven, testé — et ne publiait RIEN. Son gène
+///   `accroupi_facteur_vitesse` n'avait aucun consommateur, ce qui ne pouvait se
+///   découvrir qu'en lisant le code trois heures plus tard.
+///
+/// Le cliquet ne juge pas la qualité du garde. Il juge son EXISTENCE, ce qui est
+/// mécanique — donc fiable — et suffisant pour que l'oubli devienne impossible.
+fn plugin_gate(args: &[String]) -> i32 {
+    let racine = arg_valeur(args, "--crates").unwrap_or_else(|| "crates".to_string());
+    let cibles: Vec<String> = arg_valeur(args, "--prefixe")
+        .unwrap_or_else(|| "forgia-mode-".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    let mut plugins: Vec<(String, String)> = Vec::new(); // (nom, crate)
+    let mut sources: Vec<(String, String)> = Vec::new(); // (crate, tout le src concaténé)
+    let mut tests_par_crate: Vec<(String, String)> = Vec::new(); // (crate, blocs #[cfg(test)])
+
+    let Ok(entrees) = fs::read_dir(&racine) else {
+        eprintln!("[plugin-gate] FAIL — {racine} illisible (lancer depuis la racine workspace)");
+        return 1;
+    };
+    for e in entrees.flatten() {
+        let nom_crate = e.file_name().to_string_lossy().to_string();
+        if !cibles.iter().any(|p| nom_crate.starts_with(p.as_str())) {
+            continue;
+        }
+        // 🚨 Fichier par fichier, JAMAIS sur la concaténation de la crate.
+        //
+        // La première version concaténait tout puis découpait sur `#[cfg(test)]`.
+        // Le dernier bloc s'étendait alors jusqu'à la fin de la concaténation,
+        // donc jusque dans les fichiers SUIVANTS : un plugin simplement nommé
+        // ailleurs passait pour monté dès qu'un `app.update()` traînait dans le
+        // même bloc. Le cliquet aurait acquitté en silence exactement ce qu'il
+        // devait attraper — la faute qu'il documente, commise dans son propre code.
+        let fichiers_rs = collecter_fichiers(&e.path().join("src"));
+        let mut blocs_de_test: Vec<String> = Vec::new();
+        for contenu in &fichiers_rs {
+            if let Some(i) = contenu.find("#[cfg(test)]") {
+                blocs_de_test.push(contenu[i..].to_string());
+            }
+        }
+        tests_par_crate.push((nom_crate.clone(), blocs_de_test.join("\n")));
+        let tout = fichiers_rs.join("\n");
+        for ligne in tout.lines() {
+            let t = ligne.trim();
+            if let Some(reste) = t.strip_prefix("pub struct ") {
+                if let Some(nom) = reste.strip_suffix("Plugin;") {
+                    plugins.push((format!("{nom}Plugin"), nom_crate.clone()));
+                }
+            }
+        }
+        sources.push((nom_crate, tout));
+    }
+
+    if plugins.is_empty() {
+        // 🚨 « Zéro mesuré n'est pas vert, c'est aveugle. » Un cliquet qui ne
+        // trouve rien à contrôler doit le DIRE, sinon il se lit comme un succès.
+        println!("[plugin-gate] AVEUGLE — aucun plugin trouvé sous {racine}/{cibles:?} : le contrôle n'a rien mesuré");
+        return 1;
+    }
+
+    // 🚨 La LIGNE DE BASE, sans laquelle ce cliquet ne servirait à rien.
+    //
+    // Au premier lancement il a trouvé 41 manquements, presque tous dans du code
+    // antérieur. Un contrôle qui échoue sur tout l'existant se désactive dans la
+    // semaine — c'est la panne classique du contrôle trop ambitieux, et elle
+    // laisse le projet SANS contrôle du tout, ce qui est pire que la dette
+    // qu'il voulait solder.
+    //
+    // Il interdit donc les régressions NOUVELLES, et publie ce qui reste dû.
+    // Le fichier ne peut que rétrécir : une entrée réparée est signalée pour
+    // être retirée, ce qui rend le progrès visible au lieu d'être suggéré.
+    let chemin_base = arg_valeur(args, "--baseline")
+        .unwrap_or_else(|| "docs/audit/plugin-gate-baseline.txt".to_string());
+    let ecrire_base = args.iter().any(|a| a == "--ecrire-baseline");
+    let base: Vec<String> = fs::read_to_string(&chemin_base)
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(String::from)
+        .collect();
+    let mut vus: Vec<String> = Vec::new();
+
+    let mut fautes = 0;
+    let mut dus = 0;
+    let mut sans_harnais_admis = 0;
+    let mut sans_capteur_admis = 0;
+
+    for (plugin, nom_crate) in &plugins {
+        let src = sources
+            .iter()
+            .find(|(c, _)| c == nom_crate)
+            .map(|(_, s)| s.as_str())
+            .unwrap_or("");
+        // Le plugin racine du mode orchestre les autres : il n'a pas à être
+        // monté lui-même, ses enfants le sont.
+        let racine_du_mode = plugin.starts_with("Forgia") && plugin.ends_with("Plugin");
+
+        // 1. Monté dans un test qui tourne ?
+        let tests = tests_par_crate
+            .iter()
+            .find(|(c, _)| c == nom_crate)
+            .map(|(_, s)| s.as_str())
+            .unwrap_or("");
+        let monte = tests.contains(&format!("add_plugins({plugin}"))
+            || tests.contains(&format!("::{plugin}"))
+            || tests.contains(&format!("{plugin},"));
+        let monte = monte && tests.contains("app.update()");
+        if !monte && !racine_du_mode {
+            match PLUGIN_GATE_SANS_HARNAIS.iter().find(|(p, _)| p == plugin) {
+                Some((_, pourquoi)) => {
+                    sans_harnais_admis += 1;
+                    println!("  · {plugin} hors harnais — admis : {pourquoi}");
+                }
+                None => {
+                    let cle = format!("{plugin}|harnais");
+                    vus.push(cle.clone());
+                    if base.contains(&cle) {
+                        dus += 1;
+                    } else {
+                        eprintln!(
+                            "  REGRESSION {plugin} ({nom_crate}) — monté par aucun App::new() \
+                             suivi d'un app.update(). Un error[B0002] y passerait inaperçu \
+                             jusqu'au lancement."
+                        );
+                        fautes += 1;
+                    }
+                }
+            }
+        }
+
+        // 2. Publie un capteur ?
+        let fichier = plugin_vers_module(plugin);
+        let a_capteur = src.contains(&format!("\"id\":\"{fichier}"))
+            || src.contains("sensor_io::enqueue")
+                && src.contains(plugin.as_str())
+                && module_a_capteur(src, plugin);
+        if !a_capteur && !racine_du_mode {
+            match PLUGIN_GATE_SANS_CAPTEUR.iter().find(|(p, _)| p == plugin) {
+                Some((_, pourquoi)) => {
+                    sans_capteur_admis += 1;
+                    println!("  · {plugin} sans capteur — admis : {pourquoi}");
+                }
+                None => {
+                    let cle = format!("{plugin}|capteur");
+                    vus.push(cle.clone());
+                    if base.contains(&cle) {
+                        dus += 1;
+                    } else {
+                        eprintln!(
+                            "  REGRESSION {plugin} ({nom_crate}) — ne publie aucun capteur. Un \
+                             gène déclaré mais jamais appliqué y resterait invisible \
+                             (cf accroupi_facteur_vitesse)."
+                        );
+                        fautes += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    if ecrire_base {
+        vus.sort();
+        let contenu = format!(
+            "# Ligne de base de `xtask plugin-gate` — CE FICHIER NE DOIT QUE RETRECIR.\n\
+             # Chaque ligne est un plugin sans garde, tolere parce qu'il preexiste.\n\
+             # Un plugin NOUVEAU sans garde fait echouer le cliquet et n'a pas sa place ici.\n\
+             # Regenerer : cargo run -p xtask -- plugin-gate --ecrire-baseline\n{}\n",
+            vus.join("\n")
+        );
+        if let Some(p) = Path::new(&chemin_base).parent() {
+            let _ = fs::create_dir_all(p);
+        }
+        match fs::write(&chemin_base, contenu) {
+            Ok(()) => println!("[plugin-gate] ligne de base ecrite : {chemin_base} ({} entrées)", vus.len()),
+            Err(e) => {
+                eprintln!("[plugin-gate] FAIL — {chemin_base} non écrit : {e}");
+                return 1;
+            }
+        }
+    }
+
+    // Une entrée de la base qui ne se reproduit plus : le progrès se DIT, sinon
+    // la base enfle sans que personne ne remarque qu'elle pourrait maigrir.
+    let reparees: Vec<&String> = base.iter().filter(|b| !vus.contains(b)).collect();
+
+    // Le cliquet DIT ce qu'il a mesuré, toujours — pas seulement quand il échoue.
+    println!(
+        "[plugin-gate] {} plugin(s) contrôlé(s) sur {} crate(s) · {dus} manquement(s) tolere(s) \
+         (ligne de base) · {} repare(s) · {sans_harnais_admis} hors harnais admis · \
+         {sans_capteur_admis} sans capteur admis · {fautes} regression(s)",
+        plugins.len(),
+        sources.len(),
+        reparees.len()
+    );
+    // Honnêteté de portée : le contrôle cherche le montage DANS LA MÊME crate.
+    // Un plugin monté par le harnais d'une autre crate serait compté à tort.
+    println!(
+        "  portee : montage cherche dans les blocs #[cfg(test)] de la crate qui declare le plugin"
+    );
+    for r in &reparees {
+        println!("  · REPARE {r} — retirer de {chemin_base}");
+    }
+    if fautes > 0 {
+        eprintln!("[plugin-gate] FAIL — brancher le garde, ou justifier l'exception dans PLUGIN_GATE_* (xtask/src/main.rs)");
+        return 1;
+    }
+    println!("[plugin-gate] OK");
+    0
+}
+
+/// `ExpeditionArmeMainPlugin` → `expedition_arme` : le préfixe d'identifiant
+/// probable d'un capteur du module. Heuristique assumée : elle sert seulement à
+/// chercher, et l'échec renvoie vers la liste d'exceptions, pas vers un blocage.
+fn plugin_vers_module(plugin: &str) -> String {
+    let sans = plugin.trim_end_matches("Plugin");
+    let mut out = String::new();
+    for (i, c) in sans.chars().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            out.push('_');
+        }
+        out.extend(c.to_lowercase());
+    }
+    out
+}
+
+/// Le module qui déclare ce plugin publie-t-il un capteur ?
+fn module_a_capteur(src: &str, plugin: &str) -> bool {
+    // On cherche dans une fenêtre autour de la déclaration : les modules de ce
+    // dépôt tiennent leur plugin et leur capteur dans le même fichier, et `src`
+    // est la concaténation de la crate.
+    match src.find(&format!("pub struct {plugin};")) {
+        Some(i) => {
+            let fin = (i + 20_000).min(src.len());
+            src[i..fin].contains("sensor_io::enqueue")
+        }
+        None => false,
+    }
+}
+
+/// Le contenu de chaque `.rs`, **séparément**. Ce qui se raisonne par fichier —
+/// les blocs `#[cfg(test)]`, qui vont jusqu'à la fin du leur — ne peut pas se
+/// raisonner sur une concaténation.
+fn collecter_fichiers(dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let Ok(entrees) = fs::read_dir(dir) else {
+        return out;
+    };
+    for e in entrees.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            out.extend(collecter_fichiers(&p));
+        } else if p.extension().map(|x| x == "rs").unwrap_or(false) {
+            if let Ok(s) = fs::read_to_string(&p) {
+                out.push(s);
+            }
+        }
+    }
+    out
+}
+
+fn collecter_rs(dir: &Path, out: &mut String) {
+    out.push_str(&collecter_fichiers(dir).join("\n"));
+}
+
+/// Dépendances déclarées au manifeste et jamais référencées dans `src/`.
+///
+/// # Pourquoi
+///
+/// `forgia-ik` est resté déclaré dans `forgia-mode-expedition` après que son
+/// solveur eut été remplacé — avec, dans le manifeste, un commentaire qui
+/// continuait d'expliquer un mécanisme que le code n'appelait plus. Une
+/// dépendance morte ne coûte pas que du temps de compilation : elle **documente
+/// faussement** l'architecture, et c'est le manifeste qu'on lit en premier.
+///
+/// Volontairement conservateur : un identifiant vu n'importe où dans les sources
+/// suffit à l'acquitter. On cherche l'oubli franc, pas la subtilité.
+fn deps_mortes(args: &[String]) -> i32 {
+    let racine = arg_valeur(args, "--crates").unwrap_or_else(|| "crates".to_string());
+    let Ok(entrees) = fs::read_dir(&racine) else {
+        eprintln!("[deps-mortes] FAIL — {racine} illisible");
+        return 1;
+    };
+    let mut examinees = 0usize;
+    let mut mortes: Vec<(String, String)> = Vec::new();
+    for e in entrees.flatten() {
+        let dir = e.path();
+        let Ok(tml) = fs::read_to_string(dir.join("Cargo.toml")) else {
+            continue;
+        };
+        let Some(bloc) = tml.split("[dependencies]").nth(1) else {
+            continue;
+        };
+        let bloc = bloc.split("\n[").next().unwrap_or("");
+        let mut src = String::new();
+        collecter_rs(&dir.join("src"), &mut src);
+        if src.is_empty() {
+            continue;
+        }
+        examinees += 1;
+        let nom_crate = e.file_name().to_string_lossy().to_string();
+        for ligne in bloc.lines() {
+            let t = ligne.trim();
+            if t.starts_with('#') || !t.contains('=') {
+                continue;
+            }
+            let dep = t.split('=').next().unwrap_or("").trim();
+            if dep.is_empty() || !dep.starts_with("forgia-") {
+                // Limité aux crates DU PROJET : les dépendances tierces
+                // s'utilisent souvent via un `prelude` ou un derive, ce qui
+                // produirait des faux positifs. Mieux vaut un contrôle étroit
+                // et juste qu'un large et bruyant — mais on le DIT, §sortie.
+                continue;
+            }
+            let ident = dep.replace('-', "_");
+            if !src.contains(&ident) {
+                mortes.push((nom_crate.clone(), dep.to_string()));
+            }
+        }
+    }
+    // Même dispositif que `plugin-gate` : on interdit les NOUVELLES, on publie
+    // les anciennes. Six dettes existaient au premier lancement, dans des crates
+    // du track RPG ; les traiter d'office reviendrait à modifier le travail d'un
+    // autre chantier sous couvert d'outillage.
+    let chemin_base = arg_valeur(args, "--baseline")
+        .unwrap_or_else(|| "docs/audit/deps-mortes-baseline.txt".to_string());
+    let base: Vec<String> = fs::read_to_string(&chemin_base)
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(String::from)
+        .collect();
+    let cles: Vec<String> = mortes.iter().map(|(c, d)| format!("{c}|{d}")).collect();
+
+    if args.iter().any(|a| a == "--ecrire-baseline") {
+        let mut tri = cles.clone();
+        tri.sort();
+        let contenu = format!(
+            "# Ligne de base de `xtask deps-mortes` — CE FICHIER NE DOIT QUE RETRECIR.\n\
+             # Une dependance declaree et jamais referencee, toleree parce qu'elle preexiste.\n\
+             # Regenerer : cargo run -p xtask -- deps-mortes --ecrire-baseline\n{}\n",
+            tri.join("\n")
+        );
+        if let Some(p) = Path::new(&chemin_base).parent() {
+            let _ = fs::create_dir_all(p);
+        }
+        if let Err(e) = fs::write(&chemin_base, contenu) {
+            eprintln!("[deps-mortes] FAIL — {chemin_base} non écrit : {e}");
+            return 1;
+        }
+        println!("[deps-mortes] ligne de base ecrite : {chemin_base} ({} entrées)", tri.len());
+    }
+
+    let nouvelles: Vec<&(String, String)> = mortes
+        .iter()
+        .filter(|(c, d)| !base.contains(&format!("{c}|{d}")))
+        .collect();
+    let reparees: Vec<&String> = base.iter().filter(|b| !cles.contains(b)).collect();
+
+    println!(
+        "[deps-mortes] {examinees} crate(s) examinée(s), dépendances internes uniquement · {} morte(s) dont {} toleree(s) · {} reparee(s)",
+        mortes.len(),
+        mortes.len() - nouvelles.len(),
+        reparees.len()
+    );
+    for r in &reparees {
+        println!("  · REPARE {r} — retirer de {chemin_base}");
+    }
+    for (c, d) in &nouvelles {
+        eprintln!("  REGRESSION {c} déclare « {d} » et ne le référence nulle part dans src/");
+    }
+    if !nouvelles.is_empty() {
+        eprintln!("[deps-mortes] FAIL — retirer la ligne ET le commentaire qui la justifiait");
+        return 1;
+    }
+    println!("[deps-mortes] OK");
+    0
+}
+
+/// `--cle valeur` → `Some(valeur)`.
+fn arg_valeur(args: &[String], cle: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == cle)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+}
+
 fn arch_drift() -> i32 {
     // 1. Membres réels depuis Cargo.toml racine (section [workspace] members).
     let cargo = match fs::read_to_string("Cargo.toml") {
@@ -1795,7 +2223,13 @@ fn extract_sensor_literals(
             && !inner.contains(' ')
             && !inner.contains('/')
             && !inner.contains('\\')
-            && !inner.contains("{}")
+            // 🚨 Toute accolade = GABARIT, pas un capteur. Le garde ne couvrait
+            // que `{}` et laissait passer `forgia2_{id}.json` — le modele de
+            // `forgia_core::constat`, qui construit le nom depuis un identifiant.
+            // Resultat le 2026-08-18 : l'audit declarait orphelin un capteur qui
+            // n'existe pas. `parse_registry_filenames` excluait deja `{` en
+            // entier ; les deux cotes se lisent enfin pareil.
+            && !inner.contains('{')
         {
             let site = format!("{}:{lineno}", path.display());
             out.entry(inner.to_string()).or_default().push(site);
@@ -2549,6 +2983,289 @@ fn copy_tree(src: &Path, dst: &Path, exclude: &dyn Fn(&Path) -> bool) -> std::io
         Ok(total)
     }
     rec(src, dst, Path::new(""), exclude)
+}
+
+// ─────────────────────── Cliquet des capteurs (2026-08-18) ───────────────────
+//
+// Trois défauts se répétaient 45 fois sur 132 capteurs : écriture synchrone qui
+// bloque la frame, verdict absent, vert sur échantillon vide. Le troisième est
+// désormais impossible (`forgia_core::constat` dégrade tout seul). Les deux
+// premiers restent détectables, donc CLIQUETABLES.
+//
+// 🚨 Le seuil n'est pas zéro : il est la DETTE MESURÉE, et elle ne peut que
+// décroître. Un cliquet à zéro sur une dette existante n'est jamais branché —
+// c'est ce qui est arrivé à `sensor-sync-writes --strict`, qui compte depuis
+// des mois sans que personne ne puisse l'activer.
+
+/// Un capteur est un `.rs` qui écrit un fichier `forgia*.json`.
+fn fichiers_de_capteurs() -> Vec<(String, String)> {
+    fn visit(dir: &Path, out: &mut Vec<(String, String)>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                visit(&path, out);
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let Ok(src) = fs::read_to_string(&path) else {
+                continue;
+            };
+            let ecrit_capteur = (src.contains("sensor_io::enqueue")
+                || src.contains("fs::write(")
+                || src.contains(".publier("))
+                && src.contains("forgia")
+                && src.contains(".json");
+            if ecrit_capteur {
+                out.push((norm_path(&path), src));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    visit(Path::new("crates"), &mut out);
+    out.sort();
+    out
+}
+
+fn capteur_gate(args: &[String]) -> i32 {
+    let verbeux = args.iter().any(|a| a == "--liste");
+    let mut synchrones: Vec<String> = Vec::new();
+    let mut sans_verdict: Vec<String> = Vec::new();
+
+    for (chemin, src) in fichiers_de_capteurs() {
+        for (n, ligne) in src.lines().enumerate() {
+            let t = ligne.trim_start();
+            if t.starts_with("//") || !t.contains("fs::write(") {
+                continue;
+            }
+            if t.contains("forgia")
+                || t.contains("SENSOR_PATH")
+                || t.contains("OUTPUT_PATH")
+                || t.contains("VFX_SENSOR_PATH")
+            {
+                synchrones.push(format!("{chemin}:{}", n + 1));
+            }
+        }
+        // Signal GROSSIER mais JUSTE (leçon du 2026-08-17 : l'analyse fine des
+        // blocs `add_systems` a produit 15 faux positifs). Un capteur publie un
+        // verdict s'il écrit le champ, ou s'il passe par `constat` — qui le
+        // rend obligatoire.
+        if !src.contains("\"severity\"") && !src.contains("constat::") {
+            sans_verdict.push(chemin.clone());
+        }
+    }
+
+    let dette = Path::new("xtask/capteur-dette.toml");
+    let lu = fs::read_to_string(dette).unwrap_or_default();
+    let plafond = |cle: &str| -> usize {
+        lu.lines()
+            .find(|l| l.trim_start().starts_with(cle))
+            .and_then(|l| l.split('=').nth(1))
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(usize::MAX)
+    };
+    let max_sync = plafond("ecritures_synchrones");
+    let max_muet = plafond("sans_verdict");
+
+    println!(
+        "[capteur-gate] ecritures synchrones {} (plafond {max_sync}) · sans verdict {} (plafond {max_muet})",
+        synchrones.len(),
+        sans_verdict.len()
+    );
+    if verbeux {
+        for s in &synchrones {
+            println!("  [sync]  {s}");
+        }
+        for s in &sans_verdict {
+            println!("  [muet]  {s}");
+        }
+    }
+
+    let mut code = 0;
+    if synchrones.len() > max_sync {
+        eprintln!(
+            "[capteur-gate] FAIL — {} ecriture(s) synchrone(s) pour un plafond de {max_sync}. \
+             Un capteur ecrit par `forgia_core::constat::Constat::publier`, jamais par \
+             `fs::write` : l'ecriture directe bloque la frame de jeu.",
+            synchrones.len()
+        );
+        code = 1;
+    }
+    if sans_verdict.len() > max_muet {
+        eprintln!(
+            "[capteur-gate] FAIL — {} capteur(s) sans verdict pour un plafond de {max_muet}. \
+             Utiliser `forgia_core::constat` : il rend la severite obligatoire et degrade \
+             un `ok` sans echantillon.",
+            sans_verdict.len()
+        );
+        code = 1;
+    }
+    if code == 0 && (synchrones.len() < max_sync || sans_verdict.len() < max_muet) {
+        println!(
+            "[capteur-gate] la dette a BAISSE — abaisser les plafonds dans \
+             xtask/capteur-dette.toml pour la verrouiller."
+        );
+    }
+    code
+}
+
+// ─────────────────────── Cliquet des strates (2026-08-18) ────────────────────
+//
+// « Une crate ne dépend jamais d'une strate supérieure à la sienne. » Le
+// contrat vit dans `xtask/strates.toml`, avec sa dette. Voir l'en-tête de ce
+// fichier pour le pourquoi — notamment pourquoi l'intra-strate est LÉGAL.
+
+/// Les dépendances `forgia-*` déclarées par chaque crate du workspace.
+fn deps_forgia() -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut out = std::collections::BTreeMap::new();
+    let Ok(entries) = fs::read_dir("crates") else {
+        return out;
+    };
+    for e in entries.flatten() {
+        let manifeste = e.path().join("Cargo.toml");
+        let Ok(src) = fs::read_to_string(&manifeste) else {
+            continue;
+        };
+        let Some(bloc) = src.split("[dependencies]").nth(1) else {
+            continue;
+        };
+        let bloc = bloc.split("\n[").next().unwrap_or("");
+        let mut d: Vec<String> = bloc
+            .lines()
+            .filter_map(|l| {
+                let l = l.trim_start();
+                if l.starts_with('#') {
+                    return None;
+                }
+                let nom = l.split('=').next()?.trim();
+                (nom.starts_with("forgia-")).then(|| nom.to_string())
+            })
+            .collect();
+        d.sort();
+        d.dedup();
+        out.insert(e.file_name().to_string_lossy().to_string(), d);
+    }
+    out
+}
+
+fn strates(args: &[String]) -> i32 {
+    let verbeux = args.iter().any(|a| a == "--liste");
+    let Ok(brut) = fs::read_to_string("xtask/strates.toml") else {
+        eprintln!("[strates] FAIL — xtask/strates.toml introuvable");
+        return 1;
+    };
+    let Ok(doc) = brut.parse::<toml::Value>() else {
+        eprintln!("[strates] FAIL — xtask/strates.toml illisible");
+        return 1;
+    };
+
+    let ordre: Vec<String> = doc
+        .get("ordre")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    let rang = |s: &str| ordre.iter().position(|x| x == s);
+    // Non listée = `brique`, la strate par défaut.
+    let defaut = rang("brique").unwrap_or(1);
+
+    let mut appartenance: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    if let Some(m) = doc.get("membres").and_then(|v| v.as_table()) {
+        for (strate, liste) in m {
+            let Some(r) = rang(strate) else { continue };
+            for c in liste.as_array().into_iter().flatten() {
+                if let Some(nom) = c.as_str() {
+                    appartenance.insert(nom.to_string(), r);
+                }
+            }
+        }
+    }
+    let strate_de = |c: &str| *appartenance.get(c).unwrap_or(&defaut);
+
+    let deps = deps_forgia();
+    let mut violations: Vec<(String, Vec<String>)> = Vec::new();
+    let mut dettes: Vec<(String, usize, usize, Vec<String>)> = Vec::new();
+
+    for (crate_, ds) in &deps {
+        let dette = doc
+            .get("dette")
+            .and_then(|d| d.get(crate_.as_str()))
+            .and_then(|v| v.as_table());
+        if let Some(d) = dette {
+            // Crate qui VISE une strate plus basse : on compte l'écart au but.
+            let cible = d
+                .get("cible")
+                .and_then(|v| v.as_str())
+                .and_then(rang)
+                .unwrap_or(defaut);
+            let plafond = d
+                .get("plafond")
+                .and_then(toml::Value::as_integer)
+                .unwrap_or(0) as usize;
+            let trop_haut: Vec<String> = ds
+                .iter()
+                .filter(|x| deps.contains_key(*x) && strate_de(x) > cible)
+                .cloned()
+                .collect();
+            dettes.push((crate_.clone(), trop_haut.len(), plafond, trop_haut));
+            continue;
+        }
+        let sc = strate_de(crate_);
+        let mauvais: Vec<String> = ds
+            .iter()
+            .filter(|x| deps.contains_key(*x) && strate_de(x) > sc)
+            .cloned()
+            .collect();
+        if !mauvais.is_empty() {
+            violations.push((crate_.clone(), mauvais));
+        }
+    }
+
+    println!(
+        "[strates] {} crates · {} violation(s) vers le haut · {} dette(s) declaree(s)",
+        deps.len(),
+        violations.len(),
+        dettes.len()
+    );
+    let mut code = 0;
+    for (c, m) in &violations {
+        eprintln!(
+            "[strates] FAIL — `{c}` depend d'une strate SUPERIEURE : {}. Une crate ne \
+             dependant que de sa strate ou plus bas, soit `{c}` monte de strate, soit le \
+             type partage descend, soit l'appel s'inverse par un evenement.",
+            m.join(", ")
+        );
+        code = 1;
+    }
+    for (c, actuel, plafond, liste) in &dettes {
+        if actuel > plafond {
+            eprintln!(
+                "[strates] FAIL — `{c}` : {actuel} dep(s) hors de sa strate cible pour un \
+                 plafond de {plafond} ({}). La dette ne peut que BAISSER.",
+                liste.join(", ")
+            );
+            code = 1;
+        } else {
+            let etat = if actuel < plafond {
+                " — a BAISSE, abaisser le plafond dans xtask/strates.toml"
+            } else {
+                ""
+            };
+            println!("  dette `{c}` : {actuel}/{plafond}{etat}");
+            if verbeux && !liste.is_empty() {
+                println!("      {}", liste.join(", "));
+            }
+        }
+    }
+    code
 }
 
 #[cfg(test)]

@@ -176,9 +176,9 @@ pub fn sys_write_head_hitbox_sensor(
 
 // ── Plugin ──────────────────────────────────────────────────────────────────
 
-pub struct RogueliteHeadHitboxPlugin;
+pub struct EnemyHeadHitboxPlugin;
 
-impl Plugin for RogueliteHeadHitboxPlugin {
+impl Plugin for EnemyHeadHitboxPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -201,7 +201,7 @@ impl Plugin for RogueliteHeadHitboxPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enemies::{skeleton_scale, stats_for, EnemyArchetype};
+    use crate::{skeleton_scale, stats_for, EnemyArchetype};
 
     const ALL: [EnemyArchetype; 4] = [
         EnemyArchetype::Tank,

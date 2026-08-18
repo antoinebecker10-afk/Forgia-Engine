@@ -164,3 +164,20 @@ jobs:
       - run: cargo xtask arch-drift
       - run: cargo xtask no-scaffold
       - run: cargo xtask sensor-audit
+      # Un plugin NOUVEAU doit avoir son garde : monté dans un App::new() qui
+      # tourne (seul moyen d'attraper un error[B0002], qui panique à la
+      # construction du schedule et passe check/clippy/tests), et un capteur
+      # (sans quoi un gène déclaré mais jamais appliqué reste invisible — cf
+      # accroupi_facteur_vitesse, 2026-08-17). Les 41 manquements antérieurs
+      # sont consignés dans docs/audit/plugin-gate-baseline.txt, qui ne doit
+      # que rétrécir.
+      - run: cargo xtask plugin-gate
+      # Une dépendance interne déclarée et jamais référencée : elle documente
+      # faussement l'architecture, et c'est le manifeste qu'on lit en premier.
+      - run: cargo xtask deps-mortes
+      # Le corps d'animation LIVRÉ, pas les fichiers qui l'ont produit : clips
+      # homonymes (que le chargeur glTF écrase en silence), dérive de racine,
+      # clips vides. Sept défauts ont traversé ce pipeline en 2026-08-17 en
+      # passant chacun devant un contrôle qui ne regardait que les entrées.
+      - name: Contrôle du corps d'animation livré
+        run: python tools/assets/verifier_corps.py

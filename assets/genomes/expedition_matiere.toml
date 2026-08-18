@@ -1,0 +1,84 @@
+# expedition_matiere.toml — Donner de la matière aux 28 aplats du Vallon.
+#
+# # Le constat qui rend ce fichier court
+#
+# La carte porte 37 matériaux ; **30 n'ont aucune texture**. Mais ce ne sont pas
+# 30 problèmes : ce sont **6 familles**, et chaque matériau porte DÉJÀ sa teinte
+# dans son `baseColorFactor` glTF. La palette existe, choisie sous Blender. Il ne
+# manque que le grain.
+#
+# Six cartes de gris suffisent donc pour 28 matériaux — les deux restants,
+# `_defaultMat` et `eau_riviere`, sont exclus à dessein (l'eau a son propre
+# matériau depuis `bevy_water`).
+#
+# # Ce que ces cartes font, et ne font pas
+#
+# Elles MULTIPLIENT la couleur du matériau. Elles ne la remplacent jamais :
+# leur maximum vaut 1,0, donc la teinte choisie sous Blender reste la teinte la
+# plus claire de la surface. Elles assombrissent de 4 à 16 % selon la famille.
+#
+# # 🚨 Le préalable, qui n'est PAS dans ce fichier
+#
+# Bevy 0.18 charge toute image en `ClampToEdge` (`bevy_image/src/image.rs:668`,
+# `#[default]`). Une texture parfaitement sans couture **ne se répétera pas**
+# tant que son sampler n'est pas en `Repeat`. Le moteur le pose au chargement —
+# sans ça on verrait un aplat, et on chercherait le défaut dans l'art.
+
+version = 1
+
+# Coupe-circuit. Le décor redevient celui d'avant, sans recompiler.
+actif = true
+
+# ── L'échelle ────────────────────────────────────────────────────────────────
+#
+# 🚨 Les UV du Vallon sont DÉJÀ tuilées à l'échelle du monde : mesurées de −22 à
+# +21 en U et de −63 à +16 en V, soit des dizaines de répétitions par objet.
+# Laisser l'échelle à 1 ferait donc répéter le motif 30 à 75 fois par pièce —
+# beaucoup trop fin, et d'autant plus scintillant que **Bevy 0.18 ne génère
+# aucun mipmap** (`mip_level_count: 1` codé en dur, deux endroits).
+#
+# 0,25 ramène cela à ~8-18 répétitions : un grain qu'on lit sans qu'il grouille.
+# Ça se juge à l'écran, en marchant — pas dans ce fichier.
+echelle_uv = 0.25
+
+# ── Les six familles ─────────────────────────────────────────────────────────
+#
+# `prefixes` : un matériau appartient à la famille si son nom COMMENCE par l'un
+# d'eux. C'est ce qui fait tenir 8 variantes de pierre (`stone_v0..v3`,
+# `stoneDark_v0..v3`) sur une seule ligne.
+#
+# Les textures sont produites par `tools/assets/textures_detail.py`, qui refuse
+# de livrer une image dont le raccord dépasse la variation naturelle du motif.
+
+[[familles]]
+id = "pierre"
+prefixes = ["stone", "stoneDark"]
+texture = "textures/detail/pierre_detail.png"
+
+[[familles]]
+id = "bois"
+prefixes = ["wood"]
+texture = "textures/detail/bois_detail.png"
+
+[[familles]]
+id = "terre"
+prefixes = ["dirt"]
+texture = "textures/detail/terre_detail.png"
+
+[[familles]]
+id = "feuillage"
+prefixes = ["leafs"]
+texture = "textures/detail/feuillage_detail.png"
+
+[[familles]]
+id = "herbe"
+prefixes = ["grass"]
+texture = "textures/detail/herbe_detail.png"
+
+# Les accents colorés du kit sont des pièces PEINTES : leur donner du grain les
+# salirait. Leur carte est presque plate (4 % d'écart), juste assez pour que la
+# lumière ne soit pas parfaitement uniforme dessus.
+[[familles]]
+id = "accent"
+prefixes = ["color"]
+texture = "textures/detail/accent_detail.png"

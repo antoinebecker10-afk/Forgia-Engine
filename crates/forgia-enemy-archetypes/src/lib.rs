@@ -1,20 +1,49 @@
-//! enemies.rs — M2 step 2 : 3 archetypes ennemis Roguelite (data-driven).
+//! Les archétypes d'ennemis — **une seule définition, toutes les zones**.
 //!
-//! Story-470 M2 step 2 — résout le bug "ennemis trop collés" en variant
-//! `stop_distance` et `attack_range` par archetype : naturellement dispersés
-//! par design plutôt que via Boids separation (option B reportée).
+//! | Archétype | pv  | vitesse | stop | attaque | recharge | couleur      | rôle |
+//! |-----------|----:|--------:|-----:|--------:|---------:|--------------|------|
+//! | Tank      | 120 |     2,8 |  3,0 |     4,0 |    1,8 s | rouge sombre | ligne de front |
+//! | Runner    |  35 |     7,0 |  6,0 |     7,0 |    0,7 s | orange       | rusher proche |
+//! | Sniper    |  45 |     3,2 | 22,0 |    24,0 |    1,6 s | violet       | ligne arrière |
+//! | Boss      | 800 |     3,5 | 10,0 |    30,0 |    1,3 s | magenta      | unique, 2 phases |
 //!
-//! | Archetype | HP   | Speed | Stop | Attack | Cooldown | Couleur     | Rôle |
-//! |-----------|------|-------|------|--------|----------|-------------|------|
-//! | Tank      |  120 |  2.8  |  3.0 |   4.0  |   1.8s   | rouge sombre | front-line tank |
-//! | Runner    |   35 |  7.0  |  6.0 |   7.0  |   0.7s   | orange       | rusher proche |
-//! | Sniper    |   45 |  3.2  | 22.0 |  24.0  |   1.6s   | violet       | back-line ranged |
+//! Vérité : `assets/genomes/roguelite/roguelite_enemies.toml`, chargé au
+//! démarrage et **rechargé à chaud** (relevé de mtime à 1 Hz). Les `Default`
+//! Rust en sont le miroir exact : si le fichier disparaît ou ne parse pas, le
+//! jeu retombe dessus sans régresser.
 //!
-//! Hot-reload TOML : reporté M2 step 3 (`config/genomes/roguelite_enemies.toml`).
+//! # Pourquoi cette crate existe (2026-08-18)
+//!
+//! Ce module vivait dans `forgia-mode-roguelite`. Il n'en dépendait pourtant
+//! **en rien** — bevy, `forgia-ai-arena-bot`, serde, c'est tout. Le garder là
+//! forçait n'importe quelle autre zone voulant des ennemis à dépendre du mode
+//! Roguelite entier, ou — bien plus probable — à **s'en écrire un second**.
+//!
+//! Ce n'est pas une crainte théorique : l'audit du 2026-08-18 a trouvé **trois**
+//! définitions d'ennemis dans le dépôt. Celle-ci (vivante, 4 archétypes),
+//! `arena_bots.toml` (un seul bot, dans un mode qu'aucun menu n'atteint), et
+//! `assets/genomes/enemies/*.toml` (grunt/archer/elite — **zéro consommateur**,
+//! et pourtant citée par une règle de conception de cartes qui dimensionnait
+//! des salles entières dessus).
+//!
+//! **Une zone qui veut des ennemis dépend de cette crate, et d'aucune autre.**
+//!
+//! # Ce que cette crate ne fait PAS
+//!
+//! Elle décrit **ce qu'est** un ennemi, jamais **où ni quand** il apparaît :
+//! le placement, les vagues, les verrous de progression et le loot appartiennent
+//! à la zone. Elle ne porte pas non plus le comportement — c'est
+//! `forgia-ai-arena-bot` (poursuite, strafe, évitement, séparation ; ni repli,
+//! ni kite, ni couverture).
+
+pub mod anim;
+pub mod assemblage;
+pub mod head_hitbox;
 
 use bevy::color::LinearRgba;
 use bevy::prelude::*;
 use forgia_ai_arena_bot::ArenaBot;
+use forgia_core::prelude::{a_du_combat, GameSet};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -418,6 +447,45 @@ pub fn sys_write_enemies_sensor(
     );
     if let Err(e) = forgia_core::sensor_io::enqueue(SENSOR_PATH, json) {
         warn!("[enemies] sensor write failed: {e}");
+    }
+}
+
+/// Charge le génome, le recharge à chaud, publie le capteur.
+///
+/// # Pourquoi un plugin plutôt que trois `add_systems` chez chaque zone
+///
+/// Parce que c'est ce qui existait, et que ça n'a servi qu'une zone : le
+/// rechargement à chaud était gaté `in_state(GameMode::Roguelite)`, si bien
+/// qu'une autre zone aurait chargé les stats **une fois** puis n'aurait plus
+/// jamais vu un `Shift+F12`. On ne l'aurait pas remarqué : rien n'échoue, les
+/// valeurs restent simplement celles du démarrage.
+///
+/// Le plugin est **idempotent** — deux zones peuvent l'ajouter sans que Bevy
+/// panique sur « plugin was already added ».
+pub struct ForgiaEnemyArchetypesPlugin;
+
+impl Plugin for ForgiaEnemyArchetypesPlugin {
+    fn build(&self, app: &mut App) {
+        // Les deux plugins de la brique : l'animation squelettique et la hitbox
+        // de tete. Ils suivaient le mode Roguelite alors qu'ils ne decrivent que
+        // l'ennemi — une zone qui en spawne les veut forcement.
+        app.add_plugins((anim::EnemyAnimPlugin, head_hitbox::EnemyHeadHitboxPlugin));
+        app.add_systems(Startup, sys_init_enemy_genome)
+            .add_systems(
+                Update,
+                // Gaté sur la CAPACITÉ « cette zone se bat », pas sur un nom de
+                // mode : c'est ce qui rend le rechargement à chaud vrai dans
+                // toute zone qui a des ennemis, présente ou future.
+                sys_hot_reload_enemy_genome
+                    .in_set(GameSet::Movement)
+                    .run_if(a_du_combat),
+            )
+            .add_systems(
+                Update,
+                sys_write_enemies_sensor
+                    .in_set(GameSet::Sensors)
+                    .run_if(resource_exists::<EnemyStatsConfig>),
+            );
     }
 }
 

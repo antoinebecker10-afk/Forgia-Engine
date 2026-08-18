@@ -22,6 +22,7 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 use crate::equipment::{AvatarAnimCfg, CorpsAvatar, EquipmentConfig, EquipmentSave};
+use crate::locomotion_etat::{choisir, Clip, EtatLocomotion};
 
 /// Teinte de rareté en attente d'application sur les matériaux d'une pièce.
 ///
@@ -498,23 +499,76 @@ impl AvatarClips {
 }
 
 /// Nœuds du graphe, une fois le lecteur du corps câblé.
+///
+/// # Une table, plus trois champs
+///
+/// Elle portait `idle`/`walk`/`run` en dur. Avec quinze états, quinze champs
+/// deviendraient quinze `Option` à tester à la main — et un état oublié serait
+/// un `else` silencieux. La table dit exactement ce que CE corps sait jouer : le
+/// trooper en aura deux entrées, celui de l'Expédition quinze, et le même code
+/// sert les deux.
 #[derive(Component)]
 struct AvatarAnimNodes {
-    idle: AnimationNodeIndex,
-    walk: AnimationNodeIndex,
-    run: AnimationNodeIndex,
+    /// Ce que ce corps sait jouer. Absent = il ne l'a pas.
+    par_clip: HashMap<Clip, AnimationNodeIndex>,
     /// Nœud effectivement joué — évite de relancer le même clip chaque frame,
     /// ce qui le remettrait à zéro et figerait le personnage sur sa 1re pose.
     current: AnimationNodeIndex,
     /// Seuils et fondu de CE corps — même raison que sur [`AvatarClips`].
     anim: AvatarAnimCfg,
+    /// Le corps concerné, pour ranger le compteur de relances dans SA fiche.
+    modele: String,
 }
 
-/// Ce que l'avatar doit jouer. Le Hall y écrit la vitesse mesurée ; l'aperçu du
-/// menu la laisse à zéro et obtient l'idle.
+impl AvatarAnimNodes {
+    /// Le nœud à jouer pour cet état, en descendant les replis.
+    ///
+    /// C'est ici que le trooper — deux clips — survit à une demande de glissade.
+    /// `None` seulement si même `Idle` manque, c'est-à-dire si le corps n'a
+    /// aucune animation : il n'y a alors rien à jouer, et le dire vaut mieux que
+    /// choisir au hasard.
+    fn resoudre(&self, voulu: Clip) -> Option<AnimationNodeIndex> {
+        if let Some(n) = self.par_clip.get(&voulu) {
+            return Some(*n);
+        }
+        voulu
+            .replis()
+            .iter()
+            .find_map(|c| self.par_clip.get(c).copied())
+    }
+}
+
+/// Ce que l'avatar doit jouer.
+///
+/// # Ce que le scalaire d'avant ne pouvait pas dire
+///
+/// Il n'y avait qu'un `speed`. Une vitesse sans signe ni axe ne distingue pas
+/// une marche arrière d'une marche avant, ni un pas de côté d'une course — et
+/// elle ne dit rien du sol, donc rien d'un saut. Les onze clips ajoutés le
+/// 2026-08-17 étaient inatteignables par construction, pas par oubli.
+///
+/// `speed` reste : deux lecteurs s'en servent (le capteur du Hall, et lui-même).
+/// Les autres champs s'y ajoutent, et un mode qui les laisse à zéro obtient
+/// exactement le comportement d'avant.
 #[derive(Resource, Default)]
 pub struct AvatarLocomotion {
+    /// Norme horizontale, conservée pour ses lecteurs existants.
     pub speed: f32,
+    /// Signée dans le repère du personnage : positive quand il avance.
+    pub avant: f32,
+    /// Signée : positive vers sa droite.
+    pub lateral: f32,
+    pub au_sol: bool,
+    pub vitesse_verticale: f32,
+    pub accroupi: bool,
+    pub glisse: bool,
+    pub vise: bool,
+    pub tire: bool,
+    pub lacet_rad_s: f32,
+    pub depuis_atterrissage_s: f32,
+    /// Depuis quand il a quitté le sol. Distingue une chute d'un décollement
+    /// d'une frame sur une bosse — cf `locomotion_etat::Seuils::air_min_s`.
+    pub depuis_decollage_s: f32,
 }
 
 /// Pourquoi l'avatar joue — ou ne joue pas — ses clips.
@@ -530,9 +584,39 @@ pub struct AvatarLocomotion {
 /// 🚨 La leçon dépasse ce cas : **un diagnostic qui ne vit que dans le log est
 /// indisponible tant que le jeu tourne**, c'est-à-dire exactement quand on en a
 /// besoin. Ce qui doit se lire pendant une partie appartient à un capteur.
+/// 🚨 UN DIAGNOSTIC PAR CORPS, jamais un seul global.
+///
+/// La première version n'en gardait qu'un. Or DEUX corps se câblent en même
+/// temps — l'aperçu du menu (trooper) et celui du mode en cours — et le dernier
+/// à passer écrasait l'autre. Le 2026-08-16, en pleine enquête sur une T-pose en
+/// Expédition, le capteur affichait `corps: trooper/body.gltf` et
+/// `clips_attendus: [idle, walk, walk]` : la fiche de l'aperçu du menu, pendant
+/// qu'on cherchait celle du personnage à l'écran. Un instrument qui décrit un
+/// autre objet que celui qu'on examine coûte plus cher que pas d'instrument,
+/// parce qu'on le croit.
 #[derive(Resource, Default, Debug, Clone)]
 pub struct AvatarClipDiag {
-    /// Le corps concerné, pour distinguer Hall et Expédition.
+    /// Une fiche par corps rencontré, indexée par son chemin de modèle.
+    pub par_corps: Vec<FicheClips>,
+}
+
+impl AvatarClipDiag {
+    /// La fiche de ce corps, créée au premier passage.
+    fn fiche(&mut self, modele: &str) -> &mut FicheClips {
+        if let Some(i) = self.par_corps.iter().position(|f| f.corps == modele) {
+            return &mut self.par_corps[i];
+        }
+        self.par_corps.push(FicheClips {
+            corps: modele.to_string(),
+            ..default()
+        });
+        self.par_corps.last_mut().expect("on vient de pousser")
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct FicheClips {
+    /// Le corps concerné, pour distinguer Hall, Expédition et aperçu du menu.
     pub corps: String,
     /// Les trois noms cherchés, dans l'ordre repos / marche / course.
     pub attendus: Vec<String>,
@@ -540,8 +624,30 @@ pub struct AvatarClipDiag {
     pub presents: Vec<String>,
     /// Le graphe a-t-il été câblé sur un lecteur d'animation ?
     pub lie: bool,
+    /// Combien de fois il a fallu RELANCER un lecteur devenu muet.
+    ///
+    /// 0 = le corps n'a jamais cessé de jouer. Un nombre qui monte lentement
+    /// désigne un évènement précis (une reconstruction, un changement de mode).
+    /// Un nombre qui monte à chaque frame désigne une boucle : quelque chose
+    /// arrête le lecteur en continu, et le rattrapage ne fait que masquer.
+    pub relances: u32,
     /// Passes écoulées à chercher. Grand et `lie == false` = ça ne viendra plus.
     pub passes: u32,
+    /// 🚨 L'état que le sélecteur DEMANDE, et le clip qui est réellement joué.
+    ///
+    /// # La mesure qui manquait, et ce qu'elle sépare
+    ///
+    /// L'audit du 2026-08-16 l'a nommée : aucun capteur ne disait **quel clip
+    /// joue**. Sans elle, « le personnage ne s'accroupit pas » a quatre causes
+    /// indiscernables — l'entrée n'est pas lue, la posture n'est pas écrite, le
+    /// sélecteur ne choisit pas cet état, ou le clip est absent du corps.
+    ///
+    /// Les publier TOUS LES DEUX est ce qui tranche : `demande` ≠ `joue` dit que
+    /// le corps n'a pas ce clip et qu'un repli a servi ; `demande` faux dit que
+    /// c'est en amont, dans l'entrée ou la posture. Une seule des deux valeurs
+    /// n'aurait pas suffi.
+    pub etat_demande: String,
+    pub clip_joue: String,
 }
 
 /// Câble le graphe d'animation dès que la scène d'une pièce expose son lecteur.
@@ -562,15 +668,16 @@ fn sys_bind_avatar_animations(
         let complain = clips.tries == SKELETON_SHARE_PATIENCE;
         // Le diagnostic se met à jour à CHAQUE passe, y compris celles où rien
         // n'aboutit : c'est justement l'état « rien n'aboutit » qu'on veut
-        // pouvoir lire pendant que le jeu tourne.
-        diag.attendus = vec![
+        // pouvoir lire pendant que le jeu tourne. Et il est indexé par CORPS,
+        // sinon l'aperçu du menu écrase la fiche du personnage joué.
+        let fiche = diag.fiche(&clips.modele);
+        fiche.attendus = vec![
             clips.anim.idle_clip.clone(),
             clips.anim.walk_clip.clone(),
             clips.anim.run_clip.clone(),
         ];
-        diag.passes = clips.tries;
-        diag.lie = false;
-        diag.corps = clips.modele.clone();
+        fiche.passes = clips.tries;
+        fiche.lie = false;
         // Le glTF doit être chargé pour qu'on puisse lire ses noms de clips.
         let Some(gltf) = gltfs.get(&clips.gltf) else {
             if complain {
@@ -583,28 +690,59 @@ fn sys_bind_avatar_animations(
             continue;
         };
         let anim = clips.anim.clone();
-        diag.presents = gltf
+        let fiche = diag.fiche(&clips.modele);
+        fiche.presents = gltf
             .named_animations
             .keys()
             .map(|k| k.to_string())
             .collect();
-        diag.presents.sort();
-        let pick = |name: &String| gltf.named_animations.get(name.as_str()).cloned();
-        let (Some(idle), Some(walk), Some(run)) = (
-            pick(&anim.idle_clip),
-            pick(&anim.walk_clip),
-            pick(&anim.run_clip),
-        ) else {
+        fiche.presents.sort();
+        let pick = |name: &str| gltf.named_animations.get(name).cloned();
+        // `Idle` est la seule exigence dure : c'est le fond de toutes les chaînes
+        // de repli. Sans lui, aucun état n'a de solution et le corps resterait
+        // en pose de bind, bras écartés — l'échec qu'on veut nommer.
+        let Some(idle_handle) = pick(&anim.idle_clip) else {
             warn!(
-                "[avatar] clips absents du corps — attendus {:?}/{:?}/{:?}, présents {:?}",
+                "[avatar] le clip de repos « {} » est absent du corps — présents {:?}. \
+                 Rien ne peut être joué : tous les états retombent sur le repos.",
                 anim.idle_clip,
-                anim.walk_clip,
-                anim.run_clip,
                 gltf.named_animations.keys().collect::<Vec<_>>()
             );
             commands.entity(part).remove::<AvatarClips>();
             continue;
         };
+        // Ce que CE corps sait jouer, état par état. Un nom vide au génome ou
+        // absent du glTF n'est pas une erreur : c'est un état que ce corps n'a
+        // pas, et le sélecteur descendra ses replis. Le trooper en remplit deux,
+        // celui de l'Expédition quinze, et le code est le même.
+        let mut demandes: Vec<String> = Vec::new();
+        let mut manquants: Vec<String> = Vec::new();
+        let mut trouves: Vec<(Clip, bevy::prelude::Handle<AnimationClip>)> = Vec::new();
+        for c in Clip::TOUS {
+            let nom = anim.nom_du_clip(c);
+            if nom.is_empty() {
+                continue;
+            }
+            demandes.push(nom.to_string());
+            match pick(nom) {
+                Some(h) => trouves.push((c, h)),
+                None => manquants.push(format!("{c:?}→{nom}")),
+            }
+        }
+        if !manquants.is_empty() {
+            // Un nom déclaré mais absent est une FAUTE DE FRAPPE au génome, pas
+            // un corps pauvre — les deux se distinguent, donc ils se disent
+            // différemment. Sans ce message, un `rifle_wlak` se lirait comme
+            // « ce corps n'a pas de marche ».
+            warn!(
+                "[avatar] {} clip(s) déclaré(s) au génome mais absent(s) de {} : {} — \
+                 vérifier l'orthographe ; ces états retomberont sur leurs replis",
+                manquants.len(),
+                clips.modele,
+                manquants.join(", ")
+            );
+        }
+        fiche.attendus = demandes;
 
         let mut bound = false;
         for descendant in q_children.iter_descendants(part) {
@@ -613,36 +751,45 @@ fn sys_bind_avatar_animations(
             };
             let mut graph = AnimationGraph::new();
             let root = graph.root;
+            let mut par_clip: HashMap<Clip, AnimationNodeIndex> = HashMap::default();
+            // Le repos d'abord : il est le fond de toutes les chaînes de repli,
+            // donc il doit exister avant qu'on résolve quoi que ce soit.
+            let noeud_idle = graph.add_clip(idle_handle.clone(), 1.0, root);
+            par_clip.insert(Clip::Idle, noeud_idle);
+            for (c, h) in &trouves {
+                if *c == Clip::Idle {
+                    continue;
+                }
+                par_clip.insert(*c, graph.add_clip(h.clone(), 1.0, root));
+            }
             let nodes = AvatarAnimNodes {
-                idle: graph.add_clip(idle.clone(), 1.0, root),
-                walk: graph.add_clip(walk.clone(), 1.0, root),
-                run: graph.add_clip(run.clone(), 1.0, root),
-                current: AnimationNodeIndex::default(),
+                par_clip,
+                current: noeud_idle,
                 anim: anim.clone(),
+                modele: clips.modele.clone(),
             };
             // `AnimationTransitions` est ce qui permet le FONDU. Sans lui, tout
             // changement de clip est une coupure sèche — c'est ce qui trahit le
             // plus une animation de jeu.
             let mut transitions = AnimationTransitions::new();
             transitions
-                .play(&mut player, nodes.idle, Duration::ZERO)
+                .play(&mut player, noeud_idle, Duration::ZERO)
                 .repeat();
+            let combien = nodes.par_clip.len();
             commands.entity(descendant).insert((
                 AnimationGraphHandle(graphs.add(graph)),
                 transitions,
-                AvatarAnimNodes {
-                    current: nodes.idle,
-                    ..nodes
-                },
+                nodes,
             ));
             // Un corps non re-câblé après reconstruction reste sur la pose de
             // repos du glTF (bras écartés) — c'est ce qu'on voit à l'écran quand
             // l'avatar « se désynchronise ». Tracer le câblage permet de dire
-            // s'il a eu lieu, au lieu de le supposer.
-            info!("[avatar] animations câblées sur le corps {part:?}");
+            // s'il a eu lieu, au lieu de le supposer. Le NOMBRE d'états câblés
+            // distingue en plus « ce corps est pauvre » de « le génome est faux ».
+            info!("[avatar] animations câblées sur le corps {part:?} — {combien} état(s)");
             bound = true;
         }
-        diag.lie = bound;
+        diag.fiche(&clips.modele).lie = bound;
         if bound {
             commands.entity(part).remove::<AvatarClips>();
         } else if complain {
@@ -658,6 +805,7 @@ fn sys_bind_avatar_animations(
 /// Choisit le clip depuis la vitesse et enchaîne en fondu.
 fn sys_drive_avatar_locomotion(
     loco: Res<AvatarLocomotion>,
+    mut diag: ResMut<AvatarClipDiag>,
     mut q: Query<(
         &mut AnimationPlayer,
         &mut AnimationTransitions,
@@ -665,20 +813,91 @@ fn sys_drive_avatar_locomotion(
     )>,
 ) {
     for (mut player, mut transitions, mut nodes) in &mut q {
+        // 🚨 LE LECTEUR PEUT SE TAIRE APRÈS UN CÂBLAGE RÉUSSI, et rien ne le
+        // relançait.
+        //
+        // Mesuré le 2026-08-16 : `clips_lies: true`, les trois clips attendus
+        // présents dans le glTF, `anim_players: 1` — et `anim_playing: 0`. Le
+        // personnage restait bras écartés en jeu pendant que tous les
+        // indicateurs de câblage étaient au vert.
+        //
+        // Le mécanisme existe dans Bevy : `expire_completed_transitions` appelle
+        // `player.stop()` sur toute transition dont le poids atteint zéro. Rien
+        // ne garantit qu'il reste ensuite une animation active — et la boucle
+        // ci-dessous ne relançait QUE sur changement de clip, donc jamais.
+        //
+        // On ne devine pas le déclencheur : on tient l'INVARIANT — le corps joue
+        // toujours quelque chose — et on COMPTE les fois où il a fallu le
+        // rattraper. Un compteur qui monte nomme la cause ; un personnage figé,
+        // non.
+        let muet = player.playing_animations().count() == 0;
         let anim = nodes.anim.clone();
         let cross = Duration::from_millis(anim.crossfade_ms);
-        let next = if loco.speed >= anim.run_speed_min {
-            nodes.run
-        } else if loco.speed >= anim.walk_speed_min {
-            nodes.walk
-        } else {
-            nodes.idle
+        // La DÉCISION vit dans `locomotion_etat` — pure, testée hors moteur.
+        // Ici on ne fait plus que la traduire en nœud. C'est ce qui permet de
+        // vérifier quinze états en quinze assertions plutôt qu'en playtest.
+        let etat = EtatLocomotion {
+            avant_ms: loco.avant,
+            lateral_ms: loco.lateral,
+            au_sol: loco.au_sol,
+            vitesse_verticale_ms: loco.vitesse_verticale,
+            accroupi: loco.accroupi,
+            glisse: loco.glisse,
+            vise: loco.vise,
+            tire: loco.tire,
+            lacet_rad_s: loco.lacet_rad_s,
+            depuis_atterrissage_s: loco.depuis_atterrissage_s,
+            // Sans ce report, le délai de grâce reste à zéro et la machine
+            // retombe sur l'ancien comportement : la chute clignote pendant la
+            // marche. Un producteur branché à moitié est un correctif absent.
+            depuis_decollage_s: loco.depuis_decollage_s,
         };
-        if nodes.current == next {
+        let voulu = choisir(&etat, &anim.seuils());
+        // Résolution par replis : c'est ici que le trooper — deux clips — survit
+        // à une demande de glissade au lieu de se figer.
+        let Some(next) = nodes.resoudre(voulu) else {
+            // Même le repos manque : ce corps n'a aucune animation. Le câblage
+            // l'a déjà dit, inutile de le répéter soixante fois par seconde.
+            continue;
+        };
+        // Muet ⇒ on relance MÊME si le clip voulu n'a pas changé : c'est
+        // précisément le cas que l'ancienne condition laissait passer.
+        if nodes.current == next && !muet {
             continue;
         }
-        transitions.play(&mut player, next, cross).repeat();
+        // Sans fondu quand on rattrape : fondre depuis le néant laisserait le
+        // personnage transparent au mouvement pendant 150 ms de plus.
+        let fondu = if muet { Duration::ZERO } else { cross };
+        // 🚨 Trois clips ne DOIVENT pas boucler. Un atterrissage répété est un
+        // personnage qui rebondit sur place ; une glissade répétée est un tapis
+        // roulant ; un tir répété vide le chargeur à l'écran alors qu'on a lâché
+        // la gâchette. Ils s'éteignent d'eux-mêmes, et l'invariant « le corps
+        // joue toujours quelque chose » ci-dessus les rattrape en repos.
+        let boucle = !matches!(voulu, Clip::Atterrissage | Clip::Glissade | Clip::Tir);
+        let active = transitions.play(&mut player, next, fondu);
+        if boucle {
+            active.repeat();
+        }
         nodes.current = next;
+        // Ce que le sélecteur voulait, et ce qui sort vraiment. Écrit ICI, au
+        // moment du changement : c'est le seul endroit où les deux existent en
+        // même temps. Le repli ayant servi se lit dans leur ÉCART.
+        {
+            let modele = nodes.modele.clone();
+            let joue = nodes
+                .par_clip
+                .iter()
+                .find(|(_, n)| **n == next)
+                .map(|(c, _)| format!("{c:?}"))
+                .unwrap_or_else(|| "?".to_string());
+            let fiche = diag.fiche(&modele);
+            fiche.etat_demande = format!("{voulu:?}");
+            fiche.clip_joue = joue;
+        }
+        if muet {
+            let fiche = diag.fiche(&nodes.modele);
+            fiche.relances = fiche.relances.saturating_add(1);
+        }
     }
 }
 

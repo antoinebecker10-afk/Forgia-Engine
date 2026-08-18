@@ -44,6 +44,13 @@ pub enum PlayerAction {
     MoveRight,
     Jump,
     Sprint,
+    /// S'accroupir — **maintenu**, pas basculé.
+    ///
+    /// Maintenu parce qu'une bascule demande de se souvenir de son état : on se
+    /// relève en croyant être debout, on tire en croyant être à couvert. Tous les
+    /// jeux de tir de ces vingt ans ont convergé là-dessus, et le maintien est
+    /// aussi ce qui rend la glissade possible (sprint + accroupi).
+    Crouch,
     Fire,
     AltFire,
     Reload,
@@ -95,6 +102,11 @@ pub fn default_input_map() -> InputMap<PlayerAction> {
     map.insert(PlayerAction::MoveRight, KeyD); // Position D en AZERTY (identique)
     map.insert(PlayerAction::Jump, Space);
     map.insert(PlayerAction::Sprint, ShiftLeft);
+    // Ctrl gauche : la touche d'accroupissement de tous les jeux de tir, et la
+    // seule qui ne heurte rien ici (Shift = sprint, Espace = saut, C est libre
+    // mais moins attendue). Elle est sous l'auriculaire, donc tenable en même
+    // temps que Shift — ce que la glissade exige.
+    map.insert(PlayerAction::Crouch, ControlLeft);
     map.insert(PlayerAction::Fire, MouseButton::Left);
     map.insert(PlayerAction::AltFire, MouseButton::Right);
     map.insert(PlayerAction::Reload, KeyR);

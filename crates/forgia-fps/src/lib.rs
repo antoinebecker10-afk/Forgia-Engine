@@ -479,11 +479,17 @@ pub fn falloff_multiplier(toi: f32, e: &ViewmodelGenomeEntry) -> f32 {
 /// personne, mais « à la 3ᵉ personne » ne veut pas dire « sans combat ». Le tir
 /// y part de la caméra par-dessus l'épaule (cf. `AimCamera`), et l'arme
 /// équipée est visible dans la main du personnage.
+///
+/// Cette liste était le SEUL endroit du dépôt à connaître les zones qui tirent,
+/// pendant que quatre crates d'interface en tenaient une autre pour savoir quoi
+/// afficher. Les deux ont divergé — l'Expédition tirait sans killfeed, sans
+/// flash et sans arc de dégâts. Elles lisent maintenant la même table.
+///
+/// Volontairement SANS garde `AppMode` : ce prédicat gate des systèmes de
+/// simulation qui ont leurs propres conditions, et en ajouter une ici changerait
+/// leur comportement au lieu de le déplacer.
 fn fps_combat_mode(mode: Res<State<GameMode>>) -> bool {
-    matches!(
-        mode.get(),
-        GameMode::Fps | GameMode::Roguelite | GameMode::ArenaTest | GameMode::Expedition
-    )
+    forgia_core::capacites::capacites(mode.get()).combat
 }
 
 pub struct ForgiaFpsPlugin;

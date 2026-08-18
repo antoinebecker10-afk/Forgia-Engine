@@ -11,13 +11,16 @@ workspace = true
 bevy = { workspace = true }
 bevy_rapier3d = { workspace = true }
 forgia-core = { workspace = true }
+# `TargetCube` (ce qui se tire) : lu depuis la BRIQUE de combat depuis le
+# 2026-08-18, et non plus depuis la zone `forgia-mode-fps-arena`. Un capteur ne
+# doit pas dependre d'un mode pour savoir ce qu'est une cible.
+forgia-combat = { workspace = true }
 forgia-terrain = { workspace = true }
 # Story-467 V5 Session B — markers per-archetype counts (entities sensor)
 forgia-player = { workspace = true }
 forgia-ai-arena-bot = { workspace = true }
 forgia-enemy-nameplate = { workspace = true }
 # Story-469 V5 Session C — lifecycle/audio/input sensors
-forgia-mode-fps-arena = { workspace = true }
 forgia-audio = { workspace = true }
 forgia-input = { workspace = true }
 forgia-rpg-data = { workspace = true }

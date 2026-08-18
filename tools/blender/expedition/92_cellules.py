@@ -100,10 +100,25 @@ def exporter(objets, chemin, separe=True):
 
 
 def main():
-    if os.path.isdir(SORTIE) and os.listdir(SORTIE):
+    # LE GARDE PORTE SUR LA CARTE, PAS SUR LA BIBLIOTHEQUE DE TEXTURES.
+    #
+    # Ecrit « tout fichier present = refus », il se contredisait avec
+    # l'exportateur : celui-ci n'A PAS CREE le sous-dossier `textures/` et
+    # echouait sur `OSError [Errno 22]` des que la sortie etait vraiment vide.
+    # Impossible de satisfaire les deux — donc impossible de recuire sans
+    # contourner le garde, ce qui est la pire facon de garder une protection.
+    #
+    # Ce qu'on protege reellement, ce sont les CELLULES : elles portent le
+    # travail. La bibliotheque de textures est partagee et se reecrit a
+    # l'identique. Le garde ne regarde donc plus qu'elles, et on cree le
+    # sous-dossier nous-memes au lieu d'esperer que l'exportateur le fasse.
+    cuits = [f for f in os.listdir(SORTIE)] if os.path.isdir(SORTIE) else []
+    cellules = [f for f in cuits if f.endswith((".gltf", ".bin", ".toml"))]
+    if cellules:
         raise RuntimeError(
-            f"sortie déjà peuplée : {SORTIE} — l'écarter à la main avant de recuire")
-    os.makedirs(SORTIE, exist_ok=True)
+            f"sortie déjà peuplée : {SORTIE} — {len(cellules)} fichier(s) de carte, "
+            "l'écarter à la main avant de recuire")
+    os.makedirs(os.path.join(SORTIE, "textures"), exist_ok=True)
 
     for nom in CACHES:
         coll = bpy.data.collections.get(nom)

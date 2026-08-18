@@ -65,12 +65,66 @@ pub struct CampementDef {
     pub verrou_cap_rad: f32,
     /// Où les ennemis apparaissent. Déclaré par la carte, pas dérivé au runtime.
     pub apparitions_xyz: Vec<[f32; 3]>,
-    /// Les abris, en plan.
-    pub abris_xy: Vec<[f32; 2]>,
+    /// Les abris — **des meubles de combat**, pas du décor.
+    pub abris: Vec<AbriDef>,
+    /// Quels archétypes peuplent ce campement. C'est d'eux que le rayon dérive.
+    #[serde(default)]
+    pub archetypes: Vec<String>,
     /// Plus longue ligne de vue mesurée dans le campement (m).
     pub ligne_max_m: f32,
     /// Portée de vision du grunt (m) — pour vérifier qu'elle couvre `ligne_max_m`.
     pub grunt_vision_m: f32,
+    /// La plus petite vision parmi les archétypes présents. C'est ELLE qui borne
+    /// `ligne_max_m` ; `grunt_vision_m` n'en est qu'un cas particulier.
+    #[serde(default)]
+    pub vision_min_m: Option<f32>,
+    // ── La spec de combat (`map-design-intention.md` §1) ────────────────
+    //
+    // Elle manquait entièrement : le manifeste portait des points d'apparition
+    // sans jamais dire QUI apparaît, en quelle quantité, contre quel arsenal,
+    // ni quand la salle est finie. `verrou_xyz` était une position sans règle.
+    //
+    // Tout est `Option` : un manifeste cuit avant cet ajout reste lisible.
+    /// Combien d'ennemis, par archétype.
+    #[serde(default)]
+    pub effectifs: Option<std::collections::BTreeMap<String, u32>>,
+    /// Dégâts par seconde de l'arsenal attendu à ce moment de la course.
+    #[serde(default)]
+    pub arsenal_dps: Option<f32>,
+    #[serde(default)]
+    pub condition_sortie: Option<String>,
+    /// Durée **dérivée** : total des pv sur le dps de l'arsenal.
+    #[serde(default)]
+    pub duree_tir_s: Option<f32>,
+    /// Durée **dérivée** pour que le plus lent atteigne le joueur.
+    #[serde(default)]
+    pub duree_approche_s: Option<f32>,
+    /// L'essaim arrive-t-il, ou meurt-il en chemin (`§2.1`) ?
+    #[serde(default)]
+    pub essaim_arrive: Option<bool>,
+    /// Plancher **dérivé** : le temps de traverser la salle une fois.
+    #[serde(default)]
+    pub duree_plancher_s: Option<f32>,
+}
+
+/// Un abri de campement.
+///
+/// # Pourquoi il porte sa hauteur
+///
+/// Le manifeste ne donnait qu'un couple `[x, y]` : impossible de vérifier qu'un
+/// abri abrite sans rouvrir Blender. Or un bloc n'est une couverture que s'il
+/// dépasse l'œil du joueur (1,70 m) — il n'y a pas d'accroupissement dans
+/// Forgia, donc sous cette hauteur il masque le corps sans masquer la vue
+/// (`map-design-patterns.md` §11).
+///
+/// `casse_la_vue` est **dérivé** de `hauteur_m` côté Blender, jamais déclaré :
+/// un bloc trop bas sort `false` et se voit, au lieu de se déguiser en abri.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AbriDef {
+    pub xyz: [f32; 3],
+    pub rayon_m: f32,
+    pub hauteur_m: f32,
+    pub casse_la_vue: bool,
 }
 
 impl CampementDef {
@@ -148,8 +202,35 @@ pub struct ExpeditionManifest {
     pub porte_village: PorteDef,
     pub faune: Vec<FauneDef>,
     pub campements: Vec<CampementDef>,
-    /// `[x, y, z, rayon]` en repère Blender. Les troncs, rochers et murs.
-    pub colliders_cylindre_xyzr: Vec<[f32; 4]>,
+    /// Les solides, **par famille** : `[x, y, z_base, hauteur, rayon]` en repère
+    /// Blender.
+    ///
+    /// # Ce que ce champ remplace, et pourquoi
+    ///
+    /// Il s'appelait `colliders_cylindre_xyzr` et son commentaire annonçait
+    /// « les troncs, rochers et murs ». Mesuré le 2026-08-17 : il ne contenait
+    /// que **des troncs, et seulement 82 % d'entre eux** — le site qui publiait
+    /// les proxys vivait à l'intérieur d'une des deux boucles de plantation.
+    /// Traversaient donc le décor : 207 arbres isolés, 110 rochers, 260 éboulis,
+    /// les 22 rochers qui bouchent la ceinture, les 16 braseros, et — le pire —
+    /// **les 15 abris des trois salles de combat**, qui n'arrêtaient donc ni le
+    /// joueur ni un tir.
+    ///
+    /// La famille n'est pas décorative : elle dit ce que la pièce fait au jeu,
+    /// et elle rend le manque lisible — une famille vide se voit, un total qui
+    /// baisse ne se voit pas.
+    ///
+    /// La hauteur est publiée parce qu'elle était **devinée** : le plugin posait
+    /// 6,0 m pour tout le monde, y compris pour un éboulis de 80 cm.
+    pub colliders_prop_xyzhr: std::collections::BTreeMap<String, Vec<[f32; 5]>>,
+    /// Ce que la carte a **raté** à la cuisson. Vide = preuve, pas silence.
+    ///
+    /// Deux systèmes de placement manquaient une part de leur cible sans qu'aucune
+    /// sortie ne le dise : 8 zones de faune sur 11 et 15 abris sur 18. Le
+    /// manifeste rapportait l'obtenu sans la demande, ce qui se lit comme un
+    /// succès (`map-design-patterns.md` §13).
+    #[serde(default)]
+    pub defauts: Vec<serde_json::Value>,
     /// Les brasiers du chemin. `default` : un manifeste cuit avant leur ajout
     /// reste lisible, il n'aura simplement pas d'éclairage.
     #[serde(default)]
@@ -259,14 +340,44 @@ impl ExpeditionManifest {
             .sum()
     }
 
-    /// Les cylindres de collision, convertis : `(centre_bevy, rayon)`.
+    /// Les cylindres de collision, convertis : `(famille, base_bevy, hauteur, rayon)`.
     ///
-    /// La hauteur n'est pas dans le manifeste — l'appelant la choisit. Le `y`
-    /// exporté est celui de la **base** du cylindre.
-    pub fn colliders_bevy(&self) -> impl Iterator<Item = (Vec3, f32)> + '_ {
-        self.colliders_cylindre_xyzr
-            .iter()
-            .map(|c| (blender_to_bevy([c[0], c[1], c[2]]), c[3]))
+    /// Le `y` rendu est celui de la **base** du cylindre — Rapier veut son
+    /// centre, c'est à l'appelant de remonter d'une demi-hauteur. On ne le fait
+    /// pas ici parce que ce module ne connaît pas la convention du moteur
+    /// physique, et qu'une conversion faite au mauvais endroit est exactement ce
+    /// qui a enterré le joueur d'un mètre le 2026-08-14.
+    pub fn colliders_bevy(&self) -> impl Iterator<Item = (&str, Vec3, f32, f32)> + '_ {
+        self.colliders_prop_xyzhr.iter().flat_map(|(famille, pieces)| {
+            pieces.iter().map(move |c| {
+                (
+                    famille.as_str(),
+                    blender_to_bevy([c[0], c[1], c[2]]),
+                    c[3],
+                    c[4],
+                )
+            })
+        })
+    }
+
+    /// Combien de solides, toutes familles confondues.
+    #[must_use]
+    pub fn nb_colliders(&self) -> usize {
+        self.colliders_prop_xyzhr.values().map(Vec::len).sum()
+    }
+
+    /// Les abris qui ne cassent pas la vue, campement par campement.
+    ///
+    /// Un abri sous l'œil du joueur masque le corps sans masquer la vue : il se
+    /// lit comme une couverture et n'en est pas une. C'est un défaut de CARTE —
+    /// il se signale, il ne se corrige pas ici.
+    pub fn abris_qui_n_abritent_pas(&self) -> impl Iterator<Item = (&str, &AbriDef)> + '_ {
+        self.campements.iter().flat_map(|c| {
+            c.abris
+                .iter()
+                .filter(|a| !a.casse_la_vue)
+                .map(move |a| (c.id.as_str(), a))
+        })
     }
 }
 
@@ -328,7 +439,89 @@ mod tests {
         assert_eq!(m.emprise_m, [280.0, 200.0]);
         assert_eq!(m.chemin_xyz.len(), 91);
         assert_eq!(m.campements.len(), 3);
-        assert_eq!(m.colliders_cylindre_xyzr.len(), 943);
+        // 1 616 solides le 2026-08-17, contre 943 avant : les 207 arbres isoles,
+        // les rochers, les eboulis, les bouchons de ceinture, les braseros et
+        // les abris ont cesse de se traverser.
+        assert!(
+            m.nb_colliders() > 1_500,
+            "{} solides : le contrat de collision a regresse",
+            m.nb_colliders()
+        );
+        // Et les familles attendues sont TOUTES peuplees. Un total qui tient
+        // pendant qu'une famille se vide ne se verrait pas.
+        for famille in ["abri", "arbre", "bouchon", "brasero", "eboulis", "repere", "rocher"] {
+            let n = m.colliders_prop_xyzhr.get(famille).map_or(0, Vec::len);
+            assert!(n > 0, "famille « {famille} » vide : plus rien ne s'y collisionne");
+        }
+    }
+
+    #[test]
+    fn la_carte_ne_rate_aucune_production() {
+        // `defauts` porte deux choses tres differentes, et les confondre ferait
+        // taire la plus grave :
+        //
+        //   - un defaut de PRODUCTION : la cuisson n'a pas pose ce qu'elle
+        //     declarait (zones de faune introuvables, abris jetes par la
+        //     contrainte de couloir, rochers refuses par la pente). Ceux-la
+        //     doivent etre a ZERO — avant ce champ, 3 zones et 3 abris
+        //     manquaient sans que rien ne le dise ;
+        //   - un defaut de CONCEPTION : la carte a pose exactement ce qu'elle
+        //     voulait, et ce qu'elle voulait ne tient pas son propre contrat.
+        //     Voir le test suivant.
+        let d = vallon().defauts;
+        let production: Vec<_> = d
+            .iter()
+            .filter(|v| {
+                v.get("quoi")
+                    .and_then(|q| q.as_str())
+                    .is_some_and(|q| !q.contains("duree_engagement"))
+            })
+            .collect();
+        assert!(
+            production.is_empty(),
+            "{} defaut(s) de production : {production:?}",
+            production.len()
+        );
+    }
+
+    #[test]
+    fn les_campements_se_jouent_en_moins_de_temps_qu_il_n_en_faut_pour_les_traverser() {
+        // # Un constat grave, pas un commentaire
+        //
+        // La spec de combat (§1) a ete ajoutee le 2026-08-17, et son premier
+        // effet a ete de rendre visible ceci : les trois campements durent
+        // **1,4 / 1,9 / 2,3 s** pour un plancher derive de 3,1 s (le diametre
+        // de la salle divise par la vitesse de marche). Le combat est fini
+        // avant qu'on ait pu se repositionner — les six abris de chaque camp
+        // n'ont donc servi a rien.
+        //
+        // Ce n'est pas un bug de cuisson : la carte pose exactement ce qu'elle
+        // declare. C'est la DECLARATION qui est trop maigre, et le remede
+        // (des vagues) demande un consommateur moteur qui n'existe pas encore.
+        //
+        // Le jour ou les vagues arrivent, ce test tombe et rappelle de le
+        // mettre a jour. Un constat qui ne casse rien quand il devient faux
+        // n'est pas un constat.
+        let d = vallon().defauts;
+        let courts: Vec<_> = d
+            .iter()
+            .filter(|v| {
+                v.get("quoi")
+                    .and_then(|q| q.as_str())
+                    .is_some_and(|q| q.contains("duree_engagement"))
+            })
+            .collect();
+        assert_eq!(
+            courts.len(),
+            3,
+            "etat mesure le 2026-08-17 : les 3 campements sous leur plancher de duree"
+        );
+        // Et la spec elle-meme porte les nombres, pour qu'on n'ait pas a
+        // rouvrir Blender pour savoir de combien on est loin du compte.
+        for c in &vallon().campements {
+            assert!(c.duree_tir_s.is_some(), "{} sans duree derivee", c.id);
+            assert!(c.effectifs.is_some(), "{} sans effectifs declares", c.id);
+        }
     }
 
     #[test]
@@ -463,9 +656,23 @@ mod tests {
             verrou_xyz: [0.0; 3],
             verrou_cap_rad: 0.0,
             apparitions_xyz: vec![[0.0; 3]],
-            abris_xy: vec![[0.0; 2]],
+            abris: vec![AbriDef {
+                xyz: [0.0; 3],
+                rayon_m: 1.0,
+                hauteur_m: 2.4,
+                casse_la_vue: true,
+            }],
+            archetypes: vec!["grunt".into()],
             ligne_max_m: 18.0,
             grunt_vision_m: 20.0,
+            vision_min_m: Some(20.0),
+            effectifs: None,
+            arsenal_dps: None,
+            condition_sortie: None,
+            duree_tir_s: None,
+            duree_approche_s: None,
+            essaim_arrive: None,
+            duree_plancher_s: None,
         };
         assert!(large.vision_couvre_la_ligne(), "18 m de ligne, 20 m de vision");
 
@@ -480,29 +687,42 @@ mod tests {
     }
 
     #[test]
-    fn le_vallon_donne_du_tir_gratuit_et_on_le_mesure() {
-        // L'etat MESURE de la carte, grave pour qu'il ne se perde pas — et pour
-        // que le jour ou elle est corrigee, ce test tombe et rappelle de le
-        // mettre a jour. Un constat qui ne casse rien quand il devient faux
-        // n'est pas un constat, c'est un commentaire.
+    fn le_vallon_ne_donne_plus_de_tir_gratuit() {
+        // # L'histoire de ce test, parce qu'elle est la lecon
+        //
+        // Il affirmait l'inverse : « 3 campements a 4 m de tir gratuit », grave
+        // exprès pour tomber le jour ou la carte serait corrigee. Il vient de
+        // tomber — c'etait sa fonction, et c'est pour ca qu'un constat doit
+        // etre un test et pas un commentaire.
+        //
+        // La cause etait un LITTERAL : `rayon: 12.0` ecrit dans le commentaire
+        // meme qui citait §2.2 (« ligne max <= vision du grunt »). 12 m de rayon
+        // font 24 m de ligne pour 20 m de vision. Le rayon se DERIVE desormais
+        // de la vision des archetypes presents (rayon = min(vision) / 2 = 10 m),
+        // donc l'invariant est vrai par construction et non plus par vigilance.
         let camps = vallon().campements;
         let fautifs: Vec<(String, f32)> = camps
             .iter()
             .filter(|c| !c.vision_couvre_la_ligne())
             .map(|c| (c.id.clone(), c.ligne_max_m - c.grunt_vision_m))
             .collect();
-        println!("TIR GRATUIT PAR CAMPEMENT : {fautifs:?}");
-        assert_eq!(
-            fautifs.len(),
-            3,
-            "l'etat mesure le 2026-08-14 etait 3 campements a 4 m de tir gratuit ; \
-             si la carte a change, mettre ce test a jour au lieu de le contourner"
+        assert!(
+            fautifs.is_empty(),
+            "tir gratuit revenu sur {fautifs:?} — la derivation du rayon a saute"
         );
-        for (id, ecart) in &fautifs {
-            assert!(
-                (*ecart - 4.0).abs() < 0.01,
-                "{id} : ecart de {ecart} m, mesure 4,0 m le 2026-08-14"
-            );
+        // Et on verifie la derivation elle-meme, pas seulement son resultat :
+        // une carte dont tous les camps feraient 1 m de rayon passerait le test
+        // ci-dessus sans rien valoir.
+        for c in &camps {
+            if let Some(v) = c.vision_min_m {
+                assert!(
+                    (c.ligne_max_m - v).abs() < 0.51,
+                    "{} : ligne {} m pour une vision min de {v} m — le rayon ne \
+                     derive plus de la vision, il a ete ecrit",
+                    c.id,
+                    c.ligne_max_m
+                );
+            }
         }
     }
 
@@ -512,25 +732,68 @@ mod tests {
         // un stand de tir (map-design-patterns §11). Les deux silencieusement.
         for c in &vallon().campements {
             assert!(!c.apparitions_xyz.is_empty(), "{} sans apparition", c.id);
-            assert!(!c.abris_xy.is_empty(), "{} sans abri", c.id);
+            assert!(!c.abris.is_empty(), "{} sans abri", c.id);
         }
     }
 
     #[test]
-    fn les_colliders_tiennent_dans_l_emprise_et_ont_un_rayon_reel() {
-        // 943 cylindres : un seul mal converti se plante hors carte ou se
-        // degenere en rayon nul, et le joueur traverse un arbre sans savoir
-        // pourquoi.
+    fn tous_les_abris_cassent_vraiment_la_ligne_de_vue() {
+        // L'œil du joueur est a 1,70 m et il n'y a PAS d'accroupissement : un
+        // bloc plus bas masque le corps sans masquer la vue. Le premier jet
+        // tirait l'echelle au hasard et sortait des blocs a 1,52 m — des
+        // couvertures qui n'en sont pas, et que rien ne distinguait des vraies.
+        let m = vallon();
+        let menteurs: Vec<_> = m
+            .abris_qui_n_abritent_pas()
+            .map(|(camp, a)| format!("{camp} @ {:.1} m", a.hauteur_m))
+            .collect();
+        assert!(
+            menteurs.is_empty(),
+            "abris qui n'abritent pas : {menteurs:?} — sous l'oeil du joueur"
+        );
+        // Et il y en a assez pour que la salle ait un jeu de couverture.
+        for c in &m.campements {
+            assert!(c.abris.len() >= 4, "{} n'a que {} abris", c.id, c.abris.len());
+        }
+    }
+
+    #[test]
+    fn les_colliders_tiennent_dans_l_emprise_et_ont_une_emprise_reelle() {
+        // Un seul mal converti se plante hors carte ou se degenere en rayon nul,
+        // et le joueur traverse un arbre sans savoir pourquoi. Un cylindre de
+        // rayon ou de hauteur nulle est PIRE qu'absent : il se compte comme
+        // present (`map-design-patterns.md` §13).
         let m = vallon();
         let (demi_x, demi_z) = (m.emprise_m[0] * 0.5 + 5.0, m.emprise_m[1] * 0.5 + 5.0);
         let mut hors = 0;
-        for (centre, rayon) in m.colliders_bevy() {
-            assert!(rayon > 0.0, "collider de rayon nul");
-            if centre.x.abs() > demi_x || centre.z.abs() > demi_z {
+        for (famille, base, hauteur, rayon) in m.colliders_bevy() {
+            assert!(rayon > 0.0, "{famille} : collider de rayon nul");
+            assert!(hauteur > 0.0, "{famille} : collider de hauteur nulle");
+            if base.x.abs() > demi_x || base.z.abs() > demi_z {
                 hors += 1;
             }
         }
-        assert_eq!(hors, 0, "{hors} colliders hors de l'emprise sur 943");
+        assert_eq!(hors, 0, "{hors} colliders hors de l'emprise");
+    }
+
+    #[test]
+    fn aucun_solide_ne_se_franchit_au_saut() {
+        // Le joueur saute 1,174 m. Un cylindre plus court se franchit par le
+        // dessus, et le symptome est « les collisions ne marchent pas ».
+        // La hauteur vient desormais du manifeste : avant, le plugin posait
+        // 6,0 m pour TOUT LE MONDE — genereux pour un arbre, mensonger pour un
+        // eboulis de 80 cm, qui devenait un mur de 6 m invisible.
+        //
+        // Le seuil de solidite cote Blender est 0,60 m : sous le saut, donc
+        // franchissable — c'est VOULU, on ne veut pas trebucher sur du decor
+        // de sol. Ce test verifie seulement qu'aucune hauteur n'est absurde.
+        let m = vallon();
+        for (famille, _base, hauteur, _r) in m.colliders_bevy() {
+            assert!(
+                (0.5..=30.0).contains(&hauteur),
+                "{famille} : hauteur {hauteur:.2} m invraisemblable"
+            );
+        }
     }
 
     #[test]

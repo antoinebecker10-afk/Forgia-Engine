@@ -1,0 +1,4 @@
+# Defauts de structure connus des corps d'animation livres.
+# CE FICHIER NE DOIT QUE RETRECIR.
+# Regenerer : python tools/assets/verifier_corps.py --ecrire-baseline
+

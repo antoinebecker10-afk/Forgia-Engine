@@ -11,6 +11,7 @@
 //! Both call `forgia_game::run_game()`.
 
 use bevy::image::{ImagePlugin, ImageSamplerDescriptor};
+use bevy::log::LogPlugin;
 use bevy::prelude::*;
 #[cfg(feature = "dev-brp")]
 use bevy::remote::{http::RemoteHttpPlugin, RemotePlugin};
@@ -95,6 +96,58 @@ pub fn run_game() -> AppExit {
     // 1. Bevy DefaultPlugins EN PREMIER (fournit StatesPlugin requis par ForgiaCorePlugin)
     app.add_plugins(
         DefaultPlugins
+            // 🚨 LE JEU ÉCRIT SON PROPRE LOG (2026-08-18).
+            //
+            // `forgia2_run.log` n'était écrit par PERSONNE : c'était une
+            // redirection de shell dans `run_debug.bat`. Toute autre façon de
+            // lancer — `cargo run` à la main, l'IDE, un double-clic — donnait
+            // les capteurs et AUCUN log, sans que rien ne le signale.
+            //
+            // Coût mesuré dans la nuit du 17 au 18/08 : le log affichait
+            // 80,7 heures de retard pendant que les capteurs avaient 3 minutes,
+            // et DEUX diagnostics ont été menés à l'aveugle. Le second — un
+            // crash wgpu qui tuait l'Expédition — a été résolu en UNE lecture
+            // dès que le log a existé : il nommait la ligne
+            // `riviere posee — 1 surface(s) sous bevy_water`, 150 ms avant la
+            // panique. Six hypothèses avaient été falsifiées sans lui.
+            //
+            // > Un instrument qu'on croit cassé alors qu'il n'est pas branché
+            // > coûte plus cher qu'un instrument absent : on cesse de le
+            // > chercher.
+            //
+            // Le chemin est RELATIF : `run_game` a déjà fixé le répertoire
+            // courant sur `runtime_root()` juste au-dessus, donc le fichier
+            // atterrit au même endroit quel que soit le mode de lancement —
+            // ce qui était précisément le défaut d'origine.
+            .set(LogPlugin {
+                custom_layer: |_app| {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        // Pas de système de fichiers : la console du navigateur
+                        // reste la seule sortie.
+                        None
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        use bevy::log::tracing_subscriber::fmt::layer;
+                        // Comparer deux runs est la moitié d'un diagnostic, et
+                        // `forgia_digest.py` sait lire le `.previous`.
+                        let _ = std::fs::rename(
+                            "forgia2_run.log",
+                            "forgia2_run.log.previous",
+                        );
+                        let fichier = std::fs::File::create("forgia2_run.log").ok()?;
+                        // `with_ansi(false)` : les séquences de couleur rendaient
+                        // le log 30 % plus lourd et illisible au grep.
+                        Some(Box::new(
+                            layer()
+                                .with_writer(std::sync::Arc::new(fichier))
+                                .with_ansi(false),
+                        ))
+                    }
+                },
+                ..default()
+            })
             .set(AssetPlugin {
                 // wasm : fetch HTTP relatif a la page — un chemin disque absolu
                 // produirait des fetch file:// bloques par le navigateur.

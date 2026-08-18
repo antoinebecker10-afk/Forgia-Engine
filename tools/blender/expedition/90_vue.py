@@ -25,7 +25,14 @@ VUES_SOL = {
     "03_riviere":  ((-14.0, 20.0), (-30.0, 46.0), OEIL + 6.0, 0.0),
     "04_pont":     ((-34.0, 26.0), (-22.0, 44.0), OEIL, 1.0),
     "05_camp3":    ((36.0, 20.0), (52.0, 6.0), OEIL, 1.5),
-    "06_porte":    ((90.0, -52.0), (90.0, -22.0), OEIL, 4.0),
+    # 🚨 CETTE VUE CADRAIT CE QUE LE JOUEUR NE VOIT JAMAIS.
+    # Elle regardait la porte depuis (90, −52) PLEIN NORD. Or on arrive par le
+    # sud-ouest, au cap −28,7° : le chemin croise l'anneau du rempart à
+    # (87,5 ; −28,9) en venant de (52,4 ; −9,6). Résultat, le rendu montrait
+    # sept arbres « devant la porte » qui ne sont devant rien — et j'ai
+    # diagnostiqué un défaut de carte sur un défaut d'instrument.
+    # Elle prend désormais la VRAIE ligne d'approche, à 40 m de la porte.
+    "06_porte":    ((52.4, -9.6), (87.5, -28.9), OEIL, 4.0),
     "07_village":  ((90.0, -22.0), (90.0, 4.0), OEIL, 4.0),
 }
 VUES_AIR = {

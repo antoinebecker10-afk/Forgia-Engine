@@ -209,13 +209,60 @@ max_sane_speed = 15.0
 #   · `stylized_male_complet.glb`  — l'original, cheveux figés
 #   · `chien_expedition.glb`       — tête de chien sculptée, oreilles/yeux/
 #     mâchoire animés et clignement en morph (chaîne `32`→`39`)
-model = "models/characters/stylized/stylized_male_cheveux.glb"
+# 2026-08-17 : `_fusil` = strictement `_cheveux` PLUS 25 clips (34 au total,
+# 186 canaux chacun, 0 ignoré à la fusion). Rien n'est perdu — mêmes maillages,
+# mêmes os, mêmes cheveux — donc le retour en arrière est le nom d'avant.
+#
+# 🚨 Le jeu « fusil en main » est ce qui compte : `rifle_walk` garde l'arme
+# épaulée là où `walk` balance les deux bras librement. Aucun réglage de code ne
+# rattrape ça — c'est dans la capture ou ça n'y est pas. Et `rifle_aim` est une
+# POSE DE VISÉE capturée, qui remplace ce que l'IK approximait.
+#
+# Récolté par `tools/assets/mixamo_recolte.py` (manifeste `mixamo_clips.toml`),
+# converti et fusionné par `merge_gltf_anims.py`.
+model = "models/characters/stylized/stylized_male_fusil.glb"
 
 [expedition_body.animation]
-idle_clip = "idle"
-walk_clip = "walk"
-# Celui-là existe VRAIMENT ici, contrairement au trooper : le personnage court.
-run_clip = "run"
+# 🚨 Le jeu « fusil en main » et pas les génériques, pour une raison qui ne se
+# rattrape par aucun réglage de code : `walk` balance les deux bras librement,
+# `rifle_walk` garde l'arme épaulée. Le personnage PORTE une arme en permanence
+# dans ce mode — c'est dans la capture ou ça n'y est pas.
+#
+# Les 34 clips du corps sont récoltés par `tools/assets/mixamo_recolte.py`
+# (manifeste `tools/assets/mixamo_clips.toml`) et fusionnés par
+# `merge_gltf_anims.py`. Un nom absent du GLB est signalé au chargement.
+idle_clip = "rifle_idle"
+walk_clip = "rifle_walk"
+run_clip = "rifle_run"
+back_clip = "rifle_walk_back"
+strafe_clip = "rifle_strafe"
+
+# La visée capturée. Elle porte la POSE ; l'IK des bras porte la DIRECTION (le
+# tangage de la caméra), qu'un clip figé ne peut pas suivre. Les deux se
+# superposent, et c'est le montage des moteurs du marché.
+aim_clip = "rifle_aim"
+fire_clip = "rifle_fire"
+
+# En l'air. `fall` séparé de `jump` : sinon on descend en gardant la pose de
+# montée, et la carte a des dénivelés de plusieurs mètres.
+jump_clip = "jump"
+fall_clip = "fall"
+land_clip = "land"
+
+# Accroupi (Ctrl gauche). Trois clips, parce qu'une pose figée ne suffit pas dès
+# qu'on avance ou qu'on recule en restant baissé.
+crouch_idle_clip = "rifle_crouch_idle"
+crouch_walk_clip = "rifle_crouch_walk"
+crouch_back_clip = "rifle_crouch_back"
+
+# La glissade, qui remplace le dash de l'arène (Shift + Ctrl en courant).
+slide_clip = "slide"
+
+# Le virage sur place. Sans lui, pivoter à l'arrêt fait tourner le personnage
+# sans que ses pieds bougent — le défaut le plus visible d'une locomotion
+# incomplète, après le strafe.
+turn_clip = "rifle_turn"
+
 crossfade_ms = 150
 
 # 🚨 CES DEUX SEUILS SE DÉRIVENT DE `player_movement.toml`, ils ne se choisissent

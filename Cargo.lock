@@ -1294,6 +1294,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef8e4b7e61dfe7719bb03c884dc270cd46a82efb40f93e9933b990c5c190c59"
 
 [[package]]
+name = "bevy_mod_skinned_aabb"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b492995fcb558b443ee47c1afe80a56615c6817573331bcb6dfa17ee54ec3c1"
+dependencies = [
+ "bevy_app",
+ "bevy_asset",
+ "bevy_camera",
+ "bevy_color",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_gizmos",
+ "bevy_log",
+ "bevy_math",
+ "bevy_mesh",
+ "bevy_reflect",
+ "bevy_transform",
+]
+
+[[package]]
 name = "bevy_pbr"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3192,6 +3212,7 @@ name = "forgia-anim-debug"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_mod_skinned_aabb",
  "forgia-core",
 ]
 
@@ -3368,6 +3389,23 @@ dependencies = [
  "forgia-combat",
  "forgia-core",
  "forgia-damage",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "forgia-enemy-archetypes"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_rapier3d",
+ "forgia-ai-arena-bot",
+ "forgia-combat",
+ "forgia-core",
+ "forgia-damage",
+ "forgia-effects",
+ "forgia-enemy-nameplate",
+ "forgia-player",
  "serde",
  "toml",
 ]
@@ -3599,13 +3637,18 @@ dependencies = [
  "bevy_hanabi",
  "bevy_rapier3d",
  "bevy_water",
+ "forgia-anim-debug",
  "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
  "forgia-crosshair",
+ "forgia-enemy-archetypes",
  "forgia-genome-core",
+ "forgia-input",
  "forgia-player",
+ "forgia-secondary-motion",
  "forgia-streaming",
+ "leafwing-input-manager",
  "serde",
  "serde_json",
  "toml",
@@ -3639,11 +3682,13 @@ dependencies = [
  "forgia-anchor",
  "forgia-assets",
  "forgia-audio",
+ "forgia-camera-orbit",
  "forgia-combat",
  "forgia-core",
  "forgia-crosshair",
  "forgia-damage",
  "forgia-effects",
+ "forgia-enemy-archetypes",
  "forgia-enemy-nameplate",
  "forgia-input",
  "forgia-mode-fps-arena",
@@ -3683,10 +3728,10 @@ dependencies = [
  "bevy_water",
  "forgia-ai-arena-bot",
  "forgia-audio",
+ "forgia-combat",
  "forgia-core",
  "forgia-enemy-nameplate",
  "forgia-input",
- "forgia-mode-fps-arena",
  "forgia-player",
  "forgia-qa-core",
  "forgia-rpg",
@@ -8089,9 +8134,9 @@ checksum = "383ad40bb927465ec0ce7720e033cb4ca06912855fc35db31b5755d0de75b1ee"
 
 [[package]]
 name = "unicode-segmentation"
-version = "1.13.2"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9629274872b2bfaf8d66f5f15725007f635594914870f65218920345aa11aa8c"
+checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-width"

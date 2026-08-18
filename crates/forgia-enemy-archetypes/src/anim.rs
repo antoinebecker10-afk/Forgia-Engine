@@ -17,7 +17,7 @@
 //! auto-spawné par le GltfLoader → pas de limite `.single()`. Le graphe (asset
 //! read-only) est **partagé** entre tous les ennemis d'un même GLB.
 
-use crate::enemies::{self, EnemyArchetype};
+use crate::{self as enemies, EnemyArchetype};
 use bevy::gltf::Gltf;
 use bevy::prelude::*;
 use forgia_ai_arena_bot::{ArenaBot, BotState};
@@ -635,11 +635,10 @@ pub fn sys_write_enemy_anim_sensor(
 
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
-pub struct ForgiaRogueliteEnemyAnimPlugin;
+pub struct EnemyAnimPlugin;
 
-impl Plugin for ForgiaRogueliteEnemyAnimPlugin {
+impl Plugin for EnemyAnimPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<crate::enemy_rig_debug::EnemyMatRegistry>();
         app.init_resource::<EnemyAnimLodMetrics>();
         app.add_systems(Startup, (sys_init_enemy_anim_genome, sys_load_enemy_gltf));
         // Driver d'anim : hot-reload → build graphes → bind → select clip.
@@ -654,7 +653,7 @@ impl Plugin for ForgiaRogueliteEnemyAnimPlugin {
             )
                 .chain()
                 .in_set(GameSet::Movement)
-                .run_if(in_state(GameMode::Roguelite)),
+                .run_if(a_du_combat),
         );
         // BUG-01 (qa story-636) — vitesse mesurée en PostUpdate : lit le Transform
         // APRÈS que l'IA bot (plain Update, forgia-ai-arena-bot) ait commité son
@@ -664,28 +663,13 @@ impl Plugin for ForgiaRogueliteEnemyAnimPlugin {
         // vitesse du PostUpdate précédent (lag 1 frame imperceptible pour l'anim).
         app.add_systems(
             PostUpdate,
-            sys_sample_enemy_speed.run_if(in_state(GameMode::Roguelite)),
-        );
-        // BUG-04 (qa story-636) — purge les matériaux clonés entre runs.
-        app.add_systems(
-            OnExit(GameMode::Roguelite),
-            crate::enemy_rig_debug::sys_clear_enemy_mat_registry,
-        );
-        // Viz de contrôle du rig (transparence + gizmos) — module enemy_rig_debug.
-        app.add_systems(
-            Update,
-            (
-                crate::enemy_rig_debug::sys_apply_rig_debug,
-                crate::enemy_rig_debug::sys_draw_enemy_bones,
-            )
-                .in_set(GameSet::Effects)
-                .run_if(in_state(GameMode::Roguelite)),
+            sys_sample_enemy_speed.run_if(a_du_combat),
         );
         app.add_systems(
             Update,
             sys_write_enemy_anim_sensor
                 .in_set(GameSet::Sensors)
-                .run_if(in_state(GameMode::Roguelite)),
+                .run_if(a_du_combat),
         );
     }
 }

@@ -42,16 +42,27 @@ pub mod decor_palettes;
 pub mod defense;
 pub mod element_vfx;
 pub mod elements;
-pub mod enemies;
-pub mod enemy_anim;
+/// Les archetypes d'ennemis vivent desormais dans `forgia-enemy-archetypes`,
+/// partagee avec l'Expedition. Re-export sous l'ancien chemin : les 32 sites
+/// d'appel de cette crate et ses consommateurs externes ne bougent pas.
+pub use forgia_enemy_archetypes as enemies;
+/// Animation squelettique des ennemis — deplacee dans `forgia-enemy-archetypes`
+/// le 2026-08-18 avec les archetypes qu'elle anime. Re-export : les sites
+/// d'appel de cette crate ne bougent pas.
+pub use forgia_enemy_archetypes::anim as enemy_anim;
 /// La mort d'un ennemi : butin, retrait de ce qui doit cesser, puis envol.
 pub mod enemy_death;
 pub mod enemy_rig_debug;
 pub mod enemy_scaling;
+pub mod emote;
 pub mod equipment;
+/// QUEL clip de locomotion jouer — décision pure, testée hors moteur.
+pub mod locomotion_etat;
 pub mod forge_shop;
 pub mod ftue;
-pub mod head_hitbox;
+/// Hitbox de tete — deplacee avec les archetypes (elle derive ses mesures de
+/// leur echelle de squelette). Re-export sous l'ancien chemin.
+pub use forgia_enemy_archetypes::head_hitbox;
 pub mod hub;
 pub mod hud;
 pub mod identity;
@@ -153,6 +164,10 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         app.add_plugins(equipment::EquipmentPlugin);
         // Montage de l'avatar équipé, partagé par l'aperçu du menu et le Hall.
         app.add_plugins(avatar::AvatarPlugin);
+        // Les émotes : des danses FABRIQUÉES depuis `assets/genomes/emotes.toml`,
+        // pas chargées — aucun clip du personnage n'en est une. Après
+        // `AvatarPlugin` : elles ajoutent un nœud au graphe qu'il a monté.
+        app.add_plugins(emote::AvatarEmotePlugin);
         // Diagnostic freeze (réactivé 2026-06-24) : attribue les micro-lags à
         // spawn GLTF / colliders / compile-shader → forgia2_load_timing.json.
         app.init_resource::<load_timing::LoadTimingState>();
@@ -386,15 +401,17 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             elements::sys_write_elements_sensor.in_set(GameSet::Sensors),
         );
         // Story-638 P0-1 — stats ennemis data-driven (genome roguelite_enemies.toml,
-        // hot-reload) + sensor forgia2_enemies.json. Charge au Startup, re-parse mtime.
-        // (spawn-live = P0-2 défense tri-couche ; ici = config + observabilité.)
-        app.add_systems(Startup, enemies::sys_init_enemy_genome);
-        app.add_systems(
-            Update,
-            enemies::sys_hot_reload_enemy_genome
-                .in_set(GameSet::Movement)
-                .run_if(in_state(GameMode::Roguelite)),
-        );
+        // hot-reload) + sensor forgia2_enemies.json.
+        //
+        // 2026-08-18 : les trois systèmes sont passés dans le plugin de la brique
+        // `forgia-enemy-archetypes`, que l'Expédition ajoute aussi. Le
+        // rechargement à chaud était gaté `in_state(GameMode::Roguelite)` — une
+        // seconde zone aurait chargé les stats au démarrage puis n'aurait plus
+        // jamais vu un `Shift+F12`, sans que rien n'échoue. Il est désormais gaté
+        // sur la capacité « cette zone se bat ». Le plugin est idempotent.
+        if !app.is_plugin_added::<forgia_enemy_archetypes::ForgiaEnemyArchetypesPlugin>() {
+            app.add_plugins(forgia_enemy_archetypes::ForgiaEnemyArchetypesPlugin);
+        }
         // Story-671 — les DIRECTIONS ARTISTIQUES (palettes de props). Startup :
         // le préchargement des assets de décor lit cette config.
         app.init_resource::<decor::DecorObstacles>();
@@ -479,12 +496,9 @@ impl Plugin for ForgiaModeRoguelitePlugin {
                 .in_set(GameSet::Movement)
                 .run_if(in_state(GameMode::Roguelite)),
         );
-        app.add_systems(
-            Update,
-            enemies::sys_write_enemies_sensor
-                .in_set(GameSet::Sensors)
-                .run_if(resource_exists::<enemies::EnemyStatsConfig>),
-        );
+        // (Le capteur `forgia2_enemies.json` est monté par
+        // `ForgiaEnemyArchetypesPlugin` — il suit les stats, donc il suit la
+        // brique qui les porte.)
         // Story-640 P0-2 — défense tri-couche (Vie/Bouclier/Armure). Le mécanisme
         // (`DefenseLayer`, absorption, régén) vit dans forgia-damage ; ici : genome
         // `roguelite_defense.toml` (hot-reload), régén du bouclier hors combat,
@@ -835,11 +849,28 @@ impl Plugin for ForgiaModeRoguelitePlugin {
             // AnimationPlayer, pilotés par ArenaBot.state) + viz de contrôle du rig
             // (mesh translucide + gizmos de bones, toggle hot-reload). Capteur
             // forgia2_enemy_anim.json.
-            .add_plugins(enemy_anim::ForgiaRogueliteEnemyAnimPlugin)
+            // (`EnemyAnimPlugin` et `EnemyHeadHitboxPlugin` sont montes par
+            // `ForgiaEnemyArchetypesPlugin`, avec les archetypes qu'ils servent.)
+            // Ce qui RESTE ici est la seule piece vraiment Roguelite : la viz de
+            // controle du rig (mesh translucide + gizmos d'os), un outil de debug
+            // de ce mode.
+            .init_resource::<enemy_rig_debug::EnemyMatRegistry>()
+            .add_systems(
+                OnExit(GameMode::Roguelite),
+                enemy_rig_debug::sys_clear_enemy_mat_registry,
+            )
+            .add_systems(
+                Update,
+                (
+                    enemy_rig_debug::sys_apply_rig_debug,
+                    enemy_rig_debug::sys_draw_enemy_bones,
+                )
+                    .in_set(GameSet::Effects)
+                    .run_if(in_state(GameMode::Roguelite)),
+            )
             // Story-652 — hitbox tête suivie de l'os `head` du rig (headshots réels :
             // l'ancien proxy était enfermé dans la capsule body, inatteignable en
             // raycast premier-hit). Capteur forgia2_head_hitbox.json.
-            .add_plugins(head_hitbox::RogueliteHeadHitboxPlugin)
             // Portail → salle de loot verticale (2026-06-06).
             .add_plugins(loot_room::RogueliteLootRoomPlugin)
             // Story-590 — obstacles animés du parcours (marteaux/balayeurs/blocs, Fall Guys).

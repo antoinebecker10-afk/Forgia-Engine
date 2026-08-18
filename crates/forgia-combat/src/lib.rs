@@ -36,6 +36,25 @@ pub mod weapons;
 // pub mod boss;
 // pub mod gcd;
 
+/// Ce qui peut ETRE TIRE. C'est le filtre du tir hitscan, pas un detail d'arene.
+///
+/// # Pourquoi ce marqueur a demenage (2026-08-18)
+///
+/// Il vivait dans `forgia-mode-fps-arena`, une crate de ZONE — si bien que
+/// `forgia-fps`, `forgia-mode-roguelite` et `forgia-observability` dependaient
+/// toutes de cette zone pour savoir ce qu'une balle touche. Une zone que, par
+/// ailleurs, aucun menu n'atteint : elle n'est joignable que par la variable
+/// d'environnement `FORGIA_BOOT_MODE=fps`.
+///
+/// Sa place est ici, avec le tir qui le lit. `forgia-mode-fps-arena` le
+/// re-exporte pour que rien ne bouge chez ses appelants.
+///
+/// Story-461 (Vague 3) : `#[require(Transform, Visibility)]` garantit que tout
+/// spawn insere Transform + Visibility avec Default si non fournis.
+#[derive(Component)]
+#[require(Transform, Visibility)]
+pub struct TargetCube;
+
 pub mod prelude {
     pub use crate::ammo::{
         sync_ammo_slot_from_config, AmmoChangeKind, AmmoChanged, AmmoConfig, AmmoSlot, ReloadKind,
@@ -54,7 +73,7 @@ pub mod prelude {
         damage_falloff, CasingResources, EquippedWeapons, WeaponFireCooldown, WeaponType,
         ARENA_V1_WEAPONS,
     };
-    pub use crate::{ForgiaCombatPlugin, Health};
+    pub use crate::{ForgiaCombatPlugin, Health, TargetCube};
     // ⛔ HitStopState : RETIRÉ DÉFINITIVEMENT (décision Antoine 2026-08-12).
     // Ne pas l'importer, ne pas le recréer. Motif et historique complets dans
     // `combat_juice.rs`, en-tête « HITSTOP ».

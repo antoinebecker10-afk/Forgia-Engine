@@ -433,15 +433,34 @@ impl Plugin for RogueliteAudioPlugin {
             .add_systems(OnEnter(GameMode::Fps), sys_stop_all_audio)
             .add_systems(OnEnter(GameMode::Rpg), sys_stop_all_audio)
             .add_systems(OnEnter(GameMode::CyberCity), sys_stop_all_audio)
+            // 🚨 L'Expédition manquait à cette liste, et c'est un oubli qui
+            // s'entend : le gate arrête le SYSTÈME de musique, pas la lecture en
+            // cours. On partait donc en expédition avec le thème du hub encore
+            // en train de boucler par-dessus la forêt. La liste est une
+            // énumération, donc elle vieillit mal — chaque mode ajouté doit y
+            // penser. (Une ambiance propre au Vallon reste à faire ; le silence
+            // est déjà plus juste que la musique d'un menu.)
+            .add_systems(OnEnter(GameMode::Expedition), sys_stop_all_audio)
+            // Le son du COMBAT, partagé avec l'Expédition (2026-08-16). Ces
+            // trois-là ne connaissent rien au Roguelite : ils lisent un
+            // `WeaponFiredEvent`, un `CombatHitEvent` et la locomotion du
+            // joueur. Les garder derrière la porte du Roguelite laissait
+            // l'Expédition **muette** — on y tirait sans un bruit, et sans un
+            // bruit de pas. C'est la moitié du game feel qui manquait, pour un
+            // prédicat.
             .add_systems(
                 Update,
-                (
-                    sys_fire_sfx,
-                    sys_sfx_on_combat_hit,
-                    sys_ding_on_currency,
-                    sys_event_sfx,
-                    sys_footsteps,
-                )
+                (sys_fire_sfx, sys_sfx_on_combat_hit, sys_footsteps)
+                    .in_set(GameSet::Effects)
+                    .run_if(mode_avec_combat),
+            )
+            // Ceux-ci restent au Roguelite : ils lisent des ressources qui
+            // n'existent que là — les Âmes ramassées et le compteur de vagues.
+            // Les ouvrir aussi aurait donné des systèmes qui tournent pour ne
+            // jamais rien jouer.
+            .add_systems(
+                Update,
+                (sys_ding_on_currency, sys_event_sfx)
                     .in_set(GameSet::Effects)
                     .run_if(in_state(GameMode::Roguelite)),
             )
@@ -1260,6 +1279,31 @@ fn sys_ambience_update(
     stats.ambience_playing = true;
 }
 
+/// Les modes où le COMBAT fait du bruit.
+///
+/// Même motif que `fps_combat_mode` côté tir : une source unique, à un endroit,
+/// plutôt qu'un `in_state(Roguelite)` recopié sur chaque système. C'est
+/// exactement la mécanique par laquelle un mode finit à moitié câblé — et
+/// l'Expédition en a fait la démonstration deux fois en trois jours : d'abord
+/// sans contrôleur, puis muette.
+///
+/// L'arène `Fps` n'y est PAS, et il faut dire pourquoi : **elle est muette elle
+/// aussi**. Vérifié — `sys_fire_sfx` est le SEUL lecteur de `WeaponFiredEvent`
+/// pour le son dans tout le dépôt, et `forgia-mode-fps-arena` n'a aucun canal
+/// audio à lui. Ce n'est donc pas « elle a déjà ses sons » : c'est un trou
+/// connu, laissé tel quel parce qu'aucun symptôme ne l'a nommé et que l'arène
+/// est un banc d'essai, pas un mode joué. L'ouvrir est une décision à prendre,
+/// pas une formalité à expédier au passage.
+fn mode_avec_combat(mode: Res<State<GameMode>>) -> bool {
+    combat_sonne(mode.get())
+}
+
+/// Le prédicat, séparé de son emballage ECS pour être vérifiable sans monter
+/// une `App`. Un mode oublié ici ne plante pas : il joue en silence.
+pub(crate) fn combat_sonne(mode: &GameMode) -> bool {
+    matches!(mode, GameMode::Roguelite | GameMode::Expedition)
+}
+
 fn sys_stop_all_audio(
     music: Res<AudioChannel<MusicChannel>>,
     ambience: Res<AudioChannel<AmbienceChannel>>,
@@ -1344,6 +1388,25 @@ fn sys_write_audio_sensor(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// L'Expédition a un combat : elle doit avoir son bruit.
+    ///
+    /// Elle est restée muette parce que le son du tir était rangé derrière un
+    /// `in_state(Roguelite)` — un mode entier qui tire sans un bruit, sans que
+    /// rien ne le signale. Ce test rend l'oubli impossible à rejouer en
+    /// silence : ajouter un mode de combat sans l'ajouter ici échoue.
+    #[test]
+    fn le_combat_sonne_dans_les_modes_qui_en_ont_un() {
+        assert!(combat_sonne(&GameMode::Roguelite));
+        assert!(
+            combat_sonne(&GameMode::Expedition),
+            "l'Expédition a un combat depuis le 2026-08-14 — elle doit sonner"
+        );
+        // Et les modes SANS combat n'ouvrent pas le canal : un système qui
+        // tourne pour ne jamais rien jouer est un coût sans contrepartie.
+        assert!(!combat_sonne(&GameMode::CastleHub), "le Hall ne se tire pas dessus");
+        assert!(!combat_sonne(&GameMode::None), "le menu ne se tire pas dessus");
+    }
 
     #[test]
     fn pitch_variation_stays_in_bounds_and_varies() {

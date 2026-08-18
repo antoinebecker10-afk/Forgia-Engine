@@ -1,0 +1,29 @@
+[package]
+name = "forgia-enemy-archetypes"
+version = "0.1.0"
+edition = "2021"
+description = "Forgia V2 — Les archétypes d'ennemis : stats data-driven, hot-reload, partagés par toutes les zones qui se battent."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+# `ArenaBot` et `BotShootConfig` : les composants que porte un ennemi. Le nom
+# dit « arena » pour des raisons historiques — c'est la brique de comportement
+# commune à toutes les zones, pas un système propre à l'arène.
+forgia-ai-arena-bot = { workspace = true }
+# `GameSet` pour placer le capteur, et les capacités de zone pour le hot-reload.
+forgia-core = { workspace = true }
+# L'animation lit la position du joueur pour son LOD de distance ; la hitbox de
+# tete pose des colliders et une `HitZoneTag`.
+bevy_rapier3d = { workspace = true }
+forgia-damage = { workspace = true }
+# L'assemblage d'un ennemi : `Health` + `TargetCube` (ce qui se tire), sa plaque
+# de nom, et l'envol qui remplace la disparition a la mort.
+forgia-combat = { workspace = true }
+forgia-effects = { workspace = true }
+forgia-enemy-nameplate = { workspace = true }
+forgia-player = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

@@ -82,14 +82,136 @@ impl Default for DropRules {
     }
 }
 
+impl AvatarAnimCfg {
+    /// Le nom déclaré pour un état, ou `""` si ce corps ne l'a pas.
+    ///
+    /// C'est le seul pont entre la décision (`locomotion_etat`, pure) et la
+    /// couche definition. Une chaîne vide n'est pas une erreur : c'est la
+    /// réponse « ce corps ne porte pas ce clip », et le sélecteur descend alors
+    /// sa chaîne de replis.
+    #[must_use]
+    pub fn nom_du_clip(&self, c: crate::locomotion_etat::Clip) -> &str {
+        use crate::locomotion_etat::Clip::*;
+        match c {
+            Idle => &self.idle_clip,
+            Marche => &self.walk_clip,
+            Course => &self.run_clip,
+            MarcheArriere => &self.back_clip,
+            PasDeCote => &self.strafe_clip,
+            Visee => &self.aim_clip,
+            Tir => &self.fire_clip,
+            Saut => &self.jump_clip,
+            Chute => &self.fall_clip,
+            Atterrissage => &self.land_clip,
+            AccroupiIdle => &self.crouch_idle_clip,
+            AccroupiMarche => &self.crouch_walk_clip,
+            AccroupiArriere => &self.crouch_back_clip,
+            Glissade => &self.slide_clip,
+            Virage => &self.turn_clip,
+        }
+    }
+
+    /// Les seuils de décision, tels que le sélecteur les attend.
+    #[must_use]
+    pub fn seuils(&self) -> crate::locomotion_etat::Seuils {
+        crate::locomotion_etat::Seuils {
+            marche_min_ms: self.walk_speed_min,
+            course_min_ms: self.run_speed_min,
+            lateral_min_ms: self.lateral_min,
+            montee_min_ms: 0.5,
+            virage_min_rad_s: self.turn_rate_min,
+            atterrissage_s: self.land_seconds,
+            vitesse_absurde_ms: self.max_sane_speed,
+            air_min_s: self.air_grace_seconds,
+        }
+    }
+}
+
+fn default_lateral_min() -> f32 {
+    0.8
+}
+/// ~la durée du clip `land` de Mixamo. Plus long, il masquerait la reprise de
+/// course ; plus court, on ne le verrait jamais.
+fn default_land_s() -> f32 {
+    0.25
+}
+/// 0,10 s = six frames à 60 Hz. Assez pour absorber les décollements de terrain,
+/// assez court pour qu'un vrai saut parte sans retard visible : à 9,75 m/s on
+/// n'a parcouru qu'un mètre.
+fn default_air_grace_s() -> f32 {
+    0.10
+}
+
+/// ~34°/s. Au-delà, le personnage pivote assez pour qu'un virage sur place se
+/// voie ; en dessous, c'est une correction de visée.
+fn default_turn_rate() -> f32 {
+    0.6
+}
+
 /// Animation de l'avatar. Aligné sur `roguelite_enemy_anim.toml` (story-636) :
 /// clips par NOM, fondu, seuils de vitesse et plafond anti-téléport. Le projet
 /// n'a pas besoin de deux modèles d'animation de personnage.
+/// # Les clips au-delà des trois premiers sont TOUS optionnels
+///
+/// Deux corps cohabitent : celui de l'Expédition porte 34 clips, le trooper du
+/// Hall en porte **deux**. Un champ obligatoire de plus et la fiche du trooper ne
+/// se lirait plus — le Hall perdrait son personnage pour une locomotion qu'il n'a
+/// pas. Chaque nouveau clip est donc `#[serde(default)]`, et une chaîne vide vaut
+/// « ce corps ne l'a pas » : le sélecteur descend alors sa chaîne de replis
+/// (cf. `locomotion_etat::Clip::replis`).
 #[derive(Deserialize, Clone, Debug)]
 pub struct AvatarAnimCfg {
     pub idle_clip: String,
     pub walk_clip: String,
     pub run_clip: String,
+    /// Reculer. Sans lui, la marche se joue à l'endroit en marche arrière.
+    #[serde(default)]
+    pub back_clip: String,
+    /// Pas de côté — le mouvement le plus fréquent d'un combat en 3ᵉ personne.
+    #[serde(default)]
+    pub strafe_clip: String,
+    /// Pose de visée CAPTURÉE. Elle remplace ce que l'IK des bras approximait ;
+    /// l'IK garde le suivi du tangage, qu'un clip figé ne peut pas faire.
+    #[serde(default)]
+    pub aim_clip: String,
+    #[serde(default)]
+    pub fire_clip: String,
+    #[serde(default)]
+    pub jump_clip: String,
+    /// Chuter. Séparé du saut : sans lui, on descend en gardant la pose de montée.
+    #[serde(default)]
+    pub fall_clip: String,
+    #[serde(default)]
+    pub land_clip: String,
+    #[serde(default)]
+    pub crouch_idle_clip: String,
+    #[serde(default)]
+    pub crouch_walk_clip: String,
+    #[serde(default)]
+    pub crouch_back_clip: String,
+    #[serde(default)]
+    pub slide_clip: String,
+    /// Virage sur place. Sans lui, changer de direction à l'arrêt fait pivoter
+    /// le personnage sans que ses pieds bougent.
+    #[serde(default)]
+    pub turn_clip: String,
+    /// Seuil de pas de côté (m/s). En dessous, c'est du bruit de contrôleur.
+    #[serde(default = "default_lateral_min")]
+    pub lateral_min: f32,
+    /// Durée pendant laquelle le clip d'atterrissage gagne sur la marche.
+    #[serde(default = "default_land_s")]
+    pub land_seconds: f32,
+    /// Combien de temps hors sol avant de jouer une pose aérienne (s).
+    ///
+    /// 🚨 Le contact au sol n'est pas un booléen fiable : une capsule le perd
+    /// une frame sur une bosse, un raccord de dalle, un haut de rampe. Sans ce
+    /// délai, le clip de chute clignote pendant la marche — rapporté en jeu le
+    /// 2026-08-18. Le régler se fait manette en main, d'où sa place ici.
+    #[serde(default = "default_air_grace_s")]
+    pub air_grace_seconds: f32,
+    /// Vitesse de rotation (rad/s) à partir de laquelle un virage sur place se voit.
+    #[serde(default = "default_turn_rate")]
+    pub turn_rate_min: f32,
     pub crossfade_ms: u64,
     pub walk_speed_min: f32,
     pub run_speed_min: f32,
@@ -102,6 +224,25 @@ impl Default for AvatarAnimCfg {
             idle_clip: "idle".into(),
             walk_clip: "walk".into(),
             run_clip: "walk".into(),
+            // Vides par défaut : un corps qui ne les déclare pas n'en a pas, et
+            // le sélecteur retombe proprement. Les inventer ici ferait chercher
+            // dans le glTF des clips qui n'y sont pas, à chaque chargement.
+            back_clip: String::new(),
+            strafe_clip: String::new(),
+            aim_clip: String::new(),
+            fire_clip: String::new(),
+            jump_clip: String::new(),
+            fall_clip: String::new(),
+            land_clip: String::new(),
+            crouch_idle_clip: String::new(),
+            crouch_walk_clip: String::new(),
+            crouch_back_clip: String::new(),
+            slide_clip: String::new(),
+            turn_clip: String::new(),
+            lateral_min: default_lateral_min(),
+            land_seconds: default_land_s(),
+            air_grace_seconds: default_air_grace_s(),
+            turn_rate_min: default_turn_rate(),
             crossfade_ms: 150,
             walk_speed_min: 0.6,
             run_speed_min: 6.0,

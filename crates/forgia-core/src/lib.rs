@@ -9,6 +9,8 @@
 use bevy::prelude::*;
 
 /// Story-674 — primitives d'aménagement partagées (bruit bleu, compte d'abris).
+pub mod capacites;
+pub mod constat;
 pub mod layout;
 pub mod sectors;
 
@@ -84,6 +86,10 @@ pub mod asset_paths {
 }
 
 pub mod prelude {
+    pub use crate::capacites::{
+        a_du_combat, affiche_le_retour_de_combat, affiche_les_vagues, capacites,
+        utilise_le_hud_generique, Capacites,
+    };
     pub use crate::cosmetics::{ArmCosmetics, ArmStyle, UiStudioCamera, ViewmodelForcedVisible};
     pub use crate::faction::Faction;
     pub use crate::fps_feel::FpsFeelMetrics;

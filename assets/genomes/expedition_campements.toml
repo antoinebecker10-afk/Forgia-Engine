@@ -1,0 +1,53 @@
+# expedition_campements.toml — Les campements du Vallon : QUI apparaît, et QUAND.
+#
+# Rechargé à chaud pendant que le jeu tourne (`Genome<T>`, watcher d'assets) :
+# on règle un effectif ou un rayon sans rebuild.
+#
+# ─────────────────────────── POURQUOI UNE CORRESPONDANCE ───────────────────────
+#
+# Le manifeste de la carte (`expedition_vallon.json`) est CUIT PAR BLENDER, et il
+# nomme ses ennemis « grunt » et « archer ». Ces noms viennent de
+# `assets/genomes/enemies/`, quatre fichiers qu'aucune ligne de Rust n'a jamais
+# lus — vérifié le 2026-08-18 par `python tools/ai/strates.py` (61 génomes morts
+# sur 141). Le jeu, lui, ne connaît que quatre archétypes vivants :
+# tank · runner · sniper · boss (`roguelite/roguelite_enemies.toml`).
+#
+# On ne corrige pas le manifeste à la main : il est REGÉNÉRÉ à chaque export
+# Blender, et l'édition serait perdue au prochain passage. La correspondance vit
+# donc ici, où elle se lit, se discute et se change en une ligne.
+#
+# Changer un camp de saveur = changer une valeur de cette table.
+
+[correspondance]
+# nom autoré dans le manifeste  =  archétype qui existe en jeu
+#
+# grunt  → runner : le manifeste voulait un essaim rapide et fragile.
+#          Le runner EST ça (35 pv, 7,0 m/s) — c'est le plus proche des quatre.
+#          Il tire à 8 m au lieu de frapper au contact : il n'existe aucune mêlée
+#          dans Forgia, et prétendre le contraire dans une carte ne la crée pas.
+# archer → sniper : tient ses distances et tire de loin (28 m). Exactement le rôle.
+grunt = "runner"
+archer = "sniper"
+# Déclarés d'avance pour que le prochain export Blender ne bute pas dessus.
+elite = "tank"
+boss = "boss"
+
+[apparition]
+# Le camp s'éveille quand le joueur entre dans ce rayon autour de son centre.
+#
+# DÉRIVÉ, pas choisi : c'est la plus longue portée de tir du roster (sniper,
+# 28 m) plus la moitié du rayon d'un camp (10 m). En deçà, le joueur serait déjà
+# dans la portée d'un ennemi qui n'existe pas encore — il prendrait un tir venu
+# de nulle part. Au-delà, le camp s'anime hors de vue et le combat commence sans
+# qu'on ait rien vu venir.
+rayon_declenchement_m = 33.0
+
+# En dessous de ce nombre d'ennemis vivants, le camp est considéré nettoyé et son
+# verrou s'ouvre. À 0 : il faut tout tuer (`condition_sortie` du manifeste dit
+# « tous morts »). Le laisser réglable permet de tester une sortie plus permissive
+# sans toucher au code.
+restants_pour_ouvrir = 0
+
+# Un camp nettoyé ne se repeuple pas : on ne rejoue pas un combat déjà gagné en
+# revenant sur ses pas. Mettre `true` pour un mode « patrouille » plus tard.
+repeupler_apres_nettoyage = false

@@ -89,16 +89,11 @@ pub(crate) fn draw_ammo_counter(
     time: Res<Time>,
     mut cache: Local<DrawCache>,
 ) {
-    // `Expedition` (2026-08-14) : elle se joue à la 3ᵉ personne et son combat
-    // consomme les mêmes munitions. Un mode où l'on tire sans compteur de
-    // munitions n'est pas « épuré », il est illisible — on ne sait jamais quand
-    // recharger.
-    if *app_state.get() != AppMode::InGame
-        || !matches!(
-            *game_mode.get(),
-            GameMode::Fps | GameMode::Roguelite | GameMode::Expedition
-        )
-    {
+    // Un mode où l'on tire sans compteur de munitions n'est pas « épuré », il
+    // est illisible — on ne sait jamais quand recharger. C'est donc une pièce du
+    // retour de combat, au même titre que le flash et le killfeed, et ça se lit
+    // dans `forgia_core::capacites` plutôt qu'ici.
+    if !capacites(game_mode.get()).retour_de_combat || *app_state.get() != AppMode::InGame {
         return;
     }
     let Ok(ctx) = contexts.ctx_mut() else { return };
@@ -245,12 +240,11 @@ pub(crate) fn draw_slot_strip(
 ) {
     // Story-571 HUD : en Roguelite, les armes sont affichées par
     // `forgia-mode-roguelite::hud::draw_weapon_slots` (noms lore Pépin/Bourrasque/…).
-    // Ce strip vertical est donc gardé pour les modes qui n'ont pas leur propre
-    // affichage d'armes : l'Arena FPS, et l'Expédition (2026-08-14) — où le
-    // changement d'arme est actif et doit donc se voir.
-    if *app_state.get() != AppMode::InGame
-        || !matches!(*game_mode.get(), GameMode::Fps | GameMode::Expedition)
-    {
+    // Ce strip vertical sert donc aux zones qui n'ont PAS de HUD à elles — ce
+    // que `capacites().hud_generique` nomme désormais. Le Roguelite en est
+    // exclu parce qu'il a le sien, pas parce qu'il en manque : la nuance était
+    // invisible dans une liste de modes, elle est écrite dans la capacité.
+    if !capacites(game_mode.get()).hud_generique || *app_state.get() != AppMode::InGame {
         return;
     }
     if equipped.slots.is_empty() {

@@ -29,7 +29,7 @@ use crate::defense::DefenseConfig;
 use crate::enemies::EnemyStatsConfig;
 use forgia_combat::Health;
 use forgia_damage::Mortal;
-use forgia_mode_fps_arena::TargetCube;
+use forgia_combat::TargetCube;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 
