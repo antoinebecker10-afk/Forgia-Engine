@@ -30,6 +30,7 @@
 
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use forgia_core::prelude::GameMode;
 
 #[derive(Resource, Default)]
 pub struct PhysicsSensorState {
@@ -41,6 +42,12 @@ const SENSOR_PATH: &str = "forgia2_physics.json";
 #[allow(clippy::too_many_arguments)]
 pub fn sys_write_physics_sensor(
     time: Res<Time>,
+    // La ZONE courante. Sans elle, ce capteur criait « Physics world empty »
+    // depuis le menu — ou aucun monde n'est cense tourner. Mesure du
+    // 2026-08-18 : 3 alertes sur 7 etaient des faux positifs de menu. Un
+    // capteur qui crie dans le vide apprend a etre ignore, et c'est ainsi que
+    // 19 capteurs se sont figes jusqu'a 436 h sans que personne reagisse.
+    mode: Res<State<GameMode>>,
     q_config: Query<&RapierConfiguration>,
     mut state: ResMut<PhysicsSensorState>,
     q_rb: Query<&RigidBody>,
@@ -81,7 +88,16 @@ pub fn sys_write_physics_sensor(
         .map(|c| c.gravity.y)
         .unwrap_or(f32::NAN);
 
-    let (severity, next_step) = if rb_total == 0 && colliders_total == 0 {
+    // `simulation` dit si une zone est censee faire tourner un monde. Un monde
+    // vide n'est un DEFAUT que la ou il devait y en avoir un.
+    let simule = forgia_core::prelude::capacites(mode.get()).simulation;
+
+    let (severity, next_step) = if !simule {
+        (
+            "info",
+            "aucune zone chargee (menu) — rien a mesurer, ce n'est pas un defaut",
+        )
+    } else if rb_total == 0 && colliders_total == 0 {
         (
             "warn",
             "Physics world empty — RapierPhysicsPlugin pas initialisé ou aucun corps actif",

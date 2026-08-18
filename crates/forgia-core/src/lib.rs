@@ -88,7 +88,7 @@ pub mod asset_paths {
 pub mod prelude {
     pub use crate::capacites::{
         a_du_combat, affiche_le_retour_de_combat, affiche_les_vagues, capacites,
-        utilise_le_hud_generique, Capacites,
+        simule_un_monde, utilise_le_hud_generique, Capacites,
     };
     pub use crate::cosmetics::{ArmCosmetics, ArmStyle, UiStudioCamera, ViewmodelForcedVisible};
     pub use crate::faction::Faction;

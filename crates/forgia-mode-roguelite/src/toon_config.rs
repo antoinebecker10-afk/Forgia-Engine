@@ -11,6 +11,7 @@
 //! Bible v1 (cartoon family-friendly) : 4 bands + outline Sobel noir 0.8.
 
 use bevy::prelude::*;
+use forgia_core::prelude::GameMode;
 use forgia_player::prelude::ViewmodelCamera;
 use forgia_postprocess::toon::ToonSettings;
 use serde::Deserialize;
@@ -258,6 +259,11 @@ const OUTLINE_ATTACHED: bool = true;
 /// Sensor `forgia2_toon.json` 1Hz — état runtime + dernière config appliquée.
 pub fn sys_write_toon_sensor(
     time: Res<Time>,
+    // Le cel-shading n'est monte QUE dans l'Abime : ailleurs, zero camera
+    // attachee est l'etat normal. Sans ce parametre, ce capteur criait « 0
+    // Camera3d attached » depuis le menu — un des 3 faux positifs mesures le
+    // 2026-08-18.
+    mode: Res<State<GameMode>>,
     mut accum: Local<f32>,
     cfg: Option<Res<RogueliteToonConfig>>,
     watch: Option<Res<ToonGenomeWatch>>,
@@ -275,7 +281,11 @@ pub fn sys_write_toon_sensor(
         return;
     };
 
-    let (severity, next_step) = severity_for_toon(cfg.strength, watch.attached_cameras);
+    let (severity, next_step) = severity_for_toon(
+        cfg.strength,
+        watch.attached_cameras,
+        *mode.get() == GameMode::Roguelite,
+    );
 
     let json = format!(
         r#"{{"id":"toon","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"bands":{:.2},"strength":{:.2},"edge_dark":{:.2},"outline_enabled":{},"outline_attached":{},"outline_thickness":{:.2},"outline_threshold":{:.2},"outline_strength":{:.2},"attached_cameras":{},"reload_count":{},"last_reload_secs":{:.1}}}"#,
@@ -301,7 +311,20 @@ pub fn sys_write_toon_sensor(
 /// Pur — testable. Severity `warn` si config "on" mais aucune caméra attachée
 /// (= post-process invisible runtime malgré activation), `info` si l'outline est
 /// demandé en config mais jamais appliqué (plugin désactivé, story-593).
-pub fn severity_for_toon(strength: f32, attached_cameras: u32) -> (&'static str, &'static str) {
+pub fn severity_for_toon(
+    strength: f32,
+    attached_cameras: u32,
+    zone_concernee: bool,
+) -> (&'static str, &'static str) {
+    // Hors de l'Abime, ce post-process n'est pas monte : ne rien trouver est
+    // l'etat attendu, pas un defaut. `info` le DIT, la ou `ok` laisserait croire
+    // qu'on a mesure quelque chose.
+    if !zone_concernee {
+        return (
+            "info",
+            "hors Abime — le cel-shading n'y est pas monte, rien a mesurer",
+        );
+    }
     if strength > 0.0 && attached_cameras == 0 {
         (
             "warn",
@@ -362,9 +385,12 @@ default = -5.0
 
     #[test]
     fn severity_warn_when_strength_but_no_camera() {
-        assert_eq!(severity_for_toon(1.0, 0).0, "warn");
-        assert_eq!(severity_for_toon(1.0, 1).0, "ok");
-        assert_eq!(severity_for_toon(0.0, 0).0, "ok");
+        assert_eq!(severity_for_toon(1.0, 0, true).0, "warn");
+        assert_eq!(severity_for_toon(1.0, 1, true).0, "ok");
+        assert_eq!(severity_for_toon(0.0, 0, true).0, "ok");
+        // Hors zone : jamais d'alerte, et surtout pas `ok` — `info` dit qu'on
+        // n'a rien mesure, la ou `ok` dirait qu'on a mesure et que tout va bien.
+        assert_eq!(severity_for_toon(1.0, 0, false).0, "info");
     }
 
     #[test]
