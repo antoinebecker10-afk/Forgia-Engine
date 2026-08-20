@@ -295,11 +295,11 @@ plus, et cinq chiffres « défaut connu » codés en dur étaient tous faux.*
 ## Cross-refs
 
 - [`map-design-patterns.md`](map-design-patterns.md) — les 14 patterns de construction + tableau d'état
-- [Registre des défauts](../../docs/audits/arena-test-registre-defauts.md) — la matière première
+- [Registre des défauts](../audits/arena-test-registre-defauts.md) — la matière première
 - `assets/genomes/roguelite/roguelite_enemies.toml` — **les archétypes vivants**
   (`assets/genomes/enemies/` est mort : 0 consommateur Rust, cf. §2)
 - `assets/genomes/arena_waves.toml` — les vagues
 - `tools/ai/strates.py` — **avant de citer un génome ici**, vérifier qu'il est lu
   (C2 : 61 fichiers morts sur 141 au 2026-08-18)
-- [`docs/audit/audit-2026-08-18-strates-the-spared.md`](../../../docs/audit/audit-2026-08-18-strates-the-spared.md) §4 — pourquoi cette section a été corrigée
+- [`docs/audit/audit-2026-08-18-strates-the-spared.md`](../audit/audit-2026-08-18-strates-the-spared.md) §4 — pourquoi cette section a été corrigée
 - `no-hardcode.md` · `genome-code.md` — les valeurs vivent en couche definition

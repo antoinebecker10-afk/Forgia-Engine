@@ -6,8 +6,11 @@ description: Concevoir ou auditer une carte — charge les deux règles de conce
 
 Les deux règles de conception de carte pèsent **23,7 Ko**. Chargées à chaque
 session, elles coûtaient ~6 000 tokens par session pour un sujet qu'on aborde
-quelques fois par mois. Elles vivent donc dans `.claude/rules/on-demand/`, et
-cette commande est ce qui les fait entrer.
+quelques fois par mois. Elles vivent donc dans `docs/design/`, HORS de
+`.claude/rules/` — mesuré le 2026-08-20 : le harnais charge `.claude/rules/`
+**récursivement**, sous-dossiers compris, donc un dossier `on-demand/` dedans
+était chargé quand même. Seule la sortie du dossier rend le « à la demande »
+réel ; cette commande est ce qui les fait entrer.
 
 > **Une règle se paie à CHAQUE session ; un fichier chargé à la demande ne se
 > paie que quand on s'en sert.** Le budget de contexte du projet a un plafond
@@ -17,12 +20,12 @@ cette commande est ce qui les fait entrer.
 
 **Lis les deux fichiers, dans cet ordre — l'intention avant la géométrie :**
 
-1. `.claude/rules/on-demand/map-design-intention.md`
+1. `docs/design/map-design-intention.md`
    Le **QUOI** : spec de combat, archétypes d'ennemis, composition d'une salle,
    rythme d'une run, porte de sortie. **Bloquant** : sans spec de combat, la
    géométrie n'a pas de juge.
 
-2. `.claude/rules/on-demand/map-design-patterns.md`
+2. `docs/design/map-design-patterns.md`
    Le **COMMENT** : les 14 patterns de construction, leur tableau d'état
    (TENU / PARTIEL / CONTRÔLÉ / ÉCRIT), et ce qu'ils ne couvrent pas.
 

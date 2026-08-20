@@ -120,6 +120,30 @@ séparées), il faut un **test qui compare les deux ensembles**.
 
 ---
 
+## 4 ter. Une garde se verifie contre le TRACE, jamais contre une tangente
+
+Ajoute le 2026-08-18 apres **trois occurrences le meme jour**, sur la meme carte,
+corrigees separement avant qu'on voie que c'etait UNE faute :
+
+| Ou | Le repere utilise | Ce que ca a laisse passer |
+|---|---|---|
+| abris de campement | l'axe **droit** du camp | un abri a **3,36 m** pour une garde de 3,60 |
+| palissade | un cap **unique**, celui du centre | des pieces qui divergent du chemin (jusqu'a 16 deg) |
+| culees du pont | la tangente **au pont**, + 14,2 m d'avance | des pierres posees « a 2,7 m de l'axe », mesurees a **0,24 m** |
+
+> **Un repere local est valable AU POINT ou on le prend, jamais a quinze metres
+> de la.** La formule reste juste ; c'est l'invariant qui devient faux.
+
+Ces trois-la ne levent rien, ne cassent aucun test, et se voient seulement a
+l'oeil — les trois ont ete trouves par l'user, jamais par un chiffre.
+
+**Le signal :** tout code qui calcule `origine + tangente x d` avec `d` grand
+devant le rayon de courbure. **Le remede :** mesurer contre la polyligne (ici
+`ecarter_du_chemin`, qui pousse sur le gradient de la vraie distance).
+**Le corollaire :** une piece placee en repere local puis AVANCEE se re-verifie
+apres l'avance, jamais avant.
+
+
 ## 5. Ce qui n'est PAS couvert, et qu'il faut dire
 
 Cette règle traite l'apparition. Elle **ne traite pas** le blocage en cours de
@@ -163,9 +187,9 @@ l'apparition est garantie et que le reste est ouvert.
 
 ## 7. Cross-refs
 
-- `on-demand/map-design-intention.md` §2.4 — les arrivées ennemies « ni dans le dos au
+- `../../docs/design/map-design-intention.md` §2.4 — les arrivées ennemies « ni dans le dos au
   contact, ni hors de vue, **atteignables** »
-- `on-demand/map-design-patterns.md` §1 — le personnage est un **disque** : les
+- `../../docs/design/map-design-patterns.md` §1 — le personnage est un **disque** : les
   dégagements se mesurent en distance, jamais en AABB gonflée
 - `feedback_derive_ne_patche_pas_la_geometrie` — traiter la classe, pas le symptôme
 - `observability-required.md` — le nombre de props rejetés doit se voir

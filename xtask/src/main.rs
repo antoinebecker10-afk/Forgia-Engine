@@ -1667,7 +1667,18 @@ fn walk_test_count(p: &Path, total: &mut usize) {
 // Mesuré 92 430 o le 2026-08-09, après le dégraissage d'`outillage.md`
 // (14 468 → 4 927). Le plafond serre à ~2,5 Ko près : c'est un cliquet, pas une
 // autorisation de croître.
-const CONTEXT_BUDGET_BYTES: u64 = 95_000;
+//
+// 2026-08-20 — deux corrections (déclencheur : article Anthropic « context
+// engineering for Claude 5 », vérifié en session : le harnais charge
+// .claude/rules/ RÉCURSIVEMENT, sous-dossiers compris) :
+// 1. le scan descend dans les sous-dossiers — l'ancien read_dir plat ne voyait
+//    pas `on-demand/` (27,8 Ko chargés chaque session, invisibles au gate : le
+//    « contrôle qui passe à vide » de controle-de-la-sortie.md §1). Les règles
+//    map sont sorties vers docs/design/ ; ce scan récursif garantit qu'aucun
+//    sous-dossier ne pourra plus se glisser ici en silence.
+// 2. plafond abaissé après le déménagement : 83 163 o mesurés (fs::metadata,
+//    scan récursif) → 84 000. Abaissé de nouveau après chaque dégraissage.
+const CONTEXT_BUDGET_BYTES: u64 = 84_000;
 
 fn context_budget(_args: &[String]) -> i32 {
     println!("[xtask] context-budget — poids charge a CHAQUE session");
@@ -1690,18 +1701,25 @@ fn context_budget(_args: &[String]) -> i32 {
         eprintln!("ERROR: .claude/rules/ introuvable (lancer depuis la racine du workspace)");
         return 2;
     }
-    let mut entrees: Vec<_> = match fs::read_dir(regles) {
-        Ok(d) => d.filter_map(Result::ok).collect(),
-        Err(e) => {
-            eprintln!("ERROR: lecture de .claude/rules/ : {e}");
-            return 2;
-        }
-    };
-    entrees.sort_by_key(std::fs::DirEntry::file_name);
-    for e in entrees {
-        let p = e.path();
-        if p.extension().is_some_and(|x| x == "md") {
-            ajoute(&p, &mut lignes, &mut total);
+    // Récursif : le harnais charge les sous-dossiers aussi (mesuré 2026-08-20,
+    // `on-demand/` était chargé chaque session en échappant au gate).
+    let mut a_visiter = vec![regles.to_path_buf()];
+    while let Some(dossier) = a_visiter.pop() {
+        let mut entrees: Vec<_> = match fs::read_dir(&dossier) {
+            Ok(d) => d.filter_map(Result::ok).collect(),
+            Err(e) => {
+                eprintln!("ERROR: lecture de {} : {e}", dossier.display());
+                return 2;
+            }
+        };
+        entrees.sort_by_key(std::fs::DirEntry::file_name);
+        for e in entrees {
+            let p = e.path();
+            if p.is_dir() {
+                a_visiter.push(p);
+            } else if p.extension().is_some_and(|x| x == "md") {
+                ajoute(&p, &mut lignes, &mut total);
+            }
         }
     }
 

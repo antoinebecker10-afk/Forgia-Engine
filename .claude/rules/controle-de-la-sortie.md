@@ -139,5 +139,5 @@ et juste vaut mieux qu'un large et bruyant.
 
 `observability-required.md` (tout nombre publié porte son seuil) ·
 `no-speculative-fix.md` (citer la source de l'évidence) ·
-`on-demand/map-design-patterns.md` §13-14, d'où cette règle est généralisée ·
+`../../docs/design/map-design-patterns.md` §13-14, d'où cette règle est généralisée ·
 `multi-terminal-coordination.md` §5 (artefact = preuve, pas la source).

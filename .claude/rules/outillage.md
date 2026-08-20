@@ -95,7 +95,7 @@ grepai sur un grep.
 ## 7. Cross-refs
 
 `log-digest.md` · `session-checkpoint.md` · `multi-terminal-coordination.md` ·
-`on-demand/map-design-patterns.md` §13-14 (« 0 mesuré n'est pas vert ») ·
+`../../docs/design/map-design-patterns.md` §13-14 (« 0 mesuré n'est pas vert ») ·
 [tools/ai/tests/LISEZMOI.md](../../tools/ai/tests/LISEZMOI.md) (les 5 défauts
 que les bancs ont trouvés) · `[[reference_outillage_controle_automatique_session]]`
 

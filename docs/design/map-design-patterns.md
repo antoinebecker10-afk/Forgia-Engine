@@ -12,7 +12,7 @@
 >
 > **14 patterns, 4 familles.** Chaque chiffre est dérivé d'une métrique mesurée
 > dans le moteur ou d'une source nommée — aucun n'est choisi. Les numéros `[n]`
-> renvoient au [registre des défauts](../../docs/audits/arena-test-registre-defauts.md) :
+> renvoient au [registre des défauts](../audits/arena-test-registre-defauts.md) :
 > un pattern ne vaut que s'il aurait empêché une ligne réelle.
 
 **Métriques de référence** (mesurées, non négociables) : capsule 2,0 m × 0,6 m —
@@ -189,7 +189,7 @@ construction géométrique d'un blockout, rien de plus.
 
 ## Cross-refs
 
-- [Registre des 35 défauts](../../docs/audits/arena-test-registre-defauts.md) — la matière première
-- [story-667](../../docs/stories/story-667-arena-test-blockout-bench.md) — le détail sourcé et l'historique des passes
+- [Registre des 35 défauts](../audits/arena-test-registre-defauts.md) — la matière première
+- [story-667](../stories/story-667-arena-test-blockout-bench.md) — le détail sourcé et l'historique des passes
 - `no-hardcode.md` — les chiffres vivent en couche definition
 - `concept-first.md` §3 étape 0 — data ou code, avant tout Edit

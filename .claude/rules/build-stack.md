@@ -1,31 +1,27 @@
-# Build & Stack (Forgia)
+# Build & Stack (Forgia V2)
 
-## Build Commands
+> Réécrite 2026-08-20 — l'ancienne version décrivait le stack **V1** (3 crates,
+> « pas de tests », lightyear) et induisait les sessions en erreur. Chiffres du jour.
+
+## Commandes
+
 ```bash
-# Workspace structure: forgia-engine (lib), forgia-terrain (lib), forgia-game (bin)
-cargo build -p forgia-game          # Debug (opt-level 1, deps opt-level 3)
-cargo run -p forgia-game            # Run debug
-cargo build -p forgia-game --release # Release (thin LTO, codegen-units=1)
-cargo clippy --workspace -- -W warnings  # Lint (0 warnings obligatoire)
+cargo forgia-dev                    # LA commande de dev : Tracy + BRP (cf. outillage.md §5bis)
+cargo build -p forgia               # binaire canonique = `forgia` (package racine)
+cargo clippy --workspace -- -W warnings   # 0 warning obligatoire
+cargo run -p xtask -- <gate>        # les cliquets (story-gate, context-budget, …)
 ```
-Pas de tests. Cible : 1920x1080 borderless fullscreen.
 
-## Stack technique
-| Crate | Version | Role |
-|-------|---------|------|
-| bevy | 0.18.1 | Moteur ECS |
-| bevy_rapier3d | 0.33 | Physique, collisions |
-| bevy_egui | 0.39.1 | UI immediate-mode |
-| leafwing-input-manager | 0.20 | Input AZERTY |
-| bevy_hanabi | 0.18 | Particules GPU |
-| bevy_water | 0.18 | Eau procedurale |
-| bevy_kira_audio | 0.25 | Audio |
-| noise | 0.9 | Perlin terrain |
-| fast-surface-nets | 0.2 | Meshing SDF voxel |
-| bevy_mod_scripting | 0.19 | Scripting Luau |
-| lightyear | 0.26.4 | Networking UDP |
+⚠ `cargo run -p forgia-game` = exe stale silencieux. ⚠ RTK fausse clippy
+(`reference_rtk_wraps_cargo_hides_clippy_lints`).
 
-## Codebase
-- ~243 fichiers .rs, 3 crates (forgia-game ~198, forgia-engine ~15, forgia-terrain ~15)
-- 17 modules forgia-game: ai, combat, components, debug, effects, gamemode, inventory, network, persistence, player, quests, sky, terrain, triggers, ui, vehicle, world
-- 18 plugins, 5 collision groups (G1-G5)
+## Stack
+
+Bevy **0.18.1** (pinné jusqu'au ship) · bevy_rapier3d 0.33 · bevy_egui 0.39 ·
+bevy_hanabi 0.18 · bevy_kira_audio 0.25 · leafwing-input-manager 0.20 (AZERTY) ·
+vleue_navigator 0.15 (navmesh). **Aucune dépendance réseau** (lightyear = V1, jamais porté).
+
+## Volume (mesuré 2026-08-20)
+
+**68 crates** · ~158 k LOC · **2 234 tests** · 147 capteurs · gates xtask en CI.
+L'état exact des crates : `ARCHITECTURE.md` (gardé par `arch-drift`).
