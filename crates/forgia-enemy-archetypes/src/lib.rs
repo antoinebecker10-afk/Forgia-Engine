@@ -39,6 +39,7 @@
 pub mod anim;
 pub mod assemblage;
 pub mod head_hitbox;
+pub mod mort;
 
 use bevy::color::LinearRgba;
 use bevy::prelude::*;
@@ -469,7 +470,13 @@ impl Plugin for ForgiaEnemyArchetypesPlugin {
         // Les deux plugins de la brique : l'animation squelettique et la hitbox
         // de tete. Ils suivaient le mode Roguelite alors qu'ils ne decrivent que
         // l'ennemi — une zone qui en spawne les veut forcement.
-        app.add_plugins((anim::EnemyAnimPlugin, head_hitbox::EnemyHeadHitboxPlugin));
+        app.add_plugins((
+            anim::EnemyAnimPlugin,
+            head_hitbox::EnemyHeadHitboxPlugin,
+            // Sans lui, un ennemi assemble ici ne meurt JAMAIS : `AscendsOnDeath`
+            // l'exclut du balayage de `forgia-fps`, et rien d'autre ne le retire.
+            mort::EnemyDeathPlugin,
+        ));
         app.add_systems(Startup, sys_init_enemy_genome)
             .add_systems(
                 Update,

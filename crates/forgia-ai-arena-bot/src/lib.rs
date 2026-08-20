@@ -618,11 +618,18 @@ fn on_bot_death(
     let Ok((xf, spawn)) = bots.get(target) else {
         return;
     };
-    let is_roguelite = matches!(
-        game_mode.as_deref().map(|s| s.get()),
-        Some(GameMode::Roguelite)
-    );
-    if !is_roguelite {
+    // 2026-08-18 — c'était `if !is_roguelite { queue_respawn() }` : la
+    // réapparition infinie était le comportement PAR DÉFAUT, et une seule zone
+    // s'en exemptait **par son nom**. L'Expédition en a hérité en silence — ses
+    // campements ne pouvaient donc jamais se nettoyer, ni leur verrou s'ouvrir.
+    //
+    // La règle appartient désormais à la zone, qui la DÉCLARE
+    // (`forgia_core::capacites`). Une zone nouvelle doit dire ce qu'elle veut au
+    // lieu d'hériter du contraire sans le savoir.
+    let revient = game_mode
+        .as_deref()
+        .is_some_and(|s| forgia_core::prelude::ennemis_reapparaissent(s.get()));
+    if revient {
         let pos = spawn.map(|s| s.position).unwrap_or(xf.translation);
         let delay = spawn.map(|s| s.respawn_delay).unwrap_or(3.0);
         pending.queue.push((delay, pos));
@@ -650,12 +657,14 @@ fn tick_respawns(
     mut commands: Commands,
     game_mode: Option<Res<State<GameMode>>>,
 ) {
-    // 2026-05-29 — en Roguelite, drain la queue sans respawn. Garde-fou si des
-    // respawns avaient été queuées avant entrée mode (race OnEnter vs ticks).
-    if matches!(
-        game_mode.as_deref().map(|s| s.get()),
-        Some(GameMode::Roguelite)
-    ) {
+    // Garde-fou : si des réapparitions ont été mises en file avant l'entrée dans
+    // la zone (course entre `OnEnter` et les ticks), on les jette au lieu de les
+    // servir. Lit la CAPACITÉ, plus un nom de zone — sinon toute zone nouvelle
+    // hérite du comportement de l'arène sans fin.
+    let revient = game_mode
+        .as_deref()
+        .is_some_and(|s| forgia_core::prelude::ennemis_reapparaissent(s.get()));
+    if !revient {
         pending.queue.clear();
         return;
     }

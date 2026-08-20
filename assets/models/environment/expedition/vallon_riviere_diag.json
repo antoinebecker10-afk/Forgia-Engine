@@ -11,11 +11,11 @@
     -36.0,
     94.0
    ],
-   "niveau_eau": 3.67,
-   "terrain": 1.97,
+   "niveau_eau": 3.95,
+   "terrain": 2.25,
    "tirant": 1.7,
-   "base_creuse": 1.97,
-   "base_nue": 5.69,
+   "base_creuse": 2.25,
+   "base_nue": 6.41,
    "poids_lit": 1.0,
    "d_chemin": 55.9
   },
@@ -25,11 +25,11 @@
     -35.8,
     92.0
    ],
-   "niveau_eau": 3.42,
-   "terrain": 1.72,
+   "niveau_eau": 3.65,
+   "terrain": 1.95,
    "tirant": 1.7,
-   "base_creuse": 1.72,
-   "base_nue": 4.94,
+   "base_creuse": 1.95,
+   "base_nue": 5.2,
    "poids_lit": 1.0,
    "d_chemin": 54.0
   },
@@ -39,11 +39,11 @@
     -35.5,
     90.0
    ],
-   "niveau_eau": 3.19,
-   "terrain": 1.49,
+   "niveau_eau": 3.39,
+   "terrain": 1.69,
    "tirant": 1.7,
-   "base_creuse": 1.49,
-   "base_nue": 4.28,
+   "base_creuse": 1.69,
+   "base_nue": 4.5,
    "poids_lit": 1.0,
    "d_chemin": 52.0
   },
@@ -53,11 +53,11 @@
     -35.3,
     88.0
    ],
-   "niveau_eau": 2.99,
-   "terrain": 1.29,
+   "niveau_eau": 3.16,
+   "terrain": 1.46,
    "tirant": 1.7,
-   "base_creuse": 1.29,
-   "base_nue": 3.7,
+   "base_creuse": 1.46,
+   "base_nue": 3.84,
    "poids_lit": 1.0,
    "d_chemin": 50.1
   },
@@ -67,11 +67,11 @@
     -35.0,
     86.1
    ],
-   "niveau_eau": 2.81,
-   "terrain": 1.11,
+   "niveau_eau": 2.96,
+   "terrain": 1.26,
    "tirant": 1.7,
-   "base_creuse": 1.11,
-   "base_nue": 3.23,
+   "base_creuse": 1.26,
+   "base_nue": 3.3,
    "poids_lit": 1.0,
    "d_chemin": 48.2
   },
@@ -81,11 +81,11 @@
     -34.7,
     84.1
    ],
-   "niveau_eau": 2.38,
-   "terrain": 0.68,
+   "niveau_eau": 2.46,
+   "terrain": 0.76,
    "tirant": 1.7,
-   "base_creuse": 0.68,
-   "base_nue": 2.86,
+   "base_creuse": 0.76,
+   "base_nue": 2.87,
    "poids_lit": 1.0,
    "d_chemin": 46.3
   },
@@ -95,10 +95,10 @@
     -34.5,
     82.1
    ],
-   "niveau_eau": 2.02,
-   "terrain": 0.32,
+   "niveau_eau": 2.07,
+   "terrain": 0.37,
    "tirant": 1.7,
-   "base_creuse": 0.32,
+   "base_creuse": 0.37,
    "base_nue": 2.54,
    "poids_lit": 1.0,
    "d_chemin": 44.3
@@ -109,10 +109,10 @@
     -34.2,
     80.1
    ],
-   "niveau_eau": 1.72,
-   "terrain": 0.02,
+   "niveau_eau": 1.74,
+   "terrain": 0.04,
    "tirant": 1.7,
-   "base_creuse": 0.02,
+   "base_creuse": 0.04,
    "base_nue": 2.27,
    "poids_lit": 1.0,
    "d_chemin": 42.4
@@ -123,10 +123,10 @@
     -33.9,
     78.1
    ],
-   "niveau_eau": 1.47,
-   "terrain": -0.23,
+   "niveau_eau": 1.48,
+   "terrain": -0.22,
    "tirant": 1.7,
-   "base_creuse": -0.23,
+   "base_creuse": -0.22,
    "base_nue": 2.05,
    "poids_lit": 1.0,
    "d_chemin": 40.5
@@ -1289,7 +1289,7 @@
    "terrain": -5.72,
    "tirant": 1.7,
    "base_creuse": -5.72,
-   "base_nue": -0.47,
+   "base_nue": -0.41,
    "poids_lit": 1.0,
    "d_chemin": 47.6
   },
@@ -1303,7 +1303,7 @@
    "terrain": -5.72,
    "tirant": 1.7,
    "base_creuse": -5.72,
-   "base_nue": -0.32,
+   "base_nue": -0.14,
    "poids_lit": 1.0,
    "d_chemin": 49.3
   },
@@ -1317,7 +1317,7 @@
    "terrain": -5.72,
    "tirant": 1.7,
    "base_creuse": -5.72,
-   "base_nue": -0.01,
+   "base_nue": 0.29,
    "poids_lit": 1.0,
    "d_chemin": 51.0
   },
@@ -1331,7 +1331,7 @@
    "terrain": -5.72,
    "tirant": 1.7,
    "base_creuse": -5.72,
-   "base_nue": 0.41,
+   "base_nue": 0.79,
    "poids_lit": 1.0,
    "d_chemin": 52.8
   },
@@ -1345,7 +1345,7 @@
    "terrain": -5.72,
    "tirant": 1.7,
    "base_creuse": -5.72,
-   "base_nue": 0.84,
+   "base_nue": 2.24,
    "poids_lit": 1.0,
    "d_chemin": 54.5
   },
@@ -1359,7 +1359,7 @@
    "terrain": -5.72,
    "tirant": 1.7,
    "base_creuse": -5.72,
-   "base_nue": 0.87,
+   "base_nue": 2.61,
    "poids_lit": 1.0,
    "d_chemin": 54.6
   }

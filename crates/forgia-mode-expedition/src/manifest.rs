@@ -503,16 +503,16 @@ mod tests {
         // mettre a jour. Un constat qui ne casse rien quand il devient faux
         // n'est pas un constat.
         let d = vallon().defauts;
-        let courts: Vec<_> = d
+        let courts = d
             .iter()
             .filter(|v| {
                 v.get("quoi")
                     .and_then(|q| q.as_str())
                     .is_some_and(|q| q.contains("duree_engagement"))
             })
-            .collect();
+            .count();
         assert_eq!(
-            courts.len(),
+            courts,
             3,
             "etat mesure le 2026-08-17 : les 3 campements sous leur plancher de duree"
         );

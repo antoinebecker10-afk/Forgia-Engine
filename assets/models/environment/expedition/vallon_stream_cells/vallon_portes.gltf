@@ -29,7 +29,7 @@
 			],
 			"translation":[
 				87.5079345703125,
-				-0.7058110237121582,
+				-0.4058111906051636,
 				28.892724990844727
 			]
 		}
@@ -54,9 +54,10 @@
 					"attributes":{
 						"POSITION":0,
 						"NORMAL":1,
-						"TEXCOORD_0":2
+						"TEXCOORD_0":2,
+						"COLOR_0":3
 					},
-					"indices":3,
+					"indices":4,
 					"material":0
 				}
 			]
@@ -107,6 +108,13 @@
 		{
 			"bufferView":3,
 			"componentType":5123,
+			"count":842,
+			"normalized":true,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":4,
+			"componentType":5123,
 			"count":1440,
 			"type":"SCALAR"
 		}
@@ -132,8 +140,14 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":2880,
+			"byteLength":6736,
 			"byteOffset":26944,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2880,
+			"byteOffset":33680,
 			"target":34963
 		}
 	],
@@ -145,7 +159,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":29824,
+			"byteLength":36560,
 			"uri":"vallon_portes.bin"
 		}
 	]

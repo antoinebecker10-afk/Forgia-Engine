@@ -50,8 +50,11 @@ pub use forgia_enemy_archetypes as enemies;
 /// le 2026-08-18 avec les archetypes qu'elle anime. Re-export : les sites
 /// d'appel de cette crate ne bougent pas.
 pub use forgia_enemy_archetypes::anim as enemy_anim;
-/// La mort d'un ennemi : butin, retrait de ce qui doit cesser, puis envol.
-pub mod enemy_death;
+/// La mort d'un ennemi — deplacee dans `forgia-enemy-archetypes` le 2026-08-18 :
+/// elle etait gatee sur cette zone alors que l'assembleur PARTAGE pose le
+/// composant dont elle est le seul consommateur. Les 11 ennemis de l'Expedition
+/// etaient immortels. Re-export sous l'ancien chemin.
+pub use forgia_enemy_archetypes::mort as enemy_death;
 pub mod enemy_rig_debug;
 pub mod enemy_scaling;
 pub mod emote;
@@ -341,12 +344,8 @@ impl Plugin for ForgiaModeRoguelitePlugin {
         // `AscendsOnDeath` l'a exclu du balayage de `forgia-fps`, donc si ce
         // système ne tourne pas, plus AUCUN ennemi ne meurt ni ne lâche de butin.
         // Dans `GameSet::Combat` : après les dégâts de la frame, avant les effets.
-        app.add_systems(
-            Update,
-            enemy_death::sys_start_death_ascension
-                .in_set(GameSet::Combat)
-                .run_if(in_state(GameMode::Roguelite)),
-        );
+        // (`EnemyDeathPlugin` est monte par `ForgiaEnemyArchetypesPlugin`, avec
+        // l'ennemi dont il traite la mort.)
         // Story-582 (2026-06-07) — système d'éléments par-arme (feu/poison/
         // explosif/perforant) : matchups vs archetype + status DoT + AOE +
         // exécution. Mute forgia_combat::Health directement (despawn_dead_cubes

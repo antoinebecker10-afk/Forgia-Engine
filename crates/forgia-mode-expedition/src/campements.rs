@@ -45,6 +45,7 @@ use forgia_genome_core::{Genome, GenomeLoader};
 use forgia_player::Player;
 use serde::Deserialize;
 
+use crate::manifest::blender_to_bevy;
 use crate::plugin::ActiveExpedition;
 
 const GENOME: &str = "genomes/expedition_campements.toml";
@@ -192,7 +193,15 @@ pub fn sys_eveiller_campements(
         if etat != EtatCamp::Dormant {
             continue;
         }
-        let centre = Vec3::from(camp.centre_xyz);
+        // Le manifeste est en `blender_z_up`. La conversion est une FONCTION
+        // NOMMEE avec ses tests — jamais un `Vec3::new(v[0], v[2], -v[1])`
+        // recopie, ce que l'en-tete de `manifest.rs` interdit explicitement.
+        //
+        // Je l'ai recopiee quand meme, et de travers : les 11 ennemis du run du
+        // 2026-08-18 sont apparus EN L'AIR et DEVANT LA FORTERESSE. Le capteur
+        // disait « 11 ennemis nes » et il avait raison — il ne mesurait pas leur
+        // position. Un controle ne voit que ce qu'il regarde.
+        let centre = blender_to_bevy(camp.centre_xyz);
         if p.distance(centre) > rayon {
             continue;
         }
@@ -230,7 +239,7 @@ pub fn sys_eveiller_campements(
                 continue;
             };
             for _ in 0..*nombre {
-                let pos = camp.apparitions_xyz[i % camp.apparitions_xyz.len()];
+                let pos = blender_to_bevy(camp.apparitions_xyz[i % camp.apparitions_xyz.len()]);
                 i += 1;
                 let e = assembler(
                     &mut commands,
@@ -238,8 +247,8 @@ pub fn sys_eveiller_campements(
                     &stats,
                     Ennemi {
                         archetype,
-                        sol_xz: Vec2::new(pos[0], pos[2]),
-                        sol_y: pos[1],
+                        sol_xz: pos.xz(),
+                        sol_y: pos.y,
                         nom: &format!("Expedition_{}_{}_{i}", camp.id, archetype.label()),
                         // Pas de couche défensive en Expédition : le bouclier et
                         // l'armure sont une mécanique de l'Abîme (méta-progression).
@@ -448,6 +457,43 @@ mod tests {
                     r.archetype_pour(nom).is_some(),
                     "campement {} : « {nom} » n'a pas de correspondance — ces ennemis ne naitraient jamais",
                     c.id
+                );
+            }
+        }
+    }
+
+    /// Les points d'apparition doivent tomber DANS la carte, au niveau du sol.
+    ///
+    /// Ce test manquait, et son absence a coûté un run : la première version
+    /// convertissait les coordonnées à la main et plaçait les ennemis en l'air,
+    /// à des dizaines de mètres du campement. Tous les autres tests passaient —
+    /// ils vérifiaient la table de correspondance, jamais la géométrie.
+    #[test]
+    fn les_apparitions_tombent_au_sol_et_pres_de_leur_camp() {
+        let m = crate::manifest::ExpeditionManifest::parse(include_str!(
+            "../../../assets/models/environment/expedition/expedition_vallon.json"
+        ))
+        .expect("le manifeste du Vallon doit parser");
+        for c in &m.campements {
+            let centre = crate::manifest::blender_to_bevy(c.centre_xyz);
+            for p in &c.apparitions_xyz {
+                let v = crate::manifest::blender_to_bevy(*p);
+                // Le Vallon fait 280 x 200 m et son relief tient dans quelques
+                // metres : une hauteur a deux chiffres signifie un axe echange.
+                assert!(
+                    v.y.abs() < 10.0,
+                    "{} : apparition a {:.1} m de haut — axe vertical faux",
+                    c.id,
+                    v.y
+                );
+                // Une apparition appartient a SON campement : au-dela du rayon
+                // declare (+ une marge), elle est ailleurs sur la carte.
+                let d = (v.xz() - centre.xz()).length();
+                assert!(
+                    d <= c.rayon_m + 5.0,
+                    "{} : apparition a {d:.1} m du centre (rayon declare {:.1} m)",
+                    c.id,
+                    c.rayon_m
                 );
             }
         }

@@ -84,151 +84,151 @@
   },
   {
    "nom": "crouch_idle",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "crouch_walk",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "fall",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "land",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_aim",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_crouch_back",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_crouch_idle",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_crouch_walk",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_fire",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_idle",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_run",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_start_run",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_stop",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_strafe",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_to_crouch",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_to_stand",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_turn",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_walk",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "rifle_walk_back",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "slide",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "strafe_left",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "strafe_right",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "turn_180",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "turn_left",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   },
   {
    "nom": "turn_right",
-   "canaux": 186,
+   "canaux": 125,
    "os_touches": 62,
    "derive_racine_m": 0.0
   }

@@ -77,6 +77,32 @@ def ecrire_glb(chemin: pathlib.Path, doc: dict, binaire: bytes):
     chemin.write_bytes(bytes(out))
 
 
+
+
+# 🚨 CE QUI A ETE ESSAYE ET MESURE FAUX, pour qu'on ne le refasse pas.
+#
+# Les reperes de repos des deux rigs different encore de 110,9 deg sur les pieds,
+# 102,3 sur les cuisses et 85,6 sur les epaules, meme apres avoir corrige
+# l'import FBX. Compenser cet ecart en recalant chaque rotation dans le repere du
+# corps semblait la suite logique. Deux formules ont ete implementees et
+# mesurees dans Blender sur l'etirement maximal des aretes du maillage :
+#
+#     sans compensation   x13,9      <- le moins mauvais
+#     At = Rt . Rs-1 . As x15,4
+#     At = As . Rs-1 . Rt x15,4
+#     clips natifs        x2,9       <- la cible
+#
+# Les DEUX degradent. Le raisonnement etait donc faux, et le code a ete retire
+# plutot que garde « au cas ou » : un chemin mort qu'on croit correct coute plus
+# cher que pas de chemin du tout.
+#
+# Ce que ca dit du vrai probleme : un ecart de repos de cette ampleur ne se
+# rattrape pas canal par canal. Il demande un vrai recalage sous Blender
+# (contraintes os-a-os puis cuisson), ou des clips exportes depuis un rig qui
+# partage la pose de repos du corps. Tant que ce n'est pas fait, les clips
+# Mixamo deforment le maillage — c'est mesure, pas suppose.
+
+
 def noms_des_noeuds(doc: dict) -> dict:
     """nom -> index. Un nom en double est un piège : on garde le premier et on
     le signale, parce que le remappage deviendrait ambigu."""
@@ -93,6 +119,10 @@ def noms_des_noeuds(doc: dict) -> dict:
         print(f"    ⚠ noms de noeuds en double, ignores : {sorted(set(doublons))[:5]}")
     return table
 
+
+# L'os qui porte le deplacement d'ensemble du personnage. Le SEUL dont la
+# translation se transfere d'un rig a l'autre.
+OS_RACINE = "Hips"
 
 RAPPORT = pathlib.Path("tools/assets/rapport_clips.json")
 
@@ -208,6 +238,13 @@ def fusionner(corps_path, anims_dir, sortie_path):
 
     doc, binaire = lire_glb(corps_path)
     cible = noms_des_noeuds(doc)
+    # Le repere de repos du CORPS, os par os : la reference vers laquelle
+    # toute rotation importee doit etre ramenee.
+    repos_cible = {
+        n.get("name"): tuple(n.get("rotation", [0.0, 0.0, 0.0, 1.0]))
+        for n in doc.get("nodes", [])
+        if n.get("name")
+    }
     print(f"CORPS {corps_path.name} : {len(doc.get('nodes', []))} noeuds, "
           f"{len(doc.get('animations', []))} animation(s) au depart")
 
@@ -235,6 +272,11 @@ def fusionner(corps_path, anims_dir, sortie_path):
     for src_path in sorted(anims_dir.glob("*.glb")):
         src, src_bin = lire_glb(src_path)
         src_noms = {i: n.get("name") for i, n in enumerate(src.get("nodes", []))}
+        repos_src = {
+            n.get("name"): tuple(n.get("rotation", [0.0, 0.0, 0.0, 1.0]))
+            for n in src.get("nodes", [])
+            if n.get("name")
+        }
         if not src.get("animations"):
             print(f"  {src_path.name:22} AUCUNE animation — ignore")
             continue
@@ -274,12 +316,33 @@ def fusionner(corps_path, anims_dir, sortie_path):
 
         # 4. Les animations, avec remappage des cibles PAR NOM.
         for anim in src["animations"]:
-            canaux, manquants = [], set()
+            canaux, manquants, sans_translation = [], set(), set()
             for ch in anim.get("channels", []):
                 idx_src = ch.get("target", {}).get("node")
                 nom = src_noms.get(idx_src)
                 if nom is None or nom not in cible:
                     manquants.add(nom or f"#{idx_src}")
+                    continue
+                # 🚨 ON TRANSFERE LES ROTATIONS, PAS LES TRANSLATIONS.
+                #
+                # C'est LA regle du retargeting, et elle a un cout mesure quand
+                # on l'ignore. Un clip capture sur un squelette declare, image
+                # par image, OU se trouve chaque os. Recopier ces positions sur
+                # un autre squelette lui impose les proportions du premier : les
+                # os s'etirent, le personnage se deforme.
+                #
+                # Mesure du 2026-08-18, dans Blender, sur le corps livre : les
+                # 25 clips Mixamo etiraient l'os `Head` de **63 %** — le rig
+                # Vanguard n'a pas la tete d'un personnage stylise. Retirer les
+                # translations fait tomber l'ecart a **0,0 %**, verifie clip par
+                # clip.
+                #
+                # La racine fait exception : sa translation N'EST PAS une
+                # proportion, c'est le deplacement du personnage dans le monde
+                # (accroupissement, balancement du bassin, saut). La retirer
+                # figerait la hauteur du bassin.
+                if ch["target"].get("path") == "translation" and nom != OS_RACINE:
+                    sans_translation.add(nom)
                     continue
                 neuf = {
                     "sampler": ch["sampler"],
@@ -308,6 +371,8 @@ def fusionner(corps_path, anims_dir, sortie_path):
             noms_de_clips.add(src_path.stem)
             total_ok += 1
             note = f"  ({len(manquants)} os absents du corps)" if manquants else ""
+            if sans_translation:
+                note += f"  [{len(sans_translation)} translations d'os ecartees]"
             print(f"  {src_path.name:22} -> clip « {src_path.stem} », "
                   f"{len(canaux)} canaux{note}")
             if manquants:

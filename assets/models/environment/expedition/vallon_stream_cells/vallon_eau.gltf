@@ -23,10 +23,6 @@
 			"alphaMode":"BLEND",
 			"doubleSided":true,
 			"name":"eau_riviere",
-			"normalTexture":{
-				"index":0,
-				"scale":0.44999998807907104
-			},
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.009134058840572834,
@@ -47,98 +43,93 @@
 					"attributes":{
 						"POSITION":0,
 						"NORMAL":1,
-						"TEXCOORD_0":2
+						"TEXCOORD_0":2,
+						"COLOR_0":3
 					},
-					"indices":3,
+					"indices":4,
 					"material":0
 				}
 			]
-		}
-	],
-	"textures":[
-		{
-			"sampler":0,
-			"source":0
-		}
-	],
-	"images":[
-		{
-			"mimeType":"image/jpeg",
-			"name":"normal",
-			"uri":"textures/normal.jpg"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":276,
+			"count":1276,
 			"max":[
 				-12.850029945373535,
-				3.6697545051574707,
-				95.43260192871094
+				3.948930501937866,
+				94.82070922851562
 			],
 			"min":[
-				-54.98834991455078,
+				-53.67463302612305,
 				-4.024084568023682,
-				-95.53182983398438
+				-94.82070922851562
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":276,
+			"count":1276,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":276,
+			"count":1276,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":576,
+			"count":1276,
+			"normalized":true,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":4,
+			"componentType":5123,
+			"count":3456,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":3312,
+			"byteLength":15312,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":3312,
-			"byteOffset":3312,
+			"byteLength":15312,
+			"byteOffset":15312,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2208,
-			"byteOffset":6624,
+			"byteLength":10208,
+			"byteOffset":30624,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1152,
-			"byteOffset":8832,
+			"byteLength":10208,
+			"byteOffset":40832,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":6912,
+			"byteOffset":51040,
 			"target":34963
-		}
-	],
-	"samplers":[
-		{
-			"magFilter":9729,
-			"minFilter":9987
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":9984,
+			"byteLength":57952,
 			"uri":"vallon_eau.bin"
 		}
 	]

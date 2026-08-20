@@ -18,118 +18,181 @@
 			"name":"cell_x-4_z-3",
 			"rotation":[
 				0,
-				-0.9521815776824951,
+				0.9143257737159729,
 				0,
-				0.3055328130722046
+				0.40497976541519165
 			],
 			"scale":[
-				2.8277957439422607,
-				2.82779598236084,
-				2.8277957439422607
+				1.8406894207000732,
+				1.8406894207000732,
+				1.8406894207000732
 			],
 			"translation":[
-				-120.0601806640625,
-				-0.6610955595970154,
-				-83.755859375
+				-129.37989807128906,
+				11.946163177490234,
+				-94
 			]
 		}
 	],
 	"materials":[
 		{
-			"name":"grass",
+			"doubleSided":true,
+			"name":"sol_falaise",
+			"normalTexture":{
+				"index":0,
+				"scale":0.800000011920929
+			},
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.15592646598815918,
-					0.2961382567882538,
-					0.0802198201417923,
+					0.6514056324958801,
+					0.6104955673217773,
+					0.5149176716804504,
 					1
 				],
+				"baseColorTexture":{
+					"index":1
+				},
 				"metallicFactor":0,
-				"roughnessFactor":0.9200000166893005
+				"roughnessFactor":0.949999988079071
 			}
 		}
 	],
 	"meshes":[
 		{
-			"name":"Mesh grass_leafs.001",
+			"name":"SM_ENV_cliff_castle_01_instantmeshesexp_02.001",
 			"primitives":[
 				{
 					"attributes":{
 						"POSITION":0,
 						"NORMAL":1,
-						"TEXCOORD_0":2
+						"TEXCOORD_0":2,
+						"TEXCOORD_1":3,
+						"COLOR_0":4
 					},
-					"indices":3,
+					"indices":5,
 					"material":0
 				}
 			]
+		}
+	],
+	"textures":[
+		{
+			"sampler":0,
+			"source":0
+		},
+		{
+			"sampler":0,
+			"source":1
+		}
+	],
+	"images":[
+		{
+			"mimeType":"image/png",
+			"name":"cliff_n",
+			"uri":"textures/cliff_n.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"stone_bc",
+			"uri":"textures/stone_bc.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":688,
+			"count":13845,
 			"max":[
-				1.6745171546936035,
-				0.8251019716262817,
-				0.9349324703216553
+				4.855959892272949,
+				10.20567512512207,
+				3.302274227142334
 			],
 			"min":[
-				-0.12303996831178665,
-				-1.804778527019556e-16,
-				-0.548396110534668
+				-9.555131912231445,
+				-5.545106887817383,
+				-9.103357315063477
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":688,
+			"count":13845,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":688,
+			"count":13845,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
+			"componentType":5126,
+			"count":13845,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":4,
 			"componentType":5123,
-			"count":936,
+			"count":13845,
+			"normalized":true,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":5,
+			"componentType":5123,
+			"count":70983,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":8256,
+			"byteLength":166140,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":8256,
-			"byteOffset":8256,
+			"byteLength":166140,
+			"byteOffset":166140,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":5504,
-			"byteOffset":16512,
+			"byteLength":110760,
+			"byteOffset":332280,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":1872,
-			"byteOffset":22016,
+			"byteLength":110760,
+			"byteOffset":443040,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":110760,
+			"byteOffset":553800,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":141966,
+			"byteOffset":664560,
 			"target":34963
+		}
+	],
+	"samplers":[
+		{
+			"magFilter":9729,
+			"minFilter":9987
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":23888,
+			"byteLength":806528,
 			"uri":"cell_x-4_z-3_render.bin"
 		}
 	]

@@ -336,7 +336,23 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 #
 # La leçon : corriger la grandeur qu'on mesure, pas celle qu'on suppose. Ici on
 # ramène tout l'import à l'échelle, ce qui couvre repos ET animation.
-bpy.ops.import_scene.fbx(filepath=entree, automatic_bone_orientation=True)
+# 🚨 `automatic_bone_orientation` DOIT rester a False.
+#
+# A True, Blender REORIENTE chaque os par une heuristique — il le fait pointer
+# vers son enfant — au lieu de preserver le repere declare dans le FBX. Le rig
+# importe ne parle alors plus la meme langue que le corps du jeu, et une
+# rotation copiee de l'un a l'autre ne veut plus rien dire.
+#
+# Mesure du 2026-08-18, corps livre contre clip Mixamo : ecart median des
+# orientations au repos **66 degres** hors mains (pieds 110,9 · cuisses 102,3 ·
+# epaules 85,6), et l'erreur s'accumule le long de la chaine — les aretes du
+# maillage s'etiraient de **x13,9** autour de la main droite. Les doigts, eux,
+# concordaient a 0,7 deg : ce sont bien les os reorientes qui cassaient tout.
+#
+# On ne veut RIEN transformer ici : on veut des courbes d'animation exprimees
+# dans le repere du corps. Toute commodite d'affichage qui reecrit ce repere est
+# une corruption de la donnee.
+bpy.ops.import_scene.fbx(filepath=entree, automatic_bone_orientation=False)
 
 # `global_scale` a l'import est IGNORE ici (mesure : os toujours a 44,49 m).
 # On passe donc par l'application de transformation, qui n'a pas d'ambiguite :

@@ -974,8 +974,13 @@ fn suivre_la_visee_avec_l_arme(
 fn capteur_arme_main(
     time: Res<Time>,
     mut accum: Local<f32>,
-    mut dernier_ecart: Local<f32>,
+    // Deux mémos, un par extrémité de la visée. Un seul ne pourrait pas
+    // distinguer « l'arme suit le corps, c'est normal » de « elle ne suit pas
+    // la caméra alors qu'on vise ».
+    mut ecart_en_visee: Local<f32>,
+    mut ecart_au_repos: Local<f32>,
     mode: Res<State<GameMode>>,
+    visee: Res<crate::visee::Visee>,
     genome_handle: Option<Res<ArmeMainGenomeHandle>>,
     genomes: Res<Assets<Genome<ArmeMainGenome>>>,
     muzzle: Res<MuzzleWorld>,
@@ -984,6 +989,7 @@ fn capteur_arme_main(
     mut etat: ResMut<EtatArmeMain>,
 ) {
     let en_expedition = *mode.get() == GameMode::Expedition;
+    let facteur = visee.facteur;
     if en_expedition {
         etat.depuis_entree_s += time.delta_secs();
     }
@@ -1065,15 +1071,30 @@ fn capteur_arme_main(
     const DELAI_DE_GRACE_S: f32 = 2.0;
     let installe = etat.depuis_entree_s > DELAI_DE_GRACE_S;
 
-    // La derniere mesure PRISE DANS LE MODE est retenue : sinon la sortie
-    // d'Expedition efface exactement ce qu'on venait d'observer (cf cape.rs).
+    // 🚨 RETENIR NE SUFFIT PAS : IL FAUT DIRE DANS QUELLE CONDITION.
+    //
+    // Première version, 2026-08-18 : on retenait le dernier écart mesurable,
+    // quel qu'il soit. Le premier relevé a rendu 30,9° — un nombre qui ne
+    // conclut RIEN, parce qu'au repos l'arme suit le CORPS et qu'un écart de
+    // 30° avec la caméra d'épaule est alors parfaitement normal, tandis qu'en
+    // pleine visée le même 30° est un défaut franc.
+    //
+    // Une mesure sans sa condition n'est pas une mesure, c'est un nombre. On en
+    // retient donc DEUX, prises aux deux extrémités de la visée : leur écart
+    // est ce qui répond à « est-ce que l'arme pointe où je vise ».
+    const VISEE_PLEINE: f32 = 0.9;
+    const VISEE_NULLE: f32 = 0.1;
     if en_expedition && ecart_mesure {
-        *dernier_ecart = ecart_deg;
+        if facteur >= VISEE_PLEINE {
+            *ecart_en_visee = ecart_deg;
+        } else if facteur <= VISEE_NULLE {
+            *ecart_au_repos = ecart_deg;
+        }
     }
     let ecart_publie = if en_expedition && ecart_mesure {
         ecart_deg
     } else {
-        *dernier_ecart
+        *ecart_en_visee
     };
 
     let (severity, next_step) = if !en_expedition {
@@ -1132,12 +1153,12 @@ fn capteur_arme_main(
             "warn",
             "BOUCHE_ABSENTE : arme calibrée mais aucune bouche publiée — la lueur et le traceur sortiront de la caméra, 3,2 m derrière le personnage",
         )
-    } else if ecart_deg > seuil_alerte {
+    } else if facteur >= VISEE_PLEINE && ecart_deg > seuil_alerte {
         (
             "critical",
             "ARME_A_L_ENVERS : le canon pointe a plus d'un quart de tour du regard de la CAMERA ACTIVE — celle qui sert aussi d'origine au tir. 180° = l'arme part vers l'arriere. Cause probable : rotation_*_deg du genome fausse pour ce GLB, ou correction de socket calculee sur une pose degeneree. Seuil reglable : [visee].ecart_alerte_deg",
         )
-    } else if ecart_deg > seuil_avertit {
+    } else if facteur >= VISEE_PLEINE && ecart_deg > seuil_avertit {
         (
             "warn",
             "ARME_DE_TRAVERS : le canon s'ecarte nettement du regard — l'arme se tient mal, et la lueur de bouche sort a cote. Ajuster rotation_*_deg de cette arme au genome (rechargement a chaud). Seuil : [visee].ecart_avertit_deg",
@@ -1156,7 +1177,7 @@ fn capteur_arme_main(
     };
 
     let json = format!(
-        r#"{{"id":"expedition_arme","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"en_expedition":{en_expedition},"socket_trouve":{},"ancrage":"{}","arme":"{arme}","calibree":{},"taille_mesuree_m":{:.3},"taille_cible_m":{:.2},"echelle":{:.4},"dague_masquee":{},"bouche":[{:.2},{:.2},{:.2}],"bouche_publiee":{},"ecart_visee_deg":{:.1},"ecart_visee_retenu_deg":{:.1},"ecart_visee_mesure":{ecart_mesure},"ancrage_est_repli":{ancrage_est_repli},"depuis_entree_s":{:.1},"genome_charge":{genome_charge},"armes_declarees":{armes_declarees}}}"#,
+        r#"{{"id":"expedition_arme","severity":"{severity}","next_step":"{next_step}","timestamp_secs":{:.1},"en_expedition":{en_expedition},"socket_trouve":{},"ancrage":"{}","arme":"{arme}","calibree":{},"taille_mesuree_m":{:.3},"taille_cible_m":{:.2},"echelle":{:.4},"dague_masquee":{},"bouche":[{:.2},{:.2},{:.2}],"bouche_publiee":{},"ecart_visee_deg":{:.1},"ecart_en_visee_deg":{:.1},"ecart_au_repos_deg":{:.1},"visee_facteur":{:.2},"ecart_visee_mesure":{ecart_mesure},"ancrage_est_repli":{ancrage_est_repli},"depuis_entree_s":{:.1},"genome_charge":{genome_charge},"armes_declarees":{armes_declarees}}}"#,
         time.elapsed_secs(),
         etat.socket_trouve,
         etat.ancrage,
@@ -1171,6 +1192,8 @@ fn capteur_arme_main(
         muzzle.0.is_some(),
         ecart_deg,
         ecart_publie,
+        *ecart_au_repos,
+        facteur,
         etat.depuis_entree_s,
     );
     let _ = forgia_core::sensor_io::enqueue("forgia2_expedition_arme.json", json);
@@ -1518,7 +1541,7 @@ mod tests {
 
         if !g.dague.os.is_empty() {
             assert!(
-                noeuds.iter().any(|n| *n == g.dague.os),
+                noeuds.contains(&g.dague.os),
                 "l'os « {} » déclaré pour la dague n'existe pas dans {modele} — \
                  elle resterait à 1,39 m de la main",
                 g.dague.os
@@ -1526,7 +1549,7 @@ mod tests {
         }
         if !g.dague.materiau.is_empty() {
             assert!(
-                materiaux.iter().any(|m| *m == g.dague.materiau),
+                materiaux.contains(&g.dague.materiau),
                 "le matériau « {} » n'existe pas dans {modele} — la dague resterait \
                  blanche. Matériaux du fichier : {materiaux:?}",
                 g.dague.materiau

@@ -25,11 +25,23 @@ dbg_bone_trace_hz = 2.0
 # 24 = couvre BipedLizard (20 bones) + Humanoid (18 bones) + marge.
 dbg_bone_trace_max_bones = 24
 
-# Nombre maximum de characters tracés simultanément (Rex + lineup 5 = 6).
-dbg_bone_trace_max_characters = 8
+# 🚨 Renommé de `max_characters` le 2026-08-16 : la clé comptait des MAILLAGES,
+# pas des personnages. Le chien d'expédition en porte huit skinnés (museau,
+# gueule, iris, pupille, sac, corps, tissu) pour UN squelette — il saturait donc
+# le plafond à lui seul, et les huit relevés étaient huit fois le même début de
+# squelette. Les bras n'ont jamais été relevés.
+# Quatre SQUELETTES = le joueur et trois ennemis.
+dbg_bone_trace_max_squelettes = 4
 
-# Seuil de détection désync (mètres). Si delta entre bone_globals[0]
-# .translation et mesh_aabb_world.center > N mètres pendant 2 samples
-# consécutifs alors que le character est immobile → health alert "warning".
-# 0.05m = 5cm de tolérance jitter physique.
+# Les os relevés QUOI QU'IL ARRIVE, par nom, HORS plafond. Sans cette liste, le
+# relevé suit l'ordre du fichier glTF — qui ne dit rien de ce qu'on cherche. Les
+# bras y sont parce que c'est là que les défauts se voient : ils portent l'arme.
+# Vider la liste ne la vide pas : le moteur garde la sienne, pour qu'un `[]`
+# distrait ne rende pas le relevé silencieusement inutile.
+dbg_bone_trace_os_surveilles = ["Hips", "Spine2", "Neck", "RightShoulder", "RightArm", "RightForeArm", "RightHand", "LeftArm", "LeftForeArm", "LeftHand", "RightFoot", "LeftFoot"]
+
+# Seuil de décrochage (mètres) entre le centre d'AABB d'un maillage et le
+# barycentre de SES PROPRES joints. Avant le 2026-08-16 la comparaison portait
+# sur l'os racine : comparer le museau du chien à ses hanches donnait un mètre
+# d'écart légitime, et l'alerte criait en permanence.
 dbg_bone_trace_desync_threshold_m = 0.05

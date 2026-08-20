@@ -35,6 +35,42 @@ ajouté. Mesurer le corps fusionné, pas les fichiers d'entrée. Relire l'artefa
 l'entrée cette nuit-là, on a raté ; chaque fois qu'on a mesuré la sortie, on a
 trouvé.*
 
+## 1 bis. Deux grandeurs d'une même source : les deux, ou aucune
+
+Ajouté le 2026-08-18 après **six occurrences en deux jours**, toutes dans un
+correctif que je venais de livrer :
+
+| Corrigé | Laissé | Symptôme produit |
+|---|---|---|
+| rotation de l'arme, par frame | avance de prise, figée au calibrage | « l'arme est sur le côté quand on vise » |
+| longueur des os (÷100) | course de la racine, restée en cm | « je ne me vois plus quand je saute » |
+| fraîcheur des capteurs **verts** | celle des capteurs **en alerte** | un `critical` de la veille lu comme vivant |
+| collisions de noms de **nœuds** | celles des noms de **clips** | 43 animations pour 34 noms |
+
+C'est vicieux parce que le correctif **marche** : les tests passent, la mesure
+visée s'améliore, et le défaut ressort ailleurs sous une forme qui ressemble à un
+autre problème. Le symptôme nommait UNE grandeur, donc on en a vérifié une.
+
+**Avant de livrer** : *« quelle AUTRE grandeur dérive de ce que je viens de
+changer ? »* Si la réponse n'est pas « aucune », les deux se recalculent depuis
+la source commune, dans le même code, à la même cadence. Le signal qui alerte :
+une valeur calculée **une fois** alors que sa source change à chaque frame.
+
+## 1 ter. Une mesure porte sa condition, et se rejoue
+
+**Sa condition.** `ecart_visee_deg: 30,9` ne conclut rien : au repos l'arme suit
+le corps et 30° est normal ; en pleine visée c'est un défaut. Publier la valeur
+sans l'état qui la qualifie, c'est publier un nombre, pas une mesure.
+
+**Sa survie.** Un capteur de mode qui se réécrit en sentinelles à la sortie du
+mode efface ce qu'on venait d'observer — trois parties perdues ainsi le 18/08.
+Il retient sa dernière valeur réelle, et le dit.
+
+**Sa reproductibilité.** Le même clip a mesuré 169,9 % puis 0,0 % selon l'ordre
+de passage (Blender ne remet pas la pose à zéro entre deux actions). Un chiffre
+non reproductible ne prouve rien, même spectaculaire. **Rejouer dans un autre
+ordre** est le seul contrôle qui attrape ça.
+
 ## 2. Deux corollaires payés cher
 
 **Une exception se NOMME.** `ExpeditionVentPlugin` est hors du harnais parce que

@@ -47,6 +47,15 @@ COURSE_MAX_M = 3.0
 # dizaines que produit un fichier reste en centimetres.
 OS_MAX_M = 2.0
 
+# L'os qui porte le deplacement d'ensemble. Le SEUL dont la translation ait le
+# droit de varier au cours d'un clip.
+OS_RACINE = "Hips"
+
+# Ecart tolere entre la translation animee d'un os et sa translation au repos.
+# 1 mm : une difference plus grande n'est plus du bruit de quantification, c'est
+# une longueur d'os que le clip impose.
+TOLERANCE_OS_M = 0.001
+
 # Les corps que le jeu charge vraiment. Une liste explicite plutot qu'un glob :
 # le dossier contient aussi des bases de travail et des variantes, qu'on ne
 # livre pas et dont les defauts ne bloquent personne.
@@ -168,6 +177,51 @@ def verifier(chemin: pathlib.Path) -> list[str]:
                 f"des parents comprise, alors que la mediane est saine ({mediane:.2f} m) "
                 f"— rig casse, pas un probleme d'unites : {noms}"
             )
+
+    # 4. Un clip ne doit JAMAIS changer la longueur d'un os.
+    #
+    # 🚨 Le defaut le plus couteux du 2026-08-18, et il etait invisible a la
+    # lecture : les 25 clips Mixamo portaient une translation sur CHAQUE os.
+    #
+    # Un clip capture declare, image par image, OU se trouve chaque os. Recopier
+    # ces positions sur un autre squelette lui impose les proportions du premier.
+    # Mesure dans Blender sur le corps livre : l'os `Head` etirait de **63 %** —
+    # le rig Vanguard n'a pas la tete d'un personnage stylise. Le personnage
+    # etait visiblement deforme, et aucun controle ne le disait.
+    #
+    # La regle du metier : on transfere les ROTATIONS, jamais les translations,
+    # sauf la racine dont la translation est un DEPLACEMENT et non une
+    # proportion. Ici on verifie le resultat : toute translation d'os non-racine
+    # qui s'ecarte de sa valeur au repos etire cet os.
+    rest = {
+        i: n.get("translation", [0.0, 0.0, 0.0]) for i, n in enumerate(doc.get("nodes", []))
+    }
+    racines = {i for i, n in noeuds.items() if n == OS_RACINE}
+    etires = {}
+    for anim in doc.get("animations", []):
+        for ch in anim.get("channels", []):
+            c = ch.get("target", {})
+            n_idx = c.get("node")
+            if c.get("path") != "translation" or n_idx in racines:
+                continue
+            v = vec3(doc, blob, anim["samplers"][ch["sampler"]]["output"])
+            r = rest.get(n_idx, [0.0, 0.0, 0.0])
+            pire = max(
+                (max(abs(p[k] - r[k]) for k in range(3)) for p in v), default=0.0
+            )
+            if pire > TOLERANCE_OS_M:
+                cle = anim.get("name", "?")
+                garde = etires.get(cle)
+                if garde is None or pire > garde[1]:
+                    etires[cle] = (noeuds.get(n_idx, "?"), pire)
+    if etires:
+        pire_clip = max(etires.items(), key=lambda kv: kv[1][1])
+        defauts.append(
+            f"{len(etires)} clip(s) imposent une longueur d'os : pire = "
+            f"« {pire_clip[0]} » sur l'os {pire_clip[1][0]} ({pire_clip[1][1] * 100:.1f} cm "
+            f"d'ecart au repos) — retargeting qui copie les TRANSLATIONS au lieu "
+            f"des seules rotations, le personnage sera deforme"
+        )
 
     return defauts
 

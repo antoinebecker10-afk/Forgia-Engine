@@ -82,6 +82,19 @@ pub struct Capacites {
     pub hud_generique: bool,
     /// Compteur de vagues.
     pub vagues: bool,
+    /// Un ennemi tué **réapparaît** après un délai.
+    ///
+    /// Hors de la chaîne d'inclusion : ce n'est pas une couche d'affichage, c'est
+    /// une règle de jeu. Elle vit ici parce qu'elle était encodée **en négatif**
+    /// dans `forgia-ai-arena-bot` — `if !is_roguelite { queue_respawn() }` — ce
+    /// qui donnait la réapparition infinie à toute zone qui n'était pas l'Abîme,
+    /// **l'Expédition comprise**. Un campement dont les morts reviennent ne se
+    /// nettoie jamais, donc son verrou ne s'ouvre jamais.
+    ///
+    /// Sixième occurrence du même défaut dans la journée du 2026-08-18, et la
+    /// plus vicieuse : ici le comportement par défaut était le MAUVAIS, et une
+    /// seule zone s'en exemptait **par son nom**.
+    pub ennemis_reapparaissent: bool,
 }
 
 impl Capacites {
@@ -91,6 +104,7 @@ impl Capacites {
         retour_de_combat: false,
         hud_generique: false,
         vagues: false,
+        ennemis_reapparaissent: false,
     };
 }
 
@@ -115,6 +129,8 @@ pub const fn capacites(mode: &GameMode) -> Capacites {
             retour_de_combat: true,
             hud_generique: true,
             vagues: true,
+            // L'arène sans fin : la réapparition EST son mode de jeu.
+            ennemis_reapparaissent: true,
         },
 
         // L'Abîme. Combat complet, mais il dessine SON HUD (carte vitals,
@@ -125,6 +141,9 @@ pub const fn capacites(mode: &GameMode) -> Capacites {
             retour_de_combat: true,
             hud_generique: false,
             vagues: false,
+            // Chaque vague a un compte fixé : une réapparition ferait fuiter le
+            // compteur de vivants et la vague ne se terminerait jamais.
+            ennemis_reapparaissent: false,
         },
 
         // L'Expédition. Passée à la 3ᵉ personne le 2026-08-14 ; elle tire et
@@ -135,6 +154,9 @@ pub const fn capacites(mode: &GameMode) -> Capacites {
             retour_de_combat: true,
             hud_generique: true,
             vagues: false,
+            // Un campement se NETTOIE, et son verrou s'ouvre. Des morts qui
+            // reviennent le rendraient infranchissable.
+            ennemis_reapparaissent: false,
         },
 
         // Banc de blockout : on tire pour éprouver la forme d'une salle. Aucun
@@ -167,6 +189,14 @@ pub const fn capacites(mode: &GameMode) -> Capacites {
 /// chargée » depuis le menu, et c'est précisément l'information qui manquait.
 pub fn simule_un_monde(mode: Res<State<GameMode>>) -> bool {
     capacites(mode.get()).simulation
+}
+
+/// Les ennemis de cette zone réapparaissent-ils après leur mort ?
+///
+/// Sans garde `AppMode` : la règle appartient à la zone, pas à l'état de l'app.
+#[must_use]
+pub fn ennemis_reapparaissent(mode: &GameMode) -> bool {
+    capacites(mode).ennemis_reapparaissent
 }
 
 /// La zone courante tire-t-elle ?
@@ -273,6 +303,26 @@ mod tests {
         // slots d'armes. Lui donner le HUD générique en superposerait deux.
         assert!(!capacites(&GameMode::Roguelite).hud_generique);
         assert!(capacites(&GameMode::Expedition).hud_generique);
+    }
+
+    /// Seule l'arène sans fin fait revenir ses morts.
+    ///
+    /// C'était encodé EN NÉGATIF dans le code des bots (« si ce n'est pas
+    /// l'Abîme, remets-le en file ») : le défaut par défaut. L'Expédition en a
+    /// hérité sans que rien ne le dise — un campement dont les morts reviennent
+    /// ne se nettoie jamais.
+    #[test]
+    fn seule_l_arene_sans_fin_fait_revenir_ses_morts() {
+        assert!(capacites(&GameMode::Fps).ennemis_reapparaissent);
+        for m in TOUTES {
+            if m == GameMode::Fps {
+                continue;
+            }
+            assert!(
+                !capacites(&m).ennemis_reapparaissent,
+                "{m:?} : des morts qui reviennent empechent tout nettoyage"
+            );
+        }
     }
 
     #[test]
