@@ -66,6 +66,7 @@ PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne pl
 | Crate | LOC | Rôle | Wired |
 |---|---|---|---|
 | forgia-combat | 1500 | Gunfeel V5-F (weapons, hit-stop, recoil, hitmarker) — Health ENNEMIS | ✅ |
+| forgia-enemy-archetypes | 2184 | Archetypes d'ennemis extraits de la zone roguelite (stats, anim, hitbox de tete) — partages entre modes | ✅ |
 | forgia-damage | 280 | Health JOUEUR + DamageEvent + HitZone (⚠ dual-Health connu, M4) | ✅ |
 | forgia-fps | 1801 | Orchestrator firing path + ammo + aim assist + tuning | ✅ |
 | forgia-viewmodel | 1529 | Bras/arme 1P (CBaseViewModel-like), ADS | ✅ (calibration) ✦ |
