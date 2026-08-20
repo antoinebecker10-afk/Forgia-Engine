@@ -161,27 +161,20 @@ fn capteur_posture(
     repos: Res<ReposGlissade>,
 ) {
     let en_expedition = *mode.get() == GameMode::Expedition;
-    let (Some(posture), Some(loco)) = (posture, loco) else {
-        *accum += time.delta_secs();
-        if *accum >= 1.0 {
-            *accum = 0.0;
-            // Et on le DIT. Se taire ferait lire l'absence du fichier comme
-            // « rien à signaler », alors qu'on ne sait simplement rien.
-            let json = format!(
-                r#"{{"id":"expedition_posture","severity":"{}","next_step":"POSTURE_INDISPONIBLE : forgia-player n'a pas publie Posture/PlayerLocomotion — aucune mesure possible. Ne pas lire ce capteur comme un feu vert","timestamp_secs":{:.1},"en_expedition":{en_expedition},"posture":"inconnue","facteur_vitesse_demande":{:.3},"facteur_vitesse_constate":-1.000,"facteur_mesure":false,"ecart_facteur":-1.000,"vitesse_ms":-1.00,"vitesse_debout_max_ms":-1.00,"glissade_repos_restant_s":-1.00,"glissade_duree_s":{:.2}}}"#,
-                if en_expedition { "warn" } else { "info" },
-                time.elapsed_secs(),
-                cfg.accroupi_facteur_vitesse,
-                cfg.glissade_duree_s,
-            );
-            let _ = forgia_core::sensor_io::enqueue("forgia2_expedition_posture.json", json);
-        }
-        return;
-    };
+    // 🚨 UN SEUL point de publication.
+    //
+    // La premiere version publiait le cas « ressources absentes » dans une
+    // branche a part, avec son propre `enqueue`. Deux ecrivains pour un meme
+    // capteur, ce que `xtask sensor-audit` refuse — et il a raison : deux
+    // chemins d'ecriture peuvent diverger sans que rien ne le signale.
+    let indispo = posture.is_none() || loco.is_none();
+    let accroupi = posture.as_ref().map(|p| p.accroupi).unwrap_or(false);
+    let glisse = posture.as_ref().map(|p| p.glisse).unwrap_or(false);
+    let vitesse = loco.as_ref().map(|l| l.horizontal_speed).unwrap_or(-1.0);
     // La référence : la plus grande vitesse vue DEBOUT. Sans elle, un facteur
     // constaté n'a aucun dénominateur et le capteur ne pourrait rien conclure.
-    if en_expedition && !posture.accroupi && !posture.glisse {
-        *vitesse_debout = vitesse_debout.max(loco.horizontal_speed);
+    if en_expedition && !indispo && !accroupi && !glisse {
+        *vitesse_debout = vitesse_debout.max(vitesse);
     }
     *accum += time.delta_secs();
     if *accum < 1.0 {
@@ -189,9 +182,11 @@ fn capteur_posture(
     }
     *accum = 0.0;
 
-    let etat = if posture.glisse {
+    let etat = if indispo {
+        "inconnue"
+    } else if glisse {
         "glissade"
-    } else if posture.accroupi {
+    } else if accroupi {
         "accroupi"
     } else {
         "debout"
@@ -199,8 +194,8 @@ fn capteur_posture(
     // -1.0 = pas mesurable, JAMAIS 0.0 : un zéro se lirait comme « le
     // personnage est immobile », ce qui est une information, alors qu'ici on
     // n'en a aucune.
-    let constate = if posture.accroupi && *vitesse_debout > 0.1 {
-        loco.horizontal_speed / *vitesse_debout
+    let constate = if !indispo && accroupi && *vitesse_debout > 0.1 {
+        vitesse / *vitesse_debout
     } else {
         -1.0
     };
@@ -217,6 +212,11 @@ fn capteur_posture(
 
     let (severity, next_step) = if !en_expedition {
         ("info", "hors Expedition — aucune posture attendue")
+    } else if indispo {
+        (
+            "warn",
+            "POSTURE_INDISPONIBLE : forgia-player n'a pas publie Posture/PlayerLocomotion — aucune mesure possible. Ne pas lire ce capteur comme un feu vert",
+        )
     } else if mesure && ecart > ECART_TOLERE {
         (
             "warn",
@@ -232,7 +232,7 @@ fn capteur_posture(
         cfg.accroupi_facteur_vitesse,
         constate,
         ecart,
-        loco.horizontal_speed,
+        vitesse,
         *vitesse_debout,
         repos.0,
         cfg.glissade_duree_s,
