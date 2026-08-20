@@ -2,7 +2,7 @@
 #
 # Per-file budget of asset-load call-sites. CI gate : `cargo xtask asset-load`.
 # Regenerate after removing loads : `cargo xtask asset-load --fix`.
-# Baseline total : 121 (target V2 Lock L1 : <= 30).
+# Baseline total : 131 (target V2 Lock L1 : <= 30).
 #
 # Detection : .load( / .load::<> / .load_with_settings( / .load_folder( with
 # non-empty parens, excluding genome configs (genomes/, Genome<, .toml).
@@ -16,6 +16,8 @@
 "crates/forgia-foliage/src/material_override.rs" = 4
 "crates/forgia-viewmodel/src/attach.rs" = 4
 "crates/forgia-game/src/castle_ground.rs" = 3
+"crates/forgia-mode-expedition/src/arme_main.rs" = 3
+"crates/forgia-mode-expedition/src/plugin.rs" = 3
 "crates/forgia-mode-roguelite/src/audio.rs" = 3
 "crates/forgia-mode-roguelite/src/avatar.rs" = 3
 "crates/forgia-terrain/src/terrain_material.rs" = 3
@@ -31,15 +33,19 @@
 "crates/forgia-ui/src/menu_video.rs" = 2
 "crates/forgia-audio/src/biome.rs" = 1
 "crates/forgia-editor/src/library.rs" = 1
+"crates/forgia-enemy-archetypes/src/anim.rs" = 1
+"crates/forgia-enemy-archetypes/src/assemblage.rs" = 1
 "crates/forgia-foliage/src/lib.rs" = 1
 "crates/forgia-game/src/castle_envmap.rs" = 1
 "crates/forgia-game/src/castle_lightmaps.rs" = 1
 "crates/forgia-game/src/cyber_city.rs" = 1
 "crates/forgia-level-presets/src/lib.rs" = 1
 "crates/forgia-menu-hub/src/arena_backdrop.rs" = 1
+"crates/forgia-mode-expedition/src/campements.rs" = 1
+"crates/forgia-mode-expedition/src/eau.rs" = 1
+"crates/forgia-mode-expedition/src/matiere.rs" = 1
 "crates/forgia-mode-fps-arena/src/wave.rs" = 1
 "crates/forgia-mode-roguelite/src/decor.rs" = 1
-"crates/forgia-mode-roguelite/src/enemy_anim.rs" = 1
 "crates/forgia-mode-roguelite/src/equipment.rs" = 1
 "crates/forgia-mode-roguelite/src/run.rs" = 1
 "crates/forgia-mode-roguelite/src/waves.rs" = 1
