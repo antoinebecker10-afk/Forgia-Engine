@@ -142,6 +142,7 @@ Sept crates n'ont **aucun test** : `forgia-crosshair`, `forgia-juice-screen-flas
 | **Contrôleur joueur hors `GameSet`** | La chaîne de `forgia-player` échappe à l'ordonnancement canonique (Lock L7). L'ordre relatif à la physique n'est donc pas garanti par la structure |
 | **Trois chemins de chargement des génomes** | Voir [GENOME.md](../GENOME.md) §4. Un seul recharge à chaud, et c'est le moins emprunté : 14 chemins passent par le socle, 56 lisent le disque à la main. Le dossier `config/` (19 fichiers) n'est même pas validé par le gate |
 | **Bornes des gènes non appliquées au runtime** | Le gate les vérifie, l'exécution ne les impose pas, et deux consommateurs les réécrivent en dur dans le Rust. Détail et correction dans [GENOME.md](../GENOME.md) §6 |
+| **`register_genome` n'est appelé nulle part** | Le helper du socle exige `FromReflect`, ce dont `init_asset` et `register_asset_loader` n'ont pas besoin. La contrainte force à dériver `Reflect` sur des structs de réglage, et deux crates appellent les deux méthodes à la main pour l'éviter, en le disant en commentaire. Retirer la contrainte rend le helper utilisable. Le dépôt [genome](https://github.com/antoinebecker10-afk/genome) l'a fait |
 | **`forgia-terrain` porte un portage V1 dormant** | Environ 30 % de la crate sous `allow(dead_code)` : 11 des 29 tolérances du workspace sont là |
 | **Crates QA neutralisées par défaut** | `forgia-qa-core` et `forgia-qa-replay` sont montées mais inertes sans la feature `qa-runtime`. Une décision non tranchée (ADR-0004, statut `PROPOSED`) |
 
