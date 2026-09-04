@@ -1,5 +1,10 @@
 # The Genome System — Forgia's Data Layer, Explained for Engine Devs
 
+> ⚠️ **Short English introduction, written 2026-06-10. The authoritative reference is
+> [`GENOME.md`](../GENOME.md)** (French, measured 2026-09-04): it carries the current
+> figures, the two file forms, the three loading paths, and the known design flaws this
+> page glosses over. Where the two disagree, `GENOME.md` is right.
+>
 > One idea: **code defines mechanisms, genomes define values — and every value
 > carries its own valid range.** ~120 lines of core code, used by ~100 data files.
 
@@ -60,6 +65,10 @@ Each consumer crate owns its schema: a plain serde struct, registered in one lin
 Genomes live under `assets/genomes/<category>/<name>.toml` and ride the engine's
 standard asset pipeline — which means **hot-reload comes for free**: edit the TOML,
 the running game picks it up in seconds, no recompile, no scripting VM, no FFI.
+
+> In this repository, only 14 genome paths actually go through that pipeline; 56 more are
+> read straight from disk at startup and do **not** hot-reload. See
+> [`GENOME.md`](../GENOME.md) §4.
 
 Three contracts, all unit-tested:
 
