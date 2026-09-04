@@ -1,0 +1,338 @@
+id = "terrain_lod"
+name = "Terrain LOD & Streaming"
+domain = "Terrain"
+category = "Custom"
+description = "Multi-resolution chunk LOD, instancing, HLOD, infinite streaming parameters"
+version = "1.0.0"
+
+# === Chunk LOD System ===
+[[genes]]
+id = "lod_levels"
+label = "LOD Levels"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 1.0
+max = 4.0
+default = 3.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "lod0_distance"
+label = "LOD0 Max Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 50.0
+max = 200.0
+default = 100.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "lod1_distance"
+label = "LOD1 Max Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 100.0
+max = 600.0
+default = 300.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "lod2_distance"
+label = "LOD2 Max Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 300.0
+max = 2000.0
+default = 800.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "lod3_distance"
+label = "LOD3/Horizon Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 500.0
+max = 5000.0
+default = 2000.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "lod1_resolution"
+label = "LOD1 Resolution (voxels)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 8.0
+max = 32.0
+default = 16.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "lod2_resolution"
+label = "LOD2 Resolution (voxels)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 4.0
+max = 16.0
+default = 8.0
+layer = "chunk_lod"
+
+# === Streaming ===
+[[genes]]
+id = "streaming_infinite"
+label = "Infinite World (no cap)"
+chromosome = "Streaming"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "streaming"
+
+[[genes]]
+id = "streaming_radius_lod0"
+label = "LOD0 Radius (chunks)"
+chromosome = "Streaming"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 4.0
+layer = "streaming"
+
+[[genes]]
+id = "streaming_radius_lod1"
+label = "LOD1 Radius (chunks)"
+chromosome = "Streaming"
+target = "Value"
+min = 4.0
+max = 16.0
+default = 8.0
+layer = "streaming"
+
+[[genes]]
+id = "streaming_radius_lod2"
+label = "LOD2 Radius (chunks)"
+chromosome = "Streaming"
+target = "Value"
+min = 8.0
+max = 32.0
+default = 16.0
+layer = "streaming"
+
+[[genes]]
+id = "streaming_time_budget_ms"
+label = "Gen Time Budget (ms/frame)"
+chromosome = "Streaming"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 4.0
+layer = "streaming"
+
+[[genes]]
+id = "streaming_chunks_per_frame"
+label = "Chunks Per Frame"
+chromosome = "Streaming"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 2.0
+layer = "streaming"
+
+# === GPU Instancing ===
+[[genes]]
+id = "instancing_enabled"
+label = "GPU Instancing"
+chromosome = "Instancing"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "instancing"
+
+[[genes]]
+id = "instancing_tree_batch"
+label = "Tree Batch Size"
+chromosome = "Instancing"
+target = "Value"
+min = 50.0
+max = 2000.0
+default = 500.0
+layer = "instancing"
+
+[[genes]]
+id = "instancing_grass_batch"
+label = "Grass Batch Size"
+chromosome = "Instancing"
+target = "Value"
+min = 100.0
+max = 5000.0
+default = 1000.0
+layer = "instancing"
+
+[[genes]]
+id = "instancing_rock_batch"
+label = "Rock Batch Size"
+chromosome = "Instancing"
+target = "Value"
+min = 50.0
+max = 1000.0
+default = 300.0
+layer = "instancing"
+
+# === HLOD ===
+[[genes]]
+id = "hlod_enabled"
+label = "HLOD Merge Enabled"
+chromosome = "HLOD"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "hlod"
+
+[[genes]]
+id = "hlod_merge_distance"
+label = "HLOD Merge Distance (m)"
+chromosome = "HLOD"
+target = "Value"
+min = 200.0
+max = 2000.0
+default = 500.0
+layer = "hlod"
+
+[[genes]]
+id = "hlod_vertex_budget"
+label = "HLOD Vertex Budget"
+chromosome = "HLOD"
+target = "Value"
+min = 500.0
+max = 10000.0
+default = 3000.0
+layer = "hlod"
+
+# === Horizon ===
+[[genes]]
+id = "horizon_far_plane"
+label = "Far Plane (m)"
+chromosome = "Horizon"
+target = "Value"
+min = 500.0
+max = 10000.0
+default = 3000.0
+layer = "horizon"
+
+[[genes]]
+id = "horizon_fog_start"
+label = "Horizon Fog Start (m)"
+chromosome = "Horizon"
+target = "Value"
+min = 200.0
+max = 5000.0
+default = 1500.0
+layer = "horizon"
+
+[[genes]]
+id = "horizon_fog_density"
+label = "Horizon Fog Density"
+chromosome = "Horizon"
+target = "Value"
+min = 0.0001
+max = 0.005
+default = 0.001
+layer = "horizon"
+
+# === GTA5-style LOD System (Vague 1 — story-LOD) ===
+[[genes]]
+id = "terrain_lod0_max_m"
+label = "LOD0 Max Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 32.0
+max = 320.0
+default = 128.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod1_max_m"
+label = "LOD1 Max Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 64.0
+max = 700.0
+default = 320.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod2_max_m"
+label = "LOD2 Max Distance (m)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 128.0
+max = 2000.0
+default = 700.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod1_sample_step"
+label = "LOD1 Surface-nets sample step (2=quarter triangles)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 2.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod2_tile_size"
+label = "LOD2 Mega-tile size in chunks (4=4x4=128m tile)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 4.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod_hysteresis_m"
+label = "LOD transition hysteresis (m) — prevents flip-flop"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 0.0
+max = 64.0
+default = 16.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod1_veg_impostor"
+label = "Enable vegetation impostors at LOD1 (0=skip veg, 1=billboard)"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "chunk_lod"
+
+[[genes]]
+id = "terrain_lod2_color_saturation"
+label = "LOD2 flat tile color saturation multiplier"
+chromosome = "ChunkLOD"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.85
+layer = "chunk_lod"
+
+# Constraints
+[[constraints]]
+source = "lod0_distance"
+target = "lod1_distance"
+ratio = 3.0
+
+[[constraints]]
+source = "lod1_distance"
+target = "lod2_distance"
+ratio = 2.5
+
+[[constraints]]
+source = "streaming_radius_lod0"
+target = "streaming_radius_lod1"
+ratio = 2.0

@@ -1,0 +1,144 @@
+# Forgia V2 — FPS Tuning Genome
+#
+# Toutes les constantes "feel" du mode FPS Arena qui étaient hardcodées dans
+# les crates. Hot-reload Bevy Asset.
+#
+# Audit anti-hardcode 2026-05-18 (user request "regle le hardcode").
+
+[camera_shake]
+# Default decay/amplitude appliqués au Component CameraShake à l'attach.
+# Modif requiert respawn FpsCamera (Component fields, pas Resource live).
+default_decay = 10.0              # trauma decay /sec (~100ms full recovery)
+default_max_rotation_rad = 0.014  # ~0.8° peak max
+# Multiplicateurs amplitude par axe (live Resource, hot-reload).
+yaw_factor = 0.25                  # 25% du pitch
+roll_factor = 0.10                 # 10% du pitch (anti vertige)
+pitch_upward_bias = 0.7            # 0.7 = upward (recoil), 0 = pure random
+# Smooth noise (anti high-freq flicker à 60Hz).
+sample_rate_hz = 12.0
+
+[fov_punch]
+attack_secs = 0.030    # 30ms ramp peak
+decay_secs = 0.150     # 150ms ease-out
+
+[ads]
+lerp_speed = 12.0       # 1/12s ≈ 80ms hipfire ↔ ADS transition
+punch_attenuation = 0.7 # -70% fov_punch en ADS (precise aim protection)
+# NB (story-615) : le FOV hipfire n'est plus ici — c'est une préférence joueur
+# (slider menu ESC → forgia_player::CameraFov, défaut 90°), plus un gène genome.
+
+[mouse_look]
+base_sensitivity = 0.002  # rad/pixel
+recoil_decay_per_sec = 8.0
+
+# Story-615 — BULLET MAGNETISM (modèle souris : on corrige le TIR, jamais la caméra).
+# strength       = 0.0 off / 1.0 = fermeture max (toujours modulée par les falloffs).
+# max_angle_deg  = demi-cône de candidature : au-delà, la cible est ignorée.
+# max_correction_deg = borne dure sur la correction par tir (anti-aimbot).
+# engage_distance_m  = portée max.
+#
+# Story-649 (2026-07-03) : resserré + falloffs gradués (cohérence CoD BO6 —
+# l'aide est pleine au CENTRE du réticule et à MI-portée, dégressive vers zéro
+# au bord du cône / à bout portant / à la portée max ; jamais binaire).
+# Avant : 0.6 / 7° / 5° / 60 m = 45 % des tirs corrigés (magnétisme visible).
+[aim_assist]
+strength = 0.5
+max_angle_deg = 3.5
+max_correction_deg = 2.0
+engage_distance_m = 40.0
+
+# Story-617 — PRÉSENCE viewmodel (couche additive par-dessus l'ADS, n'affecte PAS le tir).
+# sway = l'arme traîne quand on tourne la souris ; bob = oscillation de marche ;
+# idle = micro-respiration à l'arrêt. Augmente sway_pos_max/bob_pos pour plus de vie,
+# baisse-les pour une arme plus posée. Hot-reload Shift+F12.
+[viewmodel_motion]
+sway_pos_per_px = 0.0009     # offset (m) par pixel de souris
+sway_pos_max = 0.03          # clamp offset positionnel (m)
+sway_rot_per_px_deg = 0.03   # tilt (deg) par pixel
+sway_rot_max_deg = 2.5       # clamp tilt (deg)
+sway_smooth = 9.0            # vitesse retour au centre (1/s)
+bob_pos = 0.010              # amplitude bob marche (m)
+bob_freq = 2.0               # cycles/s à pleine vitesse (baissé 8→2 : anti mal de tête)
+bob_speed_ref = 6.0          # vitesse (m/s) = bob plein
+idle_amp = 0.004             # amplitude respiration (m)
+idle_freq = 0.4              # cycles/s respiration (baissé 1.1→0.4 : respiration calme)
+
+# Story-617 inc.2 — placement des MAINS/BRAS procéduraux (hot-reload Shift+F12).
+# Ajuste sans rebuild : offset = décale tout l'ensemble, scale = grossit/réduit.
+# enabled=false pour masquer les bras. NB : un FOV élevé (slider 120°) grossit le
+# viewmodel près de la caméra — baisser scale si les mains paraissent énormes.
+# Placement des MAINS (hot-reload Shift+F12). Cale chaque poignet sur la poignée de
+# l'arme. right = main gâchette, left = main soutien. +X droite, +Y haut, -Z avant.
+# elbow_* oriente l'avant-bras (drop = descend, back = recule vers caméra, out = écarte).
+# NB : valeurs pensées pour un pistolet (mains rapprochées) ; un fusil voudra left plus
+# en avant. enabled=false pour masquer les mains.
+# Placement AUTO par-arme (story-619) : les poignets sont dérivés de la position +
+# taille RÉELLES de chaque arme (genome) → marche sur les 4 armes sans réglage.
+# Ici = fractions/décalages agnostiques. grip = main crosse (arrière), barrel = main
+# sous le canon (avant). *_back/*_fwd = fraction de la longueur de l'arme. *_drop =
+# hauteur sous l'arme. 'scale' agrandit la MAIN. Hot-reload Shift+F12.
+[viewmodel_arms]
+enabled = true
+use_glb = true     # story-661 : bras GLB cartoon ; false = poings procéduraux (A/B live)
+glb_scale = 1.35   # échelle mitaines GLB (>1 = grosses pattes cartoon, calibré WYSIWYG)
+scale = 2.0
+# Ancres recalibrées pour les bras GLB story-661 (WYSIWYG preview_ingame.py) :
+# la poignée des armes-créatures est SOUS le centre, pas loin derrière.
+# Mains sur la SILHOUETTE de l'arme (les armes-créatures sont larges : une ancre
+# au centre exact est occluse au FOV viewmodel) — coin bas-droit arrière (crosse)
+# et grip avant bas-gauche (soutien).
+# La paume CHEVAUCHE l'arme (la poignée passe dans le C de la main).
+# Main droite = MANCHE VERTICAL (poignée pistolet, le grip vert des armes-
+# créatures, LÉGÈREMENT EN AVANT du centre) — validé user 2026-07-20.
+# Calibrable visuellement : sphères MK_R/MK_L dans calibration_<arme>.blend
+# (tools/blender/preview_ingame.py) → tools/blender/read_grip_markers.py.
+# Ancres = tubes MK_R/MK_L placés à la main dans calibration_bourrasque.blend
+# (2026-07-20 19h35, extraits par read_grip_markers).
+grip_x = -0.002    # main crosse : centrée sur la poignée arrière
+grip_drop = -0.131
+grip_back = 0.045
+barrel_x = -0.033  # main soutien : museau, AU-DESSUS du centre (canon)
+barrel_drop = 0.069
+barrel_fwd = 0.400
+elbow_drop = 0.30
+elbow_back = 0.45
+grip_elbow_out = 0.12     # coude main droite (crosse) — modéré
+barrel_elbow_out = 0.34   # coude main gauche (soutien) — sorti vers le bas-gauche (CoD)
+
+# Story-618 — FOV viewmodel SÉPARÉ (arme + bras rendus par une caméra dédiée, FOV
+# fixe indépendant du FOV monde) → plus de déformation « gros tubes » au FOV 120°.
+# fov_deg bas = arme plus « zoomée »/plate ; haut = plus large. enabled=false pour
+# revenir au rendu d'avant (arme au FOV monde). Hot-reload Shift+F12.
+[viewmodel_fov]
+enabled = true
+fov_deg = 68.0
+
+[crosshair_hipfire]
+cross_len = 7.0
+cross_stroke = 2.0
+cross_alpha = 220       # u8 0..255
+
+[crosshair_ads_dot]
+outer_radius = 4.0
+inner_radius = 2.0
+
+[crosshair_sniper_overlay]
+scope_radius_factor = 0.42     # × min(w, h) screen
+dim_alpha = 145                 # u8, opacité du fond hors scope
+dim_color = [8, 8, 12]          # u8 RGB
+vignette_rings = 8              # nb anneaux concentriques fake-blur
+ring_thickness_factor = 0.18    # × scope_radius
+ring_max_alpha = 90.0           # max alpha gradient
+ring_color = [15, 15, 18]
+ring_outer_extent = 1.5         # multiplicateur ring_thickness pour l'étalement
+border_width = 8.0
+border_inner_width = 2.0
+border_inner_offset = 4.0       # px
+reticle_gap = 8.0
+reticle_line_factor = 0.85      # × scope_radius
+reticle_color = [10, 10, 10]
+reticle_line_stroke = 1.5
+reticle_tick_stroke = 1.0
+reticle_tick_size = 4.0
+red_dot_radius = 2.0
+red_dot_color = [255, 30, 30]

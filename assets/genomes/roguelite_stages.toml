@@ -1,0 +1,102 @@
+# Roguelite stage definitions — Story-483 (V7).
+#
+# Consommé par `forgia-stage-arena::RogueliteStagesGenome` via AssetServer
+# (hot-reload Shift+F12 natif Bevy file_watcher).
+#
+# Schema :
+#   [stages.<id>]
+#   biome              : string (matches forgia-terrain BiomeKind: "Volcanic" | "Plains" | ...)
+#   arena_extent_m     : f32   (demi-côté m, hex inscrit dans cercle de ce rayon)
+#   ramparts_kit       : string ("kaykit_dungeon" | "medieval_hexagon")
+#   ramparts_shape     : string ("hexagonal", default si omis)
+#   anchor_slots       : u32   (POI anchor count sur cercle, exclus PlayerSpawn/BossPad)
+#   music_state        : string (optionnel, e.g. "combat_intense")
+#   boss_pad_required  : bool  (force BossPad anchor + boss-pad POI prefab)
+#   weather_override   : string (optionnel, consommé par VFX/audio biome)
+
+[stages.crypts_of_anvil]
+biome = "Volcanic"
+arena_extent_m = 90.0
+ramparts_kit = "kaykit_dungeon"
+ramparts_shape = "hexagonal"
+anchor_slots = 6
+music_state = "combat_intense"
+boss_pad_required = true
+weather_override = "ashfall"
+# Longueur visuelle naturelle d'1 wall.glb KayKit Dungeon Pack (m). À calibrer
+# au playtest : si gaps entre murs → diminuer ; si chevauchements → augmenter.
+# Hot-reload Shift+F12 supporté pour itération sans rebuild.
+# 2026-05-27 : 1.0 → 4.0 (diag crash 1ère wave). À 1m, 90 walls/segment × 6 = 540 GLB
+# instances visuelles → pression draw-calls majeure. À 4m → 23×6 = 138, /3.9. Si
+# gaps visibles entre murs, redescendre par paliers 2.0/3.0. Revert original
+# `wall_natural_len_m = 1.0`.
+wall_natural_len_m = 4.0
+# Story-485 — palette modules intra-arena. Identity "Crypts" : dense cover,
+# verticality sniper, brawl pit central.
+# AC6 requirement : >= 6 CoverLow placés (validation runtime sensor
+# `forgia2_stage_layout.json`). Chaque module = 1 prop (pas N props/cluster,
+# `density_per_m2` non consommé downstream — cf story-485 phase suivante).
+# Phase 1 fullness (2026-05-26) : counts bumpés 2× pour density ~0.0014/m²
+# (vs Hades ~0.05/m²). Palette inferno enrichie de 10 props orphelins
+# (level_modules.toml). Solver min_spacing=3m → spacing tombera ~6m (still OK).
+module_palette = [
+    { id = "cover_low_cluster", count = 12 },
+    { id = "cover_high_wall",   count = 4 },
+    { id = "sniper_perch",      count = 1 },
+    { id = "melee_pit",         count = 1 },
+]
+
+[stages.forge_sanctum]
+biome = "Plains"
+arena_extent_m = 80.0
+ramparts_kit = "medieval_hexagon"
+ramparts_shape = "hexagonal"
+anchor_slots = 5
+music_state = "combat_default"
+boss_pad_required = false
+# 2026-05-27 : 1.0 → 4.0 (diag crash 1ère wave, cohérence avec crypts_of_anvil)
+# MESURÉ (asset_registry) : wall_straight.gltf = 2,00 m de large. Le 4,0
+# précédent espaçait les murs du double de leur largeur → un trou sur deux.
+wall_natural_len_m = 2.0
+# Story-485 — palette modules. Identity "Forge" : plain combat focus, plus de
+# cover bas, double melee pit, pas de sniper perch (distinct du Crypts).
+# Phase 1 fullness (2026-05-26) : counts bumpés 2× pour density homogène.
+module_palette = [
+    { id = "cover_low_cluster", count = 8 },
+    { id = "cover_high_wall",   count = 2 },
+    { id = "melee_pit",         count = 2 },
+]
+
+# ─── Story-671 : deux salles de plus, deux DA de plus ────────────────────────
+# Les extents restent dans la bande 80-90 m : les rayons de l'anneau de décor
+# (`roguelite_decor.toml`, 42-74 m) sont GLOBAUX et ne reçoivent pas l'extent du
+# stage. Une arène plus petite que 74 m se retrouverait avec des props hors les
+# murs. Le jour où `plan_decor_set` recevra l'extent, ces valeurs pourront varier.
+
+[stages.donjon_oublie]
+# DA « Le Donjon Oublié » — intérieur bâti, clos et lisible. Le pack KayKit
+# Dungeon fournit murs, colonnes, tonneaux et bannières : des repères réguliers
+# et des silhouettes basses, à l'opposé du chaos volcanique de la Crypte.
+biome = "Plains"
+arena_extent_m = 80.0
+ramparts_kit = "kaykit_dungeon"
+ramparts_shape = "hexagonal"
+anchor_slots = 6
+music_state = "combat_default"
+boss_pad_required = false
+wall_natural_len_m = 4.0
+
+[stages.hauts_paturages]
+# DA « Les Hauts Pâturages » — extérieur clair, low-poly coloré. Collines et
+# arbres, longues lignes de vue dégagées : c'est la salle où Madame Lenoir
+# (sniper, portée 300 m, aucun falloff) prend enfin son sens.
+biome = "Plains"
+arena_extent_m = 90.0
+ramparts_kit = "medieval_hexagon"
+ramparts_shape = "hexagonal"
+anchor_slots = 5
+music_state = "combat_default"
+boss_pad_required = false
+# MESURÉ (asset_registry) : wall_straight.gltf = 2,00 m de large. Le 4,0
+# précédent espaçait les murs du double de leur largeur → un trou sur deux.
+wall_natural_len_m = 2.0

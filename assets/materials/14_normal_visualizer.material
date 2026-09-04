@@ -1,0 +1,7 @@
+# 14_normal_visualizer.material — Renzora-format material stub.
+# Consumed by forgia-editor-material + forgia-render-* crates.
+# TODO: port node-graph from Renzora source.
+
+[meta]
+name = "14_normal_visualizer"
+version = "0.1.0"

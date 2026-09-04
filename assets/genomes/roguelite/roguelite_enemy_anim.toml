@@ -1,0 +1,47 @@
+# roguelite_enemy_anim.toml — story-636
+# Animation squelettique des ennemis Roguelite (clips bakés KayKit joués via
+# Bevy AnimationPlayer) + viz de contrôle du rig.
+#
+# Hot-reload (mtime 1Hz) :
+#   - LIVE : walk_speed_min / run_speed_min / crossfade_ms / rig_visible /
+#            mesh_alpha / gizmo_enabled / enabled (gate le binding).
+#   - RESTART requis : les *_clip (noms lus au build du graphe d'anim).
+#
+# Noms de clips = clips bakés présents dans les GLB KayKit (95 dispo) :
+#   Idle, Idle_B, Idle_Combat, Walking_A/B/C, Walking_Backwards,
+#   Running_A/B/C, Running_Strafe_Left/Right, Death_A/B/C, Hit_A/B, ...
+
+enabled = true
+
+# Clips par état IA (ArenaBot.state) + vitesse.
+idle_clip   = "Idle"          # au repos (hors détection)
+walk_clip   = "Walking_A"     # chasse lente
+run_clip    = "Running_A"     # chasse rapide
+attack_clip = "Idle_Combat"   # à portée (swing réel = fast-follow)
+death_clip  = "Death_A"       # mort (one-shot)
+hit_clip    = "Hit_A"         # réservé fast-follow (réaction au dégât)
+
+# Seuils de vitesse mesurée (m/s) : < walk → idle (bloqué), < run → marche, sinon course.
+walk_speed_min = 0.3
+run_speed_min  = 4.0
+
+# Crossfade entre clips (ms).
+crossfade_ms = 150
+
+# ── Performance : LOD d'animation squelettique ─────────────────────────────
+# Tracy 20 a confirmé que les rigs KayKit (~41 os) créent les hitches de combat
+# via propagate_parent_transforms. Les ennemis proches, en attaque ou en mort
+# restent à 60 Hz ; les autres sont déphasés à 30 puis 15 Hz, en conservant le
+# temps d'animation lors de chaque mise à jour.
+lod_near_distance_m = 18.0
+lod_far_distance_m = 38.0
+lod_mid_frame_divisor = 2
+lod_far_frame_divisor = 4
+
+# ── Viz de contrôle du rig (debug) ──────────────────────────────────────────
+# rig_visible=true  → mesh translucide (mesh_alpha) pour voir le squelette.
+# gizmo_enabled=true → trace les bones (sphères + os).
+# Passer les deux à false → ennemis opaques, sans gizmos (look final), sans rebuild.
+rig_visible   = false
+mesh_alpha    = 0.45
+gizmo_enabled = false

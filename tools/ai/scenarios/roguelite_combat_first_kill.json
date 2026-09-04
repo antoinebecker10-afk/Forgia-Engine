@@ -1,0 +1,21 @@
+{
+  "name": "roguelite_combat_first_kill",
+  "workflow": "combat_first_kill",
+  "boot_mode": "roguelite",
+  "ready_timeout_s": 90,
+  "action_timeout_s": 10,
+  "death_timeout_s": 8,
+  "maximum_fire_actions": 12,
+  "fire_frames": 6,
+  "aim_settle_s": 0.12,
+  "between_shots_s": 0.25,
+  "assertions": {
+    "game_mode": "Roguelite",
+    "run_state_prefix": "InRun"
+  },
+  "evidence_sensors": [
+    "forgia_fps_hitscan.json",
+    "forgia_killfeed.json",
+    "forgia2_roguelite_wave.json"
+  ]
+}

@@ -1,0 +1,142 @@
+id = "damage_feedback_default"
+name = "Damage Feedback"
+domain = "Combat"
+category = "Feedback"
+description = "Damage flash, screen shake, death delay — game feel tuning"
+version = "1.0.0"
+
+# Flash
+[[genes]]
+id = "dmg_flash_duration"
+label = "Flash Duration"
+chromosome = "Flash"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.3
+layer = "flash"
+
+[[genes]]
+id = "dmg_flash_intensity_div"
+label = "Flash Intensity Div"
+chromosome = "Flash"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 25.0
+layer = "flash"
+
+# Shake
+[[genes]]
+id = "dmg_shake_intensity_div"
+label = "Shake Intensity Div"
+chromosome = "Shake"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "shake"
+
+[[genes]]
+id = "dmg_shake_max"
+label = "Shake Max"
+chromosome = "Shake"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.5
+layer = "shake"
+
+# === Hitmarker (story-432 V3 — gunfeel feedback) ===
+# X-cross overlay au crosshair quand le joueur touche un ennemi.
+# Couleur rouge sur kill, blanche sur hit normal. Fade lifetime.
+[[genes]]
+id = "hud_hitmarker_duration_ms"
+label = "Hitmarker Duration (ms)"
+chromosome = "Hitmarker"
+target = "Value"
+min = 30.0
+max = 600.0
+default = 220.0
+layer = "hitmarker"
+
+[[genes]]
+id = "hud_hitmarker_size_px"
+label = "Hitmarker Size (px)"
+chromosome = "Hitmarker"
+target = "Value"
+min = 6.0
+max = 32.0
+default = 14.0
+layer = "hitmarker"
+
+[[genes]]
+id = "hud_hitmarker_gap_px"
+label = "Hitmarker Gap From Center (px)"
+chromosome = "Hitmarker"
+target = "Value"
+min = 0.0
+max = 12.0
+default = 5.0
+layer = "hitmarker"
+
+[[genes]]
+id = "hud_hitmarker_thickness"
+label = "Hitmarker Line Thickness"
+chromosome = "Hitmarker"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 1.8
+layer = "hitmarker"
+
+[[genes]]
+id = "hud_hitmarker_kill_red"
+label = "Hitmarker Kill Color R"
+chromosome = "Hitmarker"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "hitmarker_color"
+
+[[genes]]
+id = "hud_hitmarker_kill_green"
+label = "Hitmarker Kill Color G"
+chromosome = "Hitmarker"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "hitmarker_color"
+
+[[genes]]
+id = "hud_hitmarker_kill_blue"
+label = "Hitmarker Kill Color B"
+chromosome = "Hitmarker"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "hitmarker_color"
+
+# Death
+[[genes]]
+id = "dmg_death_delay"
+label = "Death Delay"
+chromosome = "Death"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.5
+layer = "death"
+
+[[genes]]
+id = "dmg_void_delay"
+label = "Void Death Delay"
+chromosome = "Death"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.5
+layer = "death"

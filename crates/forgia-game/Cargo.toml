@@ -1,0 +1,89 @@
+[package]
+name = "forgia-game"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Binaire principal. Wire tous les plugins, gate FPS/RPG par GameMode, window 1920x1080."
+
+[lints]
+workspace = true
+
+[features]
+# Story-622 (Phase 0.2) — `qa` active le bus QA : drain runtime (qa-runtime) +
+# persistance disque RON (qa-record → target/forgia_qa/inbox/). ON par défaut :
+# pré-ship on veut voir + persister les bugs (drain = 1 system PreUpdate, sink =
+# 1 write/bug distinct). Une story release pourra gater via `--no-default-features`.
+default = ["qa"]
+qa = ["forgia-qa-core/qa-runtime", "forgia-qa-core/qa-record"]
+# Bevy 0.18 : spans ECS et rendu exportés au client Tracy. Opt-in depuis le
+# package racine via `cargo run --features profile-tracy`.
+profile-tracy = ["bevy/trace_tracy"]
+# Inclut les spans Tracy et profile chaque allocation système. Diagnostic
+# ponctuel uniquement : ne pas l'utiliser pour statuer sur les FPS de ship.
+profile-tracy-memory = ["bevy/trace_tracy_memory"]
+# Inspection runtime par agent via le Bevy Remote Protocol. Strictement opt-in :
+# aucun serveur HTTP n'est compilé ni ouvert dans un lancement normal.
+dev-brp = ["bevy/bevy_remote"]
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+bevy_egui = { workspace = true }
+bevy_hanabi = { workspace = true }
+bevy_kira_audio = { workspace = true }
+forgia-core = { workspace = true }
+forgia-ai-arena-bot = { workspace = true }
+forgia-assets = { workspace = true }
+forgia-input = { workspace = true }
+forgia-player = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-damage = { workspace = true }
+forgia-enemy-nameplate = { workspace = true }
+forgia-effects = { workspace = true }
+forgia-terrain = { workspace = true }
+forgia-foliage = { workspace = true }
+forgia-water = { workspace = true }
+forgia-audio = { workspace = true }
+# Story-521 port V1 QA (bus BugReport + replay session). Harness + autopilot
+# référencés via dev-deps si on veut tests intégrés plus tard.
+forgia-qa-core = { workspace = true }
+forgia-qa-replay = { workspace = true }
+forgia-asset-registry = { workspace = true }
+forgia-mode-expedition = { workspace = true }
+forgia-streaming = { workspace = true }
+forgia-fps = { workspace = true }
+forgia-viewmodel = { workspace = true }
+forgia-rpg = { workspace = true }
+forgia-mode-roguelite = { workspace = true }
+forgia-rpg-data = { workspace = true }
+forgia-ui = { workspace = true }
+forgia-ui-lib = { workspace = true }
+forgia-menu-hub = { workspace = true }
+forgia-killfeed = { workspace = true }
+forgia-juice-screen-flash = { workspace = true }
+forgia-observability = { workspace = true }
+forgia-camera-orbit = { workspace = true }
+forgia-secondary-motion = { workspace = true }
+forgia-anim-debug = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-village-loader = { workspace = true }
+# Story-578 P1 — worldgen procédural (registre d'assets + spawn instancié grounded).
+# Découplé : 0 dép terrain/gameplay, conformance sol injectée.
+forgia-worldgen = { workspace = true }
+# Story-581 — debug overlay dev-loop (monitor perf/mémoire/VRAM egui). La crate
+# existait (story-547) mais n'était jamais branchée dans le jeu → monitor invisible.
+forgia-debug = { workspace = true }
+forgia-editor = { workspace = true }
+# Story-602 — color grading par mode (genome TOML hot-reload).
+serde = { workspace = true }
+# Table pièce -> zone de lightmap : 6801 entrées, trop volumineuses pour du TOML.
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+
+# Story-695 : features natif-only re-ajoutees ici (hot-reload assets + textures
+# basis). La resolution de features par cible fait qu'un build wasm ne les voit
+# jamais — la base workspace reste lean/web-compatible.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy = { version = "0.18.1", features = ["basis-universal", "file_watcher"] }

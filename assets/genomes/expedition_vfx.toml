@@ -1,0 +1,71 @@
+# Les feux de l'Expédition : ceux que porte le personnage, ceux qui bordent le
+# chemin. Réglable à chaud — c'est précisément pourquoi ces valeurs sont ici et
+# non dans le code : elles se jugent en jeu, de nuit, pas dans un tableur.
+#
+# CE QUE CE FICHIER NE CONTIENT PAS. La géométrie des braseros (position,
+# hauteur de flamme, avancée sur le chemin) vit dans `expedition_vallon.json`,
+# produit par Blender. Ici on ne règle que l'INTENSITÉ du feu, jamais son
+# emplacement — une position écrite deux fois finit toujours par diverger.
+
+# --- La traînée de pas -------------------------------------------------------
+# Une bouffée de braises par pas, pas un débit continu. `weapon_vfx/status.rs`
+# note que `SpawnerSettings::rate` « ne rendait rien dans ce repo » : tout le
+# VFX maison passe par des bursts. C'est aussi plus juste — une braise naît
+# quand le pied touche.
+[trainee]
+# En deçà, le joueur piétine : on n'accumule rien. Sans ce seuil, un sur-place
+# finirait par déclencher une bouffée et le village s'embraserait tout seul.
+vitesse_min_ms = 1.5
+# Vitesse à laquelle la lueur atteint son plein (le sprint est à 9,75 m/s).
+vitesse_pleine_ms = 8.0
+# Distance parcourue entre deux bouffées. À la marche (6,5 m/s) cela fait une
+# braise toutes les ~0,14 s ; au sprint, ~0,09 s. Le rythme suit donc la course
+# sans qu'aucun débit ne soit piloté.
+pas_m = 0.9
+braises_par_pas = 14.0
+braise_duree_s = 0.55
+braise_taille_m = 0.085
+braise_rayon_m = 0.06
+# Dérive ascendante : sans elle les braises collent au sol et se lisent comme
+# une tache, pas comme du feu.
+braise_vitesse_ms = 0.35
+
+# --- Les lueurs portées ------------------------------------------------------
+# BLOQUANT : un matériau émissif BRILLE mais n'éclaire PAS ses voisins. L'ourlet
+# ardent de la cape se verrait sans rien illuminer. Ces `PointLight` sont ce qui
+# rend vraie la consigne « la cape enflammée et les traînées éclaireront aussi ».
+[lueur]
+pied_intensite = 4000.0
+pied_portee_m = 4.0
+cape_intensite = 9000.0
+cape_portee_m = 5.5
+# Fondu par seconde. Une lumière qui s'allume d'un coup clignote à chaque
+# micro-variation de vitesse.
+fondu_par_s = 6.0
+
+# --- Les braseros du chemin --------------------------------------------------
+# 16 pièces semées le long des 358,7 m, jamais dans l'eau (deux rejets : 17 m de
+# l'axe de la rivière, et au-dessus du niveau d'eau + 0,3 m).
+[lampes]
+# Monté de 60 000 à 170 000 lm le 2026-08-14 (« rendre les lampadaires plus
+# lumineux »), en même temps que l'ambiante d'arrivée passait de 320 à 110 lux.
+# Les deux vont ensemble : un brasero se juge par CONTRASTE avec la nuit
+# autour, jamais dans l'absolu. Le remonter sans assombrir ne ferait qu'un
+# halo blanc ; l'inverse laisserait le chemin noir.
+#
+# La PORTÉE ne se règle pas ici : elle vient de `portee_m` du manifeste
+# Blender, par brasero. Ceci n'agit que sur l'intensité dans cette portée.
+intensite = 170000.0
+fondu_par_s = 2.0
+# Un brasero s'allume quand le joueur approche de SON avancée sur le chemin.
+# La marge est la fraction de chemin sur laquelle il monte : 0,08 = ~29 m.
+marge_allumage = 0.08
+# Au-dessus de cette élévation solaire, il fait jour : les braseros restent
+# éteints même dépassés. C'est ce qui rend l'allumage « progressif à mesure que
+# la nuit tombe » au lieu de « progressif à mesure qu'on avance ».
+#
+# Monté de 8° à 14° le 2026-08-14, pour suivre la nuit avancée : le soleil part
+# à 32° et finit à −8°, donc à 14° les feux commencent à monter bien avant
+# d'atteindre le village. Les laisser à 8° aurait allumé les braseros APRÈS que
+# la nuit soit tombée — un trou de lumière au milieu du trajet.
+elevation_extinction_deg = 14.0

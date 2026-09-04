@@ -1,0 +1,86 @@
+id = "roguelite_toon"
+name = "Roguelite Cel-Shading Toon"
+domain = "Postprocess"
+category = "Rendering"
+description = "Cel-shading + Sobel outline pour direction artistique cartoon bible v1 (Overwatch x Hades x Cult of the Lamb). Attaché OnEnter(GameMode::Roguelite) seulement — RPG/Arena gardent PBR standard."
+version = "0.1.0"
+
+# === Toon band quantization (forgia-postprocess::toon::ToonSettings) ===
+
+[[genes]]
+id = "roguelite_toon_bands"
+label = "Cel-shading bands (lighting quantization steps)"
+chromosome = "Toon"
+target = "Value"
+min = 2.0
+max = 16.0
+default = 4.0
+layer = "roguelite"
+
+[[genes]]
+id = "roguelite_toon_strength"
+label = "Toon quantization strength (0=off, 1=full)"
+chromosome = "Toon"
+target = "Value"
+# 2026-05-29 : default 1.0 → 0.6 — strength=1 crashe le rendu en noir total
+# sur la scène Roguelite (éclairage faible, all-pixel-luminance < band[0] → 0).
+# 0.6 blend 60% toon + 40% original = lisible + look cartoon préservé.
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "roguelite"
+
+[[genes]]
+id = "roguelite_toon_edge_dark"
+label = "Band edge darkening (visual band separation)"
+chromosome = "Toon"
+target = "Value"
+# 2026-05-29 : default 0.15 → 0.0 — edge_dark>0 sur scène faiblement éclairée
+# pousse les low-luminance pixels en dessous de 0 (clamp) → noir total.
+# Réactivable à 0.1 quand atmospherics Roguelite shippent (directional light fort).
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "roguelite"
+
+# === Sobel outline (forgia-postprocess::outline::OutlineSettings) ===
+
+[[genes]]
+id = "roguelite_outline_thickness"
+label = "Outline texel sampling radius"
+chromosome = "Outline"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.0
+layer = "roguelite"
+
+[[genes]]
+id = "roguelite_outline_threshold"
+label = "Outline gradient cutoff (lower = more edges)"
+chromosome = "Outline"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.15
+layer = "roguelite"
+
+[[genes]]
+id = "roguelite_outline_strength"
+label = "Outline blend strength (0=off, 1=full)"
+chromosome = "Outline"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "roguelite"
+
+[[genes]]
+id = "roguelite_outline_enabled"
+label = "Outline enabled (0=off, 1=on) — toggle without dep change"
+chromosome = "Outline"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "roguelite"

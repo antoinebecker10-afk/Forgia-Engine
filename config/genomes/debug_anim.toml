@@ -1,0 +1,47 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# debug_anim — Forgia V2 Anim Debug System (story-454 Niveau A)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Configuration data-driven du système de diagnostic anim layer. Hot-reloadable
+# via Bevy file_watcher (Shift+F12 ou détection auto). Pour désactiver
+# entièrement : `dbg_bone_trace_enabled = 0`.
+#
+# Pattern AAA :
+# - UE5 Animation Insights trace channels (rolling buffer time-series)
+# - Houdini Skinning Converter error visualisation (diff bind vs current)
+#
+# Sortie : `forgia_bone_trace.json` à la racine workspace, refresh à
+# `dbg_bone_trace_hz` Hz. Health alert side-file si désync mesh↔bones détectée.
+
+[debug_anim]
+# Active le sensor `forgia_bone_trace.json`. 0 = désactivé (zéro coût runtime).
+dbg_bone_trace_enabled = 1
+
+# Fréquence d'écriture sensor (Hz). 2.0 = 1 snapshot toutes les 500ms.
+# Recommandé 2-5 Hz pour diagnostic. Plus haut = plus de bruit JSON.
+dbg_bone_trace_hz = 2.0
+
+# Nombre maximum de bones loggés par character. Au-delà, troncature.
+# 24 = couvre BipedLizard (20 bones) + Humanoid (18 bones) + marge.
+dbg_bone_trace_max_bones = 24
+
+# 🚨 Renommé de `max_characters` le 2026-08-16 : la clé comptait des MAILLAGES,
+# pas des personnages. Le chien d'expédition en porte huit skinnés (museau,
+# gueule, iris, pupille, sac, corps, tissu) pour UN squelette — il saturait donc
+# le plafond à lui seul, et les huit relevés étaient huit fois le même début de
+# squelette. Les bras n'ont jamais été relevés.
+# Quatre SQUELETTES = le joueur et trois ennemis.
+dbg_bone_trace_max_squelettes = 4
+
+# Les os relevés QUOI QU'IL ARRIVE, par nom, HORS plafond. Sans cette liste, le
+# relevé suit l'ordre du fichier glTF — qui ne dit rien de ce qu'on cherche. Les
+# bras y sont parce que c'est là que les défauts se voient : ils portent l'arme.
+# Vider la liste ne la vide pas : le moteur garde la sienne, pour qu'un `[]`
+# distrait ne rende pas le relevé silencieusement inutile.
+dbg_bone_trace_os_surveilles = ["Hips", "Spine2", "Neck", "RightShoulder", "RightArm", "RightForeArm", "RightHand", "LeftArm", "LeftForeArm", "LeftHand", "RightFoot", "LeftFoot"]
+
+# Seuil de décrochage (mètres) entre le centre d'AABB d'un maillage et le
+# barycentre de SES PROPRES joints. Avant le 2026-08-16 la comparaison portait
+# sur l'os racine : comparer le museau du chien à ses hanches donnait un mètre
+# d'écart légitime, et l'alerte criait en permanence.
+dbg_bone_trace_desync_threshold_m = 0.05

@@ -1,0 +1,251 @@
+id = "weapon_modern_ar"
+name = "Modern Assault Rifle"
+domain = "Weapon"
+category = "Weapon"
+description = "5.56mm modern AR: balanced damage, high ROF, tight spread, low recoil"
+version = "1.0.0"
+
+# === Ballistics (game mechanics — synced with FpsTuning mar_* fields) ===
+
+[[genes]]
+id = "mar_damage"
+label = "Damage"
+chromosome = "Ballistics"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 16.0
+layer = "modern_ar"
+
+[[genes]]
+id = "mar_fire_rate"
+label = "Fire Rate (s)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.05
+max = 0.3
+default = 0.09
+layer = "modern_ar"
+
+[[genes]]
+id = "mar_range"
+label = "Range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 40.0
+max = 150.0
+default = 110.0
+layer = "modern_ar"
+
+[[genes]]
+id = "mar_spread_deg"
+label = "Spread (deg)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.8
+layer = "modern_ar"
+
+# === Handling (viewmodel / recoil / ADS) ===
+
+[[genes]]
+id = "mar_recoil_kick_back"
+label = "Recoil Back"
+chromosome = "Handling"
+target = "Value"
+min = 0.01
+max = 0.1
+default = 0.025
+layer = "recoil"
+
+[[genes]]
+id = "mar_recoil_kick_up"
+label = "Recoil Up"
+chromosome = "Handling"
+target = "Value"
+min = 0.005
+max = 0.08
+default = 0.018
+layer = "recoil"
+
+[[genes]]
+id = "mar_recoil_duration"
+label = "Recoil Time (s)"
+chromosome = "Handling"
+target = "Value"
+min = 0.03
+max = 0.2
+default = 0.07
+layer = "recoil"
+
+# === Viewmodel ===
+# Mesures Blender (assembled.glb, InfimaGames ModernAssaultRifle):
+#   Longueur totale: 82.9 cm (-Y Blender → +Z glTF)
+#   Hauteur: 26.8 cm (Z Blender → Y glTF)
+#   Largeur: 7.4 cm (X)
+#   Grip (origine) a Y≈0, Muzzle a Y=-55.4, Crosse a Y=+27.5
+#   Sight_Rear a Z=+6.7 (au-dessus du grip)
+#   Magazine centre a Z≈-7 (en-dessous du grip)
+#   Scale in-game: 0.0181 (target 1.5m / 82.9cm)
+#   Grip-to-muzzle: 55.4cm → 1.00m apres scale
+#   Sight above grip: 6.7cm → 0.12m apres scale
+#   forward_axis: PosZ (correction rotation_y(PI) dans le manifest)
+
+[[genes]]
+id = "mar_barrel_length"
+label = "Barrel Length (m)"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.3
+max = 1.2
+# Grip-to-muzzle = 55.4cm * 0.0181 = 1.0m, but barrel_length is
+# used for muzzle flash offset — 0.70 places flash near barrel tip
+default = 0.70
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_offset_x"
+label = "Hip Offset X"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.1
+max = 0.5
+# Right hand hold position, slightly right of center
+default = 0.28
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_offset_y"
+label = "Hip Offset Y"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.5
+max = -0.1
+# Below eye level. Grip is at model origin, sight is 0.12m above grip.
+# Raised slightly based on in-game screenshot feedback.
+default = -0.20
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_offset_z"
+label = "Hip Offset Z"
+chromosome = "Viewmodel"
+target = "Value"
+min = -1.0
+max = -0.3
+# Forward offset from camera. Weapon is 1.5m long at scale,
+# grip is ~67% from muzzle. Place comfortably in view.
+default = -0.55
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_ads_offset_x"
+label = "ADS Offset X"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.15
+max = 0.15
+# Scope SOCKET_Center at X=0. Center viewmodel horizontally.
+default = 0.0
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_ads_offset_y"
+label = "ADS Offset Y"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.4
+max = 0.0
+# Scope eye point (SOCKET_Center) at Blender Z=10.06 → 0.182m above grip.
+# To align scope with camera center: offset_y = -scope_height = -0.18
+default = -0.18
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_ads_offset_z"
+label = "ADS Offset Z"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.8
+max = -0.1
+# Scope eye point at Blender Y=-11.89 → 0.215m forward of grip.
+# After PosZ correction, scope is behind grip in viewmodel space.
+# Pull weapon close so eye looks through scope tube.
+default = -0.30
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_target_length"
+label = "Target Size (m)"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.3
+max = 2.5
+# Max extent of assembled model = 82.9cm → scale = 1.5/82.9 = 0.0181
+# Gives a ~1.5m viewmodel weapon (realistic for FPS perspective)
+default = 1.5
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_rotation_x_deg"
+label = "Rotation Offset X (deg)"
+chromosome = "Viewmodel"
+target = "Value"
+min = -180.0
+max = 180.0
+# No fine-tune needed — manifest PosZ handles barrel → -Z correction
+default = 0.0
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_rotation_y_deg"
+label = "Rotation Y (deg)"
+chromosome = "Viewmodel"
+target = "Value"
+min = -180.0
+max = 180.0
+default = 0.0
+layer = "viewmodel"
+
+[[genes]]
+id = "mar_rotation_z_deg"
+label = "Rotation Z (deg)"
+chromosome = "Viewmodel"
+target = "Value"
+min = -180.0
+max = 180.0
+default = 0.0
+layer = "viewmodel"
+
+# === Constraints (tradeoffs & coupled behavior) ===
+
+# Higher damage → more recoil (kick up)
+[[constraints]]
+source = "mar_damage"
+target = "mar_recoil_kick_up"
+ratio = 0.002
+
+# Higher fire rate (lower value = faster) → wider spread
+[[constraints]]
+source = "mar_fire_rate"
+target = "mar_spread_deg"
+ratio = -8.0
+
+# Higher damage → longer recoil recovery
+[[constraints]]
+source = "mar_damage"
+target = "mar_recoil_duration"
+ratio = 0.002
+
+# Longer barrel → tighter spread
+[[constraints]]
+source = "mar_barrel_length"
+target = "mar_spread_deg"
+ratio = -2.0
+
+# Longer barrel → more range
+[[constraints]]
+source = "mar_barrel_length"
+target = "mar_range"
+ratio = 60.0

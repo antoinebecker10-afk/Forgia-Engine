@@ -1,0 +1,64 @@
+# expedition_eau.toml — L'aspect de la rivière du Vallon.
+#
+# # Ce qui n'est PAS ici, et pourquoi
+#
+# La géométrie de la rivière, son tuilage (`tuile_m`) et sa vitesse de courant
+# (`courant_tuiles_par_s`) viennent du MANIFESTE de la carte
+# (`expedition_vallon.json`), pas d'ici : ce sont des décisions de l'auteur de la
+# carte sous Blender, prises en même temps que le tracé du lit. Les recopier ici
+# serait la même grandeur écrite deux fois — et le jour où le lit bouge sous
+# Blender, l'eau couleriat à la mauvaise vitesse sans que rien ne le signale.
+#
+# Ce fichier ne porte que l'APPARENCE, qui se règle à l'œil en jeu.
+
+version = 1
+
+[surface]
+# 🚨 Le glTF exporte la rivière à rugosité 0,92 — la valeur du kit, appliquée à
+# tous ses matériaux. Sur de l'eau elle donne du plastique mat.
+#
+# Mais l'excès inverse coûte plus cher : à 0,08 la surface est quasi MIROIR, et
+# la moindre ondulation devient une arête spéculaire dure. Constaté en jeu au
+# soleil couchant — la rivière lisait comme du velours côtelé, pas comme de
+# l'eau. La lumière rasante est précisément ce que cette carte met en scène,
+# donc c'est le pire réglage possible ici.
+#
+# 0,22 : la surface accroche encore le ciel, mais elle ÉTALE le reflet au lieu
+# de le concentrer en filets.
+rugosite = 0.22
+
+# La réflectance du diélectrique. 0,02 est la valeur physique de l'eau ; on
+# monte un peu pour que la rivière accroche la lumière du couchant, qui est le
+# sujet de cette carte.
+reflectance = 0.30
+
+# ── Profondeur ───────────────────────────────────────────────────────────────
+# C'est la DIFFÉRENCE entre ces deux couleurs qui fait lire la profondeur, pas
+# leur valeur absolue. Les rapprocher rend un aplat — exactement ce qu'était la
+# version précédente, un plan bleu uniforme sur lequel glissait une texture.
+couleur_profonde = [0.02, 0.16, 0.28]
+couleur_bord = [0.22, 0.48, 0.55]
+
+# Transparence. Bas = opaque, haut = on distingue le lit sous la surface.
+clarte = 0.18
+
+# ── Écume de berge ───────────────────────────────────────────────────────────
+# Ce que la version maison ne savait pas faire : une frange claire là où l'eau
+# touche la rive et les rochers. C'est le détail qui dit « courant » sans
+# animation, et il est calculé depuis la profondeur, pas peint.
+ecume_rgb = [0.92, 0.96, 1.0]
+ecume_echelle = 0.28
+
+# ── Vagues ───────────────────────────────────────────────────────────────────
+# 🚨 `bevy_water` DÉPLACE les sommets. Notre ruban n'a que 276 sommets sur 190 m
+# — environ 10 m par triangle. Une amplitude franche ne ferait pas des vagues :
+# elle plierait la nappe en accordéon et la décollerait de son lit. La borne
+# haute vient donc du MAILLAGE, pas d'un goût, et elle ne se relèvera qu'en
+# subdivisant la rivière sous Blender.
+amplitude_vagues = 0.06
+
+# Densité du motif du shader. Petit = grandes ondulations lentes.
+echelle_vagues = 0.35
+
+# Nombre d'octaves du shader, 1 à 4. 4 = le plus détaillé.
+qualite = 4

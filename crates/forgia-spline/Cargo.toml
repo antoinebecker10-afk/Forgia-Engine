@@ -1,0 +1,13 @@
+[package]
+name = "forgia-spline"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Splines/paths/rails for AI/cinematics"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

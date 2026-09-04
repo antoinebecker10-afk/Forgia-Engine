@@ -1,0 +1,19 @@
+---
+source: forgia-qa-harness/src/golden_frame.rs
+expression: self
+---
+{
+  "sensors": {
+    "forgia_mock": {
+      "elapsed_ns": "[int]",
+      "list": [
+        1,
+        2,
+        3
+      ],
+      "stable_value": 42
+    }
+  },
+  "health_alerts": [],
+  "final_state": null
+}

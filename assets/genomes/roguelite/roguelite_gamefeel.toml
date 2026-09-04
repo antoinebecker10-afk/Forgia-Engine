@@ -1,0 +1,89 @@
+# roguelite_gamefeel.toml — knockback (story-650).
+# Chaque balle pousse l'ennemi ; aucun ralentissement global n'est appliqué au tir.
+# Déplacements en MÈTRES totaux. Capteur : forgia2_knockback.json.
+
+[[genes]]
+id = "knockback_base_m"
+default = 0.3   # poussée par hit, avant multiplicateur d'arme
+
+[[genes]]
+id = "knockback_kill_mult"
+default = 3.0   # le corps part en arrière au kill
+
+[[genes]]
+id = "knockback_pop_up_m"
+default = 0.25  # composante verticale au kill — le « pop »
+
+[[genes]]
+id = "knockback_max_m"
+default = 2.5   # déplacement cumulé max (anti-éjection hors arène en full-auto)
+
+[[genes]]
+id = "knockback_mult_pepin"
+default = 0.6   # Pépin picote
+
+[[genes]]
+id = "knockback_mult_bourrasque"
+default = 0.45  # SMG : micro-poussées rapides
+
+[[genes]]
+id = "knockback_mult_lenoir"
+default = 1.6   # sniper : un seul coup qui déplace
+
+[[genes]]
+id = "knockback_mult_boucherie"
+default = 2.2   # Boucherie PROJETTE
+
+[[genes]]
+id = "knockback_mult_default"
+default = 1.0   # melee / armes sans mapping
+
+# ── L'envol des morts (2026-08-05) ──────────────────────────────────────────
+# Reprise du `goblin_death_system` du RPG V1 : le corps bascule, marque un temps
+# au sol, puis se redresse et monte au ciel en rétrécissant, traînée lumineuse
+# derrière lui. Capteur : forgia2_death_ascension.json. Hot-reload 1 Hz.
+#
+# Les durées V1 (0.8 / 10.0 / 3.0 s) étaient calibrées pour un RPG : dans une
+# arène où une vague meurt en quelques secondes, 10 s de cadavre au sol
+# empileraient les corps. D'où le resserrage — total ≈ 1,9 s ici contre 13,8 s.
+
+[[genes]]
+id = "death_fall_secs"
+default = 0.35  # la bascule vers l'avant
+
+[[genes]]
+id = "death_ground_secs"
+default = 0.25  # le temps mort qui rend la montée lisible (V1 : 10 s)
+
+[[genes]]
+id = "death_rise_secs"
+default = 1.30  # la montée, jusqu'à disparition
+
+[[genes]]
+id = "death_rise_speed_start"
+default = 1.5   # m/s au décollage
+
+[[genes]]
+id = "death_rise_speed_end"
+default = 7.0   # m/s à la fin — l'accélération, c'est ce qui fait « partir »
+
+[[genes]]
+id = "death_fall_drop_m"
+default = 0.55  # affaissement pendant la bascule
+
+[[genes]]
+id = "death_shrink_to"
+default = 0.15  # échelle finale avant disparition (V1 : 0.2)
+
+[[genes]]
+id = "death_trail_step_m"
+default = 0.18  # un segment de traînée tous les N mètres (pas par frame :
+                # la traînée ne doit pas dépendre du framerate)
+
+[[genes]]
+id = "death_trail_life_secs"
+default = 0.45  # durée de fondu d'un segment
+
+[[genes]]
+id = "death_trail_radius_m"
+default = 0.16  # épaisseur de la traînée au départ

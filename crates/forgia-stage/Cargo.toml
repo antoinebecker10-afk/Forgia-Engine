@@ -1,0 +1,24 @@
+[package]
+name = "forgia-stage"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Stage system — arena loader (terrain + ramparts + anchors) + run graph (Slay-the-Spire DAG + Hades branching). Fused from forgia-stage-arena + forgia-stage-graph (2026-05-26)."
+
+[lints]
+workspace = true
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }
+forgia-anchor = { workspace = true }
+forgia-navmesh = { workspace = true }
+forgia-level-presets = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-genome-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }

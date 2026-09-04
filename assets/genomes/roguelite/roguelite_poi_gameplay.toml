@@ -1,0 +1,63 @@
+# roguelite_poi_gameplay.toml — Story-561 : couche GAMEPLAY des POI.
+#
+# Concept-first layer = `definition` (cf .claude/rules/concept-first.md étape 0).
+# Greffé sur les anchors `AnchorKind::PoiSlot` produits par le solveur sight-line
+# de `forgia-stage` — les POSITIONS viennent du solveur, JAMAIS hardcodées ici
+# (AC1 story-561). Ce TOML ne décrit que les TYPES + paramètres reward/danger.
+#
+# Hot-reload via mtime 1Hz (pattern `toon_config.rs`, pas d'AssetServer).
+# Schéma plat `[[genes]] id/default` aligné `roguelite_toon.toml`.
+
+# ─── Pondération RNG des slots (déterministe seed-stable, par slot_index) ─────
+# Le slot 0 est toujours la Forge (si poi_forge_enabled). Les autres slots sont
+# tirés entre vault et lava selon ces poids relatifs.
+[[genes]]
+id = "poi_vault_weight"
+default = 3.0
+
+[[genes]]
+id = "poi_lava_weight"
+default = 2.0
+
+# ─── Vault de loot ────────────────────────────────────────────────────────────
+# Récompense Souls (= Or in-run) attribuée 1×/run/vault au walk-over.
+[[genes]]
+id = "poi_vault_souls_reward"
+default = 50.0
+
+# Rayon walk-over (m) pour looter un vault.
+[[genes]]
+id = "poi_loot_trigger_radius"
+default = 3.0
+
+# ─── Hazard de lave ───────────────────────────────────────────────────────────
+# Rayon de la zone de lave (m). Le visuel (disque orange) a EXACTEMENT ce rayon
+# → Perfect Information, anti-frustration enfants (bord = hitbox).
+[[genes]]
+id = "poi_lava_radius"
+default = 5.0
+
+# Dégâts par tick infligés dans la lave (joueur ET ennemis).
+[[genes]]
+id = "poi_lava_damage_per_tick"
+default = 8.0
+
+# Période entre deux ticks de dégât (s). Plus petit = plus punitif.
+[[genes]]
+id = "poi_lava_tick_period"
+default = 0.5
+
+# ─── Balise verticale (loot beam) ─────────────────────────────────────────────
+# Hauteur (m) du faisceau lumineux au-dessus des coffres + forge — lisibilité
+# "vu de partout" quel que soit le biome (anti-camouflage désert/volcanique).
+# 0 = pas de balise. Story-561 follow-up 2026-06-03 (user : "je ne vois pas le coffre").
+[[genes]]
+id = "poi_beacon_height"
+default = 7.0
+
+# ─── Forge physique (Landmark) ────────────────────────────────────────────────
+# 1 = garantir une forge emissive sur le slot 0 (présence physique du Coffre).
+# 0 = pas de forge (slot 0 retombe dans le tirage vault/lava).
+[[genes]]
+id = "poi_forge_enabled"
+default = 1.0

@@ -1,0 +1,140 @@
+# CE DEPOT VERSIONNE LE CODE ET LA STRUCTURE, PAS LES OCTETS.
+#
+# 🚨 CES REGLES VIENNENT DE LA RACINE DU DEPOT D'ORIGINE. Un subtree split
+# n'emporte QUE le sous-dossier : sans elles, les binaires redeviennent
+# committables et rien ne le dit. Mesure du 2026-08-26 : 34 Mo de code
+# contre 2 541 Mo de binaires.
+
+*.glb
+*.gltf
+*.bin
+*.fbx
+*.obj
+*.blend
+*.blend1
+*.uasset
+*.umap
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.tga
+*.dds
+*.exr
+*.hdr
+*.ktx2
+*.basis
+*.psd
+*.wav
+*.mp3
+*.ogg
+*.mp4
+*.zip
+*.7z
+*.rar
+*.exe
+*.dll
+*.lib
+*.pdb
+*.pyc
+!*.svg
+
+# ── Ce qui etait deja ignore dans ce sous-dossier ────────────────────────
+# Rust / Cargo
+target/
+Cargo.lock.bak
+**/*.rs.bk
+*.pdb
+
+# Build distribuable (scripts/build-dist.ps1)
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+.vs/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Logs
+*.log
+forgia2_run.log
+
+# Sensors runtime — checked-in baselines OK, runtime exports non
+forgia2_*.json
+!forgia2_*.baseline.json
+# V1 sensors (legacy naming kept during V1→V2 migration)
+forgia_*.json
+!forgia_*.baseline.json
+# Run log .previous backup (binary-ish, regenerated each run)
+forgia2_run.log.previous
+
+# Asset packs (CC0 externes) — Cargo.lock pattern story-449.
+# Manifest assets/packs.toml + lockfile assets/packs.lock sont committed.
+# Contenu installé par `cargo run -p forgia-asset-cdn --bin forgia-pack-cdn install`.
+# Cache des .zip téléchargés sous target/forgia-pack-cache/ (ignoré via target/).
+assets/models-v1/packs/kaykit-*/
+# Note : autres sous-dossiers de packs/ (cc0-registry, desert, dungeon, kenney-*,
+# medieval) restent tracked — ils sont soit des registries Forgia, soit des
+# packs trop petits pour mériter le pipeline.
+
+# Legacy V1 binary assets (2026-05-21) — repris de V1 monolithique, 126k fichiers
+# = 99% du repo, .git était 45GB → push GitHub HTTP 500. Purgés de l'historique
+# via git-filter-repo. Restent sur disque (build local OK) mais hors version
+# control. Migration prévue vers asset-CDN pattern (forgia-asset-cdn) avec
+# manifest + downloader.
+assets/models-v1/
+assets/textures-v1/
+assets/hdri-v1/
+assets/audio-v1/
+assets/bundles-v1/
+# Symlinks legacy (Linux/Mac) — pointent vers contenu V1, hors scope V2.
+assets/hdri-v1@
+
+# Backups .git pre-purge (safety net post-filter-repo, 45GB)
+.git.backup-*/
+
+# Save data (joueur)
+saves/
+*.save
+
+# Temp
+tmp/
+*.tmp
+
+# macOS SDK tarballs (osxcross) — multi-GB, generated from Xcode, never commit
+docker/sdk/*.tar.bz2
+docker/sdk/*.tar.xz
+docker/sdk/*.tar.gz
+
+# Demo assets lourds — local-only (cf cyber city demo)
+assets/models/characters/Cyber.glb
+assets/models/characters/Cyber_lod.glb
+assets/models/environment/cyberpunk_city.glb
+# Artefacts générés / runtime
+worldgen_baked_city.ron
+assets/user_settings.toml
+config/*_save.toml
+assets/audio/roguelite/weapons/_preroll_backup/
+
+# Éditeur in-game : les retouches de scène du joueur, pas du code source.
+castle_hub_edits.json
+
+# Caches Python des scripts outils
+__pycache__/
+
+# Story-695 : sortie du build web (tools/web/build-web.ps1)
+/web-demo/
+

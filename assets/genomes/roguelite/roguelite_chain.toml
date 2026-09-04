@@ -1,0 +1,29 @@
+# roguelite_chain.toml — la CHAÎNE (story-680, cran 5).
+#
+# `PlayerCombatMods.chain_extra_targets` était calculé par `boons_apply` depuis
+# story-558 et AUCUN système ne le lisait : les deux atouts « Chaîne » du
+# catalogue ne faisaient rien. Ce fichier règle la mécanique qui les rend réels.
+#
+# Ce que ça change pour le joueur : tirer sur l'ennemi au MILIEU du groupe vaut
+# mieux que tirer sur celui qui est isolé. C'est une décision de placement, pas
+# un multiplicateur de plus.
+#
+# Hot-reload : poll mtime 1 Hz. Miroir exact des `Default` Rust (`chain.rs`).
+
+[chain]
+enabled = true
+
+# Portée d'un saut (m). 7 m ≈ la distance entre deux ennemis d'un même essaim
+# sans atteindre le groupe d'à côté. Au-delà, la chaîne devient un AoE global et
+# le placement cesse d'être une décision.
+radius_m = 7.0
+
+# Part des dégâts d'origine transmise au 1er rebond. Bornée à 1.0 par le code :
+# un rebond ne peut jamais frapper plus fort que le tir lui-même, sinon viser
+# À CÔTÉ de sa cible deviendrait optimal.
+damage_fraction = 0.45
+
+# Décroissance par rebond supplémentaire. Le 3e saut doit valoir nettement moins
+# que le 1er, sinon la chaîne écrase toute autre statistique et il ne reste
+# qu'un seul build viable.
+falloff_per_jump = 0.7

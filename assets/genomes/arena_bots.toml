@@ -1,0 +1,162 @@
+# Forgia V2 — Arena Enemies Genome
+# Story-453 (2026-05-18) BASELINE RESET — 1 capsule par bot, pas de Head/Body split.
+# Hot-reload Bevy Asset (Shift+F12).
+
+# HP par bot. Story-456 balance fix 2026-05-18 :
+# 30→200 (sensor 0 damage_flashes_session post-Phase 4 → bots meurent avant tirer).
+# AR 256 DPS → TTK bot 0.12s → bot impossible to fire. Avec 200hp = 0.78s.
+# Source AAA : Halo Brutes 200hp (Bungie design intent — survivor against burst).
+hp = 200.0
+
+# Capsule dimensions :
+#  - body_half_h = demi-hauteur cylindrique (sans hemispheres)
+#  - body_radius = rayon (X et Z)
+#  - Total height = 2 * (body_half_h + body_radius)
+#  - 0.65 + 0.40 → capsule 2.10m de haut, 0.80m de diamètre
+body_half_h = 0.65
+body_radius = 0.40
+
+# Couleur RGB du mesh debug viz (rouge translucide overlay sur la capsule).
+debug_color = [1.0, 0.0, 0.0]
+
+# Affiche la capsule rouge translucide sur les bots pour voir la hitbox.
+# Désactiver pour rendu propre (le character mesh GLB reste visible).
+show_collider_debug = true
+
+# AI behavior (forgia-ai-arena-bot)
+[ai]
+shot_range = 35.0           # max range raycast vers player
+shot_cooldown_secs = 1.5    # 1 tir / 1.5s
+shot_damage = 12.0          # dmg par tir
+shot_warmup_secs = 0.35     # ★ Story-456 (était 0.8) — AAA reaction time humain 200-300ms
+                             # Source : research story-456 (gaming reaction time consensus)
+detect_range = 50.0
+shot_jitter_deg = 4.0       # ★ spread imprécision IA (anti-perfect-aim)
+tracer_emissive = [4.0, 1.5, 0.5]  # HDR orange-jaune
+# Story-456 Phase 1 — Movement runtime
+speed = 3.5                  # m/s en Chase. Tactical AAA 3-4.5.
+stop_distance = 6.0          # distance d'arrêt avant player (m). Doit être < shot_range.
+
+# Story-456 Phase 2-4 — Tactical AI (research sourcé)
+# Sources : Halo 2 (Damian Isla GDC 2005), Doom 2016 (80.lv), F.E.A.R. (Orkin GDC 2006),
+# Context Steering (Andrew Fray Game AI Pro 2 §18), reaction time humain 200-300ms.
+los_check_hz = 8.0                  # raycast 8/s = 7.5 frames @60fps (anti CPU spam)
+los_grace_secs = 0.20               # ★ Story-456 balance fix : 0.35→0.20 (sensor 0 hits subi
+                                     # malgré 10 alerts → bots meurent avant grace expire).
+                                     # 200ms = reaction humain limite hard (FPS comp). Plus tendu.
+strafe_amplitude_m = 1.8            # latéral peak (Doom imp dodge style)
+strafe_freq_hz = 0.9                # sin period ~1.1s
+strafe_noise_weight = 0.35          # 0=pure sin (prévisible) / 1=full noise. 0.35 = Doom mid
+local_avoid_dist_m = 2.5            # ray length context steering 3-ray
+gunshot_alert_radius_m = 25.0       # bots dans 25m alerted on player fire
+gunshot_alert_los_grace_secs = 0.6  # +600ms warmup si alerted-not-yet-seen (look around feel)
+alert_duration_secs = 4.0           # durée flag alerted post-tir player
+los_lost_grace_secs = 6.0           # ★ 2026-08-13 — 2.0 → 6.0. « Quand je quitte un mob, il
+                                     # ne peut pas faire tout le tour de l'arène ? » Non : il
+                                     # oubliait en 2 s.
+                                     #
+                                     # NI MINECRAFT NI WOW NE LÂCHENT SUR LA VUE. MC borne par
+                                     # generic.follow_range (16 blocs, ~40 pour un zombie) ;
+                                     # WoW par une LAISSE en distance + un evade après ~6 s
+                                     # sans combat actif. Forgia était le seul des trois à
+                                     # utiliser un chronomètre de VUE — d'où l'ennemi amnésique.
+                                     # 6.0 reprend le compteur d'evade de WoW retail.
+                                     #
+                                     # ET LE MODÈLE MINECRAFT EST ÉCARTÉ EXPRÈS : un zombie est
+                                     # bien plus lent qu'un joueur, donc la fuite par la
+                                     # distance y marche. Ici un grunt file à 9,0 m/s contre
+                                     # 9,75 en sprint — 92 % de la vitesse joueur. Gagner 20 m
+                                     # d'écart demanderait 27 s de sprint pur : ON NE SÈME PAS
+                                     # UN GRUNT À LA COURSE. C'est le chronomètre qui doit
+                                     # porter la fuite, pas la distance.
+                                     #
+                                     # Historique (story-464) : ce gène existe parce que sans
+                                     # lui les bots chassaient à travers les murs. Il garde ce
+                                     # rôle — seule sa durée change.
+                                     #
+                                     # ⚠️ CE FICHIER EST LA SOURCE DE VÉRITÉ. `TacticalTuning`
+                                     # porte le même défaut en Rust, mais
+                                     # `sync_tactical_tuning_from_genome` (forgia-mode-fps-arena)
+                                     # écrase la Resource à chaque chargement. Changer le Rust
+                                     # seul est INERTE — erreur commise le 2026-08-13, rattrapée
+                                     # par le capteur qui affichait encore 2.00.
+
+# ── Traversée d'exception (2026-08-13) ───────────────────────────────────────
+# « Si le mob est bloqué plus de 2 ou 3 s à cause d'un objet, il pourrait
+# exceptionnellement le traverser pour se débloquer, surtout s'il est dans la
+# zone d'aggro. »
+#
+# C'est un FILET, pas une mécanique. Un ennemi qui traverse un mur se voit, et
+# se voit mal. Trois gardes le tiennent :
+#   1. il faut avoir été bloqué `phase_after_secs` d'affilée — pas un à-coup ;
+#   2. il faut POURSUIVRE (aggro). Un bot au repos coincé reste coincé : il
+#      n'ennuie personne, et le voir traverser un mur pour rien serait pire ;
+#   3. la traversée dure au plus `phase_max_secs`, de quoi franchir un prop,
+#      pas de quoi remonter un couloir.
+#
+# ⚠️ Le compteur `phase_triggered_session` de forgia_bot_ai.json est la vraie
+# mesure : s'il monte, ce n'est PAS que le filet marche bien, c'est qu'un défaut
+# de géométrie ou de navigation reste à corriger en dessous. Le filet le rend
+# jouable, il ne le répare pas.
+phase_after_secs = 2.5      # ★ milieu de la fourchette demandée (2-3 s). Sous 2 s
+                             # on attraperait des à-coups normaux : un contournement
+                             # serré fait perdre l'avance une seconde entière.
+phase_max_secs = 1.0         # à 3,5 m/s = 3,5 m parcourus, soit largement plus que
+                             # l'épaisseur d'un prop (rayon max mesuré ~3 m) et bien
+                             # moins que la longueur d'un bâtiment.
+
+# ── Suivi de sol (story-685) ─────────────────────────────────────────────────
+# Avant, `bot_tactical_movement` travaillait en XZ pur : un bot restait au Y où
+# il était né, donc il flottait sur le relief et traversait les escaliers. Ces
+# trois gènes lui donnent un sol — c'est la pièce qui bloquait relief, marches
+# et étages d'un seul coup.
+max_step_up_m = 0.45        # ★ MaxStepHeight d'Unreal, la valeur que nos patterns
+                            # de carte citent déjà. Au-delà c'est une paroi : le bot
+                            # la contourne, il n'a ni saut ni grimpe.
+max_step_down_m = 1.2       # descendre est plus facile que gravir — mais borné,
+                            # sinon un bot sortirait de l'arène par un rebord.
+ground_probe_height_m = 1.0 # départ du rayon AU-DESSUS des pieds. Sous
+                            # `max_step_up_m`, une marche montante serait invisible
+                            # (le code re-clampe pour l'empêcher).
+
+# Enemies — 4 personnages Forgia (pas Rex = player RPG)
+# Distribution sur les 5 spawn points. Asset path relative à assets/.
+[[spawn_positions]]
+character_glb = "models/characters/Dorin.glb#Scene0"
+character_scale = 1.0           # auto-calibration AABB future si needed
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
+x = -4.0
+z = -7.0
+
+[[spawn_positions]]
+character_glb = "models/characters/Rex.glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
+x = 0.0
+z = -7.0
+
+[[spawn_positions]]
+character_glb = "models/characters/Mira.glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
+x = 4.0
+z = -7.0
+
+[[spawn_positions]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
+x = 10.0
+z = -14.0
+
+[[spawn_positions]]
+character_glb = "models/characters/Maitre Forgeron Célèste.glb#Scene0"
+character_scale = 1.0
+character_yaw_deg = 180.0       # ★ flip Meshy +Z forward → -Z (face player)
+character_y_offset = 0.9        # ★ lift pivot center → feet at ground
+x = -14.0
+z = 10.0

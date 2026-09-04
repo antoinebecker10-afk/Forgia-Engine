@@ -1,0 +1,124 @@
+# Cape du personnage d'Expedition — mouvement secondaire.
+#
+# Les six os `cloak_01`..`cloak_06` ne sont animes par AUCUN des 34 clips du
+# corps : la cape suivait le buste comme une planche. Ils sont maintenant
+# confies au solveur d'os-ressorts (`forgia-secondary-motion`), qui integre leur
+# retard sur le mouvement du personnage.
+#
+# Ces trois nombres se jugent MANETTE EN MAIN, pas dans un tableau. Ils vivent
+# donc ici, rechargeables a chaud pendant qu'on court.
+
+# 🚨 CE GENE NE FAIT RIEN (verifie dans le code le 2026-08-21).
+#
+# Le solveur interpole entre deux points COLINEAIRES depuis le parent, puis
+# renormalise : le resultat est identique de 0 a 1. Regler ce nombre ne changera
+# donc pas la souplesse de la cape — inutile de le tourner en cherchant un
+# effet. Le test `la_raideur_ne_change_encore_rien` (forgia-secondary-motion)
+# tombera le jour ou le solveur visera vraiment la direction du parent rigide ;
+# ce jour-la, ce commentaire se retire.
+#
+# 🚨 CORRECTION DU 2026-08-21 : L'ASSET N'EST PAS EN CAUSE.
+#
+# J'ai affirme trois fois que la pose de liaison de cette cape etait « a plat,
+# selon −X », et bati trois correctifs dessus. C'etait FAUX : ma mesure sommait
+# les translations des noeuds du GLB sans composer leurs rotations. En les
+# composant, la chaine pend regulierement — 12,1° / 16,3° / 14,7° / 12,7° /
+# 11,6° de la verticale, de la couture a l'ourlet.
+#
+# La pose de liaison est donc bonne, et c'est le SOLVEUR qui la casse : en jeu,
+# le meme maillon passe de 16° a 89°. Tant que ce n'est pas repare, la raideur
+# reste a zero — non pas parce qu'elle tirerait au mauvais endroit, mais parce
+# qu'on ne regle pas un parametre d'un mecanisme qu'on sait fautif.
+#
+# 0 = molle, elle tombe et traine ; 1 = rigide, elle colle au dos.
+raideur = 0.0
+
+# Fraction de vitesse perdue en UNE SECONDE. 0 = oscille longtemps apres
+# l'arret. 1 = figee instantanement.
+#
+# 🚨 2026-08-21 : c'etait une perte PAR FRAME, donc 60 fois trop forte — la cape
+# ne pouvait pas tomber plus vite que 0,095 m/s (une etoffe se lit a partir de
+# ~0,5). Constate a l'ecran : « on dirait qu'il n'y a pas de gravite ».
+#
+# Le capteur `forgia2_expedition_cape.json` publie maintenant `chute_max_ms` :
+# le reglage se juge sur CE nombre autant qu'a l'oeil. Mesure, pesanteur -4,0 :
+#   amorti 0,70  -> 3,36 m/s (elle VOLE dans tous les sens — constate a l'ecran)
+#   amorti 0,90  -> 1,77 m/s
+#   amorti 0,97  -> 1,17 m/s (elle retombe et traine)  <- point de depart retenu
+#   amorti 0,99  -> 0,90 m/s
+#   amorti 0,999 -> 0,61 m/s (a la limite du visible)
+amorti = 0.97
+
+# La pesanteur vue par le TISSU, pas par le personnage.
+#
+# La vraie (-9,81) donne un rideau : la cape tombe droit et ne vole jamais. Un
+# vetement est porte par l'air autant qu'il est tire vers le bas — d'ou une
+# valeur nettement plus faible. C'est un choix d'allure, pas une approximation
+# physique.
+pesanteur = -4.0
+
+# ── Les deux bornes du bon sens ────────────────────────────────────────────
+#
+# Ajoutees le 2026-08-21 : « elle reagit bien, trop bien meme ». Un tissu libre
+# part a 180° au premier demi-tour et traverse le personnage. Le solveur n'avait
+# ni cone d'ouverture ni volume de corps.
+
+# Ouverture maximale depuis la pose de repos, en degres. Le cone suit le
+# personnage (il se referme sur la direction que l'os aurait s'il suivait son
+# parent), donc la limite reste juste quel que soit le cap.
+#   30° = sage, colle au dos      45° = vivant sans exces      90° = elle vole
+angle_max_deg = 45.0
+
+# Rayon du corps que la cape ne traverse pas (cylindre vertical centre sur la
+# couture), en metres. Repere : les epaules du rig sont a ±0,067 m de l'axe, le
+# buste habille est plus large. Trop grand, la cape flotte a distance ; trop
+# petit, elle rentre dans le dos.
+rayon_corps_m = 0.20
+
+# ── Interrupteur du mouvement secondaire ──────────────────────────────────
+#
+# `false` : les six os gardent leur pose de liaison — cape correcte mais inerte,
+# ce qu'elle etait avant qu'on la branche. `true` : le solveur la pilote.
+#
+# A `false` le 2026-08-21 : le solveur introduit un coude de 89° la ou la pose
+# de liaison en a 16 (mesure maillon par maillon, en jeu et dans le GLB). Une
+# cape morte mais juste vaut mieux qu'une cape animee et pliee. A rebasculer des
+# que l'ecriture des rotations du solveur est corrigee et couverte par un test.
+actif = false
+
+# ── Le balancement conduit (voie WoW) ─────────────────────────────────────
+#
+# Pas de simulation : la cape reste une piece du costume, a laquelle on ajoute
+# une inclinaison CALCULEE depuis la vitesse et la rotation du personnage. Elle
+# ne peut donc ni se plier, ni s'emmeler, ni entrer dans le corps.
+#
+# Les parts sont normalisees : l'ourlet s'incline de l'angle demande, la couture
+# ne bouge presque pas, quel que soit le nombre d'os.
+[balancement]
+actif = true
+
+# Inclinaison vers l'arriere a pleine vitesse, en degres. WoW reste discret :
+# 10-20°. Au-dela, la cape « vole » au lieu de trainer.
+angle_course_deg = 18.0
+# La vitesse a laquelle cette inclinaison est atteinte (m/s) : le sprint.
+vitesse_pleine_ms = 9.75
+
+# Inclinaison laterale quand on tourne, en degres, et la vitesse de rotation
+# qui la sature (degres/seconde).
+angle_virage_deg = 12.0
+virage_plein_deg_s = 180.0
+
+# Vitesse de rattrapage (par seconde). Petit = mou et tardif, grand = colle au
+# mouvement, donc raide. 6 donne un retard perceptible sans mollesse.
+reactivite = 6.0
+
+# Repartition sur les maillons. 1 = croissance reguliere de la couture a
+# l'ourlet ; 2 = tout se joue en bas ; 0,5 = la cape se courbe plus haut.
+courbure = 1.0
+
+# Les clips `rifle_*` ne portent pas les deux courbes ajoutées aux neuf clips
+# natifs. Le solveur garde donc les cheveux vivants dans tous les états.
+[cheveux]
+raideur = 0.55
+amorti = 0.78
+pesanteur = -1.5

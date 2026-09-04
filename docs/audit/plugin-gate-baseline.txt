@@ -1,0 +1,45 @@
+# Ligne de base de `xtask plugin-gate` — CE FICHIER NE DOIT QUE RETRECIR.
+# Chaque ligne est un plugin sans garde, tolere parce qu'il preexiste.
+# Un plugin NOUVEAU sans garde fait echouer le cliquet et n'a pas sa place ici.
+# Regenerer : cargo run -p xtask -- plugin-gate --ecrire-baseline
+ArenaWavesPlugin|harnais
+AvatarEmotePlugin|capteur
+AvatarEmotePlugin|harnais
+AvatarPlugin|capteur
+AvatarPlugin|harnais
+BossPortalPlugin|harnais
+BoucherieRocketPlugin|capteur
+BoucherieRocketPlugin|harnais
+EquipmentPlugin|harnais
+ExpeditionArmeMainPlugin|capteur
+ExpeditionAvatarPlugin|capteur
+FtuePlugin|harnais
+HubPlugin|capteur
+HubPlugin|harnais
+IdentityPlugin|harnais
+IntroDialoguePlugin|capteur
+IntroDialoguePlugin|harnais
+MerchantPlugin|harnais
+MetaShopPlugin|capteur
+MetaShopPlugin|harnais
+ParcoursObstaclesPlugin|harnais
+PipelineWarmupPlugin|harnais
+PlayerProgressPlugin|capteur
+PlayerProgressPlugin|harnais
+RogueliteAtmospherePlugin|capteur
+RogueliteAtmospherePlugin|harnais
+RogueliteAudioPlugin|harnais
+RogueliteEnemyScalingPlugin|capteur
+RogueliteEnemyScalingPlugin|harnais
+RogueliteForgeShopPlugin|harnais
+RogueliteHeadHitboxPlugin|capteur
+RogueliteHeadHitboxPlugin|harnais
+RogueliteHudPlugin|capteur
+RogueliteHudPlugin|harnais
+RogueliteKillPopupPlugin|capteur
+RogueliteKillPopupPlugin|harnais
+RogueliteLootRoomPlugin|capteur
+RogueliteLootRoomPlugin|harnais
+RogueliteTrempePlugin|harnais
+WeaponSelectPlugin|capteur
+WeaponSelectPlugin|harnais

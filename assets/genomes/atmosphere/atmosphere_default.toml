@@ -1,0 +1,454 @@
+id = "atmosphere_default"
+name = "Atmosphere Default"
+domain = "Lighting"
+category = "Custom"
+description = "Fog, bloom, wind, sky — visual atmosphere parameters"
+version = "1.0.0"
+
+[[genes]]
+id = "fog_density_terrain"
+label = "Terrain Fog"
+chromosome = "Fog"
+target = "Value"
+min = 0.0
+max = 0.005
+default = 0.0025
+layer = "fog"
+
+[[genes]]
+id = "fog_density_dungeon"
+label = "Dungeon Fog"
+chromosome = "Fog"
+target = "Value"
+min = 0.0
+max = 0.02
+default = 0.008
+layer = "fog"
+
+[[genes]]
+id = "bloom_intensity"
+label = "Bloom Intensity"
+chromosome = "Bloom"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.18
+layer = "bloom"
+
+[[genes]]
+id = "bloom_low_freq_boost"
+label = "Bloom Low Freq"
+chromosome = "Bloom"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "bloom"
+
+[[genes]]
+id = "bloom_low_freq_curvature"
+label = "Bloom Curvature"
+chromosome = "Bloom"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "bloom"
+
+[[genes]]
+id = "bloom_high_pass_freq"
+label = "Bloom High Pass"
+chromosome = "Bloom"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "bloom"
+
+[[genes]]
+id = "day_cycle_duration"
+label = "Day/Night Cycle (sec)"
+chromosome = "Sky"
+target = "Value"
+min = 120.0
+max = 3600.0
+default = 600.0
+layer = "sky"
+
+[[genes]]
+id = "sun_illuminance_noon"
+label = "Sun Noon (lux)"
+chromosome = "Sky"
+target = "Value"
+min = 5000.0
+max = 120000.0
+default = 32000.0
+layer = "sky"
+
+[[genes]]
+id = "sun_illuminance_night"
+label = "Moon (lux)"
+chromosome = "Sky"
+target = "Value"
+min = 50.0
+max = 1000.0
+default = 200.0
+layer = "sky"
+
+[[genes]]
+id = "exposure_noon"
+label = "Exposure Noon"
+chromosome = "Sky"
+target = "Value"
+min = 6.0
+max = 12.0
+default = 8.5
+layer = "sky"
+
+[[genes]]
+id = "exposure_golden"
+label = "Exposure Golden"
+chromosome = "Sky"
+target = "Value"
+min = 4.0
+max = 10.0
+default = 7.0
+layer = "sky"
+
+[[genes]]
+id = "exposure_night"
+label = "Exposure Night"
+chromosome = "Sky"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 5.0
+layer = "sky"
+
+[[genes]]
+id = "ambient_night_mult"
+label = "Ambient Night"
+chromosome = "Sky"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.15
+layer = "sky"
+
+# ── Night fog tint (anti "voile gris" horizon/ciel étoilé) ──
+# Formula : fog_night = biome_fog * night_fog_floor + night_fog_tint * night_fog_blend
+# Cible : fog nuit ~match clear_color (~0.005 linear) → invisible contre ciel sombre
+
+[[genes]]
+id = "night_fog_tint_r"
+label = "Fog Night Tint R"
+chromosome = "Sky"
+target = "Value"
+min = 0.0
+max = 0.2
+default = 0.020
+layer = "sky"
+
+[[genes]]
+id = "night_fog_tint_g"
+label = "Fog Night Tint G"
+chromosome = "Sky"
+target = "Value"
+min = 0.0
+max = 0.2
+default = 0.035
+layer = "sky"
+
+[[genes]]
+id = "night_fog_tint_b"
+label = "Fog Night Tint B"
+chromosome = "Sky"
+target = "Value"
+min = 0.0
+max = 0.3
+default = 0.080
+layer = "sky"
+
+[[genes]]
+id = "night_fog_floor"
+label = "Fog Night Floor"
+chromosome = "Sky"
+target = "Value"
+min = 0.02
+max = 0.5
+default = 0.080
+layer = "sky"
+
+[[genes]]
+id = "night_fog_blend"
+label = "Fog Night Blend"
+chromosome = "Sky"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.550
+layer = "sky"
+
+[[genes]]
+id = "wind_speed"
+label = "Wind Speed"
+chromosome = "Wind"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "wind"
+
+[[genes]]
+id = "ambient_brightness"
+label = "Ambient Light"
+chromosome = "Sky"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.7
+layer = "sky"
+
+[[genes]]
+id = "sky_turbidity"
+label = "Sky Turbidity"
+chromosome = "Sky"
+target = "Value"
+min = 1.0
+max = 10.0
+# 2026-04-26 (story-350 cartoon) : 3.5 → 2.4 (-30%). Réduit aerial perspective,
+# couleurs lointaines plus saturées. Stylization > physical realism.
+default = 2.4
+layer = "sky"
+
+[[genes]]
+id = "sun_elevation"
+label = "Sun Elevation"
+chromosome = "Sky"
+target = "Value"
+min = 0.0
+max = 90.0
+default = 45.0
+layer = "sky"
+
+# === Sky Physics ===
+[[genes]]
+id = "sky_rayleigh_scale"
+label = "Rayleigh Scattering Scale"
+chromosome = "SkyPhysics"
+target = "Value"
+min = 0.1
+max = 5.0
+default = 1.0
+layer = "sky_physics"
+
+[[genes]]
+id = "sky_mie_scale"
+label = "Mie Scattering Scale"
+chromosome = "SkyPhysics"
+target = "Value"
+min = 0.1
+max = 5.0
+# 2026-04-26 (story-350 cartoon) : 1.0 → 0.5 (-50%). Halo solaire moins fort,
+# différence vers/dos soleil moins marquée — couleurs uniformes toutes directions.
+default = 0.5
+layer = "sky_physics"
+
+[[genes]]
+id = "sky_mie_direction"
+label = "Mie Direction (anisotropy)"
+chromosome = "SkyPhysics"
+target = "Value"
+min = 0.0
+max = 0.999
+# 2026-04-26 (story-350 cartoon) : 0.76 → 0.45 (-40%). Mie moins directionnel,
+# scattering plus uniforme — élimine l'effet "contre-jour délavé" en regardant le soleil.
+default = 0.45
+layer = "sky_physics"
+
+[[genes]]
+id = "sky_ozone_absorption"
+label = "Ozone Absorption"
+chromosome = "SkyPhysics"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 1.0
+layer = "sky_physics"
+
+# === God Rays ===
+[[genes]]
+id = "god_rays_intensity"
+label = "God Rays Intensity"
+chromosome = "GodRays"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.85
+layer = "god_rays"
+
+[[genes]]
+id = "god_rays_steps"
+label = "God Rays Steps"
+chromosome = "GodRays"
+target = "Value"
+min = 8.0
+max = 128.0
+default = 48.0
+layer = "god_rays"
+
+[[genes]]
+id = "god_rays_decay"
+label = "God Rays Decay"
+chromosome = "GodRays"
+target = "Value"
+min = 0.8
+max = 1.0
+default = 0.96
+layer = "god_rays"
+
+# === Stars ===
+[[genes]]
+id = "stars_density"
+label = "Star Density"
+chromosome = "Stars"
+target = "Value"
+min = 0.0
+max = 5000.0
+default = 2000.0
+layer = "stars"
+
+[[genes]]
+id = "stars_brightness"
+label = "Star Brightness"
+chromosome = "Stars"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.0
+layer = "stars"
+
+[[genes]]
+id = "stars_twinkle_speed"
+label = "Twinkle Speed"
+chromosome = "Stars"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 1.5
+layer = "stars"
+
+# ─── Skybox variant brightness (multi-HDRI day/night switch) ──────────────
+# Brightness per time-of-day variant (cd/m²). Night volontairement dim (÷4)
+# pour un rendu bleu-noir réaliste sans être aveuglant.
+[[genes]]
+id = "sky_skybox_brightness_day"
+label = "Skybox Day"
+chromosome = "Skybox"
+target = "Value"
+min = 500.0
+max = 10000.0
+default = 2500.0
+layer = "skybox"
+
+[[genes]]
+id = "sky_skybox_brightness_twilight"
+label = "Skybox Twilight"
+chromosome = "Skybox"
+target = "Value"
+min = 500.0
+max = 10000.0
+default = 2000.0
+layer = "skybox"
+
+[[genes]]
+id = "sky_skybox_brightness_dusk"
+label = "Skybox Dusk"
+chromosome = "Skybox"
+target = "Value"
+min = 500.0
+max = 10000.0
+default = 1500.0
+layer = "skybox"
+
+[[genes]]
+id = "sky_skybox_brightness_night"
+label = "Skybox Night"
+chromosome = "Skybox"
+target = "Value"
+min = 0.0
+max = 3000.0
+default = 600.0
+layer = "skybox"
+
+[[genes]]
+id = "sky_transition_duration"
+label = "Sky Crossfade (s)"
+chromosome = "Skybox"
+target = "Value"
+min = 0.2
+max = 5.0
+default = 1.5
+layer = "skybox"
+
+# ─── Atmosphere scattering density multiplier ─────────────────────────────
+# 0.15 = 85% transparent → Skybox sky_129 perce à travers. 1.0 = Earth full.
+[[genes]]
+id = "sky_scattering_density_mult"
+label = "Atmosphere Density"
+chromosome = "Atmosphere"
+target = "Value"
+min = 0.05
+max = 1.5
+default = 0.15
+layer = "atmosphere"
+
+# ─── AutoExposure range (camera eye adapt) ────────────────────────────────
+# Linear lerp entre range_night (day_factor=0) et range_day (day_factor=1).
+# range_day upper large permet brighten en cave→exterior. range_night upper
+# petit empêche eye-boost qui rendrait la nuit daylight-like.
+[[genes]]
+id = "cam_autoexp_range_day_lower"
+label = "AutoExp Day Lower EV"
+chromosome = "AutoExposure"
+target = "Value"
+min = -8.0
+max = 0.0
+default = -4.0
+layer = "autoexposure"
+
+[[genes]]
+id = "cam_autoexp_range_day_upper"
+label = "AutoExp Day Upper EV"
+chromosome = "AutoExposure"
+target = "Value"
+min = 4.0
+max = 14.0
+default = 10.0
+layer = "autoexposure"
+
+[[genes]]
+id = "cam_autoexp_range_night_upper"
+label = "AutoExp Night Upper EV"
+chromosome = "AutoExposure"
+target = "Value"
+min = 0.0
+max = 8.0
+default = 4.0
+layer = "autoexposure"
+
+# Constraints
+[[constraints]]
+source = "fog_density_terrain"
+target = "ambient_brightness"
+ratio = -200.0
+
+[[constraints]]
+source = "bloom_intensity"
+target = "bloom_low_freq_boost"
+ratio = 2.0
+
+[[constraints]]
+source = "sky_rayleigh_scale"
+target = "sky_mie_scale"
+ratio = 0.5

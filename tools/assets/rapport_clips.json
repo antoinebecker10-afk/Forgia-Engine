@@ -1,0 +1,238 @@
+{
+ "id": "clips_livres",
+ "fichier": "assets\\models\\characters\\stylized\\stylized_male_fusil.glb",
+ "clips": 34,
+ "noms_distincts": 34,
+ "os_du_corps": 83,
+ "os_jamais_animes": [
+  "Cloak_low",
+  "SM_Bag",
+  "SM_Body",
+  "SM_Dagger",
+  "SM_Flask",
+  "SM_Head",
+  "SM_Legs",
+  "cloak_01",
+  "cloak_02",
+  "cloak_03",
+  "cloak_04",
+  "cloak_05",
+  "cloak_06",
+  "perso_squelette",
+  "root.001",
+  "socket_dos",
+  "socket_main_droite",
+  "socket_pied_droit",
+  "socket_pied_gauche"
+ ],
+ "pire_derive_m": 0.8891,
+ "defauts": [],
+ "detail": [
+  {
+   "nom": "death",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.8891
+  },
+  {
+   "nom": "hammer_strike",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0147
+  },
+  {
+   "nom": "hit_react",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0029
+  },
+  {
+   "nom": "idle",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0004
+  },
+  {
+   "nom": "jog_backward",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0797
+  },
+  {
+   "nom": "jump",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0309
+  },
+  {
+   "nom": "run",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0096
+  },
+  {
+   "nom": "swim",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0037
+  },
+  {
+   "nom": "walk",
+   "canaux": 192,
+   "os_touches": 64,
+   "derive_racine_m": 0.0134
+  },
+  {
+   "nom": "crouch_idle",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "crouch_walk",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "fall",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "land",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_aim",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_crouch_back",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_crouch_idle",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_crouch_walk",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_fire",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_idle",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_run",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_start_run",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_stop",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_strafe",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_to_crouch",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_to_stand",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_turn",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_walk",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "rifle_walk_back",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "slide",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "strafe_left",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "strafe_right",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "turn_180",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "turn_left",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  },
+  {
+   "nom": "turn_right",
+   "canaux": 125,
+   "os_touches": 62,
+   "derive_racine_m": 0.0
+  }
+ ],
+ "severity": "ok",
+ "next_step": ""
+}

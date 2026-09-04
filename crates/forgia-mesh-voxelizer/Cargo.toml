@@ -1,0 +1,12 @@
+[package]
+name = "forgia-mesh-voxelizer"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Mesh voxelization (solid) — étape 1 du pipeline auto-rig Pinocchio-inspired (story-440 Phase 1)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }

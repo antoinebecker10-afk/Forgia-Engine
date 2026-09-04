@@ -1,0 +1,24 @@
+# Ligne de base de `xtask deps-mortes` — CE FICHIER NE DOIT QUE RETRECIR.
+# Une dependance declaree et jamais referencee, toleree parce qu'elle preexiste.
+# Regenerer : cargo run -p xtask -- deps-mortes --ecrire-baseline
+forgia-assets|forgia-core
+forgia-auto-rig|forgia-rig-topology
+forgia-damage|forgia-core
+forgia-fps|forgia-assets
+forgia-genome-core|forgia-core
+forgia-ik|forgia-core
+forgia-input|forgia-core
+forgia-juice-screen-flash|forgia-ui-lib
+forgia-procgen-graph|forgia-rng
+forgia-qa-autopilot|forgia-qa-replay
+forgia-qa-replay|forgia-qa-core
+forgia-rig-topology|forgia-core
+forgia-rpg|forgia-anim-debug
+forgia-rpg|forgia-assets
+forgia-rpg|forgia-combat
+forgia-rpg|forgia-ik
+forgia-rpg|forgia-prefab
+forgia-rpg|forgia-secondary-motion
+forgia-secondary-motion|forgia-core
+forgia-spline|forgia-core
+forgia-village-generator|forgia-spline

@@ -1,0 +1,199 @@
+id = "weapon_assault_rifle"
+name = "Assault Rifle (Plasma)"
+domain = "Weapon"
+category = "Weapon"
+description = "Versatile assault rifle: moderate damage, balanced ROF, medium spread"
+version = "1.0.0"
+
+# === Ballistics ===
+
+[[genes]]
+id = "rifle_damage"
+label = "Damage"
+chromosome = "Ballistics"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 12.0
+layer = "assault_rifle"
+
+[[genes]]
+id = "rifle_fire_rate"
+label = "Fire Rate (s)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.05
+max = 0.3
+default = 0.12
+layer = "assault_rifle"
+
+[[genes]]
+id = "rifle_range"
+label = "Range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 40.0
+max = 150.0
+default = 100.0
+layer = "assault_rifle"
+
+[[genes]]
+id = "rifle_spread_deg"
+label = "Spread (deg)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.5
+max = 6.0
+default = 2.5
+layer = "assault_rifle"
+
+# === Handling ===
+
+[[genes]]
+id = "rifle_recoil_kick_back"
+label = "Recoil Back"
+chromosome = "Handling"
+target = "Value"
+min = 0.01
+max = 0.1
+default = 0.03
+layer = "recoil"
+
+[[genes]]
+id = "rifle_recoil_kick_up"
+label = "Recoil Up"
+chromosome = "Handling"
+target = "Value"
+min = 0.005
+max = 0.08
+default = 0.02
+layer = "recoil"
+
+[[genes]]
+id = "rifle_recoil_duration"
+label = "Recoil Time (s)"
+chromosome = "Handling"
+target = "Value"
+min = 0.03
+max = 0.2
+default = 0.08
+layer = "recoil"
+
+# === Viewmodel ===
+
+[[genes]]
+id = "rifle_viewmodel_scale"
+label = "Model Scale"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.3
+max = 1.0
+default = 0.6
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_barrel_length"
+label = "Barrel Length (m)"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.3
+max = 0.8
+default = 0.5
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_offset_x"
+label = "Hip Offset X"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.1
+max = 0.5
+default = 0.35
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_offset_y"
+label = "Hip Offset Y"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.5
+max = -0.1
+default = -0.35
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_offset_z"
+label = "Hip Offset Z"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.8
+max = -0.3
+default = -0.5
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_ads_offset_x"
+label = "ADS Offset X"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.1
+max = 0.1
+default = 0.0
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_ads_offset_y"
+label = "ADS Offset Y"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.4
+max = -0.1
+default = -0.25
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_ads_offset_z"
+label = "ADS Offset Z"
+chromosome = "Viewmodel"
+target = "Value"
+min = -0.6
+max = -0.2
+default = -0.38
+layer = "viewmodel"
+
+[[genes]]
+id = "rifle_target_length"
+label = "Target Size (m)"
+chromosome = "Viewmodel"
+target = "Value"
+min = 0.5
+max = 1.2
+default = 0.75
+layer = "viewmodel"
+
+# === Constraints ===
+
+[[constraints]]
+source = "rifle_damage"
+target = "rifle_recoil_kick_up"
+ratio = 0.002
+
+[[constraints]]
+source = "rifle_fire_rate"
+target = "rifle_spread_deg"
+ratio = -8.0
+
+[[constraints]]
+source = "rifle_damage"
+target = "rifle_recoil_duration"
+ratio = 0.002
+
+[[constraints]]
+source = "rifle_barrel_length"
+target = "rifle_spread_deg"
+ratio = -2.0
+
+[[constraints]]
+source = "rifle_barrel_length"
+target = "rifle_range"
+ratio = 60.0

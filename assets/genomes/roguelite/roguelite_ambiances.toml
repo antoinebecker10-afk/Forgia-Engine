@@ -1,0 +1,216 @@
+# roguelite_ambiances.toml — les UNIVERS d'arène (story-676).
+#
+# Une ambiance = **sol + ciel + brouillard + ambiante**, déclarés ENSEMBLE. C'est
+# la bonne unité : avant, le ciel était indexé sur `biome` (un champ hérité du
+# terrain ouvert, sans objet pour une arène), le sol était une constante Rust
+# identique aux 4 arènes, et le brouillard était volcanique partout — Hauts
+# Pâturages compris.
+#
+# Hot-reload : poll mtime 1 Hz, comme les autres génomes roguelite.
+# Miroir exact des `Default` Rust (`ambiances.rs`) : si ce fichier disparaît ou
+# devient invalide, on retombe sur ces défauts, et un `warn!` le dit.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# LES SOLS
+# ─────────────────────────────────────────────────────────────────────────────
+# Exactement 3 tuiles par palette : le mélangeur du sol (`plan_floor_tiles`)
+# produit un `kind` 0/1/2. tiles[0] = dominante, [1] et [2] = variantes semées.
+#
+# `tile_size_m` DOIT être le côté réel mesuré de la tuile — l'arène pave à ce
+# pas. Les 12 tuiles ci-dessous sont mesurées à 4,0 × 4,0 m, X ∈ [−2, +2], et
+# **minY = −0,100 pour toutes les douze** : elles sont interchangeables sans
+# décalage vertical. Vérifié fichier par fichier, pas supposé.
+#
+# ⚠️ Changer `tile_size_m` change le NOMBRE de tuiles au carré : une arène pave
+# ~1 600 cellules à 4 m, donc ~6 400 à 2 m. Le coût de fusion n'est pas mesuré
+# en-dessous de 4 m — ne pas descendre sans mesurer.
+
+[floors.forge_pierre]
+tile_size_m = 4.0
+tiles = [
+    "models/kaykit/dungeon/floor.glb",
+    "models/kaykit/dungeon/floor_dirt.glb",
+    "models/kaykit/dungeon/floor_rocks.glb",
+]
+
+[floors.crypte_dalles]
+tile_size_m = 4.0
+tiles = [
+    "models/kaykit/dungeon_remastered/floor_tile_large.gltf.glb",
+    "models/kaykit/dungeon_remastered/floor_tile_large_rocks.gltf.glb",
+    "models/kaykit/dungeon_remastered/floor_dirt_large_rocky.gltf.glb",
+]
+
+[floors.halles_bois]
+tile_size_m = 4.0
+tiles = [
+    "models/kaykit/dungeon_remastered/floor_wood_large.gltf.glb",
+    "models/kaykit/dungeon_remastered/floor_wood_large_dark.gltf.glb",
+    "models/kaykit/dungeon_remastered/floor_tile_large.gltf.glb",
+]
+
+[floors.terre_battue]
+tile_size_m = 4.0
+tiles = [
+    "models/kaykit/dungeon_remastered/floor_dirt_large.gltf.glb",
+    "models/kaykit/dungeon_remastered/floor_dirt_large_rocky.gltf.glb",
+    "models/kaykit/dungeon_remastered/floor_tile_large_rocks.gltf.glb",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LES AMBIANCES
+# ─────────────────────────────────────────────────────────────────────────────
+# `sky` référence une clé de `assets/genomes/biome_sky.toml` (12 palettes y sont
+# déclarées ; avant cette story, 2 étaient utilisées).
+#
+# fog_rgb / ambient_rgb : linéaire 0-1 (srgb), comme les consts qu'ils remplacent.
+# fog_density : densité exponentielle, ~1/d = distance de demi-brume.
+#   ⚠️ 0.008 → ~125 m, alors que la plus longue ligne de vue mesurée dans nos
+#   arènes est 24,2 m. Le brouillard ne fait donc RIEN au gameplay : il ne sert
+#   que la teinte. C'est assumé, pas ignoré.
+# ambient_brightness : lux de l'ambiante (300 = valeur historique forge).
+#
+# ⚠️ L'AMBIANTE DOIT RESTER PEU SATURÉE (story-689). L'ancienne forge valait
+# [1.00, 0.45, 0.22] — quasiment de l'orange pur. Or une ambiante multiplie
+# CHAQUE albédo par la même teinte : roche, métal et sol finissaient par se lire
+# pareil, et le sol de pierre grise du kit dungeon apparaissait en terre cuite
+# vive. La chaleur d'un lieu doit venir de sa lumière DIRECTIONNELLE, pas de son
+# ambiante — sinon on perd le contraste de matière, qui est ce qui rend une
+# scène lisible.
+#
+# `[ambiances.X.grade]` : la CORRECTION COLORIMÉTRIQUE de l'univers. Elle était
+# appliquée par MODE, donc identique pour les six : ciel, brouillard et lumière
+# avaient beau varier, une même correction les ramenait au même rendu. Six
+# variations d'une seule image. Omettre la section = garder celle du mode.
+
+[ambiances.forge_ardente]
+label = "Forge ardente"
+floor = "forge_pierre"
+sky = "volcanic"
+fog_rgb = [0.30, 0.10, 0.07]
+fog_sun_rgb = [1.00, 0.55, 0.25]
+fog_density = 0.008
+ambient_rgb = [1.00, 0.78, 0.66]
+ambient_brightness = 260.0
+[ambiances.forge_ardente.grade]
+exposure = 0.05
+temperature = 0.16
+tint = 0.1
+post_saturation = 0.1
+contrast = 0.05
+saturation = 0.05
+
+
+[ambiances.crypte_suintante]
+label = "Crypte suintante"
+floor = "crypte_dalles"
+sky = "swamp"
+fog_rgb = [0.10, 0.15, 0.12]
+fog_sun_rgb = [0.60, 0.80, 0.55]
+fog_density = 0.011
+ambient_rgb = [0.72, 0.85, 0.78]
+ambient_brightness = 200.0
+[ambiances.crypte_suintante.grade]
+exposure = 0.02
+temperature = -0.1
+tint = 0.04
+post_saturation = 0.0
+contrast = 0.1
+saturation = -0.05
+
+
+[ambiances.halles_de_bois]
+label = "Halles de bois"
+floor = "halles_bois"
+sky = "plains"
+fog_rgb = [0.28, 0.22, 0.15]
+fog_sun_rgb = [1.00, 0.85, 0.60]
+fog_density = 0.006
+ambient_rgb = [1.00, 0.90, 0.78]
+ambient_brightness = 300.0
+[ambiances.halles_de_bois.grade]
+exposure = 0.06
+temperature = 0.1
+tint = 0.0
+post_saturation = 0.05
+contrast = 0.0
+saturation = 0.02
+
+
+[ambiances.necropole_glacee]
+label = "Nécropole glacée"
+floor = "crypte_dalles"
+sky = "tundra"
+fog_rgb = [0.16, 0.20, 0.28]
+fog_sun_rgb = [0.70, 0.82, 1.00]
+fog_density = 0.010
+ambient_rgb = [0.80, 0.86, 1.00]
+ambient_brightness = 240.0
+[ambiances.necropole_glacee.grade]
+exposure = 0.0
+temperature = -0.2
+tint = 0.06
+post_saturation = 0.0
+contrast = 0.12
+saturation = -0.1
+
+
+[ambiances.gorges_d_ocre]
+label = "Gorges d'ocre"
+floor = "terre_battue"
+sky = "canyon"
+fog_rgb = [0.32, 0.18, 0.10]
+fog_sun_rgb = [1.00, 0.72, 0.40]
+fog_density = 0.007
+ambient_rgb = [1.00, 0.84, 0.70]
+ambient_brightness = 300.0
+[ambiances.gorges_d_ocre.grade]
+exposure = 0.04
+temperature = 0.12
+tint = -0.04
+post_saturation = 0.08
+contrast = 0.06
+saturation = 0.04
+
+
+[ambiances.cime_de_pierre]
+label = "Cime de pierre"
+floor = "terre_battue"
+sky = "mountain"
+fog_rgb = [0.20, 0.22, 0.28]
+fog_sun_rgb = [0.85, 0.90, 1.00]
+fog_density = 0.009
+ambient_rgb = [0.86, 0.90, 0.98]
+ambient_brightness = 270.0
+[ambiances.cime_de_pierre.grade]
+exposure = 0.02
+temperature = -0.12
+tint = 0.0
+post_saturation = 0.0
+contrast = 0.08
+saturation = -0.04
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LA ROTATION — le ciel comme HORLOGE DE RUN
+# ─────────────────────────────────────────────────────────────────────────────
+# L'ambiance suit la PROFONDEUR du round, pas l'identité de la salle. Le joueur
+# voit où il en est dans sa run sans regarder l'interface (Hades le fait par
+# région, Risk of Rain 2 par étage).
+#
+# `order` est parcouru dans l'ordre, puis **bouclé** : round 6 revient à
+# `order[0]`. La boucle est voulue — les rounds sont infinis, la liste ne l'est
+# pas. Ce qui distingue le 2ᵉ tour du 1ᵉʳ, c'est la difficulté, pas le décor.
+
+
+[rotation]
+order = [
+    "forge_ardente",
+    "crypte_suintante",
+    "halles_de_bois",
+    "gorges_d_ocre",
+    "necropole_glacee",
+    "cime_de_pierre",
+]
+# Si true, la graine de run décale le point de départ de la rotation : deux runs
+# ne commencent pas dans le même univers. Le ROND reste ordonné (l'horloge tient).
+shuffle_start_by_seed = true

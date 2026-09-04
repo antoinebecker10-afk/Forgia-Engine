@@ -1,0 +1,204 @@
+# Template skeleton BipedLizard (Rex) — humanoïde digitigrade à queue. 25 bones.
+# Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
+# Hot-reloadable via Bevy AssetServer ; re-rig au spawn (OnEnter RPG).
+#
+# `class` = classification anatomique déclarative (story-481).
+# Ordre BFS obligatoire (parent déclaré AVANT l'enfant — cf validate()).
+#
+# Structure des bras (2026-06-05, best practices MoCap Online / VRChat) :
+#   clavicule → upper arm → forearm → main. Rex reste un HUMANOÏDE (bras descendus
+#   via [stance_offsets]). NB : les os de bras sont placés de façon DÉTERMINISTE
+#   depuis ce template (forgia-skeleton-embedder `is_arm` branch, fix 2026-06-05) —
+#   PAS de snap medial axis (qui mettait la clavicule dans le cou → visage déformé).
+# Jambe digitigrade : thigh → shin → foot → toe (4 segments raptor).
+
+# ── Axe central : hip → spine → chest → neck → head ──────────────────────────
+[[bones]]
+name = "hip"
+pos = [0.0, 0.45, 0.05]
+class = "spine"
+
+[[bones]]
+name = "spine_lower"
+parent = 0
+pos = [0.0, 0.53, 0.08]
+class = "spine"
+
+[[bones]]
+name = "chest"
+parent = 1
+pos = [0.0, 0.74, 0.08]
+class = "spine"
+
+[[bones]]
+name = "neck"
+parent = 2
+pos = [0.0, 0.76, 0.06]
+class = "spine"
+
+[[bones]]
+name = "head"
+parent = 3
+pos = [0.0, 0.82, 0.10]
+class = "head"
+
+# ── Bras gauche : clavicule → upper → forearm → main ─────────────────────────
+[[bones]]
+name = "clavicle_L"
+parent = 2
+pos = [-0.09, 0.73, 0.0]
+class = "arm"
+
+[[bones]]
+name = "arm_L"
+parent = 5
+pos = [-0.15, 0.71, 0.0]
+class = "arm"
+
+[[bones]]
+name = "forearm_L"
+parent = 6
+pos = [-0.30, 0.71, 0.0]
+class = "arm"
+
+[[bones]]
+name = "hand_L"
+parent = 7
+pos = [-0.52, 0.71, 0.0]
+class = "arm"
+
+# ── Bras droit : clavicule → upper → forearm → main ──────────────────────────
+[[bones]]
+name = "clavicle_R"
+parent = 2
+pos = [0.09, 0.73, 0.0]
+class = "arm"
+
+[[bones]]
+name = "arm_R"
+parent = 9
+pos = [0.15, 0.71, 0.0]
+class = "arm"
+
+[[bones]]
+name = "forearm_R"
+parent = 10
+pos = [0.30, 0.71, 0.0]
+class = "arm"
+
+[[bones]]
+name = "hand_R"
+parent = 11
+pos = [0.52, 0.71, 0.0]
+class = "arm"
+
+# ── Jambe gauche : thigh → shin → foot → toe ─────────────────────────────────
+[[bones]]
+name = "thigh_L"
+parent = 0
+pos = [-0.10, 0.37, 0.09]
+class = "leg"
+
+[[bones]]
+name = "shin_L"
+parent = 13
+pos = [-0.10, 0.20, 0.12]
+class = "leg"
+
+[[bones]]
+name = "foot_L"
+parent = 14
+pos = [-0.10, 0.04, 0.06]
+class = "leg"
+
+[[bones]]
+name = "toe_L"
+parent = 15
+pos = [-0.10, 0.01, 0.16]
+class = "leg"
+
+# ── Jambe droite : thigh → shin → foot → toe ─────────────────────────────────
+[[bones]]
+name = "thigh_R"
+parent = 0
+pos = [0.10, 0.37, 0.09]
+class = "leg"
+
+[[bones]]
+name = "shin_R"
+parent = 17
+pos = [0.10, 0.20, 0.12]
+class = "leg"
+
+[[bones]]
+name = "foot_R"
+parent = 18
+pos = [0.10, 0.04, 0.06]
+class = "leg"
+
+[[bones]]
+name = "toe_R"
+parent = 19
+pos = [0.10, 0.01, 0.16]
+class = "leg"
+
+# ── Queue : tail_01 → tail_04 (contrepoids) ──────────────────────────────────
+[[bones]]
+name = "tail_01"
+parent = 0
+pos = [0.0, 0.41, -0.12]
+class = "tail"
+
+[[bones]]
+name = "tail_02"
+parent = 21
+pos = [0.0, 0.39, -0.22]
+class = "tail"
+
+[[bones]]
+name = "tail_03"
+parent = 22
+pos = [0.0, 0.37, -0.32]
+class = "tail"
+
+[[bones]]
+name = "tail_04"
+parent = 23
+pos = [0.0, 0.27, -0.42]
+class = "tail"
+
+# ── Stance : Rex humanoïde, A-POSE (clavicule penchée = diagonale continue) ───
+# 2026-06-05 (soir 5) : la clavicule PENCHÉE est de retour pour l'A-pose. Avant,
+# la tourner déformait les écailles de la tête (clavicule influençait ~5887 verts
+# dont la nuque/tête). FIX SKINNING fait (forgia-auto-rig::skinning : les verts
+# dont l'os le plus proche est tête/nuque excluent les os de bras) → on peut
+# pencher la clavicule SANS déformer la tête. Re-rig requis (skinning au rig).
+# Diagonale continue : chest→clavicule(40°)→bras(25°, total ≈65°)→main = une seule
+# ligne en pente (épaule qui descend, pas de barre « ⊓ »). Le bras hérite de la
+# pente clavicule : angle_monde ≈ clavicule_Rz + arm_Rz.
+# Tunable :
+#   - A-pose plus ouverte (bras + écartés) → ↓ arm (15) / ↑ clavicule (45).
+#   - bras + près du corps (vertical) → ↑ arm (35-40).
+#   - épaules tombent trop bas → ↓ clavicule (30).
+# Le swing du walk reste AVANT-ARRIÈRE. Cf test arm_swing_is_fore_aft_not_twist.
+[stance_offsets]
+# 2026-06-06 : bras 25→45→52 (total ≈92° = juste passé la verticale) pour COLLER
+# le bras au torse — la main converge vers le FLANC (sous l'épaule, un poil rentré).
+# Clavicule garde sa pente (épaule diagonale). Tunable : ↑ (55) = encore plus rentré
+# (>~60 la main file vers l'entrejambe) ; ↓ (45-50) = plus vertical/écarté.
+# ⚠️ Si l'ÉPAULE (haut du bras) reste trop large même rentrée → c'est la LARGEUR
+# d'épaule (positions arm_L/R ci-dessus) qu'il faut réduire = re-rig (pas hot-reload).
+# ✅ 2026-06-06 (découplage skinning) : on PEUT maintenant resserrer librement les os
+# bras. Le skinning (forgia-auto-rig::compute_nearest_bone_weights) exclut désormais les
+# os de bras des verts dont l'os le plus proche est tête/nuque (is_head) OU torse/colonne
+# (is_body). Donc les verts du buste sont immunisés : resserrer arm_L/clavicle_L ne
+# comprime plus le torse. Largeur resserrée clav 0.09 / arm 0.15 / forearm 0.30 pour
+# COLLER les coudes au torse (demande user). La frontière deltoïde reste naturelle (les
+# verts d'épaule, proche=bras, suivent toujours le bras). Coudes encore trop loin → ↓ arm
+# (0.13) ; bras qui clippe DANS le torse → ↑ arm (0.17).
+clavicle_l_euler_deg = [0.0, 0.0, 40.0]
+clavicle_r_euler_deg = [0.0, 0.0, -40.0]
+# 2026-06-06 : 52→48 — l'épaule a été rétrécie (coudes plus rentrés) ; on réduit
+# le tuck pour que la main reste au FLANC et ne file pas dans les hanches.
+arm_l_euler_deg = [0.0, 0.0, 48.0]
+arm_r_euler_deg = [0.0, 0.0, -48.0]

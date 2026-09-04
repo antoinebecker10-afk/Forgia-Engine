@@ -1,0 +1,155 @@
+# Forgia V2 — Arena Waves Genome
+# Wave system progressif : training → boss. Hot-reloadable.
+#
+# Modifiers (par wave, multiplicateurs sur arena_bots.toml.ai) :
+# - hp_mult : multiplie hp (template = 100)
+# - ai_cooldown_mult : multiplie shot_cooldown_secs (<1.0 = plus rapide)
+# - ai_damage_mult : multiplie shot_damage
+
+break_secs = 4.0           # pause entre vagues
+final_wave_index = 5       # wave finale (boss)
+
+
+# ─── WAVE 1 — Roster complet (5 bots, training) ───────────────
+[[wave]]
+index = 1
+hp_mult = 1.0
+ai_cooldown_mult = 1.2          # plus lent pour onboarding
+ai_damage_mult = 0.8
+[[wave.spawns]]
+character_glb = "models/characters/Dorin.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = -4.0
+z = -7.0
+[[wave.spawns]]
+character_glb = "models/characters/Rex.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 0.0
+z = -7.0
+[[wave.spawns]]
+character_glb = "models/characters/Mira.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 4.0
+z = -7.0
+[[wave.spawns]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = -8.0
+z = -10.0
+[[wave.spawns]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 8.0
+z = -10.0
+
+# ─── WAVE 2 — Montée (3 bots) ─────────────────────────────────
+[[wave]]
+index = 2
+hp_mult = 1.1
+ai_cooldown_mult = 1.0
+ai_damage_mult = 1.0
+[[wave.spawns]]
+character_glb = "models/characters/Dorin.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = -6.0
+z = -10.0
+[[wave.spawns]]
+character_glb = "models/characters/Rex.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 6.0
+z = -10.0
+[[wave.spawns]]
+character_glb = "models/characters/Mira.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 0.0
+z = -12.0
+
+# ─── WAVE 3 — Pression (4 bots) ───────────────────────────────
+[[wave]]
+index = 3
+hp_mult = 1.2
+ai_cooldown_mult = 0.85
+ai_damage_mult = 1.0
+[[wave.spawns]]
+character_glb = "models/characters/Dorin.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = -8.0
+z = -8.0
+[[wave.spawns]]
+character_glb = "models/characters/Rex.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 8.0
+z = -8.0
+[[wave.spawns]]
+character_glb = "models/characters/Mira.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = -4.0
+z = -14.0
+[[wave.spawns]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 4.0
+z = -14.0
+
+# ─── WAVE 4 — Encerclement (5 bots, flancs) ───────────────────
+[[wave]]
+index = 4
+hp_mult = 1.3
+ai_cooldown_mult = 0.75
+ai_damage_mult = 1.1
+[[wave.spawns]]
+character_glb = "models/characters/Dorin.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 0.0
+z = -16.0
+[[wave.spawns]]
+character_glb = "models/characters/Rex.glb#Scene0"
+character_yaw_deg = -90.0
+character_y_offset = 0.9
+x = 14.0
+z = -4.0
+[[wave.spawns]]
+character_glb = "models/characters/Mira.glb#Scene0"
+character_yaw_deg = 90.0
+character_y_offset = 0.9
+x = -14.0
+z = -4.0
+[[wave.spawns]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = -10.0
+z = -12.0
+[[wave.spawns]]
+character_glb = "models/characters/L'Apprenti .glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+x = 10.0
+z = -12.0
+
+# ─── WAVE 5 — BOSS (Maitre Forgeron Céleste, solo) ────────────
+[[wave]]
+index = 5
+hp_mult = 5.0                  # 500 HP — vrai boss
+ai_cooldown_mult = 0.6
+ai_damage_mult = 1.5
+[[wave.spawns]]
+character_glb = "models/characters/Maitre Forgeron Célèste.glb#Scene0"
+character_yaw_deg = 180.0
+character_y_offset = 0.9
+character_scale = 1.4          # boss plus gros
+x = 0.0
+z = -12.0

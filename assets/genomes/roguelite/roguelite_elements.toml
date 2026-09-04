@@ -1,0 +1,160 @@
+# roguelite_elements.toml — Story-582 Phase A (2026-06-07)
+# Système d'éléments par-arme (Borderlands × Gunfire Reborn).
+# Hot-reload mtime (Shift+F12-like). Miroir exact de ElementConfig::default().
+#
+# Élément signature par arme :
+#   pistolet Pépin (modern_ar)     -> électrique (arc + réactions, story-641)
+#   SMG Bourrasque (assault_rifle) -> feu (burn DoT)
+#   sniper Lenoir (shotgun)        -> perforant (exécution tank)
+#   pompe Boucherie (rocket_launcher) -> poison (DoT stackant + shred)
+#
+# matchup = multiplicateur d'efficacité appliqué au hit de base, par type
+# d'ennemi (Tank / Runner / Sniper / Boss). C'est la source du "fort contre".
+
+# Story-589 : SHIP = progression. always_on=false → les éléments s'arment au fil
+# du run (départ = élément de l'arme de départ, +1 par portail de fin de zone).
+# Mets à `true` (override dev / test Phase A) pour armer les 4 éléments d'office.
+# 2026-06-23 : armé en mode TEST (les 4 éléments actifs d'office, re-arm live via
+# sys_enforce_always_on) pour voir feu/poison sur les ennemis sans débloquer au
+# portail. SHIP = repasser à `false` (progression : départ armé + portails).
+always_on = true
+
+[mapping]
+modern_ar = "givre"
+assault_rifle = "fire"
+shotgun = "armor_pierce"
+rocket_launcher = "poison"
+
+# ── Tables d'efficacité (× sur le hit de base) ──────────────────────────────
+[matchup.fire]
+tank = 1.0
+runner = 1.3
+sniper = 1.1
+boss = 1.0
+
+[matchup.poison]
+tank = 1.4
+runner = 1.0
+sniper = 1.1
+boss = 1.2
+
+[matchup.givre]
+tank = 1.1
+runner = 1.4
+sniper = 1.2
+boss = 1.0
+
+[matchup.armor_pierce]
+tank = 2.0
+runner = 1.0
+sniper = 1.3
+boss = 1.5
+
+# ── Status effects + AOE + exécution ────────────────────────────────────────
+[burn]
+dps = 8.0
+duration = 3.0
+
+[poison]
+dps_per_stack = 4.0
+duration = 4.0
+max_stacks = 5
+shred_per_stack = 0.04
+
+[aoe]
+radius = 3.5
+damage_factor = 0.5
+
+[execute]
+hp_ratio_threshold = 0.25
+
+# ── VFX (story-588) — rend les éléments VISIBLES ────────────────────────────
+# Flash coloré à l'impact (couleur par élément) + pulse sur les ennemis en DoT.
+# Couleurs RGB linéaires. Hot-reload : les couleurs sont ré-appliquées en place
+# sur les matériaux partagés (les sparks vivants changent aussi).
+[vfx]
+enabled = true
+impact_scale = 0.55       # rayon (m) du flash d'un hit normal
+impact_ttl = 0.28         # durée de vie (s) — fade par scale -> 0
+arc_scale = 2.4           # × taille du flash pour un hit électrique (arc)
+light_intensity = 40000.0 # lumens de la lumière d'impact (fade avec le flash)
+light_range = 6.0         # portée (m) de la lumière d'impact
+dot_pulse_scale = 0.5     # rayon (m) du pulse sur un ennemi en DoT (gros = lisible)
+dot_pulse_period = 0.25   # période (s) entre 2 pulses DoT (rapide = flammes vivantes)
+status_y = 1.4            # hauteur (m) de l'aura feu/poison sur le mob (anti-occlusion ; capsule ~2 m)
+fire_rgb = [1.0, 0.42, 0.06]          # 🔥 feu — orange (SMG Bourrasque)
+poison_rgb = [0.42, 1.0, 0.16]        # 🟣 poison — vert (pompe Boucherie)
+givre_rgb = [0.35, 0.65, 1.0]         # ❄ givre, bleu (revolver Pépin)
+armor_pierce_rgb = [0.30, 0.85, 1.0]  # 🎯 perforant — cyan (sniper Lenoir)
+
+# ── Combustion (réaction Feu + Poison) — voie Gunfire Reborn ─────────────────
+# Quand un ennemi porte À LA FOIS Feu (burn) ET Poison, un hit déclenche un burst
+# AOE. Modèle "Gunfire" (genre-validé 2026-06-23) : dégâts = % du TIR déclencheur,
+# GARDE les statuts (re-pulse aux tirs suivants), throttlé par cible.
+# Pour passer en "finisher façon PoE" : voir story (scaling par stacks + consume).
+[combustion]
+enabled = true
+target_pct = 2.0          # dégâts sur la cible = 200% du tir (Gunfire Combustion)
+area_pct = 1.0            # dégâts aux voisins dans le rayon = 100% du tir
+radius = 3.5              # rayon (m) du splash
+retrigger_cooldown = 0.8  # délai min (s) entre 2 combustions sur la même cible
+
+# ── Marque de givre + vulnérabilité — story-641 Inc.2 ──────────────
+# Un hit de givre pose StatusGivre : la cible subit +vulnérabilité (×vuln_mul)
+# sur le BONUS élémentaire (matchup) + les réactions, tant que la marque tient.
+# Le +10% sur le HIT DE BASE arrive en P0-4 (re-route via DefenseLayer).
+[givre]
+duration = 4.0   # durée (s) de la marque (rafraîchie à chaque hit de givre)
+vuln_mul = 1.1   # dégâts subis ×1.1 (= +10%) tant que la marque tient
+
+# ── Réactions Miasma & Fracture (moteur générique) — story-641 Inc.3 ────────
+# Le moteur de réactions (ReactionTable) déclenche une réaction quand 2 statuts
+# sont co-présents sur la cible : Combustion (Feu+Poison, ci-dessus), Miasma
+# (Givre+Poison) et Fracture (Feu+Givre). Chaque réaction a son cooldown/cible.
+
+# Miasma (Givre + Poison) : DoT stackant en % des PV MAX → mord sur les gros
+# PV (tanks/bosses) là où les DoT plats plafonnent.
+[miasma]
+enabled = true
+pct_max_hp_per_sec = 0.03  # 3% des PV max /s /stack
+duration = 4.0             # durée (s) du nuage (rafraîchie à chaque déclenchement)
+max_stacks = 5             # plafond de stacks
+retrigger_cooldown = 0.8   # délai min (s) entre 2 déclenchements sur la même cible
+
+# Fracture (Feu + Givre) : éclat AOE instantané. Le feu qui rencontre la glace
+# fait éclater le verre : la réaction raconte la direction artistique.
+[fracture]
+enabled = true
+target_pct = 1.5           # dégâts sur la cible = 150% du tir
+area_pct = 1.5             # dégâts aux voisins dans le rayon = 150% du tir
+radius = 4.0               # rayon (m) de la décharge
+retrigger_cooldown = 0.8   # délai min (s) entre 2 décharges sur la même cible
+
+# ── Affinité élément → couche de défense — story-642 P0-4 ────────────────────
+# Multiplicateur d'efficacité du bonus élémentaire contre chaque couche du
+# DefenseLayer : >1 = fort (efficace), <1 = faible. Modèle « effectiveness » :
+# 1 pt de dégât retire `mult` pts de la couche (casser une couche coûte
+# couche/mult). Critère masterplan : Feu +50% Vie, −25% Bouclier.
+#   Feu→Vie, Électrique→Bouclier, Perforant+Poison→Armure (matché 1.5 / autre 0.75).
+[affinity]
+# P0-4 Inc.3b — router le HIT DE BASE via l'affinité (pas seulement bonus/réactions).
+# OFF = hit de base neutre (Physical), 0 changement de balance. Passe à `true` pour
+# que TOUT le tir devienne affine (hot-reload : recalculé au changement). Gros levier.
+base_hit = false
+
+[affinity.fire]
+shield = 0.75
+armor = 0.75
+life = 1.5
+[affinity.poison]
+shield = 0.75
+armor = 1.5
+life = 0.75
+[affinity.givre]
+shield = 1.5
+armor = 0.75
+life = 0.75
+[affinity.armor_pierce]
+shield = 0.75
+armor = 1.5
+life = 0.75

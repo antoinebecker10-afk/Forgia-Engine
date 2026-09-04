@@ -1,0 +1,682 @@
+//! Opérations de transform façon Blender : **G** déplacer, **R** tourner,
+//! **T** taille, contraintes d'axe **1/2/3** (X/Y/Z), `Ctrl` = pas fixes,
+//! `Maj` = précision fine, clic gauche / `Entrée` = valider, `Retour arrière` =
+//! annuler l'opération, `Ctrl+Z` = annuler la dernière transformation validée.
+//!
+//! ## Pourquoi pas littéralement G/R/S + X/Y/Z
+//!
+//! `KeyCode` est **physique** (positions QWERTY). Sur un clavier AZERTY,
+//! le déplacement occupe le bloc `KeyW/KeyA/KeyS/KeyD` — soit les touches
+//! **Z Q S D**. « S » pour *scale* et « Z » pour l'axe Z tomberaient donc sur
+//! *reculer* et *avancer*. D'où **T** (taille) et **1/2/3** pour les axes, avec
+//! la légende affichée en permanence dans le panneau.
+//!
+//! ## Repère de calcul
+//!
+//! Le geste est **exprimé** en monde (les axes 1/2/3 et les vecteurs caméra y
+//! vivent) mais **appliqué** en local : une pièce de décor est enfant d'une racine
+//! de scène qui a sa propre transformation (calage du sol, cellule de château), et
+//! c'est bien son `Transform` local qui est persisté puis réappliqué.
+//!
+//! On convertit donc l'axe et le pivot dans le repère du parent, et on écrit
+//! séparément translation / rotation / échelle. On **ne compose pas** de matrice
+//! 4×4 pour la redécomposer ensuite : le château importé contient des
+//! transformations **miroir** (échelle négative — cf la reconstruction depuis le
+//! pack Unity), et `Transform::from_matrix` sur un déterminant négatif rend une
+//! décomposition arbitraire. Le miroir serait détruit dès le premier geste, sans
+//! que rien ne le signale.
+
+use bevy::input::mouse::MouseMotion;
+use bevy::math::Affine3A;
+use bevy::prelude::*;
+
+use crate::persist::SceneEdits;
+use crate::select::{EditorDecor, EditorProp, Selection};
+use crate::snap::{NeedsGridSnap, NeedsGroundSnap, SnapMode};
+use crate::{EditorSession, EditorStatus};
+
+/// Sensibilités du geste — ergonomie de l'outil de création, sans effet sur le
+/// gameplay : `const` nommées plutôt que gènes TOML (cf `no-hardcode` §exception).
+/// Le déplacement est proportionnel à la distance pour rester 1:1 à l'écran.
+const MOVE_M_PER_PIXEL: f32 = 0.0022;
+const ROT_RAD_PER_PIXEL: f32 = 0.006;
+const SCALE_PER_PIXEL: f32 = 0.004;
+/// Pas fixes quand `Ctrl` est maintenu.
+const SNAP_MOVE_M: f32 = 0.25;
+const SNAP_ROT_DEG: f32 = 15.0;
+const SNAP_SCALE_STEP: f32 = 0.1;
+/// Multiplicateur `Maj` — précision fine.
+const FINE_MULTIPLIER: f32 = 0.2;
+/// Échelle plancher : un objet ne doit pas pouvoir disparaître par écrasement.
+const MIN_SCALE: f32 = 0.01;
+/// Profondeur de la pile d'annulation.
+const UNDO_DEPTH: usize = 32;
+
+/// Touches acceptées pour `Ctrl+Z`.
+///
+/// 🚨 `KeyCode` est **physique** (positions QWERTY) : la touche **marquée « Z »
+/// sur un clavier AZERTY est `KeyCode::KeyW`**. Ne tester que `KeyZ` rend
+/// l'annulation totalement muette sur AZERTY — c'est le bug remonté le
+/// 2026-07-26. On accepte donc les deux positions : chacune est « la touche Z »
+/// pour la disposition correspondante.
+const UNDO_KEYS: [KeyCode; 2] = [KeyCode::KeyW, KeyCode::KeyZ];
+
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum OpKind {
+    #[default]
+    None,
+    Move,
+    Rotate,
+    Scale,
+}
+
+impl OpKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::None => "—",
+            Self::Move => "Déplacer",
+            Self::Rotate => "Tourner",
+            Self::Scale => "Taille",
+        }
+    }
+}
+
+#[derive(Default, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum OpAxis {
+    /// Libre : dans le plan de la caméra (déplacer) ou autour de son axe de vue.
+    #[default]
+    View,
+    X,
+    Y,
+    Z,
+}
+
+impl OpAxis {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::View => "libre",
+            Self::X => "X",
+            Self::Y => "Y",
+            Self::Z => "Z",
+        }
+    }
+
+    fn world_vector(self, camera: &GlobalTransform) -> Vec3 {
+        match self {
+            Self::X => Vec3::X,
+            Self::Y => Vec3::Y,
+            Self::Z => Vec3::Z,
+            Self::View => camera.forward().as_vec3(),
+        }
+    }
+}
+
+/// Un objet en cours de transformation. On mémorise l'état de départ pour que
+/// chaque frame recalcule depuis l'origine du geste (annulation exacte, pas de
+/// dérive d'accumulation).
+struct OpItem {
+    entity: Entity,
+    start_local: Transform,
+    /// Inverse de la transformation monde du parent — convertit un axe ou un
+    /// pivot monde dans le repère où l'on écrit réellement.
+    parent_inverse: Affine3A,
+}
+
+#[derive(Resource, Default)]
+pub struct ActiveOp {
+    pub kind: OpKind,
+    pub axis: OpAxis,
+    /// Déplacement souris cumulé depuis le début du geste, en pixels.
+    accumulated: Vec2,
+    /// Pivot monde = barycentre de la sélection au début du geste.
+    pivot: Vec3,
+    items: Vec<OpItem>,
+}
+
+impl ActiveOp {
+    pub fn active(&self) -> bool {
+        self.kind != OpKind::None
+    }
+
+    fn reset(&mut self) {
+        self.kind = OpKind::None;
+        self.axis = OpAxis::View;
+        self.accumulated = Vec2::ZERO;
+        self.items.clear();
+    }
+}
+
+/// Transformations d'avant-geste, pour `Ctrl+Z`.
+#[derive(Resource, Default)]
+pub struct UndoStack {
+    steps: Vec<Vec<(Entity, Transform)>>,
+}
+
+impl UndoStack {
+    fn push(&mut self, step: Vec<(Entity, Transform)>) {
+        if step.is_empty() {
+            return;
+        }
+        if self.steps.len() == UNDO_DEPTH {
+            self.steps.remove(0);
+        }
+        self.steps.push(step);
+    }
+
+    pub fn depth(&self) -> usize {
+        self.steps.len()
+    }
+}
+
+/// Démarre un geste (`G`/`R`/`T`) ou change son axe (`1`/`2`/`3`).
+pub fn sys_begin_op(
+    keys: Res<ButtonInput<KeyCode>>,
+    session: Res<EditorSession>,
+    selection: Res<Selection>,
+    q_transform: Query<&Transform>,
+    q_global: Query<&GlobalTransform>,
+    q_parent: Query<&ChildOf>,
+    mut op: ResMut<ActiveOp>,
+    mut status: ResMut<EditorStatus>,
+) {
+    if session.ui_keyboard || session.navigating {
+        return;
+    }
+
+    // Changement d'axe pendant un geste ; rappuyer sur le même axe libère.
+    if op.active() {
+        for (key, axis) in [
+            (KeyCode::Digit1, OpAxis::X),
+            (KeyCode::Digit2, OpAxis::Y),
+            (KeyCode::Digit3, OpAxis::Z),
+        ] {
+            if keys.just_pressed(key) {
+                op.axis = if op.axis == axis { OpAxis::View } else { axis };
+            }
+        }
+        return;
+    }
+
+    let kind = if keys.just_pressed(KeyCode::KeyG) {
+        OpKind::Move
+    } else if keys.just_pressed(KeyCode::KeyR) {
+        OpKind::Rotate
+    } else if keys.just_pressed(KeyCode::KeyT) {
+        OpKind::Scale
+    } else {
+        return;
+    };
+    if selection.items.is_empty() {
+        status.set("Rien de sélectionné — clic gauche sur un objet d'abord".to_owned());
+        return;
+    }
+
+    op.reset();
+    op.kind = kind;
+    let mut sum = Vec3::ZERO;
+    for &entity in &selection.items {
+        let Ok(local) = q_transform.get(entity) else {
+            continue;
+        };
+        let Ok(global) = q_global.get(entity) else {
+            continue;
+        };
+        let parent_inverse = q_parent
+            .get(entity)
+            .ok()
+            .and_then(|child_of| q_global.get(child_of.parent()).ok())
+            .map(|parent| parent.affine().inverse())
+            .unwrap_or(Affine3A::IDENTITY);
+        sum += global.translation();
+        op.items.push(OpItem {
+            entity,
+            start_local: *local,
+            parent_inverse,
+        });
+    }
+    if op.items.is_empty() {
+        op.reset();
+        return;
+    }
+    op.pivot = sum / op.items.len() as f32;
+    status.set(format!("{} — 1/2/3 = axe, clic = valider", kind.label()));
+}
+
+/// Applique le geste en cours, le valide ou l'annule.
+#[allow(clippy::too_many_arguments)]
+pub fn sys_drive_op(
+    mut motion: MessageReader<MouseMotion>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    session: Res<EditorSession>,
+    q_camera: Query<&GlobalTransform, With<forgia_player::prelude::FpsCamera>>,
+    mut commands: Commands,
+    mut op: ResMut<ActiveOp>,
+    mut edits: ResMut<SceneEdits>,
+    mut undo: ResMut<UndoStack>,
+    mut history: ResMut<crate::history::EditHistory>,
+    mut status: ResMut<EditorStatus>,
+    mut q_transform: Query<&mut Transform>,
+    q_prop: Query<&EditorProp>,
+    q_decor: Query<&EditorDecor>,
+) {
+    if !op.active() {
+        // Purge le buffer : un mouvement fait hors geste ne doit pas s'appliquer
+        // au geste suivant.
+        motion.clear();
+        return;
+    }
+
+    // Annulation du geste : tout revient à l'état de départ.
+    if keys.just_pressed(KeyCode::Backspace) {
+        for item in &op.items {
+            if let Ok(mut transform) = q_transform.get_mut(item.entity) {
+                *transform = item.start_local;
+            }
+        }
+        status.set("Geste annulé".to_owned());
+        op.reset();
+        return;
+    }
+
+    for event in motion.read() {
+        op.accumulated += event.delta;
+    }
+
+    let Ok(camera) = q_camera.single() else {
+        return;
+    };
+    let coarse_snap = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    let fine = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    let gesture = gesture_from(&op, camera, coarse_snap, fine);
+
+    for item in &op.items {
+        if let Ok(mut transform) = q_transform.get_mut(item.entity) {
+            *transform = apply_gesture(item, &gesture, op.pivot);
+        }
+    }
+
+    // Validation : clic gauche (hors panneau) ou Entrée.
+    let confirm = (mouse.just_pressed(MouseButton::Left) && !session.ui_pointer)
+        || keys.just_pressed(KeyCode::Enter)
+        || keys.just_pressed(KeyCode::NumpadEnter);
+    if !confirm {
+        return;
+    }
+
+    let kind = op.kind;
+    let mut undo_step = Vec::with_capacity(op.items.len());
+    for item in &op.items {
+        undo_step.push((item.entity, item.start_local));
+        let Ok(transform) = q_transform.get(item.entity) else {
+            continue;
+        };
+        record_transform(&mut edits, item.entity, transform, &q_prop, &q_decor);
+        // Journal consultable : une ligne par geste validé, avec l'état d'avant,
+        // pour pouvoir revenir en arrière sur CE geste précis plus tard.
+        if let Some((target, label, asset)) =
+            crate::history::describe(q_prop.get(item.entity).ok(), q_decor.get(item.entity).ok())
+        {
+            history.record(
+                match kind {
+                    OpKind::Rotate => crate::history::EditKind::Rotated,
+                    OpKind::Scale => crate::history::EditKind::Resized,
+                    _ => crate::history::EditKind::Moved,
+                },
+                target,
+                label,
+                asset,
+                Some((&item.start_local).into()),
+                Some(transform.into()),
+            );
+        }
+        // L'aimant s'applique après un déplacement validé : c'est exactement le
+        // « aimant » demandé (poser proprement au lieu de flotter / s'enfoncer).
+        if kind == OpKind::Move {
+            match session.snap {
+                SnapMode::Ground => {
+                    commands
+                        .entity(item.entity)
+                        .insert(NeedsGroundSnap::default());
+                }
+                SnapMode::Grid => {
+                    commands.entity(item.entity).insert(NeedsGridSnap);
+                }
+                SnapMode::Off => {}
+            }
+        }
+    }
+    undo.push(undo_step);
+    status.set(format!("{} validé", kind.label()));
+    op.reset();
+}
+
+/// Geste courant, exprimé en **monde**. Décrit l'intention ; l'application dans
+/// le repère de chaque objet est faite par [`apply_gesture`].
+enum Gesture {
+    None,
+    Move { world_offset: Vec3 },
+    Rotate { world_axis: Vec3, angle: f32 },
+    Scale { factor: Vec3 },
+}
+
+/// Traduit le déplacement souris cumulé en geste monde.
+fn gesture_from(op: &ActiveOp, camera: &GlobalTransform, coarse: bool, fine: bool) -> Gesture {
+    let screen = Vec2::new(op.accumulated.x, -op.accumulated.y);
+    let precision = if fine { FINE_MULTIPLIER } else { 1.0 };
+
+    match op.kind {
+        OpKind::None => Gesture::None,
+        OpKind::Move => {
+            let distance = (op.pivot - camera.translation()).length().max(1.0);
+            let unit = MOVE_M_PER_PIXEL * distance * precision;
+            let offset = match op.axis {
+                OpAxis::View => {
+                    let raw = camera.right().as_vec3() * screen.x * unit
+                        + camera.up().as_vec3() * screen.y * unit;
+                    if coarse {
+                        snap_vec(raw, SNAP_MOVE_M)
+                    } else {
+                        raw
+                    }
+                }
+                axis => {
+                    let world_axis = axis.world_vector(camera);
+                    let amount = screen_amount(screen, world_axis, camera) * unit;
+                    let amount = if coarse {
+                        snap_scalar(amount, SNAP_MOVE_M)
+                    } else {
+                        amount
+                    };
+                    world_axis * amount
+                }
+            };
+            Gesture::Move {
+                world_offset: offset,
+            }
+        }
+        OpKind::Rotate => {
+            let mut angle = screen.x * ROT_RAD_PER_PIXEL * precision;
+            if coarse {
+                angle = snap_scalar(angle, SNAP_ROT_DEG.to_radians());
+            }
+            Gesture::Rotate {
+                world_axis: op.axis.world_vector(camera).normalize_or(Vec3::Y),
+                angle,
+            }
+        }
+        OpKind::Scale => {
+            let mut factor = 1.0 + screen.x * SCALE_PER_PIXEL * precision;
+            if coarse {
+                factor = snap_scalar(factor, SNAP_SCALE_STEP);
+            }
+            let factor = factor.max(MIN_SCALE);
+            Gesture::Scale {
+                factor: match op.axis {
+                    OpAxis::View => Vec3::splat(factor),
+                    OpAxis::X => Vec3::new(factor, 1.0, 1.0),
+                    OpAxis::Y => Vec3::new(1.0, factor, 1.0),
+                    OpAxis::Z => Vec3::new(1.0, 1.0, factor),
+                },
+            }
+        }
+    }
+}
+
+/// Applique le geste à un objet, **dans son repère parent**, en écrivant
+/// translation / rotation / échelle séparément (pas de matrice recomposée).
+fn apply_gesture(item: &OpItem, gesture: &Gesture, world_pivot: Vec3) -> Transform {
+    let start = item.start_local;
+    let mut result = start;
+    match gesture {
+        Gesture::None => {}
+        Gesture::Move { world_offset } => {
+            result.translation += item.parent_inverse.transform_vector3(*world_offset);
+        }
+        Gesture::Rotate { world_axis, angle } => {
+            let local_axis = item
+                .parent_inverse
+                .transform_vector3(*world_axis)
+                .normalize_or(Vec3::Y);
+            let rotation = Quat::from_axis_angle(local_axis, *angle);
+            let pivot = item.parent_inverse.transform_point3(world_pivot);
+            result.rotation = rotation * start.rotation;
+            result.translation = pivot + rotation * (start.translation - pivot);
+        }
+        Gesture::Scale { factor } => {
+            let pivot = item.parent_inverse.transform_point3(world_pivot);
+            result.scale = start.scale * *factor;
+            result.translation = pivot + (start.translation - pivot) * *factor;
+        }
+    }
+    result.scale = clamp_scale(result.scale);
+    result
+}
+
+/// Empêche une échelle d'atteindre zéro **sans détruire un miroir** : le signe
+/// est conservé, seule la magnitude est plancher. Un `max()` naïf transformerait
+/// une pièce miroir (échelle négative) en pièce retournée.
+fn clamp_scale(scale: Vec3) -> Vec3 {
+    Vec3::new(
+        clamp_scale_component(scale.x),
+        clamp_scale_component(scale.y),
+        clamp_scale_component(scale.z),
+    )
+}
+
+fn clamp_scale_component(value: f32) -> f32 {
+    if value.abs() < MIN_SCALE {
+        MIN_SCALE.copysign(value)
+    } else {
+        value
+    }
+}
+
+/// Projette le geste souris sur la direction écran de l'axe monde visé : tirer
+/// « vers la droite » sur un axe qui pointe à droite l'allonge, quelle que soit
+/// l'orientation de la caméra.
+fn screen_amount(screen: Vec2, world_axis: Vec3, camera: &GlobalTransform) -> f32 {
+    let camera_space = camera.affine().inverse().transform_vector3(world_axis);
+    let direction = camera_space.truncate();
+    if direction.length_squared() < 1e-6 {
+        // Axe quasi parallèle à la vue : plus de direction écran exploitable,
+        // on retombe sur le geste horizontal.
+        return screen.x;
+    }
+    screen.dot(direction.normalize())
+}
+
+fn snap_scalar(value: f32, step: f32) -> f32 {
+    (value / step).round() * step
+}
+
+fn snap_vec(value: Vec3, step: f32) -> Vec3 {
+    Vec3::new(
+        snap_scalar(value.x, step),
+        snap_scalar(value.y, step),
+        snap_scalar(value.z, step),
+    )
+}
+
+/// Écrit le transform courant dans le fichier d'édition (prop ou override décor).
+pub fn record_transform(
+    edits: &mut SceneEdits,
+    entity: Entity,
+    transform: &Transform,
+    q_prop: &Query<&EditorProp>,
+    q_decor: &Query<&EditorDecor>,
+) {
+    if let Ok(prop) = q_prop.get(entity) {
+        edits.update_prop(prop.id, transform);
+    } else if let Ok(decor) = q_decor.get(entity) {
+        edits.update_override(&decor.key, transform);
+    }
+}
+
+/// `Ctrl+Z` — restaure les transforms d'avant la dernière validation.
+pub fn sys_undo(
+    keys: Res<ButtonInput<KeyCode>>,
+    session: Res<EditorSession>,
+    op: Res<ActiveOp>,
+    mut undo: ResMut<UndoStack>,
+    mut edits: ResMut<SceneEdits>,
+    mut status: ResMut<EditorStatus>,
+    mut q_transform: Query<&mut Transform>,
+    q_prop: Query<&EditorProp>,
+    q_decor: Query<&EditorDecor>,
+) {
+    if session.ui_keyboard || op.active() {
+        return;
+    }
+    let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    if !ctrl || !UNDO_KEYS.iter().any(|key| keys.just_pressed(*key)) {
+        return;
+    }
+    let Some(step) = undo.steps.pop() else {
+        status.set("Rien à annuler".to_owned());
+        return;
+    };
+    for (entity, transform) in step {
+        if let Ok(mut current) = q_transform.get_mut(entity) {
+            *current = transform;
+            record_transform(&mut edits, entity, &transform, &q_prop, &q_decor);
+        }
+    }
+    status.set("Annulé".to_owned());
+}
+
+/// Annule le geste en cours (fermeture de l'éditeur, sortie du Hall).
+pub fn cancel_active_op(op: &mut ActiveOp, q_transform: &mut Query<&mut Transform>) {
+    if !op.active() {
+        return;
+    }
+    for item in &op.items {
+        if let Ok(mut transform) = q_transform.get_mut(item.entity) {
+            *transform = item.start_local;
+        }
+    }
+    op.reset();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snap_rounds_to_step() {
+        assert_eq!(snap_scalar(0.31, 0.25), 0.25);
+        assert_eq!(snap_scalar(0.40, 0.25), 0.5);
+        assert_eq!(snap_scalar(-0.31, 0.25), -0.25);
+    }
+
+    /// Objet sans parent (cas d'un asset ajouté par l'éditeur).
+    fn item_at(translation: Vec3, scale: Vec3) -> OpItem {
+        OpItem {
+            entity: Entity::PLACEHOLDER,
+            start_local: Transform {
+                translation,
+                rotation: Quat::IDENTITY,
+                scale,
+            },
+            parent_inverse: Affine3A::IDENTITY,
+        }
+    }
+
+    #[test]
+    fn rotation_keeps_the_pivot_fixed() {
+        let pivot = Vec3::new(3.0, 1.0, -2.0);
+        let item = item_at(pivot, Vec3::ONE);
+        let result = apply_gesture(
+            &item,
+            &Gesture::Rotate {
+                world_axis: Vec3::Y,
+                angle: 1.234,
+            },
+            pivot,
+        );
+        assert!((result.translation - pivot).length() < 1e-5);
+    }
+
+    #[test]
+    fn scaling_keeps_the_pivot_fixed_and_scales_around_it() {
+        let pivot = Vec3::new(-4.0, 12.0, 7.5);
+        let item = item_at(pivot + Vec3::X * 2.0, Vec3::ONE);
+        let result = apply_gesture(
+            &item,
+            &Gesture::Scale {
+                factor: Vec3::splat(2.5),
+            },
+            pivot,
+        );
+        assert!((result.translation - (pivot + Vec3::X * 5.0)).length() < 1e-5);
+        assert!((result.scale - Vec3::splat(2.5)).length() < 1e-5);
+    }
+
+    #[test]
+    fn move_offsets_translation_only() {
+        let item = item_at(Vec3::new(1.0, 2.0, 3.0), Vec3::ONE);
+        let result = apply_gesture(
+            &item,
+            &Gesture::Move {
+                world_offset: Vec3::new(0.5, 0.0, -1.5),
+            },
+            Vec3::ZERO,
+        );
+        assert!((result.translation - Vec3::new(1.5, 2.0, 1.5)).length() < 1e-6);
+        assert_eq!(result.rotation, Quat::IDENTITY);
+        assert_eq!(result.scale, Vec3::ONE);
+    }
+
+    /// Le château importé contient des pièces miroir (échelle négative). Un geste
+    /// ne doit jamais les retourner : c'est ce que ferait un `max()` naïf sur
+    /// l'échelle, ou une recomposition/décomposition de matrice.
+    #[test]
+    fn mirrored_piece_keeps_its_negative_scale() {
+        let item = item_at(Vec3::ZERO, Vec3::new(-1.0, 1.0, 1.0));
+        let rotated = apply_gesture(
+            &item,
+            &Gesture::Rotate {
+                world_axis: Vec3::Y,
+                angle: 0.5,
+            },
+            Vec3::ZERO,
+        );
+        assert!(
+            rotated.scale.x < 0.0,
+            "le miroir doit survivre à la rotation"
+        );
+
+        let scaled = apply_gesture(
+            &item,
+            &Gesture::Scale {
+                factor: Vec3::splat(2.0),
+            },
+            Vec3::ZERO,
+        );
+        assert_eq!(scaled.scale.x, -2.0);
+    }
+
+    #[test]
+    fn scale_floor_preserves_sign() {
+        assert_eq!(clamp_scale_component(0.0001), MIN_SCALE);
+        assert_eq!(clamp_scale_component(-0.0001), -MIN_SCALE);
+        assert_eq!(clamp_scale_component(-3.0), -3.0);
+    }
+
+    #[test]
+    fn undo_stack_is_bounded() {
+        let mut stack = UndoStack::default();
+        for i in 0..(UNDO_DEPTH + 10) {
+            stack.push(vec![(Entity::PLACEHOLDER, Transform::default())]);
+            assert!(stack.depth() <= UNDO_DEPTH, "débordement à l'étape {i}");
+        }
+        assert_eq!(stack.depth(), UNDO_DEPTH);
+    }
+
+    #[test]
+    fn empty_step_is_not_pushed() {
+        let mut stack = UndoStack::default();
+        stack.push(Vec::new());
+        assert_eq!(stack.depth(), 0);
+    }
+}

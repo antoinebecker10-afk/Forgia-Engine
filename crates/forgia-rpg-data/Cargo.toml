@@ -1,0 +1,20 @@
+[package]
+name = "forgia-rpg-data"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "RPG data layer (Forgia) — inventory + quests + loot tables + XP curves + dialogue. Fused from 5 single-file scaffold crates (2026-05-26)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+forgia-genome-core = { workspace = true }
+forgia-rng = { workspace = true }
+serde = { workspace = true }
+toml = "0.8"
+
+[dev-dependencies]
+toml = "0.8"

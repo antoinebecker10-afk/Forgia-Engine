@@ -1,0 +1,495 @@
+id = "vehicle_default"
+name = "Vehicle Physics"
+domain = "Vehicle"
+category = "Vehicle"
+description = "GTA-style vehicle: suspension, engine, steering, camera — extracted from FpsTuning veh_*"
+version = "1.0.0"
+
+# Chassis
+[[genes]]
+id = "veh_mass"
+label = "Mass"
+chromosome = "Chassis"
+target = "Value"
+min = 400.0
+max = 3000.0
+default = 1200.0
+layer = "chassis"
+
+[[genes]]
+id = "veh_drag"
+label = "Aero Drag"
+chromosome = "Chassis"
+target = "Value"
+min = 0.2
+max = 2.0
+default = 0.8
+layer = "chassis"
+
+[[genes]]
+id = "veh_anti_roll"
+label = "Anti-Roll"
+chromosome = "Chassis"
+target = "Value"
+min = 1000.0
+max = 8000.0
+default = 4000.0
+layer = "chassis"
+
+# Suspension
+[[genes]]
+id = "veh_spring_stiffness"
+label = "Spring Stiffness"
+chromosome = "Suspension"
+target = "Value"
+min = 10000.0
+max = 50000.0
+default = 25000.0
+layer = "suspension"
+
+[[genes]]
+id = "veh_damping"
+label = "Damping"
+chromosome = "Suspension"
+target = "Value"
+min = 5000.0
+max = 25000.0
+default = 12000.0
+layer = "suspension"
+
+[[genes]]
+id = "veh_suspension_rest"
+label = "Rest Length"
+chromosome = "Suspension"
+target = "Value"
+min = 0.2
+max = 1.0
+default = 0.5
+layer = "suspension"
+
+[[genes]]
+id = "veh_max_travel"
+label = "Max Travel"
+chromosome = "Suspension"
+target = "Value"
+min = 0.1
+max = 0.6
+default = 0.3
+layer = "suspension"
+
+# Engine
+[[genes]]
+id = "veh_engine_force"
+label = "Engine Force"
+chromosome = "Engine"
+target = "Value"
+min = 3000.0
+max = 20000.0
+default = 8000.0
+layer = "engine"
+
+[[genes]]
+id = "veh_brake_force"
+label = "Brake Force"
+chromosome = "Engine"
+target = "Value"
+min = 2000.0
+max = 12000.0
+default = 5000.0
+layer = "engine"
+
+# Steering
+[[genes]]
+id = "veh_max_steer_deg"
+label = "Max Steer Angle"
+chromosome = "Steering"
+target = "Value"
+min = 15.0
+max = 55.0
+default = 35.0
+layer = "steering"
+
+[[genes]]
+id = "veh_steer_speed"
+label = "Steer Speed"
+chromosome = "Steering"
+target = "Value"
+min = 60.0
+max = 200.0
+default = 120.0
+layer = "steering"
+
+[[genes]]
+id = "veh_steer_reduction"
+label = "Speed Steer Reduction"
+chromosome = "Steering"
+target = "Value"
+min = 0.5
+max = 1.0
+default = 0.85
+layer = "steering"
+
+[[genes]]
+id = "veh_steer_max_speed"
+label = "Steer Reduction Speed"
+chromosome = "Steering"
+target = "Value"
+min = 20.0
+max = 80.0
+default = 40.0
+layer = "steering"
+
+# Wheels
+[[genes]]
+id = "veh_wheel_radius"
+label = "Wheel Radius"
+chromosome = "Wheels"
+target = "Value"
+min = 0.2
+max = 0.6
+default = 0.35
+layer = "wheels"
+
+[[genes]]
+id = "veh_friction"
+label = "Tire Friction"
+chromosome = "Wheels"
+target = "Value"
+min = 0.5
+max = 2.0
+default = 1.2
+layer = "wheels"
+
+# Camera
+[[genes]]
+id = "veh_cam_distance"
+label = "Camera Distance"
+chromosome = "Camera"
+target = "Value"
+min = 4.0
+max = 15.0
+default = 8.0
+layer = "camera"
+
+[[genes]]
+id = "veh_cam_height"
+label = "Camera Height"
+chromosome = "Camera"
+target = "Value"
+min = 1.5
+max = 6.0
+default = 3.0
+layer = "camera"
+
+# Chassis extended
+[[genes]]
+id = "veh_wheelbase_half"
+label = "Wheelbase Half"
+chromosome = "Chassis"
+target = "Value"
+min = 0.8
+max = 3.0
+default = 1.5
+layer = "chassis"
+
+[[genes]]
+id = "veh_track_width_half"
+label = "Track Width Half"
+chromosome = "Chassis"
+target = "Value"
+min = 0.4
+max = 1.5
+default = 0.7
+layer = "chassis"
+
+[[genes]]
+id = "veh_linear_damping"
+label = "Linear Damping"
+chromosome = "Chassis"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.3
+layer = "chassis"
+
+[[genes]]
+id = "veh_angular_damping"
+label = "Angular Damping"
+chromosome = "Chassis"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 2.5
+layer = "chassis"
+
+[[genes]]
+id = "veh_com_y"
+label = "Center of Mass Y"
+chromosome = "Chassis"
+target = "Value"
+min = -1.0
+max = 0.0
+default = -0.35
+layer = "chassis"
+
+[[genes]]
+id = "veh_gravity_assist"
+label = "Airborne Gravity"
+chromosome = "Chassis"
+target = "Value"
+min = -1000.0
+max = -100.0
+default = -500.0
+layer = "chassis"
+
+# Drift
+[[genes]]
+id = "veh_drift_handbrake_max"
+label = "Drift Handbrake Max"
+chromosome = "Drift"
+target = "Value"
+min = 0.5
+max = 1.0
+default = 0.9
+layer = "drift"
+
+[[genes]]
+id = "veh_drift_friction_reduction"
+label = "Drift Friction Reduction"
+chromosome = "Drift"
+target = "Value"
+min = 0.3
+max = 0.95
+default = 0.75
+layer = "drift"
+
+[[genes]]
+id = "veh_drift_torque_mult"
+label = "Drift Torque"
+chromosome = "Drift"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 2.0
+layer = "drift"
+
+# Grip
+[[genes]]
+id = "veh_front_lateral_mult"
+label = "Front Lateral Grip"
+chromosome = "Grip"
+target = "Value"
+min = 400.0
+max = 2000.0
+default = 1200.0
+layer = "grip"
+
+[[genes]]
+id = "veh_rear_lateral_mult"
+label = "Rear Lateral Grip"
+chromosome = "Grip"
+target = "Value"
+min = 300.0
+max = 1500.0
+default = 800.0
+layer = "grip"
+
+# Aerodynamics
+[[genes]]
+id = "veh_downforce_speed"
+label = "Downforce Speed"
+chromosome = "Aerodynamics"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 10.0
+layer = "aero"
+
+[[genes]]
+id = "veh_downforce_mult"
+label = "Downforce Mult"
+chromosome = "Aerodynamics"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "aero"
+
+[[genes]]
+id = "veh_downforce_cap"
+label = "Downforce Cap"
+chromosome = "Aerodynamics"
+target = "Value"
+min = 200.0
+max = 2000.0
+default = 800.0
+layer = "aero"
+
+# Camera extended
+[[genes]]
+id = "veh_cam_dist_bonus"
+label = "Speed Distance Bonus"
+chromosome = "Camera"
+target = "Value"
+min = 0.0
+max = 8.0
+default = 3.0
+layer = "camera"
+
+[[genes]]
+id = "veh_cam_look_smooth_mult"
+label = "Look Smooth"
+chromosome = "Camera"
+target = "Value"
+min = 1.0
+max = 3.0
+default = 1.5
+layer = "camera"
+
+# Interaction
+[[genes]]
+id = "veh_mount_distance"
+label = "Mount Distance"
+chromosome = "Interaction"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 15.0
+layer = "interaction"
+
+# Constraints
+[[constraints]]
+source = "veh_mass"
+target = "veh_engine_force"
+ratio = 6.0
+
+[[constraints]]
+source = "veh_mass"
+target = "veh_brake_force"
+ratio = 4.0
+
+[[constraints]]
+source = "veh_spring_stiffness"
+target = "veh_damping"
+ratio = 0.5
+
+# === Hover Bike ===
+[[genes]]
+id = "hover_height"
+label = "Hover Altitude"
+chromosome = "HoverBike"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.5
+layer = "hover"
+
+[[genes]]
+id = "hover_stiffness"
+label = "Repulsor Stiffness"
+chromosome = "HoverBike"
+target = "Value"
+min = 2000.0
+max = 20000.0
+default = 8000.0
+layer = "hover"
+
+[[genes]]
+id = "hover_damping"
+label = "Repulsor Damping"
+chromosome = "HoverBike"
+target = "Value"
+min = 500.0
+max = 5000.0
+default = 2000.0
+layer = "hover"
+
+[[genes]]
+id = "hover_thrust"
+label = "Thrust Force"
+chromosome = "HoverBike"
+target = "Value"
+min = 1000.0
+max = 10000.0
+default = 4000.0
+layer = "hover"
+
+[[genes]]
+id = "hover_lateral_drag"
+label = "Lateral Drag"
+chromosome = "HoverBike"
+target = "Value"
+min = 100.0
+max = 2000.0
+default = 600.0
+layer = "hover"
+
+[[genes]]
+id = "hover_lean_max_deg"
+label = "Max Lean (deg)"
+chromosome = "HoverBike"
+target = "Value"
+min = 5.0
+max = 45.0
+default = 25.0
+layer = "hover"
+
+[[genes]]
+id = "hover_lean_speed"
+label = "Lean Speed"
+chromosome = "HoverBike"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 4.0
+layer = "hover"
+
+[[genes]]
+id = "hover_vent_rpm"
+label = "Propeller Base RPM"
+chromosome = "HoverBike"
+target = "Value"
+min = 2.0
+max = 30.0
+default = 10.0
+layer = "hover"
+
+[[genes]]
+id = "hover_vent_boost_rpm"
+label = "Propeller Boost RPM"
+chromosome = "HoverBike"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "hover"
+
+[[genes]]
+id = "hover_boost_mult"
+label = "Boost Multiplier"
+chromosome = "HoverBike"
+target = "Value"
+min = 1.5
+max = 5.0
+default = 2.5
+layer = "hover"
+
+[[genes]]
+id = "hover_mass"
+label = "Bike Mass"
+chromosome = "HoverBike"
+target = "Value"
+min = 100.0
+max = 800.0
+default = 300.0
+layer = "hover"
+
+[[genes]]
+id = "hover_yaw_torque"
+label = "Yaw Torque"
+chromosome = "HoverBike"
+target = "Value"
+min = 500.0
+max = 8000.0
+default = 3000.0
+layer = "hover"

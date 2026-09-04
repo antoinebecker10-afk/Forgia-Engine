@@ -1,0 +1,23 @@
+# Volcanic — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "volcanic"
+name = "Volcanic"
+display_name_fr = "Volcanique"
+color = [0.35, 0.27, 0.22]       # = BiomeType::Volcanic.color()
+roughness = 0.95
+preview_rgb = [64, 46, 38]
+spawn_weight = 1.0
+amplitude_mult = 1.30             # relief: accidenté
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 1.4
+speed_mult = 0.9
+dmg_mult = 1.5
+
+[road]
+width_mult = 1.0
+depression_mult = 0.8
+edge_noise = 0.7
+vegetation_encroachment = 0.0

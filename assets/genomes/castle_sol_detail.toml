@@ -1,0 +1,40 @@
+# Le grain du sol du Hall — couche definition.
+#
+# # Pourquoi ces réglages vivent dans la donnée
+#
+# Ils se jugent à l'œil, en jeu, pas à la compilation. Le tuilage surtout : trop
+# fin, le sol grésille et moire à distance ; trop large, le motif se reconnaît et
+# la répétition saute aux yeux. Aucune mesure ne tranche à la place du regard.
+#
+# # Ce que ce fichier corrige
+#
+# Le sol du Hall est UN albédo 2048² cuit sur 300 × 300 m, soit **5 texels par
+# mètre** — 25 fois moins que la médiane du reste de la carte (194 texels/m,
+# mesurée dans `resolutions_hall.json`). C'est le point le plus faible du décor.
+#
+# Agrandir l'albédo ne sert à rien : à 8192² il ferait encore 20 texels/m pour
+# 268 Mo de VRAM. Ce qui manque n'est pas de la couleur — la splatmap Unity a été
+# correctement cuite — c'est de la HAUTE FRÉQUENCE.
+
+# Combien de fois le grain se répète sur l'UV du terrain.
+#
+# L'UV du sol Unity couvre 0..1 sur ses ~300 m. À 100, une tuile fait donc environ
+# 3 m. Point de départ, à confirmer manette en main : c'est le réglage qui se voit
+# le plus, dans les deux sens.
+tuiles_par_uv = 100.0
+
+# Force du grain sur la couleur. 0 éteint le détail sans recompiler — utile pour
+# un A/B honnête, et comme repli si le grain déplaît.
+#
+# Le détail a une moyenne de 0,5 EXACTEMENT (garantie vérifiée sur le fichier écrit
+# par `tools/assets/generer_detail_sol.py`), et le shader le multiplie par 2. La
+# couleur d'ensemble de la carte est donc rigoureusement inchangée quelle que soit
+# cette valeur : on n'ajoute que du relief perçu, jamais de l'assombrissement.
+force = 0.85
+
+# Même grain sur la rugosité, plus discret. Une surface parfaitement lisse sur
+# 300 m se lit comme du plastique même bien texturée — c'est la variation du
+# spéculaire qui dit « c'est de la terre » avant que la couleur ne le dise.
+#
+# Le shader borne le résultat à 0,08 minimum : une rugosité nulle ferait un miroir.
+force_rugosite = 0.35

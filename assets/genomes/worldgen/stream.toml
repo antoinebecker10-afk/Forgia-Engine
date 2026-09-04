@@ -1,0 +1,13 @@
+# Recette de streaming — ville infinie qui charge/décharge autour du joueur (story-578 P4).
+#
+# ACTIVATION : en jeu (Roguelite) appuie sur F5 pour activer/désactiver le streaming.
+# Quand actif, déplace-toi : les chunks apparaissent devant, disparaissent derrière.
+# REPRODUCTIBLE : même `world_seed` → exactement la même ville, à chaque fois.
+# Hot-reload : édite ce fichier puis re-toggle F10 (off→on) pour recharger.
+
+world_seed = 2024          # graine du monde (change-la → autre ville)
+chunk_size = 40.0          # côté d'un chunk (m)
+view_radius = 2            # rayon de chunks chargés autour du joueur (2 → grille 5x5)
+buildings_per_chunk = 5    # bâtiments par chunk
+building_role = "Prop"     # rôle des bâtiments (Prop / Pillar / Platform...)
+scale = 0.5                # échelle des bâtiments

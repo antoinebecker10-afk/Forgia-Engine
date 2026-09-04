@@ -1,0 +1,13 @@
+[package]
+name = "forgia-prefab"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Data-driven GLTF Scene prefab spawn helpers + sensor."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }

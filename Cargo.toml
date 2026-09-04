@@ -1,0 +1,271 @@
+[workspace]
+resolver = "2"
+members = [
+    ".",
+    "crates/forgia-ai-arena-bot",
+    "crates/forgia-anchor",
+    "crates/forgia-anim-debug",
+    "crates/forgia-anim-locomotion",
+    "crates/forgia-rig-topology",
+    "crates/forgia-asset-cdn",
+    "crates/forgia-asset-registry",
+    "crates/forgia-auto-rig",
+    "crates/forgia-assets",
+    "crates/forgia-assets-bundle",
+    "crates/forgia-audio",
+    "crates/forgia-camera-orbit",
+    "crates/forgia-combat",
+    "crates/forgia-core",
+    "crates/forgia-crosshair",
+    "crates/forgia-damage",
+    "crates/forgia-debug",
+    "crates/forgia-editor",
+    "crates/forgia-enemy-archetypes",
+    "crates/forgia-enemy-nameplate",
+    "crates/forgia-effects",
+    "crates/forgia-foliage",
+    "crates/forgia-fps",
+    "crates/forgia-game",
+    "crates/forgia-genome-core",
+    "crates/forgia-ik",
+    "crates/forgia-input",
+    "crates/forgia-juice-lib",
+    "crates/forgia-juice-screen-flash",
+    "crates/forgia-level-presets",
+    "crates/forgia-mesh-voxelizer",
+    "crates/forgia-medial-axis",
+    "crates/forgia-mode-expedition",
+    "crates/forgia-navmesh",
+    "crates/forgia-skeleton-embedder",
+    "crates/forgia-skeleton-template",
+    "crates/forgia-mode-fps-arena",
+    "crates/forgia-mode-roguelite",
+    "crates/forgia-observability",
+    "crates/forgia-player",
+    "crates/forgia-postprocess",
+    "crates/forgia-prefab",
+    "crates/forgia-rng",
+    "crates/forgia-rpg",
+    "crates/forgia-secondary-motion",
+    "crates/forgia-spline",
+    "crates/forgia-stage",
+    "crates/forgia-streaming",
+    "crates/forgia-terrain",
+    "crates/forgia-ui",
+    "crates/forgia-ui-lib",
+    "crates/forgia-menu-hub",
+    "crates/forgia-killfeed",
+    "crates/forgia-viewmodel",
+    "crates/forgia-genome-village",
+    "crates/forgia-procgen-graph",
+    "crates/forgia-pcg-core",
+    "crates/forgia-pcg-runtime",
+    "crates/forgia-village-generator",
+    "crates/forgia-village-kit",
+    "crates/forgia-village-loader",
+    "crates/forgia-water",
+    "crates/forgia-worldgen",
+    "crates/forgia-rpg-data",
+    "crates/forgia-qa-core",
+    "crates/forgia-qa-replay",
+    "crates/forgia-qa-harness",
+    "crates/forgia-qa-autopilot",
+    "xtask",
+]
+
+[workspace.package]
+license = "MIT OR Apache-2.0"
+
+# Lints workspace — inherited by each crate via [lints] workspace = true
+# Stricter than V1 from day 1 : 0 dead_code tolerated, 0 hardcode in gameplay paths.
+[workspace.lints.clippy]
+needless_collect = "warn"
+redundant_clone = "warn"
+unnecessary_cast = "warn"
+needless_borrow = "warn"
+cast_lossless = "warn"
+doc_overindented_list_items = "warn"
+explicit_iter_loop = "warn"
+match_wildcard_for_single_variants = "warn"
+too_many_arguments = "allow"
+type_complexity = "allow"
+single_match_else = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+# Story-516+ : ces 3 lints sont legit en tests/sanity-checks, on garde explicites
+assertions_on_constants = "allow"
+field_reassign_with_default = "allow"
+manual_range_contains = "allow"
+
+[workspace.lints.rust]
+dead_code = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+
+[workspace.dependencies]
+# Pin Bevy 0.18.1 stable until V1 ship. Migration 0.19+ post-ship V1.1.
+# Story-695 : base lean compatible wasm — "webgpu" remplace le defaut silencieux
+# webgl2 sur le web (inerte en natif). "basis-universal" (C++, pas de sysroot
+# wasm) et "file_watcher" (natif-only) sont re-ajoutes cote natif par la
+# dependance target-gatee de forgia-game.
+bevy = { version = "0.18.1", features = ["wav", "mp3", "vorbis", "jpeg", "bevy_dev_tools", "ktx2", "webp", "webgpu"] }
+bevy_rapier3d = { version = "0.33", features = ["debug-render-3d"] }
+bevy_egui = "0.39.1"
+bevy_hanabi = { version = "0.18", default-features = false, features = ["3d"] }
+bevy_kira_audio = "0.25"
+leafwing-input-manager = "0.20"
+
+# Terrain (port verbatim V1 forgia-terrain — DAG-libre)
+noise = "0.9"
+fast-surface-nets = "0.2.1"
+ndshape = "0.3"
+voronoice = "0.2"
+rayon = "1"
+zstd = "0.13"
+
+# Story-695 : horloges portables — std::time panique sur wasm32 (« time not
+# implemented ») ; web-time = horloge JS sur web, re-export std en natif.
+web-time = "1"
+wasm-bindgen = "0.2"
+
+# Procgen — spatial index pour validation building-vs-road (story-446)
+rstar = "0.12"
+
+# Navigation — navmesh polyanya (épic E1 compagnon). Résolu contre bevy 0.18.1 sans
+# doublon de version (vérifié 2026-08-12 : un seul bevy_ecs 0.18.1 dans le lock).
+# `default-features = false` retire `debug-with-gizmos` : une lib n'impose pas bevy_gizmos.
+vleue_navigator = { version = "0.15", default-features = false }
+
+# Common
+sentry = "0.34"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+ron = "0.8"
+thiserror = "2.0"
+ulid = { version = "1.1", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+
+# Internal crates (paths) — auto-généré, 237 crates, ne pas éditer manuellement.
+# Pour ajouter une crate : éditer [workspace] members + cd & créer crate, puis re-générer cette section via xtask.
+
+forgia-ai-arena-bot = { path = "crates/forgia-ai-arena-bot" }
+forgia-anchor = { path = "crates/forgia-anchor" }
+forgia-anim-debug = { path = "crates/forgia-anim-debug" }
+forgia-anim-locomotion = { path = "crates/forgia-anim-locomotion" }
+forgia-rig-topology = { path = "crates/forgia-rig-topology" }
+forgia-asset-cdn = { path = "crates/forgia-asset-cdn" }
+forgia-asset-registry = { path = "crates/forgia-asset-registry" }
+forgia-auto-rig = { path = "crates/forgia-auto-rig" }
+forgia-assets = { path = "crates/forgia-assets" }
+forgia-assets-bundle = { path = "crates/forgia-assets-bundle" }
+forgia-audio = { path = "crates/forgia-audio" }
+forgia-camera-orbit = { path = "crates/forgia-camera-orbit" }
+forgia-combat = { path = "crates/forgia-combat" }
+forgia-core = { path = "crates/forgia-core" }
+forgia-crosshair = { path = "crates/forgia-crosshair" }
+forgia-damage = { path = "crates/forgia-damage" }
+forgia-enemy-archetypes = { path = "crates/forgia-enemy-archetypes" }
+forgia-enemy-nameplate = { path = "crates/forgia-enemy-nameplate" }
+forgia-effects = { path = "crates/forgia-effects" }
+forgia-foliage = { path = "crates/forgia-foliage" }
+forgia-fps = { path = "crates/forgia-fps" }
+forgia-game = { path = "crates/forgia-game" }
+forgia-genome-core = { path = "crates/forgia-genome-core" }
+forgia-ik = { path = "crates/forgia-ik" }
+forgia-input = { path = "crates/forgia-input" }
+forgia-juice-lib = { path = "crates/forgia-juice-lib" }
+forgia-juice-screen-flash = { path = "crates/forgia-juice-screen-flash" }
+forgia-level-presets = { path = "crates/forgia-level-presets" }
+forgia-mesh-voxelizer = { path = "crates/forgia-mesh-voxelizer" }
+forgia-medial-axis = { path = "crates/forgia-medial-axis" }
+forgia-mode-expedition = { path = "crates/forgia-mode-expedition" }
+forgia-navmesh = { path = "crates/forgia-navmesh" }
+forgia-skeleton-embedder = { path = "crates/forgia-skeleton-embedder" }
+forgia-skeleton-template = { path = "crates/forgia-skeleton-template" }
+forgia-mode-fps-arena = { path = "crates/forgia-mode-fps-arena" }
+forgia-mode-roguelite = { path = "crates/forgia-mode-roguelite" }
+forgia-observability = { path = "crates/forgia-observability" }
+forgia-debug = { path = "crates/forgia-debug" }
+forgia-editor = { path = "crates/forgia-editor" }
+forgia-player = { path = "crates/forgia-player" }
+forgia-postprocess = { path = "crates/forgia-postprocess" }
+forgia-prefab = { path = "crates/forgia-prefab" }
+forgia-rng = { path = "crates/forgia-rng" }
+forgia-rpg = { path = "crates/forgia-rpg" }
+forgia-secondary-motion = { path = "crates/forgia-secondary-motion" }
+forgia-spline = { path = "crates/forgia-spline" }
+forgia-stage = { path = "crates/forgia-stage" }
+forgia-streaming = { path = "crates/forgia-streaming" }
+forgia-terrain = { path = "crates/forgia-terrain" }
+forgia-ui = { path = "crates/forgia-ui" }
+forgia-ui-lib = { path = "crates/forgia-ui-lib" }
+forgia-menu-hub = { path = "crates/forgia-menu-hub" }
+forgia-killfeed = { path = "crates/forgia-killfeed" }
+forgia-viewmodel = { path = "crates/forgia-viewmodel" }
+forgia-genome-village = { path = "crates/forgia-genome-village" }
+forgia-procgen-graph = { path = "crates/forgia-procgen-graph" }
+forgia-pcg-core = { path = "crates/forgia-pcg-core" }
+forgia-pcg-runtime = { path = "crates/forgia-pcg-runtime" }
+forgia-village-generator = { path = "crates/forgia-village-generator" }
+forgia-village-kit = { path = "crates/forgia-village-kit" }
+forgia-village-loader = { path = "crates/forgia-village-loader" }
+forgia-water = { path = "crates/forgia-water" }
+forgia-worldgen = { path = "crates/forgia-worldgen" }
+forgia-rpg-data = { path = "crates/forgia-rpg-data" }
+forgia-qa-core = { path = "crates/forgia-qa-core" }
+forgia-qa-replay = { path = "crates/forgia-qa-replay" }
+forgia-qa-harness = { path = "crates/forgia-qa-harness" }
+forgia-qa-autopilot = { path = "crates/forgia-qa-autopilot" }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Root package — Renzora-style. `cargo run` from workspace root launches game.
+# Real assembly lives in the `forgia-game` library crate.
+# ─────────────────────────────────────────────────────────────────────────────
+[package]
+name = "forgia"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — YouTube of gaming. Play / Build / Edit funnel."
+
+[lints]
+workspace = true
+
+[dependencies]
+forgia-game = { path = "crates/forgia-game" }
+# Story-592 (M0.4) : panic hook -> forgia2_crash.json (echappement JSON correct).
+serde_json = { workspace = true }
+
+[features]
+# Build de diagnostic uniquement : active les spans CPU/rendu de Bevy pour Tracy.
+# Ne jamais activer dans un build joueur, l'instrumentation a un coût mesurable.
+profile-tracy = ["forgia-game/profile-tracy"]
+# Capture d'allocations Tracy. À réserver aux investigations mémoire : le coût
+# d'instrumentation fausse les mesures de frame time normales.
+profile-tracy-memory = ["forgia-game/profile-tracy-memory"]
+# Pont de diagnostic Bevy Remote Protocol. Désactivé par défaut : il ne doit
+# jamais exposer un build joueur ni modifier ses performances.
+dev-brp = ["forgia-game/dev-brp"]
+
+[[bin]]
+name = "forgia"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.release-fast]
+inherits = "release"
+lto = false
+codegen-units = 4
+

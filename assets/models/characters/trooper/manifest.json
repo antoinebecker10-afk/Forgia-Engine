@@ -1,0 +1,50 @@
+{
+  "id": "trooper",
+  "source": "Sci-Fi Trooper Man v3 (unitypackage)",
+  "rig": {
+    "kind": "unreal",
+    "bones": 68,
+    "root": "pelvis"
+  },
+  "body": {
+    "file": "body.gltf",
+    "mesh": "trooper_body"
+  },
+  "slots": {
+    "chest": {
+      "file": "chest.gltf",
+      "mesh": "trooper_chest",
+      "tris": 5526,
+      "hides": []
+    },
+    "helmet": {
+      "file": "helmet.gltf",
+      "mesh": "trooper_helmet",
+      "tris": 2626,
+      "hides": []
+    },
+    "legs": {
+      "file": "legs.gltf",
+      "mesh": "trooper_legs",
+      "tris": 3448,
+      "hides": []
+    },
+    "gloves": {
+      "file": "gloves.gltf",
+      "mesh": "trooper_gloves",
+      "tris": 1164,
+      "hides": []
+    },
+    "boots": {
+      "file": "boots.gltf",
+      "mesh": "trooper_boots",
+      "tris": 1216,
+      "hides": []
+    }
+  },
+  "viewmodel": {
+    "left": "viewmodel_arm_l.gltf",
+    "right": "viewmodel_arm_r.gltf",
+    "note": "statique, pose de préhension cuite — le placement des poignets reste au code"
+  }
+}

@@ -1,0 +1,39 @@
+﻿[package]
+name = "forgia-observability"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Health monitor + lag detector + watchdog"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }
+# `TargetCube` (ce qui se tire) : lu depuis la BRIQUE de combat depuis le
+# 2026-08-18, et non plus depuis la zone `forgia-mode-fps-arena`. Un capteur ne
+# doit pas dependre d'un mode pour savoir ce qu'est une cible.
+forgia-combat = { workspace = true }
+forgia-terrain = { workspace = true }
+# Story-467 V5 Session B — markers per-archetype counts (entities sensor)
+forgia-player = { workspace = true }
+forgia-ai-arena-bot = { workspace = true }
+forgia-enemy-nameplate = { workspace = true }
+# Story-469 V5 Session C — lifecycle/audio/input sensors
+forgia-audio = { workspace = true }
+forgia-input = { workspace = true }
+forgia-rpg-data = { workspace = true }
+forgia-rpg = { workspace = true }
+# Story-622 (Phase 0.2) — pont santé → bus QA (BugReport). Direction saine :
+# l'observabilité PRODUIT des BugReport ; qa-core ne dépend pas d'observability
+# (aucun cycle). Types seulement (BugBus/BugReport/DetectionSource/Severity).
+forgia-qa-core = { workspace = true }
+bevy_kira_audio = "0.25"
+bevy_water = "0.18"
+leafwing-input-manager = "0.20"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
+toml = { workspace = true }

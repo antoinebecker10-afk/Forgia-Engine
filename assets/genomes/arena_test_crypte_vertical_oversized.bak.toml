@@ -1,0 +1,1742 @@
+# Arena Test — « Les Cryptes verticales ». Greybox PvE roguelite.
+#
+# ⚠️ ÉTAPE GREYBOX. On juge la FORME, pas l'art. Primitives grises uniquement.
+# SOURCE DE VÉRITÉ de la carte : le Rust n'a aucune coordonnée en dur.
+# Hot-reload : sauvegarder ce fichier reconstruit la carte à la volée.
+#
+# ── Structure ─────────────────────────────────────────────────────────
+#   entrée (départ, couvert)
+#      ├── terrasse (combat, ciel ouvert, +4)  ─┐
+#      ├── tunnel   (contournement, couvert)   ─┤→ cour (combat) → pont → chapelle (boss)
+#      └── ruines   (récompense, ciel ouvert)  ─┘
+# Trois routes depuis le départ, convergence, puis goulot final : c'est la forme
+# canonique du roguelite (Hadès, Returnal, Gunfire Reborn).
+#
+# ── Ce que la passe « donjon » a changé ──────────────────────────────────
+# AVANT : un sol de 224 × 148 m et 6 murs. On pouvait marcher partout, donc les
+# routes ne servaient à rien — le graphe était décoratif.
+# APRÈS : CARVING EN ESPACE NÉGATIF. Tout ce qui n'est ni salle ni couloir est de
+# la ROCHE PLEINE. 43 % de la surface reste ouverte, le reste est massif. Le
+# graphe devient physique : pour aller d'une salle à l'autre il FAUT prendre une
+# route. C'est ce qui distingue un donjon d'un terrain vague avec des estrades.
+#
+# ── Alternance clos / ouvert ────────────────────────────────────────
+# Une enfilade entièrement fermée étouffe ; une carte entièrement ouverte n'est
+# plus un donjon. Départ et boss sont couverts (on entre dans quelque chose, on
+# finit dans une nef), le tunnel est un boyau, et terrasse / ruines / cour / pont
+# respirent à ciel ouvert. Toute salle couverte est éclairée : une dalle arrête
+# le soleil directionnel, et une salle non éclairée est NOIRE.
+#
+# Convention : `pos` = centre de l'EMPREINTE AU SOL, la boîte monte de `pos.y`
+# à `pos.y + size[1]`. Repère Bevy Y-up, angles en degrés.
+
+[metrics]
+player_height_m = 2
+player_radius_m = 0.3
+eye_height_m = 1.7
+walk_speed_ms = 6.5
+sprint_speed_ms = 9.75
+jump_velocity_ms = 6.5
+gravity_ms2 = 18
+jump_height_m = 1.174
+air_time_s = 0.722
+jump_reach_walk_m = 4.69
+jump_reach_sprint_m = 7.04
+engagement_close_m = 6.5
+engagement_core_m = 26
+engagement_sniper_m = 52
+
+[grid]
+module_m = 2
+step_max_m = 0.4
+platform_step_m = 1.1
+cover_low_m = 1.8
+cover_high_m = 2.8
+wall_min_m = 1.5
+gap_max_m = 4
+show = true
+cell_count = 60
+# Débord de la dalle de plafond au-delà de l'emprise de la salle.
+# Le creusement ouvre la salle AVEC une marge : une dalle taillée pile sur
+# l'emprise laisserait une fente ouverte sur ~200 m de développé par salle.
+ceiling_overhang_m = 1.5
+
+# Code couleur fonctionnel : le joueur lit la fonction, pas la déco.
+[palette]
+floor = [0.46, 0.46, 0.49]
+platform = [0.55, 0.5, 0.41]
+cover = [0.38, 0.41, 0.45]
+wall = [0.27, 0.29, 0.33]
+traversal = [0.9, 0.63, 0.18]
+perch = [0.34, 0.6, 0.76]
+ceiling = [0.24, 0.24, 0.27]
+
+[arena]
+name = "Les Cryptes verticales"
+shape = "rectangular"
+size_x = 220
+size_z = 144
+extent_m = 30
+wall_height_m = 12
+wall_thickness_m = 1
+spawn_pos = [-100, 1.5, 0]
+spawn_yaw_deg = -90
+
+# ── LES SALLES ──────────────────────────────────────────────────
+# `center[1]` = niveau du SOL. `ceiling_m` = hauteur libre (0 = ciel ouvert).
+# Toute salle couverte doit avoir au moins 3,18 m sous plafond (joueur 2,0 +
+# saut 1,174), sinon on se cogne dès qu'on appuie sur espace.
+
+[[rooms]]
+id = "entree"
+role = "spawn"
+center = [-92, 0, 0]
+size = [36, 12, 64]
+ceiling_m = 6
+
+[[rooms]]
+id = "terrasse"
+role = "combat"
+center = [-35, 4, 32]
+size = [55, 4, 22]
+ceiling_m = 0
+
+[[rooms]]
+id = "tunnel"
+role = "flank"
+center = [-40, 0, 0]
+size = [66, 6, 14]
+ceiling_m = 4
+
+[[rooms]]
+id = "ruines"
+role = "reward"
+center = [-32, 0, -35]
+size = [64, 10, 46]
+ceiling_m = 0
+
+[[rooms]]
+id = "cour"
+role = "combat"
+center = [15, 2, 0]
+size = [30, 2, 52]
+ceiling_m = 0
+
+[[rooms]]
+id = "pont"
+role = "bridge"
+center = [45, 3, 0]
+size = [22, 1, 14]
+ceiling_m = 0
+
+[[rooms]]
+id = "chapelle"
+role = "boss"
+center = [80, 4, 0]
+size = [45, 4, 54]
+ceiling_m = 7
+
+# ── LES ROUTES ──────────────────────────────────────────────────
+# Contrat vérifié au chargement : ids uniques, largeur suffisante, rampes
+# alignées et sous la pente de confort, boss atteignable depuis le départ.
+
+[[routes]]
+id = "entree_terrasse"
+from = "entree"
+to = "terrasse"
+width_m = 5
+ramp_section = "rampe_terrasse_entree"
+path = [
+  [-100, 0, 0],
+  [-79, 0, 32],
+  [-62.5, 4, 32],
+  [-35, 4, 32],
+]
+
+[[routes]]
+id = "entree_tunnel"
+from = "entree"
+to = "tunnel"
+width_m = 5
+path = [
+  [-100, 0, 0],
+  [-88, 0, 7],
+  [-76, 0, 7],
+  [-73, 0, 5],
+  [-66, 0, -3.5],
+  [-58, 0, -3.5],
+  [-51, 0, 3.5],
+  [-40, 0, 3.5],
+]
+
+[[routes]]
+id = "entree_ruines"
+from = "entree"
+to = "ruines"
+width_m = 6
+path = [
+  [-100, 0, 0],
+  [-88, 0, -7],
+  [-76, 0, -10],
+  [-70, 0, -12],
+  [-60, 0, -20],
+  [-32, 0, -35],
+]
+
+[[routes]]
+id = "terrasse_cour"
+from = "terrasse"
+to = "cour"
+width_m = 5
+ramp_section = "rampe_terrasse_cour"
+path = [
+  [-35, 4, 32],
+  [-7.5, 4, 32],
+  [0, 2, 26],
+  [15, 2, 20],
+  [15, 2, 0],
+]
+
+[[routes]]
+id = "tunnel_cour"
+from = "tunnel"
+to = "cour"
+width_m = 5
+ramp_section = "rampe_tunnel_cour"
+path = [
+  [-40, 0, 3.5],
+  [-36, 0, -3.5],
+  [-28, 0, -3.5],
+  [-22, 0, 3.5],
+  [-14, 0, 3.5],
+  [-7, 0, 5],
+  [-7, 0, 0],
+  [0, 2, 0],
+  [15, 2, 0],
+]
+
+[[routes]]
+id = "ruines_cour"
+from = "ruines"
+to = "cour"
+width_m = 5
+ramp_section = "rampe_ruines_cour"
+path = [
+  [-32, 0, -35],
+  [-7, 0, -32],
+  [0, 2, -26],
+  [15, 2, -22],
+  [15, 2, -10],
+]
+
+[[routes]]
+id = "cour_pont"
+from = "cour"
+to = "pont"
+width_m = 5
+ramp_section = "rampe_pont"
+path = [
+  [15, 2, 0],
+  [30, 2, 0],
+  [34, 3, 0],
+  [45, 3, 0],
+]
+
+[[routes]]
+id = "pont_chapelle"
+from = "pont"
+to = "chapelle"
+width_m = 5
+ramp_section = "rampe_chapelle"
+path = [
+  [45, 3, 0],
+  [54, 3, 0],
+  [57.5, 4, 0],
+  [65, 4, 0],
+]
+
+# Éclairage global NEUTRE : en greybox on juge la forme, pas l'ambiance.
+[lighting]
+sun_illuminance = 9000
+sun_color = [0.94, 0.76, 0.58]
+fill_illuminance = 2800
+fill_color = [0.44, 0.54, 0.74]
+ambient_brightness = 500
+ambient_color = [0.55, 0.6, 0.72]
+
+# ── LUMIÈRES ───────────────────────────────────────────────────
+# Obligatoires dans tout espace couvert : une dalle de plafond arrête le
+# soleil directionnel. Intensités faibles — une ponctuelle trop forte écrase
+# l'atmosphère et le bloom (garde-fou hérité de forgia-stage).
+
+[[lights]]
+pos = [-101, 5.2, -24]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-101, 5.2, -8]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-101, 5.2, 8]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-101, 5.2, 24]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-83, 5.2, -24]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-83, 5.2, -8]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-83, 5.2, 8]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-83, 5.2, 24]
+intensity = 6000
+range_m = 22
+room = "entree"
+
+[[lights]]
+pos = [-64.75, 3.2, 0]
+intensity = 6000
+range_m = 22
+room = "tunnel"
+
+[[lights]]
+pos = [-48.25, 3.2, 0]
+intensity = 6000
+range_m = 22
+room = "tunnel"
+
+[[lights]]
+pos = [-31.75, 3.2, 0]
+intensity = 6000
+range_m = 22
+room = "tunnel"
+
+[[lights]]
+pos = [-15.25, 3.2, 0]
+intensity = 6000
+range_m = 22
+room = "tunnel"
+
+[[lights]]
+pos = [65, 10.2, -18]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [65, 10.2, 0]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [65, 10.2, 18]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [80, 10.2, -18]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [80, 10.2, 0]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [80, 10.2, 18]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [95, 10.2, -18]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [95, 10.2, 0]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [95, 10.2, 18]
+intensity = 6000
+range_m = 22
+room = "chapelle"
+
+[[lights]]
+pos = [-96.5, 3.2, 5.33]
+intensity = 4200
+range_m = 14
+room = "entree_terrasse"
+
+[[lights]]
+pos = [-89.5, 3.2, 16]
+intensity = 4200
+range_m = 14
+room = "entree_terrasse"
+
+[[lights]]
+pos = [-82.5, 3.2, 26.67]
+intensity = 4200
+range_m = 14
+room = "entree_terrasse"
+
+[[lights]]
+pos = [-70.75, 7.2, 32]
+intensity = 4200
+range_m = 14
+room = "entree_terrasse"
+
+[[lights]]
+pos = [-55.62, 7.2, 32]
+intensity = 4200
+range_m = 14
+room = "entree_terrasse"
+
+[[lights]]
+pos = [-41.88, 7.2, 32]
+intensity = 4200
+range_m = 14
+room = "entree_terrasse"
+
+[[lights]]
+pos = [-94, 3.2, 3.5]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-82, 3.2, 7]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-74.5, 3.2, 6]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-69.5, 3.2, 0.75]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-62, 3.2, -3.5]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-54.5, 3.2, 0]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-45.5, 3.2, 3.5]
+intensity = 4200
+range_m = 14
+room = "entree_tunnel"
+
+[[lights]]
+pos = [-94, 3.2, -3.5]
+intensity = 4200
+range_m = 14
+room = "entree_ruines"
+
+[[lights]]
+pos = [-82, 3.2, -8.5]
+intensity = 4200
+range_m = 14
+room = "entree_ruines"
+
+[[lights]]
+pos = [-73, 3.2, -11]
+intensity = 4200
+range_m = 14
+room = "entree_ruines"
+
+[[lights]]
+pos = [-65, 3.2, -16]
+intensity = 4200
+range_m = 14
+room = "entree_ruines"
+
+[[lights]]
+pos = [-53, 3.2, -23.75]
+intensity = 4200
+range_m = 14
+room = "entree_ruines"
+
+[[lights]]
+pos = [-39, 3.2, -31.25]
+intensity = 4200
+range_m = 14
+room = "entree_ruines"
+
+[[lights]]
+pos = [-28.12, 7.2, 32]
+intensity = 4200
+range_m = 14
+room = "terrasse_cour"
+
+[[lights]]
+pos = [-14.38, 7.2, 32]
+intensity = 4200
+range_m = 14
+room = "terrasse_cour"
+
+[[lights]]
+pos = [-3.75, 7.2, 29]
+intensity = 4200
+range_m = 14
+room = "terrasse_cour"
+
+[[lights]]
+pos = [7.5, 5.2, 23]
+intensity = 4200
+range_m = 14
+room = "terrasse_cour"
+
+[[lights]]
+pos = [15, 5.2, 10]
+intensity = 4200
+range_m = 14
+room = "terrasse_cour"
+
+[[lights]]
+pos = [-38, 3.2, 0]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-32, 3.2, -3.5]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-25, 3.2, 0]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-18, 3.2, 3.5]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-10.5, 3.2, 4.25]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-7, 3.2, 2.5]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-3.5, 5.2, 0]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [7.5, 5.2, 0]
+intensity = 4200
+range_m = 14
+room = "tunnel_cour"
+
+[[lights]]
+pos = [-25.75, 3.2, -34.25]
+intensity = 4200
+range_m = 14
+room = "ruines_cour"
+
+[[lights]]
+pos = [-13.25, 3.2, -32.75]
+intensity = 4200
+range_m = 14
+room = "ruines_cour"
+
+[[lights]]
+pos = [-3.5, 5.2, -29]
+intensity = 4200
+range_m = 14
+room = "ruines_cour"
+
+[[lights]]
+pos = [7.5, 5.2, -24]
+intensity = 4200
+range_m = 14
+room = "ruines_cour"
+
+[[lights]]
+pos = [15, 5.2, -16]
+intensity = 4200
+range_m = 14
+room = "ruines_cour"
+
+[[lights]]
+pos = [22.5, 5.2, 0]
+intensity = 4200
+range_m = 14
+room = "cour_pont"
+
+[[lights]]
+pos = [32, 6.2, 0]
+intensity = 4200
+range_m = 14
+room = "cour_pont"
+
+[[lights]]
+pos = [39.5, 6.2, 0]
+intensity = 4200
+range_m = 14
+room = "cour_pont"
+
+[[lights]]
+pos = [49.5, 6.2, 0]
+intensity = 4200
+range_m = 14
+room = "pont_chapelle"
+
+[[lights]]
+pos = [55.75, 7.2, 0]
+intensity = 4200
+range_m = 14
+room = "pont_chapelle"
+
+[[lights]]
+pos = [61.25, 7.2, 0]
+intensity = 4200
+range_m = 14
+room = "pont_chapelle"
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# LA ROCHE — masse pleine entre les salles.
+# C'est elle qui rend le graphe physique : sans elle on coupe par le vide et
+# les routes ne servent à rien. Fusionnée en gros blocs (24 au lieu de ~4 500
+# cellules) pour ne pas noyer le moteur en entités.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [-88, 0, -53]
+size = [44, 12, 38]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-86, 0, 53]
+size = [48, 12, 38]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-70, 0, -25]
+size = [4, 12, 18]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-67, 0, 19]
+size = [10, 12, 22]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-35, 0, -9]
+size = [70, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-67, 0, -26]
+size = [2, 12, 16]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [22, 0, -66]
+size = [176, 12, 12]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-31, 0, 14]
+size = [62, 12, 12]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [24, 0, 58]
+size = [172, 12, 28]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-7, 0, 24]
+size = [2, 12, 8]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [51, 0, 39]
+size = [118, 12, 10]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-3, 0, -5]
+size = [6, 12, 6]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-3, 0, 7]
+size = [6, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-4, 0, 23]
+size = [4, 12, 6]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-2, 0, 4]
+size = [4, 12, 4]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [53, 0, 33]
+size = [114, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [-1, 0, 22]
+size = [2, 12, 4]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [54, 0, 31]
+size = [112, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [55, 0, 29]
+size = [110, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [56, 0, -44]
+size = [108, 12, 32]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [31, 0, 27]
+size = [54, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [32, 0, -27]
+size = [52, 12, 2]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [32, 0, -14]
+size = [4, 12, 24]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [32, 0, 14]
+size = [4, 12, 24]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [46, 0, -17]
+size = [24, 12, 18]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [46, 0, 17]
+size = [24, 12, 18]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [57, 0, -5]
+size = [2, 12, 6]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [57, 0, 5]
+size = [2, 12, 6]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [106, 0, 0]
+size = [8, 12, 56]
+role = "wall"
+section = "roche"
+
+[[blocks]]
+pos = [88, 4, 0]
+size = [28, 8, 2]
+role = "wall"
+section = "refend_chapelle"
+
+[[blocks]]
+pos = [-100, 0, -22]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-100, 0, -14]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-100, 0, 14]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-100, 0, 22]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-92, 0, -22]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-92, 0, -14]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-92, 0, 22]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-84, 0, -22]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-84, 0, -14]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-84, 0, 14]
+size = [2, 6, 2]
+role = "wall"
+section = "colonnade_entree"
+
+[[blocks]]
+pos = [-56, 0, -50]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-56, 0, -40]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-46, 0, -50]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-46, 0, -40]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-46, 0, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-36, 0, -50]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-36, 0, -40]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-36, 0, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-28, 0, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-18, 0, -40]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-18, 0, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-8, 0, -50]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-8, 0, -40]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [-8, 0, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_ruines"
+
+[[blocks]]
+pos = [66, 4, -10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [66, 4, 10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [76, 4, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [76, 4, -10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [76, 4, 10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [76, 4, 20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [84, 4, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [84, 4, -10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [84, 4, 10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [84, 4, 20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [94, 4, -20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [94, 4, -10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [94, 4, 10]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [94, 4, 20]
+size = [2, 8, 2]
+role = "wall"
+section = "colonnade_chapelle"
+
+[[blocks]]
+pos = [-62, 0, 4]
+size = [2, 4, 8]
+role = "wall"
+section = "chicane_tunnel"
+
+[[blocks]]
+pos = [-48, 0, -4]
+size = [2, 4, 8]
+role = "wall"
+section = "chicane_tunnel"
+
+[[blocks]]
+pos = [-32, 0, 4]
+size = [2, 4, 8]
+role = "wall"
+section = "chicane_tunnel"
+
+[[blocks]]
+pos = [-18, 0, -4]
+size = [2, 4, 8]
+role = "wall"
+section = "chicane_tunnel"
+
+[[blocks]]
+pos = [36, 0, 0]
+size = [2, 2, 2]
+role = "wall"
+section = "piles_pont"
+
+[[blocks]]
+pos = [44, 0, 0]
+size = [2, 2, 2]
+role = "wall"
+section = "piles_pont"
+
+[[blocks]]
+pos = [52, 0, 0]
+size = [2, 2, 2]
+role = "wall"
+section = "piles_pont"
+
+# ────────────────────────────────────────────────────────────────────────────
+# PLAFONDS DE COULOIR
+# Un couloir est une pièce à part entière : il se couvre et s'éclaire.
+# Hauteur libre 4 m — au-dessus du gabarit joueur plus le saut.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [-89.5, 4, 16]
+size = [38.28, 0.5, 5]
+yaw_deg = -56.73
+role = "ceiling"
+section = "plafond_entree_terrasse"
+
+[[blocks]]
+pos = [-70.75, 8, 32]
+size = [16.5, 0.5, 5]
+role = "ceiling"
+section = "plafond_entree_terrasse"
+
+[[blocks]]
+pos = [-48.75, 8, 32]
+size = [27.5, 0.5, 5]
+role = "ceiling"
+section = "plafond_entree_terrasse"
+
+[[blocks]]
+pos = [-94, 4, 3.5]
+size = [13.89, 0.5, 5]
+yaw_deg = -30.26
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-82, 4, 7]
+size = [12, 0.5, 5]
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-74.5, 4, 6]
+size = [3.61, 0.5, 5]
+yaw_deg = 33.69
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-69.5, 4, 0.75]
+size = [11.01, 0.5, 5]
+yaw_deg = 50.53
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-62, 4, -3.5]
+size = [8, 0.5, 5]
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-54.5, 4, 0]
+size = [9.9, 0.5, 5]
+yaw_deg = -45
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-45.5, 4, 3.5]
+size = [11, 0.5, 5]
+role = "ceiling"
+section = "plafond_entree_tunnel"
+
+[[blocks]]
+pos = [-94, 4, -3.5]
+size = [13.89, 0.5, 6]
+yaw_deg = 30.26
+role = "ceiling"
+section = "plafond_entree_ruines"
+
+[[blocks]]
+pos = [-82, 4, -8.5]
+size = [12.37, 0.5, 6]
+yaw_deg = 14.04
+role = "ceiling"
+section = "plafond_entree_ruines"
+
+[[blocks]]
+pos = [-73, 4, -11]
+size = [6.32, 0.5, 6]
+yaw_deg = 18.43
+role = "ceiling"
+section = "plafond_entree_ruines"
+
+[[blocks]]
+pos = [-65, 4, -16]
+size = [12.81, 0.5, 6]
+yaw_deg = 38.66
+role = "ceiling"
+section = "plafond_entree_ruines"
+
+[[blocks]]
+pos = [-46, 4, -27.5]
+size = [31.76, 0.5, 6]
+yaw_deg = 28.18
+role = "ceiling"
+section = "plafond_entree_ruines"
+
+[[blocks]]
+pos = [-21.25, 8, 32]
+size = [27.5, 0.5, 5]
+role = "ceiling"
+section = "plafond_terrasse_cour"
+
+[[blocks]]
+pos = [-3.75, 8, 29]
+size = [9.6, 0.5, 5]
+yaw_deg = 38.66
+role = "ceiling"
+section = "plafond_terrasse_cour"
+
+[[blocks]]
+pos = [7.5, 6, 23]
+size = [16.16, 0.5, 5]
+yaw_deg = 21.8
+role = "ceiling"
+section = "plafond_terrasse_cour"
+
+[[blocks]]
+pos = [15, 6, 10]
+size = [20, 0.5, 5]
+yaw_deg = 90
+role = "ceiling"
+section = "plafond_terrasse_cour"
+
+[[blocks]]
+pos = [-38, 4, 0]
+size = [8.06, 0.5, 5]
+yaw_deg = 60.26
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-32, 4, -3.5]
+size = [8, 0.5, 5]
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-25, 4, 0]
+size = [9.22, 0.5, 5]
+yaw_deg = -49.4
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-18, 4, 3.5]
+size = [8, 0.5, 5]
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-10.5, 4, 4.25]
+size = [7.16, 0.5, 5]
+yaw_deg = -12.09
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-7, 4, 2.5]
+size = [5, 0.5, 5]
+yaw_deg = 90
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-3.5, 6, 0]
+size = [7, 0.5, 5]
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [7.5, 6, 0]
+size = [15, 0.5, 5]
+role = "ceiling"
+section = "plafond_tunnel_cour"
+
+[[blocks]]
+pos = [-19.5, 4, -33.5]
+size = [25.18, 0.5, 5]
+yaw_deg = -6.84
+role = "ceiling"
+section = "plafond_ruines_cour"
+
+[[blocks]]
+pos = [-3.5, 6, -29]
+size = [9.22, 0.5, 5]
+yaw_deg = -40.6
+role = "ceiling"
+section = "plafond_ruines_cour"
+
+[[blocks]]
+pos = [7.5, 6, -24]
+size = [15.52, 0.5, 5]
+yaw_deg = -14.93
+role = "ceiling"
+section = "plafond_ruines_cour"
+
+[[blocks]]
+pos = [15, 6, -16]
+size = [12, 0.5, 5]
+yaw_deg = -90
+role = "ceiling"
+section = "plafond_ruines_cour"
+
+[[blocks]]
+pos = [22.5, 6, 0]
+size = [15, 0.5, 5]
+role = "ceiling"
+section = "plafond_cour_pont"
+
+[[blocks]]
+pos = [32, 7, 0]
+size = [4, 0.5, 5]
+role = "ceiling"
+section = "plafond_cour_pont"
+
+[[blocks]]
+pos = [39.5, 7, 0]
+size = [11, 0.5, 5]
+role = "ceiling"
+section = "plafond_cour_pont"
+
+[[blocks]]
+pos = [49.5, 7, 0]
+size = [9, 0.5, 5]
+role = "ceiling"
+section = "plafond_pont_chapelle"
+
+[[blocks]]
+pos = [55.75, 8, 0]
+size = [3.5, 0.5, 5]
+role = "ceiling"
+section = "plafond_pont_chapelle"
+
+[[blocks]]
+pos = [61.25, 8, 0]
+size = [7.5, 0.5, 5]
+role = "ceiling"
+section = "plafond_pont_chapelle"
+
+[[blocks]]
+pos = [-79, 3.98, 32]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_terrasse"
+
+[[blocks]]
+pos = [-62.5, 7.98, 32]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_terrasse"
+
+[[blocks]]
+pos = [-88, 3.98, 7]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_tunnel"
+
+[[blocks]]
+pos = [-76, 3.98, 7]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_tunnel"
+
+[[blocks]]
+pos = [-73, 3.98, 5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_tunnel"
+
+[[blocks]]
+pos = [-66, 3.98, -3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_tunnel"
+
+[[blocks]]
+pos = [-58, 3.98, -3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_tunnel"
+
+[[blocks]]
+pos = [-51, 3.98, 3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_entree_tunnel"
+
+[[blocks]]
+pos = [-88, 3.98, -7]
+size = [6, 0.5, 6]
+role = "ceiling"
+section = "coude_entree_ruines"
+
+[[blocks]]
+pos = [-76, 3.98, -10]
+size = [6, 0.5, 6]
+role = "ceiling"
+section = "coude_entree_ruines"
+
+[[blocks]]
+pos = [-70, 3.98, -12]
+size = [6, 0.5, 6]
+role = "ceiling"
+section = "coude_entree_ruines"
+
+[[blocks]]
+pos = [-60, 3.98, -20]
+size = [6, 0.5, 6]
+role = "ceiling"
+section = "coude_entree_ruines"
+
+[[blocks]]
+pos = [-7.5, 7.98, 32]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_terrasse_cour"
+
+[[blocks]]
+pos = [0, 5.98, 26]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_terrasse_cour"
+
+[[blocks]]
+pos = [15, 5.98, 20]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_terrasse_cour"
+
+[[blocks]]
+pos = [-36, 3.98, -3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [-28, 3.98, -3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [-22, 3.98, 3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [-14, 3.98, 3.5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [-7, 3.98, 5]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [-7, 3.98, 0]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [0, 5.98, 0]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_tunnel_cour"
+
+[[blocks]]
+pos = [-7, 3.98, -32]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_ruines_cour"
+
+[[blocks]]
+pos = [0, 5.98, -26]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_ruines_cour"
+
+[[blocks]]
+pos = [15, 5.98, -22]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_ruines_cour"
+
+[[blocks]]
+pos = [30, 5.98, 0]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_cour_pont"
+
+[[blocks]]
+pos = [34, 6.98, 0]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_cour_pont"
+
+[[blocks]]
+pos = [54, 6.98, 0]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_pont_chapelle"
+
+[[blocks]]
+pos = [57.5, 7.98, 0]
+size = [4, 0.5, 4]
+role = "ceiling"
+section = "coude_pont_chapelle"
+
+# ────────────────────────────────────────────────────────────────────────────
+# SOL, PLATEFORMES ET COUVERTURES (posés à la main, conservés)
+# Ces pièces portent l'intention de combat de chaque salle. La passe donjon
+# ne les touche pas : elle ajoute l'enveloppe autour.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[blocks]]
+pos = [0, -0.5, 0]
+size = [224, 0.5, 148]
+role = "floor"
+section = "sol"
+
+[[blocks]]
+pos = [-88, 0, 26]
+size = [5, 6, 5]
+role = "cover"
+section = "vestibule"
+
+[[blocks]]
+pos = [-88, 0, -26]
+size = [5, 6, 5]
+role = "cover"
+section = "vestibule"
+
+[[blocks]]
+pos = [-35, 0, 32]
+size = [55, 4, 22]
+role = "platform"
+section = "terrasse_haute"
+
+[[blocks]]
+pos = [-50, 4, 24]
+size = [5, 3, 3]
+role = "cover"
+section = "terrasse_haute"
+
+[[blocks]]
+pos = [-30, 4, 40]
+size = [5, 3, 3]
+role = "cover"
+section = "terrasse_haute"
+
+[[blocks]]
+pos = [-12, 4, 24]
+size = [5, 3, 3]
+role = "cover"
+section = "terrasse_haute"
+
+[[blocks]]
+pos = [-55, 0, -31]
+size = [7, 7, 7]
+role = "cover"
+section = "ruines_basses"
+
+[[blocks]]
+pos = [-31, 0, -40]
+size = [6, 8, 6]
+role = "cover"
+section = "ruines_basses"
+
+[[blocks]]
+pos = [-15, 0, -25]
+size = [8, 6, 5]
+role = "cover"
+section = "ruines_basses"
+
+[[blocks]]
+pos = [-24, 0, -50]
+size = [16, 3, 10]
+role = "platform"
+section = "recompense_basse"
+
+[[blocks]]
+pos = [15, 0, 0]
+size = [30, 2, 52]
+role = "platform"
+section = "cour_convergence"
+
+[[blocks]]
+pos = [8, 2, 16]
+size = [4, 6, 4]
+role = "cover"
+section = "cour_convergence"
+
+[[blocks]]
+pos = [8, 2, -16]
+size = [4, 6, 4]
+role = "cover"
+section = "cour_convergence"
+
+[[blocks]]
+pos = [23, 2, 12]
+size = [4, 6, 4]
+role = "cover"
+section = "cour_convergence"
+
+[[blocks]]
+pos = [23, 2, -12]
+size = [4, 6, 4]
+role = "cover"
+section = "cour_convergence"
+
+[[blocks]]
+pos = [45, 2, 0]
+size = [22, 1, 14]
+role = "platform"
+section = "pont_expose"
+
+[[blocks]]
+pos = [43, 3, -5]
+size = [3, 5, 3]
+role = "cover"
+section = "pont_expose"
+
+[[blocks]]
+pos = [50, 3, 5]
+size = [3, 5, 3]
+role = "cover"
+section = "pont_expose"
+
+[[blocks]]
+pos = [80, 0, 0]
+size = [45, 4, 54]
+role = "platform"
+section = "chapelle_finale"
+
+[[blocks]]
+pos = [68, 4, -17]
+size = [5, 7, 5]
+role = "cover"
+section = "chapelle_finale"
+
+[[blocks]]
+pos = [68, 4, 17]
+size = [5, 7, 5]
+role = "cover"
+section = "chapelle_finale"
+
+[[blocks]]
+pos = [91, 4, -16]
+size = [5, 7, 5]
+role = "cover"
+section = "chapelle_finale"
+
+[[blocks]]
+pos = [91, 4, 16]
+size = [5, 7, 5]
+role = "cover"
+section = "chapelle_finale"
+
+# ────────────────────────────────────────────────────────────────────────────
+# RAMPES — les liaisons verticales entre niveaux de salles.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[ramps]]
+from = [-79, 0, 32]
+to = [-62.5, 4, 32]
+width_m = 5
+section = "rampe_terrasse_entree"
+
+[[ramps]]
+from = [-7.5, 4, 32]
+to = [0, 2, 26]
+width_m = 5
+section = "rampe_terrasse_cour"
+
+[[ramps]]
+from = [-45, 0, -50]
+to = [-32, 3, -50]
+width_m = 4
+section = "rampe_recompense"
+
+[[ramps]]
+from = [-7, 0, 0]
+to = [0, 2, 0]
+width_m = 5
+section = "rampe_tunnel_cour"
+
+[[ramps]]
+from = [-7, 0, -32]
+to = [0, 2, -26]
+width_m = 5
+section = "rampe_ruines_cour"
+
+[[ramps]]
+from = [30, 2, 0]
+to = [34, 3, 0]
+width_m = 5
+section = "rampe_pont"
+
+[[ramps]]
+from = [54, 3, 0]
+to = [57.5, 4, 0]
+width_m = 5
+section = "rampe_chapelle"
+
+# ────────────────────────────────────────────────────────────────────────────
+# DISQUES — socle du boss.
+# ────────────────────────────────────────────────────────────────────────────
+
+[[discs]]
+pos = [80, 4, 0]
+radius_m = 10
+height_m = 1
+role = "perch"
+section = "socle_boss"

@@ -1,0 +1,58 @@
+[package]
+name = "forgia-mode-expedition"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Mode Expedition — charge une carte autoree sous Blender (cellules glTF + manifeste de gameplay), la peuple et la rend jouable. Premiere carte : « Le Vallon » (280 x 200 m)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+# Particules GPU : la trainee de pas et la braise de cape.
+bevy_hanabi = { workspace = true }
+bevy_rapier3d = { workspace = true }
+# La rivière : `StandardWaterMaterial` (profondeur, écume de berge, vagues).
+# On n'utilise PAS ses `WaterTiles` — elles sont un plan horizontal, et notre
+# rivière descend de 7,69 m. Seul le matériau nous sert. Le `WaterPlugin` qui
+# l'enregistre est déjà branché par `forgia_water::ForgiaWaterPlugin`.
+bevy_water = "0.18"
+forgia-core = { workspace = true }
+# La visée : le champ de vision se resserre sur la caméra d'épaule, et le buste
+# suit SON tangage — c'est elle qui dit où on regarde.
+forgia-camera-orbit = { workspace = true }
+# Le réticule : deux ressources dont AUCUN système de ce mode n'est écrivain, et
+# qui arrivent donc ici avec la valeur laissée par le mode précédent.
+forgia-crosshair = { workspace = true }
+# L'arme tenue en main : `EquippedWeapons` (laquelle), `WeaponType::genome_key`
+# (quel fichier), `MuzzleWorld` (où sort la balle à l'écran).
+forgia-combat = { workspace = true }
+# Le génome de l'arme en main est un asset `Genome<T>` — donc rechargé à chaud
+# pendant que le jeu tourne, ce qu'une lecture `def_io` au démarrage ne permet
+# pas. Une orientation d'arme dans un poing se règle à l'œil, en trois essais.
+forgia-genome-core = { workspace = true }
+# `forgia-ik` a été retiré ici le 2026-08-18. Son solveur `two_bone_ik` rend une
+# flexion ABSOLUE que le chemin de visée composait comme un delta — d'où les bras
+# en hélice. Il est remplacé par `visee::coude_vise`, qui travaille sur les
+# positions réelles des os. Le manifeste le déclarait encore, avec un commentaire
+# qui décrivait un solveur que le code n'appelle plus : deux fichiers qui se
+# contredisent, et c'est celui qu'on lit en premier qui mentait.
+# S'accroupir et glisser : lire l'action `Crouch` et le sprint.
+forgia-input = { workspace = true }
+leafwing-input-manager = { workspace = true }
+# Publier la cible des mains pour qu'on la VOIE (F3) à côté de la main. Une
+# mesure d'écart se cite ; une cible dessinée se comprend sans être lue.
+forgia-anim-debug = { workspace = true }
+# La cape : ses six os ne sont animes par AUCUN clip du corps. Le solveur
+# d'os-ressorts leur donne le retard qui fait un vetement.
+forgia-secondary-motion = { workspace = true }
+# Les campements : les archetypes d'ennemis, leur assemblage en quatre entites,
+# leur animation et leur hitbox de tete. Brique PARTAGEE avec l'Abime depuis le
+# 2026-08-18 — sans elle il aurait fallu recopier cinq pieges deja payes.
+forgia-enemy-archetypes = { workspace = true }
+forgia-player = { workspace = true }
+forgia-streaming = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

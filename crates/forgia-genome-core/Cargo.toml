@@ -1,0 +1,19 @@
+[package]
+name = "forgia-genome-core"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Genome TOML loader + hot-reload core (Forgia data-driven)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+
+# manifest module fused 2026-05-26 (forgia-manifest absorbed, was 0-consumer scaffold)
+

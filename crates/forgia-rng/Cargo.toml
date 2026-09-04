@@ -1,0 +1,11 @@
+[package]
+name = "forgia-rng"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Seeded deterministic RNG (xoshiro256++). Pure data, no Bevy dep."
+
+[lints]
+workspace = true
+
+[dependencies]

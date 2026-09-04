@@ -1,0 +1,90 @@
+# roguelite_enemies.toml — Stats des ennemis Roguelite (story-638, P0-1).
+#
+# Data-driven + hot-reload (poll mtime 1Hz) : édite ce fichier pendant que le jeu
+# tourne pour régler HP / vitesse / portées / dégâts SANS rebuild. Miroir exact des
+# `Default` Rust (enemies.rs) — si ce fichier disparaît ou est invalide, le jeu
+# retombe sur ces défauts (zéro régression). Prérequis du scaling de difficulté (P0-2).
+#
+# NB : le roster « forge » flavorful (Runt/Tireur/Brute/Forgeron Noir, format [[genes]])
+# est archivé dans docs/design/roster-forge-enemies-reference.toml — à adopter dans la
+# passe thème/roster (story future), pas ici. Ici = les archétypes runtime actuels.
+#
+# Champs : hp, speed (m/s), stop_distance / attack_range / detect_range (m),
+# attack_cooldown / warmup_secs (s), capsule_radius / capsule_half_height (m),
+# color_rgb / emissive_rgb (RGB linéaire), shoot_damage / shoot_range / shoot_jitter_deg.
+#
+# Story-652 — hitbox tête + capsules recalibrées sur les meshs KayKit MESURÉS :
+# la capsule body s'arrête aux ÉPAULES ; le crâne est couvert par une sphère tête
+# qui DÉPASSE de la capsule (sinon headshot impossible en raycast premier-hit) et
+# qui SUIT l'os `head` du rig animé. `head_radius` (m, optionnel) force le rayon de
+# cette sphère ; absent = auto (crâne mesuré 0.456 × échelle du squelette).
+# Généreux = headshots faciles (gamefeel) ; petit = précision exigeante.
+
+# Tank — front-line lent et costaud (rouge sombre).
+[tank]
+hp = 120.0
+speed = 2.8
+stop_distance = 3.0
+attack_range = 4.0
+detect_range = 22.0
+attack_cooldown = 1.8
+warmup_secs = 2.0
+capsule_radius = 0.55
+capsule_half_height = 0.43
+color_rgb = [0.55, 0.10, 0.10]
+emissive_rgb = [0.25, 0.03, 0.03]
+shoot_damage = 25.0
+shoot_range = 5.0
+shoot_jitter_deg = 6.0
+
+# Runner — rusher rapide et fragile (orange).
+[runner]
+hp = 35.0
+speed = 7.0
+stop_distance = 6.0
+attack_range = 7.0
+detect_range = 40.0
+attack_cooldown = 0.7
+warmup_secs = 1.2
+capsule_radius = 0.32
+capsule_half_height = 0.38
+color_rgb = [0.95, 0.45, 0.10]
+emissive_rgb = [0.40, 0.18, 0.04]
+shoot_damage = 8.0
+shoot_range = 8.0
+shoot_jitter_deg = 5.0
+
+# Sniper — back-line longue portée (violet).
+[sniper]
+hp = 45.0
+speed = 3.2
+stop_distance = 22.0
+attack_range = 24.0
+detect_range = 55.0
+attack_cooldown = 1.6
+warmup_secs = 1.8
+capsule_radius = 0.30
+capsule_half_height = 0.47
+color_rgb = [0.55, 0.20, 0.80]
+emissive_rgb = [0.22, 0.08, 0.35]
+shoot_damage = 18.0
+shoot_range = 28.0
+shoot_jitter_deg = 1.5
+
+# Boss — unique, tanky, 2 phases (enrage à 50% HP) (magenta). Silhouette géante via
+# skeleton_scale 2.5 (crâne à ~4.3 m) ; capsule = épaules, rayon large conservé.
+[boss]
+hp = 800.0
+speed = 3.5
+stop_distance = 10.0
+attack_range = 30.0
+detect_range = 80.0
+attack_cooldown = 1.3
+warmup_secs = 2.5
+capsule_radius = 1.4
+capsule_half_height = 0.35
+color_rgb = [0.90, 0.10, 0.50]
+emissive_rgb = [0.50, 0.05, 0.25]
+shoot_damage = 22.0
+shoot_range = 32.0
+shoot_jitter_deg = 3.0

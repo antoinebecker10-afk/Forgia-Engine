@@ -1,0 +1,23 @@
+# Tundra — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "tundra"
+name = "Tundra"
+display_name_fr = "Toundra"
+color = [0.68, 0.74, 0.78]       # = BiomeType::Tundra.color()
+roughness = 0.80
+preview_rgb = [209, 224, 235]
+spawn_weight = 1.0
+amplitude_mult = 0.85             # relief: collines douces
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 0.9
+speed_mult = 1.1
+dmg_mult = 1.0
+
+[road]
+width_mult = 0.9
+depression_mult = 1.2
+edge_noise = 1.0
+vegetation_encroachment = 0.0

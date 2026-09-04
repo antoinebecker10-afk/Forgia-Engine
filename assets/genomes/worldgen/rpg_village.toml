@@ -1,0 +1,35 @@
+# Village RPG — recette de la toolbox forgia-worldgen, posé sur le terrain RPG (story-578).
+#
+# Généré OnEnter(GameMode::Rpg) à (80, 80) monde, conformé au terrain via heightmap_at.
+# Hot-éditable : modifier ce fichier puis ressortir/rentrer en RPG régénère le village.
+# Échelle « village » : petit, peu d'étages, rues étroites.
+#
+# ⚠️ TOML : scalaires AVANT les tables [building] / [[landmarks]].
+
+seed = 42
+size = 72.0               # côté du village (m)
+base_angle_deg = 0.0      # orientation des rues
+radial_strength = 0.0     # 0 = grille ; >0 = rues en anneaux
+radial_radius = 30.0
+road_spacing = 14.0       # espacement des rues = taille des îlots (m) — resserré = plus dense
+road_step = 4.0
+road_sep = 6.0
+parcel_target_area = 70.0  # surface cible d'une parcelle (m²) — plus petit = plus de maisons
+parcel_inset = 2.0         # marge rue autour des îlots (m)
+building_scale = 0.55      # échelle des maisons
+landmark_reserve_radius = 10.0  # place réservée autour du monument central
+
+# Grammaire de maison : base au sol → 1-2 étages → toit (petit, village).
+[building]
+base_role = "Platform"
+body_role = "Pillar"
+cap_role = "Prop"
+min_floors = 1
+max_floors = 2
+
+# Monument central du village (puits / tour).
+[[landmarks]]
+module_id = "Cube.028"    # module vertical (~16 m natif → ~8 m à scale 0.5)
+x = 0.0
+z = 0.0
+scale = 0.5

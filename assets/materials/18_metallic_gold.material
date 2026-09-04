@@ -1,0 +1,7 @@
+# 18_metallic_gold.material — Renzora-format material stub.
+# Consumed by forgia-editor-material + forgia-render-* crates.
+# TODO: port node-graph from Renzora source.
+
+[meta]
+name = "18_metallic_gold"
+version = "0.1.0"

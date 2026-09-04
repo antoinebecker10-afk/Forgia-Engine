@@ -1,0 +1,474 @@
+# Story-529 — Boons Catalogue (Mission 2 GDD)
+#
+# Hot-reload via Shift+F12 (Bevy Asset). Schema mirroirs
+# forgia-rpg-data::boons::BoonsCatalogue.
+#
+# Champs:
+#   id                 : string stable (sert de key Rust `BoonId`)
+#   name               : nom affiché (FR cartoon kid-friendly)
+#   voiceline_preview  : ligne <5s, vocab CE2 (anti-canon bible v1)
+#   rarity             : "common" | "uncommon" | "rare" | "legendary"
+#   tags               : ["fire" | "ricochet" | "knockback" | "chain" | "precision" | "chaos"]
+#                        3 tags identiques pendant la run → légendaire correspondant unlock
+#   weapon_filter      : Optional [string] des weapon_id éligibles, omettre = tous
+#   effect.kind        : "damage_mul" | "heal_on_kill" | "fire_rate_mul"
+#                      | "chain_targets" | "knockback" | "damage_reduction"
+#                      | "flat_bonus"
+#
+# AC4 Mission 2.3 — 5 boons neutres minimum :
+#   1. Éclat d'âme nourrissant   (heal on kill, chaos)
+#   2. Métal chaud               (damage_mul, fire)
+#   3. Bénédiction de l'Enclume  (damage_reduction, precision)
+#   4. Souffle du Maître         (fire_rate_mul, chaos)
+#   5. Petit Champignon Lumineux (flat_bonus crit_chance, ricochet)
+#
+# AC2 — 1 boon par wave clear (3 stages × 3 waves = 9 occasions) + mid-boss.
+# AC5 — Légendaires d'exemple (1 par tag clé, unlockés via tag stack ≥3).
+#
+# Story-558 Phase 2 (2026-05-29) — souls_cost ajouté par boon.
+# Defaults rarity-based si omis : Common=20, Uncommon=40, Rare=60, Legendary=80.
+# Calibration drop economy : Tank=5, Sniper=3, Runner=2, Boss=40 souls.
+# Common pickable après ~4 Tank kills, Legendary après ~16 Tank + Boss.
+
+# ── Poids de tirage par rareté (R3.4, story-645) ────────────────────────
+# Un Common sort souvent, un Legendary est un ÉVÉNEMENT. Poids 0 = jamais tiré.
+# Hot-reload. Miroir de RarityWeights::default() (boons.rs).
+# ── LE SAC (2026-08-04) — la leçon de Dicero ────────────────────────────────
+# Nombre d'atouts DISTINCTS portables. C'est la seule chose qui transforme le
+# Coffre en arbitrage : sans plafond, tout ajout est gratuit, donc tout choix est
+# bon, donc aucun choix n'est intéressant.
+#
+# ⚠️ Le plafond porte sur les atouts DISTINCTS, pas sur le nombre de prises. Un
+# doublon AMÉLIORE ce qu'on porte déjà et ne consomme pas de place — c'est ce qui
+# empêche le pool de se diluer, et pourquoi le 8e coffre reste aussi intéressant
+# que le 1er.
+#
+# 6 places : assez pour composer une synergie (seuil légendaire = 3 tags
+# identiques) sans que tout tienne dans le sac. Dicero plafonne à 5.
+# 0 = illimité (désactive la mécanique, comportement d'avant).
+bag_slots = 6
+
+[rarity_weights]
+common = 100
+uncommon = 45
+rare = 18
+legendary = 6
+
+# ────────────────────────────────────────────────────────────────────────
+# Boons neutres (Common) — 5 minimum AC4
+# ────────────────────────────────────────────────────────────────────────
+
+[[entries]]
+id = "eclat_ame_nourrissant"
+name = "Éclat d'âme nourrissant"
+voiceline_preview = "Petite bouchée d'énergie ! Miam."
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 20
+effect = { kind = "heal_on_kill", hp = 5.0 }
+
+[[entries]]
+id = "metal_chaud"
+name = "Métal chaud"
+voiceline_preview = "Ça brûle ! Touche pas trop fort."
+rarity = "common"
+tags = ["fire"]
+souls_cost = 20
+effect = { kind = "damage_mul", factor = 1.15 }
+
+[[entries]]
+id = "benediction_enclume"
+name = "Bénédiction de l'Enclume"
+voiceline_preview = "L'Enclume veille sur toi."
+rarity = "common"
+tags = ["precision"]
+souls_cost = 25
+effect = { kind = "damage_reduction", factor = 0.10 }
+
+[[entries]]
+id = "souffle_du_maitre"
+name = "Souffle du Maître"
+voiceline_preview = "Respire fort ! Tape plus vite."
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 25
+effect = { kind = "fire_rate_mul", factor = 1.20 }
+
+[[entries]]
+id = "petit_champignon_lumineux"
+name = "Petit Champignon Lumineux"
+voiceline_preview = "Il brille, il guide tes coups."
+rarity = "common"
+tags = ["ricochet", "precision"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "crit_chance", amount = 0.10 }
+
+# ────────────────────────────────────────────────────────────────────────
+# Légendaires d'exemple (unlock via 3 tags identiques) — graines pour AC5
+# ────────────────────────────────────────────────────────────────────────
+
+[[entries]]
+id = "tornade_de_braise"
+name = "Tornade de Braise"
+voiceline_preview = "Tout brûle ! Recule, recule !"
+rarity = "legendary"
+tags = ["fire", "chaos"]
+souls_cost = 80
+effect = { kind = "damage_mul", factor = 1.75 }
+
+[[entries]]
+id = "oeil_de_lenoir"
+name = "Œil de Madame Lenoir"
+voiceline_preview = "Vise. Respire. Bang."
+rarity = "legendary"
+tags = ["precision"]
+souls_cost = 70
+effect = { kind = "flat_bonus", stat = "headshot_mul", amount = 0.50 }
+
+[[entries]]
+id = "ouragan_de_bourrasque"
+name = "Ouragan de Bourrasque"
+voiceline_preview = "Wouuush ! Ils valsent !"
+rarity = "legendary"
+tags = ["knockback", "chaos"]
+souls_cost = 70
+effect = { kind = "knockback", strength = 25.0 }
+
+[[entries]]
+id = "chaine_des_ames"
+name = "Chaîne des Âmes"
+voiceline_preview = "Ça saute partout ! Joli."
+rarity = "legendary"
+tags = ["chain", "ricochet"]
+souls_cost = 80
+effect = { kind = "chain_targets", count = 3 }
+
+# ────────────────────────────────────────────────────────────────────────
+# Story-558 P4 (2026-05-29) — extension catalogue 9 → 18 boons
+# Mark Brown GMT "Synergies are the Secret to StS's Fun" cite ~15 minimum
+# pour combinatoire intéressante. Mix Common+Uncommon+Legendary, tous tags
+# couverts pour favoriser synergies (audit §3).
+# ────────────────────────────────────────────────────────────────────────
+
+# ── Commons supplémentaires ──────────────────────────────────────────────
+
+[[entries]]
+id = "chaussons_du_lievre"
+name = "Chaussons du Lièvre"
+voiceline_preview = "Cours-cours-cours, petit !"
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 25
+# Phase 4c TODO — move_speed_mul demande wire forgia-player KCC. Pour l'instant
+# reformulé via fire_rate (aligné "vif" / "rapide", bible CE2 OK).
+effect = { kind = "fire_rate_mul", factor = 1.12 }
+
+[[entries]]
+id = "etincelle_vorace"
+name = "Étincelle Vorace"
+voiceline_preview = "Plus tu manges, plus tu brilles."
+rarity = "common"
+tags = ["fire", "chaos"]
+souls_cost = 25
+effect = { kind = "damage_mul", factor = 1.10 }
+
+[[entries]]
+id = "respiration_du_souffleur"
+name = "Respiration du Souffleur"
+voiceline_preview = "Souffle calme, tir précis."
+rarity = "common"
+tags = ["precision"]
+souls_cost = 20
+effect = { kind = "fire_rate_mul", factor = 1.10 }
+
+# ── Uncommons (rareté intermédiaire) ─────────────────────────────────────
+
+[[entries]]
+id = "marteau_du_charron"
+name = "Marteau du Charron"
+voiceline_preview = "Tape un grand coup !"
+rarity = "uncommon"
+tags = ["fire", "precision"]
+souls_cost = 40
+effect = { kind = "damage_mul", factor = 1.30 }
+
+[[entries]]
+id = "vent_du_nord"
+name = "Vent du Nord"
+voiceline_preview = "Tape, recule, respire."
+rarity = "uncommon"
+tags = ["knockback"]
+souls_cost = 40
+effect = { kind = "knockback", strength = 12.0 }
+
+[[entries]]
+id = "ecailles_de_la_loutre"
+name = "Écailles de la Loutre"
+voiceline_preview = "Tout glisse sur toi !"
+rarity = "uncommon"
+tags = ["precision"]
+souls_cost = 45
+effect = { kind = "damage_reduction", factor = 0.15 }
+
+# ── Rares (entre Uncommon et Legendary) ─────────────────────────────────
+
+[[entries]]
+id = "rebond_du_caillou"
+name = "Rebond du Caillou"
+voiceline_preview = "Hop-hop-hop ! Il rebondit."
+rarity = "rare"
+tags = ["chain", "ricochet"]
+souls_cost = 60
+effect = { kind = "chain_targets", count = 1 }
+
+[[entries]]
+id = "oeil_de_lynx"
+name = "Œil de Lynx"
+voiceline_preview = "Tu vois leur faiblesse."
+rarity = "rare"
+tags = ["precision"]
+souls_cost = 60
+effect = { kind = "flat_bonus", stat = "crit_chance", amount = 0.20 }
+
+# ── Legendary supplémentaire ─────────────────────────────────────────────
+
+[[entries]]
+id = "coeur_de_marteau"
+name = "Cœur du Marteau"
+voiceline_preview = "BAM. Tu es le marteau."
+rarity = "legendary"
+tags = ["fire", "precision", "chaos"]
+souls_cost = 90
+effect = { kind = "heal_on_kill", hp = 10.0 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Story-680 cran 5 — des atouts qui CHANGENT LA FAÇON DE JOUER
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# L'audit de progression : « cinq systèmes, un seul verbe — multiplier ». Sur les
+# 18 atouts d'origine, 14 étaient des statistiques et les 4 restants (2 Chaîne,
+# 2 Impact) étaient MORTS — `chain_extra_targets` et `knockback_strength` étaient
+# calculés et personne ne les lisait. Les deux exceptions ne fonctionnaient pas.
+#
+# Les deux mécaniques sont réparées (`chain.rs`, `combat_juice.rs`). On les peuple
+# maintenant — et SEULEMENT elles. Ajouter dix atouts « +X % dégâts » aurait
+# multiplié le même non-choix ; ce qu'il manquait, ce sont des décisions.
+#
+# Ces atouts se répondent : la Chaîne récompense de tirer AU MILIEU du groupe,
+# l'Impact récompense de le DISPERSER. Les jouer ensemble demande d'arbitrer,
+# pas d'empiler.
+
+# ── Chaîne (le placement devient une décision) ──────────────────────────────
+
+[[entries]]
+id = "arc_jumeau"
+name = "Arc Jumeau"
+voiceline_preview = "Une balle, deux ennuis."
+rarity = "uncommon"
+tags = ["chain", "precision"]
+souls_cost = 45
+effect = { kind = "chain_targets", count = 1 }
+
+[[entries]]
+id = "orage_de_forge"
+name = "Orage de Forge"
+voiceline_preview = "Ça saute partout !"
+rarity = "rare"
+tags = ["chain", "chaos"]
+souls_cost = 65
+effect = { kind = "chain_targets", count = 2 }
+
+[[entries]]
+id = "fil_rouge"
+name = "Fil Rouge"
+voiceline_preview = "Ils sont tous reliés."
+rarity = "uncommon"
+tags = ["chain", "fire"]
+souls_cost = 45
+effect = { kind = "chain_targets", count = 1 }
+
+# ── Impact (disperser le groupe, gagner de l'espace) ────────────────────────
+
+[[entries]]
+id = "coup_de_bourrasque"
+name = "Coup de Bourrasque"
+voiceline_preview = "Pousse-toi de là."
+rarity = "common"
+tags = ["knockback"]
+souls_cost = 25
+effect = { kind = "knockback", strength = 0.5 }
+
+[[entries]]
+id = "enclume_volante"
+name = "Enclume Volante"
+voiceline_preview = "Envole-toi !"
+rarity = "rare"
+tags = ["knockback", "chaos"]
+souls_cost = 60
+effect = { kind = "knockback", strength = 1.2 }
+
+[[entries]]
+id = "revers_du_forgeron"
+name = "Revers du Forgeron"
+voiceline_preview = "Recule, toi."
+rarity = "uncommon"
+tags = ["knockback", "precision"]
+souls_cost = 40
+effect = { kind = "knockback", strength = 0.8 }
+
+# ── Légendaires de synergie (débloqués à 3 tags identiques) ─────────────────
+# Le mécanisme « 3 tags → légendaire » n'avait de légendaire que pour certains
+# tags. `chain` et `knockback` n'en avaient AUCUN : construire ces synergies ne
+# menait nulle part, ce qui les rendait sans objet.
+
+[[entries]]
+id = "chaine_sans_fin"
+name = "Chaîne sans Fin"
+voiceline_preview = "Ça ne s'arrête plus."
+rarity = "legendary"
+tags = ["chain"]
+souls_cost = 90
+effect = { kind = "chain_targets", count = 3 }
+
+[[entries]]
+id = "marteau_du_ciel"
+name = "Marteau du Ciel"
+voiceline_preview = "Tout le monde dehors !"
+rarity = "legendary"
+tags = ["knockback"]
+souls_cost = 90
+effect = { kind = "knockback", strength = 2.0 }
+
+# ── Ricochet : le tag existait sans mécanique ───────────────────────────────
+# Le tag `ricochet` n'avait que 2 atouts tirables — sa synergie (3 requis) était
+# INATTEIGNABLE, donc le jeu promettait une combinaison impossible à construire.
+# Et il n'existe aucun effet « ricochet » dans le moteur : le tag nommait une
+# fantaisie que rien ne livrait.
+#
+# Or un ricochet, mécaniquement, c'est une balle qui rebondit sur un autre
+# ennemi — c'est-à-dire exactement `chain_targets`. On lui donne donc la
+# mécanique de la chaîne : le tag cesse d'être décoratif, et la synergie devient
+# atteignable. (Trouvé par le test `every_promised_synergy_is_reachable`.)
+
+[[entries]]
+id = "galet_du_ruisseau"
+name = "Galet du Ruisseau"
+voiceline_preview = "Plouf, plouf, plouf."
+rarity = "common"
+tags = ["ricochet"]
+souls_cost = 25
+effect = { kind = "chain_targets", count = 1 }
+
+[[entries]]
+id = "pierre_qui_danse"
+name = "Pierre qui Danse"
+voiceline_preview = "Elle ne s'arrête jamais."
+rarity = "uncommon"
+tags = ["ricochet", "chaos"]
+souls_cost = 45
+effect = { kind = "chain_targets", count = 1 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FAMILLE « ENTRETIEN » (2026-08-04) — les atouts qui RENFORCENT le pilier
+#
+# Toutes les armes sont vivantes et le choix vient de l'ennemi (matchup
+# élémentaire, jusqu'à ×2,0). Un atout qui buffe UNE arme casse ce pilier : il
+# bat le bon matchup partout et le joueur cesse de changer d'arme.
+#
+# Ceux-ci ne buffent aucune arme. Ils allongent le temps qu'on peut passer sur
+# LA BONNE — c'est le moteur de DOOM Eternal, où la rareté des munitions FORCE
+# la rotation. Ils sont donc la seule famille d'atouts d'arme qui serve le
+# pilier au lieu de l'éroder.
+#
+# ⚠️ Dosés MODESTEMENT et fréquents, jamais rares et énormes : en donner trop
+# supprime la rotation au lieu de la servir. Il y a un optimum, pas une
+# monotonie.
+#
+# `flat_bonus` additif : deux atouts +25 % donnent +50 %, pas ×1,56. Plus
+# lisible, et une pile de doublons n'explose pas.
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[entries]]
+id = "mains_promptes"
+name = "Mains Promptes"
+voiceline_preview = "Tes doigts vont plus vite que ta tête !"
+rarity = "common"
+tags = ["precision"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "reload_speed", amount = 0.25 }
+
+[[entries]]
+id = "poches_profondes"
+name = "Poches Profondes"
+voiceline_preview = "Y'en a encore plein là-dedans."
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "mag_size", amount = 0.20 }
+
+[[entries]]
+id = "gestes_du_forgeron"
+name = "Gestes du Forgeron"
+voiceline_preview = "Recharge comme on bat le fer : sans regarder."
+rarity = "uncommon"
+tags = ["precision", "fire"]
+souls_cost = 40
+effect = { kind = "flat_bonus", stat = "reload_speed", amount = 0.45 }
+
+[[entries]]
+id = "besace_sans_fond"
+name = "Besace sans Fond"
+voiceline_preview = "Elle pèse rien et elle est jamais vide."
+rarity = "uncommon"
+tags = ["chaos", "ricochet"]
+souls_cost = 40
+effect = { kind = "flat_bonus", stat = "mag_size", amount = 0.40 }
+
+# ── FAMILLE « CORPS » — neutre pour le pilier, axe de build indépendant ──────
+# Elle n'attache rien à une arme, donc elle ne crée aucune raison d'en préférer
+# une. C'est ce qui la rend sûre.
+#
+# ⚠️ PAS de double saut ici. Les bots n'ont ni navmesh ni gravité : un joueur qui
+# saute plus haut devient inatteignable (spawn-clearance.md §5). Ce n'est pas un
+# atout, c'est un chantier IA.
+
+[[entries]]
+id = "pas_du_furet"
+name = "Pas du Furet"
+voiceline_preview = "Tes jambes ont décidé d'aller plus vite."
+rarity = "common"
+tags = ["chaos"]
+souls_cost = 20
+effect = { kind = "flat_bonus", stat = "move_speed", amount = 0.10 }
+
+[[entries]]
+id = "souffle_du_coureur"
+name = "Souffle du Coureur"
+voiceline_preview = "Tu ne t'arrêtes plus. Jamais."
+rarity = "uncommon"
+tags = ["chaos", "precision"]
+souls_cost = 40
+effect = { kind = "flat_bonus", stat = "move_speed", amount = 0.18 }
+
+# ── FAMILLE « RÉCOLTE » — à doser BAS ───────────────────────────────────────
+# Elle se multiplie avec elle-même : plus d'Âmes achète plus d'atouts, qui
+# rapportent plus d'Âmes. C'est le snowball classique — d'où des valeurs basses
+# et une rareté élevée, contrairement à l'entretien qui est fréquent et modeste.
+
+[[entries]]
+id = "doigts_crochus"
+name = "Doigts Crochus"
+voiceline_preview = "Tout ce qui traîne finit dans ta poche."
+rarity = "uncommon"
+tags = ["ricochet"]
+souls_cost = 45
+effect = { kind = "flat_bonus", stat = "loot_gain", amount = 0.20 }
+
+[[entries]]
+id = "appetit_de_lenclume"
+name = "Appétit de l'Enclume"
+voiceline_preview = "L'Enclume a faim, et elle mange bien."
+rarity = "rare"
+tags = ["chaos", "fire"]
+souls_cost = 65
+effect = { kind = "flat_bonus", stat = "loot_gain", amount = 0.35 }

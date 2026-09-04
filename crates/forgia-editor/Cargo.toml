@@ -1,0 +1,20 @@
+[package]
+name = "forgia-editor"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "In-game scene editor (props: select / transform / library / snap / persist)"
+
+[lints]
+workspace = true
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }
+forgia-input = { workspace = true }
+forgia-player = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

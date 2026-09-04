@@ -1,0 +1,352 @@
+id = "roguelite_weapons"
+name = "Roguelite Talking Weapons MVP"
+domain = "Weapon"
+category = "Weapon"
+description = "4 armes parlantes MVP : Pépin (pistolet timide), Bourrasque (SMG vent extraverti), Madame Lenoir (sniper snob), Boucherie (shotgun butcher brutal). Hook : chaque arme = personnage + gimmick mécanique unique."
+version = "0.1.0"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ PÉPIN — pistolet apprenti timide, gimmick = ricochet         ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "pepin_damage"
+label = "Pépin damage"
+chromosome = "Ballistics"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 18.0
+layer = "pepin"
+
+[[genes]]
+id = "pepin_fire_rate"
+label = "Pépin fire rate (s between shots)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.05
+max = 1.0
+default = 0.25
+layer = "pepin"
+
+[[genes]]
+id = "pepin_range"
+label = "Pépin effective range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 40.0
+layer = "pepin"
+
+[[genes]]
+id = "pepin_mag_size"
+label = "Pépin magazine size"
+chromosome = "Ammo"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 12.0
+layer = "pepin"
+
+[[genes]]
+id = "pepin_reload_sec"
+label = "Pépin reload time"
+chromosome = "Ammo"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.4
+layer = "pepin"
+
+[[genes]]
+id = "pepin_gimmick_ricochet_count"
+label = "Pépin gimmick: max ricochets per shot"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 2.0
+layer = "pepin"
+
+[[genes]]
+id = "pepin_gimmick_ricochet_dmg_decay"
+label = "Pépin damage retained per ricochet (0.7 = -30%)"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "pepin"
+
+[[genes]]
+id = "pepin_gimmick_ricochet_max_dist_m"
+label = "Pépin max distance to ricochet target"
+chromosome = "Gimmick"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 8.0
+layer = "pepin"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ BOURRASQUE — SMG vent extravertie, gimmick = multi-burst     ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "bourrasque_damage"
+label = "Bourrasque damage per pellet"
+chromosome = "Ballistics"
+target = "Value"
+min = 3.0
+max = 20.0
+default = 7.0
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_fire_rate"
+label = "Bourrasque fire rate (s between bursts)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.35
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_range"
+label = "Bourrasque effective range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 5.0
+max = 60.0
+default = 22.0
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_mag_size"
+label = "Bourrasque magazine size"
+chromosome = "Ammo"
+target = "Value"
+min = 10.0
+max = 60.0
+default = 30.0
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_reload_sec"
+label = "Bourrasque reload time"
+chromosome = "Ammo"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.8
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_gimmick_pellets_per_burst"
+label = "Bourrasque gimmick: pellets per burst (wind gust)"
+chromosome = "Gimmick"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 4.0
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_gimmick_burst_spread_deg"
+label = "Bourrasque burst spread (degrees)"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.5
+max = 15.0
+default = 4.0
+layer = "bourrasque"
+
+[[genes]]
+id = "bourrasque_gimmick_knockback_n"
+label = "Bourrasque target knockback force (newtons)"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.0
+max = 500.0
+default = 120.0
+layer = "bourrasque"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ MADAME LENOIR — sniper aristo snob, gimmick = lifesteal      ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "lenoir_damage"
+label = "Lenoir damage"
+chromosome = "Ballistics"
+target = "Value"
+min = 30.0
+max = 200.0
+default = 90.0
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_fire_rate"
+label = "Lenoir fire rate (s between shots)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.2
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_range"
+label = "Lenoir effective range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 30.0
+max = 300.0
+default = 150.0
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_mag_size"
+label = "Lenoir magazine size"
+chromosome = "Ammo"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 5.0
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_reload_sec"
+label = "Lenoir reload time"
+chromosome = "Ammo"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 2.8
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_gimmick_lifesteal_pct"
+label = "Lenoir gimmick: lifesteal % of damage dealt"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.20
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_gimmick_headshot_mult"
+label = "Lenoir headshot multiplier"
+chromosome = "Gimmick"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.5
+layer = "lenoir"
+
+[[genes]]
+id = "lenoir_gimmick_scope_zoom_fov_deg"
+label = "Lenoir scoped FOV (sniper)"
+chromosome = "Gimmick"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 12.0
+layer = "lenoir"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ BOUCHERIE — shotgun butcher brutal, gimmick = pump cleave    ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[genes]]
+id = "boucherie_damage"
+label = "Boucherie damage per pellet"
+chromosome = "Ballistics"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 14.0
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_fire_rate"
+label = "Boucherie fire rate (s between pumps)"
+chromosome = "Ballistics"
+target = "Value"
+min = 0.4
+max = 2.0
+default = 0.85
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_range"
+label = "Boucherie effective range (m)"
+chromosome = "Ballistics"
+target = "Value"
+min = 3.0
+max = 25.0
+default = 10.0
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_mag_size"
+label = "Boucherie magazine size (shells)"
+chromosome = "Ammo"
+target = "Value"
+min = 2.0
+max = 10.0
+default = 6.0
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_reload_sec"
+label = "Boucherie reload time per shell (pump-action)"
+chromosome = "Ammo"
+target = "Value"
+min = 0.3
+max = 1.5
+default = 0.6
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_gimmick_pellet_count"
+label = "Boucherie pellets per shell"
+chromosome = "Gimmick"
+target = "Value"
+min = 4.0
+max = 16.0
+default = 9.0
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_gimmick_spread_deg"
+label = "Boucherie shell spread (degrees)"
+chromosome = "Gimmick"
+target = "Value"
+min = 3.0
+max = 25.0
+default = 10.0
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_gimmick_cleave_radius_m"
+label = "Boucherie point-blank cleave radius (gore splash)"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 2.0
+layer = "boucherie"
+
+[[genes]]
+id = "boucherie_gimmick_cleave_dmg_pct"
+label = "Boucherie cleave damage % to AoE targets"
+chromosome = "Gimmick"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.40
+layer = "boucherie"

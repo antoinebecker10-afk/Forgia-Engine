@@ -1,0 +1,60 @@
+# Forgia V2 — Portes de l'enceinte (story-703)
+#
+# L'arène est une enceinte hexagonale. On la PERCE de trois portes, dans trois
+# directions opposées, par lesquelles les packs entrent. C'est tout.
+#
+# ⚠️ Il n'y a NI atrium, NI cloison intérieure. Une première version en posait,
+# et elle a enfermé le joueur : le tank et le boss apparaissent à 12 m
+# (`roguelite_waves.toml [ring]`), donc dans l'anneau central, avec lui —
+# « Player died » 18 s après le spawn de la vague, deux fois de suite.
+#
+# La seule cage, pour le joueur COMME pour les ennemis, est l'enceinte.
+#
+# ⚠️ AUCUNE valeur ici n'est libre : chacune est soit une conséquence chiffrée,
+# soit un curseur de difficulté assumé. Si un nombre ne se rattache à rien,
+# c'est un défaut — il doit se lire comme une dérivation.
+
+[sectors]
+
+# Interrupteur maître. À `false`, l'enceinte reste pleine et l'arène est
+# exactement ce qu'elle était. Ce n'est pas une commodité : c'est le repli qui
+# rend un changement de géométrie livrable sans risque — et il a servi.
+enabled = true
+
+# Nombre de portes. 3 = « trois directions opposées ».
+#
+# L'enceinte est un hexagone, dont les milieux de faces tombent à 0°, 60°, 120°,
+# 180°, 240° et 300°. Trois portes à 120° sont donc exactement UNE FACE SUR
+# DEUX, et elles s'alignent d'elles-mêmes sur les axes de parts. La géométrie du
+# kit a donné la réponse ; on ne l'a pas choisie.
+#
+# Borné à 6 : au-delà, deux parts se disputeraient la même face, et l'une
+# n'aurait pas de porte du tout — son pack resterait dehors, en silence.
+count = 3
+
+# Rayon d'agent qui DIMENSIONNE les portes (m). 1,40 = le boss, le plus gros du
+# jeu (`roguelite_enemies.toml`). La largeur utile en découle : 4 × ce rayon,
+# soit 5,60 m.
+#
+# NE PAS mettre 2 × : le maillage rétrécit les obstacles du rayon d'agent, donc
+# une porte de 2r a un couloir navigable de largeur NULLE — infranchissable par
+# construction, pas par malchance.
+#
+# En pratique l'ouverture réelle est plus large : on retire des modules de mur
+# ENTIERS (4,00 m mesurés pour `kaykit_dungeon`), ce qui donne 8,00 m utiles sur
+# une face de 80 m. L'approximation ouvre toujours PLUS que le nominal, jamais
+# moins — le bon sens d'erreur.
+door_agent_radius_m = 1.40
+
+# Débordement de l'aggro sur CHAQUE part voisine, en fraction de part.
+#
+# ★ CURSEUR DE DIFFICULTÉ À PART ENTIÈRE. À 0,25 sur des parts de 120°, le cône
+# d'un pack couvre 120 + 2×30 = 180°. Conséquence MESURÉE par
+# `la_poche_sure_retrecit_a_chaque_porte_ouverte` :
+#
+#   1 porte ouverte → 180° sûrs · 2 portes → 61° · 3 portes → 0°
+#
+# La poche est donc divisée par ~3 à chaque porte, puis disparaît. Plus large =
+# plus dur. (La story annonçait 120/60/0 « divisé par deux » : c'était faux des
+# deux côtés, le test l'a corrigée.)
+aggro_sector_spill_frac = 0.25

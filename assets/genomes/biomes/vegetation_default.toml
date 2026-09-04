@@ -1,0 +1,307 @@
+id = "vegetation_default"
+name = "Vegetation Default"
+domain = "Vegetation"
+category = "Custom"
+description = "Procedural vegetation: density, spacing, scale, categories by biome"
+version = "1.0.0"
+
+[[genes]]
+id = "veg_density_global"
+label = "Global Density"
+chromosome = "Density"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.8
+layer = "density"
+
+[[genes]]
+id = "veg_per_chunk"
+label = "Per Chunk"
+chromosome = "Density"
+target = "Value"
+min = 10.0
+max = 100.0
+default = 70.0
+layer = "density"
+
+# Total vegetation cap (base) — multiplied by graphics_settings.vegetation_density.
+# Pre-M7 W3 : 3500 (multi-primitive GLB blow up x3-4, safe under entity_budget 15000).
+# Post-M7 W3 : raise to 30000+ once GPU instance buffer lands (story-348).
+# Hot-reloadable via Shift+F12 for stress tests.
+[[genes]]
+id = "veg_max_total_base"
+label = "Vegetation total base cap"
+chromosome = "Density"
+target = "Value"
+min = 1500.0
+max = 50000.0
+default = 3500.0
+layer = "density"
+
+[[genes]]
+id = "veg_min_spacing"
+label = "Min Spacing"
+chromosome = "Placement"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 2.0
+layer = "placement"
+
+[[genes]]
+id = "veg_scale_min"
+label = "Scale Min"
+chromosome = "Scale"
+target = "Value"
+min = 0.3
+max = 3.0
+default = 1.2
+layer = "scale"
+
+[[genes]]
+id = "veg_scale_max"
+label = "Scale Max"
+chromosome = "Scale"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.5
+layer = "scale"
+
+[[genes]]
+id = "veg_tree_ratio"
+label = "Tree Ratio"
+chromosome = "Categories"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "categories"
+
+[[genes]]
+id = "veg_bush_ratio"
+label = "Bush Ratio"
+chromosome = "Categories"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "categories"
+
+[[genes]]
+id = "veg_ground_ratio"
+label = "Ground Cover Ratio"
+chromosome = "Categories"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "categories"
+
+[[genes]]
+id = "veg_accent_ratio"
+label = "Accent Ratio"
+chromosome = "Categories"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.1
+layer = "categories"
+
+# === Wind Animation (GPU vertex shader) ===
+[[genes]]
+id = "veg_wind_amplitude"
+label = "Wind Sway Amplitude"
+chromosome = "Wind"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.5
+layer = "wind"
+
+[[genes]]
+id = "veg_wind_frequency"
+label = "Wind Sway Frequency"
+chromosome = "Wind"
+target = "Value"
+min = 0.5
+max = 5.0
+default = 1.5
+layer = "wind"
+
+[[genes]]
+id = "veg_wind_gust_strength"
+label = "Gust Strength"
+chromosome = "Wind"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 0.8
+layer = "wind"
+
+[[genes]]
+id = "veg_wind_gust_frequency"
+label = "Gust Frequency"
+chromosome = "Wind"
+target = "Value"
+min = 0.01
+max = 0.5
+default = 0.1
+layer = "wind"
+
+# === Procedural Vegetation (L-system inspired) ===
+[[genes]]
+id = "veg_proc_enabled"
+label = "Procedural Trees Enabled"
+chromosome = "Procedural"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "procedural"
+
+[[genes]]
+id = "veg_proc_branch_angle"
+label = "Branch Angle (deg)"
+chromosome = "Procedural"
+target = "Value"
+min = 15.0
+max = 60.0
+default = 30.0
+layer = "procedural"
+
+[[genes]]
+id = "veg_proc_branch_length_ratio"
+label = "Branch Length Decay"
+chromosome = "Procedural"
+target = "Value"
+min = 0.4
+max = 0.9
+default = 0.7
+layer = "procedural"
+
+[[genes]]
+id = "veg_proc_iterations"
+label = "L-system Depth"
+chromosome = "Procedural"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 4.0
+layer = "procedural"
+
+[[genes]]
+id = "veg_proc_trunk_radius"
+label = "Trunk Radius"
+chromosome = "Procedural"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.3
+layer = "procedural"
+
+[[genes]]
+id = "veg_proc_leaf_density"
+label = "Leaf Density"
+chromosome = "Procedural"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 1.0
+layer = "procedural"
+
+# === Per-Category Cull Distances (Vague 4 — story-412) ===
+# Accent cull etait le seul hardcode dans `PlacementCategory::cull_distances_*`,
+# les autres categories (Tree/Bush/Ground) utilisaient deja FpsTuning. Asymetrie
+# casse vague 4. `show <= hide` invariant force par constraint.
+[[genes]]
+id = "veg_accent_cull_hide"
+label = "Accent Cull Hide"
+chromosome = "Performance"
+target = "Value"
+min = 50.0
+max = 400.0
+default = 150.0
+layer = "performance"
+
+[[genes]]
+id = "veg_accent_cull_show"
+label = "Accent Cull Show"
+chromosome = "Performance"
+target = "Value"
+min = 30.0
+max = 380.0
+default = 135.0
+layer = "performance"
+
+# === Per-Category Max Slope (Vague 4) ===
+# Hardcodes elimines dans `PlacementCategory::max_slope_deg()`. Slope max =
+# pente maximale (degres) au-dessus de laquelle un asset de cette categorie
+# n'est plus place.
+[[genes]]
+id = "veg_tree_max_slope"
+label = "Tree Max Slope (deg)"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 90.0
+default = 35.0
+layer = "placement"
+
+[[genes]]
+id = "veg_bush_max_slope"
+label = "Bush Max Slope (deg)"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 90.0
+default = 45.0
+layer = "placement"
+
+[[genes]]
+id = "veg_ground_max_slope"
+label = "Ground Cover Max Slope (deg)"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 90.0
+default = 60.0
+layer = "placement"
+
+[[genes]]
+id = "veg_accent_max_slope"
+label = "Accent Max Slope (deg)"
+chromosome = "Placement"
+target = "Value"
+min = 0.0
+max = 90.0
+default = 30.0
+layer = "placement"
+
+# Constraints
+[[constraints]]
+source = "veg_density_global"
+target = "veg_per_chunk"
+ratio = 30.0
+
+# V4 hysteresis : show <= hide (anti-flicker)
+[[constraints]]
+source = "veg_accent_cull_show"
+target = "veg_accent_cull_hide"
+ratio = 1.0
+
+[[constraints]]
+source = "veg_per_chunk"
+target = "veg_max_total_base"
+ratio = 16.0
+
+[[constraints]]
+source = "veg_scale_min"
+target = "veg_min_spacing"
+ratio = 2.0
+
+[[constraints]]
+source = "veg_proc_iterations"
+target = "veg_proc_branch_angle"
+ratio = -3.0

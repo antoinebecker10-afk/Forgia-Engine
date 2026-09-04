@@ -1,0 +1,123 @@
+# roguelite_meta_shop.toml — Story-591. L'Enclume des Âmes (méta-progression).
+# Miroir EXACT de MetaShopCatalogue::default() (meta_shop.rs). Chargé au boot.
+#
+# effect : max_hp | damage_mul | damage_reduction | start_gold
+#
+# ─── Story-680 cran 2 : les FACES exclusives (modèle Miroir de Nuit d'Hades) ───
+# Chaque ligne a deux visages et UN SEUL est actif. Les rangs achetés sont
+# CONSERVÉS quand on permute : on choisit ce qu'ils font, pas combien on en a.
+# La permutation est gratuite et réversible — punir le changement d'avis
+# transforme un choix en peur, et une peur n'est pas une décision.
+#
+# `[upgrades.alt]` doit venir APRÈS `costs` : en TOML, une table avale tout ce
+# qui la suit dans la section.
+# amount : valeur ajoutée PAR RANG (cumul). costs : coût par rang (len = rang max).
+
+[[upgrades]]
+id = "max_hp"
+name = "Vitalité"
+desc = "+15 PV max"
+effect = "max_hp"
+amount = 15.0
+costs = [20, 40, 70, 110, 160]
+# Encaisser plus, ou encaisser mieux ? Les PV rendent les gros coups
+# survivables, la réduction rend l'attrition supportable.
+[upgrades.alt]
+name = "Cuirasse"
+desc = "+4 % de réduction de dégâts (au lieu des PV)"
+effect = "damage_reduction"
+amount = 0.04
+
+[[upgrades]]
+id = "damage"
+name = "Puissance"
+desc = "+8% dégâts"
+effect = "damage_mul"
+amount = 0.08
+costs = [25, 50, 85, 130, 190]
+# Frapper plus fort, ou partir plus riche ? La puissance paie tout de suite,
+# l'Or paie en Trempe et en achats — plus fort, mais plus tard.
+[upgrades.alt]
+name = "Fortune"
+desc = "+45 Or de départ (au lieu des dégâts)"
+effect = "start_gold"
+amount = 45.0
+
+[[upgrades]]
+id = "armor"
+name = "Armure"
+desc = "+5% réduction de dégâts"
+effect = "damage_reduction"
+amount = 0.05
+costs = [30, 60, 100, 150]
+# L'armure protège de tout un peu ; les PV donnent une marge brute que rien
+# ne perce.
+[upgrades.alt]
+name = "Endurance"
+desc = "+12 PV max (au lieu de la réduction)"
+effect = "max_hp"
+amount = 12.0
+
+[[upgrades]]
+id = "gold"
+name = "Pactole"
+desc = "+50 Or de départ"
+effect = "start_gold"
+amount = 50.0
+costs = [15, 35, 60]
+# Commencer riche, ou commencer fort ?
+[upgrades.alt]
+name = "Étincelle"
+desc = "+6 % de dégâts (au lieu de l'Or)"
+effect = "damage_mul"
+amount = 0.06
+
+# ── Maîtrise d'arme (progression permanente par arme) ──
+# L'arme équipée gagne +1 niveau à CHAQUE run terminée (victoire OU défaite).
+# Le bonus s'applique par niveau AU-DESSUS de 1 : au plafond il vaut
+# (max_level - 1) × damage_per_level. Ici 5 × 0.04 = +20 %.
+# SANS plafond, +4 %/run non borné finit par annuler le scaling ennemi
+# (+35 % PV/salle) et rend la courbe de difficulté intenable.
+[mastery]
+# Niveau maximum par arme. Borné 1..=20 par le code (au-delà = ramené + warn).
+max_level = 6
+# ⚠️ FRACTION, pas un pourcentage : 0.04 = +4 % par niveau. Écrire `4` donnerait
+# +400 %/niveau — le code borne à 0.25 max et loggue la correction.
+damage_per_level = 0.04
+
+# ── Déblocage permanent des armes (Âmes) — story-613 ──
+# Pépin = arme de départ : toujours débloquée, jamais listée ici.
+# key = clé genome viewmodel (pepin/bourrasque/madame_lenoir/boucherie).
+# Coûts croissants = courbe « évolutive » (nouveau joueur = Pépin seul).
+[[weapon_unlocks]]
+key = "bourrasque"
+name = "Bourrasque"
+cost = 60
+
+[[weapon_unlocks]]
+key = "madame_lenoir"
+name = "Madame Lenoir"
+cost = 150
+
+[[weapon_unlocks]]
+key = "boucherie"
+name = "Boucherie"
+cost = 250
+
+# ── Déblocage permanent des paliers d'ATOUTS (boons), en Âmes — story-616 ──
+# Common = toujours offert (jamais listé). key = uncommon | rare | legendary.
+# Coûts croissants > armes (les boons = profondeur de build).
+[[boon_tier_unlocks]]
+key = "uncommon"
+name = "Atouts Peu communs"
+cost = 80
+
+[[boon_tier_unlocks]]
+key = "rare"
+name = "Atouts Rares"
+cost = 200
+
+[[boon_tier_unlocks]]
+key = "legendary"
+name = "Atouts Légendaires"
+cost = 400

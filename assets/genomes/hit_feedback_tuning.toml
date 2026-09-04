@@ -1,0 +1,102 @@
+# Forgia V2 — Hit Feedback Tuning Genome (story-456 Vague 1, 2026-05-19)
+#
+# Source de vérité TOML pour :
+# - Damage number popups (color/size/lifetime par body zone)
+# - Enemy nameplate floating HP bars (timings/colors/scaling)
+# - Hitzone damage multipliers (head/body/limb)
+#
+# Hot-reload via Bevy Asset. Conventions AAA sourcées (story-456 §6) :
+# - Apex Legends: gold popup headshot, white shield, color tiers
+# - Valorant: hitmarker worldspace + spark VFX at impact point
+# - Halo Infinite: shield-break audio cue, RRR red reticle range
+# - Overwatch 2: crit ligne jaune crosshair, popups opt-in
+# - Hunt: Showdown: body zone multipliers (head=4x, body=1x, limb=0.5-0.8x)
+# - GDC Pennant: color never alone (redondance audio + forme + outline)
+
+# ─── Hit zone damage multipliers ────────────────────────────────────────
+# Appliqués côté hitscan AVANT emit CombatHitEvent. Le `damage` event reflète
+# déjà la valeur post-multiplier — popup affiche la vraie valeur subie.
+[hitzone_multipliers]
+head = 2.0    # Apex precision tier ; Hunt: rifle headshot ~4x mais on plafonne arena
+body = 1.0    # baseline
+limb = 0.75   # Hunt: legs/arms ~0.5-0.8x ; arena 0.75 pour rester punishing-but-not-frustrating
+
+# ─── Damage number popups ──────────────────────────────────────────────
+# Floating numbers 3D world-anchored (forgia-damage-numbers), spawn sur
+# CombatHitEvent au `hit_world_pos` + Y offset, drift up + fade.
+[popup]
+lifetime_secs = 1.0          # standard Apex/Destiny ; OW2 plus court (0.7s)
+rise_speed_mps = 1.6         # m/s en world-space
+gravity_mps2 = 2.0           # decel naturelle (ease-out feel)
+rise_speed_min_mps = 0.2     # plancher (reste flottant en fin de vie)
+spawn_y_offset = 1.6         # m au-dessus de l'origine target
+
+font_size_normal = 22.0
+font_size_headshot = 30.0    # gold popup plus gros (Apex pattern, +36%)
+font_size_kill = 28.0        # kill confirm grand (mais < headshot)
+font_size_limb = 18.0        # limb shot plus discret
+
+text_outline_px = 1.4        # outline noir pour lisibilité tous fonds (GDC Pennant)
+
+# Couleurs RGBA — sources :
+# - normal (white) = Apex body shot baseline
+# - headshot (gold) = Apex/Destiny precision
+# - kill (red) = popup distinct kill confirm
+# - shield (light blue) = OW2/Apex shield damage
+# - armor (yellow-orange) = OW2 armor damage
+color_normal = [1.0, 1.0, 1.0, 1.0]
+color_headshot = [1.0, 0.85, 0.20, 1.0]
+color_kill = [1.0, 0.30, 0.20, 1.0]
+color_shield = [0.50, 0.80, 1.0, 1.0]    # V2 layered
+color_armor = [1.0, 0.80, 0.30, 1.0]      # V2 layered
+color_limb = [0.85, 0.85, 0.85, 1.0]      # gris doux (de-emphasized)
+
+# ─── Enemy nameplate floating HP bar ────────────────────────────────────
+# Billboard 3D mesh world-anchored au-dessus target, fade après dernier hit.
+# Industry pattern : pas permanent (Apex/Valorant/CS2/Halo n'affichent pas),
+# fade 1.5-2s après hit (Destiny raid, The Finals, Marvel Rivals).
+[nameplate]
+fade_duration_secs = 2.0
+y_offset_world = 2.2          # m au-dessus pivot target (head height humanoid)
+
+# Scaling inverse distance : plus loin = barre relativement plus grosse
+# pour rester lisible (pratique AAA non documentée publiquement mais
+# observable empiriquement Apex/OW2).
+distance_scale_base = 10.0    # scale = base / dist.max(2.0)
+distance_scale_min = 0.4
+distance_scale_max = 1.6
+
+# Dimensions billboard en world units (avant distance scale)
+width_world = 1.0
+height_world = 0.10
+
+# Couleurs RGBA
+color_bg = [0.06, 0.07, 0.09, 0.85]      # fond chunky noir translucide
+color_outline = [0.0, 0.0, 0.0, 0.95]     # bord chunky cartoon
+color_fill_hp = [0.85, 0.20, 0.20, 0.95]  # rouge OW2 enemy HP
+color_fill_shield = [0.40, 0.75, 1.0, 0.95]  # V2 layered
+color_fill_armor = [1.0, 0.75, 0.25, 0.95]   # V2 layered
+
+# Outline thickness en world units pré-scaling
+outline_thickness_world = 0.008
+
+# ─── Headshot screen feedback (V3) ──────────────────────────────────────
+# Hook depuis forgia-juice-screen-flash quand body_zone=Head AND attacker=Player.
+# Anti-eye-strain : valeurs plafonnées via reference_aaa_juice_safe_values_2024.md
+[headshot_flash]
+enabled = true
+alpha_peak = 0.12              # Apex pulse modéré, 12% max
+duration_secs = 0.080          # 80ms fade-in+out
+color = [1.0, 0.90, 0.30, 1.0] # jaune chaud cohérent popup gold
+
+# ─── Settings defaults (V3) ─────────────────────────────────────────────
+# Toggles user-facing exposés via settings menu (story-456 V3).
+# OW2 default = damage numbers OFF. Apex default = ON. Forgia choisit ON
+# pour onboarding casual + toggle facile dans pause menu.
+[settings_defaults]
+show_damage_numbers = true
+show_nameplate = true
+show_headshot_flash = true
+
+# ─── Sensor ─────────────────────────────────────────────────────────────
+sensor_period_secs = 1.0

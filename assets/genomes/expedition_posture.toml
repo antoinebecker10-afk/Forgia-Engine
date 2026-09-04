@@ -1,0 +1,33 @@
+# expedition_posture.toml — s'accroupir et glisser.
+#
+# La glissade REMPLACE le dash de l'arène en Expédition. Le dash est un mouvement
+# d'arène : instantané, abstrait, sans poids. L'Expédition est un parcours — on y
+# veut un geste qui part de la course, se lit au sol, et coûte de la vitesse.
+#
+# ── Les trois bornes qui empêchent la glissade d'être gratuite ───────────────
+#
+# Sans elles, glisser en boucle traverse la carte plus vite que courir, et le
+# sprint devient décoratif :
+#
+#   1. il faut COURIR pour déclencher (`glissade_vitesse_min_ms`) — la glissade
+#      convertit de la vitesse, elle n'en crée pas ;
+#   2. elle a une DURÉE fixe, elle ne se tient pas ;
+#   3. recommencer coûte plus longtemps que le geste lui-même
+#      (`glissade_repos_s` > `glissade_duree_s`), ce qu'un test vérifie.
+#
+# Commandes : Ctrl gauche = accroupi (maintenu). Shift + Ctrl en courant = glisser.
+
+# Durée d'une glissade (s). Calée sur le clip `slide` de Mixamo (~0,7 s) : plus
+# longue, l'animation boucle et le personnage répète le même geste en glissant.
+glissade_duree_s = 0.7
+
+# Délai avant de pouvoir re-glisser (s). Doit rester SUPÉRIEUR à la durée.
+glissade_repos_s = 1.2
+
+# Vitesse minimale de déclenchement (m/s). C'est le seuil de course du
+# personnage : on glisse depuis une course, pas depuis une marche.
+glissade_vitesse_min_ms = 5.0
+
+# Vitesse accroupi, en fraction de la normale. Trop lent, personne ne s'accroupit ;
+# trop rapide, tout le monde y reste. À 0,45 c'est un choix.
+accroupi_facteur_vitesse = 0.45

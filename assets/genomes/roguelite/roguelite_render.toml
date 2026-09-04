@@ -1,0 +1,73 @@
+# roguelite_render.toml — story-625 Tier 4 : contrôle du rendu (SSAO + atmosphère).
+#
+# Garde-fou : chaque effet est toggleable EN DATA (hot-reload mtime 1Hz). Si un
+# effet casse en jeu (crash GPU, perf), mettre son *_enabled à 0.0 et sauver →
+# l'effet se coupe SANS rebuild. État runtime visible dans forgia2_render_fx.json.
+#
+# Consommé par forgia-mode-roguelite::render_quality + atmosphere.rs.
+
+# ── SSAO (ambient occlusion — ancre les props au sol, profondeur) ────────────
+# Effet compute natif (PbrPlugin), pas de FullscreenMaterial → pas du piège outline.
+[[genes]]
+id = "roguelite_ssao_enabled"
+# 0 = OFF par défaut. Le SSAO ACTIF (Msaa::Off requis) est INCOMPATIBLE avec le
+# post-process toon du roguelite → arène blanchie (meshes dans le frustum mais non
+# dessinés). Confirmé runtime 2026-06-30 : SSAO off → monde rend. Le code force
+# correctement Msaa::Off si on remet 1.0 (cf render_quality::apply_ssao_to + health-
+# check ssao_msaa_conflict), mais ne le faire QU'APRÈS avoir réglé la compat toon+SSAO.
+default = 0.0   # 1 = ON, 0 = OFF
+
+[[genes]]
+id = "roguelite_ssao_quality"
+default = 2.0   # 0 Low · 1 Medium · 2 High · 3 Ultra
+
+[[genes]]
+id = "roguelite_ssao_thickness"
+default = 0.25  # épaisseur estimée des objets (occlusion), 0.01..2.0
+
+# ── Bloom (story-647 — glow des émissifs HDR : muzzle/tracers/sparks/hit-flash)
+# Natif Bevy (bevy::post_process), tourne AVANT tonemapping → pas du piège outline
+# (aucune passe FullscreenMaterial ajoutée). Le Hdr est posé à la CRÉATION de la
+# FpsCamera (forgia-player) ; seul le composant Bloom s'attache/détache à chaud.
+[[genes]]
+id = "roguelite_bloom_enabled"
+# 2026-07-02 : OFF — le Hdr a été retiré des caméras après l'essai runtime (teinte
+# rouge saturée : tout l'éclairage était calibré sur l'écrêtage LDR ; + ghosting
+# Text2d via MenuCamera2d restée LDR). Réactiver SEULEMENT avec la story de
+# calibration HDR (Hdr sur LES TROIS caméras + retune éclairage/grading).
+default = 0.0
+
+[[genes]]
+id = "roguelite_bloom_intensity"
+default = 0.15  # préset NATURAL Bevy. 0.0..0.5 (au-delà = glow soupe, clampé)
+
+# ── Atmosphère volcanique (brume DistanceFog + ambiante chaude) ──────────────
+[[genes]]
+id = "roguelite_fog_enabled"
+default = 1.0
+
+[[genes]]
+id = "roguelite_fog_density"
+default = 0.008  # ~1/density ≈ distance de demi-brume (0.008 → ~125 m)
+
+[[genes]]
+id = "roguelite_ambient_brightness"
+default = 300.0  # lumière ambiante chaude (teinte volcanique)
+
+# ── Fond du menu = l'arène du chapitre atteint (story-678 Phase 5) ───────────
+# Le hub ne montre plus une vidéo de branding : il montre l'univers où le joueur
+# en est, bâti avec les props de sa palette de chapitre, son personnage équipé
+# debout dedans. Diorama RTT (aucune passe fullscreen — celles-ci tombent sous
+# DX12), caméra en dérive lente.
+#
+# Si ça coûte trop cher sur une machine : mettre 0.0 → retour au fond vidéo,
+# SANS rebuild. État runtime dans forgia2_menu_hub.json (backdrop_props).
+[[genes]]
+id = "ui_backdrop_enabled"
+default = 1.0   # 1 = arène du chapitre, 0 = fond vidéo
+
+[[genes]]
+id = "ui_backdrop_height_px"
+default = 720.0 # largeur suivie sur l'aspect REEL de la fenetre (story-692).
+                # Borné 240..1440 — monter à 1080-1440 sur ecran 1440p si le
+                # fond parait flou ; au-dela, la brume efface ce qu'on paie.

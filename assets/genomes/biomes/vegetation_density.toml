@@ -1,0 +1,59 @@
+# Densité de végétation PAR BIOME — consommé par forgia-foliage (populate_new_chunks).
+# Raccroche à la couche definition le hardcode `biome_max_per_chunk`/`biome_min_spacing`
+# (forgia-foliage/src/lib.rs), comme le TODO du code le demandait depuis le vertical slice.
+# Lu au boot (load_or_default) — relancer le mode pour appliquer.
+#
+# max_per_chunk : arbres visés par chunk 32×32 m en LOD0 (LOD1 = ×0.2, LOD2 = aucun).
+# min_spacing   : espacement Poisson disk minimal (mètres).
+#
+# Valeurs = miroir des fallbacks Rust, SAUF forest (expédition forêt 2026-08-10 :
+# 35→50 arbres, espacement 3.5→2.8 — mesurer FPS + forgia_vegetation.json avant d'élargir).
+#
+# [global].max_total : plafond DUR d'arbres simultanés, toutes zones confondues.
+# Consommé par populate_new_chunks — remplace le gène MORT `veg_max_total_base`
+# (vegetation_default.toml, jamais lu par personne). Leçon du crash OOM 2026-08-10 :
+# 80/chunk × monde 71 % forêt sans plafond = 42 729 entités → allocation refusée.
+# Une densité sans plafond n'est jamais sûre (règle scalability).
+
+[global]
+max_total = 4000
+
+[per_biome.jungle]
+max_per_chunk = 45
+min_spacing = 3.5
+
+[per_biome.forest]
+max_per_chunk = 50
+min_spacing = 2.8
+
+[per_biome.swamp]
+max_per_chunk = 22
+min_spacing = 5.0
+
+[per_biome.plains]
+max_per_chunk = 18
+min_spacing = 5.0
+
+[per_biome.savanna]
+max_per_chunk = 14
+min_spacing = 5.0
+
+[per_biome.mountain]
+max_per_chunk = 11
+min_spacing = 7.0
+
+[per_biome.tundra]
+max_per_chunk = 8
+min_spacing = 7.0
+
+[per_biome.canyon]
+max_per_chunk = 8
+min_spacing = 7.0
+
+[per_biome.desert]
+max_per_chunk = 6
+min_spacing = 9.0
+
+[per_biome.volcanic]
+max_per_chunk = 3
+min_spacing = 12.0

@@ -1,0 +1,52 @@
+[alias]
+xtask = "run --package xtask --"
+# Commandes de dev : Tracy est systématiquement activé pour diagnostiquer les
+# hitches pendant l'itération. Le build release joueur n'active pas cette feature.
+# 🚨 `dev-brp` est ici depuis le 2026-08-16. L'alias `forgia-brp` existait déjà
+# et n'a jamais servi : une commande à part est une commande qu'on oublie, et on
+# a passé des sessions à écrire des capteurs pour des questions ponctuelles
+# qu'une requête BRP règle en un appel. La commande de dev quotidienne porte donc
+# les deux ponts — Tracy pour le temps, BRP pour l'état. Le build joueur n'a ni
+# l'un ni l'autre.
+forgia-dev = "run -p forgia --features profile-tracy,dev-brp --"
+forgia-fast = "run -p forgia --profile release-fast --features profile-tracy --"
+
+# 🚨 LE JEU POUR TESTER, sans Tracy. Mesure du 2026-08-20 : avec
+# `--features profile-tracy` et AUCUN GUI Tracy connecte, tracy-client accumule
+# tout le profilage en RAM — croissance mesuree a 50 Mo/s, le processus est
+# abattu en 20 a 90 s. Ce soir-la, quatre runs sont morts sous QUATRE signatures
+# differentes (ACCESS_VIOLATION x2, STACK_BUFFER_OVERRUN, allocation failed), ce
+# qui a fait soupconner successivement trois innocents.
+#
+# Detection en 10 s si le doute revient : le process ecoute le port TCP 8086.
+#
+# 🚨 ET LA VERSION DU VIEWER DOIT CORRESPONDRE (mesure 2026-08-21).
+# Le client embarque est `tracy-client-sys 0.28.0`, qui vend Tracy **0.13.1**,
+# protocole **76** (TracyVersion.hpp / TracyProtocol.hpp du crate). Un viewer
+# d'une autre version REFUSE la connexion — et un viewer refuse est, pour le jeu,
+# exactement la meme chose qu'un viewer absent : il accumule et il meurt.
+# Un viewer d'une autre version (par exemple 0.11.1) est INCOMPATIBLE.
+# Verifier la version AVANT de lancer, pas apres le crash.
+# `forgia-dev` reste juste — mais UNIQUEMENT avec le viewer Tracy ouvert, qui
+# streame au lieu d'accumuler.
+forgia-jeu = "run -p forgia --features dev-brp --"
+
+# 🚨 LE LINT DANS SON PROPRE REPERTOIRE. `clippy` ne produit que des `.rmeta` ;
+# un `build` qui suit dans le MEME target reutilise l'empreinte et echoue sur
+# « crate X required to be available in rlib format, but was not found in this
+# form ». Arrive deux fois en deux jours, 9,3 Go de reconstruction a chaque fois.
+# Un repertoire separe coute de l'espace disque une fois, et supprime le piege.
+forgia-lint = "clippy --workspace --target-dir target/lint -- -W warnings"
+# À lancer seulement pour une enquête mémoire avec le viewer Tracy ouvert.
+forgia-memory = "run -p forgia --profile release-fast --features profile-tracy-memory --"
+# Lance le jeu avec le pont d'inspection ECS sur localhost:15702. Le serveur MCP
+# `bevy-brp` peut alors interroger le monde vivant sans toucher aux builds joueur.
+forgia-brp = "run -p forgia --features dev-brp --"
+# Audit local rapide et sans compilation du code du jeu.
+forgia-supply-chain = "deny check advisories bans sources"
+
+# Bevy + wgpu + Tracy peuvent épuiser la RAM/pagefile si rustc compile les 20+
+# crates lourdes en parallèle. Deux jobs gardent le build reproductible sur la
+# machine de dev sans changer le binaire produit.
+[build]
+jobs = 2

@@ -1,0 +1,148 @@
+# Template skeleton Humanoid Vitruvian — 20 bones (avec hand_L/R)
+# Source de vérité pour `forgia-skeleton-template::SkeletonTemplate`.
+# Hot-reloadable via Bevy AssetServer (Shift+F12).
+
+# Story-482 P2 — Stance offsets game-pose vs bind-pose.
+# Mesh Vitruvian T-pose (bras horizontaux) → rotation Z ±90° pour ramener vertical.
+# Composé via Quat::from_euler(EulerRot::XYZ, x_rad, y_rad, z_rad) AVANT le swing
+# du walk cycle. Si mesh est déjà en pose game (arms-down), mettre tous à zéros.
+[stance_offsets]
+arm_l_euler_deg = [0.0, 0.0, 90.0]
+arm_r_euler_deg = [0.0, 0.0, -90.0]
+leg_l_euler_deg = [0.0, 0.0, 0.0]
+leg_r_euler_deg = [0.0, 0.0, 0.0]
+spine_euler_deg = [0.0, 0.0, 0.0]
+hip_euler_deg   = [0.0, 0.0, 0.0]
+# Story-482 P2c — clavicle stance : zéros = pas d'ancre (clavicle suit bind).
+# Tuner Z pour accompagner pose game arms-down (~-15° à -30° typique humanoid
+# Vitruvian). Ajuster par essai visuel, hot-reload via Shift+F12.
+clavicle_l_euler_deg = [0.0, 0.0, 0.0]
+clavicle_r_euler_deg = [0.0, 0.0, 0.0]
+
+#
+# Position normalisée : `pos = [x, y, z]` où y∈[0,1] (0=sol mesh, 1=top mesh),
+# x latéral (±), z avant/arrière (±). Scalé par mesh_height au runtime.
+#
+# `parent` = index du bone parent dans cette liste (0-indexed). Omis = root.
+# `class`  = classification anatomique déclarative (story-481) :
+#            "spine" | "head" | "arm" | "leg" | "tail" | "other"
+#            Consommé par embedder (locks YXZ) + rescale (Y mapping par chaîne).
+
+[[bones]]
+name = "hip"
+pos = [0.0, 0.50, 0.0]
+class = "spine"
+
+[[bones]]
+name = "spine_lower"
+parent = 0
+pos = [0.0, 0.58, 0.0]
+class = "spine"
+
+[[bones]]
+name = "spine_mid"
+parent = 1
+pos = [0.0, 0.66, 0.0]
+class = "spine"
+
+[[bones]]
+name = "chest"
+parent = 2
+pos = [0.0, 0.75, 0.0]
+class = "spine"
+
+[[bones]]
+name = "neck"
+parent = 3
+pos = [0.0, 0.85, 0.0]
+class = "spine"
+
+[[bones]]
+name = "head"
+parent = 4
+pos = [0.0, 0.95, 0.0]
+class = "head"
+
+[[bones]]
+name = "clavicle_L"
+parent = 3
+pos = [-0.08, 0.80, 0.0]
+class = "arm"
+
+[[bones]]
+name = "arm_L"
+parent = 6
+pos = [-0.25, 0.78, 0.0]
+class = "arm"
+
+[[bones]]
+name = "forearm_L"
+parent = 7
+pos = [-0.55, 0.78, 0.0]
+class = "arm"
+
+[[bones]]
+name = "hand_L"
+parent = 8
+pos = [-0.85, 0.78, 0.0]
+class = "arm"
+
+[[bones]]
+name = "clavicle_R"
+parent = 3
+pos = [0.08, 0.80, 0.0]
+class = "arm"
+
+[[bones]]
+name = "arm_R"
+parent = 10
+pos = [0.25, 0.78, 0.0]
+class = "arm"
+
+[[bones]]
+name = "forearm_R"
+parent = 11
+pos = [0.55, 0.78, 0.0]
+class = "arm"
+
+[[bones]]
+name = "hand_R"
+parent = 12
+pos = [0.85, 0.78, 0.0]
+class = "arm"
+
+[[bones]]
+name = "thigh_L"
+parent = 0
+pos = [-0.10, 0.40, 0.0]
+class = "leg"
+
+[[bones]]
+name = "shin_L"
+parent = 14
+pos = [-0.10, 0.27, 0.03]
+class = "leg"
+
+[[bones]]
+name = "foot_L"
+parent = 15
+pos = [-0.10, 0.02, 0.05]
+class = "leg"
+
+[[bones]]
+name = "thigh_R"
+parent = 0
+pos = [0.10, 0.40, 0.0]
+class = "leg"
+
+[[bones]]
+name = "shin_R"
+parent = 17
+pos = [0.10, 0.27, 0.03]
+class = "leg"
+
+[[bones]]
+name = "foot_R"
+parent = 18
+pos = [0.10, 0.02, 0.05]
+class = "leg"

@@ -1,0 +1,135 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Spawn village V1 — hub d'apparition RPG (story-441 v2 — option B calibré)
+# ──────────────────────────────────────────────────────────────────────────────
+# Refonte 2026-05-17 PM (option B "Standard RPG starter") :
+#
+# Calibration référence FPS Arena (KayKit Dungeon TILE_SIZE = 4m, scale 1.0)
+# Mon kit Medieval Hexagon est tabletop scale (mesh raw ~1-2m). Le mapping
+# vers échelle joueur = unit_scale 3.5 :
+#   - Tavern raw 1.17×1.40 → scaled 4.1m × 4.9m (cottage 1 étage habitable)
+#   - Church raw 1.03×1.65 → scaled 3.6m × 5.8m (focal landmark visible)
+#   - Wall raw 2×1.1 → scaled 7m × 3.85m (proportions FPS arena +75%)
+#   - Player 1.8m dépasse les toits homes (clear silhouette reading)
+#
+# Layout 30m × 30m bounding (tient dans 1 chunk terrain 32m). Axe nord-sud
+# dominant : spawn sud → puits centre → église focal nord. Hiérarchie 1
+# landmark majeur (église) + 3 secondaires (tavern/marché/wells) + 2 retrait
+# (homes). Pattern AAA : Keller Overwatch "build road first", Fortnite max
+# 3-5 points of engagement, Level Design Book composition contrast.
+#
+# Édition hot-reloadable (Shift+F12 via Bevy file_watcher).
+
+[meta]
+id = "spawn_village"
+center = [16.0, 16.0]    # Position monde (x, z) — milieu du chunk (0, 0).
+unit_scale = 3.5         # Option B — standard RPG starter, voir docstring.
+kit = "kaykit_medieval_hexagon"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ramparts DÉSACTIVÉS (story-441 v2 — 2026-05-17 PM)
+# ──────────────────────────────────────────────────────────────────────────────
+# Le joueur se retrouvait bloqué dans le spawn par les walls. La génération
+# village + ramparts sera retravaillée plus tard (story-442 prévue) — pour
+# l'instant pas de murs autour du village. `shape = "none"` court-circuite
+# `compute_rampart_pieces` qui retourne Vec::new() sur shape inconnue.
+# Conserver les champs pour réactivation rapide future.
+
+[ramparts]
+shape = "none"           # "hexagon" pour réactiver les 18 walls chaînés.
+radius = 15.0
+gates_deg = [180.0]
+y_offset = 0.0
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Buildings — 6 bâtiments AAA-composed (focal église nord, axe central libre)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# 1. ÉGLISE — focal landmark NORD, face SUD (vers spawn). Hauteur 5.8m = focal.
+[[buildings]]
+piece = "building_church"
+color = "red"
+position = [0.0, -10.0]    # Sud négatif z = nord du village.
+yaw_deg = 0.0               # Façade côté +Z (vers le joueur arrivant du sud).
+label = "Chapelle de l'Apprenti"
+road_anchor = "south"
+
+# 2. TAVERNE — flanc ouest, face est (vers axe central / puits).
+[[buildings]]
+piece = "building_tavern"
+color = "red"
+position = [-7.0, -3.0]
+yaw_deg = 90.0              # Façade vers +X.
+label = "Taverne du Forgeron"
+road_anchor = "east"
+
+# 3. MARCHÉ — flanc est, face ouest (symétrie tavern).
+[[buildings]]
+piece = "building_market"
+color = "red"
+position = [7.0, -3.0]
+yaw_deg = -90.0             # Façade vers -X.
+label = "Marché central"
+road_anchor = "west"
+
+# 4. PUITS — centre de la place ouverte, jalon visuel intermédiaire.
+[[buildings]]
+piece = "building_well"
+color = "red"
+position = [0.0, 1.0]       # Légèrement en avant du centre pour ne pas masquer la sightline église.
+yaw_deg = 0.0
+label = "Puits du village"
+
+# 5. MAISON A — résidentiel SO en retrait, face NE.
+[[buildings]]
+piece = "building_home_A"
+color = "red"
+position = [-7.0, 6.0]
+yaw_deg = 45.0
+label = "Demeure d'Aldric"
+
+# 6. MAISON B — résidentiel SE en retrait, face NO (symétrie home_A).
+[[buildings]]
+piece = "building_home_B"
+color = "red"
+position = [7.0, 6.0]
+yaw_deg = -45.0
+label = "Demeure de Mira"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Roads — 1 axe urbain dominant + 3 sentiers secondaires (max 3-5 Fortnite)
+# ──────────────────────────────────────────────────────────────────────────────
+
+[roads]
+
+# Route principale URBAINE — sortie gate SUD, axe d'aventure vers le monde.
+[[roads.radial]]
+direction_deg = 180.0       # Sud à travers le gate.
+length = 60.0
+tier = "urban"
+
+# Sentiers secondaires — 3 sorties NE, SE, NO (60°, 120°, 300°).
+[[roads.radial]]
+direction_deg = 60.0
+length = 50.0
+tier = "secondary"
+
+[[roads.radial]]
+direction_deg = 120.0
+length = 50.0
+tier = "secondary"
+
+[[roads.radial]]
+direction_deg = 300.0
+length = 50.0
+tier = "secondary"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Player spawn — juste à l'intérieur du gate SUD, face NORD (sightline focal)
+# ──────────────────────────────────────────────────────────────────────────────
+# Position local : 11m sud du center (apothem 13m - 2m intérieur = juste
+# derrière le gate). Yaw 0 = regarde nord = voit puits puis église.
+# Cone visuel 20° aligné sur axe central → composition optimale.
+
+[spawn]
+player_position = [0.0, 11.0]
+player_yaw_deg = 0.0

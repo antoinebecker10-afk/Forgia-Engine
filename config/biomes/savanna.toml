@@ -1,0 +1,23 @@
+# Savanna — biome definition (story-575). Miroir exact des fallbacks Rust.
+# Hot-reload Shift+F12. Voir plains.toml pour la note complète.
+
+id = "savanna"
+name = "Savanna"
+display_name_fr = "Savane"
+color = [0.78, 0.68, 0.32]       # = BiomeType::Savanna.color()
+roughness = 0.92
+preview_rgb = [184, 166, 89]
+spawn_weight = 1.0
+amplitude_mult = 0.70             # relief: plat-ondulé
+status = "Approved"
+
+[enemy_modifiers]
+hp_mult = 0.9
+speed_mult = 1.1
+dmg_mult = 0.8
+
+[road]
+width_mult = 1.2
+depression_mult = 1.0
+edge_noise = 0.8
+vegetation_encroachment = 0.1

@@ -1,0 +1,33 @@
+# Gait genome — Rex (biped lizard). Story-579 incr.1 (2026-06-07).
+# Miroir EXACT des const proc_walk au moment de l'extraction → zéro régression.
+# Édite ces valeurs pour retuner la marche/course de Rex SANS recompiler.
+# (Relecture : au lancement du jeu ; hot-reload Shift+F12 = incr.2.)
+# Champs : paires walk/run lerpées par GaitTunables::for_speed selon la vitesse.
+
+# Cadence : cycles par mètre (↑ = petits pas rapides, ↓ = grandes foulées).
+stride_per_m_walk = 0.55
+stride_per_m_run = 0.40
+
+# Ratio stance/swing (fraction du cycle pied au sol).
+stance_frac_walk = 0.60
+stance_frac_run = 0.40
+
+# Amplitude swing cuisse (rad). ~46° walk / ~57° run.
+amp_thigh_walk = 0.80
+amp_thigh_run = 1.00
+
+# Amplitude swing bras / pitch épaule (rad). ~43° walk / ~60° run.
+amp_arm_walk = 0.75
+amp_arm_run = 1.05
+
+# Flexion genou peak en swing (rad). ~92° walk / ~103° run (digitigrade raptor).
+knee_flex_peak_walk = 1.60
+knee_flex_peak_run = 1.80
+
+# Yaw bassin (rad). ~6° walk / ~10° run.
+pelvic_yaw_amp_walk = 0.10
+pelvic_yaw_amp_run = 0.17
+
+# Bob vertical bassin (m). ~4 cm walk / ~7 cm run.
+pelvic_bob_amp_walk = 0.04
+pelvic_bob_amp_run = 0.07

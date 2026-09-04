@@ -1,0 +1,107 @@
+{
+ "bloc_proche": {
+  "asset": "rock_09",
+  "maillages": 1,
+  "tris": 12416,
+  "largeur_m": 0.07,
+  "profondeur_m": 0.14,
+  "hauteur_m": 0.03,
+  "rayon_m": 0.09,
+  "z_min": -0.001,
+  "textures": [
+   "rock_09_diff",
+   "rock_09_nor_gl",
+   "rock_09_rough"
+  ]
+ },
+ "bloc_proche_2": {
+  "asset": "namaqualand_boulder_04",
+  "maillages": 1,
+  "tris": 59066,
+  "largeur_m": 2.52,
+  "profondeur_m": 2.5,
+  "hauteur_m": 1.9,
+  "rayon_m": 1.48,
+  "z_min": -0.029,
+  "textures": [
+   "boulder_04_diff",
+   "boulder_04_nor_gl",
+   "boulder_04_rough"
+  ]
+ },
+ "paroi_proche": {
+  "asset": "rock_face_01",
+  "maillages": 1,
+  "tris": 20174,
+  "largeur_m": 4.95,
+  "profondeur_m": 3.83,
+  "hauteur_m": 3.56,
+  "rayon_m": 3.78,
+  "z_min": -0.034,
+  "textures": [
+   "rock_face_01_diff",
+   "rock_face_01_nor_gl",
+   "rock_face_01_rough"
+  ]
+ },
+ "paroi_proche_2": {
+  "asset": "rock_face_02",
+  "maillages": 1,
+  "tris": 29566,
+  "largeur_m": 2.71,
+  "profondeur_m": 2.13,
+  "hauteur_m": 2.47,
+  "rayon_m": 2.55,
+  "z_min": -0.14,
+  "textures": [
+   "rock_face_02_diff",
+   "rock_face_02_nor_gl",
+   "rock_face_02_rough"
+  ]
+ },
+ "crete_moyenne": {
+  "asset": "namaqualand_cliff_01",
+  "maillages": 1,
+  "tris": 94369,
+  "largeur_m": 8.28,
+  "profondeur_m": 4.39,
+  "hauteur_m": 4.96,
+  "rayon_m": 5.46,
+  "z_min": -0.419,
+  "textures": [
+   "namaqualand_cliff_01_diff",
+   "namaqualand_cliff_01_nor_gl",
+   "namaqualand_cliff_01_rough"
+  ]
+ },
+ "crete_moyenne_2": {
+  "asset": "namaqualand_cliff_02",
+  "maillages": 1,
+  "tris": 194080,
+  "largeur_m": 20.23,
+  "profondeur_m": 6.59,
+  "hauteur_m": 7.18,
+  "rayon_m": 10.88,
+  "z_min": -0.16,
+  "textures": [
+   "namaqualand_cliff_02_diff",
+   "namaqualand_cliff_02_nor_gl",
+   "namaqualand_cliff_02_rough"
+  ]
+ },
+ "montagne_lointaine": {
+  "asset": "mountainside",
+  "maillages": 1,
+  "tris": 153472,
+  "largeur_m": 10.21,
+  "profondeur_m": 5.25,
+  "hauteur_m": 10.52,
+  "rayon_m": 5.88,
+  "z_min": -0.2,
+  "textures": [
+   "mountainside_diff",
+   "mountainside_nor_gl",
+   "mountainside_rough"
+  ]
+ }
+}

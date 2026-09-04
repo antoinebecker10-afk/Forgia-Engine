@@ -1,0 +1,21 @@
+[package]
+name = "forgia-ai-arena-bot"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Arena FPS bot — simple state machine (Idle/Chase/Attack) + respawn"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-core = { workspace = true }
+# Story-700 inc.3 — le bot suit un chemin au lieu de foncer en ligne droite.
+forgia-navmesh = { workspace = true }
+forgia-damage = { path = "../forgia-damage" }
+forgia-combat = { workspace = true }
+# 2026-08-05 — `on_bot_death` doit connaître `AscendsOnDeath` pour ne PAS balayer
+# un corps qui s'envole (cf. le garde jumeau de `despawn_dead_cubes`, forgia-fps).
+forgia-effects = { workspace = true }
+bevy_rapier3d = { workspace = true }

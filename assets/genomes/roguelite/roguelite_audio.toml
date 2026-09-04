@@ -1,0 +1,239 @@
+# Roguelite — Audio (story-559 slice A, 2026-06-04)
+#
+# SFX combat (impact/kill/hurt) + ding pickup (Or/Âmes) + musique (combat/break).
+# Hot-reload Shift+F12 (poll mtime 1Hz). Volumes 0..2 (1.0 = nominal).
+# Chemins relatifs à la racine `assets/`. Pack original reproductible via
+# `tools/audio/generate_forgia_da.py`, sans sample tiers. Swap = modifier le
+# chemin puis Shift+F12.
+
+master_volume = 0.9
+music_volume = 0.45
+ui_sfx_volume = 1.0     # trim global famille UI (story-678) — scalaire AVANT les tables
+
+[impact]                # hit ennemi (court, fréquent) — Kenney impactGeneric_light
+path = "audio/forgia_original/combat/impact_forge.ogg"
+volume = 0.45
+
+[weakspot]              # « tink » tête/weakspot (story-651) — Kenney impactMetal_light
+                        # Pitch FIXE (signature pavlovienne), couche additive à CHAQUE
+                        # headshot (même au kill — double récompense Gunfire Reborn).
+path = "audio/forgia_original/combat/weakspot_chime.ogg"
+volume = 0.8
+
+[kill]                  # kill (meaty) — Kenney impactMining
+path = "audio/forgia_original/combat/kill_stamp.ogg"
+volume = 0.7
+
+[hurt]                  # joueur touché (thud sourd) — Kenney impactPlank
+path = "audio/forgia_original/combat/player_hurt.ogg"
+volume = 0.6
+
+[ding_gold]             # ramassage Or — Kenney handleCoins
+path = "audio/forgia_original/pickups/gold_spark.ogg"
+volume = 0.6
+
+[ding_souls]            # ramassage Âme (cloche éthérée) — Kenney impactBell
+path = "audio/forgia_original/pickups/soul_echo.ogg"
+volume = 0.55
+
+# Musique CONTINUE du jeu = le morceau « entre les waves » (user 2026-06-05).
+# combat == break → pas de switch/restart aux transitions de wave.
+# 2026-08-05 : music_combat/break ne servent plus que de FALLBACK (chapitre sans
+# piste dédiée). La bande-son réelle = music_hub + music_chapters ci-dessous.
+[music_combat]
+path = "audio/forgia_original/music/forged_destiny_loop.ogg"
+volume = 0.8
+
+[music_break]
+path = "audio/forgia_original/music/forged_destiny_loop.ogg"
+volume = 0.8
+
+# ── Bande-son Suno (2026-08-05) ─────────────────────────────────────────────
+# Générée sur Suno (plan payant, droits commerciaux) par le créateur, intégrée
+# loudnorm I=-16 / 48 kHz / trim silences. Hub = menu/lobby (hors run) ;
+# une piste par CHAPITRE du Livre ([[music_chapters]] : l'ordre = chapitre 1→10).
+# Retirer une entrée → ce chapitre retombe sur music_combat.
+
+[music_hub]
+path = "audio/forgia_original/music/hub.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_01.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_02.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_03.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_04.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_05.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_06.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_07.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_08.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_09.ogg"
+volume = 0.8
+
+[[music_chapters]]
+path = "audio/forgia_original/music/chapter_10.ogg"
+volume = 0.8
+
+# ── Sons de TIR par arme (slice B) ──────────────────────────────────────────
+# Mapping slot Digit1-4 : Pépin=sec/mécanique · Bourrasque=air/rafale ·
+# Lenoir=noble/cristalline · Boucherie=fournaise/lourde.
+#
+# RE-BALANCE 2026-08-05 (« on n'entend pas bien les armes »). Cause MESURÉE :
+# la bande-son Suno arrive à -17,8 dB de moyenne quand les tirs sont à ~-35 dB
+# — 17 dB d'écart, la musique masquait les armes. Les volumes montent d'environ
+# +5 à +7 dB, bornés pour que la crête reste sous -2 dB APRÈS master_volume :
+#   crête finale = crête_fichier + 20·log10(volume) + 20·log10(master 0.9)
+# Crêtes fichier mesurées (ffmpeg volumedetect) : pépin -7,5 · bourrasque -10,0
+# · lenoir -9,9 · boucherie -5,9 dB. La hiérarchie anti-fatigue de CREDITS.md
+# est conservée : les armes FRÉQUENTES restent en retrait des armes RARES.
+
+[fire_pepin]        # Digit1 — pistolet (CZ-52) · fréquent → crête finale ≈ -2,2 dB
+path = "audio/forgia_original/weapons/pepin_forge.ogg"
+volume = 2.05
+
+[fire_bourrasque]   # Digit2 — mitraillette (SKS) · full-auto, le plus répété →
+                    # gardé sous les autres (les instances se cumulent) ≈ -4,0 dB
+path = "audio/forgia_original/weapons/bourrasque_gale.ogg"
+volume = 2.20
+
+[fire_lenoir]       # Digit3 — sniper (Mosin Nagant) · rare, doit CLAQUER ≈ -1,8 dB
+path = "audio/forgia_original/weapons/lenoir_royal.ogg"
+volume = 2.80
+
+[fire_boucherie]    # Digit4 — pompe · rare mais fichier déjà chaud (-5,9) ≈ -2,0 dB
+path = "audio/forgia_original/weapons/boucherie_furnace.ogg"
+volume = 1.75
+
+# ── Boucle de jeu ───────────────────────────────────────────────────────────
+# Tous les assets ci-dessous sont versionnés et originaux Forgia.
+#
+# RE-BALANCE 2026-08-05 (demande user) : les sons d'ANIMATION (dash, recharge,
+# changement d'arme, pas) reculent d'environ -6 dB. Ils accompagnent le geste,
+# ils ne doivent pas concurrencer le tir — surtout maintenant que les armes
+# ont pris +6 dB. Ce sont les sons les plus RÉPÉTÉS de la boucle : c'est là que
+# la fatigue d'écoute se paie en premier.
+
+[dash]
+path = "audio/forgia_original/movement/dash_ember.ogg"
+volume = 0.28
+
+# Le rechargement REMONTE (2026-08-05, 2e passe) : ce n'est pas de l'ambiance,
+# c'est de l'INFORMATION — « je peux retirer » doit s'entendre en plein combat.
+# `reload_complete` passe devant `reload_start` : c'est la fin qui rend la main.
+# Crêtes fichier : start -8,1 dB · complete -8,0 dB → finales ≈ -12 / -10 dB,
+# soit ~8-10 dB sous les tirs : audible, jamais concurrent.
+
+[reload_start]
+path = "audio/forgia_original/movement/reload_start.ogg"
+volume = 0.70
+
+[reload_complete]
+path = "audio/forgia_original/movement/reload_complete.ogg"
+volume = 0.90
+
+[weapon_switch]
+path = "audio/forgia_original/movement/weapon_switch.ogg"
+volume = 0.20
+
+[boon]
+path = "audio/forgia_original/events/boon_forged.ogg"
+volume = 0.70
+
+[chest]
+path = "audio/forgia_original/events/chest_open.ogg"
+volume = 0.65
+
+[wave_clear]
+path = "audio/forgia_original/events/wave_clear.ogg"
+volume = 0.60
+
+[wave_start]
+path = "audio/forgia_original/events/wave_start.ogg"
+volume = 0.55
+
+[boss_enrage]
+path = "audio/forgia_original/events/boss_enrage.ogg"
+volume = 0.85
+
+[victory]
+path = "audio/forgia_original/events/victory.ogg"
+volume = 0.90
+
+[defeat]
+path = "audio/forgia_original/events/defeat.ogg"
+volume = 0.75
+
+[ambience]
+path = "audio/forgia_original/ambience/forge_heart_loop.ogg"
+volume = 0.28
+
+# Les pas sont le son le PLUS répété du jeu (1013 lectures sur une session
+# mesurée) : ils reculent avec les autres sons d'animation (2026-08-05).
+
+[footstep_1]
+path = "audio/forgia_original/footsteps/forge_stone_01.ogg"
+volume = 0.14
+
+[footstep_2]
+path = "audio/forgia_original/footsteps/forge_stone_02.ogg"
+volume = 0.14
+
+[footstep_3]
+path = "audio/forgia_original/footsteps/forge_stone_03.ogg"
+volume = 0.14
+
+[footstep_4]
+path = "audio/forgia_original/footsteps/forge_stone_04.ogg"
+volume = 0.14
+
+# ── Sons d'UI (story-678 Phase 1) ───────────────────────────────────────────
+# La famille la plus discrète du pack (loudnorm -28 LUFS au générateur). Joués
+# au MENU comme in-game (système non gaté sur le mode). Hover = front montant.
+
+[ui_hover]
+path = "audio/forgia_original/ui/ui_hover.ogg"
+volume = 0.35
+
+[ui_click]
+path = "audio/forgia_original/ui/ui_click.ogg"
+volume = 0.5
+
+[ui_tab]
+path = "audio/forgia_original/ui/ui_tab.ogg"
+volume = 0.45
+
+[ui_buy]
+path = "audio/forgia_original/ui/ui_buy.ogg"
+volume = 0.6
+
+[ui_unlock]
+path = "audio/forgia_original/ui/ui_unlock.ogg"
+volume = 0.65
+
+[ui_denied]
+path = "audio/forgia_original/ui/ui_denied.ogg"
+volume = 0.5

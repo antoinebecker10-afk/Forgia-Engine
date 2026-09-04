@@ -1,0 +1,13 @@
+[package]
+name = "forgia-juice-lib"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Consolidated juice library — recoil + hit_stop + fov_punch + camera_shake (story-522 fusion). screen_flash standalone car cycle forgia-combat."
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+forgia-core = { workspace = true }

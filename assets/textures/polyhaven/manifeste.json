@@ -1,0 +1,215 @@
+{
+ "licence": "CC0 (Poly Haven)",
+ "source": "https://api.polyhaven.com",
+ "assets": {
+  "lave": {
+   "asset": "cracked_red_ground",
+   "resolution": "2k",
+   "cartes": {
+    "Diffuse": {
+     "fichier": "assets\\textures\\polyhaven\\cracked_red_ground\\diffuse.jpg",
+     "octets": 2849587,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cracked_red_ground/cracked_red_ground_diff_2k.jpg"
+    },
+    "nor_gl": {
+     "fichier": "assets\\textures\\polyhaven\\cracked_red_ground\\nor_gl.jpg",
+     "octets": 4271462,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cracked_red_ground/cracked_red_ground_nor_gl_2k.jpg"
+    },
+    "Rough": {
+     "fichier": "assets\\textures\\polyhaven\\cracked_red_ground\\rough.jpg",
+     "octets": 2159311,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cracked_red_ground/cracked_red_ground_rough_2k.jpg"
+    },
+    "Displacement": {
+     "fichier": "assets\\textures\\polyhaven\\cracked_red_ground\\displacement.jpg",
+     "octets": 1222962,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cracked_red_ground/cracked_red_ground_disp_2k.jpg"
+    }
+   },
+   "luminance_lineaire": 0.0793,
+   "moyenne_srgb": [
+    101,
+    74,
+    52
+   ],
+   "exces_vert": -2
+  },
+  "chemin": {
+   "asset": "cobblestone_floor_08",
+   "resolution": "1k",
+   "cartes": {
+    "Diffuse": {
+     "fichier": "assets\\textures\\polyhaven\\cobblestone_floor_08\\diffuse.jpg",
+     "octets": 585727,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/cobblestone_floor_08/cobblestone_floor_08_diff_1k.jpg"
+    },
+    "nor_gl": {
+     "fichier": "assets\\textures\\polyhaven\\cobblestone_floor_08\\nor_gl.jpg",
+     "octets": 1002410,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/cobblestone_floor_08/cobblestone_floor_08_nor_gl_1k.jpg"
+    },
+    "Rough": {
+     "fichier": "assets\\textures\\polyhaven\\cobblestone_floor_08\\rough.jpg",
+     "octets": 408718,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/cobblestone_floor_08/cobblestone_floor_08_rough_1k.jpg"
+    }
+   },
+   "luminance_lineaire": 0.2729,
+   "moyenne_srgb": [
+    146,
+    139,
+    128
+   ],
+   "exces_vert": 2
+  },
+  "terrain": {
+   "asset": "dry_riverbed_rock",
+   "resolution": "2k",
+   "cartes": {
+    "Diffuse": {
+     "fichier": "assets\\textures\\polyhaven\\dry_riverbed_rock\\diffuse.jpg",
+     "octets": 4334972,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dry_riverbed_rock/dry_riverbed_rock_diff_2k.jpg"
+    },
+    "nor_gl": {
+     "fichier": "assets\\textures\\polyhaven\\dry_riverbed_rock\\nor_gl.jpg",
+     "octets": 3831261,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dry_riverbed_rock/dry_riverbed_rock_nor_gl_2k.jpg"
+    },
+    "Rough": {
+     "fichier": "assets\\textures\\polyhaven\\dry_riverbed_rock\\rough.jpg",
+     "octets": 2578360,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dry_riverbed_rock/dry_riverbed_rock_rough_2k.jpg"
+    }
+   },
+   "luminance_lineaire": 0.1006,
+   "moyenne_srgb": [
+    102,
+    85,
+    74
+   ],
+   "exces_vert": -3
+  },
+  "paroi": {
+   "asset": "cliff_side",
+   "resolution": "2k",
+   "cartes": {
+    "Diffuse": {
+     "fichier": "assets\\textures\\polyhaven\\cliff_side\\diffuse.jpg",
+     "octets": 3387348,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_diff_2k.jpg"
+    },
+    "nor_gl": {
+     "fichier": "assets\\textures\\polyhaven\\cliff_side\\nor_gl.jpg",
+     "octets": 3585856,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_nor_gl_2k.jpg"
+    },
+    "Rough": {
+     "fichier": "assets\\textures\\polyhaven\\cliff_side\\rough.jpg",
+     "octets": 1765122,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_rough_2k.jpg"
+    }
+   },
+   "luminance_lineaire": 0.1114,
+   "moyenne_srgb": [
+    124,
+    83,
+    49
+   ],
+   "exces_vert": -3
+  },
+  "paroi_haute": {
+   "asset": "marble_cliff_03",
+   "resolution": "2k",
+   "cartes": {
+    "Diffuse": {
+     "fichier": "assets\\textures\\polyhaven\\marble_cliff_03\\diffuse.jpg",
+     "octets": 3068300,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_diff_2k.jpg"
+    },
+    "nor_gl": {
+     "fichier": "assets\\textures\\polyhaven\\marble_cliff_03\\nor_gl.jpg",
+     "octets": 2771168,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_nor_gl_2k.jpg"
+    },
+    "Rough": {
+     "fichier": "assets\\textures\\polyhaven\\marble_cliff_03\\rough.jpg",
+     "octets": 1440023,
+     "etat": "telecharge",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_cliff_03/marble_cliff_03_rough_2k.jpg"
+    }
+   },
+   "luminance_lineaire": 0.2343,
+   "moyenne_srgb": [
+    155,
+    125,
+    91
+   ],
+   "exces_vert": 2
+  },
+  "croute": {
+   "asset": "burned_ground_01",
+   "resolution": "1k",
+   "cartes": {
+    "Diffuse": {
+     "fichier": "assets\\textures\\polyhaven\\burned_ground_01\\diffuse.jpg",
+     "octets": 1033112,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/burned_ground_01/burned_ground_01_diff_1k.jpg"
+    },
+    "nor_gl": {
+     "fichier": "assets\\textures\\polyhaven\\burned_ground_01\\nor_gl.jpg",
+     "octets": 366727,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/burned_ground_01/burned_ground_01_nor_gl_1k.jpg"
+    },
+    "Rough": {
+     "fichier": "assets\\textures\\polyhaven\\burned_ground_01\\rough.jpg",
+     "octets": 319073,
+     "etat": "deja la",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/burned_ground_01/burned_ground_01_rough_1k.jpg"
+    }
+   },
+   "luminance_lineaire": 0.1026,
+   "moyenne_srgb": [
+    98,
+    85,
+    73
+   ],
+   "exces_vert": 0
+  }
+ },
+ "incandescence": {
+  "taille": [
+   2048,
+   2048
+  ],
+  "moyenne_rgb": [
+   109.6,
+   23.6,
+   4.2
+  ],
+  "part_incandescente": 0.039,
+  "octets": 2771404,
+  "fichier": "assets\\textures\\polyhaven\\lave\\incandescence.png",
+  "derive_de": "assets\\textures\\polyhaven\\cracked_red_ground\\displacement.jpg"
+ },
+ "octets_total": 43752903,
+ "mo_total": 41.7
+}

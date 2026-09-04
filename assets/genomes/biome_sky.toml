@@ -1,0 +1,90 @@
+# biome_sky.toml — palette cartoon skybox per biome.
+#
+# Story-555 (Phase 2 de story-554). Indexé par biome_id matchant
+# `forgia-stage::StageLoadResult.biome` (string lowercase from
+# roguelite_stages.toml `[stages.X].biome`).
+#
+# Format : 3 couleurs RGB 0-255.
+#   zenith_rgb  = sommet du ciel (face +Y du cubemap)
+#   horizon_rgb = bas du gradient des faces latérales
+#   ground_rgb  = face -Y (sous le joueur, vue plongeante)
+#
+# Hot-reload : Shift+F12 in-game → asset_server détecte mtime change →
+# AssetEvent::Modified → forgia-player regénère le cubemap live.
+#
+# Tuning : à itérer cartoon (saturation forte, contrastes francs, pas de
+# greys ternes). Palette canon Cult of the Lamb / Death's Door.
+#
+# overlay_blend (0-1, optionnel, défaut 0) : fond le ciel cartoon `sky_129`
+# (nuages roses) PAR-DESSUS le gradient sans le supprimer. 0 = gradient seul,
+# 0.6 ≈ nuages fondus dans les teintes du biome. Hot-reload Shift+F12.
+
+# ─── Fallback : utilisé si biome inconnu OU hors Roguelite (Menu, Arena générique) ──
+[default]
+zenith_rgb = [61, 36, 102]    # #3D2466 — deep violet (Crypts canon bible v1)
+horizon_rgb = [255, 107, 53]  # #FF6B35 — warm orange forge
+ground_rgb = [42, 27, 61]     # #2A1B3D — dark mauve
+overlay_blend = 0.6           # nuages cartoon sky_129 fondus dans le ciel forge
+
+# ─── Volcanic — Crypts of Anvil (bible v1 canon) ──
+# Identité forge/lave : violet ardent au zénith, orange chaud horizon,
+# mauve sombre au sol pour ancrage cinématique.
+[volcanic]
+zenith_rgb = [61, 36, 102]
+horizon_rgb = [255, 107, 53]
+ground_rgb = [42, 27, 61]
+overlay_blend = 0.6           # nuages cartoon fondus (identité crypts + ciel rose)
+
+# ─── Plains — biome ouvert pastoral ──
+[plains]
+zenith_rgb = [120, 180, 230]  # bleu ciel doux
+horizon_rgb = [255, 220, 180] # crème chaud
+ground_rgb = [80, 140, 60]    # vert prairie
+
+# ─── Forest — biome boisé tamisé ──
+[forest]
+zenith_rgb = [60, 100, 140]   # bleu-vert dense
+horizon_rgb = [200, 200, 100] # jaune feuillage
+ground_rgb = [40, 70, 30]     # vert sombre humus
+
+# ─── Desert — biome aride ensoleillé ──
+[desert]
+zenith_rgb = [200, 180, 100]  # jaune soleil
+horizon_rgb = [255, 200, 120] # crème dune
+ground_rgb = [180, 130, 70]   # sable orangé
+
+# ─── Mountain — biome haut altitude ──
+[mountain]
+zenith_rgb = [90, 110, 160]   # bleu froid
+horizon_rgb = [220, 220, 240] # blanc neigeux
+ground_rgb = [100, 100, 110]  # gris pierre
+
+# ─── Swamp — biome humide brumeux ──
+[swamp]
+zenith_rgb = [80, 90, 70]     # vert-gris brumeux
+horizon_rgb = [150, 160, 100] # jaune marécage
+ground_rgb = [40, 50, 30]     # vert vase
+
+# ─── Tundra — biome froid neigeux ──
+[tundra]
+zenith_rgb = [180, 200, 230]  # bleu glace
+horizon_rgb = [240, 240, 255] # blanc cassé
+ground_rgb = [200, 210, 220]  # gris-blanc neige
+
+# ─── Savanna — biome sec ensoleillé ──
+[savanna]
+zenith_rgb = [180, 160, 100]  # ocre chaud
+horizon_rgb = [255, 180, 80]  # orange savane
+ground_rgb = [160, 130, 70]   # terre cuite
+
+# ─── Jungle — biome dense tropical ──
+[jungle]
+zenith_rgb = [40, 80, 60]     # vert profond
+horizon_rgb = [180, 220, 100] # vert lime
+ground_rgb = [30, 60, 40]     # vert sombre
+
+# ─── Canyon — biome roche stratifiée ──
+[canyon]
+zenith_rgb = [200, 120, 80]   # ocre rouge
+horizon_rgb = [255, 160, 80]  # orange grès
+ground_rgb = [150, 80, 50]    # brun ferreux

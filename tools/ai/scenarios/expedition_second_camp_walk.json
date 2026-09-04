@@ -1,0 +1,21 @@
+{
+  "name": "expedition_second_camp_walk",
+  "workflow": "expedition_first_camp_walk",
+  "camp": "camp_2",
+  "boot_mode": "expedition",
+  "ready_timeout_s": 120,
+  "path_timeout_s": 180,
+  "sample_interval_s": 0.1,
+  "minimum_walk_speed_mps": 5.0,
+  "minimum_moving_samples": 150,
+  "maximum_camp_distance_m": 10.1,
+  "assertions": {
+    "game_mode": "Expedition",
+    "run_state_prefix": "None"
+  },
+  "evidence_sensors": [
+    "forgia2_animation.json",
+    "forgia2_expedition_carte.json",
+    "forgia2_expedition_posture.json"
+  ]
+}

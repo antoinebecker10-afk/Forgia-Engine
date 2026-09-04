@@ -1,0 +1,52 @@
+# roguelite_ultimate.toml — Tuning des Ultimes (touche F, story-596 T4a).
+#
+# Hot-reload (Shift+F12-like, poll mtime 1Hz) : édite ce fichier pendant que le
+# jeu tourne pour régler durées / rayons / dégâts SANS rebuild. Miroir exact des
+# `pub const` de Rust (ultimate.rs + ultimate_tech.rs) — si ce fichier disparaît,
+# le jeu retombe sur ces défauts (zéro régression).
+#
+# Cycle F : entrée en État Ultime `duration` s, puis cooldown `cooldown` s avant
+# réactivation (verrou total = duration + cooldown). Pendant l'Ultime, l'arme
+# équipée applique sa technique signature EN PLUS de son élément passif.
+
+# État Ultime (forgia-combat::UltimateState).
+duration = 10.0   # durée de la fenêtre active (s)
+cooldown = 25.0   # cooldown APRÈS la fin de l'Ultime (s)
+
+# Pépin (ModernAR) — explosion AOE autour de chaque impact.
+[explosion]
+radius = 4.5          # rayon du splash (m)
+damage_factor = 0.8   # fraction des dégâts du tir transmise aux voisins
+
+# Bourrasque (AssaultRifle) — chaîne électrique (rebonds de proche en proche).
+[chain]
+max_extra = 3         # nb de rebonds après l'ennemi touché
+hop_radius = 4.0      # distance max d'un rebond (m)
+damage_factor = 0.6   # fraction des dégâts transmise à chaque maillon
+
+# Mme Lenoir (Shotgun=sniper) — perforation (couloir) + poison sur les perforés.
+[pierce]
+range = 25.0          # portée du couloir derrière la cible (m)
+half_width = 1.5      # demi-largeur du couloir (m)
+damage_factor = 0.7   # fraction des dégâts transmise aux perforés
+
+# Pompe (RocketLauncher) — gel de zone (immobilise les ennemis du rayon).
+[freeze]
+secs = 2.5            # durée du gel (s)
+slow_factor = 0.0     # facteur de vitesse pendant le gel (0 = immobile)
+aoe_radius = 5.0      # rayon de la zone de gel (m)
+
+# VFX (T4b) — flash émissif par technique (sphère, fade par scale + lumière).
+# 1re passe placeholder en-moteur (sprite-sheet/Hanabi = polish ultérieur).
+# Hot-reload : les couleurs se ré-appliquent en place sur les matériaux partagés.
+[vfx]
+enabled = true             # master switch (off = Ultime invisible mais actif)
+ttl = 0.35                 # durée de vie d'un flash (s)
+light_intensity = 30000.0  # lumens du point light d'impact (explosion)
+light_range = 7.0          # portée (m) de la lumière
+explosion_scale = 2.5      # rayon (m) de la sphère d'explosion (Pépin)
+hit_scale = 0.7            # rayon (m) des pops par ennemi (chaîne/perfo/gel)
+explosion_rgb = [1.0, 0.5, 0.12]   # orange (Pépin)
+chain_rgb = [0.35, 0.75, 1.0]      # cyan électrique (Bourrasque)
+pierce_rgb = [0.75, 0.30, 1.0]     # violet (Mme Lenoir)
+freeze_rgb = [0.55, 0.85, 1.0]     # glace (Pompe)

@@ -1,0 +1,35 @@
+id = "mood_dark"
+name = "Dark Fantasy"
+domain = "Meta"
+category = "Mood"
+description = "Cross-domain mood: low light, high fog, reduced vegetation, aggressive enemies, eerie particles"
+version = "1.0.0"
+
+# === Low Visibility World ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "fog_density_terrain" }
+target = { domain = "vegetation_default", gene = "veg_density_global" }
+ratio = -200.0
+
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "ambient_brightness" }
+target = { domain = "npc_default", gene = "goblin_vision_range" }
+ratio = 10.0
+
+# === Darkness → Enemy Aggression ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "ambient_brightness" }
+target = { domain = "npc_default", gene = "goblin_chase_range" }
+ratio = -5.0
+
+# === Fog → Lamppost Visibility ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "fog_density_terrain" }
+target = { domain = "lampposts_default", gene = "light_intensity" }
+ratio = 5000000.0
+
+# === Dark → Water Murky ===
+[[cross_constraints]]
+source = { domain = "atmosphere_default", gene = "ambient_brightness" }
+target = { domain = "water_default", gene = "water_opacity" }
+ratio = -0.2

@@ -1,0 +1,253 @@
+# roguelite_decor.toml — Story-562b : props GLB Inferno pour remplir l'arène.
+#
+# Pack Inferno (CC0, volcan) dans assets/models/environment/inferno/. Spawné par
+# forgia-mode-roguelite (crate LIBRE), greffé sur l'arène SANS toucher
+# forgia-stage. Hot-reload mtime 1Hz.
+#
+# COHÉRENCE : chaque prop est calibré à une TAILLE CIBLE (m) par groupe via
+# mesure AABB runtime (les tailles natives des GLB varient trop). Ajuste les
+# `decor_target_*` pour la taille voulue. Colliders auto sur les gros props
+# (périmètre) ; petits débris au sol = sans collider (nav bots safe).
+# Arène crypts_of_anvil = extent 90 m (POI ~50 m, murs ~90 m).
+
+[[genes]]
+id = "decor_enabled"
+default = 1.0
+
+# ─── Anneau périmétrique ───────────────────────────────────────────────────────
+[[genes]]
+id = "decor_ring_radius_min"
+default = 42.0
+
+[[genes]]
+id = "decor_ring_radius_max"
+default = 74.0
+
+# NOTE story-674 — `decor_perimeter_count` et `decor_scatter_count` ont été
+# SUPPRIMÉS : le compte se dérive maintenant de l'aire de l'anneau et de
+# l'espacement visé (`decor_perimeter_spacing_m` / `decor_scatter_spacing_m`,
+# plus bas). Un littéral ne savait pas si la salle faisait 40 ou 90 m.
+
+# Nombre de LANDMARKS (statue / tour) = points focaux hauts. Pris sur le total.
+[[genes]]
+id = "decor_landmark_count"
+default = 4.0
+
+# Fraction du RESTE de l'anneau qui sont des braseros lumineux.
+[[genes]]
+id = "decor_brazier_ratio"
+default = 0.30
+
+# ─── Petits props dispersés au sol (sans collider) ────────────────────────────
+[[genes]]
+id = "decor_scatter_radius_min"
+default = 12.0
+
+[[genes]]
+id = "decor_scatter_radius_max"
+default = 72.0
+
+# ─── Tailles cibles (m) par groupe — calibration AABB (cohérence) ─────────────
+# Hauteur/taille max visée pour chaque type. C'est ICI qu'on règle l'échelle.
+[[genes]]
+id = "decor_target_landmark"
+default = 16.0
+
+[[genes]]
+id = "decor_target_big"
+default = 7.0
+
+[[genes]]
+id = "decor_target_brazier"
+default = 3.5
+
+[[genes]]
+id = "decor_target_scatter"
+default = 1.6
+
+# ─── Salles en L (murs KayKit dungeon, colliders) ─────────────────────────────
+# Coin + 2 bras de mur perpendiculaires, layout OUVERT (bots contournent).
+# Mets decor_room_count=0 si les bots se coincent.
+[[genes]]
+id = "decor_room_count"
+default = 4.0
+
+# Longueur de chaque bras (en segments de mur de 1 m).
+[[genes]]
+id = "decor_room_arm_segments"
+default = 6.0
+
+[[genes]]
+id = "decor_room_radius_min"
+default = 20.0
+
+[[genes]]
+id = "decor_room_radius_max"
+default = 52.0
+
+# ─── Gravats au sol (masquent la répétition des dalles forgia-stage) ──────────
+[[genes]]
+id = "decor_rubble_count"
+default = 34.0
+
+[[genes]]
+id = "decor_target_rubble"
+default = 3.4
+
+# ─── Fond « Cratère de la Forge » (incr.1) — hors-map, ÉNORME, sans collider ───
+# Anneau lointain de falaises volcaniques (rochers/crags Inferno scalés énormes)
+# AU-DELÀ des ramparts (~90 m) → silhouette de cratère à l'horizon. Hauteurs
+# variées = crête déchiquetée. + pics géants dominants (« le rocher géant hors map »).
+# Règle le radius/taille pour cadrer la skyline. Pure déco lointaine.
+[[genes]]
+id = "decor_background_count"
+default = 44.0
+
+[[genes]]
+id = "decor_background_radius_min"
+default = 110.0
+
+[[genes]]
+id = "decor_background_radius_max"
+default = 165.0
+
+# Taille cible (m) des falaises de crête. ÉNORME pour dominer les ramparts ~90 m.
+[[genes]]
+id = "decor_target_background"
+default = 34.0
+
+# Pics géants : peu nombreux, gigantesques, dominent la crête.
+[[genes]]
+id = "decor_giant_peak_count"
+default = 2.0
+
+[[genes]]
+id = "decor_giant_peak_radius"
+default = 205.0
+
+[[genes]]
+id = "decor_target_giant_peak"
+default = 80.0
+
+# ─── Cœur de forge (incr.2) : anneau de feu + monuments hauts ─────────────────
+# Braseros en anneau autour de l'aire de combat (« ring of fire ») + monuments/
+# cheminées hauts encadrant le centre. Rapproche l'ambiance forge du joueur.
+# Solides (cover, contournés par les bots). Centre (rayon < forge_ring_radius)
+# reste OUVERT pour le combat.
+[[genes]]
+id = "decor_forge_ring_count"
+default = 8.0
+
+[[genes]]
+id = "decor_forge_ring_radius"
+default = 16.0
+
+[[genes]]
+id = "decor_forge_monument_count"
+default = 4.0
+
+[[genes]]
+id = "decor_forge_monument_radius"
+default = 30.0
+
+[[genes]]
+id = "decor_forge_monument_target"
+default = 18.0
+
+# ─── Ville-forge (incr.3) : ceinture de bâtiments KayKit Medieval Hexagon ─────
+# Bâtiments rouges (forge, mine, tours, barracks, ruines...) en anneau FACE au
+# centre, dos aux ramparts → skyline de ville. Calibrés à `decor_target_building`.
+# Augmente `decor_perimeter_spacing_m` si la ville + les rochers font trop chargé.
+[[genes]]
+id = "decor_building_count"
+default = 18.0
+
+[[genes]]
+id = "decor_building_radius_min"
+default = 52.0
+
+[[genes]]
+id = "decor_building_radius_max"
+default = 76.0
+
+[[genes]]
+id = "decor_target_building"
+default = 12.0
+
+# ─── Anti-freeze (story-619 follow-up) : étalement du spawn décor ─────────────
+# Le décor est planifié d'un coup mais instancié par budget/frame. Sans ça, ~800
+# props GLB s'instancient en 1 frame à l'entrée de stage = freeze de 65 ms. Plus
+# haut = remplissage plus rapide mais hitch plus gros ; plus bas = pop-in plus
+# long mais 0 freeze. 12/frame ≈ 1,1 s pour ~800 props, chaque frame < 16 ms.
+[[genes]]
+id = "decor_spawn_budget_per_frame"
+default = 12.0
+
+# ─── Zones interdites au décor (story-672) ────────────────────────────────────
+# INVARIANT : aucun prop ne doit atterrir là où quelqu'un APPARAÎT. Sinon le
+# joueur spawne dans un rocher et les ennemis naissent coincés dans le décor.
+# Le filtre s'applique en SORTIE de planification, donc il couvre TOUS les
+# générateurs (périmètre, scatter, gravats, salles en L, anneau de forge,
+# bâtiments) — au lieu d'aller corriger chaque rayon un par un.
+
+# Rayon dégagé autour du point d'apparition du joueur (m). Le joueur est un
+# disque de 0,6 m ; 8 m lui laissent de quoi se retourner et voir la salle avant
+# d'être au contact.
+[[genes]]
+id = "decor_keepout_player_m"
+default = 8.0
+
+# Marge ajoutée de part et d'autre des ANNEAUX d'apparition ennemis (m), en plus
+# de leur dispersion (`ring.jitter_m` de roguelite_waves.toml). Un ennemi qui
+# apparaît à 1 m d'un pilier est déjà coincé : il pousse dedans sans jamais
+# l'contourner (les bots n'ont pas de navmesh).
+[[genes]]
+id = "decor_keepout_spawn_margin_m"
+default = 3.5
+
+# ─── Aménagement dérivé (story-674) ──────────────────────────────────────────
+# Le semis passe du polaire aléatoire au BRUIT BLEU : espacement minimum garanti,
+# plus d'amas ni de trous. Et le COMPTE se dérive de l'aire au lieu d'être un
+# littéral — `covers_expected(aire, espacement)` (forgia-core::layout).
+
+# Espacement minimal entre deux petits props au sol (m).
+[[genes]]
+id = "decor_scatter_spacing_m"
+default = 5.0
+
+# Espacement minimal entre deux props SOLIDES du périmètre (m).
+# Bande sourcée 3-10 m (Watch Dogs, Gears) — cf map-design-patterns §11.
+[[genes]]
+id = "decor_perimeter_spacing_m"
+default = 9.0
+
+# Plafond de props planifiés par salle. Garde-fou de BUDGET DE FRAME, pas de
+# goût : l'aire d'une arène de 90 m rend une dérivation à 5 m très généreuse.
+# Quand le plafond mord, le log le DIT (jamais de troncature silencieuse).
+[[genes]]
+id = "decor_max_props"
+default = 420.0
+
+# ─── Le COUVERT de l'aire de combat (story-688) ──────────────────────────────
+# Les props SOLIDES vivaient tous dans l'anneau 42→74 m : l'aire où l'on se bat
+# n'avait aucun abri. C'est un défaut de COMPOSITION, pas de densité — ajouter
+# des props ne le corrigeait pas, il fallait les mettre au bon endroit.
+#
+# Le rôle se DÉRIVE de la hauteur EN JEU (≥ 1,80 m casse la ligne de vue,
+# map-design-patterns §11) — pas de la hauteur native : le kit hexagon est en
+# miniatures (0,93 m) et le décor le recalibre à 7 m. Filtrer sur le natif
+# conclurait « ces cartes n'ont aucun couvert », ce qui est faux.
+
+# Rayon intérieur de l'anneau de couvert (m). 20 m laisse le centre dégagé —
+# c'est là que tombe le complexe de pièces (36 m de côté) sur les cartes
+# génératives, et le joueur doit pouvoir respirer autour de son apparition.
+[[genes]]
+id = "decor_cover_radius_min_m"
+default = 20.0
+
+# Espacement des abris (m). Bande sourcée 3-10 m (Watch Dogs, Gears of War),
+# 10 m au maximum. 8 m = assez dense pour qu'un repli existe toujours, assez
+# lâche pour qu'on ne joue pas à cache-cache dans une forêt de piliers.
+[[genes]]
+id = "decor_cover_spacing_m"
+default = 8.0

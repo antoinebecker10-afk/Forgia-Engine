@@ -1,0 +1,273 @@
+# Forgia V2 — Viewmodel Arena Genome
+# Configuration des 4 armes V1 Arena (hot-reload via Bevy Asset).
+#
+# Mapping :
+#   Digit1 (ModernAR)     → pepin
+#   Digit2 (AssaultRifle) → bourrasque
+#   Digit3 (Shotgun)      → madame_lenoir
+#   Digit4 (RocketLauncher)→ boucherie
+#
+# Assets : assets/models/weapons/forgia/{pepin,bourrasque,madame_lenoir,boucherie}.glb
+
+[weapons.pepin]
+# Slot 1 (Digit1) — Gun (pistolet semi-auto) — Pépin
+# ─── Viewmodel PIXEL ART ────────────────────────────────────────────────────
+# Le GLB (assets/models/weapons/forgia/pepin.glb) est un maillage FUSIONNÉ :
+# 1 node, 1 mesh, 0 animation, 0 squelette — donc aucun rechargement animé
+# possible dessus tel quel. Les frames sont produites par
+# `tools/art/pepin_sprites.py`, qui REND ce même GLB sous l'angle voulu puis
+# réduit l'image en pixel art (procédé Doom / Duke 3D). Le barillet y est isolé
+# par un critère géométrique, ce qui rend le rechargement de revolver animable
+# sans toucher à l'asset.
+#
+# Régénérer après tout changement d'angle :
+#   cd tools/art && python pepin_sprites.py
+# DÉSACTIVÉ 2026-08-11 (demande produit) : retour au viewmodel GLB 3D.
+# sprite_dir vide = weapon_is_sprite() false, le chemin 3D reprend la main.
+# Les frames et le pipeline (tools/art/pepin_sprites.py) restent disponibles
+# pour réactivation — il suffit de restaurer le chemin ci-dessous.
+sprite_dir = ""
+sprite_fire_frames = 3
+sprite_reload_frames = 12
+sprite_idle_frames = 12       # Pépin est vivant : il cligne des yeux au repos
+sprite_idle_secs = 3.6        # durée d'une boucle de repos
+sprite_ads_frames = 12        # visée : l'arme plein dos, clip à part (convention CoD)
+target_size = 0.90              # ★ réduit hipfire 1.10→0.90 (au jugé moins encombrant)
+hide_support_hand = true        # pistolet une-main : pas de main gauche (story-661)
+offset_x = 0.22
+offset_y = -0.35
+offset_z = -1.30
+# ⚠ Ces rotations dépendent du MODE, et se contredisent d'un mode à l'autre :
+#   - GLB 3D (mode actuel, sprite_dir vide) : yaw **-90°** oriente le maillage.
+#     À 0°, l'arme se voit DE PROFIL — c'est la régression du 2026-08-11.
+#   - Quad sprite : yaw **0°** obligatoire, sinon le quad est de chant (invisible).
+# Restauré à -90.0 le 2026-08-12 (rapporté en jeu : « l'arme est vue du côté »).
+# Valeur d'origine confirmée par git : `beac5c8` avait fait passer -90.0 → 0.0
+# pour le sprite ; le revert `46e8808` avait vidé sprite_dir sans remettre l'angle.
+# Si le pixel art est réactivé un jour, ce yaw doit repasser à 0.0 EN MÊME TEMPS.
+rotation_x_deg = 0.0
+rotation_y_deg = -90.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.55
+ads_offset_x = 0.0             # centré horizontal
+ads_offset_y = -0.28           # crosshair clair du mesh (aligné Boucherie)
+ads_offset_z = -0.80
+ads_fov_deg = 30.0
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.40
+ads_move_speed_factor = 0.75  # gun = pénalité légère
+scope_glass_alpha_ads = 0.20
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 1.00   # ★ pas de transparence user request 2026-05-18
+ads_mouse_sensitivity_factor = 0.70  # précision moyenne (semi-auto pistolet)
+# Fire behavior — Pistolet semi-auto Pépin
+# TTK Overwatch : body 4 shots (0.57s) / head 2 shots (0.29s) — DPS 168 polyvalent
+fire_mode = "semi"
+burst_count = 0
+damage = 28.0           # bump 25→28 (cohérence vs SMG 16)
+fire_rate = 6.0
+range = 80.0
+pellets = 1
+spread_deg = 0.0
+sniper_scope_fullscreen = false
+# Phase F — TTK balance Overwatch
+head_damage_mul = 2.0          # ★ 2x headshot
+damage_falloff_start = 30.0    # full damage 0-30m
+damage_falloff_end = 80.0      # min damage 80m+
+damage_falloff_min = 0.60      # -40% au-delà 80m
+# Phase G — Juice AAA-safe per Pépin (semi pistolet, gunfeel moderne) — softening v2
+shake_trauma = 0.03            # ← 0.06→0.03 (moitié)
+recoil_pitch_deg = 0.25        # ← 0.5→0.25 (moitié)
+recoil_yaw_random_deg = 0.05   # ← 0.12→0.05 (très subtil)
+fov_punch_deg = 0.0            # ★ SKIP (CS2 philosophy — semi-auto)
+# Phase H — ADS scale shrink (gun plus petit en ADS = crosshair visible)
+ads_scale_factor = 0.70        # -30% taille en full ADS
+# Story-455 Phase A — Ammo Pépin (pistolet semi, clip pistolet AAA standard)
+mag_size = 12                  # CoD Modern Warfare M1911 / Glock pattern
+reserve_max = 84               # 7 mags total
+reload_time_secs = 1.2         # pistolet rapide
+reload_kind = "mag"
+infinite_ammo = false
+low_ammo_threshold = 0.25      # flash <= 3 bullets
+
+[weapons.bourrasque]
+# Slot 2 (Digit2) — Mitraillette classique (SMG full-auto, 1 balle/tir) — Bourrasque
+target_size = 0.90              # ★ réduit hipfire 1.10→0.90
+# Ancres mains GLB (story-661) — tubes MK_R/MK_L placés à la main le 2026-07-20
+# (calibration_bourrasque.blend → read_grip_markers). Camera-local, m.
+grip_anchor = [-0.002, -0.131, 0.040]
+barrel_anchor = [-0.033, 0.069, -0.360]
+offset_x = 0.22
+offset_y = -0.35
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = -90.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.55
+ads_offset_x = 0.0             # centré horizontal
+ads_offset_y = -0.28           # crosshair clair du mesh (aligné Boucherie)
+ads_offset_z = -0.80
+ads_fov_deg = 32.0
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.40
+ads_move_speed_factor = 0.70
+scope_glass_alpha_ads = 0.20
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 0.40   # body semi-transparent SMG
+ads_mouse_sensitivity_factor = 0.70  # cadence rapide, précision moyenne
+# Fire behavior — mitraillette classique (feedback user 2026-06-19 : la gerbe de
+# pellets dispersés ne plaît pas). Bourrasque = SMG STANDARD : 1 balle par tir,
+# full-auto rapide, cône quasi nul. DPS conservé vs lance-rafales (≈120 close).
+# 1×11 × 11/s = 121 DPS soutenu ; falloff doux 18→30 m.
+fire_mode = "auto"
+burst_count = 0
+damage = 11.0           # par balle (1 balle/tir, plus de gerbe)
+fire_rate = 11.0        # cadence SMG soutenue (full-auto)
+range = 80.0            # ★ portée alignée sur Pépin (user 2026-06-24)
+pellets = 1             # balle unique — plus de dispersion
+spread_deg = 1.5        # quasi précis en auto (léger cône de cadence)
+sniper_scope_fullscreen = false
+head_damage_mul = 1.5          # balle unique = headshot redevient payant
+# Portée de dégâts alignée sur Pépin (user 2026-06-24) : full 0-30 m, -40% à 80 m.
+damage_falloff_start = 30.0    # full damage 0-30 m (= Pépin)
+damage_falloff_end = 80.0      # min damage 80 m+ (= Pépin)
+damage_falloff_min = 0.60      # -40% au-delà (= Pépin)
+# Juice SMG : recul vertical léger, wobble horizontal réduit (arme contrôlée)
+shake_trauma = 0.05
+recoil_pitch_deg = 0.40
+recoil_yaw_random_deg = 0.10   # wobble horizontal réduit (précision SMG)
+fov_punch_deg = 0.0
+ads_scale_factor = 0.65        # -35% taille en full ADS
+# Ammo : mag 30 (~2,7 s de tir auto à 11/s), recharge vive SMG
+mag_size = 30
+reserve_max = 120              # 4 mags total
+reload_time_secs = 1.6
+reload_kind = "mag"
+infinite_ammo = false
+low_ammo_threshold = 0.25      # flash <= 7 ("Saperlipopette, faut recharger !")
+
+[weapons.madame_lenoir]
+# Slot 3 (Digit3) — Sniper (semi-auto, one-shot, scope fullscreen) — Madame Lenoir
+# Meshy axis : +X local (vs -X pour Pepin/Bourrasque). R_y(+90)·(+1,0,0)=(0,0,-1) forward.
+target_size = 1.15              # ★ sniper un peu + gros (user 2026-07-20)
+# Ancres mains GLB (story-661). Main soutien SOUS le canon, en avant (sniper).
+grip_anchor = [-0.002, -0.131, 0.120]
+barrel_anchor = [-0.020, -0.080, -0.560]
+barrel_roll_deg = 90.0          # paume tournée vers le HAUT (tient le canon par le bas)
+offset_x = 0.25
+offset_y = -0.40
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = 90.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.65   # canon long sniper
+ads_offset_x = 0.0
+ads_offset_y = -0.20
+ads_offset_z = -0.85
+ads_fov_deg = 10.0      # ULTRA zoom sniper (~4-5x)
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.40
+ads_move_speed_factor = 0.35  # sniper très pénalisé en visée
+scope_glass_alpha_ads = 0.10  # scope très see-through (sniper precise)
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 1.00   # ★ pas de body fade (scope fullscreen overlay cache déjà)
+ads_mouse_sensitivity_factor = 0.30  # ★ ultra-lent précision sniper
+# Fire behavior — Sniper Madame Lenoir
+# TTK Overwatch : head 1-shot (100hp) / body 2 shots (50dmg×2)
+fire_mode = "semi"
+burst_count = 0
+damage = 50.0          # ★ base body. ×2 head = 100 = one-shot head
+fire_rate = 0.8        # ~1 tir / 1.25s
+range = 300.0
+pellets = 1
+spread_deg = 0.0       # precision absolute
+sniper_scope_fullscreen = true   # ★ active overlay fullscreen ADS
+# Phase F — TTK balance Overwatch (sniper = no falloff, headshot insta-kill)
+head_damage_mul = 2.0          # ★ head one-shot
+damage_falloff_start = 300.0   # pas de falloff
+damage_falloff_end = 300.0
+damage_falloff_min = 1.00      # 100% damage all range
+# Phase G — Juice AAA-safe per Lenoir (sniper one-big-kick + recovery) — softening v2
+shake_trauma = 0.12            # ← 0.18→0.12 (~0.8° peak, decay 100ms)
+recoil_pitch_deg = 1.2         # ← 1.8→1.2 (kick puissant mais pas brutal)
+recoil_yaw_random_deg = 0.0    # ★ pas de yaw : sniper = précision absolue
+fov_punch_deg = 0.5            # ← 0.8→0.5 (subtle weight feel, CS2 AWP-lite)
+# Phase H — ADS scale shrink (sniper = PAS de changement, scope overlay cache déjà)
+ads_scale_factor = 1.00        # ★ inchangé (sniper a son scope fullscreen)
+# Story-455 Phase A — Ammo Madame Lenoir (sniper bolt-style mag 5, AWP/Kraber)
+mag_size = 5
+reserve_max = 25               # 5 mags total
+reload_time_secs = 2.5         # bolt-action lent
+reload_kind = "mag"
+infinite_ammo = false
+low_ammo_threshold = 0.40      # flash <= 2 (mag petit, seuil plus haut)
+
+[weapons.boucherie]
+# Slot 4 (Digit4) — LANCE-ROQUETTES parabolique (story-534 AC1, ex-pump) — Boucherie
+# Meshy axis : +Z local (vs -X autres). R_y(180)·(0,0,1)=(0,0,-1) forward.
+target_size = 1.00              # ★ réduit hipfire 1.20→1.00
+offset_x = 0.28
+offset_y = -0.40
+offset_z = -1.30
+rotation_x_deg = 0.0
+rotation_y_deg = 180.0
+rotation_z_deg = 0.0
+hipfire_tilt_y_deg = 5.0
+fallback_scale = 1.0
+barrel_length = 0.55
+ads_offset_x = 0.0             # centré horizontal
+ads_offset_y = -0.28           # ★ remonté (était -0.50, shotgun mesh + volumineux donc un peu plus bas que les autres)
+ads_offset_z = -0.85
+ads_fov_deg = 35.0      # Shotgun zoom modéré
+sight_local_x = 0.0
+sight_local_y = 0.0
+sight_local_z = 0.0
+sight_distance = 0.45
+ads_move_speed_factor = 0.65
+scope_glass_alpha_ads = 0.30
+# ADS visibility & feel (Phase E 2026-05-18)
+ads_viewmodel_fade_alpha = 0.30   # body très transparent (pas d'iron sight précis)
+ads_mouse_sensitivity_factor = 0.85  # cone spread = pas besoin précision fine
+# Fire behavior — story-534 AC1 (GDD Mission 3) : ROQUETTE parabolique.
+# damage = 0 ⇒ guard `projectile_weapon` forgia-fps : le ray hitscan ne porte
+# ni dégâts ni tracer — la roquette (boucherie_rocket.rs, 12 m/s, explosion
+# 4 m / 70 dmg + knockback pop) est spawnée sur WeaponFiredEvent.
+# Le hitscan plumbing garde : ammo, cooldown, recoil, muzzle, SFX.
+fire_mode = "pump"      # 1 roquette par pression, pause théâtrale
+burst_count = 0
+damage = 0.0           # ★ projectile : dégâts portés par l'explosion AOE
+fire_rate = 0.9        # ~1 roquette / 1.1 s
+range = 60.0           # portée du ray neutralisé (sensor log uniquement)
+pellets = 1
+spread_deg = 0.0
+sniper_scope_fullscreen = false
+head_damage_mul = 1.0          # sans objet (AOE = Body)
+damage_falloff_start = 60.0    # sans objet (damage 0)
+damage_falloff_end = 60.0
+damage_falloff_min = 1.0       # sans objet (damage 0)
+# Juice lance-roquettes : gros kick théâtral (le plus lourd du roster)
+shake_trauma = 0.20
+recoil_pitch_deg = 1.6
+recoil_yaw_random_deg = 0.10
+fov_punch_deg = 1.0
+# Phase H — ADS scale shrink (gros mesh = shrink agressif)
+ads_scale_factor = 0.60        # -40% taille en full ADS (mesh le plus volumineux)
+# Ammo story-534 AC1 : mag 3, reload roquette par roquette (GDD : 4 s les 3)
+mag_size = 3
+reserve_max = 15               # 5 mags total
+reload_time_secs = 1.33        # durée 1 roquette (boucle jusqu'à mag full ou interrupt)
+reload_kind = "shell_per_shell"
+infinite_ammo = false
+low_ammo_threshold = 0.34      # flash <= 1 roquette ("Plus de jouets ! Vite vite !")

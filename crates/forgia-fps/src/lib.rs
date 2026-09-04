@@ -1,0 +1,1652 @@
+//! # forgia-fps
+//!
+//! Orchestrator Arena FPS — assemble le firing path, l'arena, le scoring, les
+//! ammo systems et le tuning global. Le rendering du viewmodel 1P (mesh, ADS,
+//! scope glass, auto-scale) vit dans `forgia-viewmodel` (Tier 2B 2026-05-19),
+//! équivalent `CBaseViewModel` du Source SDK.
+//!
+//! Frontière respectée (Source SDK pattern + Bevy official example) :
+//! - **forgia-viewmodel** : ce qui touche le mesh 1P (data layer, attach, pose, fade).
+//! - **forgia-fps** : firing path orchestré + FPS tuning + ammo + scoring.
+//! - **forgia-combat** : domaine `WeaponType`, `EquippedWeapons`, `WeaponFireCooldown`.
+
+use bevy::ecs::system::SystemParam;
+use bevy::input::mouse::MouseButtonInput;
+use bevy::input::ButtonState;
+use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
+// Story-490 — DamageKind + DeathEvent pour bridge V7 damage pipeline (despawn_dead_cubes triggers DeathEvent before despawn → Roguelite observers loot/defeat fire correctement).
+use forgia_combat::prelude::*;
+use forgia_combat::weapons::{EquippedWeapons, WeaponFireCooldown};
+use forgia_core::prelude::*;
+use forgia_crosshair::CrosshairTuning;
+use forgia_damage::{DamageKind, DeathEvent, Mortal};
+use forgia_effects::prelude::{
+    spawn_hitscan_tracer, spawn_impact_vfx, spawn_kill_burst, spawn_muzzle_flash, AscendsOnDeath,
+    TracerResources, WeaponVfxEffects,
+};
+use forgia_genome_core::{Genome, GenomeLoader};
+use forgia_input::InputBlockers;
+use forgia_juice_lib::camera_shake::{
+    CameraShakeTuning, ForgiaJuiceCameraShakePlugin, ShakeImpulse,
+};
+use forgia_juice_lib::fov_punch::{ForgiaJuiceFovPunchPlugin, FovPunchImpulse, FovPunchTuning};
+use forgia_juice_lib::recoil::{ForgiaJuiceRecoilPlugin, WeaponRecoilImpulse};
+use forgia_mode_fps_arena::TargetCube;
+use forgia_player::prelude::MouseLookTuning;
+use forgia_player::prelude::*;
+use forgia_viewmodel::{
+    AdsState, AdsTuning, ForgiaViewmodelPlugin, ViewmodelArmsTuning, ViewmodelFovTuning,
+    ViewmodelGenomeCtx, ViewmodelGenomeEntry, ViewmodelMotionTuning,
+};
+use serde::Deserialize;
+
+mod ammo_systems;
+pub mod bourrasque;
+mod hitscan_sensor;
+pub mod lenoir;
+pub use hitscan_sensor::{HitscanCategory, HitscanLogEntry, HitscanSensorState};
+pub mod aim_assist;
+pub mod pepin;
+mod score;
+
+pub mod prelude {
+    pub use crate::aim_assist::AimAssistTuning;
+    pub use crate::score::{ArenaScore, ArenaScorePlugin, ScoreboardVisible};
+    pub use crate::ForgiaFpsPlugin;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Fire trigger state (Resources + dispatch pure)
+// ════════════════════════════════════════════════════════════════════════════
+
+/// État du clic gauche pour dispatch fire_mode (V2 : ButtonInput consommé par egui →
+/// tracking via MessageReader<MouseButtonInput>).
+/// `just_pressed` = transition Released→Pressed cette frame (mode semi/pump/burst).
+/// `held` = bouton actuellement enfoncé (mode auto).
+#[derive(Resource, Default)]
+pub struct LeftMouseState {
+    /// Edge clic RÉSOLU pour le step FixedUpdate courant (rempli par
+    /// `drain_left_click_edge`, lu par `fire_weapon_minimal`). Vrai sur exactement
+    /// 1 step après un press (semi/pump/burst).
+    pub just_pressed: bool,
+    pub held: bool,
+    /// Latch interne (keystone 0.1a-2 slice 4) : passe `true` sur un press, posé en
+    /// `RunFixedMainLoop::BeforeFixedMainLoop` (avant la boucle fixe) et consommé 1×
+    /// par le drain. Survit aux frames SANS step fixe (anti-perte) et n'est lu qu'une
+    /// fois (anti-doublé) — l'équivalent manuel de ce que leafwing fait pour ActionState.
+    pressed_latch: bool,
+}
+
+/// État d'une rafale en cours (fire_mode = "burst").
+/// Inséré au just_pressed initial, retiré quand `shots_remaining == 0`.
+/// Pendant qu'il existe, le cooldown standard est bypassé — le timer interne pilote la cadence.
+#[derive(Resource)]
+pub struct BurstState {
+    pub shots_remaining: u8,
+    pub interval_timer: Timer,
+}
+
+/// Décision pure du dispatch fire_mode → (doit tirer cette frame, démarre une rafale).
+/// Extrait de `fire_weapon_minimal` pour testabilité headless.
+///
+/// - `auto` : tire tant que `held`.
+/// - `semi` / `pump` : tire uniquement sur `just_pressed`.
+/// - `burst` : si rafale active, suit `burst_fires_now` ; sinon démarre sur `just_pressed`.
+/// - inconnu : fallback `semi` (warn loggé par l'appelant).
+pub fn dispatch_fire_trigger(
+    fire_mode: &str,
+    held: bool,
+    just_pressed: bool,
+    burst_active: bool,
+    burst_fires_now: bool,
+) -> (bool, bool) {
+    match fire_mode {
+        "auto" => (held, false),
+        "semi" | "pump" => (just_pressed, false),
+        "burst" => {
+            if burst_active {
+                (burst_fires_now, false)
+            } else if just_pressed {
+                (true, true)
+            } else {
+                (false, false)
+            }
+        }
+        _ => (just_pressed, false),
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FPS Tuning Genome (fps_tuning.toml — anti-hardcode constantes feel)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Toutes les constantes "feel" qui étaient hardcodées dans les crates juice /
+// crosshair / player / ads. Loadées au Startup depuis `assets/genomes/fps_tuning.toml`
+// et propagées par `sync_fps_tuning` à chaque downstream Resource Tuning.
+
+#[derive(Deserialize, TypePath, Clone)]
+pub struct FpsTuning {
+    pub camera_shake: FtCameraShake,
+    pub fov_punch: FtFovPunch,
+    pub ads: FtAds,
+    pub mouse_look: FtMouseLook,
+    pub crosshair_hipfire: FtCrosshairHipfire,
+    pub crosshair_ads_dot: FtCrosshairAdsDot,
+    pub crosshair_sniper_overlay: FtCrosshairSniper,
+    // Story-528 AC1 — aim assist accessibility (Roblox kids + casual).
+    #[serde(default)]
+    pub aim_assist: FtAimAssist,
+    // Story-617 — présence viewmodel (sway/bob/idle).
+    #[serde(default)]
+    pub viewmodel_motion: FtViewmodelMotion,
+    // Story-617 inc.2 — placement des bras procéduraux.
+    #[serde(default)]
+    pub viewmodel_arms: FtViewmodelArms,
+    // Story-618 — FOV viewmodel séparé.
+    #[serde(default)]
+    pub viewmodel_fov: FtViewmodelFov,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtViewmodelFov {
+    pub enabled: bool,
+    pub fov_deg: f32,
+}
+
+impl Default for FtViewmodelFov {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            fov_deg: 68.0,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtViewmodelArms {
+    pub enabled: bool,
+    // Story-661 — bras GLB cartoon vs poings procéduraux (toggle A/B hot-reload).
+    pub use_glb: bool,
+    pub glb_scale: f32,
+    pub scale: f32,
+    pub grip_x: f32,
+    pub grip_drop: f32,
+    pub grip_back: f32,
+    pub barrel_x: f32,
+    pub barrel_drop: f32,
+    pub barrel_fwd: f32,
+    pub elbow_drop: f32,
+    pub elbow_back: f32,
+    pub grip_elbow_out: f32,
+    pub barrel_elbow_out: f32,
+}
+
+impl Default for FtViewmodelArms {
+    fn default() -> Self {
+        // Miroir de ViewmodelArmsTuning::default (forgia-viewmodel).
+        Self {
+            enabled: true,
+            use_glb: true,
+            glb_scale: 1.0,
+            scale: 2.0,
+            grip_x: 0.0,
+            grip_drop: -0.08,
+            grip_back: 0.30,
+            barrel_x: -0.04,
+            barrel_drop: -0.06,
+            barrel_fwd: 0.30,
+            elbow_drop: 0.30,
+            elbow_back: 0.45,
+            grip_elbow_out: 0.12,
+            barrel_elbow_out: 0.34,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtViewmodelMotion {
+    pub sway_pos_per_px: f32,
+    pub sway_pos_max: f32,
+    pub sway_rot_per_px_deg: f32,
+    pub sway_rot_max_deg: f32,
+    pub sway_smooth: f32,
+    pub bob_pos: f32,
+    pub bob_freq: f32,
+    pub bob_speed_ref: f32,
+    pub idle_amp: f32,
+    pub idle_freq: f32,
+}
+
+impl Default for FtViewmodelMotion {
+    fn default() -> Self {
+        // Miroir exact de ViewmodelMotionTuning::default (forgia-viewmodel).
+        Self {
+            sway_pos_per_px: 0.0009,
+            sway_pos_max: 0.03,
+            sway_rot_per_px_deg: 0.03,
+            sway_rot_max_deg: 2.5,
+            sway_smooth: 9.0,
+            bob_pos: 0.010,
+            bob_freq: 2.0,
+            bob_speed_ref: 6.0,
+            idle_amp: 0.004,
+            idle_freq: 0.4,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtAimAssist {
+    pub strength: f32,
+    pub max_angle_deg: f32,
+    /// Story-615 — borne dure sur la correction de tir (degrés), anti-aimbot.
+    #[serde(default = "default_aa_max_correction")]
+    pub max_correction_deg: f32,
+    pub engage_distance_m: f32,
+}
+
+fn default_aa_max_correction() -> f32 {
+    5.0
+}
+
+impl Default for FtAimAssist {
+    fn default() -> Self {
+        Self {
+            strength: 0.6,
+            max_angle_deg: 7.0,
+            max_correction_deg: 5.0,
+            engage_distance_m: 60.0,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCameraShake {
+    pub default_decay: f32,
+    pub default_max_rotation_rad: f32,
+    pub yaw_factor: f32,
+    pub roll_factor: f32,
+    pub pitch_upward_bias: f32,
+    pub sample_rate_hz: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtFovPunch {
+    pub attack_secs: f32,
+    pub decay_secs: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtAds {
+    pub lerp_speed: f32,
+    pub punch_attenuation: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtMouseLook {
+    pub base_sensitivity: f32,
+    pub recoil_decay_per_sec: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCrosshairHipfire {
+    pub cross_len: f32,
+    pub cross_stroke: f32,
+    pub cross_alpha: u8,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCrosshairAdsDot {
+    pub outer_radius: f32,
+    pub inner_radius: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct FtCrosshairSniper {
+    pub scope_radius_factor: f32,
+    pub dim_alpha: u8,
+    pub dim_color: [u8; 3],
+    pub vignette_rings: u32,
+    pub ring_thickness_factor: f32,
+    pub ring_max_alpha: f32,
+    pub ring_color: [u8; 3],
+    pub ring_outer_extent: f32,
+    pub border_width: f32,
+    pub border_inner_width: f32,
+    pub border_inner_offset: f32,
+    pub reticle_gap: f32,
+    pub reticle_line_factor: f32,
+    pub reticle_color: [u8; 3],
+    pub reticle_line_stroke: f32,
+    pub reticle_tick_stroke: f32,
+    pub reticle_tick_size: f32,
+    pub red_dot_radius: f32,
+    pub red_dot_color: [u8; 3],
+}
+
+#[derive(Resource)]
+pub struct FpsTuningHandle(pub Handle<Genome<FpsTuning>>);
+
+// ════════════════════════════════════════════════════════════════════════════
+// SystemParams orchestrator (réduit le param count de fire_weapon_minimal)
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Bundle des resources timing pour le fire system (cooldown + burst + temps réel).
+#[derive(SystemParam)]
+pub struct FireTimingCtx<'w> {
+    pub cooldown: Option<Res<'w, WeaponFireCooldown>>,
+    pub burst_state: Option<ResMut<'w, BurstState>>,
+    pub time: Res<'w, Time>,
+}
+
+/// Bundle des MessageWriters juice (shake / recoil / fov punch) pour fire system.
+#[derive(SystemParam)]
+pub struct JuiceWriters<'w> {
+    pub shake: MessageWriter<'w, ShakeImpulse>,
+    pub recoil: MessageWriter<'w, WeaponRecoilImpulse>,
+    pub fov_punch: MessageWriter<'w, FovPunchImpulse>,
+}
+
+impl JuiceWriters<'_> {
+    /// Emit les 3 impulses depuis le genome de l'arme. Yaw random uniforme [-yaw_max..+yaw_max].
+    /// `seed` pour PRNG yaw (pseudo-déterministe par tir).
+    pub fn emit_from_genome(&mut self, e: &ViewmodelGenomeEntry, seed: u32) {
+        if e.shake_trauma > 0.0 {
+            self.shake.write(ShakeImpulse {
+                trauma: e.shake_trauma,
+            });
+        }
+        if e.recoil_pitch_deg.abs() > 0.001 || e.recoil_yaw_random_deg.abs() > 0.001 {
+            let yaw_signed = (pseudo_rand(seed) - 0.5) * 2.0 * e.recoil_yaw_random_deg;
+            self.recoil.write(WeaponRecoilImpulse {
+                pitch_rad: e.recoil_pitch_deg.to_radians(),
+                yaw_rad: yaw_signed.to_radians(),
+            });
+        }
+        if e.fov_punch_deg.abs() > 0.01 {
+            self.fov_punch.write(FovPunchImpulse {
+                peak_deg: e.fov_punch_deg,
+            });
+        }
+    }
+}
+
+/// Story-453 baseline reset (2026-05-18) — query simplifiée : ray hit le PARENT
+/// directement (bot = 1 entité unique avec capsule + Health + TargetCube).
+#[derive(SystemParam)]
+pub struct HitApplyCtx<'w, 's> {
+    pub health: Query<
+        'w,
+        's,
+        (
+            &'static mut Health,
+            Option<&'static MeshMaterial3d<StandardMaterial>>,
+            // Audit fire-path 2026-07-20 — flash déjà actif : reset du timer
+            // SANS re-capturer l'emissive (sinon le blanc du flash deviendrait
+            // « l'origine » et l'ennemi resterait blanc à jamais).
+            Option<&'static mut HitFlashTimer>,
+        ),
+        With<TargetCube>,
+    >,
+    /// Story-640 P0-2 — couche défensive optionnelle de la cible (Bouclier/Armure).
+    /// Le hit de base la draine (canal `Physical`) avant de fuir vers `combat::Health`.
+    /// Champ distinct de `health` → double emprunt disjoint autorisé.
+    pub defense: Query<'w, 's, &'static mut forgia_damage::DefenseLayer, With<TargetCube>>,
+    /// Story-642 P0-4 Inc.3 — vulnérabilité électrique (posée par forgia-mode-roguelite
+    /// sur les hits `Shock`). Le hit de base est ×`mult` avant absorption. Lecture seule ;
+    /// composant générique `forgia-damage` (visible cross-crate, contrairement à l'ex-`StatusShock`).
+    /// `With<TargetCube>` par cohérence défensive avec `health`/`defense` (on ne lit la vuln
+    /// que des cibles frappables, jamais du joueur si un 2e producteur apparaît un jour).
+    pub vulnerability: Query<'w, 's, &'static forgia_damage::Vulnerability, With<TargetCube>>,
+    /// Story-642 P0-4 Inc.3b — affinité par arme du hit de base (peuplée par
+    /// forgia-mode-roguelite ; vide si le toggle genome `base_hit` est OFF → `Physical`).
+    pub weapon_affinities: Res<'w, forgia_combat::weapons::WeaponAffinities>,
+}
+
+/// Bundle hitscan diagnostic — q_children pour predicate récursif + sensor state.
+#[derive(SystemParam)]
+pub struct HitscanCtx<'w, 's> {
+    pub q_children: Query<'w, 's, &'static Children>,
+    pub q_child_of: Query<'w, 's, &'static ChildOf>,
+    pub q_name: Query<'w, 's, &'static Name>,
+    /// Story-457 — lookup zone sur le collider directement frappé.
+    pub q_zone: Query<'w, 's, &'static forgia_damage::HitZoneTag>,
+    pub sensor: ResMut<'w, HitscanSensorState>,
+    /// Story-457 — multiplicateurs damage par zone (genome-driven, hot-reload).
+    pub feedback: Res<'w, forgia_damage::HitFeedback>,
+    /// Story-558 Phase 4 — boons multiplicateurs (damage_mul, fire_rate_mul,
+    /// damage_reduction). Default neutre 1.0/1.0/0.0 si pas de boon actif.
+    pub combat_mods: Res<'w, forgia_combat::combat_mods::PlayerCombatMods>,
+    /// Keystone 0.1b (story-634) — flux RNG combat DÉTERMINISTE (crit). Reseedé
+    /// depuis RunSeed au StartRunEvent (Roguelite) ; seed 0 déterministe hors run.
+    /// `begin_shot()` 1×/tir, puis `shot_stream(pellet, salt)` par roll.
+    pub combat_rng: ResMut<'w, forgia_combat::combat_rng::CombatRng>,
+    /// Story-559 slice B — émet `WeaponFiredEvent` par tir (son d'arme propre).
+    pub fired: MessageWriter<'w, forgia_combat::combat_juice::WeaponFiredEvent>,
+    /// Story-531 AC9 — résolution hit/miss par tir (jauge confiance Pépin).
+    pub resolved: MessageWriter<'w, forgia_combat::confidence::ShotResolved>,
+    /// Story-531 — jauge + tuning lus pour le payoff dégâts (neutre hors Pépin).
+    pub pepin_conf: Res<'w, forgia_combat::confidence::PepinConfidence>,
+    pub pepin_tuning: Res<'w, pepin::PepinTuning>,
+    /// Bouche du canon de l'arme VISIBLE dans le monde (3ᵉ personne). `None` en
+    /// vue subjective → repli sur le calcul viewmodel. Rangée dans ce paquet et
+    /// non en paramètre direct : `fire_weapon_minimal` est déjà à 16 params, la
+    /// limite de Bevy — un 17ᵉ ne compilerait pas.
+    pub muzzle: Option<Res<'w, forgia_combat::weapons::MuzzleWorld>>,
+    /// Story-615 — bullet magnetism : cibles candidates (cross-mode, découplé du
+    /// type `Health` — `Mortal Without<Player>` matche ennemis FPS + Roguelite).
+    pub aim_targets: Query<
+        'w,
+        's,
+        &'static GlobalTransform,
+        (With<Mortal>, Without<Player>, Without<FpsCamera>),
+    >,
+    pub aim_tuning: Res<'w, aim_assist::AimAssistTuning>,
+    pub aim_metrics: ResMut<'w, aim_assist::AimAssistMetrics>,
+    /// Compteur d'engagements agrégé (forgia2_fps_feel.json).
+    pub feel_metrics: ResMut<'w, FpsFeelMetrics>,
+}
+
+/// Multiplicateur damage falloff selon distance. Linéaire entre start et end.
+/// Avant start = 1.0, après end = falloff_min.
+pub fn falloff_multiplier(toi: f32, e: &ViewmodelGenomeEntry) -> f32 {
+    if toi <= e.damage_falloff_start {
+        return 1.0;
+    }
+    if toi >= e.damage_falloff_end {
+        return e.damage_falloff_min;
+    }
+    let span = (e.damage_falloff_end - e.damage_falloff_start).max(0.001);
+    let t = ((toi - e.damage_falloff_start) / span).clamp(0.0, 1.0);
+    1.0_f32.lerp(e.damage_falloff_min, t)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Plugin
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Modes où le combat FPS tourne (tir, ammo, sélection d'arme, aim assist).
+///
+/// Story-667 : source unique, en remplacement des quatre
+/// `in_state(Fps).or(in_state(Roguelite))` recopiés. Ajouter un mode de combat
+/// se fait désormais ici, pas en quatre endroits — c'était la mécanique exacte
+/// par laquelle un mode finissait à moitié câblé.
+///
+/// `ArenaTest` en fait partie : un blockout qu'on ne peut pas tirer dessus ne se
+/// juge pas. Les distances d'engagement sont la moitié du level design FPS.
+/// `Expedition` en fait partie depuis le 2026-08-14 : elle se joue à la 3ᵉ
+/// personne, mais « à la 3ᵉ personne » ne veut pas dire « sans combat ». Le tir
+/// y part de la caméra par-dessus l'épaule (cf. `AimCamera`), et l'arme
+/// équipée est visible dans la main du personnage.
+///
+/// Cette liste était le SEUL endroit du dépôt à connaître les zones qui tirent,
+/// pendant que quatre crates d'interface en tenaient une autre pour savoir quoi
+/// afficher. Les deux ont divergé — l'Expédition tirait sans killfeed, sans
+/// flash et sans arc de dégâts. Elles lisent maintenant la même table.
+///
+/// Volontairement SANS garde `AppMode` : ce prédicat gate des systèmes de
+/// simulation qui ont leurs propres conditions, et en ajouter une ici changerait
+/// leur comportement au lieu de le déplacer.
+fn fps_combat_mode(mode: Res<State<GameMode>>) -> bool {
+    forgia_core::capacites::capacites(mode.get()).combat
+}
+
+pub struct ForgiaFpsPlugin;
+
+impl Plugin for ForgiaFpsPlugin {
+    fn build(&self, app: &mut App) {
+        // MeshFaderPlugin (idempotent — plusieurs crates peuvent l'utiliser).
+        if !app.is_plugin_added::<forgia_effects::mesh_fader::MeshFaderPlugin>() {
+            app.add_plugins(forgia_effects::mesh_fader::MeshFaderPlugin);
+        }
+        // Arena spawn/cleanup + clouds.
+        if !app.is_plugin_added::<forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin>() {
+            app.add_plugins(forgia_mode_fps_arena::ForgiaModeFpsArenaPlugin);
+        }
+        // Juice plugins (idempotent — check anti double-add).
+        if !app.is_plugin_added::<ForgiaJuiceCameraShakePlugin>() {
+            app.add_plugins(ForgiaJuiceCameraShakePlugin);
+        }
+        if !app.is_plugin_added::<ForgiaJuiceFovPunchPlugin>() {
+            app.add_plugins(ForgiaJuiceFovPunchPlugin);
+        }
+        if !app.is_plugin_added::<ForgiaJuiceRecoilPlugin>() {
+            app.add_plugins(ForgiaJuiceRecoilPlugin);
+        }
+        // Viewmodel = render layer (Tier 2B 2026-05-19, équivalent CBaseViewModel
+        // Source SDK). Compose attach/pose/fade + load_viewmodel_genome Startup.
+        if !app.is_plugin_added::<ForgiaViewmodelPlugin>() {
+            app.add_plugins(ForgiaViewmodelPlugin);
+        }
+        // Story-531 — jauge de confiance Pépin (genome + update + sensor).
+        app.add_plugins(pepin::ForgiaPepinPlugin);
+        // Story-532 AC9 — stats Bourrasque (observe ShotResolved/CombatHitEvent).
+        app.add_plugins(bourrasque::ForgiaBourrasquePlugin);
+        // Story-533 AC10 — stats Lenoir (HS ratio, même pattern observe-only).
+        app.add_plugins(lenoir::ForgiaLenoirPlugin);
+        app.add_plugins(score::ArenaScorePlugin)
+            .init_resource::<EquippedWeapons>()
+            .init_resource::<LeftMouseState>()
+            .init_resource::<HitscanSensorState>()
+            .init_resource::<aim_assist::AimAssistTuning>()
+            // Story-642 P0-4 Inc.3b — table d'affinité par arme pour le hit de base
+            // (peuplée par forgia-mode-roguelite ; vide par défaut = hit de base neutre).
+            .init_resource::<forgia_combat::weapons::WeaponAffinities>()
+            .add_systems(Update, hitscan_sensor::write_hitscan_sensor)
+            .init_asset::<Genome<FpsTuning>>()
+            .register_asset_loader(GenomeLoader::<FpsTuning>::default())
+            .add_systems(Startup, load_fps_tuning)
+            .add_systems(Update, sync_fps_tuning)
+            // Fire system genome-driven : dispatch fire_mode (auto/semi/pump/burst) + multi-pellets
+            // + per-weapon damage/fire_rate/range/spread depuis ViewmodelGenomeEntry TOML.
+            //
+            // Story-455 Phase A — sync_ammo_slots_from_genome NE DOIT PAS être gated Fps.
+            // Le genome ViewmodelGenome se charge au Startup → AssetEvent::Added arrive
+            // ~50-200ms après boot, alors que GameMode = None (menu). Si gated Fps, l'event
+            // expire du buffer Bevy avant que le user entre Arena → slots jamais peuplés.
+            //
+            // Fix : sync system tourne en permanence (idempotent, no-op si handle absent).
+            .add_systems(Update, ammo_systems::sync_ammo_slots_from_genome)
+            // Story-615 — bullet magnetism : la correction se fait DANS le fire path
+            // (cf. fire_weapon_minimal via HitscanCtx), pas en système caméra. Ici on
+            // ne branche que le sensor d'observabilité (forgia2_aimassist.json, 1Hz).
+            .init_resource::<aim_assist::AimAssistMetrics>()
+            .init_resource::<aim_assist::AimAssistSensorState>()
+            .add_systems(
+                Update,
+                aim_assist::write_aim_assist_sensor
+                    .run_if(fps_combat_mode),
+            )
+            // Keystone 0.1a-2 slice 4 (story-634) — clic gauche latché en
+            // `RunFixedMainLoop::BeforeFixedMainLoop` (lit `MouseButtonInput` brut,
+            // non-leafwing → l'edge doit survivre aux frames sans step fixe), puis
+            // résolu 1×/step par `drain_left_click_edge` (FixedUpdate, Input).
+            .add_systems(
+                bevy::app::RunFixedMainLoop,
+                track_left_mouse_state
+                    .in_set(bevy::app::RunFixedMainLoopSystems::BeforeFixedMainLoop)
+                    .run_if(fps_combat_mode),
+            )
+            // Input/UI non-twitch (switch arme, reload key, despawn morts) restent Update.
+            .add_systems(
+                Update,
+                (
+                    weapon_select_system,
+                    ammo_systems::cancel_reload_on_weapon_switch,
+                    ammo_systems::reload_key_input,
+                    despawn_dead_cubes,
+                )
+                    .chain()
+                    .in_set(GameSet::Combat)
+                    .run_if(fps_combat_mode),
+            )
+            // Tir + ammo en FixedUpdate (sim déterministe, aligné mouvement/physique).
+            // drain (Input) avant fire (Combat) via la chaîne GameSet. tick_ammo_reload
+            // = timer pur (ex-slice 2 déféré ici car chaîné au tir).
+            .add_systems(
+                FixedUpdate,
+                (
+                    drain_left_click_edge.in_set(GameSet::Input),
+                    (
+                        ammo_systems::tick_ammo_reload,
+                        fire_weapon_minimal.run_if(fire_allowed),
+                    )
+                        .chain()
+                        .in_set(GameSet::Combat),
+                )
+                    .run_if(fps_combat_mode),
+            );
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Helpers firing path
+// ════════════════════════════════════════════════════════════════════════════
+
+/// PRNG pseudo-déterministe ultra-léger (xorshift32). Out [0, 1).
+fn pseudo_rand(seed: u32) -> f32 {
+    let mut x = seed.max(1);
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    (x as f32) / (u32::MAX as f32)
+}
+
+/// Walk ChildOf ancestors max `max_depth` niveaux pour trouver l'entité qui porte
+/// `Health` (typiquement le parent TargetCube d'un bot — story-453 architecture
+/// `AsyncSceneCollider ConvexHull` : ray hit child mesh, parent porte Health).
+fn find_health_ancestor(
+    hit_entity: Entity,
+    q_child_of: &Query<&ChildOf>,
+    health_query: &Query<
+        (
+            &mut Health,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+            Option<&mut HitFlashTimer>,
+        ),
+        With<TargetCube>,
+    >,
+    max_depth: u32,
+) -> Option<Entity> {
+    let mut current = hit_entity;
+    for _ in 0..max_depth {
+        if health_query.get(current).is_ok() {
+            return Some(current);
+        }
+        match q_child_of.get(current) {
+            Ok(co) => current = co.parent(),
+            Err(_) => return None,
+        }
+    }
+    None
+}
+
+/// Despawn les cubes morts (HP=0). Système séparé chained après fire.
+/// Balayage des cibles mortes → `DeathEvent` + despawn immédiat.
+///
+/// `Without<AscendsOnDeath>` (2026-08-05) : une entité qui doit **s'envoler** à
+/// sa mort n'est PAS traitée ici. Son mode s'en charge — lui seul sait quels
+/// composants retirer (IA, collision, ciblage) avant de lancer l'ascension, et
+/// c'est lui qui émettra `DeathEvent`. Sans cette exclusion, le corps serait
+/// despawné dans la même frame et l'envol ne se verrait jamais.
+fn despawn_dead_cubes(
+    mut commands: Commands,
+    q: Query<(Entity, &Health), (With<TargetCube>, Without<AscendsOnDeath>)>,
+) {
+    for (entity, hp) in &q {
+        if hp.is_dead() {
+            // Story-490 — bridge V7 damage pipeline. Trigger DeathEvent AVANT
+            // despawn pour que les observers Roguelite (loot pickup spawn cf
+            // run.rs:257, defeat detection cf run.rs:219) puissent réagir.
+            // Sans ça, ennemis Roguelite meurent silencieusement → 0 Souls drop.
+            // source=None car despawn_dead_cubes n'a pas l'info attaquant à ce
+            // point (story-491 future passera DamageEvent en amont).
+            commands.trigger(DeathEvent {
+                target: entity,
+                source: None,
+                final_kind: DamageKind::Physical,
+            });
+            if let Ok(mut ec) = commands.get_entity(entity) {
+                ec.try_despawn();
+            }
+            // Lot A perf tir (audit 2026-07-20) : per-kill → debug! (le stdout
+            // synchrone par événement coûtait des freezes ; data via sensors 1Hz).
+            debug!(
+                "[death] cube {:?} despawned (HP=0) + DeathEvent fired",
+                entity
+            );
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Input → state systems
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Switch arme via Digit1-4 (Pépin / Bourrasque / Madame Lenoir / Boucherie).
+fn weapon_select_system(keys: Res<ButtonInput<KeyCode>>, mut equipped: ResMut<EquippedWeapons>) {
+    let new_idx: Option<usize> = if keys.just_pressed(KeyCode::Digit1) {
+        Some(0)
+    } else if keys.just_pressed(KeyCode::Digit2) {
+        Some(1)
+    } else if keys.just_pressed(KeyCode::Digit3) {
+        Some(2)
+    } else if keys.just_pressed(KeyCode::Digit4) {
+        Some(3)
+    } else {
+        None
+    };
+    if let Some(i) = new_idx {
+        let target = forgia_combat::weapons::ARENA_V1_WEAPONS[i];
+        if equipped.current != target {
+            equipped.current = target;
+            info!("[forgia-fps] weapon_select : Digit{} → {:?}", i + 1, target);
+        }
+    }
+}
+
+/// Latch `LeftMouseState` (held niveau + `pressed_latch` edge) via
+/// MessageReader<MouseButtonInput>. Keystone 0.1a-2 slice 4 : tourne en
+/// `RunFixedMainLoop::BeforeFixedMainLoop` (1×/frame, avant la boucle fixe) →
+/// l'edge clic survit aux frames sans step fixe ; il sera résolu/consommé 1× par
+/// `drain_left_click_edge`. NE reset PAS `just_pressed` (c'est le rôle du drain).
+fn track_left_mouse_state(
+    mut evs: MessageReader<MouseButtonInput>,
+    mut state: ResMut<LeftMouseState>,
+) {
+    for ev in evs.read() {
+        if ev.button == MouseButton::Left {
+            match ev.state {
+                ButtonState::Pressed => {
+                    state.held = true;
+                    state.pressed_latch = true; // latch (OR-accumulé jusqu'au drain)
+                }
+                ButtonState::Released => {
+                    state.held = false;
+                }
+            }
+        }
+    }
+}
+
+/// FixedUpdate (tête de `GameSet::Input`) : résout l'edge clic POUR CE step fixe —
+/// `just_pressed = pressed_latch` puis CLEAR le latch (consommé 1×). Garantit qu'un
+/// press déclenche exactement 1 tir semi/pump/burst, quel que soit le nombre de
+/// steps fixes dans la frame (0 → survit ; N → 1 seul step voit l'edge).
+fn drain_left_click_edge(mut state: ResMut<LeftMouseState>) {
+    state.just_pressed = state.pressed_latch;
+    state.pressed_latch = false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// fire_weapon_minimal — orchestrator firing path
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Run-condition du firing path : `false` quand un écran UI capture le clic
+/// (Pause, Defeat, Victory — écrivains dans forgia-ui).
+///
+/// Story-592 (audit 2026-06-10 P0-1) : `InputBlockers.block_fire` avait
+/// 4 écrivains et 0 lecteur — cliquer « Nouvelle Run » sur l'écran de fin
+/// de run déclenchait un tir (son/VFX/munitions). Ce gate est LE lecteur.
+fn fire_allowed(blockers: Res<InputBlockers>) -> bool {
+    !blockers.block_fire
+}
+
+/// Fire system genome-driven (Forgia V2).
+///
+/// Dispatch via `ViewmodelGenomeEntry.fire_mode` :
+/// - `"auto"` : tire tant que held (Bourrasque SMG)
+/// - `"semi"` : tire UNIQUEMENT sur just_pressed (Pépin, Madame Lenoir sniper)
+/// - `"pump"` : just_pressed + multi-pellets cone spread (Boucherie shotgun)
+/// - `"burst"` : rafale `burst_count` tirs à cadence `fire_rate`, puis cooldown long
+///
+/// Cooldown = `1.0 / entry.fire_rate` secondes. Damage/range/pellets/spread depuis genome.
+/// Muzzle flash spawn à `origin + direction * entry.barrel_length`.
+/// Multi-pellets : xorshift32 PRNG déterministe seed=position+pellet_idx pour reproducibility.
+#[allow(clippy::too_many_arguments)]
+fn fire_weapon_minimal(
+    rapier: ReadRapierContext,
+    q_cam: Query<(&GlobalTransform, &Camera), With<AimCamera>>,
+    q_player: Query<Entity, With<Player>>,
+    mut hit_ctx: HitApplyCtx,
+    mut commands: Commands,
+    // Audit fire-path 2026-07-20 — hit flash par mutation d'emissive EN PLACE
+    // (remplace Res<HitFlashCache> + swap de MeshMaterial3d ; budget 16 params neutre).
+    mut std_materials: ResMut<Assets<StandardMaterial>>,
+    tracer_res: Option<Res<TracerResources>>,
+    weapon_vfx: Option<Res<WeaponVfxEffects>>,
+    mut timing: FireTimingCtx,
+    mut hit_events: MessageWriter<CombatHitEvent>,
+    mut juice: JuiceWriters,
+    left: Res<LeftMouseState>,
+    mut ammo: ammo_systems::AmmoCtx,
+    genome_ctx: ViewmodelGenomeCtx,
+    ads: Res<AdsState>,
+    mut hitscan_ctx: HitscanCtx,
+) {
+    let entry = genome_ctx.entry(ammo.equipped.current);
+    let fire_mode = entry.map(|e| e.fire_mode.as_str()).unwrap_or("auto");
+    let is_burst_mode = fire_mode == "burst";
+
+    // Tick burst state (fait avancer le timer interne). just_finished cette frame = fire.
+    let mut burst_fires_now = false;
+    let mut burst_active = false;
+    let mut burst_will_terminate = false;
+    if let Some(burst) = timing.burst_state.as_mut() {
+        burst_active = true;
+        if burst
+            .interval_timer
+            .tick(timing.time.delta())
+            .just_finished()
+        {
+            burst_fires_now = true;
+            burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
+            if burst.shots_remaining == 0 {
+                burst_will_terminate = true;
+            }
+        }
+    }
+
+    // Pendant un burst actif, on bypass le cooldown standard (pacing géré par BurstState).
+    if timing.cooldown.is_some() && !burst_active {
+        return;
+    }
+
+    // Dispatch trigger selon fire_mode (logique pure extraite cf dispatch_fire_trigger).
+    if !matches!(fire_mode, "auto" | "semi" | "pump" | "burst") {
+        warn!("[fire] fire_mode inconnu '{}' — fallback semi", fire_mode);
+    }
+    let (trigger, starts_burst) = dispatch_fire_trigger(
+        fire_mode,
+        left.held,
+        left.just_pressed,
+        burst_active,
+        burst_fires_now,
+    );
+    if !trigger {
+        return;
+    }
+
+    // Story-455 Phase A — Ammo gate.
+    if !ammo.try_fire() {
+        return;
+    }
+
+    // On tire depuis la caméra QUI REND. En vue subjective c'est la `FpsCamera` ;
+    // en 3ᵉ personne (Hall, Expédition) `castle_avatar` la désactive et rend une
+    // caméra orbitale — les deux portent `AimCamera`, `is_active` départage.
+    //
+    // Le repli sur la première caméra marquée n'est PAS un détail cosmétique :
+    // sans lui, une frame où aucune caméra n'est encore marquée active avalerait
+    // le tir en silence. On préfère tirer depuis une caméra plausible et le
+    // signaler que ne pas tirer sans rien dire.
+    let Some(cam_tf) = q_cam
+        .iter()
+        .find(|(_, c)| c.is_active)
+        .or_else(|| q_cam.iter().next())
+        .map(|(gt, _)| gt)
+    else {
+        warn!("[fire] aucune AimCamera — ni FpsCamera ni camera 3e personne");
+        return;
+    };
+    let Ok(ctx) = rapier.single() else {
+        warn!("[fire] RapierContext not found");
+        return;
+    };
+
+    // Keystone 0.1b (story-634) — avance le nonce déterministe : 1× par tir résolu,
+    // AVANT le juice (recoil) ET le crit (pellet loop) → les deux dérivent du MÊME
+    // n° de tir, sels distincts. Placé ici (après les early-returns trigger/ammo/
+    // cam/ctx) : tout tir atteignant ce point résout recoil + pellets.
+    hitscan_ctx.combat_rng.begin_shot();
+
+    // Juice per-arme : shake + recoil + FOV punch. Yaw recoil DÉTERMINISTE — seed
+    // dérivé de (RunSeed, ce tir) au lieu de elapsed_secs*1000 (temps de frame, non
+    // reproductible). Distribution inchangée (pseudo_rand sur le seed).
+    if let Some(e) = entry {
+        let juice_seed = hitscan_ctx
+            .combat_rng
+            .shot_stream(0, forgia_combat::combat_rng::RECOIL_SALT)
+            .next_u64() as u32;
+        juice.emit_from_genome(e, juice_seed);
+    }
+
+    let origin = cam_tf.translation();
+    // Story-615 — bullet magnetism : on courbe la DIRECTION DU TIR vers la cible la
+    // plus centrée dans le cône (jamais la caméra — modèle souris). strength=0 ⇒ no-op.
+    let (direction, correction_rad) = aim_assist::bend_fire_direction(
+        origin,
+        cam_tf.forward().as_vec3(),
+        hitscan_ctx.aim_targets.iter().map(|gt| gt.translation()),
+        &hitscan_ctx.aim_tuning,
+    );
+    hitscan_ctx.aim_metrics.shots_total = hitscan_ctx.aim_metrics.shots_total.saturating_add(1);
+    if correction_rad > 0.0 {
+        hitscan_ctx.aim_metrics.shots_corrected =
+            hitscan_ctx.aim_metrics.shots_corrected.saturating_add(1);
+        hitscan_ctx.aim_metrics.last_correction_deg = correction_rad.to_degrees();
+        hitscan_ctx.feel_metrics.aim_assist_engagements_total = hitscan_ctx
+            .feel_metrics
+            .aim_assist_engagements_total
+            .saturating_add(1);
+    }
+
+    // Story-559 slice B — son de tir propre à l'arme (hit OU miss). Émis ici : le
+    // tir est désormais engagé (trigger OK + munition consommée). Lu par
+    // forgia-mode-roguelite::audio pour jouer le SFX mappé au WeaponType.
+    if let Ok(shooter) = q_player.single() {
+        hitscan_ctx
+            .fired
+            .write(forgia_combat::combat_juice::WeaponFiredEvent {
+                shooter,
+                weapon: ammo.equipped.current,
+            });
+    }
+
+    // Cooldown depuis genome (fallback 0.1s = ModernAR 10 shots/s).
+    // Story-558 Phase 4 — fire_rate_mul des boons divise le cooldown (clamp ≥0.1).
+    let fire_rate_mul = hitscan_ctx.combat_mods.fire_rate_mul.max(0.1);
+    let cooldown_s = entry.map(|e| 1.0 / e.fire_rate.max(0.1)).unwrap_or(0.1) / fire_rate_mul;
+    // Burst : pas de cooldown standard entre les shots de la rafale (interval géré par BurstState).
+    if !is_burst_mode {
+        commands.insert_resource(WeaponFireCooldown {
+            timer: Timer::from_seconds(cooldown_s, TimerMode::Once),
+        });
+    } else if starts_burst {
+        let burst_count = entry.map(|e| e.burst_count.max(1)).unwrap_or(3);
+        commands.insert_resource(BurstState {
+            shots_remaining: burst_count.saturating_sub(1),
+            interval_timer: Timer::from_seconds(cooldown_s, TimerMode::Repeating),
+        });
+    } else if burst_will_terminate {
+        // Rafale finie : cooldown long avant pouvoir re-trigger.
+        commands.remove_resource::<BurstState>();
+        commands.insert_resource(WeaponFireCooldown {
+            timer: Timer::from_seconds(cooldown_s * 3.0, TimerMode::Once),
+        });
+    }
+
+    // Muzzle flash : position au BOUT DU CANON, lerp hipfire ↔ ADS via AdsState.progress.
+    let barrel_len_base = entry.map(|e| e.barrel_length).unwrap_or(0.55);
+    let p = ads.progress.clamp(0.0, 1.0);
+    let lerp = |a: f32, b: f32| a + (b - a) * p;
+    let gun_off_x = entry
+        .map(|e| lerp(e.offset_x, e.ads_offset_x))
+        .unwrap_or(0.22);
+    let gun_off_y = entry
+        .map(|e| lerp(e.offset_y, e.ads_offset_y))
+        .unwrap_or(-0.35);
+    let gun_off_z = entry
+        .map(|e| lerp(e.offset_z, e.ads_offset_z))
+        .unwrap_or(-1.30);
+    let viewmodel_scale = entry.map(|e| lerp(1.0, e.ads_scale_factor)).unwrap_or(1.0);
+    let barrel_len = barrel_len_base * viewmodel_scale;
+    let forward_dist = (-gun_off_z) + barrel_len;
+    let cam_right_v = cam_tf.right().as_vec3();
+    let cam_up_v = cam_tf.up().as_vec3();
+    let barrel_tip =
+        origin + direction * forward_dist + cam_right_v * gun_off_x + cam_up_v * gun_off_y;
+    // D'où le TIR SE VOIT partir. Le rayon, lui, part toujours de la caméra —
+    // c'est ce qui fait que le réticule dit vrai. Seul le visuel suit l'arme.
+    //
+    // En vue subjective les deux se confondent (le canon est à 30 cm de l'œil).
+    // En 3ᵉ personne la caméra est 3,2 m derrière le personnage : la lueur et le
+    // traceur sortiraient d'un point vide à côté de son épaule. Le module qui
+    // rend l'arme visible publie donc la position réelle de sa bouche.
+    let bouche = hitscan_ctx
+        .muzzle
+        .as_deref()
+        .and_then(|m| m.0)
+        .unwrap_or(barrel_tip);
+    if let Some(vfx) = weapon_vfx.as_deref() {
+        spawn_muzzle_flash(&mut commands, vfx, bouche, direction, &ammo.equipped.current);
+    }
+
+    let range = entry.map(|e| e.range).unwrap_or(100.0);
+    let damage = entry.map(|e| e.damage).unwrap_or(25.0);
+    // Story-534 — arme PROJECTILE (Boucherie) : damage<=0 dans le genome = le
+    // ray hitscan ne porte ni dégâts, ni tracer, ni impact VFX. La roquette
+    // (forgia-mode-roguelite/boucherie_rocket.rs, via WeaponFiredEvent) porte
+    // tout ça. Ammo/cooldown/recoil/muzzle restent pilotés ici.
+    let projectile_weapon = damage <= 0.0;
+    let pellets = entry.map(|e| e.pellets.max(1)).unwrap_or(1);
+    let spread_rad = entry.map(|e| e.spread_deg.to_radians()).unwrap_or(0.0);
+    // Story-531 — payoff jauge de confiance Pépin (1.0 pour toute autre arme).
+    let pepin_mul = pepin::confidence_damage_mul(
+        &hitscan_ctx.pepin_conf,
+        &hitscan_ctx.pepin_tuning,
+        ammo.equipped.current,
+    );
+
+    // Exclure Player ET TOUS ses descendants (FpsCamera, viewmodel mesh, weapon child
+    // colliders) du raycast. Pattern Overwatch GDC 2017 — Tim Ford.
+    let mut excluded: std::collections::HashSet<Entity> = std::collections::HashSet::default();
+    if let Ok(player_entity) = q_player.single() {
+        excluded.insert(player_entity);
+        let mut stack = vec![player_entity];
+        while let Some(e) = stack.pop() {
+            if let Ok(children) = hitscan_ctx.q_children.get(e) {
+                for c in children.iter() {
+                    if excluded.insert(c) {
+                        stack.push(c);
+                    }
+                }
+            }
+        }
+    }
+    let predicate = |e: Entity| !excluded.contains(&e);
+
+    let right = cam_tf.right().as_vec3();
+    let up = cam_tf.up().as_vec3();
+
+    // Keystone 0.1b (story-634) — base de seed du spread DÉTERMINISTE : dérivée du
+    // tir courant (CombatRng) au lieu de la position f32 (non reproductible cross-
+    // plateforme + dépend de la position joueur). pseudo_rand inchangé → cône identique.
+    let seed_base = hitscan_ctx
+        .combat_rng
+        .shot_stream(0, forgia_combat::combat_rng::SPREAD_SALT)
+        .next_u64() as u32;
+
+    let mut hit_record: Option<(Entity, f32)> = None;
+    for pellet_idx in 0..pellets {
+        let pellet_dir = if pellets > 1 && spread_rad > 0.0 {
+            let seed = seed_base
+                .wrapping_add(u32::from(pellet_idx))
+                .wrapping_mul(2654435761);
+            let r1 = pseudo_rand(seed) - 0.5;
+            let r2 = pseudo_rand(seed.wrapping_mul(0x9E3779B1)) - 0.5;
+            let dev = right * (r1 * spread_rad) + up * (r2 * spread_rad);
+            (direction + dev).normalize()
+        } else {
+            direction
+        };
+
+        // Story-453 baseline reset (2026-05-18) — ray cast simple, first hit only.
+        let filter = QueryFilter::default().predicate(&predicate);
+        let hit_result = ctx.cast_ray(origin, pellet_dir, range, true, filter);
+
+        // Tracer + impact par pellet (pas pour les armes projectile : la
+        // roquette est elle-même le visuel).
+        let hit_dist = hit_result.map(|(_, t)| t).unwrap_or(range);
+        if !projectile_weapon {
+            if let Some(tres) = tracer_res.as_deref() {
+                // Le traceur relie LA BOUCHE au point touché — pas la caméra au
+                // point touché. En vue subjective les deux tracés se
+                // superposent ; en 3ᵉ personne, seul le premier sort de l'arme.
+                // Un vecteur nul (bouche pile sur l'impact, tir à bout portant)
+                // retomberait sur la direction du rayon plutôt que d'exploser en
+                // NaN.
+                let impact = origin + pellet_dir * hit_dist;
+                let (depart_dir, longueur) = (impact - bouche)
+                    .try_normalize()
+                    .map(|d| (d, (impact - bouche).length()))
+                    .unwrap_or((pellet_dir, hit_dist));
+                spawn_hitscan_tracer(
+                    &mut commands,
+                    tres,
+                    bouche,
+                    depart_dir,
+                    longueur,
+                    &ammo.equipped.current,
+                    range.min(120.0),
+                    0.30,
+                );
+            }
+            if let Some((_, toi)) = hit_result {
+                let impact_pos = origin + pellet_dir * toi;
+                if let Some(vfx) = weapon_vfx.as_deref() {
+                    spawn_impact_vfx(
+                        &mut commands,
+                        vfx,
+                        impact_pos,
+                        pellet_dir,
+                        &ammo.equipped.current,
+                    );
+                }
+            }
+        }
+
+        // Sensor categorization (BUG-RUN-1 fix story-455 — walk ChildOf vers Health).
+        let target_ancestor = match hit_result {
+            None => None,
+            Some((entity, _)) => {
+                find_health_ancestor(entity, &hitscan_ctx.q_child_of, &hit_ctx.health, 8)
+            }
+        };
+        let (sensor_category, sensor_hit_idx, sensor_name, sensor_toi) = match hit_result {
+            None => (HitscanCategory::Miss, None, None, None),
+            Some((entity, toi)) => {
+                // Story-517 fix : différencier HitZoneHead vs HitZoneBody dans le
+                // sensor log. Avant ce fix le code écrivait toujours Body même
+                // quand le ray touchait le head_proxy sphere (tagué HitZoneTag(Head)).
+                // Le damage multiplier était déjà appliqué correctement via q_zone,
+                // mais le sensor cosmétique mentait. Maintenant cohérent.
+                let cat = if target_ancestor.is_some() {
+                    let zone = hitscan_ctx
+                        .q_zone
+                        .get(entity)
+                        .map(|t| t.0)
+                        .unwrap_or(forgia_damage::HitZone::Body);
+                    if zone == forgia_damage::HitZone::Head {
+                        HitscanCategory::HitZoneHead
+                    } else {
+                        HitscanCategory::HitZoneBody
+                    }
+                } else {
+                    HitscanCategory::BlockerNonZone
+                };
+                let display_entity = target_ancestor.unwrap_or(entity);
+                let name = hitscan_ctx
+                    .q_name
+                    .get(display_entity)
+                    .ok()
+                    .map(|n| n.as_str().to_string());
+                (cat, Some(entity.to_bits()), name, Some(toi))
+            }
+        };
+        hitscan_ctx.sensor.push(HitscanLogEntry {
+            t: timing.time.elapsed_secs(),
+            weapon: ammo.equipped.current,
+            origin,
+            dir: pellet_dir,
+            hit_entity_idx: sensor_hit_idx,
+            hit_name: sensor_name,
+            toi: sensor_toi,
+            category: sensor_category,
+        });
+
+        // Apply damage : story-457 zone-based multiplier + falloff.
+        // Armes projectile : les dégâts viennent de l'explosion AOE, pas du ray.
+        if let Some((hit_collider, toi)) = hit_result {
+            if let Some(entity) = target_ancestor.filter(|_| !projectile_weapon) {
+                let zone = hitscan_ctx
+                    .q_zone
+                    .get(hit_collider)
+                    .map(|t| t.0)
+                    .unwrap_or(forgia_damage::HitZone::Body);
+                let zone_mul = hitscan_ctx.feedback.0.damage_mul(zone);
+
+                if let Ok((mut hp, mat_opt, flash_opt)) = hit_ctx.health.get_mut(entity) {
+                    let falloff_mul = entry.map(|e| falloff_multiplier(toi, e)).unwrap_or(1.0);
+                    // Story-558 Phase 4 — damage_mul appliqué au damage final.
+                    // Phase 4b — headshot_bonus_mul ajouté à zone_mul si Head zone,
+                    // crit_chance roll RNG cheap (xorshift via time) ×2 damage si proc.
+                    let head_bonus = if zone == forgia_damage::HitZone::Head {
+                        hitscan_ctx.combat_mods.headshot_bonus_mul
+                    } else {
+                        0.0
+                    };
+                    let effective_zone = zone_mul + head_bonus;
+                    // Keystone 0.1b (story-634) — roll crit DÉTERMINISTE : flux
+                    // dérivé de (RunSeed, ce tir, pellet) au lieu de
+                    // elapsed_secs ^ toi.to_bits() (temps de frame + ordre BVH
+                    // Rapier, non reproductibles). Distribution inchangée
+                    // (uniforme [0,1)), donc taux de crit identique.
+                    let crit_roll = hitscan_ctx
+                        .combat_rng
+                        .shot_stream(u32::from(pellet_idx), forgia_combat::combat_rng::CRIT_SALT)
+                        .next_f32();
+                    let crit_mul = if crit_roll < hitscan_ctx.combat_mods.crit_chance {
+                        2.0
+                    } else {
+                        1.0
+                    };
+                    let effective_dmg = damage
+                        * falloff_mul
+                        * effective_zone
+                        * hitscan_ctx.combat_mods.damage_mul
+                        * crit_mul
+                        * pepin_mul;
+                    if crit_mul > 1.0 {
+                        debug!("[fire] CRIT! dmg ×2");
+                    }
+                    // Story-642 P0-4 Inc.3 — vulnérabilité électrique : le hit de base est
+                    // ×mult si la cible porte une `Vulnerability` (posée par les hits Shock).
+                    // Appliqué au dégât ENVOYÉ à la couche/Vie ; `CombatHitEvent.damage` reste
+                    // le dégât NOMINAL (pré-vuln) → la couche élémentaire (elements.rs) applique
+                    // sa propre vuln une seule fois (pas de double comptage).
+                    let vuln_mult = hit_ctx
+                        .vulnerability
+                        .get(entity)
+                        .map(|v| v.mult)
+                        .unwrap_or(1.0);
+                    let raw = effective_dmg * vuln_mult;
+                    // Story-642 P0-4 Inc.3b — si l'arme a une affinité armée (table peuplée
+                    // par mode-roguelite QUAND le toggle genome `base_hit` est ON), le hit de
+                    // base draine la couche AVEC affinité ; sinon neutre (`Physical`, historique).
+                    let base_aff = hit_ctx.weapon_affinities.0.get(&ammo.equipped.current);
+                    // Story-640 P0-2 — la couche défensive (Bouclier → Armure) absorbe
+                    // le hit de base avant la Vie ; le résidu seul entame `combat::Health`.
+                    // Tout coup gèle la régén (`note_hit`), même entièrement absorbé.
+                    let to_health = if let Ok(mut dl) = hit_ctx.defense.get_mut(entity) {
+                        dl.note_hit();
+                        match base_aff {
+                            Some(aff) => dl.absorb_elemental(raw, aff),
+                            None => dl.absorb(raw, forgia_damage::DamageChannel::Physical),
+                        }
+                    } else {
+                        raw
+                    };
+                    let was_alive = !hp.is_dead();
+                    hp.current = (hp.current - to_health).max(0.0);
+                    let dead = hp.is_dead();
+                    let new_hp = hp.current;
+                    if let Some(mat_comp) = mat_opt {
+                        let flash_dur = entry.map(|e| e.hit_flash_duration).unwrap_or(0.15);
+                        // Audit fire-path 2026-07-20 — flash par mutation
+                        // d'emissive EN PLACE (handle inchangé → pas de re-batch
+                        // GPU, zéro swap de MeshMaterial3d per-hit).
+                        if let Some(mut flash) = flash_opt {
+                            // Hit pendant un flash actif : prolonge SANS re-capturer
+                            // l'emissive (elle vaut déjà le blanc du flash).
+                            flash.timer.reset();
+                        } else if let Some(mat) = std_materials.get_mut(&mat_comp.0) {
+                            // Garde même-frame (pellets shotgun) : le HitFlashTimer
+                            // du 1er pellet est différé (Commands) → invisible ici ;
+                            // l'égalité d'emissive évite la double capture.
+                            if mat.emissive != forgia_combat::prelude::HIT_FLASH_EMISSIVE {
+                                let original_emissive = mat.emissive;
+                                mat.emissive = forgia_combat::prelude::HIT_FLASH_EMISSIVE;
+                                commands.entity(entity).insert(HitFlashTimer {
+                                    timer: Timer::from_seconds(flash_dur, TimerMode::Once),
+                                    original_emissive,
+                                    material: mat_comp.0.clone(),
+                                });
+                            }
+                        }
+                    }
+
+                    let attacker_entity = q_player.single().ok();
+                    let hit_world = origin + pellet_dir * toi;
+                    let is_headshot = zone == forgia_damage::HitZone::Head;
+                    hit_events.write(CombatHitEvent {
+                        target: entity,
+                        attacker: attacker_entity,
+                        damage: effective_dmg,
+                        is_kill: dead,
+                        is_headshot,
+                        hit_world_pos: hit_world,
+                        weapon: Some(ammo.equipped.current),
+                        body_zone: zone,
+                    });
+
+                    // Story-652 — burst de kill (volutes + light) à l'edge vivant→mort.
+                    if dead && was_alive {
+                        if let Some(vfx) = weapon_vfx.as_deref() {
+                            spawn_kill_burst(
+                                &mut commands,
+                                vfx,
+                                hit_world,
+                                pellet_dir,
+                                &ammo.equipped.current,
+                            );
+                        }
+                    }
+
+                    if hit_record.is_none() {
+                        hit_record = Some((entity, toi));
+                    }
+                    // Lot A perf tir : per-pellet → debug! (1+ ligne/tir garantie
+                    // = coût stdout synchrone à chaque tir, cf audit 2026-07-20).
+                    debug!(
+                        "[fire] pellet {}/{} HIT {entity:?} toi={toi:.2}m dmg={effective_dmg:.1} hp={new_hp:.1} dead={dead}",
+                        pellet_idx + 1, pellets
+                    );
+                }
+            }
+        }
+    }
+
+    // Story-531 — résolution du TIR (pas par-pellet) pour la jauge de confiance :
+    // au moins un pellet a touché un ennemi = hit ; mur ou vide = miss (GDD §2.2).
+    hitscan_ctx
+        .resolved
+        .write(forgia_combat::confidence::ShotResolved {
+            weapon: ammo.equipped.current,
+            hit_enemy: hit_record.is_some(),
+        });
+
+    if hit_record.is_none() {
+        debug!(
+            "[fire] miss ({} pellets, {:?})",
+            pellets, ammo.equipped.current
+        );
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FPS Tuning load + sync
+// ════════════════════════════════════════════════════════════════════════════
+
+fn load_fps_tuning(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let handle: Handle<Genome<FpsTuning>> = asset_server.load("genomes/fps_tuning.toml");
+    commands.insert_resource(FpsTuningHandle(handle));
+    info!("[forgia-fps] fps_tuning genome loading : genomes/fps_tuning.toml");
+}
+
+/// Sync system : lit FpsTuning genome et push vers chaque downstream Resource Tuning.
+/// Hot-reload : éditer le TOML → Bevy Asset re-load → ce système push automatiquement.
+#[allow(clippy::too_many_arguments)]
+fn sync_fps_tuning(
+    handle: Option<Res<FpsTuningHandle>>,
+    assets: Res<Assets<Genome<FpsTuning>>>,
+    mut cs_tuning: ResMut<CameraShakeTuning>,
+    mut fp_tuning: ResMut<FovPunchTuning>,
+    mut ml_tuning: ResMut<MouseLookTuning>,
+    mut ch_tuning: ResMut<CrosshairTuning>,
+    mut ads_tuning: ResMut<AdsTuning>,
+    mut aa_tuning: ResMut<aim_assist::AimAssistTuning>,
+    mut vm_tuning: ResMut<ViewmodelMotionTuning>,
+    mut arms_tuning: ResMut<ViewmodelArmsTuning>,
+    mut vm_fov_tuning: ResMut<ViewmodelFovTuning>,
+) {
+    let Some(g) = handle.as_deref().and_then(|h| assets.get(&h.0)) else {
+        return;
+    };
+    let t = &g.data;
+    // Story-615 — bullet magnetism hot-reload.
+    aa_tuning.strength = t.aim_assist.strength;
+    aa_tuning.max_angle_deg = t.aim_assist.max_angle_deg;
+    aa_tuning.max_correction_deg = t.aim_assist.max_correction_deg;
+    aa_tuning.engage_distance_m = t.aim_assist.engage_distance_m;
+    // Story-617 — présence viewmodel (sway/bob/idle) hot-reload.
+    let vm = &t.viewmodel_motion;
+    vm_tuning.sway_pos_per_px = vm.sway_pos_per_px;
+    vm_tuning.sway_pos_max = vm.sway_pos_max;
+    vm_tuning.sway_rot_per_px_deg = vm.sway_rot_per_px_deg;
+    vm_tuning.sway_rot_max_deg = vm.sway_rot_max_deg;
+    vm_tuning.sway_smooth = vm.sway_smooth;
+    vm_tuning.bob_pos = vm.bob_pos;
+    vm_tuning.bob_freq = vm.bob_freq;
+    vm_tuning.bob_speed_ref = vm.bob_speed_ref;
+    vm_tuning.idle_amp = vm.idle_amp;
+    vm_tuning.idle_freq = vm.idle_freq;
+    // Story-617/618 — placement bras par-main (hot-reload : ajuste sans rebuild).
+    let arms = &t.viewmodel_arms;
+    arms_tuning.enabled = arms.enabled;
+    arms_tuning.use_glb = arms.use_glb;
+    arms_tuning.glb_scale = arms.glb_scale;
+    arms_tuning.scale = arms.scale;
+    arms_tuning.grip_x = arms.grip_x;
+    arms_tuning.grip_drop = arms.grip_drop;
+    arms_tuning.grip_back = arms.grip_back;
+    arms_tuning.barrel_x = arms.barrel_x;
+    arms_tuning.barrel_drop = arms.barrel_drop;
+    arms_tuning.barrel_fwd = arms.barrel_fwd;
+    arms_tuning.elbow_drop = arms.elbow_drop;
+    arms_tuning.elbow_back = arms.elbow_back;
+    arms_tuning.grip_elbow_out = arms.grip_elbow_out;
+    arms_tuning.barrel_elbow_out = arms.barrel_elbow_out;
+    // Story-618 — FOV viewmodel séparé (hot-reload).
+    vm_fov_tuning.enabled = t.viewmodel_fov.enabled;
+    vm_fov_tuning.fov_deg = t.viewmodel_fov.fov_deg;
+    // Camera shake
+    cs_tuning.default_decay = t.camera_shake.default_decay;
+    cs_tuning.default_max_rotation = t.camera_shake.default_max_rotation_rad;
+    cs_tuning.yaw_factor = t.camera_shake.yaw_factor;
+    cs_tuning.roll_factor = t.camera_shake.roll_factor;
+    cs_tuning.pitch_upward_bias = t.camera_shake.pitch_upward_bias;
+    cs_tuning.sample_rate_hz = t.camera_shake.sample_rate_hz;
+    // FOV punch
+    fp_tuning.attack_secs = t.fov_punch.attack_secs;
+    fp_tuning.decay_secs = t.fov_punch.decay_secs;
+    // Mouse look
+    ml_tuning.base_sensitivity = t.mouse_look.base_sensitivity;
+    ml_tuning.recoil_decay_per_sec = t.mouse_look.recoil_decay_per_sec;
+    // ADS (story-615 : default_fov_deg retiré — le FOV hipfire est une préf joueur
+    // via forgia_player::CameraFov, plus un gène genome).
+    ads_tuning.lerp_speed = t.ads.lerp_speed;
+    ads_tuning.punch_attenuation = t.ads.punch_attenuation;
+    // Crosshair
+    ch_tuning.hipfire_cross_len = t.crosshair_hipfire.cross_len;
+    ch_tuning.hipfire_cross_stroke = t.crosshair_hipfire.cross_stroke;
+    ch_tuning.hipfire_cross_alpha = t.crosshair_hipfire.cross_alpha;
+    ch_tuning.ads_dot_outer_radius = t.crosshair_ads_dot.outer_radius;
+    ch_tuning.ads_dot_inner_radius = t.crosshair_ads_dot.inner_radius;
+    let s = &t.crosshair_sniper_overlay;
+    ch_tuning.sniper_scope_radius_factor = s.scope_radius_factor;
+    ch_tuning.sniper_dim_alpha = s.dim_alpha;
+    ch_tuning.sniper_dim_color = s.dim_color;
+    ch_tuning.sniper_vignette_rings = s.vignette_rings;
+    ch_tuning.sniper_ring_thickness_factor = s.ring_thickness_factor;
+    ch_tuning.sniper_ring_max_alpha = s.ring_max_alpha;
+    ch_tuning.sniper_ring_color = s.ring_color;
+    ch_tuning.sniper_ring_outer_extent = s.ring_outer_extent;
+    ch_tuning.sniper_border_width = s.border_width;
+    ch_tuning.sniper_border_inner_width = s.border_inner_width;
+    ch_tuning.sniper_border_inner_offset = s.border_inner_offset;
+    ch_tuning.sniper_reticle_gap = s.reticle_gap;
+    ch_tuning.sniper_reticle_line_factor = s.reticle_line_factor;
+    ch_tuning.sniper_reticle_color = s.reticle_color;
+    ch_tuning.sniper_reticle_line_stroke = s.reticle_line_stroke;
+    ch_tuning.sniper_reticle_tick_stroke = s.reticle_tick_stroke;
+    ch_tuning.sniper_reticle_tick_size = s.reticle_tick_size;
+    ch_tuning.sniper_red_dot_radius = s.red_dot_radius;
+    ch_tuning.sniper_red_dot_color = s.red_dot_color;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Tests
+// ════════════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plugin_constructible() {
+        let _p = ForgiaFpsPlugin;
+    }
+
+    #[test]
+    fn left_mouse_state_default_idle() {
+        let s = LeftMouseState::default();
+        assert!(!s.held, "default held doit être false");
+        assert!(!s.just_pressed, "default just_pressed doit être false");
+    }
+
+    #[test]
+    fn pseudo_rand_in_unit_range() {
+        for seed in [1u32, 42, 12345, u32::MAX / 2] {
+            let v = pseudo_rand(seed);
+            assert!(
+                (0.0..1.0).contains(&v),
+                "pseudo_rand({}) = {} hors [0,1)",
+                seed,
+                v
+            );
+        }
+    }
+
+    #[test]
+    fn pseudo_rand_deterministic_same_seed() {
+        assert_eq!(pseudo_rand(12345), pseudo_rand(12345));
+        assert_ne!(pseudo_rand(12345), pseudo_rand(12346));
+    }
+
+    #[test]
+    fn burst_state_decrement_via_timer() {
+        let mut burst = BurstState {
+            shots_remaining: 3,
+            interval_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
+        };
+        assert!(!burst.interval_timer.just_finished());
+        burst
+            .interval_timer
+            .tick(std::time::Duration::from_millis(60));
+        assert!(burst.interval_timer.just_finished());
+        burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
+        assert_eq!(burst.shots_remaining, 2);
+    }
+
+    #[test]
+    fn burst_state_terminates_at_zero() {
+        let mut burst = BurstState {
+            shots_remaining: 1,
+            interval_timer: Timer::from_seconds(0.05, TimerMode::Repeating),
+        };
+        burst.shots_remaining = burst.shots_remaining.saturating_sub(1);
+        assert_eq!(burst.shots_remaining, 0);
+    }
+
+    #[test]
+    fn track_left_mouse_pressed_sets_both() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(s.held);
+        assert!(s.just_pressed);
+    }
+
+    #[test]
+    fn track_left_mouse_just_pressed_resets_each_frame() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(s.held);
+        assert!(!s.just_pressed);
+    }
+
+    #[test]
+    fn track_left_mouse_released_clears_held() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state: ButtonState::Released,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(!s.held);
+    }
+
+    #[test]
+    fn dispatch_auto_uses_held_only() {
+        assert_eq!(
+            dispatch_fire_trigger("auto", true, false, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("auto", false, true, false, false),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn dispatch_semi_uses_just_pressed_only() {
+        assert_eq!(
+            dispatch_fire_trigger("semi", false, true, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("semi", true, false, false, false),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn dispatch_pump_behaves_like_semi() {
+        assert_eq!(
+            dispatch_fire_trigger("pump", false, true, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("pump", true, false, false, false),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn dispatch_burst_starts_on_just_pressed() {
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, true, false, false),
+            (true, true)
+        );
+    }
+
+    #[test]
+    fn dispatch_burst_follows_timer_when_active() {
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, false, true, true),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, false, true, false),
+            (false, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("burst", false, true, true, false),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn dispatch_unknown_mode_fallbacks_semi() {
+        assert_eq!(
+            dispatch_fire_trigger("railgun", false, true, false, false),
+            (true, false)
+        );
+        assert_eq!(
+            dispatch_fire_trigger("railgun", true, false, false, false),
+            (false, false)
+        );
+    }
+
+    /// Régression story-592 (audit 2026-06-10 P0-1) : `block_fire=true` doit
+    /// empêcher le firing path de tourner (tir à travers Defeat/Victory/Pause).
+    /// Le probe partage exactement la même run-condition que fire_weapon_minimal.
+    #[test]
+    fn fire_blocked_when_block_fire_set() {
+        #[derive(Resource, Default)]
+        struct FireRuns(u32);
+        fn probe(mut runs: ResMut<FireRuns>) {
+            runs.0 += 1;
+        }
+
+        let mut app = App::new();
+        app.init_resource::<InputBlockers>()
+            .init_resource::<FireRuns>()
+            .add_systems(Update, probe.run_if(fire_allowed));
+
+        app.world_mut().resource_mut::<InputBlockers>().block_fire = true;
+        app.update();
+        app.update();
+        assert_eq!(
+            app.world().resource::<FireRuns>().0,
+            0,
+            "block_fire=true → le firing path ne doit jamais tourner"
+        );
+
+        app.world_mut().resource_mut::<InputBlockers>().block_fire = false;
+        app.update();
+        assert_eq!(
+            app.world().resource::<FireRuns>().0,
+            1,
+            "block_fire=false → le firing path reprend"
+        );
+    }
+
+    #[test]
+    fn track_left_mouse_ignores_other_buttons() {
+        let mut app = App::new();
+        app.add_message::<MouseButtonInput>()
+            .init_resource::<LeftMouseState>()
+            .add_systems(
+                Update,
+                (track_left_mouse_state, drain_left_click_edge).chain(),
+            );
+
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Right,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+
+        let s = app.world().resource::<LeftMouseState>();
+        assert!(!s.held);
+        assert!(!s.just_pressed);
+    }
+}

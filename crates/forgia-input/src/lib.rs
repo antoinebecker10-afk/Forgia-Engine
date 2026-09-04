@@ -1,0 +1,133 @@
+//! # forgia-input
+//!
+//! Input layer : Leafwing PlayerAction AZERTY + KeybindRegistry + InputBlockers.
+//!
+//! Convention V2 : 1 KeyCode = 1 handler unique (anti-trap V1 double handler ESC).
+
+use bevy::prelude::*;
+use leafwing_input_manager::prelude::*;
+
+pub mod prelude {
+    pub use crate::{ForgiaInputPlugin, InputBlockers, MouseSensitivityMultiplier, PlayerAction};
+}
+
+/// Multiplicateur global de sensibilité souris appliqué par `mouse_look` (forgia-player).
+/// Producteur : forgia-fps en ADS écrit `factor = lerp(1.0, ads_mouse_sensitivity_factor, ads_progress)`.
+/// Consommateur : `mouse_look` multiplie sa sensitivity de base par `factor`.
+/// Default 1.0 = pas de changement (hipfire ou RPG mode).
+#[derive(Resource)]
+pub struct MouseSensitivityMultiplier {
+    pub factor: f32,
+}
+
+impl Default for MouseSensitivityMultiplier {
+    fn default() -> Self {
+        Self { factor: 1.0 }
+    }
+}
+
+/// PlayerAction — actions joueur AZERTY.
+///
+/// `MoveLeft`/`MoveRight` sont SÉMANTIQUEMENT polyvalents :
+/// - **FPS mode** : strafe gauche/droite (comportement legacy)
+/// - **RPG mode + RMB libre** : tourner gauche/droite (pattern WoW Q/D)
+/// - **RPG mode + RMB tenu** : strafe gauche/droite (override mouselook WoW)
+///
+/// `CameraLook`/`CameraSteer` co-bind LMB/RMB en plus de `Fire`/`AltFire` :
+/// leafwing supporte le multi-bind sur le même input, chaque consommateur
+/// (combat vs camera) lit son action sans conflit (gate par GameMode).
+#[derive(Actionlike, PartialEq, Eq, Hash, Clone, Copy, Debug, Reflect)]
+pub enum PlayerAction {
+    MoveForward,
+    MoveBackward,
+    MoveLeft,
+    MoveRight,
+    Jump,
+    Sprint,
+    /// S'accroupir — **maintenu**, pas basculé.
+    ///
+    /// Maintenu parce qu'une bascule demande de se souvenir de son état : on se
+    /// relève en croyant être debout, on tire en croyant être à couvert. Tous les
+    /// jeux de tir de ces vingt ans ont convergé là-dessus, et le maintien est
+    /// aussi ce qui rend la glissade possible (sprint + accroupi).
+    Crouch,
+    Fire,
+    AltFire,
+    Reload,
+    Pause,
+    Interact,
+    /// LMB held — camera orbits around player only. WoW "look mode".
+    CameraLook,
+    /// RMB held — camera orbits AND player yaw follows. WoW "mouselook/steer".
+    CameraSteer,
+}
+
+/// InputBlockers — blocage temporaire input (menu ouvert, dialog, console).
+///
+/// Contrat lecteur/écrivain (story-592) : chaque champ DOIT avoir au moins un
+/// écrivain ET un lecteur — un flag écrit jamais lu est un bug silencieux
+/// (audit 2026-06-10 P0-1 : block_fire écrit par forgia-ui, lu par personne →
+/// tir à travers les écrans de fin de run). `block_movement` (0/0) supprimé.
+///
+/// - `block_look` : écrit par forgia-ui (pause/defeat/victory) + forgia-mode-roguelite
+///   (hud coffre/choix), lu par forgia-player::mouse_look.
+/// - `block_fire` : écrit par forgia-ui, lu par `forgia-fps::fire_allowed`.
+#[derive(Resource, Default)]
+pub struct InputBlockers {
+    pub block_look: bool,
+    pub block_fire: bool,
+}
+
+pub struct ForgiaInputPlugin;
+
+impl Plugin for ForgiaInputPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(InputManagerPlugin::<PlayerAction>::default())
+            .init_resource::<InputBlockers>()
+            .init_resource::<MouseSensitivityMultiplier>();
+    }
+}
+
+/// Default keybindings — mapping POSITIONNEL (WASD physique).
+/// Bevy `KeyCode` est PHYSIQUE (position QWERTY US), pas logique.
+/// → Mapping `KeyW/KeyA/KeyS/KeyD` correspond à la POSITION "ZQSD" sur clavier AZERTY.
+/// User AZERTY appuie sur Z (touche physique W) → MoveForward déclenché.
+pub fn default_input_map() -> InputMap<PlayerAction> {
+    use bevy::input::keyboard::KeyCode::*;
+    use bevy::input::mouse::MouseButton;
+    let mut map = InputMap::default();
+    map.insert(PlayerAction::MoveForward, KeyW); // Position Z en AZERTY
+    map.insert(PlayerAction::MoveBackward, KeyS); // Position S en AZERTY (identique)
+    map.insert(PlayerAction::MoveLeft, KeyA); // Position Q en AZERTY
+    map.insert(PlayerAction::MoveRight, KeyD); // Position D en AZERTY (identique)
+    map.insert(PlayerAction::Jump, Space);
+    map.insert(PlayerAction::Sprint, ShiftLeft);
+    // Ctrl gauche : la touche d'accroupissement de tous les jeux de tir, et la
+    // seule qui ne heurte rien ici (Shift = sprint, Espace = saut, C est libre
+    // mais moins attendue). Elle est sous l'auriculaire, donc tenable en même
+    // temps que Shift — ce que la glissade exige.
+    map.insert(PlayerAction::Crouch, ControlLeft);
+    map.insert(PlayerAction::Fire, MouseButton::Left);
+    map.insert(PlayerAction::AltFire, MouseButton::Right);
+    map.insert(PlayerAction::Reload, KeyR);
+    map.insert(PlayerAction::Pause, Escape);
+    map.insert(PlayerAction::Interact, KeyE);
+    // WoW-style camera controls — LMB orbit-only, RMB orbit+steer player.
+    // Co-bind with Fire/AltFire ; consumers gate by GameMode (no conflict).
+    map.insert(PlayerAction::CameraLook, MouseButton::Left);
+    map.insert(PlayerAction::CameraSteer, MouseButton::Right);
+    map
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_map_has_all_actions() {
+        let map = default_input_map();
+        assert!(map.get(&PlayerAction::MoveForward).is_some());
+        assert!(map.get(&PlayerAction::Fire).is_some());
+        assert!(map.get(&PlayerAction::Pause).is_some());
+    }
+}

@@ -1,0 +1,487 @@
+id = "roguelite_dialogue"
+name = "Roguelite Talking Weapons Dialogue"
+domain = "Audio"
+category = "Audio"
+description = "Système barks contextuels pour les 4 armes parlantes MVP. Pattern Hadès (Kasavin GDC 2021) : event triggers + LinePool weighted + BarkSelector cooldown + priority override. Mantra : 'What would these characters notice?'"
+version = "0.1.0"
+
+# === Global bark tuning ===
+
+[[genes]]
+id = "bark_global_speaker_lock_sec"
+label = "Time another weapon must wait after one barks (anti-overlap)"
+chromosome = "Cooldown"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 2.5
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_global_max_per_minute"
+label = "Max barks per minute (anti-fatigue)"
+chromosome = "Cooldown"
+target = "Value"
+min = 1.0
+max = 60.0
+default = 12.0
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_priority_death_override"
+label = "Priority threshold above which cooldown is ignored"
+chromosome = "Priority"
+target = "Value"
+min = 50.0
+max = 255.0
+default = 150.0
+layer = "roguelite_dialogue"
+
+# === Event trigger probabilities (chance to fire a bark on event) ===
+
+[[genes]]
+id = "bark_chance_on_kill"
+label = "P(bark) on enemy kill"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.30
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_miss"
+label = "P(bark) on missed shot (only speakers with a miss pool judge)"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.35
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_lowhp"
+label = "P(bark) when player HP crosses lowhp threshold"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.70
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_lowhp_threshold_pct"
+label = "Low HP threshold for bark trigger"
+chromosome = "Trigger"
+target = "Value"
+min = 0.05
+max = 0.60
+default = 0.25
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_reload"
+label = "P(bark) on reload (limit to empty mag only)"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.15
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_idle_after_sec"
+label = "Idle bark fires after this many sec without combat"
+chromosome = "Trigger"
+target = "Value"
+min = 10.0
+max = 120.0
+# 2026-05-20 — relevé 30 → 45 (RoR2 ~45, LoL ~50). Idle à 30s donne sensation
+# "blabla constant" en gameplay calme. Source : audit standards AAA + leçon
+# Borderlands 3 anti-fatigue (>30/min muté par les joueurs).
+default = 45.0
+layer = "roguelite_dialogue"
+
+[[genes]]
+id = "bark_chance_on_pickup"
+label = "P(bark) on item pickup"
+chromosome = "Trigger"
+target = "Value"
+min = 0.0
+max = 1.0
+# 2026-05-20 — relevé 0.25 → 0.35 (RoR2 item callout >0.40, OW pickup chatter
+# ~0.40). Pickup = event excitant, peut tolérer plus de chance sans fatigue.
+default = 0.35
+layer = "roguelite_dialogue"
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ LINE POOLS — pattern Hadès                                   ║
+# ║ Format: speaker.event = [{ text, weight, priority, cooldown_sec }]
+# ║ priority 0-255 ; >bark_priority_death_override = override CD ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# --- PÉPIN (timide, hésitant, voix douce) ---
+
+[[pool]]
+speaker = "pepin"
+event = "kill"
+lines = [
+  { id = "pepin_kill_01", text = "Oh... pardon...", weight = 30, priority = 30, cooldown_sec = 12.0 },
+  { id = "pepin_kill_02", text = "Je crois que je l'ai eu ?", weight = 25, priority = 30, cooldown_sec = 12.0 },
+  { id = "pepin_kill_03", text = "Ce n'était pas mon intention...", weight = 20, priority = 30, cooldown_sec = 15.0 },
+  { id = "pepin_kill_04", text = "Désolé !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "lowhp"
+lines = [
+  { id = "pepin_lowhp_01", text = "Aïe... ça pique...", weight = 50, priority = 80, cooldown_sec = 20.0 },
+  { id = "pepin_lowhp_02", text = "Tu... tu fais attention ?", weight = 50, priority = 80, cooldown_sec = 20.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "idle"
+lines = [
+  { id = "pepin_idle_01", text = "Tu... tu veux que je dorme ?", weight = 40, priority = 10, cooldown_sec = 60.0 },
+  { id = "pepin_idle_02", text = "On bouge ?", weight = 60, priority = 10, cooldown_sec = 45.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "reload"
+lines = [
+  { id = "pepin_reload_01", text = "Une seconde, j'arrive pas à...", weight = 100, priority = 20, cooldown_sec = 30.0 },
+]
+
+# --- BOURRASQUE (extravertie, énergique, voix pétillante) ---
+
+[[pool]]
+speaker = "bourrasque"
+event = "kill"
+lines = [
+  { id = "bourr_kill_01", text = "WHOOSH ! Voilà ce que j'appelle un kill !", weight = 30, priority = 30, cooldown_sec = 10.0 },
+  { id = "bourr_kill_02", text = "Au suivant, au suivant !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+  { id = "bourr_kill_03", text = "Souffle moi tout ça !", weight = 20, priority = 30, cooldown_sec = 12.0 },
+  { id = "bourr_kill_04", text = "Yes ! Encore !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "lowhp"
+lines = [
+  { id = "bourr_lowhp_01", text = "Eh oh ! On respire pas pour rien là !", weight = 50, priority = 80, cooldown_sec = 18.0 },
+  { id = "bourr_lowhp_02", text = "Bouge bouge bouge !", weight = 50, priority = 80, cooldown_sec = 15.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "idle"
+lines = [
+  { id = "bourr_idle_01", text = "Allez ! Du nerf ! On a pas que ça à faire !", weight = 50, priority = 10, cooldown_sec = 40.0 },
+  { id = "bourr_idle_02", text = "Y'a personne ? Vraiment ? Personne ?", weight = 50, priority = 10, cooldown_sec = 50.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "pickup"
+lines = [
+  { id = "bourr_pickup_01", text = "Ooooh, joli !", weight = 100, priority = 25, cooldown_sec = 20.0 },
+]
+
+# --- MADAME LENOIR (snob aristocratique, voix posée acerbe) ---
+
+[[pool]]
+speaker = "lenoir"
+event = "kill"
+lines = [
+  { id = "lenoir_kill_01", text = "Plébéien.", weight = 25, priority = 30, cooldown_sec = 15.0 },
+  { id = "lenoir_kill_02", text = "Quelle médiocrité.", weight = 25, priority = 30, cooldown_sec = 15.0 },
+  { id = "lenoir_kill_03", text = "Élégant. Comme moi.", weight = 30, priority = 30, cooldown_sec = 12.0 },
+  { id = "lenoir_kill_04", text = "Encore un. Soupir.", weight = 20, priority = 30, cooldown_sec = 18.0 },
+]
+
+# Story-533 AC7 — Lenoir JUGE le joueur qui rate (signature persona, GDD).
+[[pool]]
+speaker = "lenoir"
+event = "miss"
+lines = [
+  { id = "lenoir_miss_01", text = "Lamentable.", weight = 50, priority = 40, cooldown_sec = 18.0 },
+  { id = "lenoir_miss_02", text = "On se ressaisit, voulez-vous ?", weight = 50, priority = 40, cooldown_sec = 25.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "lowhp"
+lines = [
+  { id = "lenoir_lowhp_01", text = "C'est inadmissible. Je suis salie.", weight = 50, priority = 80, cooldown_sec = 20.0 },
+  { id = "lenoir_lowhp_02", text = "Mes manchettes ! Quel scandale.", weight = 50, priority = 80, cooldown_sec = 25.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "idle"
+lines = [
+  { id = "lenoir_idle_01", text = "Je n'ai pas que ça à faire, mon cher.", weight = 60, priority = 10, cooldown_sec = 50.0 },
+  { id = "lenoir_idle_02", text = "L'attente est un crime du peuple.", weight = 40, priority = 10, cooldown_sec = 60.0 },
+]
+
+# --- BOUCHERIE (butcher brutal, voix grasse joyeuse) ---
+
+[[pool]]
+speaker = "boucherie"
+event = "kill"
+lines = [
+  { id = "bouch_kill_01", text = "AAAH ! Le bon morceau !", weight = 30, priority = 30, cooldown_sec = 10.0 },
+  { id = "bouch_kill_02", text = "Coupe ! Coupe ! Coupe !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+  { id = "bouch_kill_03", text = "Trois pièces pour le prix d'une !", weight = 20, priority = 30, cooldown_sec = 12.0 },
+  { id = "bouch_kill_04", text = "À la prochaine, monsieur !", weight = 25, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "lowhp"
+lines = [
+  { id = "bouch_lowhp_01", text = "Eh ! Je suis pas ton steak !", weight = 50, priority = 80, cooldown_sec = 18.0 },
+  { id = "bouch_lowhp_02", text = "Tu te trompes de viande !", weight = 50, priority = 80, cooldown_sec = 18.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "idle"
+lines = [
+  { id = "bouch_idle_01", text = "Y'a pas de clients ? J'en ai marre !", weight = 50, priority = 10, cooldown_sec = 45.0 },
+  { id = "bouch_idle_02", text = "Trouve-moi un truc à découper, allez !", weight = 50, priority = 10, cooldown_sec = 50.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "reload"
+lines = [
+  { id = "bouch_reload_01", text = "Une seconde, je rappelle l'apprenti !", weight = 100, priority = 20, cooldown_sec = 25.0 },
+]
+
+# --- TOUS — événements partagés (Death = priority max, override CD) ---
+
+[[pool]]
+speaker = "any"
+event = "death"
+lines = [
+  { id = "any_death_01", text = "...", weight = 100, priority = 200, cooldown_sec = 0.0 },
+]
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ V1 EXTENSIONS — stage_clear / pickup / swap / boss (~60 lignes)
+# ║ Bible v1 cross-refs : docs/lore/personas/*.md "Voicelines à ajouter"
+# ╚══════════════════════════════════════════════════════════════╝
+
+# --- PÉPIN — stage_clear / pickup / swap ---
+
+[[pool]]
+speaker = "pepin"
+event = "stage_clear"
+lines = [
+  { id = "pepin_clear_01", text = "Ouf... on a fini ?", weight = 40, priority = 40, cooldown_sec = 0.0 },
+  { id = "pepin_clear_02", text = "Pardon pour le bruit.", weight = 30, priority = 40, cooldown_sec = 0.0 },
+  { id = "pepin_clear_03", text = "C'était fort, hein ?", weight = 30, priority = 40, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "pickup_item"
+lines = [
+  { id = "pepin_pick_01", text = "Oh ! Ça brille...", weight = 40, priority = 25, cooldown_sec = 15.0 },
+  { id = "pepin_pick_02", text = "Pour moi ? Vraiment ?", weight = 30, priority = 25, cooldown_sec = 15.0 },
+  { id = "pepin_pick_03", text = "Merci...", weight = 30, priority = 25, cooldown_sec = 15.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "swap_to_me"
+lines = [
+  { id = "pepin_swap_in_01", text = "D'accord, j'essaie.", weight = 60, priority = 30, cooldown_sec = 10.0 },
+  { id = "pepin_swap_in_02", text = "Tu me fais confiance ?", weight = 40, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "pepin"
+event = "swap_away"
+lines = [
+  { id = "pepin_swap_out_01", text = "Oui, repose-toi un peu.", weight = 60, priority = 20, cooldown_sec = 10.0 },
+  { id = "pepin_swap_out_02", text = "Pardon de pas être assez.", weight = 40, priority = 20, cooldown_sec = 10.0 },
+]
+
+# --- BOURRASQUE — stage_clear / pickup / swap ---
+
+[[pool]]
+speaker = "bourrasque"
+event = "stage_clear"
+lines = [
+  { id = "bourr_clear_01", text = "Et voilà ! Au suivant !", weight = 40, priority = 40, cooldown_sec = 0.0 },
+  { id = "bourr_clear_02", text = "Trop facile !", weight = 30, priority = 40, cooldown_sec = 0.0 },
+  { id = "bourr_clear_03", text = "On enchaîne !", weight = 30, priority = 40, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "pickup_item"
+lines = [
+  { id = "bourr_pick_01", text = "Brillant brillant !", weight = 60, priority = 25, cooldown_sec = 12.0 },
+  { id = "bourr_pick_02", text = "À moi à moi !", weight = 40, priority = 25, cooldown_sec = 12.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "swap_to_me"
+lines = [
+  { id = "bourr_swap_in_01", text = "YES ! Enfin !", weight = 60, priority = 30, cooldown_sec = 10.0 },
+  { id = "bourr_swap_in_02", text = "Tu vas voir !", weight = 40, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "swap_away"
+lines = [
+  { id = "bourr_swap_out_01", text = "Hein ? Pourquoi ?", weight = 50, priority = 20, cooldown_sec = 10.0 },
+  { id = "bourr_swap_out_02", text = "Ok mais reviens vite !", weight = 50, priority = 20, cooldown_sec = 10.0 },
+]
+
+# --- MADAME LENOIR — stage_clear / pickup / swap ---
+
+[[pool]]
+speaker = "lenoir"
+event = "stage_clear"
+lines = [
+  { id = "lenoir_clear_01", text = "Enfin. Une douche, mon cher.", weight = 50, priority = 40, cooldown_sec = 0.0 },
+  { id = "lenoir_clear_02", text = "Quelle vulgarité, ce massacre.", weight = 50, priority = 40, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "pickup_item"
+lines = [
+  { id = "lenoir_pick_01", text = "Un bijou. Comme moi.", weight = 60, priority = 25, cooldown_sec = 15.0 },
+  { id = "lenoir_pick_02", text = "Donne. C'est pour moi.", weight = 40, priority = 25, cooldown_sec = 15.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "swap_to_me"
+lines = [
+  { id = "lenoir_swap_in_01", text = "Bien. Tu as bon goût.", weight = 60, priority = 30, cooldown_sec = 10.0 },
+  { id = "lenoir_swap_in_02", text = "Évidemment.", weight = 40, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "swap_away"
+lines = [
+  { id = "lenoir_swap_out_01", text = "Bon. Repose tes bras de pauvre.", weight = 50, priority = 20, cooldown_sec = 10.0 },
+  { id = "lenoir_swap_out_02", text = "Reviens vite, mon cher.", weight = 50, priority = 20, cooldown_sec = 10.0 },
+]
+
+# --- BOUCHERIE — stage_clear / pickup / swap ---
+
+[[pool]]
+speaker = "boucherie"
+event = "stage_clear"
+lines = [
+  { id = "bouch_clear_01", text = "Belle journée au marché, ça !", weight = 50, priority = 40, cooldown_sec = 0.0 },
+  { id = "bouch_clear_02", text = "Allez, on rentre, j'ai faim !", weight = 50, priority = 40, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "pickup_item"
+lines = [
+  { id = "bouch_pick_01", text = "Pour la caisse !", weight = 60, priority = 25, cooldown_sec = 12.0 },
+  { id = "bouch_pick_02", text = "Joli butin, ça !", weight = 40, priority = 25, cooldown_sec = 12.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "swap_to_me"
+lines = [
+  { id = "bouch_swap_in_01", text = "AAAH ! Du travail !", weight = 60, priority = 30, cooldown_sec = 10.0 },
+  { id = "bouch_swap_in_02", text = "Au boulot, mon gars !", weight = 40, priority = 30, cooldown_sec = 10.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "swap_away"
+lines = [
+  { id = "bouch_swap_out_01", text = "Bah quoi, j'avais pas fini !", weight = 50, priority = 20, cooldown_sec = 10.0 },
+  { id = "bouch_swap_out_02", text = "Ok, j'aiguise !", weight = 50, priority = 20, cooldown_sec = 10.0 },
+]
+
+# --- BOSS — réactions persona à l'apparition Forgeron Noir ---
+
+[[pool]]
+speaker = "pepin"
+event = "boss_intro"
+lines = [
+  { id = "pepin_boss_01", text = "...c'est lui... celui qui m'a...", weight = 100, priority = 90, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "bourrasque"
+event = "boss_intro"
+lines = [
+  { id = "bourr_boss_01", text = "Lui ! C'est LUI ! On y va !", weight = 100, priority = 90, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "lenoir"
+event = "boss_intro"
+lines = [
+  { id = "lenoir_boss_01", text = "Ah. Vous voilà, monsieur. À nous deux.", weight = 100, priority = 90, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "boucherie"
+event = "boss_intro"
+lines = [
+  { id = "bouch_boss_01", text = "AAAH ! Mon client préféré ! Tu vas payer la note !", weight = 100, priority = 90, cooldown_sec = 0.0 },
+]
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║ LE FORGERON NOIR — boss antagoniste (bible: méchant grognon) ║
+# ║ Ton : râleur, vocabulaire commercial, jamais menaçant épique ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+[[pool]]
+speaker = "forgeron_noir"
+event = "boss_intro"
+lines = [
+  { id = "fn_intro_01", text = "Tiens. L'Apprenti. T'aurais dû rester à ton atelier, gamin.", weight = 50, priority = 100, cooldown_sec = 0.0 },
+  { id = "fn_intro_02", text = "Tes bavardes là, c'est du déchet. Allez, viens m'expliquer ton business model.", weight = 50, priority = 100, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "forgeron_noir"
+event = "boss_combat"
+lines = [
+  { id = "fn_cbt_01", text = "Pffff. Encore debout.", weight = 18, priority = 50, cooldown_sec = 8.0 },
+  { id = "fn_cbt_02", text = "Inadmissible. Tu casses mon stock !", weight = 15, priority = 50, cooldown_sec = 10.0 },
+  { id = "fn_cbt_03", text = "Voilà ce que ça donne, les bavardes. Médiocre.", weight = 15, priority = 50, cooldown_sec = 12.0 },
+  { id = "fn_cbt_04", text = "Reste là. Bouge plus. Stop.", weight = 18, priority = 50, cooldown_sec = 8.0 },
+  { id = "fn_cbt_05", text = "Tu vois ? Une arme qui se tait, ça marche mieux.", weight = 12, priority = 50, cooldown_sec = 15.0 },
+  { id = "fn_cbt_06", text = "Ma marge, gamin. Tu touches à ma marge.", weight = 12, priority = 50, cooldown_sec = 12.0 },
+  { id = "fn_cbt_07", text = "Crénom ! Tu as cassé un truc cher, là !", weight = 10, priority = 50, cooldown_sec = 15.0 },
+]
+
+[[pool]]
+speaker = "forgeron_noir"
+event = "boss_phase_2"
+lines = [
+  { id = "fn_p2_01", text = "Bon. Ça suffit. J'augmente la cadence de production.", weight = 100, priority = 110, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "forgeron_noir"
+event = "boss_defeated"
+lines = [
+  { id = "fn_def_01", text = "Pffff. Bavardes. ...Bon. Reposez-vous, alors.", weight = 60, priority = 120, cooldown_sec = 0.0 },
+  { id = "fn_def_02", text = "Vous l'avez mérité, je suppose.", weight = 40, priority = 120, cooldown_sec = 0.0 },
+]

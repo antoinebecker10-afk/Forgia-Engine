@@ -1,0 +1,7 @@
+# 04_hue_rotator.material — Renzora-format material stub.
+# Consumed by forgia-editor-material + forgia-render-* crates.
+# TODO: port node-graph from Renzora source.
+
+[meta]
+name = "04_hue_rotator"
+version = "0.1.0"

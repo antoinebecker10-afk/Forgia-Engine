@@ -1,0 +1,24 @@
+[package]
+name = "forgia-ui-lib"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Consolidated UI library — style + hud + hud_ammo + pause_menu + damage_direction + dialogue (story-517 fusion)"
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
+bevy_kira_audio = { workspace = true }
+serde = { workspace = true }
+toml = "0.8"
+
+forgia-core = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-damage = { workspace = true }
+forgia-mode-fps-arena = { workspace = true }
+forgia-player = { workspace = true }
+# Story-595 (M2-B1) : UserMasterVolume (volume settings -> canaux kira).
+forgia-audio = { workspace = true }
+forgia-genome-core = { workspace = true }
+forgia-rpg-data = { workspace = true }

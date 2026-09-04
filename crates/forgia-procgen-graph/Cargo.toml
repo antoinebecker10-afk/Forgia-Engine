@@ -1,0 +1,14 @@
+[package]
+name = "forgia-procgen-graph"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — VillageGraph data structures (nodes/edges/districts). Pure data."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-rng = { workspace = true }
+forgia-pcg-core = { workspace = true }

@@ -1,0 +1,1000 @@
+id = "combat_default"
+name = "Combat Default"
+domain = "Combat"
+category = "Custom"
+description = "Weapon stats, spell parameters, melee, projectiles — extracted from FpsTuning"
+version = "1.0.0"
+
+# Spell system
+[[genes]]
+id = "gcd_duration"
+label = "Global Cooldown"
+chromosome = "Spells"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.5
+layer = "timing"
+
+[[genes]]
+id = "fireball_speed"
+label = "Fireball Speed"
+chromosome = "Spells"
+target = "Value"
+min = 10.0
+max = 50.0
+default = 25.0
+layer = "fireball"
+
+[[genes]]
+id = "fireball_damage"
+label = "Fireball Damage"
+chromosome = "Spells"
+target = "Value"
+min = 5.0
+max = 60.0
+default = 25.0
+layer = "fireball"
+
+[[genes]]
+id = "fireball_cooldown"
+label = "Fireball Cooldown"
+chromosome = "Spells"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.2
+layer = "fireball"
+
+[[genes]]
+id = "fireball_mana_cost"
+label = "Fireball Mana"
+chromosome = "Spells"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "fireball"
+
+[[genes]]
+id = "ice_bolt_speed"
+label = "Ice Bolt Speed"
+chromosome = "Spells"
+target = "Value"
+min = 10.0
+max = 50.0
+default = 30.0
+layer = "ice"
+
+[[genes]]
+id = "ice_bolt_damage"
+label = "Ice Bolt Damage"
+chromosome = "Spells"
+target = "Value"
+min = 5.0
+max = 40.0
+default = 15.0
+layer = "ice"
+
+[[genes]]
+id = "ice_cooldown"
+label = "Ice Cooldown"
+chromosome = "Spells"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.5
+layer = "ice"
+
+[[genes]]
+id = "freeze_duration"
+label = "Freeze Duration"
+chromosome = "Spells"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 3.0
+layer = "ice"
+
+[[genes]]
+id = "freeze_slow_factor"
+label = "Freeze Slow"
+chromosome = "Spells"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.5
+layer = "ice"
+
+# Shield
+[[genes]]
+id = "shield_duration"
+label = "Shield Duration"
+chromosome = "Spells"
+target = "Value"
+min = 3.0
+max = 20.0
+default = 10.0
+layer = "shield"
+
+[[genes]]
+id = "shield_cooldown"
+label = "Shield Cooldown"
+chromosome = "Spells"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 12.0
+layer = "shield"
+
+[[genes]]
+id = "shield_reduction"
+label = "Shield Reduction"
+chromosome = "Spells"
+target = "Value"
+min = 0.3
+max = 1.0
+default = 1.0
+layer = "shield"
+
+# Shotgun
+[[genes]]
+id = "shotgun_damage"
+label = "Shotgun Damage"
+chromosome = "Weapons"
+target = "Value"
+min = 3.0
+max = 20.0
+default = 7.5
+layer = "shotgun"
+
+[[genes]]
+id = "shotgun_pellets"
+label = "Shotgun Pellets"
+chromosome = "Weapons"
+target = "Value"
+min = 4.0
+max = 16.0
+default = 8.0
+layer = "shotgun"
+
+[[genes]]
+id = "shotgun_spread_deg"
+label = "Shotgun Spread"
+chromosome = "Weapons"
+target = "Value"
+min = 1.0
+max = 15.0
+default = 5.0
+layer = "shotgun"
+
+# Plasma
+[[genes]]
+id = "plasma_damage"
+label = "Plasma Damage"
+chromosome = "Weapons"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "plasma"
+
+[[genes]]
+id = "plasma_fire_rate"
+label = "Plasma Fire Rate"
+chromosome = "Weapons"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.1
+layer = "plasma"
+
+# Rocket
+[[genes]]
+id = "rocket_damage"
+label = "Rocket Damage"
+chromosome = "Weapons"
+target = "Value"
+min = 30.0
+max = 200.0
+default = 100.0
+layer = "rocket"
+
+[[genes]]
+id = "rocket_splash_radius"
+label = "Rocket Splash"
+chromosome = "Weapons"
+target = "Value"
+min = 2.0
+max = 10.0
+default = 5.0
+layer = "rocket"
+
+# Rifle
+[[genes]]
+id = "rifle_damage"
+label = "Rifle Damage"
+chromosome = "Weapons"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 12.0
+layer = "rifle"
+
+[[genes]]
+id = "ak47_damage"
+label = "AK-47 Damage"
+chromosome = "Weapons"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 14.0
+layer = "rifle"
+
+# Melee
+[[genes]]
+id = "chainsaw_damage"
+label = "Chainsaw Damage"
+chromosome = "Melee"
+target = "Value"
+min = 50.0
+max = 300.0
+default = 150.0
+layer = "melee"
+
+[[genes]]
+id = "glory_kill_heal"
+label = "Glory Kill Heal"
+chromosome = "Melee"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 20.0
+layer = "melee"
+
+[[genes]]
+id = "stagger_hp_threshold"
+label = "Stagger Threshold"
+chromosome = "Melee"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.2
+layer = "melee"
+
+# Constraints
+[[constraints]]
+source = "fireball_damage"
+target = "fireball_mana_cost"
+ratio = 0.8
+
+[[constraints]]
+source = "rocket_damage"
+target = "rocket_splash_radius"
+ratio = 0.05
+
+[[constraints]]
+source = "ice_bolt_damage"
+target = "freeze_duration"
+ratio = 0.1
+
+# === Combat UI Colors (RGB triples) ===
+# Floating text colors
+[[genes]]
+id = "text_color_damage_r"
+label = "Damage Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+[[genes]]
+id = "text_color_damage_g"
+label = "Damage Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_text"
+[[genes]]
+id = "text_color_damage_b"
+label = "Damage Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_text"
+
+[[genes]]
+id = "text_color_explosion_r"
+label = "Explosion Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+[[genes]]
+id = "text_color_explosion_g"
+label = "Explosion Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_text"
+[[genes]]
+id = "text_color_explosion_b"
+label = "Explosion Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.1
+layer = "colors_text"
+
+[[genes]]
+id = "text_color_glory_r"
+label = "Glory Kill Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+[[genes]]
+id = "text_color_glory_g"
+label = "Glory Kill Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_text"
+[[genes]]
+id = "text_color_glory_b"
+label = "Glory Kill Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "colors_text"
+
+[[genes]]
+id = "text_color_heal_r"
+label = "Heal Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_text"
+[[genes]]
+id = "text_color_heal_g"
+label = "Heal Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+[[genes]]
+id = "text_color_heal_b"
+label = "Heal Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_text"
+
+[[genes]]
+id = "text_color_armor_r"
+label = "Armor Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "colors_text"
+[[genes]]
+id = "text_color_armor_g"
+label = "Armor Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_text"
+[[genes]]
+id = "text_color_armor_b"
+label = "Armor Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+
+[[genes]]
+id = "text_color_ammo_r"
+label = "Ammo Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+[[genes]]
+id = "text_color_ammo_g"
+label = "Ammo Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "colors_text"
+[[genes]]
+id = "text_color_ammo_b"
+label = "Ammo Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_text"
+
+[[genes]]
+id = "text_color_ice_damage_r"
+label = "Ice Damage Text R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "colors_text"
+[[genes]]
+id = "text_color_ice_damage_g"
+label = "Ice Damage Text G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "colors_text"
+[[genes]]
+id = "text_color_ice_damage_b"
+label = "Ice Damage Text B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_text"
+
+# Material colors
+[[genes]]
+id = "ice_material_r"
+label = "Ice Material R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "colors_material"
+[[genes]]
+id = "ice_material_g"
+label = "Ice Material G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "colors_material"
+[[genes]]
+id = "ice_material_b"
+label = "Ice Material B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_material"
+
+[[genes]]
+id = "ice_emissive_r"
+label = "Ice Emissive R (HDR)"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 2.0
+layer = "colors_material"
+[[genes]]
+id = "ice_emissive_g"
+label = "Ice Emissive G (HDR)"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 4.0
+layer = "colors_material"
+[[genes]]
+id = "ice_emissive_b"
+label = "Ice Emissive B (HDR)"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 8.0
+layer = "colors_material"
+
+[[genes]]
+id = "vase_debris_color_r"
+label = "Vase Debris R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "colors_material"
+[[genes]]
+id = "vase_debris_color_g"
+label = "Vase Debris G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "colors_material"
+[[genes]]
+id = "vase_debris_color_b"
+label = "Vase Debris B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_material"
+
+[[genes]]
+id = "vase_coin_color_r"
+label = "Vase Coin R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "colors_material"
+[[genes]]
+id = "vase_coin_color_g"
+label = "Vase Coin G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "colors_material"
+[[genes]]
+id = "vase_coin_color_b"
+label = "Vase Coin B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "colors_material"
+
+[[genes]]
+id = "obj_debris_color_r"
+label = "Obj Debris R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_material"
+[[genes]]
+id = "obj_debris_color_g"
+label = "Obj Debris G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_material"
+[[genes]]
+id = "obj_debris_color_b"
+label = "Obj Debris B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_material"
+
+[[genes]]
+id = "obj_destructible_color_r"
+label = "Obj Destructible R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.9
+layer = "colors_material"
+[[genes]]
+id = "obj_destructible_color_g"
+label = "Obj Destructible G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "colors_material"
+[[genes]]
+id = "obj_destructible_color_b"
+label = "Obj Destructible B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_material"
+
+[[genes]]
+id = "gold_material_r"
+label = "Gold Material R"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "colors_material"
+[[genes]]
+id = "gold_material_g"
+label = "Gold Material G"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.85
+layer = "colors_material"
+[[genes]]
+id = "gold_material_b"
+label = "Gold Material B"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "colors_material"
+
+[[genes]]
+id = "gold_emissive_r"
+label = "Gold Emissive R (HDR)"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 6.0
+layer = "colors_material"
+[[genes]]
+id = "gold_emissive_g"
+label = "Gold Emissive G (HDR)"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 4.0
+layer = "colors_material"
+[[genes]]
+id = "gold_emissive_b"
+label = "Gold Emissive B (HDR)"
+chromosome = "Combat Colors"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 0.5
+layer = "colors_material"
+
+# === Reload (reload.rs) ===
+[[genes]]
+id = "reload_lockout_secs"
+label = "Reload Fire Lockout"
+chromosome = "Reload"
+target = "Value"
+min = 0.05
+max = 1.0
+default = 0.1
+layer = "reload"
+
+# === Ice Bolt VFX (ice_bolt.rs) ===
+[[genes]]
+id = "ice_glow_z_offset"
+label = "Ice Bolt Glow Z Offset"
+chromosome = "Ice VFX"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.05
+layer = "ice"
+
+# === Vase Destructibles (projectile_hit.rs) ===
+[[genes]]
+id = "vase_fragment_count"
+label = "Vase Fragment Count"
+chromosome = "Destructibles"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 4.0
+layer = "destructibles"
+
+[[genes]]
+id = "vase_fragment_scale"
+label = "Vase Fragment Scale"
+chromosome = "Destructibles"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.15
+layer = "destructibles"
+
+[[genes]]
+id = "vase_coin_count"
+label = "Vase Coin Drop Count"
+chromosome = "Destructibles"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 2.0
+layer = "destructibles"
+
+[[genes]]
+id = "vase_coin_value"
+label = "Vase Coin Value"
+chromosome = "Destructibles"
+target = "Value"
+min = 1.0
+max = 200.0
+default = 15.0
+layer = "destructibles"
+
+# === Object Destructibles (projectile_hit.rs) ===
+[[genes]]
+id = "obj_fragment_count"
+label = "Obj Fragment Count"
+chromosome = "Destructibles"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 5.0
+layer = "destructibles"
+
+[[genes]]
+id = "obj_fragment_scale"
+label = "Obj Fragment Scale"
+chromosome = "Destructibles"
+target = "Value"
+min = 0.05
+max = 0.5
+default = 0.2
+layer = "destructibles"
+
+# === Fireball VFX (fireball.rs) ===
+[[genes]]
+id = "fireball_glow_z_offset"
+label = "Fireball Glow Z Offset"
+chromosome = "Fireball VFX"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.05
+layer = "fireball"
+
+# === Ejected Casing Physics (fireball.rs / weapons.rs) ===
+[[genes]]
+id = "casing_gravity"
+label = "Casing Gravity"
+chromosome = "Casing"
+target = "Value"
+min = 0.0
+max = 30.0
+default = 9.8
+layer = "casing"
+
+[[genes]]
+id = "casing_spin_x"
+label = "Casing Spin X"
+chromosome = "Casing"
+target = "Value"
+min = 0.0
+max = 30.0
+default = 8.0
+layer = "casing"
+
+[[genes]]
+id = "casing_spin_z"
+label = "Casing Spin Z"
+chromosome = "Casing"
+target = "Value"
+min = 0.0
+max = 30.0
+default = 3.0
+layer = "casing"
+
+# === Floating Text Heights (weapons.rs) ===
+[[genes]]
+id = "weapon_text_height_pickup"
+label = "Pickup Text Height"
+chromosome = "Combat UI"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 1.5
+layer = "combat_ui"
+
+[[genes]]
+id = "weapon_text_height_explosion"
+label = "Explosion Text Height"
+chromosome = "Combat UI"
+target = "Value"
+min = 0.5
+max = 4.0
+default = 1.0
+layer = "combat_ui"
+
+[[genes]]
+id = "weapon_text_height_glory"
+label = "Glory Kill Text Height"
+chromosome = "Combat UI"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "combat_ui"
+
+[[genes]]
+id = "weapon_text_height_glory_heal"
+label = "Glory Heal Text Height"
+chromosome = "Combat UI"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 4.0
+layer = "combat_ui"
+
+[[genes]]
+id = "glory_kill_death_phase_mult"
+label = "Glory Kill Death Speed"
+chromosome = "Combat"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.5
+layer = "combat"
+
+[[genes]]
+id = "weapon_explosion_ray_margin"
+label = "Explosion Ray Margin"
+chromosome = "Combat"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.3
+layer = "combat"
+
+# === Destruction Debris (story-134) ===
+[[genes]]
+id = "debris_roughness"
+label = "Debris Material Roughness"
+chromosome = "Destruction"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "destruction"
+
+[[genes]]
+id = "debris_y_spawn_offset"
+label = "Debris Spawn Y Offset"
+chromosome = "Destruction"
+target = "Value"
+min = 0.0
+max = 2.0
+default = 0.3
+layer = "destruction"
+
+[[genes]]
+id = "debris_angvel_x_mult"
+label = "Debris Angular Vel X"
+chromosome = "Destruction"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 8.0
+layer = "destruction"
+
+[[genes]]
+id = "debris_angvel_y_mult"
+label = "Debris Angular Vel Y"
+chromosome = "Destruction"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 6.0
+layer = "destruction"
+
+[[genes]]
+id = "debris_angvel_z_mult"
+label = "Debris Angular Vel Z"
+chromosome = "Destruction"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 4.0
+layer = "destruction"
+
+[[genes]]
+id = "debris_collider_x_factor"
+label = "Debris Collider X Factor"
+chromosome = "Destruction"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.5
+layer = "destruction"
+
+[[genes]]
+id = "debris_collider_y_factor"
+label = "Debris Collider Y Factor"
+chromosome = "Destruction"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.3
+layer = "destruction"
+
+[[genes]]
+id = "debris_collider_z_factor"
+label = "Debris Collider Z Factor"
+chromosome = "Destruction"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.4
+layer = "destruction"
+
+[[genes]]
+id = "crater_sdf_max_clamp"
+label = "Crater SDF Max"
+chromosome = "Destruction"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 5.0
+layer = "destruction"
+
+[[genes]]
+id = "level_dmg_bonus_flat"
+label = "Damage Bonus per Level"
+chromosome = "Combat"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 2.0
+layer = "combat"
+
+[[genes]]
+id = "level_hp_bonus"
+label = "Max HP Bonus per Level"
+chromosome = "Combat"
+target = "Value"
+min = 0.0
+max = 50.0
+default = 10.0
+layer = "combat"

@@ -1,0 +1,106 @@
+id = "async_pipeline_default"
+name = "Async Streaming Pipeline"
+domain = "Performance"
+category = "Custom"
+description = "Concurrency budgets for async chunk-streaming systems (grass, roads, sculpting, terrain meshing). Tunes how aggressively the streaming pipeline dispatches work to AsyncComputeTaskPool. Lower = smoother frame pacing, higher = faster catch-up but spikier frames."
+version = "1.0.0"
+
+# === Global frame budget ===
+[[genes]]
+id = "async_streaming_budget_ms"
+label = "Streaming Frame Budget (ms)"
+chromosome = "Budget"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 6.0
+layer = "global"
+
+# === Grass mesh pipeline (forgia-game/src/terrain/grass.rs) ===
+[[genes]]
+id = "async_grass_max_inflight"
+label = "Grass Max In-flight Tasks"
+chromosome = "Grass"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 4.0
+layer = "grass"
+
+[[genes]]
+id = "async_grass_per_frame"
+label = "Grass Dispatches per Frame"
+chromosome = "Grass"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 4.0
+layer = "grass"
+
+# === Road mesh pipeline (Phase 2 — wired when terrain/roads.rs goes async) ===
+[[genes]]
+id = "async_road_max_inflight"
+label = "Road Max In-flight Tasks"
+chromosome = "Roads"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 4.0
+layer = "roads"
+
+[[genes]]
+id = "async_road_per_frame"
+label = "Road Dispatches per Frame"
+chromosome = "Roads"
+target = "Value"
+min = 1.0
+max = 16.0
+default = 2.0
+layer = "roads"
+
+# === Sculpting pipeline (Phase 3 — wired when terrain/sculpting.rs goes async) ===
+[[genes]]
+id = "async_sculpt_max_inflight"
+label = "Sculpting Max In-flight Tasks"
+chromosome = "Sculpting"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 2.0
+layer = "sculpting"
+
+# === Terrain meshing pipeline (forgia-terrain/src/meshing.rs) ===
+# Bridged via parameter to spawn_async_mesh() from forgia-game streaming.
+[[genes]]
+id = "async_terrain_max_inflight"
+label = "Terrain Mesh Max In-flight"
+chromosome = "Terrain"
+target = "Value"
+min = 1.0
+max = 32.0
+default = 3.0
+layer = "terrain"
+
+# === Terrain SDF generation pipeline (forgia-game/src/terrain/streaming.rs) ===
+# Caps how many chunks can be generating their SDF in parallel. Generation is
+# the heaviest async operation (Perlin + erosion + path/village flatten + SDF).
+[[genes]]
+id = "async_terrain_gen_max_inflight"
+label = "Terrain Gen Max In-flight"
+chromosome = "Terrain"
+target = "Value"
+min = 1.0
+max = 32.0
+default = 4.0
+layer = "terrain"
+
+# Constraints — keep dispatch ≤ in-flight to avoid wasted submissions.
+[[constraints]]
+source = "async_grass_max_inflight"
+target = "async_grass_per_frame"
+ratio = 1.0
+
+[[constraints]]
+source = "async_road_max_inflight"
+target = "async_road_per_frame"
+ratio = 0.5

@@ -1,0 +1,13 @@
+[package]
+name = "forgia-pcg-runtime"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Bevy adapter: drives a PCG SpatialPlan through cell streaming with a collision/navmesh-before-render activation ladder."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-pcg-core = { workspace = true }

@@ -1,0 +1,135 @@
+id = "roguelite_hub_dialogues"
+name = "Roguelite Hub Dialogues — Maître Forgeron / Apprenti"
+domain = "Audio"
+category = "Dialogue"
+description = "Dialogues entre runs. Pattern Hadès NPC hub : ~5-10 répliques courtes par persona, débloquées par progression. Apprenti parle peu (10% volume), Maître Forgeron est le mentor bavard. Bible v1 cross-ref : docs/lore/personas/apprenti.md + docs/lore/personas/forgeron_noir.md (futur post-game NPC)."
+version = "0.1.0"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Maître Forgeron — mentor gentil vieux, accueille l'Apprenti entre runs
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Trigger : entrée Hub (post-run) après run 1 — première rencontre post-Pépin
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_first_return"
+lines = [
+  { id = "mf_first_01", text = "Tu reviens ! Et... tu as ramené quelqu'un.", weight = 100, priority = 50, cooldown_sec = 0.0 },
+  { id = "mf_first_02", text = "Je vois Pépin a accepté de te suivre. C'est rare.", weight = 100, priority = 50, cooldown_sec = 0.0 },
+  { id = "mf_first_03", text = "Sois doux avec lui. Il a vu des choses.", weight = 100, priority = 50, cooldown_sec = 0.0 },
+]
+
+# Trigger : entrée Hub (post-run) générique, après run >=2
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_return"
+lines = [
+  { id = "mf_return_01", text = "Te revoilà, gamin. Assieds-toi.", weight = 30, priority = 40, cooldown_sec = 0.0 },
+  { id = "mf_return_02", text = "Ah, tu sens encore la suie. Repose-toi un peu.", weight = 25, priority = 40, cooldown_sec = 0.0 },
+  { id = "mf_return_03", text = "Tu as bien fait. Les âmes te remercieront.", weight = 20, priority = 40, cooldown_sec = 0.0 },
+  { id = "mf_return_04", text = "Combien aujourd'hui ? Une ? Deux ? Belle journée.", weight = 15, priority = 40, cooldown_sec = 0.0 },
+  { id = "mf_return_05", text = "Tu sais que je suis fier, hein.", weight = 10, priority = 40, cooldown_sec = 0.0 },
+]
+
+# Trigger : entrée Hub après défaite
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_after_defeat"
+lines = [
+  { id = "mf_defeat_01", text = "Ah. Ça arrive. Repose tes armes.", weight = 35, priority = 50, cooldown_sec = 0.0 },
+  { id = "mf_defeat_02", text = "Personne n'attend de toi que ça marche du premier coup.", weight = 30, priority = 50, cooldown_sec = 0.0 },
+  { id = "mf_defeat_03", text = "Les âmes patienteront. Elles savent que tu reviens.", weight = 35, priority = 50, cooldown_sec = 0.0 },
+]
+
+# Trigger : entrée Hub après libération d'une nouvelle arme (chacune unique)
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_freed_bourrasque"
+lines = [
+  { id = "mf_freed_bourr_01", text = "Bourrasque ? Tu es là ? ...Doucement, je suis vieux.", weight = 100, priority = 60, cooldown_sec = 0.0 },
+  { id = "mf_freed_bourr_02", text = "Une âme de vent. Je ne pensais plus en revoir une.", weight = 100, priority = 60, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_freed_lenoir"
+lines = [
+  { id = "mf_freed_len_01", text = "Madame... bienvenue dans mon atelier. Pardon pour la poussière.", weight = 100, priority = 60, cooldown_sec = 0.0 },
+  { id = "mf_freed_len_02", text = "Une noble. Ça promet des conversations intéressantes.", weight = 100, priority = 60, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_freed_boucherie"
+lines = [
+  { id = "mf_freed_bouch_01", text = "Bonté divine, c'est Maurice ! Le boucher de la rue haute !", weight = 100, priority = 60, cooldown_sec = 0.0 },
+  { id = "mf_freed_bouch_02", text = "Son apprenti le cherche depuis des mois. Il faudra qu'on lui dise.", weight = 100, priority = 60, cooldown_sec = 0.0 },
+]
+
+# Trigger : entrée Hub avant boss final (run boss-ready)
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_pre_boss"
+lines = [
+  { id = "mf_preboss_01", text = "Cette fois, tu y vas. Tu es prêt. Je le sens.", weight = 100, priority = 70, cooldown_sec = 0.0 },
+  { id = "mf_preboss_02", text = "Le Forgeron Noir... fais attention. Il est plus malin qu'il en a l'air.", weight = 100, priority = 70, cooldown_sec = 0.0 },
+  { id = "mf_preboss_03", text = "Quoi qu'il arrive, ramène-toi entier. Le reste, on s'en fiche.", weight = 100, priority = 70, cooldown_sec = 0.0 },
+]
+
+# Trigger : entrée Hub post-victoire finale
+[[pool]]
+speaker = "maitre_forgeron"
+event = "hub_post_victory"
+lines = [
+  { id = "mf_victory_01", text = "Tu l'as fait. Toutes les âmes... toutes libres.", weight = 100, priority = 80, cooldown_sec = 0.0 },
+  { id = "mf_victory_02", text = "Le Royaume va parler de toi pendant des générations.", weight = 100, priority = 80, cooldown_sec = 0.0 },
+  { id = "mf_victory_03", text = "Bon. Maintenant, qu'est-ce qu'on mange ?", weight = 100, priority = 80, cooldown_sec = 0.0 },
+]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# L'Apprenti — parle peu, encourage, acquiesce. ~10% volume total.
+# ──────────────────────────────────────────────────────────────────────────────
+
+[[pool]]
+speaker = "apprenti"
+event = "hub_return"
+lines = [
+  { id = "appr_return_01", text = "Mmh. Bonjour Maître.", weight = 40, priority = 40, cooldown_sec = 0.0 },
+  { id = "appr_return_02", text = "...Salut.", weight = 30, priority = 40, cooldown_sec = 0.0 },
+  { id = "appr_return_03", text = "Pardon pour la suie.", weight = 30, priority = 40, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "apprenti"
+event = "hub_after_defeat"
+lines = [
+  { id = "appr_defeat_01", text = "Désolé. J'ai pas tenu.", weight = 50, priority = 50, cooldown_sec = 0.0 },
+  { id = "appr_defeat_02", text = "Je vais y retourner.", weight = 50, priority = 50, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "apprenti"
+event = "hub_pre_boss"
+lines = [
+  { id = "appr_preboss_01", text = "Ok. J'y vais.", weight = 60, priority = 70, cooldown_sec = 0.0 },
+  { id = "appr_preboss_02", text = "...promis, je rentre.", weight = 40, priority = 70, cooldown_sec = 0.0 },
+]
+
+[[pool]]
+speaker = "apprenti"
+event = "hub_post_victory"
+lines = [
+  { id = "appr_victory_01", text = "...Ouf.", weight = 50, priority = 80, cooldown_sec = 0.0 },
+  { id = "appr_victory_02", text = "On rentre.", weight = 50, priority = 80, cooldown_sec = 0.0 },
+]
+
+# In-run rare interjections (l'Apprenti commente très rarement, < 5%/min)
+[[pool]]
+speaker = "apprenti"
+event = "encourage_weapon"
+lines = [
+  { id = "appr_enc_01", text = "T'as géré.", weight = 30, priority = 20, cooldown_sec = 30.0 },
+  { id = "appr_enc_02", text = "Bien joué.", weight = 25, priority = 20, cooldown_sec = 30.0 },
+  { id = "appr_enc_03", text = "Respire.", weight = 25, priority = 20, cooldown_sec = 30.0 },
+  { id = "appr_enc_04", text = "Joli, ça.", weight = 20, priority = 20, cooldown_sec = 30.0 },
+]

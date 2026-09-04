@@ -1,0 +1,651 @@
+//! decor_palettes.rs — les DIRECTIONS ARTISTIQUES en couche definition (story-671).
+//!
+//! Avant : les catalogues de props étaient des `const &[&str]` dans `decor.rs`.
+//! UNE seule palette pour tout le jeu (Inferno + murs KayKit dungeon), donc toutes
+//! les salles de toutes les runs portaient le même habillage. Le semis bougeait —
+//! il est tiré à la graine — mais c'étaient toujours les mêmes objets.
+//!
+//! Maintenant : `assets/genomes/roguelite/roguelite_palettes.toml` déclare N
+//! palettes et la table `stage_palette` dit laquelle porte quel stage. Ré-habiller
+//! une salle = changer une chaîne dans le TOML, sans toucher au code.
+//!
+//! **Le miroir Rust ne contient que `inferno`**, la palette historique. Si le
+//! génome est absent (build distribué, chemin relatif au CWD), le jeu retombe
+//! donc exactement sur le comportement d'avant story-671 — pas sur une salle vide.
+//! Les trois autres DA vivent uniquement en couche definition, ce qui est leur
+//! place : ce sont des listes d'assets, pas de la logique.
+
+use bevy::prelude::*;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::fs;
+use std::time::SystemTime;
+
+pub(crate) const GENOME_PATH: &str = "assets/genomes/roguelite/roguelite_palettes.toml";
+const POLL_PERIOD_SEC: f32 = 1.0;
+
+/// Palette par défaut quand un stage n'est pas dans `[stage_palette]`.
+pub const FALLBACK_PALETTE: &str = "inferno";
+
+/// Un jeu de props cohérent = une DA.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct DecorPalette {
+    /// Nom lisible (logs, futur affichage HUD « tu entres dans … »).
+    pub name: String,
+    /// Points focaux hauts (statue, tour, grand arbre).
+    pub landmarks: Vec<String>,
+    /// Masses de remplissage du périmètre.
+    pub big: Vec<String>,
+    /// Story-684 — décorations MURALES : bannières, tentures, torches murales.
+    /// Accrochées aux tronçons de mur des pièces, jamais posées au sol.
+    ///
+    /// Les bannières étaient dans `landmarks` et `braziers` : une tenture de
+    /// 1,50 × 0,31 m pour 3,20 m de haut se retrouvait plantée debout en plein
+    /// champ. Classement par NOM plutôt que par forme.
+    pub wall_props: Vec<String>,
+    /// Éléments porteurs de lumière (brasero) — ou leur équivalent de la DA.
+    pub braziers: Vec<String>,
+    /// Petits props dispersés au sol, sans collider.
+    pub scatter: Vec<String>,
+    /// Segments de mur (salles en L).
+    pub walls: Vec<String>,
+    /// Angle de mur.
+    pub wall_corner: String,
+    /// Gravats au sol (masque de répétition des dalles).
+    pub rubble: Vec<String>,
+    /// Bâtiments (silhouettes urbaines).
+    pub buildings: Vec<String>,
+}
+
+impl DecorPalette {
+    /// La palette historique (pack Inferno + murs KayKit dungeon) — miroir exact
+    /// des ex-`const` de `decor.rs`.
+    fn inferno() -> Self {
+        let v = |xs: &[&str]| xs.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        Self {
+            name: "La Crypte de l'Enclume".into(),
+            // Le pack Inferno n'a pas de tenture : pool vide, pas de faux
+            // remplissage. Une palette sans décor mural n'en aura pas.
+            wall_props: Vec::new(),
+            landmarks: v(&[
+                "models/environment/inferno/StatueKnight_002.glb",
+                "models/environment/inferno/TowerBig_001.glb",
+            ]),
+            big: v(&[
+                "models/environment/inferno/RockBig_001.glb",
+                "models/environment/inferno/RockBig_003.glb",
+                "models/environment/inferno/RockBig_004.glb",
+                "models/environment/inferno/Crag_001.glb",
+                "models/environment/inferno/Crag_003.glb",
+                "models/environment/inferno/Mound_005.glb",
+                "models/environment/inferno/Mound_008.glb",
+                "models/environment/inferno/ColumnBig_001.glb",
+                "models/environment/inferno/ColumnBigBroken_001.glb",
+                "models/environment/inferno/ColumnBigBroken_002.glb",
+            ]),
+            braziers: v(&[
+                "models/environment/inferno/Brazier_002.glb",
+                "models/environment/inferno/Brazier_004.glb",
+            ]),
+            scatter: v(&[
+                "models/environment/inferno/RockMid_001.glb",
+                "models/environment/inferno/RockMid_002.glb",
+                "models/environment/inferno/RockMid_003.glb",
+                "models/environment/inferno/Box_001.glb",
+                "models/environment/inferno/Vase_001.glb",
+                "models/environment/inferno/Vase_002.glb",
+                "models/environment/inferno/Gear_001.glb",
+                "models/environment/inferno/Gear_002.glb",
+            ]),
+            walls: v(&[
+                "models/kaykit/dungeon/wall.glb",
+                "models/kaykit/dungeon/wall.glb",
+                "models/kaykit/dungeon/wall_broken.glb",
+                "models/kaykit/dungeon/wall_window.glb",
+            ]),
+            wall_corner: "models/kaykit/dungeon/wall_corner.glb".into(),
+            rubble: v(&["models/kaykit/dungeon/rubble.glb"]),
+            buildings: v(&[
+                "models/kaykit/hexagon/red/building_blacksmith_red.gltf",
+                "models/kaykit/hexagon/red/building_mine_red.gltf",
+                "models/kaykit/hexagon/red/building_tower_A_red.gltf",
+                "models/kaykit/hexagon/red/building_tower_catapult_red.gltf",
+                "models/kaykit/hexagon/neutral/building_scaffolding.gltf",
+                "models/kaykit/hexagon/neutral/building_destroyed.gltf",
+            ]),
+        }
+    }
+}
+
+/// Toutes les DA + la table stage → DA.
+#[derive(Resource, Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct DecorPalettesConfig {
+    pub palettes: HashMap<String, DecorPalette>,
+    /// `stage_id` → id de palette. Absent = `FALLBACK_PALETTE`.
+    pub stage_palette: HashMap<String, String>,
+    /// 2026-08-04 — **numéro de chapitre → id de palette**.
+    ///
+    /// C'est la table du Livre : un chapitre = une direction artistique, et elle
+    /// tient du round 1 au round 10. Elle a la PRIORITÉ sur `stage_palette` : en
+    /// boucle de chapitre, c'est le chapitre qui décide de l'habillage, pas la
+    /// salle traversée — sinon on retraverserait quatre univers en dix rounds.
+    ///
+    /// Les clés sont les numéros écrits en toutes lettres (`1`, `2`, …) ; TOML
+    /// les rend comme des chaînes.
+    pub chapter_palette: HashMap<String, String>,
+}
+
+impl Default for DecorPalettesConfig {
+    fn default() -> Self {
+        let mut palettes = HashMap::new();
+        palettes.insert(FALLBACK_PALETTE.to_string(), DecorPalette::inferno());
+        Self {
+            palettes,
+            // Sans génome, tous les stages portent la DA historique.
+            stage_palette: HashMap::new(),
+            // …et aucun chapitre ne déclare la sienne, donc le repli par stage
+            // s'applique : le comportement d'avant le Livre, exactement.
+            chapter_palette: HashMap::new(),
+        }
+    }
+}
+
+impl DecorPalettesConfig {
+    /// PUR — testable. Fallback complet si le TOML est illisible, et le DIT.
+    pub fn parse_toml(content: &str) -> Self {
+        match toml::from_str::<Self>(content) {
+            Ok(mut c) => {
+                if c.palettes.is_empty() {
+                    warn!("[decor-palettes] genome sans palette — miroir Rust utilisé");
+                    return Self::default();
+                }
+                // Garantie : la palette de repli existe TOUJOURS, sinon un stage non
+                // listé se retrouverait sans aucun prop.
+                c.palettes
+                    .entry(FALLBACK_PALETTE.to_string())
+                    .or_insert_with(DecorPalette::inferno);
+                c
+            }
+            Err(e) => {
+                warn!("[decor-palettes] genome illisible ({e}) — MIROIR RUST utilisé");
+                Self::default()
+            }
+        }
+    }
+
+    /// Chargement direct depuis le disque — utilisé par le préchargement des
+    /// assets, qui ne peut pas dépendre de l'ordre d'application des Commands
+    /// au Startup.
+    pub fn load_or_default_public() -> Self {
+        Self::load_or_default()
+    }
+
+    fn load_or_default() -> Self {
+        match fs::read_to_string(GENOME_PATH) {
+            Ok(c) => Self::parse_toml(&c),
+            Err(e) => {
+                warn!("[decor-palettes] {GENOME_PATH} illisible ({e}) — DA historique seule");
+                Self::default()
+            }
+        }
+    }
+
+    /// Id de palette d'un stage. Repli explicite (jamais de salle sans props).
+    pub fn palette_id_for_stage(&self, stage_id: &str) -> &str {
+        self.stage_palette
+            .get(stage_id)
+            .map(String::as_str)
+            .filter(|id| self.palettes.contains_key(*id))
+            .unwrap_or(FALLBACK_PALETTE)
+    }
+
+    /// Id de palette d'un CHAPITRE. `None` si le chapitre n'en déclare pas —
+    /// l'appelant retombe alors sur la table par stage.
+    ///
+    /// Filtre sur les palettes réellement déclarées : pointer un id inexistant
+    /// donnerait une salle vide, et une salle vide ne se voit qu'en jeu.
+    pub fn palette_id_for_chapter(&self, chapter: u32) -> Option<&str> {
+        self.chapter_palette
+            .get(&chapter.to_string())
+            .map(String::as_str)
+            .filter(|id| self.palettes.contains_key(*id))
+    }
+
+    /// La palette à HABILLER : le chapitre d'abord, la salle en repli.
+    ///
+    /// L'ordre EST la règle du Livre — un chapitre garde sa direction artistique
+    /// sur ses quatre arènes, et ce sont la géométrie et le semis qui changent
+    /// d'une pièce à l'autre.
+    pub fn palette_id_for(&self, chapter: u32, stage_id: &str) -> &str {
+        self.palette_id_for_chapter(chapter)
+            .unwrap_or_else(|| self.palette_id_for_stage(stage_id))
+    }
+
+    pub fn palette(&self, id: &str) -> Option<&DecorPalette> {
+        self.palettes.get(id)
+    }
+
+    /// Tous les chemins d'assets déclarés, toutes palettes confondues — pour le
+    /// préchargement.
+    pub fn all_paths(&self) -> Vec<&str> {
+        let mut out = Vec::new();
+        for p in self.palettes.values() {
+            for list in [
+                &p.landmarks,
+                &p.big,
+                &p.braziers,
+                &p.scatter,
+                &p.walls,
+                &p.rubble,
+                &p.buildings,
+            ] {
+                out.extend(list.iter().map(String::as_str));
+            }
+            if !p.wall_corner.is_empty() {
+                out.push(&p.wall_corner);
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+}
+
+// ─── Systems : load + hot-reload ─────────────────────────────────────────────
+
+#[derive(Resource, Default, Debug)]
+pub struct DecorPalettesWatch {
+    pub last_mtime: Option<SystemTime>,
+    pub reload_count: u32,
+}
+
+pub fn sys_init_decor_palettes(mut commands: Commands) {
+    let cfg = DecorPalettesConfig::load_or_default();
+    let mtime = fs::metadata(GENOME_PATH).and_then(|m| m.modified()).ok();
+    let mut ids: Vec<&str> = cfg.palettes.keys().map(String::as_str).collect();
+    ids.sort_unstable();
+    info!(
+        "[decor-palettes] {} DA chargées ({}) — {} assets distincts",
+        ids.len(),
+        ids.join(", "),
+        cfg.all_paths().len()
+    );
+    commands.insert_resource(cfg);
+    commands.insert_resource(DecorPalettesWatch {
+        last_mtime: mtime,
+        reload_count: 0,
+    });
+}
+
+/// Poll mtime 1 Hz (`genome-code.md` : tout gène doit marcher en hot-reload).
+/// Le rechargement ne re-précharge PAS les scènes : les handles vivent dans
+/// `DecorAssets`, chargés au boot pour toutes les palettes. Éditer une liste
+/// prend donc effet sur les props DÉJÀ préchargés ; ajouter un chemin inédit
+/// demande un redémarrage.
+pub fn sys_hot_reload_decor_palettes(
+    time: Res<Time<Real>>,
+    mut cfg: ResMut<DecorPalettesConfig>,
+    mut watch: ResMut<DecorPalettesWatch>,
+    mut cooldown: Local<f32>,
+) {
+    *cooldown -= time.delta_secs();
+    if *cooldown > 0.0 {
+        return;
+    }
+    *cooldown = POLL_PERIOD_SEC;
+    let Ok(mtime) = fs::metadata(GENOME_PATH).and_then(|m| m.modified()) else {
+        return;
+    };
+    if watch.last_mtime == Some(mtime) {
+        return;
+    }
+    watch.last_mtime = Some(mtime);
+    let Ok(content) = fs::read_to_string(GENOME_PATH) else {
+        return;
+    };
+    let next = DecorPalettesConfig::parse_toml(&content);
+    if next == *cfg {
+        return;
+    }
+    *cfg = next;
+    watch.reload_count = watch.reload_count.saturating_add(1);
+    info!(
+        "[decor-palettes] genome HOT-RELOADED (#{}) — effet à la PROCHAINE salle",
+        watch.reload_count
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_rust_mirror_is_the_historical_da_only() {
+        let d = DecorPalettesConfig::default();
+        assert_eq!(d.palettes.len(), 1, "sans génome : la DA historique seule");
+        assert!(d.palettes.contains_key(FALLBACK_PALETTE));
+        // Comportement identique à avant story-671 pour n'importe quel stage.
+        assert_eq!(d.palette_id_for_stage("crypts_of_anvil"), FALLBACK_PALETTE);
+        assert_eq!(d.palette_id_for_stage("n_importe_quoi"), FALLBACK_PALETTE);
+    }
+
+    #[test]
+    fn an_unknown_stage_or_a_dangling_palette_falls_back_never_empty() {
+        let c = DecorPalettesConfig::parse_toml(
+            r#"
+[palettes.inferno]
+name = "hist"
+big = ["a.glb"]
+
+[stage_palette]
+connu = "inferno"
+casse = "palette_qui_n_existe_pas"
+"#,
+        );
+        assert_eq!(c.palette_id_for_stage("connu"), "inferno");
+        assert_eq!(
+            c.palette_id_for_stage("casse"),
+            FALLBACK_PALETTE,
+            "une palette référencée mais absente ne doit pas vider la salle"
+        );
+        assert_eq!(c.palette_id_for_stage("jamais_declare"), FALLBACK_PALETTE);
+    }
+
+    /// Un génome sans `inferno` ne doit pas priver le repli de sa palette.
+    #[test]
+    fn the_fallback_palette_is_always_present() {
+        let c =
+            DecorPalettesConfig::parse_toml("[palettes.autre]\nname = \"x\"\nbig = [\"a.glb\"]");
+        assert!(c.palettes.contains_key(FALLBACK_PALETTE));
+        assert!(c.palettes.contains_key("autre"));
+    }
+
+    #[test]
+    fn a_broken_genome_falls_back_loudly_not_silently_empty() {
+        let c = DecorPalettesConfig::parse_toml("ceci n'est pas du TOML {{{");
+        assert_eq!(c, DecorPalettesConfig::default());
+    }
+
+    /// Le TOML livré doit déclarer les 4 DA et router les 4 stages.
+    #[test]
+    fn the_real_genome_declares_the_four_art_directions() {
+        let content = fs::read_to_string(GENOME_PATH)
+            .or_else(|_| fs::read_to_string(format!("../../{GENOME_PATH}")))
+            .expect("roguelite_palettes.toml introuvable depuis la crate ET depuis la racine");
+        let c = DecorPalettesConfig::parse_toml(&content);
+        for id in ["inferno", "donjon", "paturages", "bourg"] {
+            let p = c
+                .palette(id)
+                .unwrap_or_else(|| panic!("palette {id} absente"));
+            assert!(!p.name.is_empty(), "{id} doit avoir un nom lisible");
+            assert!(
+                !p.big.is_empty(),
+                "{id} doit avoir des masses de remplissage"
+            );
+            assert!(!p.scatter.is_empty(), "{id} doit avoir du semis au sol");
+        }
+        for stage in [
+            "crypts_of_anvil",
+            "forge_sanctum",
+            "donjon_oublie",
+            "hauts_paturages",
+        ] {
+            let id = c.palette_id_for_stage(stage);
+            assert!(c.palette(id).is_some(), "{stage} → palette {id} inconnue");
+        }
+        // Deux stages ne doivent pas porter la MÊME DA, sinon la variété est fictive.
+        let ids: std::collections::HashSet<&str> = [
+            "crypts_of_anvil",
+            "forge_sanctum",
+            "donjon_oublie",
+            "hauts_paturages",
+        ]
+        .iter()
+        .map(|s| c.palette_id_for_stage(s))
+        .collect();
+        assert_eq!(ids.len(), 4, "les 4 stages doivent porter 4 DA distinctes");
+    }
+}
+
+#[cfg(test)]
+mod wall_prop_shape_tests {
+    use super::*;
+    use crate::asset_metrics::AssetRegistry;
+
+    /// Un prop est de FORME MURALE s'il est fin dans un axe ET haut : une
+    /// tenture, un panneau.
+    const THIN_RATIO: f32 = 0.35;
+    /// Épaisseur absolue au-dessus de laquelle un objet **tient debout tout
+    /// seul** (m).
+    ///
+    /// Le ratio seul ne suffit pas : un mur brisé (1,00 × 4,00 × 4,00) et un
+    /// engrenage géant (2,92 × 10,20) sont fins et hauts, et pourtant ils se
+    /// posent très bien au sol. Ce qui les sépare d'une bannière, c'est
+    /// l'ÉPAISSEUR : 31 cm n'offre aucune base — l'objet ne peut pas tenir sans
+    /// être accroché. Un mètre d'épaisseur, si.
+    ///
+    /// Ce n'est pas un seuil abaissé pour repasser au vert : c'est le critère
+    /// physique qui manquait, trouvé parce que le test a signalé deux cas que
+    /// le premier critère classait à tort.
+    const STANDS_ALONE_THICKNESS_M: f32 = 0.5;
+    /// Au-dessus de 1,80 m un objet casse la ligne de vue — il est donc lu comme
+    /// une structure, pas comme un objet posé (`map-design-patterns.md` §11).
+    const TALL_M: f32 = 1.8;
+
+    fn read(rel: &str) -> String {
+        std::fs::read_to_string(rel)
+            .or_else(|_| std::fs::read_to_string(format!("../../{rel}")))
+            .unwrap_or_else(|e| panic!("{rel} illisible : {e}"))
+    }
+
+    /// Story-684 — **une décoration murale ne se plante pas dans l'herbe.**
+    ///
+    /// Les bannières (1,50 × **0,31** m pour 3,20 m de haut) étaient dans
+    /// `landmarks` — donc posées comme points focaux de l'anneau — et dans
+    /// `braziers`, où elles étaient en plus calibrées à la taille d'un brasero.
+    /// Classement par NOM (« c'est un asset dungeon ») au lieu de par forme.
+    ///
+    /// Ce test lit les dimensions MESURÉES et refuse toute forme murale dans un
+    /// pool où les props sont posés debout au sol. Il vaut pour les palettes
+    /// présentes et futures : c'est le correctif de classe, pas le déplacement
+    /// des trois bannières.
+    #[test]
+    fn no_wall_shaped_prop_sits_in_a_free_standing_pool() {
+        let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
+        let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
+
+        let mut measured = 0usize;
+        let mut faults: Vec<String> = Vec::new();
+        for (pid, pal) in &cfg.palettes {
+            // Les pools où un prop est POSÉ AU SOL, debout.
+            for (pool_name, pool) in [
+                ("landmarks", &pal.landmarks),
+                ("big", &pal.big),
+                ("braziers", &pal.braziers),
+                ("scatter", &pal.scatter),
+            ] {
+                for path in pool {
+                    let Some(m) = reg.get(path) else { continue };
+                    measured += 1;
+                    let thin = m.size.x.min(m.size.z);
+                    let wide = m.size.x.max(m.size.z);
+                    if wide <= 0.5 {
+                        continue; // trop petit pour qu'un ratio veuille dire quelque chose
+                    }
+                    if m.height_m >= TALL_M
+                        && thin / wide < THIN_RATIO
+                        && thin < STANDS_ALONE_THICKNESS_M
+                    {
+                        faults.push(format!(
+                            "  '{pid}' / {pool_name} : {} — {:.2} × {:.2} m pour {:.2} m de haut \
+                             (ratio {:.2}) : c'est une TENTURE, elle va dans `wall_props`",
+                            path.rsplit('/').next().unwrap_or(path),
+                            thin,
+                            wide,
+                            m.height_m,
+                            thin / wide
+                        ));
+                    }
+                }
+            }
+        }
+        // « Zéro mesuré n'est pas vert, c'est aveugle » (§13).
+        assert!(measured > 0, "aucun prop mesuré — ce test ne vérifie rien");
+        assert!(
+            faults.is_empty(),
+            "{} décoration(s) murale(s) plantée(s) au sol sur {measured} props mesurés :\n{}",
+            faults.len(),
+            faults.join("\n")
+        );
+    }
+
+    /// Le test ci-dessus a-t-il des dents ? On lui donne le cas exact qui a
+    /// motivé la story : la bannière, telle qu'elle était classée.
+    #[test]
+    fn the_shape_check_really_catches_a_banner() {
+        let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
+        let m = reg
+            .get("models/kaykit/dungeon/banner_blue.glb")
+            .expect("la bannière doit être dans le registre mesuré");
+        let thin = m.size.x.min(m.size.z);
+        let wide = m.size.x.max(m.size.z);
+        assert!(
+            m.height_m >= TALL_M && thin / wide < THIN_RATIO && thin < STANDS_ALONE_THICKNESS_M,
+            "la bannière ({thin:.2} × {wide:.2} × {:.2}) devrait être détectée comme murale",
+            m.height_m
+        );
+    }
+}
+
+#[cfg(test)]
+mod wall_props_coverage_tests {
+    use super::*;
+    use crate::asset_metrics::AssetRegistry;
+
+    fn read(rel: &str) -> String {
+        std::fs::read_to_string(rel)
+            .or_else(|_| std::fs::read_to_string(format!("../../{rel}")))
+            .unwrap_or_else(|e| panic!("{rel} illisible : {e}"))
+    }
+
+    /// Story-687 — **corriger une classe ne doit pas vider la scène.**
+    ///
+    /// Story-684 a sorti les bannières des pools debout (elles y étaient
+    /// plantées dans l'herbe) et les a mises dans `wall_props`, consommé
+    /// uniquement par les murs de PIÈCES. Or les pièces ne sortent pas sur les
+    /// cartes autorées : `crypts_of_anvil` et `forge_sanctum` se sont retrouvées
+    /// sans AUCUNE bannière. Mal posé est devenu absent.
+    ///
+    /// C'est exactement la leçon de story-672 (« un invariant qui vide la scène
+    /// est une régression »), et ce test l'empêche de se reproduire.
+    #[test]
+    fn every_palette_has_wall_decoration() {
+        let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
+        let empty: Vec<&str> = cfg
+            .palettes
+            .iter()
+            .filter(|(_, p)| p.wall_props.is_empty())
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert!(
+            empty.is_empty(),
+            "palettes sans décor mural : {empty:?} — leurs remparts resteront nus"
+        );
+    }
+
+    /// Et ces décorations doivent EXISTER sur le disque et être mesurées : un
+    /// chemin inventé donne un mur nu, en silence.
+    #[test]
+    fn every_wall_prop_exists_and_is_measured() {
+        let cfg = DecorPalettesConfig::parse_toml(&read(GENOME_PATH));
+        let reg = AssetRegistry::parse_toml(&read(crate::asset_metrics::REGISTRY_PATH));
+        let root = if std::fs::metadata("assets").is_ok() {
+            "assets"
+        } else {
+            "../../assets"
+        };
+        let mut faults = Vec::new();
+        for (id, p) in &cfg.palettes {
+            for path in &p.wall_props {
+                if std::fs::metadata(format!("{root}/{path}")).is_err() {
+                    faults.push(format!("  '{id}' : {path} ABSENT du disque"));
+                } else if reg.get(path).is_none() {
+                    faults.push(format!("  '{id}' : {path} non mesuré"));
+                }
+            }
+        }
+        assert!(
+            faults.is_empty(),
+            "décor mural invalide :\n{}",
+            faults.join("\n")
+        );
+    }
+}
+
+// ─── La table du Livre (2026-08-04) ──────────────────────────────────────────
+
+#[cfg(test)]
+mod chapter_palette_tests {
+    use super::*;
+
+    fn shipped() -> DecorPalettesConfig {
+        let content = std::fs::read_to_string(GENOME_PATH)
+            .or_else(|_| std::fs::read_to_string(format!("../../{GENOME_PATH}")))
+            .expect("roguelite_palettes.toml introuvable");
+        DecorPalettesConfig::parse_toml(&content)
+    }
+
+    /// Dix chapitres, dix directions artistiques — et elles doivent être
+    /// DIFFÉRENTES, sinon la table est déclarative sans effet et deux chapitres
+    /// se ressemblent au point qu'on ne voit pas qu'on a changé de livre.
+    #[test]
+    fn the_ten_chapters_wear_ten_distinct_art_directions() {
+        let cfg = shipped();
+        let mut vues = std::collections::HashSet::new();
+        for chapitre in 1..=crate::meta_shop::CHAPTERS_PER_BOOK {
+            let id = cfg
+                .palette_id_for_chapter(chapitre)
+                .unwrap_or_else(|| panic!("chapitre {chapitre} sans direction artistique"));
+            assert!(
+                vues.insert(id.to_string()),
+                "chapitre {chapitre} réutilise la DA « {id} » — le changement de chapitre serait invisible"
+            );
+        }
+        assert_eq!(vues.len(), crate::meta_shop::CHAPTERS_PER_BOOK as usize);
+    }
+
+    /// Le chapitre PRIME sur la salle : c'est toute la règle du Livre. Une arène
+    /// traversée au chapitre 6 porte la DA du chapitre 6, pas celle de sa salle.
+    #[test]
+    fn the_chapter_wins_over_the_stage() {
+        let cfg = shipped();
+        let par_chapitre = cfg.palette_id_for_chapter(6).unwrap();
+        assert_eq!(cfg.palette_id_for(6, "crypts_of_anvil"), par_chapitre);
+        assert_eq!(cfg.palette_id_for(6, "hauts_paturages"), par_chapitre);
+    }
+
+    /// Un chapitre non déclaré retombe sur la table par stage — jamais sur une
+    /// salle vide. C'est le comportement d'avant le Livre, préservé.
+    #[test]
+    fn an_undeclared_chapter_falls_back_to_the_stage_table() {
+        let cfg = shipped();
+        assert!(cfg.palette_id_for_chapter(99).is_none());
+        assert_eq!(
+            cfg.palette_id_for(99, "crypts_of_anvil"),
+            cfg.palette_id_for_stage("crypts_of_anvil")
+        );
+    }
+
+    /// Un id de palette inconnu ne doit PAS produire une salle vide : il est
+    /// ignoré au profit du repli. Une faute de frappe se voit en test, pas en jeu.
+    #[test]
+    fn a_typo_in_the_table_never_empties_a_room() {
+        let mut cfg = DecorPalettesConfig::default();
+        cfg.chapter_palette
+            .insert("3".to_string(), "palette_qui_nexiste_pas".to_string());
+        assert!(cfg.palette_id_for_chapter(3).is_none());
+        assert_eq!(cfg.palette_id_for(3, "inconnu"), FALLBACK_PALETTE);
+    }
+}

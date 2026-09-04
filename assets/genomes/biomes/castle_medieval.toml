@@ -1,0 +1,643 @@
+id = "castle_medieval"
+name = "Medieval Capital"
+domain = "Building"
+category = "Building"
+description = "Procedural medieval capital: massive walls, cathedral, 8 districts, faubourg, bridges"
+version = "4.0.0"
+
+# Structure — overall layout (Capital scale)
+[[genes]]
+id = "wall_radius"
+label = "Wall Radius"
+chromosome = "Structure"
+target = "Value"
+# 2026-04-19 : 120 → 160. Plus d'espace intérieur → bâtiments (scale 0.6)
+# respirent entre les murs. Évite l'effet "ville étouffée" de 120m.
+min = 40.0
+max = 250.0
+default = 160.0
+layer = "structure"
+
+[[genes]]
+id = "wall_height"
+label = "Wall Height"
+chromosome = "Structure"
+target = "Value"
+# 2026-04-19 : 10.0 → 2.0 basé sur mesures Blender.
+# KayKit wall native = 4×4×1m. Ancien code : scale = wall_height×0.625×0.75 =
+# 4.69 → murs 18.75m wide = absurde (monstre géant). Nouveau : scale ~0.94
+# → murs 3.76m wide, échelle médiévale réaliste.
+# Formule : wall_height × 0.625 × 0.75 ≈ scale_effectif.
+min = 1.0
+max = 6.0
+default = 2.0
+layer = "structure"
+
+[[genes]]
+id = "wall_thickness"
+label = "Wall Segments"
+chromosome = "Structure"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "structure"
+
+[[genes]]
+id = "gate_count"
+label = "Gate Count"
+chromosome = "Structure"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 4.0
+layer = "structure"
+
+# Entrance — grand approach
+[[genes]]
+id = "barbican_length"
+label = "Barbican Length"
+chromosome = "Entrance"
+target = "Value"
+min = 8.0
+max = 25.0
+default = 15.0
+layer = "structure"
+
+[[genes]]
+id = "entrance_grandeur"
+label = "Entrance Grandeur"
+chromosome = "Entrance"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "structure"
+
+# Structure — inner wall height bonus (inner taller than outer, like Krak des Chevaliers)
+[[genes]]
+id = "inner_wall_bonus"
+label = "Inner Wall Height Bonus"
+chromosome = "Structure"
+target = "Value"
+min = 1.0
+max = 1.8
+default = 1.4
+layer = "structure"
+
+# Structure — main avenue width (gate to keep)
+[[genes]]
+id = "avenue_width"
+label = "Main Avenue Width"
+chromosome = "Structure"
+target = "Value"
+min = 3.0
+max = 8.0
+default = 5.0
+layer = "layout"
+
+# Towers
+[[genes]]
+id = "tower_count"
+label = "Tower Count"
+chromosome = "Towers"
+target = "Value"
+min = 4.0
+max = 16.0
+default = 8.0
+layer = "structure"
+
+[[genes]]
+id = "tower_height"
+label = "Tower Height"
+chromosome = "Towers"
+target = "Value"
+min = 6.0
+max = 20.0
+default = 12.0
+layer = "structure"
+
+[[genes]]
+id = "tower_radius"
+label = "Tower Radius"
+chromosome = "Towers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "structure"
+
+[[genes]]
+id = "tower_variety"
+label = "Tower Variety"
+chromosome = "Towers"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "variety"
+
+# Keep — central donjon
+[[genes]]
+id = "donjon_scale"
+label = "Donjon Scale"
+chromosome = "Keep"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.5
+layer = "structure"
+
+[[genes]]
+id = "donjon_height"
+label = "Donjon Height"
+chromosome = "Keep"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "structure"
+
+[[genes]]
+id = "keep_prominence"
+label = "Keep Prominence"
+chromosome = "Keep"
+target = "Value"
+min = 0.3
+max = 1.0
+default = 0.7
+layer = "structure"
+
+# Courtyard — inner buildings
+[[genes]]
+id = "courtyard_density"
+label = "Courtyard Density"
+chromosome = "Courtyard"
+target = "Value"
+# 2026-04-19 : 0.8 → 0.45. 0.8 + wc_building_scale 0.35 = 1038 petites pièces
+# empilées dans 130m (effet "tas de blocs"). 0.45 laisse respirer la cour
+# centrale entre le keep et les murs.
+min = 0.0
+max = 1.0
+default = 0.45
+layer = "layout"
+
+[[genes]]
+id = "courtyard_ring_count"
+label = "Ring Count"
+chromosome = "Courtyard"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "layout"
+
+# Faubourg — outer village ring
+[[genes]]
+id = "faubourg_density"
+label = "Faubourg Density"
+chromosome = "Faubourg"
+target = "Value"
+# 2026-04-19 : 0.7 → 0.95. Le château paraissait "perdu au milieu de rien"
+# car le faubourg autour était sparse. 0.95 = ceinture dense de maisons
+# autour des murs → contexte "ville vivante" au lieu de "forteresse isolée".
+min = 0.0
+max = 1.0
+default = 0.95
+layer = "layout"
+
+# Ambiance — decoration and weathering
+[[genes]]
+id = "decoration_density"
+label = "Decoration"
+chromosome = "Ambiance"
+target = "Value"
+# 2026-04-19 : 0.5 → 0.3. Réduit les petites pièces de décor (torches,
+# bannières, tonneaux) qui ajoutaient du bruit visuel dans le "pile de blocs".
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "ambiance"
+
+[[genes]]
+id = "age_weathering"
+label = "Weathering"
+chromosome = "Ambiance"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "ambiance"
+
+[[genes]]
+id = "scaffold_amount"
+label = "Scaffolding"
+chromosome = "Ambiance"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.1
+layer = "ambiance"
+
+# Visual — color palette
+[[genes]]
+id = "color_palette"
+label = "Color Palette"
+chromosome = "Visual"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "visual"
+
+# Interior — procedural rooms inside the castle
+[[genes]]
+id = "interior_room_count"
+label = "Room Count"
+chromosome = "Interior"
+target = "Value"
+min = 4.0
+max = 12.0
+default = 6.0
+layer = "interior"
+
+[[genes]]
+id = "interior_corridor_width"
+label = "Corridor Width"
+chromosome = "Interior"
+target = "Value"
+min = 2.0
+max = 5.0
+default = 3.0
+layer = "interior"
+
+[[genes]]
+id = "interior_room_height"
+label = "Room Height"
+chromosome = "Interior"
+target = "Value"
+min = 3.0
+max = 8.0
+default = 4.5
+layer = "interior"
+
+[[genes]]
+id = "interior_light_density"
+label = "Light Density"
+chromosome = "Interior"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.5
+layer = "interior"
+
+[[genes]]
+id = "interior_furniture_density"
+label = "Furniture"
+chromosome = "Interior"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "interior"
+
+[[genes]]
+id = "interior_room_variety"
+label = "Room Variety"
+chromosome = "Interior"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.5
+layer = "interior"
+
+[[genes]]
+id = "interior_decay"
+label = "Interior Decay"
+chromosome = "Interior"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.2
+layer = "interior"
+
+[[genes]]
+id = "interior_floor_width"
+label = "Floor Width"
+chromosome = "Interior"
+target = "Value"
+min = 40.0
+max = 80.0
+default = 60.0
+layer = "interior"
+
+# Roads — path decoration inside the capital
+[[genes]]
+id = "road_lamp_density"
+label = "Lampadaires"
+chromosome = "Roads"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.7
+layer = "ambiance"
+
+[[genes]]
+id = "road_tile_density"
+label = "Dalles sol"
+chromosome = "Roads"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.6
+layer = "layout"
+
+[[genes]]
+id = "road_barrier_density"
+label = "Barrieres"
+chromosome = "Roads"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.4
+layer = "layout"
+
+[[genes]]
+id = "road_stair_auto"
+label = "Escaliers auto"
+chromosome = "Roads"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.8
+layer = "layout"
+
+# WhiteCastle piece scales (relative to donjon_scale)
+[[genes]]
+id = "wc_building_scale"
+label = "Building Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+# 2026-04-19 (v3) : 0.60 → 0.25 basé sur mesures Blender.
+# WC_BLD_MAIN natif = 40×58×36m (58m tall !). WC_BLD_TOWER natif = 16×72×28m.
+# Ancien 0.60 × donjon 1.5 = 0.90 → cathédrale 52m tall, flèche 65m = gigantesque.
+# Nouveau 0.25 × donjon 1.5 = 0.375 → cathédrale 21.6m, flèche 27m = monument
+# lisible mais pas écrasant. Ground_offset_y mesuré (1.996m × 0.375 = 0.75m)
+# maintenant appliqué dans Phase 7 pour poser la base exactement au sol.
+min = 0.15
+max = 0.6
+default = 0.25
+layer = "whitecastle"
+
+[[genes]]
+id = "wc_gate_scale"
+label = "Gate Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 0.5
+max = 1.2
+default = 0.80
+layer = "whitecastle"
+
+[[genes]]
+id = "wc_column_scale"
+label = "Column Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 0.4
+max = 1.0
+default = 0.70
+layer = "whitecastle"
+
+[[genes]]
+id = "wc_detail_scale"
+label = "Detail Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 0.6
+max = 2.0
+default = 1.20
+layer = "whitecastle"
+
+[[genes]]
+id = "wc_prop_scale"
+label = "Prop Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 0.4
+max = 1.2
+default = 0.80
+layer = "whitecastle"
+
+[[genes]]
+id = "wc_torch_scale"
+label = "Torch Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 1.0
+max = 4.0
+default = 2.3
+layer = "whitecastle"
+
+[[genes]]
+id = "faubourg_radius_offset"
+label = "Faubourg Radius Offset"
+chromosome = "Faubourg"
+target = "Value"
+# 2026-04-19 : 70 → 100. Avec wall_radius passé de 120 → 160, le faubourg
+# doit s'étendre plus loin pour créer une vraie "ville extérieure". 100m
+# d'offset = faubourg entre 160-260m du centre = ceinture village de 100m.
+min = 30.0
+max = 150.0
+default = 100.0
+layer = "layout"
+
+# Cathedral compound — meta-parameters for the central structure
+[[genes]]
+id = "cathedral_density"
+label = "Densite Cathedrale"
+chromosome = "Cathedral"
+target = "Value"
+min = 0.3
+max = 2.0
+default = 1.3
+layer = "layout"
+# Controls: buttress_count, cloister_count, balustrade_count, parvis columns
+
+[[genes]]
+id = "cathedral_spire_offset"
+label = "Spire Offset"
+chromosome = "Cathedral"
+target = "Value"
+# 2026-04-19 : 14 → 4. Avec WC_BLD_MAIN scaled à 40×0.375=15m wide
+# + TOWER scaled à 16×0.375=6m wide, spire offset doit rester proche du
+# main (4m offset = la flèche est attachée au flanc de la cathédrale,
+# pas séparée à 14m de distance).
+min = 2.0
+max = 10.0
+default = 4.0
+layer = "layout"
+
+[[genes]]
+id = "cathedral_wing_spread"
+label = "Wing Spread"
+chromosome = "Cathedral"
+target = "Value"
+# 2026-04-19 : 16 → 8. Cathédrale main 22m tall × 14m wide, wings doivent
+# être adjacents pour faire la croix cohérente. 8m offset = les wings
+# collent aux flancs nord/sud.
+min = 4.0
+max = 14.0
+default = 8.0
+layer = "layout"
+
+[[genes]]
+id = "cathedral_elevated_height"
+label = "Elevated Height"
+chromosome = "Cathedral"
+target = "Value"
+min = 6.0
+max = 18.0
+default = 10.0
+layer = "layout"
+
+[[genes]]
+id = "avenue_pillar_step"
+label = "Avenue Pillar Step"
+chromosome = "Roads"
+target = "Value"
+min = 3.0
+max = 8.0
+default = 4.5
+layer = "layout"
+
+[[genes]]
+id = "well_scale"
+label = "Well Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 4.0
+max = 12.0
+default = 8.0
+layer = "whitecastle"
+
+[[genes]]
+id = "portal_scale"
+label = "Portal Scale"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 4.0
+layer = "whitecastle"
+
+[[genes]]
+id = "portal_height"
+label = "Portal Height"
+chromosome = "WhiteCastle"
+target = "Value"
+min = 0.5
+max = 3.0
+default = 1.5
+layer = "whitecastle"
+
+[[genes]]
+id = "faubourg_building_mult"
+label = "Faubourg Buildings Mult"
+chromosome = "Faubourg"
+target = "Value"
+# 2026-04-19 : 40 → 60. Augmente le nombre de maisons de village dans
+# la ceinture faubourg pour un vrai feel "capitale médiévale peuplée".
+min = 20.0
+max = 100.0
+default = 60.0
+layer = "layout"
+
+# Constraints — exterior
+[[constraints]]
+source = "wall_radius"
+target = "tower_height"
+ratio = 0.3
+
+[[constraints]]
+source = "wall_radius"
+target = "tower_count"
+ratio = 0.2
+
+[[constraints]]
+source = "wall_radius"
+target = "donjon_scale"
+ratio = 0.4
+
+[[constraints]]
+source = "wall_height"
+target = "tower_height"
+ratio = 0.6
+
+[[constraints]]
+source = "courtyard_density"
+target = "decoration_density"
+ratio = 0.5
+
+[[constraints]]
+source = "wall_radius"
+target = "faubourg_density"
+ratio = 0.3
+
+[[constraints]]
+source = "age_weathering"
+target = "scaffold_amount"
+ratio = 0.4
+
+# Constraints — entrance & keep
+[[constraints]]
+source = "wall_radius"
+target = "barbican_length"
+ratio = 0.3
+
+[[constraints]]
+source = "donjon_scale"
+target = "keep_prominence"
+ratio = 0.5
+
+[[constraints]]
+source = "wall_height"
+target = "inner_wall_bonus"
+ratio = 0.1
+
+# Constraints — interior (propagated from exterior genes)
+[[constraints]]
+source = "wall_radius"
+target = "interior_floor_width"
+ratio = 0.5
+
+[[constraints]]
+source = "wall_radius"
+target = "interior_room_count"
+ratio = 0.15
+
+[[constraints]]
+source = "age_weathering"
+target = "interior_decay"
+ratio = 0.7
+
+[[constraints]]
+source = "courtyard_density"
+target = "interior_furniture_density"
+ratio = 0.4
+
+# Constraints — roads (propagated from main genes)
+[[constraints]]
+source = "decoration_density"
+target = "road_lamp_density"
+ratio = 0.5
+
+[[constraints]]
+source = "courtyard_density"
+target = "road_tile_density"
+ratio = 0.4
+
+[[constraints]]
+source = "decoration_density"
+target = "road_barrier_density"
+ratio = 0.3

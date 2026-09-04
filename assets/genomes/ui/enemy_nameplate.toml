@@ -1,0 +1,27 @@
+# forgia-enemy-nameplate — EnemyNameplateTuning (story-457, 2026-05-19)
+# Hot-reload : éditer ce fichier → sync_tuning push automatique runtime.
+
+width = 2.0              # world-space (m) — élargi 2026-07-03 (lisibilité, demande user)
+height = 0.30
+y_offset = 2.4           # au-dessus du bot parent
+lifetime = 12.0          # durée visible (s) — 2.5→12 : les barres RESTENT lisibles en combat (user 2026-07-03)
+fade_out_secs = 0.6      # début du fade en fin de lifetime
+
+# Couleurs linear RGB — style cartoon AAA (Overwatch/Fortnite/Hytale outline)
+fill_color = [1.0, 0.18, 0.12]     # red HP saturé cartoon
+bg_color = [0.0, 0.0, 0.0]         # noir pur pour outline marquée
+border_color = [0.0, 0.0, 0.0]
+
+# Bord fin cartoon — 1% du width = ~1.5cm trait net (vs 8.5% lourd v1)
+border_thickness = 0.015
+
+# story-644 P1 Inc.2 — barres défensives empilées AU-DESSUS de la HP (si la couche
+# existe) : Bouclier bleu / Armure jaune. Rend lisible le choix d'arme (élément vs couche).
+shield_color = [0.28, 0.55, 0.95]   # bleu électrique
+armor_color = [0.92, 0.76, 0.24]    # jaune armure
+
+# story-654 — les couches défensives s'affichent en PLAQUES segmentées (façon
+# Apex/DRG), pas en barres : chaque plaque vaut N PV et « saute » quand la couche
+# passe sous son seuil. La barre principale n'affiche plus QUE la vie.
+shield_segment_hp = 20.0
+armor_segment_hp = 20.0

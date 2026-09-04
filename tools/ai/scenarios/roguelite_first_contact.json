@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "name": "roguelite_first_contact",
+  "boot_mode": "roguelite",
+  "ready_timeout_s": 120,
+  "action_timeout_s": 15,
+  "actions": [
+    { "action": "move_forward", "frames": 90 },
+    { "action": "fire", "frames": 6 }
+  ],
+  "assertions": {
+    "game_mode": "Roguelite",
+    "run_state_prefix": "InRun",
+    "minimum_distance_m": 0.5,
+    "minimum_new_shots": 1
+  },
+  "evidence_sensors": [
+    "forgia2_watchdog.json",
+    "forgia2_sensor_health.json",
+    "forgia_hitscan.json",
+    "forgia2_roguelite_state.json"
+  ]
+}
+

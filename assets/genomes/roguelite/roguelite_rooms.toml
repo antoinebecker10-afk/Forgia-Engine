@@ -1,0 +1,56 @@
+# roguelite_rooms.toml — des PIÈCES et des COULOIRS dans l'arène (story-683).
+#
+# Modèle Gunfire Reborn / Doom : on ne se bat plus dans un disque nu, on traverse
+# un complexe. TOUT RESTE À PLAT — c'est la condition pour que ça marche.
+#
+# Pourquoi plat : les bots n'ont ni navmesh ni gravité. `bot_tactical_movement`
+# travaille en XZ pur et un bot reste au Y où il est né ; relief, escaliers et
+# étages sont bloqués par la même pièce absente. En revanche `collide_and_slide`
+# lance déjà 3 rayons et fait glisser le bot le long d'un mur — c'est
+# littéralement de la navigation de couloir. Les pièces à plat sont la seule
+# partie du Doom-like qui ne demande AUCUN travail d'IA.
+#
+# Hot-reload : poll mtime 1 Hz. Miroir exact des `Default` Rust (`rooms.rs`).
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CE QUI NE SE RÈGLE PAS ICI, PARCE QUE ÇA SE DÉRIVE
+# ─────────────────────────────────────────────────────────────────────────────
+# · Côté d'une pièce  = vue du grunt (20 m) / √2, arrondi au module de mur.
+#   Une pièce plus large que sa vue le fait tirer dessus sans qu'il réagisse.
+# · Largeur de porte  ≥ 2 × (rayon joueur 0,6 + rayon bot 0,4) = 2,0 m.
+# · Pas de trame      = multiple du module de mur (4 m), sinon trous ou débords.
+# · Hauteur de mur    = celle du module : `kaykit/dungeon/wall.glb` fait 4,00 m
+#   (MESURÉ). ⚠️ `medieval_hexagon/wall_straight` ne fait que 1,10 m — le joueur
+#   saute 1,174 m, donc il passe PAR-DESSUS. C'est une clôture, pas un mur, et
+#   elle ne peut pas servir à faire des pièces.
+
+[rooms]
+enabled = true
+
+# Côté de la grille. 3 → 9 pièces. La cellule se DÉRIVE (20 m de vue / √2,
+# arrondi au module) = 12 m, donc un complexe de 3 × 12 = 36 m au centre d'une
+# arène de 80-90 m de rayon. L'anneau extérieur reste OUVERT : c'est la forme
+# Gunfire (une structure bâtie dans un espace plus large), et ça préserve les
+# anneaux d'apparition ennemis existants.
+rooms_per_side = 3
+
+# Largeur d'une porte, en modules de mur. 1 → 4 m, soit le double du minimum
+# nécessaire pour qu'un joueur et un bot se croisent. Plus large ferait des
+# brèches plutôt que des portes.
+#
+# ⚠️ La PARITÉ est imposée par le code : `(cellule − porte)` doit être pair pour
+# que les deux demi-tronçons soient des entiers de modules. La cellule fait
+# 3 modules, donc la porte doit être IMPAIRE (1 ou 3). Une valeur paire est
+# ramenée d'un module vers le bas — jamais vers le haut : élargir ouvrirait une
+# brèche, rétrécir reste une porte.
+corridor_modules = 1
+
+# Fraction des arêtes rouvertes EN PLUS de l'arbre couvrant.
+#
+# L'arbre garantit la connexité (aucune pièce isolée, par construction). Mais un
+# arbre seul, c'est un labyrinthe à sens unique plein de culs-de-sac — et une
+# pièce de combat à une seule entrée est un piège, pas un espace
+# (`map-design-intention.md` §3.1). Les boucles donnent des routes alternatives.
+#
+# 0.0 = labyrinthe pur · 1.0 = grille ouverte sans aucun cul-de-sac.
+extra_loops = 0.5

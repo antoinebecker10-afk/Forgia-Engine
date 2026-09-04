@@ -1,0 +1,7 @@
+PSX First Person Arms (Free) — Drillimpact
+Source : https://drillimpact.itch.io/psx-first-person-arms-free
+Téléchargé : 2026-07-19 (story-661)
+Licence : CC0 / Public Domain (affichée sur la page itch.io au téléchargement)
+Usage : base des bras viewmodel cartoon Forgia (cartoonisation scriptée via
+tools/blender/cartoonize_arms.py → assets/models/arms/fps_arms_cartoon.glb).
+Attribution non requise (CC0) — créditée par courtoisie dans les crédits du jeu.

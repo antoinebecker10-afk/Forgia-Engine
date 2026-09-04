@@ -1,0 +1,26 @@
+# Gait genome — Humanoïde (NPCs, futurs persos humains). Story-579 incr.1 (2026-06-07).
+# Démarre en MIROIR du biped lizard (zéro régression) ; à diverger quand on tunera
+# une marche humaine dédiée (foulée plus longue, genou moins fléchi, etc.).
+# NB : les NPCs ne sont pas encore animés (pas de LocomotionTarget) — ce fichier
+# est prêt pour quand ils le seront (voir audit P1 #5).
+
+stride_per_m_walk = 0.55
+stride_per_m_run = 0.40
+
+stance_frac_walk = 0.60
+stance_frac_run = 0.40
+
+amp_thigh_walk = 0.80
+amp_thigh_run = 1.00
+
+amp_arm_walk = 0.75
+amp_arm_run = 1.05
+
+knee_flex_peak_walk = 1.60
+knee_flex_peak_run = 1.80
+
+pelvic_yaw_amp_walk = 0.10
+pelvic_yaw_amp_run = 0.17
+
+pelvic_bob_amp_walk = 0.04
+pelvic_bob_amp_run = 0.07

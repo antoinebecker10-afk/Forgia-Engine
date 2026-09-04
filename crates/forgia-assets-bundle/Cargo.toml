@@ -1,0 +1,14 @@
+[package]
+name = "forgia-assets-bundle"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Asset pack manifest + lockfile (content-addressed, Cargo.lock pattern adapted to game assets)"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }

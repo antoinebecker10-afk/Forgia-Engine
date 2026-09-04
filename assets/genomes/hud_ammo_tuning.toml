@@ -1,0 +1,62 @@
+# Forgia V2 — Ammo HUD Tuning Genome (story-455 Phase B + audit fixes, 2026-05-18)
+#
+# Hot-reload via Bevy Asset. 0 pixel hardcodé Rust — toutes valeurs ici.
+# Audit BUG-455 verifier + qa-lead : ajout de tous les pads/fonts/outlines internes.
+
+# ─── Counter principal (bottom-right) ────────────────────────────────
+counter_padding_right = 32.0
+counter_padding_bottom = 28.0
+counter_font_main = 78.0
+counter_font_reserve = 28.0
+counter_panel_w = 280.0
+counter_panel_h = 120.0
+counter_outline_px = 2.5
+counter_main_padding_right = 28.0     # décalage main number depuis bord droit panel
+counter_main_y_offset = 18.0          # décalage Y main number depuis centre panel
+counter_reserve_padding_top = 18.0    # décalage Y reserve depuis top panel
+counter_reserve_outline_px = 1.5
+
+# Label "AMMO" top-left
+label_padding_left = 14.0
+label_padding_top = 12.0
+label_font_size = 14.0
+label_outline_px = 1.0
+
+# Reload indicator bottom-left
+reload_indicator_padding_left = 14.0
+reload_indicator_padding_bottom = 22.0
+reload_indicator_font_size = 13.0
+reload_indicator_outline_px = 1.0
+
+# ─── Vertical slot strip ──────────────────────────────────────────────
+slot_padding_right = 24.0
+slot_first_y = 220.0
+slot_box_w = 56.0
+slot_box_h = 56.0
+slot_spacing = 10.0
+slot_active_scale = 1.10
+slot_inactive_alpha = 0.55
+slot_outline_inactive = 2.0
+slot_outline_active = 3.5
+slot_initial_font = 28.0
+slot_hotkey_font = 14.0
+slot_corner_rounding = 6.0
+slot_hotkey_padding_x = 6.0
+slot_hotkey_padding_y = 4.0
+slot_mini_counter_padding_bottom = 6.0
+slot_mini_counter_font = 11.0
+slot_mini_counter_outline_px = 0.8
+slot_initial_outline_px = 1.5
+
+# ─── Reload arc ───────────────────────────────────────────────────────
+reload_arc_radius = 36.0
+reload_arc_thickness = 4.5
+reload_arc_segments = 36
+
+# ─── Low-ammo flash ───────────────────────────────────────────────────
+low_flash_hz = 2.0
+low_flash_alpha_min = 0.4
+low_flash_alpha_max = 1.0
+
+# ─── Sensor ───────────────────────────────────────────────────────────
+sensor_period_secs = 1.0

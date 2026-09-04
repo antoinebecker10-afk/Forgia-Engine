@@ -1,0 +1,18 @@
+[package]
+name = "forgia-core"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Core types : States, GameSet, Resources globales. 0 dépendance workspace (DAG-libre)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+
+# Story-695 inc.2 : export JS du dump des capteurs (web uniquement).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+web-sys = { version = "0.3", features = ["Window", "Storage"] }

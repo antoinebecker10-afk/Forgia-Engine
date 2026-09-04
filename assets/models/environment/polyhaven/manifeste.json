@@ -1,0 +1,64 @@
+{
+ "licence": "CC0 (Poly Haven)",
+ "source": "https://api.polyhaven.com",
+ "modeles": {
+  "bloc_proche": {
+   "asset": "rock_09",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\rock_09\\rock_09_1k.gltf",
+   "annexes": 4,
+   "octets": 2745
+  },
+  "bloc_proche_2": {
+   "asset": "namaqualand_boulder_04",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\namaqualand_boulder_04\\namaqualand_boulder_04_1k.gltf",
+   "annexes": 4,
+   "octets": 2818
+  },
+  "paroi_proche": {
+   "asset": "rock_face_01",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\rock_face_01\\rock_face_01_1k.gltf",
+   "annexes": 4,
+   "octets": 2793
+  },
+  "paroi_proche_2": {
+   "asset": "rock_face_02",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\rock_face_02\\rock_face_02_1k.gltf",
+   "annexes": 4,
+   "octets": 2794
+  },
+  "crete_moyenne": {
+   "asset": "namaqualand_cliff_01",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\namaqualand_cliff_01\\namaqualand_cliff_01_1k.gltf",
+   "annexes": 4,
+   "octets": 2848
+  },
+  "crete_moyenne_2": {
+   "asset": "namaqualand_cliff_02",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\namaqualand_cliff_02\\namaqualand_cliff_02_1k.gltf",
+   "annexes": 4,
+   "octets": 2857
+  },
+  "montagne_lointaine": {
+   "asset": "mountainside",
+   "resolution": "1k",
+   "etat": "telecharge",
+   "fichier": "assets\\models\\environment\\polyhaven\\mountainside\\mountainside_1k.gltf",
+   "annexes": 4,
+   "octets": 2776
+  }
+ },
+ "octets_total": 32567262,
+ "mo_total": 31.1
+}

@@ -1,0 +1,25 @@
+[package]
+name = "forgia-viewmodel"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "FPS arms viewmodel (1P weapon render). Decoupled from firing — équivalent CBaseViewModel Source SDK."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+forgia-core = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-genome-core = { workspace = true }
+forgia-player = { workspace = true }
+forgia-effects = { workspace = true }
+forgia-juice-lib = { workspace = true }
+forgia-input = { workspace = true }
+# Le crosshair est lu DIRECTEMENT à sa source : passer par le re-export de
+# `forgia-ui` faisait entrer tout le hub-menu (et les 28k l. du roguelite
+# derrière) dans le graphe du viewmodel. Story-694 AC5.
+forgia-crosshair = { workspace = true }
+forgia-assets = { workspace = true }

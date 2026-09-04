@@ -1,0 +1,70 @@
+[package]
+name = "forgia-mode-roguelite"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Roguelite mode plugin (procedural)"
+
+[lints]
+workspace = true
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }
+# 2026-08-12 — `blocks_agent` + `NavmeshBuild` : le spawn et la navigation partagent
+# LE MEME predicat de solidite. Sans ca, une troisieme notion de « solide » diverge.
+forgia-navmesh = { workspace = true }
+# Story-470 M2 step 1 — réutilise ArenaBot AI + Health/Mortal damage path
+forgia-ai-arena-bot = { workspace = true }
+# Les archetypes d'ennemis vivaient DANS cette crate (`enemies.rs`) sans jamais
+# dependre d'elle. Sortis en brique partagee le 2026-08-18 pour que l'Expedition
+# les consomme sans dependre du Roguelite entier — ni s'en ecrire un second jeu.
+forgia-enemy-archetypes = { workspace = true }
+forgia-damage = { workspace = true }
+# Story-470 V7 M2 bug fix (2026-05-20) — HitApplyCtx attend forgia_combat::Health
+# (PAS forgia_damage::Health). Sans ça, parent porte mauvais type → QueryDoesNotMatch.
+forgia-combat = { workspace = true }
+# Story-470 M2 fix — TargetCube marker requis par HitApplyCtx + despawn_dead_cubes (forgia-fps)
+forgia-mode-fps-arena = { workspace = true }
+# story-644 fix boss — NameplateAnchor : positionne le nameplate au-dessus de la tête
+# de CHAQUE ennemi (le boss géant rendait le sien dans son corps avec l'offset fixe).
+forgia-enemy-nameplate = { workspace = true }
+# story-611 VFX — EffectAsset hanabi de statut (flamme/poison) + ParticleEffect via prelude.
+bevy_hanabi = { workspace = true }
+forgia-effects = { workspace = true }
+# Story-470 M2 step 3 — drop loot on death + Souls currency
+forgia-rpg-data = { workspace = true }
+# Player marker requis pour tag PickupCollector
+forgia-player = { workspace = true }
+# 2026-06-03 — InputBlockers (block_look) pour le clic-hors-panel → caméra pendant le choix.
+# Les emotes reprennent la main sur le cadrage : la danse se regarde de
+# face, et c'est la camera orbitale qui le sait faire.
+forgia-camera-orbit = { workspace = true }
+forgia-input = { workspace = true }
+# Story-617 — masquer le crosshair au Lobby (CrosshairHidden flag).
+forgia-crosshair = { workspace = true }
+# Story-470 V7 M1 — RunSeed déterministe (host-authoritative, choix audit §0.2)
+rand_xoshiro = "0.7"
+# Story-470 V7 M2.5 — HUD Roguelite (Wave/Souls + Defeat/Victory overlays).
+bevy_egui = { workspace = true }
+forgia-ui-lib = { workspace = true }
+# Story-470 V7 M3 step 2 (2026-05-20) — StageGraph node-driven run loop.
+forgia-stage = { workspace = true }
+# Story-561 (2026-06-03) — POI gameplay greffé sur les anchors AnchorKind::PoiSlot.
+# AnchorPoint/AnchorKind = contrat stable découplé de forgia-stage (édité autre terminal).
+forgia-anchor = { workspace = true }
+# Story-544 (2026-05-27 → close 2026-05-29) — toon cel-shading + Sobel outline
+# post-process pour direction cartoon bible v1 (réf reference_bible_forgia_roguelite_v1.md).
+forgia-postprocess = { workspace = true }
+forgia-assets = { workspace = true }
+# Story-559 slice A (2026-06-04) — audio Roguelite : SFX combat + ding + musique.
+# forgia-audio fournit ForgiaAudioCorePlugin (wrap AudioPlugin) ; bevy_kira_audio
+# pour les channels SFX/Music. Orthogonal (in-crate), 0 édition cross-crate.
+forgia-audio = { workspace = true }
+bevy_kira_audio = { workspace = true }
+# Story-544 close — TOML genome parsing for hot-reload toon config.
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

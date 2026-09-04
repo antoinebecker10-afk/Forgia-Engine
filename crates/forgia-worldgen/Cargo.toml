@@ -1,0 +1,24 @@
+[package]
+name = "forgia-worldgen"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — procedural worldgen engine (cities/villages/maps). Story-578. P0: asset registry. P1: points + instanced spawn (grounded, collider per kind) + sensor + debug viz. Decoupled — ground height is injected (no forgia-terrain / gameplay dep)."
+
+[lints]
+workspace = true
+
+[features]
+# `dev-tools` = key-triggered demo/visualization (F7 hamlet / F9 city / F11 baked / F8 viz /
+# F5 streaming / Shift+F12 reload). On by default for dev; disable for ship builds
+# (`forgia-worldgen = { ..., default-features = false }`) — the authoring API stays available.
+default = ["dev-tools"]
+dev-tools = []
+
+[dependencies]
+serde = { workspace = true }
+ron = { workspace = true }
+toml = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+forgia-core = { workspace = true }

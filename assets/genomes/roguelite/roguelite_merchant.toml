@@ -1,0 +1,42 @@
+# roguelite_merchant.toml — Story-610. Commerçant d'arène (sink in-run).
+# Miroir EXACT de MerchantCatalogue::default() (merchant.rs). Chargé au boot.
+#
+# currency : or  (in-run, Gold) | ames (méta, MetaSouls)
+# effect   : ammo_current | ammo_all | heal | revive
+# amount   : valeur de l'effet (heal = PV). cost : prix dans la monnaie `currency`.
+
+[[items]]
+id = "ammo"
+name = "Munitions"
+desc = "Recharge la réserve de l'arme en main"
+currency = "or"
+cost = 30
+effect = "ammo_current"
+amount = 0.0
+
+[[items]]
+id = "ammo_all"
+name = "Réassort complet"
+desc = "Recharge TOUTES les armes"
+currency = "or"
+cost = 70
+effect = "ammo_all"
+amount = 0.0
+
+[[items]]
+id = "heal"
+name = "Soin"
+desc = "+40 PV"
+currency = "or"
+cost = 40
+effect = "heal"
+amount = 40.0
+
+[[items]]
+id = "revive"
+name = "Second souffle"
+desc = "Survis à ta prochaine mort (1×)"
+currency = "ames"
+cost = 15
+effect = "revive"
+amount = 0.0

@@ -1,0 +1,4454 @@
+# forgia-asset-registry — manifest auto-généré au 1er boot.
+# Éditable à la main. Hot-reload via Shift+F12 en cours de jeu.
+# Les entries `missing = true` sont conservées pour history (le GLB peut
+# revenir). `disabled = true` désactive temporairement sans supprimer.
+
+[[asset]]
+path = "models-v1/nature/birch_tree_1.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.6924262046813965
+
+[[asset]]
+path = "models-v1/nature/birch_tree_2.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.6333024501800537
+
+[[asset]]
+path = "models-v1/nature/birch_tree_3.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.181218385696411
+
+[[asset]]
+path = "models-v1/nature/birch_tree_4.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.886606216430664
+
+[[asset]]
+path = "models-v1/nature/birch_tree_5.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 4.3678998947143555
+
+[[asset]]
+path = "models-v1/nature/birch_tree_autumn_1.glb"
+species = "birch"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.6924264430999756
+
+[[asset]]
+path = "models-v1/nature/birch_tree_autumn_2.glb"
+species = "birch"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.6333024501800537
+
+[[asset]]
+path = "models-v1/nature/birch_tree_autumn_3.glb"
+species = "birch"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.181218385696411
+
+[[asset]]
+path = "models-v1/nature/birch_tree_autumn_4.glb"
+species = "birch"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.886606216430664
+
+[[asset]]
+path = "models-v1/nature/birch_tree_autumn_5.glb"
+species = "birch"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 4.3678998947143555
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_1.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_2.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_3.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_4.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_5.glb"
+species = "birch"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_snow_1.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_snow_2.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_snow_3.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_snow_4.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_dead_snow_5.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/birch_tree_snow_1.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.6924262046813965
+
+[[asset]]
+path = "models-v1/nature/birch_tree_snow_2.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.6333024501800537
+
+[[asset]]
+path = "models-v1/nature/birch_tree_snow_3.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.181218385696411
+
+[[asset]]
+path = "models-v1/nature/birch_tree_snow_4.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.054218053817749
+
+[[asset]]
+path = "models-v1/nature/birch_tree_snow_5.glb"
+species = "birch"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 4.3678998947143555
+
+[[asset]]
+path = "models-v1/nature/branch.glb"
+species = "branch"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush1.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush2.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush3.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_1.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_2.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_berries_1.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_berries_2.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_common.gltf"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_common_flowers.gltf"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_snow_1.glb"
+species = "bush"
+category = "Bush"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/bush_snow_2.glb"
+species = "bush"
+category = "Bush"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_1.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_2.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_3.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_4.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_5.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_flowers_2.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_flowers_3.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_flowers_4.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_flowers_5.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cactus_flower_1.glb"
+species = "cactus"
+category = "Cactus"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/campfire_logs.glb"
+species = "campfire_logs"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_cave_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_diagonal_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_half_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_quarter_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_slope_half_walls_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_slope_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_block_slope_walls_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_cave_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_corner_inner_large_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_corner_inner_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_corner_inner_top_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_corner_large_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_corner_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_corner_top_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_diagonal_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_half_corner_inner_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_half_corner_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_half_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_large_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_steps_corner_inner_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_steps_corner_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_steps_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_top_diagonal_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_top_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_waterfall_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cliff_waterfall_top_rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cloud_big.gltf"
+species = "cloud_big"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/cloud_small.gltf"
+species = "cloud_small"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/clover_1.gltf"
+species = "clover_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/clover_2.gltf"
+species = "clover_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_1.gltf"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 6.726521015167236
+
+[[asset]]
+path = "models-v1/nature/common_tree_2.gltf"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 6.97014045715332
+
+[[asset]]
+path = "models-v1/nature/common_tree_3.gltf"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 8.220751762390137
+
+[[asset]]
+path = "models-v1/nature/common_tree_4.gltf"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 8.200221061706543
+
+[[asset]]
+path = "models-v1/nature/common_tree_5.gltf"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 5.696475505828857
+
+[[asset]]
+path = "models-v1/nature/common_tree_autumn_1.glb"
+species = "common"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.7731361389160156
+
+[[asset]]
+path = "models-v1/nature/common_tree_autumn_2.glb"
+species = "common"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.9591825008392334
+
+[[asset]]
+path = "models-v1/nature/common_tree_autumn_3.glb"
+species = "common"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.001664876937866
+
+[[asset]]
+path = "models-v1/nature/common_tree_autumn_4.glb"
+species = "common"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.3694441318511963
+
+[[asset]]
+path = "models-v1/nature/common_tree_autumn_5.glb"
+species = "common"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.296003818511963
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_1.glb"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_2.glb"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_3.glb"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_4.glb"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_5.glb"
+species = "common"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_snow_1.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_snow_2.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_snow_3.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_snow_4.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_dead_snow_5.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/common_tree_snow_1.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.7731361389160156
+
+[[asset]]
+path = "models-v1/nature/common_tree_snow_2.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.9591825008392334
+
+[[asset]]
+path = "models-v1/nature/common_tree_snow_3.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.001664876937866
+
+[[asset]]
+path = "models-v1/nature/common_tree_snow_4.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.3694441318511963
+
+[[asset]]
+path = "models-v1/nature/common_tree_snow_5.glb"
+species = "common"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.296003818511963
+
+[[asset]]
+path = "models-v1/nature/corn_1.glb"
+species = "corn_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/corn_2.glb"
+species = "corn_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/crops_leafs_stage_a.glb"
+species = "crops_leafs_stage_a"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/crops_leafs_stage_b.glb"
+species = "crops_leafs_stage_b"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/dead_tree_1.gltf"
+species = "dead"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/dead_tree_2.gltf"
+species = "dead"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/dead_tree_3.gltf"
+species = "dead"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/dead_tree_4.gltf"
+species = "dead"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/dead_tree_5.gltf"
+species = "dead"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/fern_1.gltf"
+species = "fern_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/floor_dirt_large_rocky_gltf.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flowers.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_3_group.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_3_single.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_4_group.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_4_single.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_purple_a.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_purple_b.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_purple_c.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_red_a.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_red_b.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_red_c.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_yellow_a.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_yellow_b.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/flower_yellow_c.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass1.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass2.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass3.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_2.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_common_short.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_common_tall.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_large.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_leafs.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_leafs_large.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_short.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_wispy_short.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/grass_wispy_tall.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/ground_grass.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hanging_moss.glb"
+species = "hanging_moss"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hills_a.gltf"
+species = "hills_a"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hills_a_trees.gltf"
+species = "hills"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.7553441524505615
+
+[[asset]]
+path = "models-v1/nature/hills_b.gltf"
+species = "hills_b"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hills_b_trees.gltf"
+species = "hills"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6236045360565186
+
+[[asset]]
+path = "models-v1/nature/hills_c.gltf"
+species = "hills_c"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hills_c_trees.gltf"
+species = "hills"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.8992114067077637
+
+[[asset]]
+path = "models-v1/nature/hill_single_a.gltf"
+species = "hill_single_a"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hill_single_b.gltf"
+species = "hill_single_b"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/hill_single_c.gltf"
+species = "hill_single_c"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/lilypad.glb"
+species = "lilypad"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/log.glb"
+species = "log"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/log_large.glb"
+species = "log_large"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/log_stack.glb"
+species = "log_stack"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/log_stack_large.glb"
+species = "log_stack_large"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_a.gltf"
+species = "mountain_a"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_a_grass.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_a_grass_trees.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_b.gltf"
+species = "mountain_b"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_b_grass.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_b_grass_trees.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_c.gltf"
+species = "mountain_c"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_c_grass.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mountain_c_grass_trees.gltf"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom.glb"
+species = "mushroom"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_common.gltf"
+species = "mushroom_common"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_laetiporus.gltf"
+species = "mushroom_laetiporus"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_red.glb"
+species = "mushroom_red"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_red_group.glb"
+species = "mushroom_red_group"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_red_tall.glb"
+species = "mushroom_red_tall"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_tan.glb"
+species = "mushroom_tan"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_tan_group.glb"
+species = "mushroom_tan_group"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/mushroom_tan_tall.glb"
+species = "mushroom_tan_tall"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/palm_tree_1.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.589149236679077
+
+[[asset]]
+path = "models-v1/nature/palm_tree_2.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.7279086112976074
+
+[[asset]]
+path = "models-v1/nature/palm_tree_3.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.5969016551971436
+
+[[asset]]
+path = "models-v1/nature/palm_tree_4.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.23172664642334
+
+[[asset]]
+path = "models-v1/nature/pebble_round_1.gltf"
+species = "pebble_round_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_round_2.gltf"
+species = "pebble_round_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_round_3.gltf"
+species = "pebble_round_3"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_round_4.gltf"
+species = "pebble_round_4"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_round_5.gltf"
+species = "pebble_round_5"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_square_1.gltf"
+species = "pebble_square_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_square_2.gltf"
+species = "pebble_square_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_square_3.gltf"
+species = "pebble_square_3"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_square_4.gltf"
+species = "pebble_square_4"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_square_5.gltf"
+species = "pebble_square_5"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pebble_square_6.gltf"
+species = "pebble_square_6"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/pine_1.gltf"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 7.057816028594971
+
+[[asset]]
+path = "models-v1/nature/pine_2.gltf"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 7.096892833709717
+
+[[asset]]
+path = "models-v1/nature/pine_3.gltf"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 7.233315944671631
+
+[[asset]]
+path = "models-v1/nature/pine_4.gltf"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 9.93547534942627
+
+[[asset]]
+path = "models-v1/nature/pine_5.gltf"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 8.56734561920166
+
+[[asset]]
+path = "models-v1/nature/pine_tree_1.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.4907314777374268
+
+[[asset]]
+path = "models-v1/nature/pine_tree_2.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1430468559265137
+
+[[asset]]
+path = "models-v1/nature/pine_tree_3.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1009433269500732
+
+[[asset]]
+path = "models-v1/nature/pine_tree_4.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1109256744384766
+
+[[asset]]
+path = "models-v1/nature/pine_tree_5.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.479919195175171
+
+[[asset]]
+path = "models-v1/nature/pine_tree_autumn_1.glb"
+species = "pine"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.4907314777374268
+
+[[asset]]
+path = "models-v1/nature/pine_tree_autumn_2.glb"
+species = "pine"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1430468559265137
+
+[[asset]]
+path = "models-v1/nature/pine_tree_autumn_3.glb"
+species = "pine"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.0776615142822266
+
+[[asset]]
+path = "models-v1/nature/pine_tree_autumn_4.glb"
+species = "pine"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1109256744384766
+
+[[asset]]
+path = "models-v1/nature/pine_tree_autumn_5.glb"
+species = "pine"
+category = "Tree"
+season = "Autumn"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.479919195175171
+
+[[asset]]
+path = "models-v1/nature/pine_tree_snow_1.glb"
+species = "pine"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.4907314777374268
+
+[[asset]]
+path = "models-v1/nature/pine_tree_snow_2.glb"
+species = "pine"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1430468559265137
+
+[[asset]]
+path = "models-v1/nature/pine_tree_snow_3.glb"
+species = "pine"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.0875813961029053
+
+[[asset]]
+path = "models-v1/nature/pine_tree_snow_4.glb"
+species = "pine"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.1109256744384766
+
+[[asset]]
+path = "models-v1/nature/pine_tree_snow_5.glb"
+species = "pine"
+category = "Tree"
+season = "Winter"
+biome_compat = "Tundra"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.479919195175171
+
+[[asset]]
+path = "models-v1/nature/plant_01.glb"
+species = "plant_01"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_02.glb"
+species = "plant_02"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_1.gltf"
+species = "plant_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_1_big.gltf"
+species = "plant_1_big"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_2.glb"
+species = "plant_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_3.glb"
+species = "plant_3"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_4.glb"
+species = "plant_4"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_5.glb"
+species = "plant_5"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_7.gltf"
+species = "plant_7"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_7_big.gltf"
+species = "plant_7_big"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_bush.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_bush_detailed.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_bush_large.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_bush_large_triangle.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_bush_small.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_bush_triangle.glb"
+species = "bush"
+category = "Bush"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_flat_short.glb"
+species = "plant_flat_short"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/plant_flat_tall.glb"
+species = "plant_flat_tall"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/platform_grass.glb"
+species = "ground"
+category = "Ground"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock1.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock2.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock3.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_1.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_2.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_3.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_4.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_5.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_6.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_7.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_large_a.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_large_b.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_large_c.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_large_d.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_large_e.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_large_f.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_medium_1.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_medium_2.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_medium_3.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_1.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_2.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_3.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_4.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_5.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_6.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_moss_7.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_round_small_1.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_round_small_2.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_round_small_3.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_round_thin.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_round_wide.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_square_small_1.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_square_small_2.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_square_small_3.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_square_thin.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_path_square_wide.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_single_a.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_single_b.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_single_c.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_single_d.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_single_e.gltf"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_a.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_b.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_c.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_d.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_e.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_f.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_flat_a.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_flat_b.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_flat_c.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_g.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_h.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_i.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_top_a.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_small_top_b.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_1.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_2.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_3.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_4.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_5.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_6.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_snow_7.glb"
+species = "rock"
+category = "Rock"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_a.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_b.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_c.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_d.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_e.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_f.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_g.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_h.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_i.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/rock_tall_j.glb"
+species = "rock"
+category = "Rock"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_round.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_round_detailed.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_square.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_square_detailed.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_square_detailed_wide.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/tree.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 0.11084677278995514
+
+[[asset]]
+path = "models-v1/nature/tree1.glb"
+species = "tree1"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.298280715942383
+
+[[asset]]
+path = "models-v1/nature/tree2.glb"
+species = "tree2"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.214611768722534
+
+[[asset]]
+path = "models-v1/nature/tree3.glb"
+species = "tree3"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.532405376434326
+
+[[asset]]
+path = "models-v1/nature/tree4.glb"
+species = "tree4"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 3.5852489471435547
+
+[[asset]]
+path = "models-v1/nature/trees_a_cut.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6847074031829834
+
+[[asset]]
+path = "models-v1/nature/trees_a_large.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.9666298627853394
+
+[[asset]]
+path = "models-v1/nature/trees_a_medium.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.8142790794372559
+
+[[asset]]
+path = "models-v1/nature/trees_a_small.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4350239038467407
+
+[[asset]]
+path = "models-v1/nature/trees_b_cut.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.460629940032959
+
+[[asset]]
+path = "models-v1/nature/trees_b_large.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.9324822425842285
+
+[[asset]]
+path = "models-v1/nature/trees_b_medium.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.8638317584991455
+
+[[asset]]
+path = "models-v1/nature/trees_b_small.gltf"
+species = "trees"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.3283746242523193
+
+[[asset]]
+path = "models-v1/nature/tree_blocks.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1850000619888306
+
+[[asset]]
+path = "models-v1/nature/tree_blocks_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1850000619888306
+
+[[asset]]
+path = "models-v1/nature/tree_blocks_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1850000619888306
+
+[[asset]]
+path = "models-v1/nature/tree_cone.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4303327798843384
+
+[[asset]]
+path = "models-v1/nature/tree_cone_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4303327798843384
+
+[[asset]]
+path = "models-v1/nature/tree_cone_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4303327798843384
+
+[[asset]]
+path = "models-v1/nature/tree_default.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.7078874111175537
+
+[[asset]]
+path = "models-v1/nature/tree_default_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.7078874111175537
+
+[[asset]]
+path = "models-v1/nature/tree_default_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.7078874111175537
+
+[[asset]]
+path = "models-v1/nature/tree_detailed.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.3324170112609863
+
+[[asset]]
+path = "models-v1/nature/tree_detailed_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.3324170112609863
+
+[[asset]]
+path = "models-v1/nature/tree_detailed_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.3324170112609863
+
+[[asset]]
+path = "models-v1/nature/tree_fat.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1503874063491821
+
+[[asset]]
+path = "models-v1/nature/tree_fat_darkh.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1503874063491821
+
+[[asset]]
+path = "models-v1/nature/tree_fat_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1503874063491821
+
+[[asset]]
+path = "models-v1/nature/tree_oak.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2262399196624756
+
+[[asset]]
+path = "models-v1/nature/tree_oak_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2262399196624756
+
+[[asset]]
+path = "models-v1/nature/tree_oak_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2262399196624756
+
+[[asset]]
+path = "models-v1/nature/tree_palm.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5145906209945679
+
+[[asset]]
+path = "models-v1/nature/tree_palm_bend.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.3799107074737549
+
+[[asset]]
+path = "models-v1/nature/tree_palm_detailed_short.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.0343290567398071
+
+[[asset]]
+path = "models-v1/nature/tree_palm_detailed_tall.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2476129531860352
+
+[[asset]]
+path = "models-v1/nature/tree_palm_short.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.0562318563461304
+
+[[asset]]
+path = "models-v1/nature/tree_palm_tall.glb"
+species = "palm"
+category = "Tree"
+season = "Default"
+biome_compat = "Desert"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.355659008026123
+
+[[asset]]
+path = "models-v1/nature/tree_pine_default_a.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5458356142044067
+
+[[asset]]
+path = "models-v1/nature/tree_pine_default_b.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5457414388656616
+
+[[asset]]
+path = "models-v1/nature/tree_pine_ground_a.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 0.9144685864448547
+
+[[asset]]
+path = "models-v1/nature/tree_pine_ground_b.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.0419671535491943
+
+[[asset]]
+path = "models-v1/nature/tree_pine_round_a.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.3664371967315674
+
+[[asset]]
+path = "models-v1/nature/tree_pine_round_b.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1959165334701538
+
+[[asset]]
+path = "models-v1/nature/tree_pine_round_c.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2528530359268188
+
+[[asset]]
+path = "models-v1/nature/tree_pine_round_d.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.0817166566848755
+
+[[asset]]
+path = "models-v1/nature/tree_pine_round_e.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2546355724334717
+
+[[asset]]
+path = "models-v1/nature/tree_pine_round_f.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2545415163040161
+
+[[asset]]
+path = "models-v1/nature/tree_pine_small_a.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 0.967199981212616
+
+[[asset]]
+path = "models-v1/nature/tree_pine_small_b.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.0086222887039185
+
+[[asset]]
+path = "models-v1/nature/tree_pine_small_c.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1230697631835938
+
+[[asset]]
+path = "models-v1/nature/tree_pine_small_d.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 0.9555696845054626
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_a.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5296059846878052
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_a_detailed.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5296059846878052
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_b.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.9346060752868652
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_b_detailed.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.9346060752868652
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_c.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6704988479614258
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_c_detailed.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6704988479614258
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_d.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.0754988193511963
+
+[[asset]]
+path = "models-v1/nature/tree_pine_tall_d_detailed.glb"
+species = "pine"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 2.0754988193511963
+
+[[asset]]
+path = "models-v1/nature/tree_plateau.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2493399381637573
+
+[[asset]]
+path = "models-v1/nature/tree_plateau_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2493399381637573
+
+[[asset]]
+path = "models-v1/nature/tree_plateau_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.2493399381637573
+
+[[asset]]
+path = "models-v1/nature/tree_simple.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5194368362426758
+
+[[asset]]
+path = "models-v1/nature/tree_simple_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5194368362426758
+
+[[asset]]
+path = "models-v1/nature/tree_simple_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.5194368362426758
+
+[[asset]]
+path = "models-v1/nature/tree_single_a.gltf"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1964486837387085
+
+[[asset]]
+path = "models-v1/nature/tree_single_a_cut.gltf"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 0.33024048805236816
+
+[[asset]]
+path = "models-v1/nature/tree_single_b.gltf"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.212677240371704
+
+[[asset]]
+path = "models-v1/nature/tree_single_b_cut.gltf"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 0.23664486408233643
+
+[[asset]]
+path = "models-v1/nature/tree_small.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1100374460220337
+
+[[asset]]
+path = "models-v1/nature/tree_small_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1100374460220337
+
+[[asset]]
+path = "models-v1/nature/tree_small_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.1100374460220337
+
+[[asset]]
+path = "models-v1/nature/tree_stump.glb"
+species = "tree"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/tree_stump_moss.glb"
+species = "tree"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/tree_stump_snow.glb"
+species = "tree"
+category = "Stump"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/tree_tall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6877188682556152
+
+[[asset]]
+path = "models-v1/nature/tree_tall_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6877188682556152
+
+[[asset]]
+path = "models-v1/nature/tree_tall_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.6877188682556152
+
+[[asset]]
+path = "models-v1/nature/tree_thin.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4902979135513306
+
+[[asset]]
+path = "models-v1/nature/tree_thin_dark.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4902979135513306
+
+[[asset]]
+path = "models-v1/nature/tree_thin_fall.glb"
+species = "tree"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 1.4902979135513306
+
+[[asset]]
+path = "models-v1/nature/twisted_tree_1.gltf"
+species = "twisted"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 15.483333587646484
+
+[[asset]]
+path = "models-v1/nature/twisted_tree_2.gltf"
+species = "twisted"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 17.76406478881836
+
+[[asset]]
+path = "models-v1/nature/twisted_tree_3.gltf"
+species = "twisted"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 14.958907127380371
+
+[[asset]]
+path = "models-v1/nature/twisted_tree_4.gltf"
+species = "twisted"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 17.553991317749023
+
+[[asset]]
+path = "models-v1/nature/twisted_tree_5.gltf"
+species = "twisted"
+category = "Tree"
+season = "Default"
+biome_compat = "Forest"
+is_dead = false
+missing = false
+disabled = false
+measured_size_m = 14.555057525634766
+
+[[asset]]
+path = "models-v1/nature/waterlily_a.gltf"
+species = "waterlily_a"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/waterlily_b.gltf"
+species = "waterlily_b"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/waterplant_a.gltf"
+species = "waterplant_a"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/waterplant_b.gltf"
+species = "waterplant_b"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/waterplant_c.gltf"
+species = "waterplant_c"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/wheat.glb"
+species = "wheat"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_1.glb"
+species = "willow_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_2.glb"
+species = "willow_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_3.glb"
+species = "willow_3"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_4.glb"
+species = "willow_4"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_5.glb"
+species = "willow_5"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_autumn_1.glb"
+species = "willow_autumn_1"
+category = "Other"
+season = "Autumn"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_autumn_2.glb"
+species = "willow_autumn_2"
+category = "Other"
+season = "Autumn"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_autumn_3.glb"
+species = "willow_autumn_3"
+category = "Other"
+season = "Autumn"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_autumn_4.glb"
+species = "willow_autumn_4"
+category = "Other"
+season = "Autumn"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_autumn_5.glb"
+species = "willow_autumn_5"
+category = "Other"
+season = "Autumn"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_1.glb"
+species = "willow_dead_1"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_2.glb"
+species = "willow_dead_2"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_3.glb"
+species = "willow_dead_3"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_4.glb"
+species = "willow_dead_4"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_5.glb"
+species = "willow_dead_5"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_snow_1.glb"
+species = "willow_dead_snow_1"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_snow_2.glb"
+species = "willow_dead_snow_2"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_snow_3.glb"
+species = "willow_dead_snow_3"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_snow_4.glb"
+species = "willow_dead_snow_4"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_dead_snow_5.glb"
+species = "willow_dead_snow_5"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = true
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_snow_1.glb"
+species = "willow_snow_1"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_snow_2.glb"
+species = "willow_snow_2"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_snow_3.glb"
+species = "willow_snow_3"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_snow_4.glb"
+species = "willow_snow_4"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/willow_snow_5.glb"
+species = "willow_snow_5"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/wood_log.glb"
+species = "wood_log"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/wood_log_moss.glb"
+species = "wood_log_moss"
+category = "Other"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/wood_log_snow.glb"
+species = "wood_log_snow"
+category = "Other"
+season = "Winter"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_old.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false
+
+[[asset]]
+path = "models-v1/nature/stump_old_tall.glb"
+species = "stump"
+category = "Stump"
+season = "Default"
+biome_compat = "Any"
+is_dead = false
+missing = false
+disabled = false

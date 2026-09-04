@@ -1,0 +1,32 @@
+[package]
+name = "forgia-terrain"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Terrain procédural OpenWorld (port partiel V1)."
+
+[lints]
+workspace = true
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+noise = { workspace = true }
+fast-surface-nets = { workspace = true }
+ndshape = { workspace = true }
+voronoice = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+forgia-core = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"
+
+# Story-695 : zstd est une dep C sans sysroot wasm — le cache SDF passe en octets
+# bruts sur web (le cache disque n'y existe pas de toute facon, cf chunk.rs).
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+zstd = { workspace = true }

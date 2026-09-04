@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  push:
+    # TOUTES les branches (2026-08-11) : un dev qui pousse sur feat/* doit avoir
+    # un signal AVANT la PR — sinon il travaille deux jours à l'aveugle. C'est le
+    # prérequis du travail à plusieurs.
+    #
+    # Le budget tient par trois mécanismes, pas par la restriction de branche :
+    #   1. les jobs CHERS (check, test) restent gardés au gate — voir leur `if:`
+    #   2. la `concurrency` ci-dessous fusionne push et pull_request (×1, pas ×2)
+    #   3. `paths-ignore` : les pushes docs-only ne consomment AUCUNE minute
+    branches: ['**']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main, master]
+  # Spot-check Windows (plateforme cible) lancé À LA MAIN uniquement (×2 facturation).
+  workflow_dispatch:
+
+# Budget zero-pay : un nouveau push annule le run précédent de la même branche
+# (pas d'empilement de runs qui brûlent le quota gratuit 2000 min/mois).
+#
+# Sans fusion push/pull_request, ouvrir `branches: ['**']` ferait tourner DEUX
+# runs par push dès qu'une PR est ouverte : ×2 le quota pour un signal identique.
+#
+# Il faut `ref_name`, PAS `ref` : sur un push `github.ref` vaut
+# `refs/heads/feat/x` alors que `github.head_ref` (pull_request) vaut `feat/x` —
+# deux chaînes différentes, donc deux groupes, donc aucune fusion. `ref_name` est
+# déjà la forme courte et se confond avec `head_ref`.
+#   push feat/x → head_ref vide → ref_name = feat/x → ci-feat/x
+#   PR  feat/x → head_ref      = feat/x            → ci-feat/x   (même groupe ✓)
+#
+# Contrepartie assumée : le second run annule le premier. Si un jour des checks
+# deviennent requis sur la PR, une course peut laisser le run de PR en
+# « cancelled » et bloquer la fusion — il faudra alors relancer à la main, ou
+# restreindre `cancel-in-progress` aux branches hors gate.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # NOTE: RUSTFLAGS=-D warnings supprime ici car cassait les deps 3rd-party
+  # (bevy_water, bevy_mod_outline emettent leurs propres warnings).
+  # Le clippy job applique encore -D warnings sur notre code via `cargo clippy ... -- -D warnings`.
+
+jobs:
+  # Budget zero-pay (2026-06-11) : check+clippy passés windows→ubuntu (×1 au lieu
+  # de ×2 facturation — c'est le job windows 4h qui avait épuisé le quota).
+  # La plateforme cible Windows reste couverte par : (1) les builds locaux
+  # quotidiens (machine dev = Windows), (2) le job windows-check manuel ci-dessous.
+  check:
+    name: Cargo Check
+    runs-on: ubuntu-latest
+    # Gate seulement. Sur une branche de feature, `clippy --all-targets` (job
+    # ci-dessous, lui non gardé) type-vérifie DÉJÀ tout ce que `check
+    # --all-targets` vérifie : le lancer aussi doublerait la facture pour zéro
+    # signal supplémentaire. Sur main et en PR, on garde les deux — le
+    # comportement d'avant 2026-08-11 est intact là où il comptait.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Bevy linux deps
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - run: cargo check --workspace --all-targets
+
+  clippy:
+    name: Clippy (0 warnings)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Bevy linux deps
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  windows-check:
+    name: Windows spot-check (manuel)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets
+
+  test:
+    name: Cargo Test (per-crate)
+    runs-on: ubuntu-latest
+    # Gate seulement — c'est LE job cher : boucle sur les ~65 crates, timeout 90 min.
+    # L'ouvrir à toutes les branches épuiserait le quota en quelques jours.
+    #
+    # Contrepartie assumée : sur une branche de feature, les tests ne tournent pas
+    # en CI. Ils restent à la charge du dev en local, où ils sont RAPIDES parce que
+    # scopés — `cargo test -p <crate>` rend en secondes une fois le cache chaud.
+    # Si un jour ce trou fait mal (une régression découverte seulement à la PR),
+    # l'étape suivante est de tester les crates TOUCHÉES par le diff, pas toutes.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    # story-592 (M0.6) : continue-on-error RETIRE — les 1066 tests bloquent a nouveau.
+    # Boucle per-crate au lieu de --workspace : 3 echecs DIFFERENTS observes en
+    # workspace build local (artefacts incrementaux/courses), alors que chaque
+    # crate testee isolement passe (8 crates validees vertes localement).
+    # ubuntu = runner 1x facturation (le job windows 4h x2 a tue le billing).
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Bevy linux deps
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - name: Test chaque crate isolement
+        run: |
+          failed=()
+          for c in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'); do
+            echo "::group::cargo test -p $c"
+            if ! cargo test -p "$c" --no-fail-fast; then
+              failed+=("$c")
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Tests en echec dans: ${failed[*]}"
+            exit 1
+          fi
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  ratchets:
+    name: Ratchets (gates xtask)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Lock L1 : fail si les call-sites d'asset-load derivent au-dessus de la
+      # baseline par fichier (xtask/asset-load-allowlist.toml). story-528.
+      - run: cargo xtask asset-load
+      # Gate QA couche 1 (story-619) : tous les genomes parsent + bornes genes
+      # (min<=default<=max) + ids uniques + cross-refs declarees. Voir
+      # docs/plan/rpg-qa-integrated-plan-2026-06-24.md.
+      - run: cargo xtask validate-genomes
+      # Gates portes du pre-push vers la CI (story-620, Phase 0.6) une fois verts.
+      # story-ids reste au pre-push uniquement (doublons d'IDs en cours sur du
+      # travail local : 597/598/617).
+      - run: cargo xtask arch-drift
+      - run: cargo xtask no-scaffold
+      - run: cargo xtask sensor-audit
+      # Un plugin NOUVEAU doit avoir son garde : monté dans un App::new() qui
+      # tourne (seul moyen d'attraper un error[B0002], qui panique à la
+      # construction du schedule et passe check/clippy/tests), et un capteur
+      # (sans quoi un gène déclaré mais jamais appliqué reste invisible — cf
+      # accroupi_facteur_vitesse, 2026-08-17). Les 41 manquements antérieurs
+      # sont consignés dans docs/audit/plugin-gate-baseline.txt, qui ne doit
+      # que rétrécir.
+      - run: cargo xtask plugin-gate
+      # Une dépendance interne déclarée et jamais référencée : elle documente
+      # faussement l'architecture, et c'est le manifeste qu'on lit en premier.
+      - run: cargo xtask deps-mortes
+      # Le corps d'animation LIVRÉ, pas les fichiers qui l'ont produit : clips
+      # homonymes (que le chargeur glTF écrase en silence), dérive de racine,
+      # clips vides. Sept défauts ont traversé ce pipeline en 2026-08-17 en
+      # passant chacun devant un contrôle qui ne regardait que les entrées.
+      - name: Contrôle du corps d'animation livré
+        run: python tools/assets/verifier_corps.py

@@ -1,0 +1,51 @@
+# roguelite_progression.toml — Progression de l'arme EN COURS DE RUN (story-653).
+#
+# Data-driven + hot-reload (poll mtime 1Hz) : édite pendant que le jeu tourne pour
+# régler l'économie de la Trempe SANS rebuild. Miroir exact des `Default` Rust
+# (trempe.rs) — si ce fichier disparaît/est invalide, retombe sur ces défauts.
+#
+# « La Trempe » : chez le Forgeron Itinérant (marchand), le joueur dépense de l'Or
+# pour tremper son arme → +dégâts par palier (multiplicatif avec les boons/méta).
+
+[trempe]
+# Active la mécanique. false = la Trempe disparaît (retour au comportement pré-653).
+enabled = true
+# Bonus de dégâts PAR palier (fraction), ADDITIF entre paliers :
+#   damage_mul = 1 + level × damage_per_level   (0.15 → niveau 7 = ×2.05)
+# ⚠️ « Multiplicatif » ailleurs dans ce fichier qualifie le produit avec les boons
+# et la méta (`PlayerCombatMods`), PAS la composition entre paliers. La confusion a
+# déjà coûté un chiffre faux dans un audit (×2.01 annoncé au lieu de ×1.75).
+damage_per_level = 0.15
+# Nombre max de trempes par run.
+#
+# ── Pourquoi 7 et plus 5 (mesuré en jeu le 2026-08-04) ──────────────────────────
+# À 5 paliers, le total coûte 219 Or — et le capteur a montré l'arme trempée AU MAX
+# dès le ROUND 1 (`forgia2_trempe.json` : level 5/5, or_spent 219). Le principal
+# levier de progression d'une run était épuisé au premier round : plus rien à gagner
+# pendant les neuf suivants, alors que la menace, elle, continue de monter.
+#
+# À 7 paliers le total passe à 478 Or. Le revenu mesuré est d'environ 44 Or/round
+# (88 Or sur les deux premiers rounds), donc le dernier palier tombe vers le round
+# 10 — la fin d'un chapitre. La Trempe redevient une montée, pas un achat unique.
+#
+# ⚠️ Ces 44 Or/round viennent d'UNE run : le chiffre exact est à confirmer au
+# playtest. C'est une ligne, hot-reloadable, revenir à 5 est immédiat.
+level_cap = 7
+# Coût du 1er palier (Or). Les kills donnent ~2-5 Or → 1re trempe en ~4-10 kills.
+# Volontairement bas : le capteur a aussi montré une run entière à 275 Or en poche
+# sans une seule trempe achetée — le problème est la découvrabilité, pas le prix.
+cost_base = 20
+# Facteur de croissance du coût par palier.
+# 1.4 → 20 / 28 / 39 / 55 / 77 / 108 / 151  (478 au total)
+cost_growth = 1.4
+
+# ── Scaling ennemi par profondeur (story-658) ────────────────────────────────
+# La PRESSION qui donne son sens à la Trempe : plus on avance dans les salles
+# (`stage`), plus les ennemis sont durs. Salle 0 = ×1.0 (référence). Sans ce
+# scaling, monter son arme rendait le jeu trivial.
+[scaling]
+enabled = true
+# +HP (vie + bouclier + armure) par salle. 0.35 = +35 %/salle (salle 2 = ×1.70).
+hp_per_stage = 0.35
+# +dégâts des tirs ennemis par salle. 0.15 = +15 %/salle.
+damage_per_stage = 0.15

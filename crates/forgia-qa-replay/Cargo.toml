@@ -1,0 +1,25 @@
+[package]
+name = "forgia-qa-replay"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia QA replay déterministe + binaire forgia_repro (story-391 P4)"
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-qa-core = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[features]
+default = []
+qa-record = ["forgia-qa-core/qa-record"]
+qa-replay = []
+

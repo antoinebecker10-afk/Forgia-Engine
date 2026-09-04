@@ -1,0 +1,18 @@
+# Forgia Rewrite — Locale
+# Source : fr.toml (French project) — mirror keys to other locales.
+# Format : flat dotted keys. Hot-reload via Shift+F11.
+
+[menu]
+play = "Jouer"
+build = "Créer"
+edit = "Éditer"
+quit = "Quitter"
+
+[hud]
+hp = "PV"
+ammo = "Munitions"
+score = "Score"
+
+[combat]
+hit = "Touché"
+critical = "Critique"

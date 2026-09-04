@@ -1,0 +1,2122 @@
+id = "debug_monitor"
+name = "Debug Monitor & Diagnostics"
+domain = "Debug"
+category = "Custom"
+description = "All diagnostic thresholds for the 360° monitoring system. Controls FPS detection, physics safety, memory leak detection, entity budgets, and health checks. Hot-reloadable via Shift+F12."
+version = "1.0.0"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PERFORMANCE — FPS & frame time thresholds
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_fps_warning"
+label = "FPS Warning Threshold"
+chromosome = "Performance"
+target = "Value"
+min = 10.0
+max = 60.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_fps_critical"
+label = "FPS Critical Threshold"
+chromosome = "Performance"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 15.0
+layer = "global"
+
+[[genes]]
+id = "dbg_fps_unplayable"
+label = "FPS Unplayable Threshold"
+chromosome = "Performance"
+target = "Value"
+min = 1.0
+max = 15.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_frame_spike_ms"
+label = "Frame Spike Threshold (ms)"
+chromosome = "Performance"
+target = "Value"
+min = 16.0
+max = 500.0
+default = 100.0
+layer = "global"
+
+[[genes]]
+id = "dbg_stutter_ms"
+label = "Stutter Detection (ms)"
+chromosome = "Performance"
+target = "Value"
+min = 16.0
+max = 100.0
+default = 33.3
+layer = "global"
+
+[[genes]]
+id = "dbg_history_window"
+label = "Metrics History Window (frames)"
+chromosome = "Performance"
+target = "Value"
+min = 60.0
+max = 1200.0
+default = 600.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHYSICS — NaN, teleport, out-of-bounds
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_teleport_threshold"
+label = "Teleport Detection Distance"
+chromosome = "Physics"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_oob_max_coord"
+label = "Out-of-Bounds Max Coordinate"
+chromosome = "Physics"
+target = "Value"
+min = 1000.0
+max = 100000.0
+default = 10000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_ground_threshold"
+label = "Below-Ground Y Threshold"
+chromosome = "Physics"
+target = "Value"
+min = -500.0
+max = 0.0
+default = -100.0
+layer = "global"
+
+[[genes]]
+id = "dbg_nan_throttle_frames"
+label = "NaN Sanitizer Throttle (frames)"
+chromosome = "Physics"
+target = "Value"
+min = 1.0
+max = 120.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_nan_log_max"
+label = "NaN Fix Max Logged"
+chromosome = "Physics"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 10.0
+layer = "global"
+
+[[genes]]
+id = "dbg_oob_cleanup_interval"
+label = "OOB Cleanup Interval (seconds)"
+chromosome = "Physics"
+target = "Value"
+min = 0.5
+max = 10.0
+default = 2.0
+layer = "global"
+
+[[genes]]
+id = "dbg_collider_warn_count"
+label = "Collider Count Warning"
+chromosome = "Physics"
+target = "Value"
+min = 1000.0
+max = 50000.0
+default = 5000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_bodies_at_origin_warn"
+label = "Bodies at Origin Warning"
+chromosome = "Physics"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 10.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY — leak detection
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_memory_leak_rate"
+label = "Memory Leak Threshold (MB/s)"
+chromosome = "Memory"
+target = "Value"
+min = 0.1
+max = 10.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_memory_history_frames"
+label = "Memory History Window (frames)"
+chromosome = "Memory"
+target = "Value"
+min = 60.0
+max = 1200.0
+default = 600.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENTITIES — spawn flood, budget
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_entity_flood_threshold"
+label = "Entity Flood (5s window)"
+chromosome = "Entities"
+target = "Value"
+min = 50.0
+max = 5000.0
+default = 500.0
+layer = "global"
+
+[[genes]]
+id = "dbg_entity_budget_critical_mult"
+label = "Entity Budget Critical Multiplier"
+chromosome = "Entities"
+target = "Value"
+min = 1.5
+max = 5.0
+default = 2.0
+layer = "global"
+
+[[genes]]
+id = "dbg_spawn_history_seconds"
+label = "Spawn History Window (seconds)"
+chromosome = "Entities"
+target = "Value"
+min = 10.0
+max = 300.0
+default = 60.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HEALTH MONITOR — intervals, player checks
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_health_interval"
+label = "Health Check Interval (seconds)"
+chromosome = "Health"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_health_history_max"
+label = "Health History Max Entries"
+chromosome = "Health"
+target = "Value"
+min = 10.0
+max = 300.0
+default = 60.0
+layer = "global"
+
+[[genes]]
+id = "dbg_player_underground_offset"
+label = "Player Underground Offset"
+chromosome = "Health"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_player_fall_rate"
+label = "Player Fall Rate Alert (m/check)"
+chromosome = "Health"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 20.0
+layer = "global"
+
+[[genes]]
+id = "dbg_camera_desync_dist"
+label = "Camera Desync Distance"
+chromosome = "Health"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_no_chunks_timeout"
+label = "No Chunks Loaded Timeout (s)"
+chromosome = "Health"
+target = "Value"
+min = 5.0
+max = 60.0
+default = 10.0
+layer = "global"
+
+[[genes]]
+id = "dbg_veg_min_chunks"
+label = "Min Chunks for Vegetation Check"
+chromosome = "Health"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 10.0
+layer = "global"
+
+[[genes]]
+id = "dbg_veg_zero_grace_secs"
+label = "Vegetation Zero Boot Grace (s)"
+chromosome = "Health"
+target = "Value"
+min = 0.0
+max = 300.0
+default = 90.0
+layer = "global"
+
+[[genes]]
+id = "dbg_floating_text_saturation_streak"
+label = "Floating Text Saturation Alert Streak"
+chromosome = "Health"
+target = "Value"
+min = 0.0
+max = 60.0
+default = 3.0
+layer = "global"
+
+[[genes]]
+id = "dbg_low_preset_budget"
+label = "Low Preset Entity Budget"
+chromosome = "Health"
+target = "Value"
+min = 100.0
+max = 5000.0
+default = 1500.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PERF GUARDIAN — adaptive throttling
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_guardian_throttle_fps"
+label = "Guardian Throttle FPS (1% low)"
+chromosome = "Guardian"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 20.0
+layer = "global"
+
+[[genes]]
+id = "dbg_guardian_reduce_fps"
+label = "Guardian Reduce FPS (1% low)"
+chromosome = "Guardian"
+target = "Value"
+min = 15.0
+max = 45.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_guardian_restore_frames"
+label = "Guardian Restore Hysteresis (frames)"
+chromosome = "Guardian"
+target = "Value"
+min = 30.0
+max = 300.0
+default = 120.0
+layer = "global"
+
+[[genes]]
+id = "dbg_guardian_cooldown_frames"
+label = "Guardian Change Cooldown (frames)"
+chromosome = "Guardian"
+target = "Value"
+min = 10.0
+max = 120.0
+default = 60.0
+layer = "global"
+
+[[genes]]
+id = "dbg_guardian_window_frames"
+label = "Guardian FPS Window (frames)"
+chromosome = "Guardian"
+target = "Value"
+min = 30.0
+max = 120.0
+default = 60.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INVARIANTS — validation ranges
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_fov_min"
+label = "FOV Min Valid"
+chromosome = "Invariants"
+target = "Value"
+min = 10.0
+max = 60.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_fov_max"
+label = "FOV Max Valid"
+chromosome = "Invariants"
+target = "Value"
+min = 90.0
+max = 200.0
+default = 170.0
+layer = "global"
+
+[[genes]]
+id = "dbg_enemy_level_max"
+label = "Enemy Max Level"
+chromosome = "Invariants"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 10.0
+layer = "global"
+
+[[genes]]
+id = "dbg_invariant_check_frames"
+label = "Invariant Check Interval (frames)"
+chromosome = "Invariants"
+target = "Value"
+min = 10.0
+max = 300.0
+default = 60.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REPORT — centralized 360° report settings
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_report_interval"
+label = "360° Report Interval (seconds)"
+chromosome = "Report"
+target = "Value"
+min = 1.0
+max = 60.0
+default = 10.0
+layer = "global"
+
+[[genes]]
+id = "dbg_report_history_max"
+label = "Report History Max"
+chromosome = "Report"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 30.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VISUAL — AAA rendering & environment quality checks
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_visual_check_frames"
+label = "Visual Check Interval (frames)"
+chromosome = "Visual"
+target = "Value"
+min = 30.0
+max = 600.0
+default = 120.0
+layer = "global"
+
+[[genes]]
+id = "dbg_scale_min"
+label = "Min Valid Scale"
+chromosome = "Visual"
+target = "Value"
+min = 0.0001
+max = 0.1
+default = 0.005
+layer = "global"
+
+[[genes]]
+id = "dbg_scale_max"
+label = "Max Valid Scale"
+chromosome = "Visual"
+target = "Value"
+min = 10.0
+max = 1000.0
+default = 200.0
+layer = "global"
+
+[[genes]]
+id = "dbg_gameset_threshold_ms"
+label = "GameSet Frame Time Threshold (ms)"
+chromosome = "Performance"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_floating_threshold"
+label = "Floating Object Height Threshold"
+chromosome = "Visual"
+target = "Value"
+min = 0.5
+max = 100.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_shadow_min_distance"
+label = "Shadow Min Distance (AAA)"
+chromosome = "Visual"
+target = "Value"
+min = 50.0
+max = 400.0
+default = 100.0
+layer = "global"
+
+[[genes]]
+id = "dbg_min_veg_density"
+label = "Min Vegetation Density (AAA)"
+chromosome = "Visual"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "global"
+
+[[genes]]
+id = "dbg_min_grass_density"
+label = "Min Grass Density (AAA)"
+chromosome = "Visual"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.3
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VRAM GUARDIAN EMERGENCY — seuils emergency et limites minimales (story-373)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_vram_emergency_freeze_warn_ms"
+label = "VRAM Emergency Freeze Warning (ms)"
+chromosome = "Guardian"
+target = "Value"
+min = 50.0
+max = 5000.0
+default = 100.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_despawn_batch_size"
+label = "VRAM Despawn Batch Size per Frame"
+chromosome = "Guardian"
+target = "Value"
+min = 5.0
+max = 500.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_min_streaming_radius"
+label = "Emergency Minimum Streaming Radius"
+chromosome = "Guardian"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_min_view_distance"
+label = "Emergency Minimum View Distance (m)"
+chromosome = "Guardian"
+target = "Value"
+min = 50.0
+max = 300.0
+default = 150.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_min_building_distance"
+label = "Emergency Minimum Building Distance (m)"
+chromosome = "Guardian"
+target = "Value"
+min = 30.0
+max = 150.0
+default = 80.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_min_entity_budget"
+label = "Emergency Minimum Entity Budget"
+chromosome = "Guardian"
+target = "Value"
+min = 500.0
+max = 5000.0
+default = 1500.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_min_veg_density"
+label = "Emergency Minimum Vegetation Density"
+chromosome = "Guardian"
+target = "Value"
+min = 0.0
+max = 0.5
+default = 0.2
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_min_veg_distance"
+label = "Emergency Minimum Vegetation Distance (m)"
+chromosome = "Guardian"
+target = "Value"
+min = 25.0
+max = 100.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_escalation_min_streaming_radius"
+label = "Escalation L2 Minimum Streaming Radius"
+chromosome = "Guardian"
+target = "Value"
+min = 1.0
+max = 4.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_escalation_min_entity_budget"
+label = "Escalation L2 Minimum Entity Budget"
+chromosome = "Guardian"
+target = "Value"
+min = 200.0
+max = 2000.0
+default = 800.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONSTRAINTS — ensure thresholds stay coherent
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Critical must be ≤ Warning
+[[constraints]]
+source = "dbg_fps_warning"
+target = "dbg_fps_critical"
+ratio = 0.5
+
+# Unplayable must be ≤ Critical
+[[constraints]]
+source = "dbg_fps_critical"
+target = "dbg_fps_unplayable"
+ratio = 0.33
+
+# Guardian throttle must be ≤ reduce
+[[constraints]]
+source = "dbg_guardian_reduce_fps"
+target = "dbg_guardian_throttle_fps"
+ratio = 0.67
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WATCHDOG & FREEZE DETECTION — moved from hardcoded constants
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_lag_threshold_ms"
+label = "Lag Detection Threshold (ms)"
+chromosome = "Watchdog"
+target = "Value"
+min = 16.0
+max = 200.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_freeze_threshold_ms"
+label = "Freeze Detection Threshold (ms)"
+chromosome = "Watchdog"
+target = "Value"
+min = 100.0
+max = 1000.0
+default = 200.0
+layer = "global"
+
+[[genes]]
+id = "dbg_critical_freeze_ms"
+label = "Critical Freeze Threshold (ms)"
+chromosome = "Watchdog"
+target = "Value"
+min = 500.0
+max = 5000.0
+default = 1000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_watchdog_timeout_ms"
+label = "Watchdog Main Thread Timeout (ms)"
+chromosome = "Watchdog"
+target = "Value"
+min = 2000.0
+max = 30000.0
+default = 5000.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY EXTENDED — RAM thresholds & leak detection
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_ram_warning_mb"
+label = "RAM Warning Threshold (MB)"
+chromosome = "Memory"
+target = "Value"
+min = 2000.0
+max = 16000.0
+default = 6000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_ram_critical_mb"
+label = "RAM Critical Threshold (MB)"
+chromosome = "Memory"
+target = "Value"
+min = 4000.0
+max = 24000.0
+default = 8000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_ram_panic_mb"
+label = "RAM Panic Threshold (MB)"
+chromosome = "Memory"
+target = "Value"
+min = 6000.0
+max = 32000.0
+default = 10000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_leak_snapshot_interval"
+label = "Leak Snapshot Interval (seconds)"
+chromosome = "Memory"
+target = "Value"
+min = 5.0
+max = 120.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_leak_consecutive_required"
+label = "Consecutive Leaks Before Alert"
+chromosome = "Memory"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 3.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOGGING — verbose mode per subsystem
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_verbose_physics"
+label = "Verbose Physics Logging"
+chromosome = "Logging"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "dbg_verbose_streaming"
+label = "Verbose Streaming Logging"
+chromosome = "Logging"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "dbg_verbose_animation"
+label = "Verbose Animation Logging"
+chromosome = "Logging"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "dbg_max_log_buffer_mb"
+label = "Max Log Buffer Size (MB)"
+chromosome = "Logging"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 10.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEBUG UI — overlay & visualization controls
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_overlay_enabled"
+label = "Ship Overlay Enabled"
+chromosome = "DebugUI"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_overlay_level"
+label = "Overlay Detail Level (0=off, 1=minimal, 2=standard, 3=full)"
+chromosome = "DebugUI"
+target = "Value"
+min = 0.0
+max = 3.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_overlay_update_ms"
+label = "Overlay Refresh Interval (ms)"
+chromosome = "DebugUI"
+target = "Value"
+min = 16.0
+max = 1000.0
+default = 100.0
+layer = "global"
+
+[[genes]]
+id = "dbg_show_chunk_grid"
+label = "Show Chunk Grid Overlay"
+chromosome = "DebugUI"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "dbg_show_entity_spawns"
+label = "Highlight Recent Entity Spawns"
+chromosome = "DebugUI"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "dbg_panel_opacity"
+label = "Debug Panel Opacity"
+chromosome = "DebugUI"
+target = "Value"
+min = 0.1
+max = 1.0
+default = 0.85
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CRISIS MITIGATION — auto-response to performance emergencies
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_crisis_mode_enabled"
+label = "Crisis Auto-Mitigation Enabled"
+chromosome = "Crisis"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_vram_emergency_mb"
+label = "VRAM Emergency Threshold (MB)"
+chromosome = "Crisis"
+target = "Value"
+min = 2000.0
+max = 12000.0
+default = 5500.0
+layer = "global"
+
+[[genes]]
+id = "dbg_entity_despawn_rate_crisis"
+label = "Entity Despawn Rate on Crisis (per frame)"
+chromosome = "Crisis"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_crisis_fps_threshold"
+label = "FPS Below Which Crisis Triggers"
+chromosome = "Crisis"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 10.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROFILING — per-system timing & sampling
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_perf_profiling_enabled"
+label = "Per-System Profiling Enabled"
+chromosome = "Profiling"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+
+[[genes]]
+id = "dbg_perf_sampling_hz"
+label = "Profiler Sampling Rate (Hz)"
+chromosome = "Profiling"
+target = "Value"
+min = 0.5
+max = 60.0
+default = 10.0
+layer = "global"
+
+[[genes]]
+id = "dbg_perf_budget_ms"
+label = "Frame Budget Target (ms)"
+chromosome = "Profiling"
+target = "Value"
+min = 8.0
+max = 33.3
+default = 16.67
+layer = "global"
+
+[[genes]]
+id = "dbg_perf_slow_frame_pct"
+label = "Slow Frame Percentile Threshold"
+chromosome = "Profiling"
+target = "Value"
+min = 90.0
+max = 99.9
+default = 95.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TELEMETRY — export & crash dump control
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_json_export_interval"
+label = "JSON Export Interval (seconds)"
+chromosome = "Telemetry"
+target = "Value"
+min = 0.5
+max = 60.0
+default = 2.0
+layer = "global"
+
+[[genes]]
+id = "dbg_crash_dump_enabled"
+label = "Crash Dump Enabled"
+chromosome = "Telemetry"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_events_log_cap"
+label = "Events Log Buffer Capacity"
+chromosome = "Telemetry"
+target = "Value"
+min = 50.0
+max = 5000.0
+default = 500.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCULPT PERSISTENCE — story-335 M2.2 (terrain edits saved to disk)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_sculpt_enabled"
+label = "Sculpt autosave enabled (0 off, 1 on)"
+chromosome = "SculptPersist"
+target = "Toggle"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_sculpt_autosave_interval"
+label = "Sculpt autosave interval (seconds between flushes)"
+chromosome = "SculptPersist"
+target = "Value"
+min = 1.0
+max = 300.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_sculpt_autosave_debounce"
+label = "Sculpt autosave debounce (wait N sec after last brush before flushing)"
+chromosome = "SculptPersist"
+target = "Value"
+min = 0.0
+max = 30.0
+default = 2.0
+layer = "global"
+
+[[genes]]
+id = "dbg_sculpt_drift_warn_mult"
+label = "Unsaved drift warning — fires after interval × this multiplier"
+chromosome = "SculptPersist"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 3.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RENDER QUALITY — photoreal debug thresholds (v3.0)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_exposure_ev_min"
+label = "Min Exposure EV100 (too dark below)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 1.0
+max = 8.0
+default = 3.0
+layer = "global"
+
+[[genes]]
+id = "dbg_exposure_ev_max"
+label = "Max Exposure EV100 (overexposed above)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 8.0
+max = 16.0
+default = 12.0
+layer = "global"
+
+[[genes]]
+id = "dbg_min_sun_illuminance"
+label = "Min Sun Illuminance (unlit below)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 0.0
+max = 5000.0
+default = 500.0
+layer = "global"
+
+[[genes]]
+id = "dbg_min_shadow_cascade_distance"
+label = "Min Shadow Distance for AAA (m)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 30.0
+max = 200.0
+default = 80.0
+layer = "global"
+
+[[genes]]
+id = "dbg_min_postfx_count"
+label = "Min Post-FX Count for AAA Look"
+chromosome = "RenderQuality"
+target = "Value"
+min = 1.0
+max = 9.0
+default = 4.0
+layer = "global"
+
+[[genes]]
+id = "dbg_min_render_quality_score"
+label = "Min Render Quality Score (0-100)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_max_chromatic_aberration"
+label = "Max Chromatic Aberration (headache above)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 0.001
+max = 0.1
+default = 0.02
+layer = "global"
+
+[[genes]]
+id = "dbg_min_vol_fog_steps"
+label = "Min Volumetric Fog Steps (banding below)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 8.0
+max = 128.0
+default = 32.0
+layer = "global"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Textures / Material Validator (industrie AAA — UE5 ListMissingTextures
+# + Unity HDRP Material Validator). Sensor `forgia_textures.json` (2026-05-04).
+# ───────────────────────────────────────────────────────────────────────────────
+
+[[genes]]
+id = "dbg_textures_top_n"
+label = "Top-N VRAM textures listed in forgia_textures.json"
+chromosome = "RenderQuality"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_textures_max_materials"
+label = "Max materials iterated per textures snapshot (cap)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 1000.0
+max = 50000.0
+default = 5000.0
+layer = "global"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Build mode sensor (story-windrose 2026-05-04 — CS2 placement burst handling
+# + Bungie GDC 2018 edit cadence). Sensor `forgia_build_mode.json`.
+# ───────────────────────────────────────────────────────────────────────────────
+
+[[genes]]
+id = "dbg_placements_per_min_warn"
+label = "Placements/min above which build sensor flags HIGH (perf editor risk)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 10.0
+max = 1000.0
+default = 120.0
+layer = "global"
+
+[[genes]]
+id = "dbg_build_idle_warn_secs"
+label = "Build mode idle seconds before sensor flags STUCK"
+chromosome = "RenderQuality"
+target = "Value"
+min = 10.0
+max = 600.0
+default = 90.0
+layer = "global"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Material PBR auto-fix (Unity HDRP Material Validator > Auto-Fix pattern).
+# Corrige les Pure Metals violations sur les GLB AI-générés (Meshy/Tripo/Sloyd)
+# qui sortent avec metallic=1.0 par défaut sans MR texture, causant le bug
+# "mobs/armes deviennent blancs selon angle". 2026-05-04.
+# ───────────────────────────────────────────────────────────────────────────────
+
+[[genes]]
+id = "dbg_material_autofix_enabled"
+label = "Master toggle PBR auto-fix Pure Metals (1=on)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_material_pure_metal_threshold"
+label = "Metallic > seuil + no MR map = AI default → reset à 0"
+chromosome = "RenderQuality"
+target = "Value"
+min = 0.5
+max = 1.0
+default = 0.9
+layer = "global"
+
+[[genes]]
+id = "dbg_material_min_roughness"
+label = "Plancher perceptual_roughness post-fix (évite miroir parfait AI)"
+chromosome = "RenderQuality"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.30
+layer = "global"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Terrain seam coherence (industrie AAA — UE5 Landscape ShowDebugBorders,
+# Skyrim CK LOD Stitch). Sensor `forgia_terrain_seams.json` (2026-05-04).
+# ───────────────────────────────────────────────────────────────────────────────
+
+[[genes]]
+id = "dbg_seam_warn_diff_m"
+label = "Terrain seam SDF delta WARN threshold (metres)"
+chromosome = "Terrain"
+target = "Value"
+min = 0.001
+max = 5.0
+default = 0.05
+layer = "global"
+
+[[genes]]
+id = "dbg_seam_critical_diff_m"
+label = "Terrain seam SDF delta CRITICAL threshold (metres)"
+chromosome = "Terrain"
+target = "Value"
+min = 0.01
+max = 50.0
+default = 0.5
+layer = "global"
+
+[[genes]]
+id = "dbg_seam_top_n"
+label = "Top-N seam offenders exported"
+chromosome = "Terrain"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_seam_max_pairs"
+label = "Max chunk pairs sampled per seam snapshot (cap)"
+chromosome = "Terrain"
+target = "Value"
+min = 1000.0
+max = 50000.0
+default = 8000.0
+layer = "global"
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Roads coherence (industrie AAA — RDR2 road persistence, CS2 net validation).
+# Sensor `forgia_roads.json` (2026-05-04).
+# ───────────────────────────────────────────────────────────────────────────────
+
+[[genes]]
+id = "dbg_road_slope_warn_dy_m"
+label = "Road consecutive sample dY WARN threshold (metres, ~26° at 3m stride)"
+chromosome = "Terrain"
+target = "Value"
+min = 0.1
+max = 10.0
+default = 1.5
+layer = "global"
+
+[[genes]]
+id = "dbg_road_slope_critical_dy_m"
+label = "Road consecutive sample dY CRITICAL threshold (cliff under road)"
+chromosome = "Terrain"
+target = "Value"
+min = 0.5
+max = 50.0
+default = 4.0
+layer = "global"
+
+[[genes]]
+id = "dbg_road_top_n"
+label = "Top-N road offenders exported"
+chromosome = "Terrain"
+target = "Value"
+min = 1.0
+max = 30.0
+default = 5.0
+layer = "global"
+
+[[genes]]
+id = "dbg_road_max_samples"
+label = "Max road samples scanned per snapshot (cap)"
+chromosome = "Terrain"
+target = "Value"
+min = 1000.0
+max = 100000.0
+default = 20000.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TERRAIN GENERATION — observability thresholds
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_terrain_gen_stall_threshold"
+label = "Terrain Gen Stall Threshold (pending tasks)"
+chromosome = "Terrain"
+target = "Value"
+min = 5.0
+max = 100.0
+default = 20.0
+layer = "global"
+
+[[genes]]
+id = "dbg_terrain_gen_slow_ms"
+label = "Terrain Gen Slow Chunk Threshold (ms)"
+chromosome = "Terrain"
+target = "Value"
+min = 10.0
+max = 500.0
+default = 100.0
+layer = "global"
+
+[[genes]]
+id = "dbg_terrain_anomaly_height_margin"
+label = "Terrain Height Anomaly Margin (above max_height)"
+chromosome = "Terrain"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "global"
+
+[[genes]]
+id = "dbg_terrain_gen_export_recent"
+label = "Terrain Gen Export — Recent Chunks Count"
+chromosome = "Terrain"
+target = "Value"
+min = 5.0
+max = 50.0
+default = 10.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GENOME OBSERVABILITY — M3 W4 (2026-04-21)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_genome_enabled"
+label = "Genome Sensor Enabled"
+chromosome = "Genome"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_genome_min_packs"
+label = "Min Packs Before Genome Empty Alert"
+chromosome = "Genome"
+target = "Value"
+min = 1.0
+max = 100.0
+default = 1.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY BUDGETS — story-351 V3 (industrialisation AAA, 2026-04-27)
+# Sensor forgia_memory_budgets.json compare l'usage estime aux budgets FpsTuning
+# (mem_budget_*_mb) et fait remonter MEM_BUDGET_WARN/EXCEEDED via health_monitor.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_mem_budget_warn_pct"
+label = "Memory Budget Warning Threshold (% of budget)"
+chromosome = "Memory"
+target = "Value"
+min = 1.0
+max = 199.0
+default = 80.0
+layer = "global"
+
+[[genes]]
+id = "dbg_mem_budget_alert_pct"
+label = "Memory Budget Alert Threshold (% of budget)"
+chromosome = "Memory"
+target = "Value"
+min = 1.0
+max = 200.0
+default = 95.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MESHY — AI asset generation (story-312, ADR 0002)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_meshy_enabled"
+label = "Meshy AI Plugin Enabled"
+chromosome = "AI"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_meshy_poll_interval_ms"
+label = "Meshy Task Poll Interval (ms)"
+chromosome = "AI"
+target = "Value"
+min = 1000.0
+max = 30000.0
+default = 5000.0
+layer = "global"
+
+[[genes]]
+id = "dbg_meshy_credits_low_threshold"
+label = "Meshy Credits Low Alert Threshold"
+chromosome = "AI"
+target = "Value"
+min = 0.0
+max = 500.0
+default = 50.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VILLAGE GENERATOR — forgia-gen-village CLI (story-336, ADR 0003)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_village_gen_enabled"
+label = "Village Generator Plugin Enabled"
+chromosome = "AI"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+
+[[genes]]
+id = "dbg_village_gen_max_assets"
+label = "Village Generator Hard Asset Cap"
+chromosome = "AI"
+target = "Value"
+min = 10.0
+max = 100.0
+default = 30.0
+layer = "global"
+
+[[genes]]
+id = "dbg_village_gen_ollama_timeout_s"
+label = "Village Generator Ollama Timeout (s)"
+chromosome = "AI"
+target = "Value"
+min = 10.0
+max = 300.0
+default = 60.0
+layer = "global"
+
+[[genes]]
+id = "dbg_village_gen_meshy_concurrent"
+label = "Village Generator Meshy Concurrent Workers"
+chromosome = "AI"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 4.0
+layer = "global"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONSTRAINTS v2 — new threshold coherence rules
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Freeze must be > lag threshold
+[[constraints]]
+source = "dbg_freeze_threshold_ms"
+target = "dbg_lag_threshold_ms"
+ratio = 0.25
+
+# Critical freeze must be > freeze threshold
+[[constraints]]
+source = "dbg_critical_freeze_ms"
+target = "dbg_freeze_threshold_ms"
+ratio = 0.2
+
+# RAM critical must be > RAM warning
+[[constraints]]
+source = "dbg_ram_critical_mb"
+target = "dbg_ram_warning_mb"
+ratio = 0.75
+
+# Crisis FPS must be <= unplayable FPS
+[[constraints]]
+source = "dbg_fps_unplayable"
+target = "dbg_crisis_fps_threshold"
+ratio = 2.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOON RENDER DEBUG — Story 350 Cartoon Island AAA (Phase 1)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_toon_enabled"
+label = "Toon Pipeline Debug Toggle"
+chromosome = "ToonDebug"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+# 0 = disable toon post-process (fallback PBR). 1 = active. Hot-reload safe.
+
+[[genes]]
+id = "dbg_toon_show_bands"
+label = "Show Cel-Band Borders (Debug)"
+chromosome = "ToonDebug"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.0
+layer = "global"
+# 1 = overlay visible band transitions (bright line at threshold). Debug only.
+
+[[genes]]
+id = "dbg_toon_json_interval"
+label = "Toon Sensor JSON Export Interval (s)"
+chromosome = "ToonDebug"
+target = "Value"
+min = 1.0
+max = 60.0
+default = 10.0
+layer = "global"
+# How often forgia_render_quality.json toon fields are refreshed.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FRAME HISTOGRAM — Story-390 W1 (Riot, CapFrameX, Klartext)
+# Distribution P50/P95/P99/P99.9 + variance ms² (industry-standard stutter detection).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_frame_p99_p50_ratio_warn"
+label = "Frame P99/P50 Ratio Warn Threshold"
+chromosome = "Performance"
+target = "Value"
+min = 1.5
+max = 5.0
+default = 2.0
+layer = "global"
+# > 2.0 = stutter perceptible joueur (source: Riot Down the Rabbit Hole, Klartext).
+# P99 deux fois plus lent que median = micro-stutters visibles.
+
+[[genes]]
+id = "dbg_frame_variance_critical_ms2"
+label = "Frame Variance Critical (ms^2)"
+chromosome = "Performance"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 4.0
+layer = "global"
+# > 4.0 ms^2 = frame pacing instable (Klartext frametime variance analyzer).
+# Deviation typique smooth = sqrt(4) = 2 ms autour de la mediane.
+
+
+[[genes]]
+id = "dbg_submanager_orphan_warn"
+label = "Submanager Orphan Chunks Warn Threshold"
+chromosome = "Entities"
+target = "Value"
+min = 10.0
+max = 500.0
+default = 50.0
+layer = "global"
+# Story-390 W4 — chunks fantomes retenus dans Submanager.chunk_entities qui ne sont
+# plus dans ChunkManager.loaded_entities. > 50 = leak HashMap, despawn_chunk pas appele.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI DEBUG COMPLETION — Story-411 (2026-05-06)
+# V1 invariants cross-module + V2 perf egui + V3 snapshot on-demand.
+# Inspiration : Unreal Slate Widget Reflector + Unity UI Toolkit Debugger +
+# bevy-inspector-egui. Comble le gap observabilite UI vs terrain (audit 2026-05-06).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── V1 invariants cross-module (4 health checks) ─────────────────────────────
+
+[[genes]]
+id = "dbg_blocker_orphan_streak"
+label = "Input Blocker Orphan Streak (ticks)"
+chromosome = "UiDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Ticks consecutifs ou block_keyboard_shortcuts=true mais aucun panel ouvert detecte.
+# > 30 (~6s a 5Hz) = blocker orphelin = clavier mort apres fermeture panel. 0 = check off.
+
+[[genes]]
+id = "dbg_cursor_drift_streak"
+label = "Cursor Registry Drift Streak (ticks)"
+chromosome = "UiDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Ticks ou Resource XxxActive insertee mais CursorUiPanels::any_open()=false.
+# Detecte les marqueurs de panel non listes dans le registry (cf. Lock cursor camera.rs).
+
+[[genes]]
+id = "dbg_hud_menu_streak"
+label = "HUD Running In Menu Streak (ticks)"
+chromosome = "UiDebug"
+target = "Value"
+min = 0.0
+max = 1200.0
+default = 0.0
+layer = "global"
+# 0 = check desactive (default depuis qa-lead audit BUG-411-02). L'implementation
+# V1 surveille uniquement la duree du menu (proxy), pas un vrai compteur HUD,
+# d'ou faux positifs systematiques a 12s d'AFK menu. Reactiver avec un vrai
+# proxy compteur HUD dans une story V4 future. En attendant, mettre > 0 pour
+# essayer le check (sera renomme MENU_SUSTAINED_LONG, severity info).
+
+[[genes]]
+id = "dbg_modal_max_depth"
+label = "Modal Stack Max Depth"
+chromosome = "UiDebug"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 2.0
+layer = "global"
+# Profondeur max de panels modaux empiles toleree. > 2 = risque de modal trap
+# (impossible de fermer dans l'ordre, focus pige).
+
+# ── V2 perf egui (3 health checks + 1 sensor) ────────────────────────────────
+
+[[genes]]
+id = "dbg_egui_paint_p99_warn_ms"
+label = "egui Paint P99 Warn (ms)"
+chromosome = "UiDebug"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 8.0
+layer = "global"
+# Seuil p99 paint_ms sustained avant alerte EGUI_PAINT_SLOW. 8ms = 50% du budget
+# 16.67ms a 60 FPS, marge confortable hors spike.
+
+[[genes]]
+id = "dbg_egui_focus_stuck_secs"
+label = "egui Focus Stuck Threshold (s)"
+chromosome = "UiDebug"
+target = "Value"
+min = 5.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Seconds avec wants_keyboard_input=true sans changement de focus avant alerte.
+# > 30s = TextEdit oublie ou modal trap (focus pige).
+
+[[genes]]
+id = "dbg_egui_areas_max"
+label = "egui Areas Max (open windows)"
+chromosome = "UiDebug"
+target = "Value"
+min = 1.0
+max = 100.0
+# Vague-6 (2026-05-06) : bumped 10 → 30. Default 10 fired sur shipping game
+# complexe (dock editor + N panels = 25-30 layers normaux). Comparaison
+# Unity Editor layout par défaut ≈ 28 layers. Vague-6 metric refondue : la
+# comparaison utilise `areas_open_window_max` (rolling max) sur catégorisation
+# ZOrder, donc le seuil reflète vrais leaks pas spike transient.
+default = 30.0
+layer = "global"
+# Nb max de Areas (windows egui) ouvertes simultanement. > 10 = panels orphelins
+# pas fermes proprement (Memory leak Areas).
+
+# ── V3 snapshot on-demand (Shift+F8) ─────────────────────────────────────────
+
+[[genes]]
+id = "dbg_egui_snapshot_enabled"
+label = "egui Snapshot On-Demand Enabled"
+chromosome = "UiDebug"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+# 0 = disable Shift+F8 dump. 1 = active. Production safe (one-shot, pas de cost passif).
+
+[[genes]]
+id = "dbg_egui_perf_export_interval_s"
+label = "egui Perf Sensor Export Interval (s)"
+chromosome = "UiDebug"
+target = "Value"
+min = 0.5
+max = 60.0
+default = 1.0
+layer = "global"
+# Refresh interval forgia_egui_perf.json. 1s = bon compromis precision/disk IO.
+
+[[genes]]
+id = "dbg_egui_perf_window_frames"
+label = "egui Perf Sliding Window (frames)"
+chromosome = "UiDebug"
+target = "Value"
+min = 30.0
+max = 240.0
+default = 60.0
+layer = "global"
+# Nb de frames pour calculer p99/avg paint_ms. 60 = ~1s a 60 FPS, lisse les outliers
+# tout en restant reactif aux regressions.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COMBAT HEALTH CHECKS — Story-412 (2026-05-06)
+# Connecte les 4 flags du sensor forgia_combat.json existant + 2 invariants
+# additionnels (spell registry, projectile flood) au HealthMonitor. Le sensor
+# ecrivait deja les flags, personne ne les surveillait. Resout le trou identifie
+# par audit modules post-story-411.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# NOTE UNITE TICKS — Tous les `dbg_combat_*_streak` se mesurent en ticks du
+# `combat_snapshot_system`, qui tourne a `dbg_json_export_interval` (default
+# 2.0 s). Wall-clock effectif = streak * json_export_interval. Exemple :
+# streak=30 a interval=2s => alerte fire apres ~60 s de condition sustained.
+# Si l'operateur change `dbg_json_export_interval`, les wall-clocks decales.
+# 0 = check desactive (genome opt-out).
+
+[[genes]]
+id = "dbg_combat_orphan_streak"
+label = "Combat VFX Orphan Streak (ticks)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Ticks consecutifs ou fireball_vfx_orphan ou icebolt_vfx_orphan = true.
+# 30 ticks * json_export_interval (2.0s default) = ~60s wall-clock. Tolere
+# 1 frame de delai spawn projectile/VFX (deja code dans combat_flags).
+
+[[genes]]
+id = "dbg_combat_shield_missing_streak"
+label = "Combat Shield VFX Missing Streak (ticks)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Ticks ou shield_vfx_missing=true (shield actif mais 0 mesh visuel). Glitch
+# spawn ShieldMesh detectable par cette divergence soutenue.
+# 30 ticks * 2s = ~60s wall-clock default.
+
+[[genes]]
+id = "dbg_combat_impact_leak_streak"
+label = "Combat Impact Leak Streak (ticks)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 5.0
+layer = "global"
+# Ticks ou impact_leak=true (>50 ImpactEffect actifs). 5 ticks * 2s = ~10s
+# wall-clock — reactif car 50+ impacts = pool leak certain (despawn casse).
+
+[[genes]]
+id = "dbg_combat_spell_reg_grace_secs"
+label = "Combat Spell Registry Boot Grace (s)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 5.0
+max = 300.0
+default = 30.0
+layer = "global"
+# Secondes wall-clock post-boot pendant lesquelles le streak
+# `spell_reg_missing_streak` n'incremente PAS. Protege contre le faux positif
+# cold boot (registry inseree par systeme startup tardif). Combine avec
+# `dbg_combat_spell_reg_missing_streak` pour la double-garde (BUG-412-B fix).
+
+[[genes]]
+id = "dbg_combat_spell_reg_missing_streak"
+label = "Combat Spell Registry Missing Streak (ticks)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 3.0
+layer = "global"
+# Ticks consecutifs ou !spell_registry_loaded (post grace). 3 ticks * 2s = ~6s
+# wall-clock. Protege contre la fenetre transient quand un save load
+# mid-session reload le monde et reinsere la registry en quelques ticks.
+# BUG-412-B fix (qa-lead audit 2026-05-06).
+
+[[genes]]
+id = "dbg_combat_projectile_flood_max"
+label = "Combat Projectile Flood Max (count)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 10.0
+max = 500.0
+default = 100.0
+layer = "global"
+# fireballs + icebolts + impacts > seuil = pool leak ou spawn frenzy. 100
+# correspond a ~10 projectiles actifs par seconde sur 10s, deja anormal.
+
+[[genes]]
+id = "dbg_combat_projectile_flood_streak"
+label = "Combat Projectile Flood Streak (ticks)"
+chromosome = "CombatDebug"
+target = "Value"
+min = 0.0
+max = 300.0
+default = 10.0
+layer = "global"
+# Ticks ou total projectiles > flood_max sustained. 10 ticks * 2s = ~20s
+# wall-clock — evite faux positif spike combat intense ponctuel.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EFFECTS OBSERVABILITY — Story-413 (2026-05-06)
+# Surveille ParticleBudget + pool hanabi + VFX orphans (goblin/levelup) hors
+# scope story-412 combat. Comble le 2e plus gros trou modules apres UI/combat
+# (5745 LOC, 0 sensor, 0 check).
+#
+# NOTE UNITE TICKS — Tous les `dbg_effects_*_streak` se mesurent en ticks du
+# `effects_snapshot_system` qui tourne a `dbg_json_export_interval` (default
+# 2.0 s). Wall-clock = streak * json_export_interval. 0 = check desactive.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_effects_budget_overrun_streak"
+label = "Effects Particle Budget Overrun Streak (ticks)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 5.0
+layer = "global"
+# Ticks consecutifs ou ParticleBudget.active_count > max_systems. 5 * 2s = ~10s
+# wall-clock — reactif car le culling devrait clamp en 1-2 ticks max.
+
+[[genes]]
+id = "dbg_effects_hanabi_pool_max"
+label = "Effects Hanabi Pool Max (count)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 10.0
+max = 500.0
+default = 60.0
+layer = "global"
+# Total entites avec ParticleEffect > seuil = pool leak. 60 = ~2x le budget
+# (max_systems default 30) avec marge culled offscreen.
+
+[[genes]]
+id = "dbg_effects_hanabi_pool_streak"
+label = "Effects Hanabi Pool Streak (ticks)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 0.0
+max = 300.0
+default = 10.0
+layer = "global"
+# Ticks ou pool hanabi > max sustained. 10 * 2s = ~20s, evite spike combat
+# intense legitime.
+
+[[genes]]
+id = "dbg_effects_levelup_stuck_max"
+label = "Effects LevelUp VFX Stuck Max (count)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 3.0
+layer = "global"
+# Nb max de LevelUpVfx simultanees toleree. > 3 = cleanup_levelup_vfx casse
+# (un level-up devrait spawn 1 effet, despawn dans cleanup en quelques s).
+
+[[genes]]
+id = "dbg_effects_levelup_stuck_streak"
+label = "Effects LevelUp VFX Stuck Streak (ticks)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 15.0
+layer = "global"
+# Ticks ou LevelUpVfx > max sustained. 15 * 2s = ~30s, laisse le cleanup
+# operer sur des level-ups consecutifs intentionnels.
+
+[[genes]]
+id = "dbg_effects_goblin_vfx_max"
+label = "Effects Goblin Status VFX Max (count)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 1.0
+max = 200.0
+default = 30.0
+layer = "global"
+# Total `GoblinFireVfx + GoblinFrozenVfx` simultanes au-dela = DOT cleanup
+# casse ou AoE permanent. 30 = combat tres intense legitime, 50+ = certain
+# bug status effect non disperse.
+# Note : ces components sont attaches DIRECTEMENT sur l'entite Goblin (pas
+# d'entite separee), donc despawn goblin = despawn component automatique.
+# Pas de risque "orphan" stricto sensu, juste leak de status sur goblins
+# vivants long-terme.
+
+[[genes]]
+id = "dbg_effects_goblin_vfx_streak"
+label = "Effects Goblin Status VFX Streak (ticks)"
+chromosome = "EffectsDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Ticks ou goblin status VFX > max sustained. 30 * 2s = ~60s wall-clock,
+# laisse passer un AoE freeze ou un mass burn intentionnel court.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NETWORK OBSERVABILITY — Story-414 (2026-05-06)
+# Connecte les flags du sensor forgia_network.json existant (story-331) au
+# HealthMonitor. Le flag `client_disconnected_unexpectedly` est calcule depuis
+# story-349 mais aucun health check ne le lit. 4 checks (CHECK 71-74).
+#
+# NOTE UNITE TICKS — `dbg_network_*_streak` se mesurent en ticks du
+# `network_snapshot_system` qui tourne a `dbg_json_export_interval`
+# (default 2.0 s). Wall-clock = streak * json_export_interval.
+# `dbg_network_*_secs` sont en wall-clock direct.
+# 0 = check desactive.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_network_disconnect_streak"
+label = "Network Client Disconnect Streak (ticks)"
+chromosome = "NetworkDebug"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 5.0
+layer = "global"
+# Ticks consecutifs ou client_disconnected_unexpectedly=true. Le sensor
+# applique deja un seuil sentinel 10s (cf. client_disconnected_unexpectedly
+# helper) avant de set le flag — ce streak est une 2e garde contre flap
+# transient (network blip <2s). 5 * 2s = ~10s wall-clock additionnel.
+
+[[genes]]
+id = "dbg_network_disconnect_warn_secs"
+label = "Network Disconnect Warn Threshold (s)"
+chromosome = "NetworkDebug"
+target = "Value"
+min = 5.0
+max = 600.0
+default = 30.0
+layer = "global"
+# time_disconnected_secs > seuil = warning. 30s = client a probablement
+# perdu sa session, le serveur ne va pas l'attendre eternellement.
+
+[[genes]]
+id = "dbg_network_disconnect_critical_secs"
+label = "Network Disconnect Critical Threshold (s)"
+chromosome = "NetworkDebug"
+target = "Value"
+min = 30.0
+max = 3600.0
+default = 120.0
+layer = "global"
+# time_disconnected_secs > seuil = critical. 2 min = certainement perdu,
+# le client devrait avoir abandonne ou relance le matchmaking.
+
+[[genes]]
+id = "dbg_network_sync_drift_max"
+label = "Network Sync Drift Max (entity delta)"
+chromosome = "NetworkDebug"
+target = "Value"
+min = 5.0
+max = 1000.0
+default = 50.0
+layer = "global"
+# |net_synced_entities(t) - net_synced_entities(t-1)| > seuil = drift
+# replication suspect. 50 entites apparues/disparues entre 2 ticks (2s) =
+# soit map_switch, soit bug replication massive. Le check tolere le legitime
+# avec le streak.
+
+[[genes]]
+id = "dbg_network_sync_drift_streak"
+label = "Network Sync Drift Streak (ticks)"
+chromosome = "NetworkDebug"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 3.0
+layer = "global"
+# Ticks ou |delta| > drift_max sustained. 3 * 2s = ~6s — un map_switch
+# legitime fait spike 1-2 ticks au plus.
+
+[[genes]]
+id = "dbg_network_host_empty_streak"
+label = "Network Host Empty Streak (ticks)"
+chromosome = "NetworkDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 30.0
+layer = "global"
+# Ticks ou role=Host + connected + 0 remote_players sustained = lobby
+# fantome (host attend des clients qui n'arrivent pas). 30 * 2s = ~60s.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INVENTORY OBSERVABILITY — Story-416 (2026-05-06)
+# Surveille LOCK-INV-1 (80 slots max) + invariants slot/equip/page. Le module
+# inventory n'avait aucun health check actif malgre 2025 LOC + Lock critique.
+#
+# NOTE UNITE TICKS — `dbg_inventory_*_streak` se mesurent en ticks de
+# `inventory_snapshot_system` qui tourne a `dbg_json_export_interval` (default
+# 2.0s). Wall-clock = streak * json_export_interval. 0 = check desactive.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_inventory_slot_overflow_streak"
+label = "Inventory Slot Overflow Streak (ticks)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 0.0
+max = 100.0
+default = 1.0
+layer = "global"
+# Ticks consecutifs ou slot_count > INVENTORY_SLOTS (80, LOCK-INV-1). 1 = fire
+# IMMEDIATEMENT car violation Lock = critical, pas tolere meme transient.
+
+[[genes]]
+id = "dbg_inventory_zero_qty_streak"
+label = "Inventory Zero-Quantity Slot Streak (ticks)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 5.0
+layer = "global"
+# Ticks ou un slot a quantity=0 mais pas removed (cleanup casse dans
+# remove_item ou bug shop transfer). 5 * 2s = ~10s wall-clock.
+
+[[genes]]
+id = "dbg_inventory_equip_desync_streak"
+label = "Inventory Equip Desync Streak (ticks)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 3.0
+layer = "global"
+# Ticks ou EquippedItems.X = Some(ItemId) mais ItemId absent de
+# PlayerInventory.slots = desync transfer (item utilise sans removeequip).
+# 3 * 2s = ~6s wall-clock.
+
+[[genes]]
+id = "dbg_inventory_full_streak"
+label = "Inventory Full Streak (ticks, info)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 0.0
+max = 1200.0
+default = 30.0
+layer = "global"
+# Ticks ou slot_count == INVENTORY_SLOTS (80/80). Severity info (peut etre
+# normal sur un joueur hoarder), 30 * 2s = ~60s avant fire pour eviter le
+# bruit lors d'un inventaire rempli en combat intense.
+
+[[genes]]
+id = "dbg_inventory_page_max"
+label = "Inventory Page Max (count, 80/20=4)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 1.0
+max = 20.0
+default = 4.0
+layer = "global"
+# Pages max valides (INVENTORY_SLOTS / 20 par page = 4). current_page > max-1
+# = page OOB (UI bug navigation). Genome pour permettre l'ajustement si
+# pagination change.
+
+[[genes]]
+id = "dbg_inventory_page_oob_streak"
+label = "Inventory Page Out-Of-Bounds Streak (ticks)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 0.0
+max = 600.0
+default = 3.0
+layer = "global"
+# Ticks ou current_page >= pages_total. 3 * 2s = ~6s wall-clock. **BUG-416-01
+# fix (qa-lead audit)** : avant, CHECK 78 reutilisait dbg_inventory_equip_desync_streak,
+# ce qui couplait deux checks semantiquement independants. Maintenant chacun a
+# son streak dedie.
+
+[[genes]]
+id = "dbg_inventory_dup_warn_threshold"
+label = "Inventory Dup Items Warn Threshold (count)"
+chromosome = "InventoryDebug"
+target = "Value"
+min = 2.0
+max = 80.0
+default = 10.0
+layer = "global"
+# Compte de slots avec le meme ItemId au-dela = duplication suspecte
+# (stack max non respecte ou bug add_item). 10 = tolere les consommables
+# (potions/ammo) qui peuvent legitimement avoir multiples stacks.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARENA BOTS OBSERVABILITY — Story-420 (2026-05-12)
+# Sensor forgia_arena_bots.json : count_total, state breakdown, kills, deaths, avg_hp_pct.
+# Health check "ARENA BOTS ZERO" gated is_arena (pattern story-418).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[[genes]]
+id = "dbg_arena_bots_enabled"
+label = "Arena Bots Sensor Enabled (0=off, 1=on)"
+chromosome = "ArenaDebug"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 1.0
+layer = "global"
+# 0 = disable forgia_arena_bots.json export + health check. Hot-reload Shift+F12.
+
+[[genes]]
+id = "dbg_arena_bots_min_count"
+label = "Arena Bots Min Count (health check threshold)"
+chromosome = "ArenaDebug"
+target = "Value"
+min = 0.0
+max = 32.0
+default = 1.0
+layer = "global"
+# Si count_total < seuil alors que arena_bot_count > 0 = spawn raté.
+# 1 = fire si 0 bots alors que config demande au moins 1.

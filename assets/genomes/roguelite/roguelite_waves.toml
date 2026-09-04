@@ -1,0 +1,127 @@
+# roguelite_waves.toml — COMPOSITION DE VAGUE, DÉRIVÉE (story-669).
+#
+# ── Pourquoi ce fichier existe ───────────────────────────────────────────────
+# Avant : une table Rust en dur, `wave_composition(wave: u8)`, qui ne recevait NI
+# la salle, NI le type de salle, NI la graine de run. Quatre conséquences, une
+# seule cause :
+#   1. les 3 salles de combat rejouaient les MÊMES 8 puis 12 ennemis ;
+#   2. les positions étaient figées (graine constante) — mémorisables en 2 runs ;
+#   3. le choix de porte ne pouvait rien changer (`room_kind` écrit, jamais lu) ;
+#   4. la difficulté ne pouvait monter que par les PV.
+#
+# ── La dérivation ────────────────────────────────────────────────────────────
+#   count(archétype) = round( base × densité(salle) × modificateur(type de salle) )
+#   densité(salle)   = budget_director(salle) / budget_director(0)
+#
+# `budget_director` vient des gènes `roguelite_director_credits_per_sec_base` et
+# `_stage_mult` de roguelite_run.toml (2.0 et ×1.25/salle) — calculés depuis
+# toujours, stockés dans `StageNode.difficulty_budget`, et jamais lus jusqu'ici.
+# Avec les valeurs par défaut : densité ×1.00 → ×1.25 → ×1.56 sur les 3 salles.
+#
+# ⚠️ PLANCHER : au moins 1 ennemi par vague, toujours. Une salle qui spawnerait 0
+# ennemi ne se nettoierait JAMAIS (`seen_alive` resterait faux) et la run se
+# figerait. Le code l'impose, quels que soient les nombres écrits ici.
+#
+# Hot-reload : sauvegarder ce fichier suffit (poll mtime 1 Hz). Miroir exact des
+# `Default` Rust (wave_comp.rs) — si le fichier disparaît, rien ne change.
+
+# ── Effectifs de référence (salle 0, type Combat) ────────────────────────────
+# Ce sont les valeurs historiques de la table Rust : à densité 1.0 et modificateur
+# 1.0, la vague 1 fait toujours 8 ennemis et la vague 2 en fait 12.
+
+[base.wave1]
+tank = 3
+runner = 3
+sniper = 2
+
+[base.wave2]
+tank = 4
+runner = 4
+sniper = 4
+
+[base.boss]
+boss = 1
+runner = 4
+
+# ── Placement ────────────────────────────────────────────────────────────────
+[ring]
+# Rayon de l'anneau de spawn (m) par archétype — le Tank arrive près, le Sniper loin.
+tank = 12.0
+runner = 25.0
+# Story-686 — 50 → 42. À 50 m, le pire cas (jitter + bonus vague 2) donnait
+# 54,5 m pour 55 m de portée de détection : une marge de CINQUANTE CENTIMÈTRES.
+# Le moindre écart et le sniper n'acquérait jamais le joueur — il restait Idle à
+# vie, et le round ne se nettoyait pas.
+#
+# Et il ne TIRE qu'à 24 m : depuis 50 m il devait marcher 8,8 s à 3,2 m/s avant
+# de servir à quelque chose. À 42 m c'est 5,6 s, et la marge de détection passe
+# de 1 % à 15 %.
+sniper = 42.0
+boss = 12.0
+# La vague 2 est plus dense : on élargit un peu ses anneaux pour ne pas empiler.
+wave2_bonus_m = 2.5
+# Dispersion du rayon (m, ±), tirée de la graine de RUN. C'est ce qui fait que
+# deux runs ne posent plus les ennemis aux mêmes mètres. 0 = anneaux parfaits
+# (comportement d'avant story-669).
+jitter_m = 2.0
+
+# ── Densité par profondeur ───────────────────────────────────────────────────
+[density]
+# false = toutes les salles ont les effectifs de référence (densité figée à 1.0).
+enabled = true
+# Garde-fou : une salle ne peut jamais dépasser ce facteur, même si les gènes du
+# director sont réglés haut. Protège le budget de frame (spawn + IA + raycasts).
+max_factor = 2.5
+
+# ── Modificateur PAR TYPE DE SALLE ───────────────────────────────────────────
+# C'est CE tableau qui rend le choix de porte réel : deux portes ne mènent plus
+# au même combat. 1.0 = référence. Les types viennent de `forgia_stage::StageKind`.
+# Non listé = 1.0 partout.
+
+[room_kind.combat]
+# La salle de référence — l'équilibre historique.
+tank = 1.0
+runner = 1.0
+sniper = 1.0
+
+[room_kind.elite]
+# Un mur qui avance : peu d'essaim, beaucoup d'encaisse. Le combat se joue au
+# repositionnement, pas au nettoyage.
+tank = 1.7
+runner = 0.4
+sniper = 1.0
+
+[room_kind.event]
+# L'essaim : beaucoup de Runners rapides, peu de tenue. Le combat se joue au
+# contrôle de foule et au recul.
+tank = 0.5
+runner = 1.8
+sniper = 0.6
+
+[room_kind.shop]
+# Combat léger — la salle sert à respirer et à dépenser son Or.
+tank = 0.5
+runner = 0.5
+sniper = 0.5
+
+[room_kind.rest]
+# La respiration — VRAIE salle sans combat (story-670). C'est le feu de camp de
+# Slay the Spire / la fontaine d'Hadès. `spawns_enemies = false` court-circuite le
+# plancher d'1 ennemi : celui-ci est un garde anti-run-figée pour les salles de
+# COMBAT, pas une raison de trahir le nom d'une salle.
+# Contrepartie : le Coffre y est OFFERT. Sans ça la salle ne vaudrait rien — les PV
+# sont déjà restaurés à chaque break, donc « se reposer » ne rendrait aucune
+# ressource. Les multiplicateurs ci-dessous sont sans effet tant que
+# `spawns_enemies = false` ; ils sont conservés pour pouvoir rebasculer la salle en
+# combat léger d'un seul booléen.
+spawns_enemies = false
+tank = 0.0
+runner = 0.0
+sniper = 0.0
+
+[room_kind.treasure]
+# Le trésor est gardé DE LOIN : peu de contact, beaucoup de tir à distance. Aller
+# chercher le coffre coûte de s'exposer.
+tank = 0.6
+runner = 0.6
+sniper = 1.6

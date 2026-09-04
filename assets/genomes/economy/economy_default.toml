@@ -1,0 +1,177 @@
+id = "economy_default"
+name = "Economy Default"
+domain = "Economy"
+category = "Custom"
+description = "Prices, loot weights, XP curves, gold rewards, destructible objects"
+version = "1.0.0"
+
+# Player stats
+[[genes]]
+id = "player_max_hp"
+label = "Player Max HP"
+chromosome = "Stats"
+target = "Value"
+min = 50.0
+max = 500.0
+default = 100.0
+layer = "stats"
+
+[[genes]]
+id = "player_max_mana"
+label = "Player Max Mana"
+chromosome = "Stats"
+target = "Value"
+min = 30.0
+max = 300.0
+default = 100.0
+layer = "stats"
+
+[[genes]]
+id = "hp_regen_per_sec"
+label = "HP Regen/s"
+chromosome = "Stats"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 2.0
+layer = "regen"
+
+[[genes]]
+id = "mana_regen_per_sec"
+label = "Mana Regen/s"
+chromosome = "Stats"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 5.0
+layer = "regen"
+
+[[genes]]
+id = "ooc_delay"
+label = "OOC Delay"
+chromosome = "Stats"
+target = "Value"
+min = 2.0
+max = 15.0
+default = 5.0
+layer = "regen"
+
+# Loot
+[[genes]]
+id = "coin_spawn_height"
+label = "Coin Spawn Height"
+chromosome = "Loot"
+target = "Value"
+min = 0.3
+max = 2.0
+default = 0.8
+layer = "loot"
+
+[[genes]]
+id = "glory_kill_ammo"
+label = "Glory Kill Ammo"
+chromosome = "Loot"
+target = "Value"
+min = 1.0
+max = 15.0
+default = 5.0
+layer = "loot"
+
+[[genes]]
+id = "pickup_range"
+label = "Pickup Range"
+chromosome = "Loot"
+target = "Value"
+min = 1.0
+max = 5.0
+default = 2.5
+layer = "loot"
+
+# Destructible objects
+[[genes]]
+id = "obj_destructible_health"
+label = "Object HP"
+chromosome = "Objects"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "objects"
+
+[[genes]]
+id = "obj_destructible_drops"
+label = "Object Drops"
+chromosome = "Objects"
+target = "Value"
+min = 0.0
+max = 10.0
+default = 3.0
+layer = "objects"
+
+[[genes]]
+id = "obj_interactive_radius"
+label = "Interact Radius"
+chromosome = "Objects"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "objects"
+
+# Traps
+[[genes]]
+id = "obj_trap_damage"
+label = "Trap Damage"
+chromosome = "Objects"
+target = "Value"
+min = 5.0
+max = 60.0
+default = 20.0
+layer = "traps"
+
+[[genes]]
+id = "obj_trap_cooldown"
+label = "Trap Cooldown"
+chromosome = "Objects"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 3.0
+layer = "traps"
+
+# Spawning
+[[genes]]
+id = "terrain_enemy_max"
+label = "Max Enemies"
+chromosome = "Spawning"
+target = "Value"
+min = 10.0
+max = 150.0
+default = 50.0
+layer = "spawning"
+
+[[genes]]
+id = "terrain_enemies_per_chunk"
+label = "Enemies per Chunk"
+chromosome = "Spawning"
+target = "Value"
+min = 1.0
+max = 10.0
+default = 4.0
+layer = "spawning"
+
+# Constraints
+[[constraints]]
+source = "player_max_hp"
+target = "hp_regen_per_sec"
+ratio = 0.02
+
+[[constraints]]
+source = "player_max_mana"
+target = "mana_regen_per_sec"
+ratio = 0.05
+
+[[constraints]]
+source = "obj_destructible_health"
+target = "obj_destructible_drops"
+ratio = 0.05

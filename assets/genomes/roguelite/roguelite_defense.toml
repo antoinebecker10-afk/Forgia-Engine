@@ -1,0 +1,41 @@
+# roguelite_defense.toml — Story-640 P0-2 : défense tri-couche (Vie/Bouclier/Armure).
+#
+# Le Bouclier (bleu) régénère hors combat ; l'Armure (jaune) est permanente.
+# La Vie vit ailleurs (genome roguelite_enemies.toml pour les ennemis, spawn joueur).
+# Hot-reload mtime 1Hz. Le `Default` Rust de `DefenseConfig` est le miroir EXACT
+# de ce fichier → zéro régression s'il disparaît.
+#
+# Design Gunfire-lite :
+#   - Tank    : bouclier bleu À CASSER D'ABORD + armure jaune épaisse
+#               (user 2026-07-03 : « casser le shield avant que les PV baissent »).
+#   - Runner  : léger bouclier régénérant, pas d'armure (rusher fragile).
+#   - Sniper  : bouclier moyen, pas d'armure (back-line).
+#   - Boss    : les deux couches, épaisses.
+#   - Joueur  : bouclier bleu régénérant (Gunfire), pas d'armure au départ.
+
+[tank]
+shield_max = 60.0
+armor_max = 80.0
+
+[runner]
+shield_max = 30.0
+armor_max = 0.0
+
+[sniper]
+shield_max = 40.0
+armor_max = 0.0
+
+[boss]
+shield_max = 200.0
+armor_max = 150.0
+
+[player]
+shield_max = 50.0
+armor_max = 0.0
+
+# Régénération du BOUCLIER (partagée ennemis + joueur). L'armure ne régénère jamais.
+[regen]
+# Points de bouclier restaurés par seconde une fois hors combat.
+rate = 20.0
+# Secondes sans coup avant que le bouclier commence à régénérer (critère masterplan = 3 s).
+delay = 3.0

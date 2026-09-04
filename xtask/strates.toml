@@ -1,0 +1,72 @@
+# Les strates de Forgia — ce qui a le droit de dépendre de quoi.
+#
+# POURQUOI CE FICHIER EXISTE
+#
+# Le 2026-08-18, on a audité « les liaisons entre strates » à la main, en une
+# demi-heure, et le résultat ne valait que pour ce jour-là. Un contrat
+# d'architecture qui n'est vérifié que quand quelqu'un pense à le vérifier n'est
+# pas un contrat : c'est un souvenir. Ce fichier le rend mécanique.
+#
+# LA RÈGLE, UNIQUE
+#
+#   Une crate ne dépend JAMAIS d'une strate supérieure à la sienne.
+#
+# Les dépendances au sein d'une même strate sont LÉGALES — une brique s'appuie
+# sur d'autres briques, c'est le but. Interdire l'intra-strate produisait 33
+# fausses violations ; la première version de ce gate est morte de ça.
+#
+# MESURE DU 2026-08-18 : 67 crates, **1 seule** violation vers le haut.
+# L'architecture est saine ; ce gate protège cet état, il ne le répare pas.
+
+ordre = ["socle", "brique", "mode", "application"]
+
+[membres]
+# Le socle ne connaît RIEN du jeu. C'est ce qui le rend citable partout.
+socle = ["forgia-core", "forgia-rng", "forgia-qa-core", "forgia-debug"]
+
+# Un mode est un jeu jouable : il assemble des briques.
+mode = [
+    "forgia-mode-expedition",
+    "forgia-mode-roguelite",
+    "forgia-mode-fps-arena",
+    "forgia-rpg",
+    "forgia-fps",
+    "forgia-editor",
+]
+
+# L'application monte les modes et l'interface.
+application = ["forgia-game", "forgia-ui", "forgia-menu-hub", "forgia-observability"]
+
+# Tout ce qui n'est pas listé est une `brique`.
+
+# ─────────────────────────────── LA DETTE ───────────────────────────────
+#
+# Une crate peut viser une strate PLUS BASSE que celle où elle se trouve. Le
+# plafond compte ses dépendances encore trop hautes, et **ne peut que baisser**.
+# Un cliquet à zéro sur une dette existante ne se branche jamais — c'est ce qui
+# est arrivé à `sensor-sync-writes --strict`, qui compte sans bloquer depuis des
+# mois.
+
+[dette."forgia-observability"]
+cible = "socle"
+plafond = 9
+# L'observateur dépend de l'observé : 9 dépendances vers des briques et des
+# modes (ai-arena-bot, audio, enemy-nameplate, input, mode-fps-arena, player,
+# rpg, rpg-data, terrain). Chacune vient d'UN capteur qui lit les types d'un
+# mode. Conséquences mesurées : la crate se recompile dès que l'une des 9 bouge,
+# et son fan-in est le suspect n°1 de l'erreur « gltf required in rlib format »
+# du 2026-08-18, deux terminaux compilant avec des jeux de features différents.
+#
+# LE REMÈDE, capteur par capteur : le capteur d'un mode vit DANS la crate de ce
+# mode et n'utilise que `forgia_core::constat` — exactement ce que fait déjà
+# `forgia-mode-expedition/src/capteur.rs`. Chaque déménagement retire une ligne
+# ici. Le sens correct est déjà écrit dans son propre Cargo.toml à propos de
+# qa-core : « l'observabilité PRODUIT des BugReport ; qa-core ne dépend pas
+# d'observability ».
+
+[dette."forgia-ui-lib"]
+cible = "brique"
+plafond = 1
+# `forgia-ui-lib` (brique d'interface) dépend de `forgia-mode-fps-arena` (mode).
+# C'est LA seule dépendance vers le haut du dépôt. À traiter en déplaçant le
+# type partagé vers une brique, ou en inversant par un événement.

@@ -1,0 +1,112 @@
+id = "enemy_grunt"
+name = "Goblin Grunt"
+domain = "Creature"
+category = "Creature"
+description = "Swarm melee enemy: low HP, fast chase, rush in groups"
+version = "1.0.0"
+
+# === Combat Stats ===
+
+[[genes]]
+id = "grunt_max_hp"
+label = "Max HP"
+chromosome = "Combat"
+target = "Value"
+min = 15.0
+max = 60.0
+default = 30.0
+layer = "grunt"
+
+[[genes]]
+id = "grunt_melee_damage"
+label = "Melee Damage"
+chromosome = "Combat"
+target = "Value"
+min = 5.0
+max = 25.0
+default = 12.0
+layer = "grunt"
+
+[[genes]]
+id = "grunt_chase_speed"
+label = "Chase Speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 5.0
+max = 14.0
+default = 9.0
+layer = "grunt"
+
+[[genes]]
+id = "grunt_vision_range"
+label = "Vision Range (m)"
+chromosome = "Senses"
+target = "Value"
+min = 10.0
+max = 35.0
+default = 20.0
+layer = "grunt"
+
+[[genes]]
+id = "grunt_melee_range"
+label = "Melee Range (m)"
+chromosome = "Combat"
+target = "Value"
+min = 2.0
+max = 5.0
+default = 3.0
+layer = "grunt"
+
+# === Appearance ===
+
+[[genes]]
+id = "grunt_model_scale"
+label = "Model Scale"
+chromosome = "Appearance"
+target = "Value"
+min = 0.6
+max = 1.2
+default = 0.9
+layer = "grunt"
+
+# === Rewards ===
+
+[[genes]]
+id = "grunt_gold_reward"
+label = "Gold Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 5.0
+max = 30.0
+default = 15.0
+layer = "grunt"
+
+[[genes]]
+id = "grunt_xp_reward"
+label = "XP Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 5.0
+max = 25.0
+default = 10.0
+layer = "grunt"
+
+# === Constraints ===
+
+# More HP → slower (tankier = heavier)
+[[constraints]]
+source = "grunt_max_hp"
+target = "grunt_chase_speed"
+ratio = -0.1
+
+# More damage → more XP reward
+[[constraints]]
+source = "grunt_melee_damage"
+target = "grunt_xp_reward"
+ratio = 0.5
+
+# Bigger model → more HP
+[[constraints]]
+source = "grunt_model_scale"
+target = "grunt_max_hp"
+ratio = 20.0

@@ -1,0 +1,20 @@
+[package]
+name = "forgia-skeleton-template"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Skeleton template data layer — single source of truth pour templates anatomiques (Humanoid, BipedLizard, …). Pure data, TOML-loadable via Genome<T>. Conforme AAA pattern (Unreal USkeleton / Unity Avatar / Godot SkeletonProfile)."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+forgia-genome-core = { workspace = true }
+
+[dev-dependencies]
+# Story-480 Phase 4 : test régression cross-crate qui parse les TOML asset
+# files (`assets/genomes/skeleton_*.toml`) et compare avec les builders Rust
+# pour bloquer tout futur drift Definition layer ↔ Framework layer.
+toml = { workspace = true }

@@ -1,0 +1,268 @@
+# Éclairage du Hall de Forgia — hot-reload (poll mtime 1 Hz, aucun rebuild).
+#
+# Pourquoi ce fichier : l'ambiante du Hall a oscillé 700 → 1600 → 900 en dur dans
+# le code, chaque valeur étant un compromis à l'œil. Ce réglage se juge en jeu, pas
+# à la compilation — il appartient donc à la donnée.
+#
+# Contexte : la scène du pack est authorée pour être **lightmappée** (UV2 présent
+# sur 100 % des meshes) et son éclairage d'origine repose sur des lumières et des
+# particules Unity, perdues à l'import. Les flammes ci-dessous les remplacent.
+# Détail : docs/audits/audit-2026-07-26-comparaison-interieur-createur.md
+
+# 🚨 SANS REBOND, IL FAUT COMPENSER — MAIS PAS N'IMPORTE OÙ (2026-07-26)
+# La lumière cuite est coupée (voir `[lightmaps]`), donc il n'y a plus aucune
+# lumière indirecte : ce qui n'est pas frappé directement tombe au plancher de
+# l'ambiante. Il faut compenser, et le choix du levier n'est pas neutre.
+#
+# Ce qui est REMONTÉ, parce que ça ne coûte presque rien :
+#   - l'ambiante, qui n'a pas de coût par lumière ;
+#   - le facteur des 56 lumières placées à la main par le créateur. Elles existent
+#     de toute façon, portent à 6,9 m (ponctuelles) et 11,7 m (spots), et sont
+#     posées pour couvrir des ZONES. C'est LE bon levier pour éclairer une pièce.
+#
+# Ce qui reste aux valeurs mesurées du créateur, parce que c'est ce qui coûtait :
+#   - la portée et le nombre des bougies. Le volume d'une lumière croît au CUBE de
+#     son rayon : 128 bougies à 5,5 m, c'était environ quinze fois le travail de
+#     groupement de 96 à 2,45 m — et la baisse de FPS constatée en jeu.
+
+[ambient]
+# L'ambiante ne sert plus à *voir* l'intérieur — les lightmaps et les bougies s'en
+# chargent — seulement à empêcher le noir absolu. Elle n'a pas de direction : trop
+# forte, elle supprime le modelé au lieu de le révéler. Remontée à 400 faute de
+# rebond ; elle redescendra à 250 le jour où la lumière cuite reviendra.
+# 🚨 REDESCENDUE le 2026-08-21 — c'etait le plan ecrit deux lignes plus haut :
+# « elle redescendra a 250 le jour ou la lumiere cuite reviendra ». Elle est revenue,
+# en mode ADDITIF (`bake_includes_direct = false`).
+#
+# La raison est mesuree, pas cosmetique : sur les 6697 pieces cuites, 1142 (17 %)
+# ont une cuisson ou le BLEU domine le rouge, jusqu'a +0,73 d'ecart relatif. C'est
+# physiquement juste (c'est le ciel qui rebondit par les fenetres), mais empile sur
+# une ambiante elle-meme froide [0.72,0.80,0.92], ca vire au turquoise. L'ambiante
+# tenait lieu de rebond ; la cuisson le fournit maintenant avec sa vraie couleur, il
+# ne faut plus le compter deux fois.
+# ⚠ J'AI BAISSE PUIS REMONTE CETTE VALEUR le 2026-08-21. La baisse a 250
+# reposait sur une hypothese FAUSSE : que l'ambiante etait la cause du bleu-vert.
+# Mesure faite ensuite : c'est le REMPLISSAGE qui teinte l'interieur (couleur
+# (0.68, 0.78, 1.0), sans ombres, 600 lux qui traversent la pierre, ~50 % de la
+# mediane interieure). Baisser l'ambiante ne faisait qu'assombrir en donnant PLUS
+# de poids relatif a la cuisson, elle-meme froide sur 17 % des pieces. Le plan du
+# fichier (« elle redescendra a 250 ») reste valable, mais APRES avoir regle le
+# remplissage — une variable a la fois.
+brightness = 400.0
+# Légèrement froide : c'est le contraste avec les bougies chaudes qui crée la
+# lecture du volume (ombres bleu-vert / lumières orangées chez le créateur).
+color = [0.72, 0.80, 0.92]
+# Soleil principal, en lux. Il PORTE les ombres (cascades étendues à 420 m pour
+# couvrir les 193 m du château — sinon les intérieurs lointains reçoivent le
+# soleil à pleine puissance à travers le toit).
+key_lux = 12000.0
+# Remplissage ciel, en lux. 🚨 Il n'a PAS d'ombres : il traverse murs et toit.
+# À 7 000 (valeur d'origine) c'était la cause des murs incohérents — identiques
+# côte à côte, l'un blanc éclatant, l'autre noir, selon leur seule orientation.
+# Il ne doit servir qu'à teinter légèrement le ciel. Monte-le avec prudence.
+# 🚨 BAISSE de 600 a 250 le 2026-08-21, sur mesure.
+#
+# Cette lumiere est BLEUE — `Color::srgb(0.68, 0.78, 1.0)` en dur dans
+# castle_hub.rs:399 — et SANS ombres, donc elle traverse murs et toit. Le soleil,
+# lui, est chaud (1.0, 0.97, 0.90) mais il porte des ombres : il est bloque a
+# l'interieur. Resultat : l'interieur du Hall est eclaire EN BLEU, et les sources
+# chaudes placees (56 lampes + 96 bougies) n'eclairent lisiblement que 0,48 % de
+# sa surface. C'est la vraie cause de la teinte bleu-vert, pas la lumiere cuite.
+#
+# Mesure : le remplissage fournit 341,70 lux, soit 50,3 % de la mediane interieure
+# (678,83 lux). A 250 il tombe a ~142, soit 29,7 %. L'exterieur ne bouge pas :
+# 341 lux sur 11 920, c'est 2,9 %.
+#
+# Le sens est le sens SUR : la lecon payee ici l'a ete a 7000 lux (murs
+# incoherents). On descend, on ne monte pas.
+fill_lux = 250.0
+
+[flames]
+enabled = true
+# 🚨 Les bougies sont des objets SÉPARÉS des bougeoirs (audit 2026-07-26) : sa
+# scène compte 176 bougies posées sur 203 bougeoirs en métal. Une flamme ne va
+# donc QUE sur un nœud `candle_castle_NN`, jamais sur un `candleholder` — sinon
+# elle se pose au sommet du métal, à côté de la mèche. Nous avons 98 bougies.
+#
+# Toutes allumées : ses 78 bougies allumées le sont en permanence. Avec une
+# portée courte (voir ci-dessous), le coût de groupement reste faible.
+max_active_lights = 96
+# Valeurs RELEVÉES dans ses prefabs `_lit` : chacun porte une lumière ponctuelle
+# d'intensité 0,7 et de portée 2,45 m. Ses bougies éclairent à peine au-delà
+# d'elles-mêmes — c'est ce qui donne des points NETS au lieu d'un halo qui bave,
+# et c'est aussi bien moins cher à grouper.
+# 630 lm ≈ 0,7 × le facteur de conversion utilisé pour ses autres lumières.
+light_intensity_lm = 630.0
+light_range_m = 2.45
+# Sa couleur exacte de flamme.
+light_color = [1.0, 0.846, 0.288]
+# Luminance de la flamme elle-même (ce qu'on voit briller sur la mèche).
+emissive_luminance = 9000.0
+# Taille de la flamme (rayon, en mètres) et hauteur au-dessus du haut de la bougie.
+size_m = 0.022
+lift_m = 0.012
+# Vacillement : amplitude relative de l'intensité et vitesse. 0 = flamme figée.
+flicker_amplitude = 0.22
+flicker_speed_hz = 6.5
+
+# Les points de flamme (combien, et où) vivent dans
+# `castle_hub_candle_mounts.toml`, généré par
+# `tools/gltf/extract_candle_mounts.py` : les mèches sont détectées dans la
+# GÉOMÉTRIE, parce que beaucoup de bougeoirs ont leurs bougies modelées dans le
+# mesh — il n'existe alors aucun objet séparé où accrocher une flamme.
+
+[lightmaps]
+# La lumière CUITE du créateur : 11 atlas portant deux rebonds et une occlusion
+# ambiante. C'est le seul apport de lumière **indirecte** du Hall — aucun
+# éclairage temps réel n'en produit. Étude complète :
+# docs/audits/audit-2026-07-26-etude-eclairage.md
+#
+# 🚨 COUPÉ le 2026-07-26 sur décision utilisateur : le rendu en jeu était trop
+# sombre et les performances en baisse. Toute la chaîne reste en place (module,
+# table de 6801 pièces, 11 atlas, outils) — remettre `true` suffit à réessayer.
+# Le passer à `true` rebascule AUSSI l'ambiante, le diffus de l'éclairage par
+# image et le soleil hors de la géométrie cuite, pour ne pas compter deux fois.
+# Ce qui reste à trancher avant un nouvel essai : la valeur de `exposure`
+# (8000 est un calcul, jamais une observation) et `flip_v`.
+# 🚨 RECOUPE le 2026-08-21 apres essai en jeu, et pour une raison NEUVE :
+# ce n'est plus « trop sombre » (ce verdict-la visait le facteur d'exposition, qui
+# etait deux fois trop bas et qui est corrige ci-dessous). Le decor sort BARIOLE.
+#
+# Mesure sur les 46 cellules livrees : 7907 noeuds a maillage, 6797 couverts par la
+# table (86,0 %), et 1110 SANS lumiere cuite (14,0 %). Or `affects_lightmapped_meshes`
+# ne retire l'ambiante QUE des pieces qui en ont une (castle_flames.rs:187). Les 1110
+# orphelines gardent donc l'ambiante FROIDE [0.72,0.80,0.92] a 400 pendant que leurs
+# voisines n'en ont plus du tout : deux modeles d'eclairage sur des pieces qui se
+# touchent, d'ou des plafonds, arches, piliers et dalles bleu-vert au milieu de pierre
+# chaude. Les familles les plus touchees : ceiling_plaster_curved_corner_02 (x91),
+# tower_part_arch (x83), deco_trim_arch_half_bricks (x81), pillar_part (x70).
+#
+# HORS DE CAUSE, verifie : le canal d'UV (TEXCOORD_1 present sur 100 % des maillages)
+# et le sens vertical (les 11 atlas decodes, les deux orientations comparees : celle
+# d'ici est MOINS saturee, 0,504 contre 0,572 — inverser aggraverait).
+#
+# Cout mesure au passage : lag_events critique, frame_time > 25 ms, VRAM > 2 Go.
+#
+# Rallumer n'a de sens QU'APRES avoir cuit les 1110 manquantes — story dediee.
+enabled = true   # ESSAI 2026-08-21 avec bake_includes_direct=false + exposure 3900
+# 🚨 Sens vertical des UV. Unity place l'origine d'une texture en bas à gauche,
+# glTF en haut à gauche. Ça ne se tranche qu'en regardant le jeu : si les
+# lightmaps sortent retournées (l'ombre d'un pilier du mauvais côté, la lumière
+# d'une fenêtre au sol au lieu du mur), c'est CETTE valeur qu'il faut inverser.
+# Relu à chaud : le changement s'applique sans quitter le Hall.
+flip_v = false
+# 🚨 LE réglage qui décide si on voit quelque chose. Ses valeurs cuites ont une
+# médiane de 0,05, alors que l'ambiante Bevy qu'elles remplacent valait 400 : les
+# deux moteurs ne comptent pas dans la même unité. Au gain 1 (le défaut de Bevy),
+# poser les lightmaps ASSOMBRIT le Hall — on a coupé l'ambiante, le diffus de
+# l'éclairage par image et le soleil sur la géométrie cuite, et rien ne les
+# remplace.
+#
+# 🚨 MESURÉ le 2026-08-21 — le 0,05 sur lequel reposait ce facteur était FAUX,
+# et c'est probablement lui qui a fait couper la lumière cuite. Il n'avait aucune
+# source dans le dépôt (ni outil, ni audit) et les EXR d'origine ont disparu ;
+# les 11 atlas KTX2, eux, sont là, et leur encodeur
+# (tools/unity/convert_lightmaps.py) est lisible — on en a donc écrit l'inverse
+# exact. Sur les 46 137 344 texels livrés, en luminance BT.709 :
+#     médiane globale 0,0200 · médiane des texels allumés 0,0259 · moyenne 0,0291
+#     (11,6 % de l'atlas est du remplissage vide · maximum 98,4 aux fenêtres)
+#
+# La formule reste la même — 400 / médiane — mais alimentée par la vraie valeur :
+# 400 / 0,0259 = 15 455. On pose 15 500.
+#
+# Autrement dit : à 8000, la lumière cuite pesait environ MOITIÉ de ce qu'elle
+# remplaçait. « Trop sombre » n'était pas un verdict sur les lightmaps, c'était
+# un verdict sur ce facteur — et l'interrupteur ci-dessus reste à `false` tant
+# que le nouveau réglage n'a pas été jugé en jeu.
+#
+# Monte-le si l'intérieur reste noir, baisse-le s'il crame.
+# 🚨 LA VALEUR DEPEND DU MODE ci-dessous.
+#   - cuisson qui REMPLACE le direct : 400 / 0,0259 = 15 455, arrondi a 15 500.
+#     C'est ce que valait ce reglage tant que `bake_includes_direct` n'existait pas.
+#   - cuisson qui S'AJOUTE (le cas ici) : il ne faut plus tenir lieu d'ambiante,
+#     seulement apporter un rebond PAR-DESSUS elle. 3900 fait peser ce rebond a
+#     0,0259 x 3900 = 101, soit environ 25 % de l'ambiante (400).
+#
+# ⚠ CE 25 % EST UN CHOIX, PAS UNE MESURE. C'est un ordre de grandeur plausible
+# pour un rebond dans un interieur de pierre — a juger a l'oeil et a conclure par
+# une valeur ECRITE. Le fichier est en hot-reload : monter si le modele reste plat,
+# descendre si les coins se delavent.
+exposure = 3900.0
+
+
+# La cuisson contient-elle le DIRECT, ou seulement le rebond ?
+#
+# 🚨 MESURE le 2026-08-21 sur les 11 atlas : les toits en plein soleil ont une
+# luminance mediane de 0,0099 — MOINS que les murs interieurs (0,0200) et a peine
+# plus que les plafonds (0,0088). Une cuisson contenant le soleil ferait des toits
+# les surfaces les plus brillantes de l'atlas ; c'est l'inverse qu'on mesure.
+# Le nom des sources le dit aussi (`Lightmap-N_comp_light.exr`), et le createur
+# s'appuyait sur des shadowmasks pour son direct.
+#
+# A `false`, la lumiere cuite S'AJOUTE a l'ambiante, au soleil et au remplissage
+# au lieu de les remplacer. C'est ce qui supprime la COUTURE : 14 % des maillages
+# du Hall n'ont pas de lightmap (1110 sur 7907, dont 699 d'architecture), et les
+# retirer du direct les laissait seuls avec une ambiante froide au milieu de
+# voisins cuits et chauds — d'ou les plafonds, arches et dalles bleu-vert du
+# premier essai.
+bake_includes_direct = false
+[environment]
+# Éclairage par image. Forgia n'en avait AUCUN : `EnvironmentMapLight` n'était
+# employé nulle part. Une surface PBR avec une carte de rugosité et rien à
+# réfléchir tombe sur un reflet plat et uniforme — c'est l'aspect « pierre
+# mouillée » du sol face à la capture du créateur.
+#
+# La cubemap `assets/hdri/castle_hub_env.hdr` est moyennée depuis ses 27 sondes
+# de réflexion cuites d'intérieur (sur 32 ; les 5 autres regardent le ciel), par
+# `tools/unity/build_castle_envmap.py`.
+enabled = true
+# En cd/m². Ses sondes sont très sombres (luminance moyenne 0,008) : ce facteur
+# les remonte au niveau du reste de l'éclairage. Monte-le si la pierre reste
+# mate, baisse-le si tout se met à briller comme du métal.
+intensity = 900.0
+
+[ssao]
+# Occlusion de contact en espace ecran — le seul substitut bon marche au rebond
+# coupe. Elle n'agit QUE sur la lumiere indirecte (l'ambiante ci-dessus et
+# l'eclairage par image), jamais sur le soleil ni sur les 56 lumieres du
+# createur : c'est justement la portion qui se pose a plat sur tout.
+#
+# 🚨 Elle force `Msaa::Off` sur la camera du Hall — les deux sont exclusifs dans
+# Bevy. `forgia-ui-lib` restaure le MSAA choisi par le joueur des qu'on quitte le
+# Hall. Etat verifiable dans `forgia2_castle_lighting.json` (`ssao_pose`,
+# `ssao_conflit_msaa`).
+#
+# 🚨 Non supporte sur WebGL2 ni WebGPU : le portage web devra poser `false` ici.
+#
+# Le jumeau roguelite est a `0.0` dans son propre genome, pour une raison qui ne
+# vaut PAS ici : combine a son post-traitement toon il blanchit l'arene
+# (constate en jeu le 2026-06-30). Le Hall n'a pas ce post-traitement.
+# 🚨 COUPE le 2026-08-21 : je l'avais allume par defaut sans qu'il ait JAMAIS
+# ete vu en jeu — c'etait une faute. Suspect n° 1 du « le Hall ne s'affiche pas »
+# du meme jour. Le repasser a `true` est un hot-reload : ca se juge en une seconde,
+# sans rebuild, et le capteur `forgia2_castle_lighting.json` dit s'il est pose.
+enabled = false   # essai du 2026-08-21 : ECRAN NOIR, repasse a false
+# 0 Low · 1 Medium · 2 High · 3 Ultra. High est le defaut de Bevy (18 echantillons
+# par pixel). Descendre a 1 si le Hall coute trop cher, monter a 3 pour juger la
+# qualite maximale avant d'arbitrer.
+quality = 2
+# Epaisseur estimee des objets, en metres. Elle decide a quelle distance derriere
+# un objet un rayon passe encore : trop grande, les objets fins occultent tout
+# ce qui est derriere ; trop petite, le contact au sol s'efface. 0,25 est le
+# defaut de Bevy, non mesure sur ce decor — a juger a l'oeil.
+thickness = 0.25
+
+[creator_lights]
+# Les 56 lumières placées à la main par le créateur du pack (43 ponctuelles +
+# 13 spots), portées 1:1 depuis sa scène Unity vers
+# `castle_hub_creator_lights.toml`. Elles ne sont PAS dérivées des bougies : il
+# éclaire des zones, avec des oranges ET des cyans d'appoint — c'est ce couple
+# chaud/froid qui fait le rendu de sa capture.
+enabled = true
+# Son intensité est en unités Unity (0,4 à 59), pas en lumens. Ce facteur unique
+# les convertit toutes. Ses 43 ponctuelles portent à 6,9 m de médiane et ses 13
+# spots à 11,7 m : elles éclairent des ZONES, là où une bougie n'éclaire que son
+# coin. Revenu à 900 avec le rebond cuit ; c'était monté à 2200 quand il n'y avait
+# que du direct. Remonté à 2200 puisque le rebond est coupé : c'est le levier le
+# moins cher pour éclairer une pièce, ces lumières étant déjà dans la scène.
+scale = 2200.0

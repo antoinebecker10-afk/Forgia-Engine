@@ -1,0 +1,32 @@
+# Garde-fous supply-chain volontairement progressifs : les vulnérabilités et
+# sources inattendues bloquent, tandis que la dette historique reste visible
+# sous forme d'avertissements. On pourra durcir sans casser le développement.
+
+[advisories]
+yanked = "warn"
+unmaintained = "workspace"
+unsound = "workspace"
+ignore = [
+    # Transitive build-time dependency of wayland-scanner on Linux only.
+    # wayland-scanner 0.31.10 pins quick-xml ^0.39, so 0.41 cannot be selected
+    # until winit's Wayland stack updates. Forgia's current shipped target is Windows.
+    { id = "RUSTSEC-2026-0194", reason = "Linux-only wayland-scanner proc-macro; upstream pins quick-xml ^0.39" },
+    { id = "RUSTSEC-2026-0195", reason = "Linux-only wayland-scanner proc-macro; upstream pins quick-xml ^0.39" },
+]
+
+[bans]
+multiple-versions = "warn"
+# Les crates internes sont des dépendances `path` sans version ; cargo-deny les
+# classe aussi comme wildcards. On les signale sans invalider l'audit.
+wildcards = "warn"
+highlight = "all"
+
+[bans.workspace-dependencies]
+duplicates = "warn"
+include-path-dependencies = true
+unused = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

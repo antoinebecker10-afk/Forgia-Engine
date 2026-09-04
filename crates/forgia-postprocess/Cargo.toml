@@ -1,0 +1,12 @@
+[package]
+name = "forgia-postprocess"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Library of 45 post-process effects (Bevy FullscreenMaterial). Each effect is opt-in via its own Plugin."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }

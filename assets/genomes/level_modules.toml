@@ -1,0 +1,245 @@
+# forgia-level-presets — Module palette V7 (story-485 phase 2)
+#
+# Modules placés intra-arena par forgia-stage-arena (sight-line solver).
+# Sources industry :
+# - Uncharted 4 (Naughty Dog) — heights 1.0/1.25/1.75 m
+# - Resistance (Insomniac) — verticality 3 m / 6 m
+# - Level Design Book — "less cover is better" (cover spacing rule)
+# - Risk of Rain 2 (Hopoo) — module palette count-per-stage
+#
+# Hot-reload : Shift+F12 dans la session.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# cover_low_cluster — crates/barrels cluster, crouch behind / peek over
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.cover_low_cluster]
+kind = "CoverCluster"
+density_per_m2 = 0.08
+min_spacing_m = 3.0
+footprint_radius_m = 6.0
+allowed_biomes = ["Volcanic", "Plains"]
+anchor_kinds_emitted = ["cover_low"]
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/kaykit/dungeon/crates.glb"
+weight = 0.20
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/kaykit/dungeon/barrel.glb"
+weight = 0.15
+anchor_kind = "cover_low"
+height_class = "Low"
+
+# Bible v1 Crypts of Anvil — Inferno Donjon pack (CC0 GLB Bevy-ready)
+# Vases / caisses / rochers = props forge abandonnée
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Vase_001.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Vase_002.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Box_001.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockMid_001.glb"
+weight = 0.08
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockMid_002.glb"
+weight = 0.08
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Mound_005.glb"
+weight = 0.09
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Mound_008.glb"
+weight = 0.10
+anchor_kind = "cover_low"
+height_class = "Low"
+
+# Phase 1 fullness (2026-05-26) — wire 8 GLB inferno orphelins commit 998098f
+# Rochers naturels + landmarks bas : densité +60% sans nouveau ModuleKind.
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockBig_001.glb"
+weight = 0.07
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockBig_003.glb"
+weight = 0.07
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockBig_004.glb"
+weight = 0.07
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Crag_001.glb"
+weight = 0.06
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/Crag_003.glb"
+weight = 0.06
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/RockMid_003.glb"
+weight = 0.05
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/PedestalBig_001.glb"
+weight = 0.04
+anchor_kind = "cover_low"
+height_class = "Low"
+
+[[modules.cover_low_cluster.prop_palette]]
+prefab = "models/environment/inferno/WellSmall_001.glb"
+weight = 0.04
+anchor_kind = "cover_low"
+height_class = "Low"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# cover_high_wall — pillars / wall sections, full body conceal, blocks LoS
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.cover_high_wall]
+kind = "CoverWall"
+density_per_m2 = 0.04
+min_spacing_m = 5.0
+footprint_radius_m = 8.0
+allowed_biomes = ["Volcanic"]
+anchor_kinds_emitted = ["cover_high"]
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/kaykit/dungeon/pillar.glb"
+weight = 0.20
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/kaykit/dungeon/wall.glb"
+weight = 0.15
+anchor_kind = "cover_high"
+height_class = "High"
+
+# Bible v1 Crypts of Anvil — colonnes brisées identity-defining ruines forges
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ColumnBig_001.glb"
+weight = 0.20
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ColumnBigBroken_001.glb"
+weight = 0.25
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ColumnBigBroken_002.glb"
+weight = 0.20
+anchor_kind = "cover_high"
+height_class = "High"
+
+# Phase 1 fullness (2026-05-26) — landmarks identity Crypts (canon bible v1).
+# Hauts cover qui racontent l'histoire forge abandonnée : statue garde + chest géant.
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/StatueKnight_002.glb"
+weight = 0.10
+anchor_kind = "cover_high"
+height_class = "High"
+
+[[modules.cover_high_wall.prop_palette]]
+prefab = "models/environment/inferno/ChestBig_001.glb"
+weight = 0.08
+anchor_kind = "cover_high"
+height_class = "High"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# sniper_perch — overlook vantage point (Resistance 6 m verticality)
+# Singleton (density=0). Placé en bord par stage-arena solver (distance > 0.6*extent).
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.sniper_perch]
+kind = "SniperPerch"
+density_per_m2 = 0.0
+min_spacing_m = 0.0
+footprint_radius_m = 4.0
+allowed_biomes = ["Volcanic", "Plains"]
+anchor_kinds_emitted = ["sniper_perch"]
+
+# Bible v1 Crypts of Anvil — "Perchoir du contremaître" (canon)
+# TowerBig_001 (Inferno Donjon CC0) résout le TODO story-485b — vraie tour
+# walkable 6m+. StairsMiddle_001 ajouté en variante (perchoir bas escalier).
+# Sight-line solver bénéficie d'un vrai height_class="Tall" volumétrique.
+[[modules.sniper_perch.prop_palette]]
+prefab = "models/environment/inferno/TowerBig_001.glb"
+weight = 0.6
+anchor_kind = "sniper_perch"
+height_class = "Tall"
+
+[[modules.sniper_perch.prop_palette]]
+prefab = "models/environment/inferno/StairsMiddle_001.glb"
+weight = 0.4
+anchor_kind = "sniper_perch"
+height_class = "Tall"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# melee_pit — central close-combat zone, cramped (Tank/melee archetype favored)
+# Singleton (density=0). Placé central par stage-arena solver (distance < 0.3*extent).
+# ──────────────────────────────────────────────────────────────────────────────
+[modules.melee_pit]
+kind = "MeleePit"
+density_per_m2 = 0.0
+min_spacing_m = 0.0
+footprint_radius_m = 6.0
+allowed_biomes = ["Volcanic", "Plains"]
+anchor_kinds_emitted = ["melee_pit"]
+
+# Bible v1 Crypts of Anvil — "La fosse à mêlée" (canon)
+# CirclePlatformSmall_001 = sol rond délimité visuellement (cf bible
+# locations/crypts_of_anvil.md "sol rond"). Brazier en variante = fosse
+# entourée de braises forge (identity volcanique cartoon).
+[[modules.melee_pit.prop_palette]]
+prefab = "models/environment/inferno/CirclePlatformSmall_001.glb"
+weight = 0.5
+anchor_kind = "melee_pit"
+height_class = "Low"
+
+[[modules.melee_pit.prop_palette]]
+prefab = "models/environment/inferno/Brazier_002.glb"
+weight = 0.3
+anchor_kind = "melee_pit"
+height_class = "Low"
+
+[[modules.melee_pit.prop_palette]]
+prefab = "models/environment/inferno/Brazier_004.glb"
+weight = 0.2
+anchor_kind = "melee_pit"
+height_class = "Low"

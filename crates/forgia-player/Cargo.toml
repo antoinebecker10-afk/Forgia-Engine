@@ -1,0 +1,23 @@
+[package]
+name = "forgia-player"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Player KCC + camera 1P/3P + spawn/respawn."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+leafwing-input-manager = { workspace = true }
+forgia-core = { workspace = true }
+forgia-assets = { workspace = true }
+forgia-input = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-damage = { workspace = true }
+forgia-ai-arena-bot = { workspace = true }
+forgia-genome-core = { workspace = true }
+forgia-stage = { workspace = true }
+serde = { workspace = true }

@@ -1,0 +1,108 @@
+{
+ "_": "Recettes de couleur du Hall : ce que le graphe de noeuds du kit calcule, et que glTF ne sait pas porter.",
+ "_pourquoi": "L'export glTF ne garde qu'une texture par emplacement. Les materiaux du kit qui COMPOSENT leur base color (teinte, masque, luminosite/contraste) perdent tout sauf une texture — parfois la mauvaise : le rempart recevait son MASQUE en couleur, le pont sa carte PBR. Or ces operations sont per-texel et independantes de l'UV : on les fige dans la texture au moment du build, ce qui reproduit la source a l'identique sans cuisson Cycles.",
+ "_non_couvert": "Les melanges pilotes par un SECOND depliage UV (le badigeon blanc des moulures) ou par une couleur de sommet : ceux-la exigent une vraie cuisson. Listes dans `a_cuire`.",
+ "recettes": {
+  "M_MOD_wall_castle": {
+   "base_color": "T_MOD_wall_blocks_castle_01_BC.png",
+   "normale": "T_MOD_wall_blocks_castle_01_N.png",
+   "pbr": "T_MOD_wall_blocks_castle_01_PBR.png",
+   "dossier": "sources_rempart",
+   "sortie": "T_MOD_wall_blocks_castle_01_BC_hall",
+   "operations": [
+    {
+     "op": "teinte",
+     "couleur": [
+      1.0,
+      0.7682,
+      0.3864
+     ]
+    },
+    {
+     "op": "brightcontrast",
+     "bright": 0.2,
+     "contrast": 0.1
+    }
+   ]
+  },
+  "M_MOD_wall_curved_castle": {
+   "base_color": "T_MOD_wall_blocks_castle_01_BC.png",
+   "normale": "T_MOD_wall_blocks_castle_01_N.png",
+   "pbr": "T_MOD_wall_blocks_castle_01_PBR.png",
+   "dossier": "sources_rempart",
+   "sortie": "T_MOD_wall_blocks_castle_01_BC_hall",
+   "operations": [
+    {
+     "op": "teinte",
+     "couleur": [
+      1.0,
+      0.7682,
+      0.3864
+     ]
+    },
+    {
+     "op": "brightcontrast",
+     "bright": 0.2,
+     "contrast": 0.1
+    }
+   ]
+  },
+  "M_MOD_wall_gate_castle": {
+   "base_color": "T_MOD_wall_blocks_castle_01_BC.png",
+   "normale": "T_MOD_wall_blocks_castle_01_N.png",
+   "pbr": "T_MOD_wall_blocks_castle_01_PBR.png",
+   "dossier": "sources_rempart",
+   "sortie": "T_MOD_wall_blocks_castle_01_BC_hall",
+   "operations": [
+    {
+     "op": "teinte",
+     "couleur": [
+      1.0,
+      0.7682,
+      0.3864
+     ]
+    },
+    {
+     "op": "brightcontrast",
+     "bright": 0.2,
+     "contrast": 0.1
+    }
+   ]
+  },
+  "M_MOD_floor_castle_04": {
+   "base_color": "T_MOD_floor_castle_05_BC.png",
+   "normale": "T_MOD_floor_castle_03_N.png",
+   "pbr": "T_MOD_floor_castle_05_PBR.png",
+   "pbr_espace": "sRGB",
+   "dossier": "sources_pont",
+   "sortie": "T_MOD_floor_castle_05_BC_hall",
+   "operations": [
+    {
+     "op": "teinte_masquee",
+     "couleur": [
+      1.0,
+      0.9425,
+      0.5066
+     ],
+     "masque": "pbr",
+     "canal": 0,
+     "inverse": true,
+     "_": "ColorRamp lineaire blanc->noir sur le canal rouge du PBR = 1 - r"
+    },
+    {
+     "op": "brightcontrast",
+     "bright": 0.2,
+     "contrast": 0.1
+    }
+   ]
+  }
+ },
+ "a_cuire": {
+  "M_MOD_wall_castle+curved+gate": "badigeon blanc des moulures — melange pilote par T_MOD_citywall_MASK sur un SECOND depliage UV (~10 % de la surface)",
+  "M_ENV_tree_wood_castle": "melange ecorce claire / brun sombre pilote par la couleur de sommet, plus la teinte (1 ; 0,6062 ; 0,4779)"
+ },
+ "_a_conserver": {
+  "sources_rempart/T_MOD_citywall_MASK.png": "Entree du chantier `a_cuire` (badigeon blanc des moulures). AUCUNE recette ne la reference aujourd hui : un elagage naif la supprime et le chantier perd sa matiere premiere. C'est arrive le 2026-08-21, rattrape depuis le kit.",
+  "sources_falaise/T_ENV_cliff_castle_02_N.png": "Seconde macro-normale de falaise, portee par M_ENV_cliff_castle_02 dans le kit. Meme raison : utile, non referencee, donc fragile."
+ }
+}

@@ -1,0 +1,42 @@
+{
+  "_": "Corrections manuelles du Hall, rejouees a CHAQUE rebuild des cellules.",
+  "_pourquoi": "Le pipeline reconstruit tout depuis castle_highlands.glb. Un geste fait a la main dans Blender et non consigne ici est perdu au rebuild suivant, sans un mot. Une retouche qui ne trouve plus sa cible LEVE : mieux vaut un rebuild rouge qu'un toit remis a l'envers en silence.",
+  "_cle": "prefixe de nom + position monde de l'ORIGINE (que la rotation ne bouge pas), a tolerance_m pres. Le quaternion est ABSOLU (w, x, y, z), donc rejouer deux fois donne le meme resultat.",
+  "_limite_connue": "Ces retouches ne sont rejouees QUE par bake_cliff_grass_cells.py. Les deux proxies de collision cuits hors ligne repartent du meme castle_highlands.glb SANS les rejouer — build_castle_collision.py ne les lit pas, et le producteur de castle_highlands_collision_runtime.glb n'existe nulle part dans tools/. Sans effet pour les 4 entrees actuelles (mesure faite), mais une suppression visant un sol, un mur ou un escalier PRESENT dans un proxy laisserait un obstacle invisible. A traiter avant la prochaine du genre.",
+  "_combien": "Chaque entree declare COMBIEN de cibles elle attend (defaut 1). Le pack Unity contient des props empiles a la meme place : une entree qui en trouverait deux quand elle en attend une est une erreur, pas un detail. Le compte fait donc partie de la retouche.",
+
+  "retouches": [
+    {
+      "prefixe": "SM_MOD_roof_sloped_castle_LOD0",
+      "position_m": [-2.04148, -47.37215, 45.32861],
+      "tolerance_m": 0.05,
+      "quaternion_wxyz": [1.0, 0.0, 0.0, -0.00054],
+      "raison": "pan de toit a l'envers dans la source (180 deg autour de Z) — redresse a la main le 2026-08-20, la pente partait a contresens de ses voisines",
+      "avant_wxyz": [1.7e-05, 0.0, 0.0, 1.0]
+    }
+  ],
+
+  "suppressions": [
+    {
+      "prefixe": "SM_PROP_candleholder_castle_02_LOD0",
+      "position_m": [-32.044, -35.64714, 46.55331],
+      "tolerance_m": 0.05,
+      "combien": 2,
+      "raison": "DEUX bougeoirs empiles a 7 mm l'un de l'autre, FLOTTANT dans le vide : le plancher le plus proche est 13,2 m plus bas, le plafond 4,8 m plus haut. Le prefab est sain (69 cm, pivot exactement a sa base) — c'est le placement du pack Unity qui est faux. Deux autres exemplaires du meme modele, 9,4 m plus haut, sont poses correctement sur le plancher de l'etage superieur. Retires a la main le 2026-08-21."
+    },
+    {
+      "prefixe": "SM_PROP_candleholder_castle_03_LOD0",
+      "position_m": [-28.04148, -36.02415, 35.56952],
+      "tolerance_m": 0.05,
+      "combien": 1,
+      "raison": "bougeoir mal place dans la meme piece — retire a la main le 2026-08-21."
+    },
+    {
+      "prefixe": "SM_MOD_stairs_straight_02_castle_LOD0",
+      "position_m": [-30.04, 32.63, 12.33],
+      "tolerance_m": 0.1,
+      "combien": 1,
+      "raison": "ESCALIER QUI BOUCHE UNE PORTE. Il partage l'origine EXACTE de SM_MOD_wall_small_door_castle_LOD0.002 et occupe les 2,06 m juste derriere le seuil, avec 1,30 m de denivele. Or les deux planchers de part et d'autre sont au MEME niveau (floor_castle a +2 m et floor_broken a -2,4 m, ecart 5 cm) : cet escalier ne mene nulle part, il ne fait qu'une marche infranchissable. Retirer le maillage libere AUSSI la collision : castle_hub.rs:588 fusionne tous les Mesh3d de la cellule en un TriMesh (verifie, pas suppose). Et les deux proxies cuits hors ligne (castle_highlands_collision_runtime / _walkable_runtime) ne contiennent PAS cet escalier — mesure au triangle sur le volume qu'il occupait : y max 12,48 pour le walkable (des dalles), et les 29 triangles hauts du structurel sont le mur, hors du couloir de passage."
+    }
+  ]
+}

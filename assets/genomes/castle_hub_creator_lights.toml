@@ -1,0 +1,435 @@
+# Lumières du créateur du pack, portées 1:1 depuis sa scène Unity.
+# Généré par tools/unity/extract_scene_lights.py — ne pas éditer à la main.
+# Conversion vérifiée : bevy = (−unity.x -32.041, unity.y -172.671, unity.z +35.372).
+# 1 directionnelle(s) volontairement non reprise(s).
+
+[[light]]
+kind = "spot"
+pos = [66.192, 19.329, -11.300]
+dir = [-0.0000, -1.0000, 0.0000]
+outer_deg = 68.87374
+inner_deg = 0.0
+intensity = 20.0
+range = 10.542
+color = [1.0000, 0.9922, 0.7216]
+
+[[light]]
+kind = "point"
+pos = [-45.225, 58.089, 35.555]
+intensity = 3.0
+range = 12.968
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "point"
+pos = [-0.057, 40.701, 35.532]
+intensity = 5.0
+range = 6.498
+color = [1.0000, 0.9626, 0.7783]
+
+[[light]]
+kind = "point"
+pos = [-37.751, 70.799, 29.252]
+intensity = 0.7
+range = 3.515
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-30.191, 57.949, 25.312]
+intensity = 2.0
+range = 13.720
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "point"
+pos = [-44.653, 27.599, 59.830]
+intensity = 1.0
+range = 8.000
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "point"
+pos = [-36.851, 73.759, 35.372]
+intensity = 5.0
+range = 14.638
+color = [0.5608, 1.0000, 0.9952]
+
+[[light]]
+kind = "spot"
+pos = [-24.021, 48.459, 12.592]
+dir = [-0.0000, -0.8068, 0.5909]
+outer_deg = 115.43684
+inner_deg = 19.8471
+intensity = 9.3
+range = 13.421
+color = [1.0000, 0.9838, 0.8632]
+
+[[light]]
+kind = "point"
+pos = [-36.009, 70.748, 38.628]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-28.041, 39.759, 35.372]
+intensity = 10.0
+range = 19.498
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-25.801, 21.609, 43.742]
+intensity = 4.0
+range = 5.870
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "point"
+pos = [-88.227, 50.729, 35.372]
+intensity = 7.67
+range = 9.812
+color = [1.0000, 0.9323, 0.6462]
+
+[[light]]
+kind = "point"
+pos = [-40.710, 70.929, 33.167]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-67.351, 47.459, 35.372]
+intensity = 2.0
+range = 16.570
+color = [1.0000, 1.0000, 1.0000]
+
+[[light]]
+kind = "point"
+pos = [-33.816, 71.280, 41.839]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-11.631, 49.509, 35.372]
+intensity = 4.0
+range = 9.784
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-30.191, 57.949, 46.802]
+intensity = 2.0
+range = 13.720
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "point"
+pos = [-17.921, 74.919, 35.372]
+intensity = 5.0
+range = 6.365
+color = [1.0000, 0.8737, 0.6462]
+
+[[light]]
+kind = "point"
+pos = [-18.951, 60.639, 46.342]
+intensity = 6.0
+range = 10.227
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "point"
+pos = [-40.608, 71.009, 37.820]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "spot"
+pos = [47.782, 28.758, 25.521]
+dir = [-0.1106, -0.9179, 0.3811]
+outer_deg = 50.484314
+inner_deg = 0.0
+intensity = 20.0
+range = 10.542
+color = [1.0000, 0.9922, 0.7216]
+
+[[light]]
+kind = "spot"
+pos = [-28.731, 37.319, -40.218]
+dir = [-0.2115, -0.9440, 0.2531]
+outer_deg = 76.5535
+inner_deg = 0.0
+intensity = 59.16
+range = 34.714
+color = [1.0000, 1.0000, 1.0000]
+
+[[light]]
+kind = "point"
+pos = [-38.812, 70.825, 41.801]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "spot"
+pos = [-29.471, 18.469, -40.768]
+dir = [0.0752, -0.9898, 0.1209]
+outer_deg = 93.77859
+inner_deg = 0.0
+intensity = 8.0
+range = 11.728
+color = [1.0000, 0.9922, 0.7216]
+
+[[light]]
+kind = "point"
+pos = [-25.801, 21.549, 26.802]
+intensity = 4.0
+range = 5.870
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "spot"
+pos = [-11.401, 32.809, -39.548]
+dir = [-0.2405, -0.9704, 0.0237]
+outer_deg = 64.87747
+inner_deg = 1.6298673
+intensity = 45.0
+range = 31.400
+color = [1.0000, 1.0000, 1.0000]
+
+[[light]]
+kind = "spot"
+pos = [0.929, 32.569, -44.628]
+dir = [-0.2542, -0.9596, 0.1207]
+outer_deg = 64.87747
+inner_deg = 1.6298673
+intensity = 59.16
+range = 31.400
+color = [1.0000, 1.0000, 1.0000]
+
+[[light]]
+kind = "point"
+pos = [-18.951, 60.639, 24.112]
+intensity = 6.0
+range = 10.227
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "spot"
+pos = [-46.919, 28.129, 35.482]
+dir = [-0.0000, -1.0000, 0.0000]
+outer_deg = 60.901955
+inner_deg = 0.0
+intensity = 10.0
+range = 9.138
+color = [1.0000, 0.8863, 0.6196]
+
+[[light]]
+kind = "point"
+pos = [-34.781, 70.735, 28.826]
+intensity = 0.7
+range = 3.515
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "spot"
+pos = [62.509, 18.209, -97.308]
+dir = [0.3111, -0.9452, 0.0994]
+outer_deg = 99.19361
+inner_deg = 0.0
+intensity = 8.0
+range = 11.728
+color = [1.0000, 0.9922, 0.7216]
+
+[[light]]
+kind = "point"
+pos = [-34.198, 36.559, 4.582]
+intensity = 2.0
+range = 6.840
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-5.898, 37.259, 15.962]
+intensity = 3.0
+range = 11.676
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-72.029, 58.640, 35.372]
+intensity = 4.0
+range = 6.930
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "spot"
+pos = [-85.219, 48.820, 44.854]
+dir = [-0.4967, -0.5130, -0.7000]
+outer_deg = 57.675346
+inner_deg = 1.9487597
+intensity = 9.0
+range = 15.985
+color = [1.0000, 0.9267, 0.6651]
+
+[[light]]
+kind = "point"
+pos = [-32.351, 36.559, 66.012]
+intensity = 2.0
+range = 6.840
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-13.981, 47.329, 47.992]
+intensity = 2.0
+range = 17.351
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-36.840, 70.478, 31.944]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-29.880, 71.191, 41.839]
+intensity = 0.7
+range = 3.400
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-57.340, 57.479, 35.372]
+intensity = 3.0
+range = 7.846
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "point"
+pos = [-5.898, 37.259, 55.032]
+intensity = 3.0
+range = 11.676
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-37.878, 23.329, 35.372]
+intensity = 0.4
+range = 5.027
+color = [0.5804, 1.0000, 0.9797]
+
+[[light]]
+kind = "point"
+pos = [-46.901, 25.397, 45.482]
+intensity = 2.0
+range = 6.000
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "point"
+pos = [-46.901, 26.009, 26.119]
+intensity = 2.0
+range = 6.000
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "point"
+pos = [-26.771, 74.579, 44.122]
+intensity = 2.0
+range = 8.134
+color = [0.5608, 1.0000, 0.9961]
+
+[[light]]
+kind = "point"
+pos = [-29.880, 71.191, 29.252]
+intensity = 0.7
+range = 3.977
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-49.241, 43.329, 35.372]
+intensity = 6.0
+range = 7.310
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "point"
+pos = [-11.778, 63.329, 35.372]
+intensity = 3.0
+range = 7.616
+color = [1.0000, 0.8415, 0.5613]
+
+[[light]]
+kind = "point"
+pos = [-42.194, 18.801, 31.891]
+intensity = 1.0
+range = 4.966
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "point"
+pos = [-33.094, 70.478, 31.944]
+intensity = 0.7
+range = 2.780
+color = [1.0000, 0.8471, 0.2863]
+
+[[light]]
+kind = "point"
+pos = [-46.169, 27.922, 12.007]
+intensity = 1.0
+range = 8.000
+color = [1.0000, 0.8854, 0.6179]
+
+[[light]]
+kind = "spot"
+pos = [-27.631, 26.279, 35.482]
+dir = [-0.0000, -1.0000, 0.0000]
+outer_deg = 81.51117
+inner_deg = 0.0
+intensity = 10.0
+range = 10.362
+color = [0.5529, 1.0000, 1.0000]
+
+[[light]]
+kind = "point"
+pos = [-13.981, 47.329, 20.892]
+intensity = 2.0
+range = 17.351
+color = [1.0000, 0.9446, 0.6745]
+
+[[light]]
+kind = "spot"
+pos = [-21.881, 26.279, 35.482]
+dir = [-0.0000, -1.0000, 0.0000]
+outer_deg = 80.822
+inner_deg = 0.0
+intensity = 10.0
+range = 10.362
+color = [0.5529, 1.0000, 1.0000]
+
+[[light]]
+kind = "point"
+pos = [-27.421, 74.519, 26.582]
+intensity = 2.0
+range = 8.134
+color = [0.5608, 1.0000, 0.9961]
+
+[[light]]
+kind = "spot"
+pos = [-24.021, 48.459, 58.272]
+dir = [-0.0000, -0.8068, -0.5909]
+outer_deg = 115.43684
+inner_deg = 19.8471
+intensity = 9.3
+range = 13.421
+color = [1.0000, 0.9838, 0.8632]

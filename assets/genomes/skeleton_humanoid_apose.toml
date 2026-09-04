@@ -1,0 +1,146 @@
+# Template skeleton Humanoid A-POSE — 20 bones (variante arms-down).
+# Story-601 incr.1 — pour les meshes générés bras le long du corps (assets IA
+# type Meshy/Tripo, ex. Cyber.glb) au lieu de la T-pose Vitruvienne de
+# `skeleton_humanoid.toml`. Source de vérité `forgia-skeleton-template`.
+# Hot-reloadable via Bevy AssetServer (Shift+F12) — TUNER les positions de bras
+# à l'œil sur le mesh cible (overlay rig ON en CyberCity).
+#
+# Différences vs skeleton_humanoid.toml :
+#  - bras qui DESCENDENT (Y décroissant, X proche du corps) au lieu d'horizontaux
+#  - stance_offsets À ZÉRO : le mesh est déjà en pose game (arms-down), aucune
+#    rotation à appliquer (cf skeleton_humanoid.toml:6-8).
+
+[stance_offsets]
+arm_l_euler_deg = [0.0, 0.0, 0.0]
+arm_r_euler_deg = [0.0, 0.0, 0.0]
+leg_l_euler_deg = [0.0, 0.0, 0.0]
+leg_r_euler_deg = [0.0, 0.0, 0.0]
+spine_euler_deg = [0.0, 0.0, 0.0]
+hip_euler_deg   = [0.0, 0.0, 0.0]
+clavicle_l_euler_deg = [0.0, 0.0, 0.0]
+clavicle_r_euler_deg = [0.0, 0.0, 0.0]
+
+# Position normalisée : `pos = [x, y, z]`, y∈[0,1] (0=sol, 1=top), scalé par
+# mesh_height au runtime. `parent` = index 0-based. `class` = anatomie déclarative.
+
+[[bones]]
+name = "hip"
+pos = [0.0, 0.50, 0.0]
+class = "spine"
+
+[[bones]]
+name = "spine_lower"
+parent = 0
+pos = [0.0, 0.58, 0.0]
+class = "spine"
+
+[[bones]]
+name = "spine_mid"
+parent = 1
+pos = [0.0, 0.66, 0.0]
+class = "spine"
+
+[[bones]]
+name = "chest"
+parent = 2
+pos = [0.0, 0.75, 0.0]
+class = "spine"
+
+[[bones]]
+name = "neck"
+parent = 3
+pos = [0.0, 0.85, 0.0]
+class = "spine"
+
+[[bones]]
+name = "head"
+parent = 4
+pos = [0.0, 0.95, 0.0]
+class = "head"
+
+# ── Bras GAUCHE : descendent le long du corps (X≈-0.16, Y 0.80→0.44) ──────────
+[[bones]]
+name = "clavicle_L"
+parent = 3
+pos = [-0.08, 0.80, 0.0]
+class = "arm"
+
+[[bones]]
+name = "arm_L"
+parent = 6
+pos = [-0.16, 0.70, 0.0]
+class = "arm"
+
+[[bones]]
+name = "forearm_L"
+parent = 7
+pos = [-0.18, 0.56, 0.0]
+class = "arm"
+
+[[bones]]
+name = "hand_L"
+parent = 8
+pos = [-0.19, 0.44, 0.0]
+class = "arm"
+
+# ── Bras DROIT : miroir (X≈+0.16) ─────────────────────────────────────────────
+[[bones]]
+name = "clavicle_R"
+parent = 3
+pos = [0.08, 0.80, 0.0]
+class = "arm"
+
+[[bones]]
+name = "arm_R"
+parent = 10
+pos = [0.16, 0.70, 0.0]
+class = "arm"
+
+[[bones]]
+name = "forearm_R"
+parent = 11
+pos = [0.18, 0.56, 0.0]
+class = "arm"
+
+[[bones]]
+name = "hand_R"
+parent = 12
+pos = [0.19, 0.44, 0.0]
+class = "arm"
+
+# ── Jambes (identiques au template Humanoid) ──────────────────────────────────
+[[bones]]
+name = "thigh_L"
+parent = 0
+pos = [-0.10, 0.40, 0.0]
+class = "leg"
+
+[[bones]]
+name = "shin_L"
+parent = 14
+pos = [-0.10, 0.27, 0.03]
+class = "leg"
+
+[[bones]]
+name = "foot_L"
+parent = 15
+pos = [-0.10, 0.02, 0.05]
+class = "leg"
+
+[[bones]]
+name = "thigh_R"
+parent = 0
+pos = [0.10, 0.40, 0.0]
+class = "leg"
+
+[[bones]]
+name = "shin_R"
+parent = 17
+pos = [0.10, 0.27, 0.03]
+class = "leg"
+
+[[bones]]
+name = "foot_R"
+parent = 18
+pos = [0.10, 0.02, 0.05]
+class = "leg"

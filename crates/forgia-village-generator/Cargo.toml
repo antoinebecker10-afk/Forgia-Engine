@@ -1,0 +1,18 @@
+[package]
+name = "forgia-village-generator"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Procgen orchestrator (Hamlet + Village). Pure logic, no Bevy ECS."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true }
+forgia-rng = { workspace = true }
+forgia-procgen-graph = { workspace = true }
+forgia-genome-village = { workspace = true }
+forgia-spline = { workspace = true }
+thiserror = { workspace = true }
+rstar = { workspace = true }

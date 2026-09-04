@@ -1,0 +1,48 @@
+# Forgia V2 — Kill Feed Tuning Genome (story-455 Phase D, 2026-05-18)
+#
+# Hot-reload via Bevy Asset. Pattern AAA :
+# - Overwatch / CS2 / Apex : top-right, FIFO 5 entries, slide-in 0.18s, display 5s + fade 1s
+# - Halo : multi-kill sweeping banner CENTER_TOP ("DOUBLE KILL" / "TRIPLE KILL")
+#
+# Sources research story-455 §7 :
+# - Overwatch Workshop KillFeed mod (fadeInTime / displayTime / fadeOutTime / slideInTime)
+# - Blizzard forum thread persistent kill feed ~6s default
+# - CS2 patch killfeed special icons (headshot, no-scope, wallbang, blind kill)
+
+# ─── Layout feed (top-right) ──────────────────────────────────────────
+padding_right = 32.0       # marge bord droit
+first_entry_y = 132.0      # Y du premier entry — sous les compteurs Or/Âmes (bas y≈118, top-right) pour éviter le chevauchement
+entry_width = 360.0        # largeur d'un entry
+entry_height = 34.0        # hauteur d'un entry
+entry_spacing = 6.0        # espacement vertical
+max_entries = 5            # cap FIFO (Overwatch/CS2 standard)
+
+# ─── Timings ──────────────────────────────────────────────────────────
+display_secs = 5.0         # durée totale avant fade (Overwatch ~6s, CS2 ~5s)
+fade_out_secs = 1.0        # fade-out final
+slide_in_secs = 0.18       # slide-in lateral droite→gauche
+slide_in_distance = 60.0   # distance du slide-in en px
+
+# ─── Fonts ────────────────────────────────────────────────────────────
+font_attacker = 18.0
+font_arrow = 22.0
+font_victim = 18.0
+font_weapon_icon = 20.0
+text_outline_px = 1.5
+# Layout interne entry (audit BUG-455-08 — fix hardcodes)
+entry_pad_inner = 14.0
+icon_offset_x = 90.0
+arrow_offset_x_from_icon = 24.0
+victim_offset_x_from_icon = 48.0
+entry_corner_rounding = 6.0
+entry_outline_px = 2.0
+headshot_font_bonus = 2.0
+
+# ─── Multi-kill banner (Halo CENTER_TOP) ──────────────────────────────
+multikill_window_secs = 4.0    # fenêtre 2 kills enchaînés
+multikill_banner_secs = 1.8    # durée banner
+multikill_banner_y = 130.0     # Y depuis top
+multikill_font = 56.0          # taille font banner (big impact)
+
+# ─── Sensor ───────────────────────────────────────────────────────────
+sensor_period_secs = 1.0       # période forgia_killfeed.json

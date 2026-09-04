@@ -1,0 +1,27 @@
+# no-scaffold allowlist — story-515 (2026-05-23)
+#
+# Ratchet anti-regression : preserve les gains story-512+513 (-99 crates).
+# Le check fail si une crate forgia-* a moins de 50 LOC effectives
+# (non-blank, non-comment) ET n'est pas dans cette allowlist.
+#
+# Mises a jour necessitent justification dans le commit.
+#
+# Categories :
+#   - Foundation : crates legitimement minimales (forgia-core, forgia-rng)
+#   - Baseline 2026-05-23 : 93 scaffolds restants apres story-512+513.
+#     A purger dans waves futures (stories 516+). Listees pour eviter
+#     que le ratchet fail sur l'etat actuel — ratchet protege seulement
+#     contre AJOUT de nouvelle crate scaffold.
+
+allowed = [
+    # Foundation crates (intentionally minimal)
+    "forgia-core",
+    "forgia-rng",
+
+    # Baseline 2026-05-23 — 93 scaffolds restants (a purger dans stories 516+)
+    # forgia-audio-core removed 2026-05-26 (fused into forgia-audio with biome)
+    # Purge audit 2026-07-19 (story-662) : forgia-juice-hit-stop, forgia-juice-recoil,
+    # forgia-sensors retirees — crates supprimees du workspace, entrees mortes.
+    "forgia-assets",
+    "forgia-water",
+]

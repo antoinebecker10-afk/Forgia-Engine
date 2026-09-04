@@ -1,0 +1,132 @@
+id = "enemy_archer"
+name = "Goblin Archer"
+domain = "Creature"
+category = "Creature"
+description = "Ranged kiter: maintains distance, strafes, moderate HP"
+version = "1.0.0"
+
+# === Combat Stats ===
+
+[[genes]]
+id = "archer_max_hp"
+label = "Max HP"
+chromosome = "Combat"
+target = "Value"
+min = 20.0
+max = 80.0
+default = 45.0
+layer = "archer"
+
+[[genes]]
+id = "archer_melee_damage"
+label = "Melee Damage"
+chromosome = "Combat"
+target = "Value"
+min = 4.0
+max = 15.0
+default = 8.0
+layer = "archer"
+
+[[genes]]
+id = "archer_ranged_distance"
+label = "Ranged Distance (m)"
+chromosome = "Combat"
+target = "Value"
+min = 8.0
+max = 25.0
+default = 15.0
+layer = "archer"
+
+[[genes]]
+id = "archer_chase_speed"
+label = "Chase Speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 3.0
+max = 10.0
+default = 5.5
+layer = "archer"
+
+[[genes]]
+id = "archer_retreat_speed_factor"
+label = "Retreat Speed Factor"
+chromosome = "Movement"
+target = "Value"
+min = 0.3
+max = 0.9
+default = 0.6
+layer = "archer"
+
+[[genes]]
+id = "archer_vision_range"
+label = "Vision Range (m)"
+chromosome = "Senses"
+target = "Value"
+min = 20.0
+max = 50.0
+default = 35.0
+layer = "archer"
+
+[[genes]]
+id = "archer_melee_range"
+label = "Melee Range (m)"
+chromosome = "Combat"
+target = "Value"
+min = 1.5
+max = 4.0
+default = 2.5
+layer = "archer"
+
+# === Appearance ===
+
+[[genes]]
+id = "archer_model_scale"
+label = "Model Scale"
+chromosome = "Appearance"
+target = "Value"
+min = 0.7
+max = 1.3
+default = 1.0
+layer = "archer"
+
+# === Rewards ===
+
+[[genes]]
+id = "archer_gold_reward"
+label = "Gold Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 10.0
+max = 50.0
+default = 25.0
+layer = "archer"
+
+[[genes]]
+id = "archer_xp_reward"
+label = "XP Reward"
+chromosome = "Rewards"
+target = "Value"
+min = 8.0
+max = 35.0
+default = 18.0
+layer = "archer"
+
+# === Constraints ===
+
+# More ranged distance → more vision (needs to see further to kite)
+[[constraints]]
+source = "archer_ranged_distance"
+target = "archer_vision_range"
+ratio = 1.5
+
+# Faster retreat → less HP (glass cannon)
+[[constraints]]
+source = "archer_retreat_speed_factor"
+target = "archer_max_hp"
+ratio = -30.0
+
+# More damage → more gold reward
+[[constraints]]
+source = "archer_melee_damage"
+target = "archer_gold_reward"
+ratio = 2.0

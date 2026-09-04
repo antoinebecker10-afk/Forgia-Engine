@@ -1,0 +1,91 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# streaming.toml — Forgia V2 chunk streaming genome (story-450 wave 1)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Configuration runtime du système de streaming chunks.
+# ⚠️ Lu au Startup UNIQUEMENT (load_streaming_genome, std::fs) — PAS via le
+# file_watcher Bevy → RELANCER le jeu pour appliquer un changement (aucun
+# hot-reload câblé, malgré l'ancienne note erronée corrigée 2026-06-05).
+#
+# Pattern industrie composite :
+# - Dual radii (Minecraft view_radius != simulation_radius)
+# - Unload hysteresis (UE5 Level Streaming default 2.0s)
+# - Memory budget LRU (Unity Addressables memoryBudgetKB)
+# - Async pipeline back-pressure (Bevy AsyncComputeTaskPool sizing)
+# - Sensor JSON 1Hz (observability-required.md)
+#
+# Sources verified : minecraft.wiki/w/Chunk, docs.unrealengine.com,
+# create.roblox.com/docs/workspace/streaming, docs.unity3d.com Addressables.
+
+schema_version = 1
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Radii — dual tier streaming (Minecraft + Roblox pattern)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Forgia chunk = 32m × 32m.
+# - simulation_m=64m  : 2 chunks ring → collisions/AI/vegetation tick
+# - view_m=128m       : 4 chunks ring → mesh + LOD0 + foliage rendered
+# - unload_m=160m     : 5 chunks ring → eviction eligible (hysteresis)
+#
+# 2026-06-05 (audit procgen) : view_m 96→128 pour FERMER le gap de couverture
+# 96-128m. Les mega-tiles LOD2 ne spawnent qu'à partir de LOD1_MAX_M=128m
+# (forgia-terrain/src/lod.rs) ; avec view_m=96 la bande annulaire 96-128m
+# n'avait NI chunk NI LOD2 → trou au plancher sea_level (devenu béant avec
+# max_height=80). view_m=128 aligne le bord des chunks sur le seuil LOD2 inner.
+# unload_m 128→160 préserve la marge d'hystérésis (≥1 chunk).
+# Tune up pour vision lointaine ; tune down si frame budget serré.
+
+[radii]
+simulation_m = 64.0
+view_m = 128.0
+unload_m = 160.0
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Hysteresis — UE5 Level Streaming Volumes default 2.0s unload delay
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Un chunk doit avoir résidé au moins min_residence_secs avant d'être éligible
+# à eviction par distance, MÊME si le joueur s'en est éloigné. Évite le
+# thrash aux boundaries quand le joueur fait des allers-retours.
+
+[hysteresis]
+min_residence_secs = 2.0
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Memory budget — Unity Addressables memoryBudgetKB LRU pattern
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Si loaded_mb_est dépasse max_mb, eviction LRU jusqu'à retomber sous le seuil.
+# max_chunks est un cap secondaire si l'estimation MB sous-évalue.
+#
+# Tunable per platform : 512MB starting point, doit être benché.
+
+[budget]
+max_mb = 512.0
+max_chunks = 256
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Async pipeline — Bevy AsyncComputeTaskPool sizing
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Pool default Bevy = 25% CPU cores. Sur 8 cores → 2 worker threads.
+# max_queue_depth limite les tasks in-flight pour éviter burst (back-pressure).
+# chunks_per_frame = combien de tasks finies sont promues à l'ECS par frame.
+
+[async_pipeline]
+max_queue_depth = 8
+chunks_per_frame = 2
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Debug — sensor & observability
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# sensor_enabled = 1 active l'export forgia_chunk_stream.json
+# sensor_interval_s = 1.0 → écriture toutes les secondes
+# gen_ms_buckets = histogram pour gen_ms timings (log2-scale 16 buckets)
+
+[debug]
+sensor_enabled = 1
+sensor_interval_s = 1.0
+gen_ms_buckets = 16

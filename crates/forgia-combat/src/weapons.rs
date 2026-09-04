@@ -1,0 +1,375 @@
+#![allow(dead_code, unused_imports)]
+//! Port verbatim de `forgia-game/src/combat/weapons.rs` (V1).
+//! TODOs de dépendances cross-module marqués inline.
+
+use bevy::ecs::system::SystemParam;
+use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
+
+// TODO: port from V1 — app_state (GameMode, GameSet, WorldMode)
+// use forgia_core::app_state::GameMode;
+
+// TODO: depend on forgia-assets — GameAssets
+// use forgia_assets::GameAssets;
+
+// TODO: port from V1 — components (Player, LocalPlayer, FpsCamera, GoblinAI, etc.)
+// use forgia_player::components::{Player, LocalPlayer, FpsCamera};
+
+// TODO: port from V1 — ai::arena_bot::BotHealth
+// use forgia_ai_arena_bot::BotHealth;
+
+// TODO: port from V1 — resources::FpsTuning
+// use forgia_core::resources::FpsTuning;
+
+// TODO: port from V1 — genome registry
+// use forgia_genome_registry::GenomeRegistry;
+
+use bevy::platform::collections::HashMap;
+
+use crate::ammo::AmmoSlot;
+
+/// Table d'affinité élément→couche PAR ARME pour le **hit de base** (story-642 P0-4
+/// Inc.3b). Peuplée par forgia-mode-roguelite (arme → élément armé × affinité genome,
+/// **uniquement si le toggle genome `[affinity] base_hit` est ON**) ; LUE par forgia-fps
+/// pour router le hit de base via `DefenseLayer::absorb_elemental` au lieu de `Physical`.
+/// **Vide (défaut) = hit de base neutre** (comportement historique, 0 changement de
+/// balance tant que le toggle est OFF). Table par type d'arme (config-like), PAS un
+/// singleton joueur → compatible multi-joueurs.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct WeaponAffinities(pub HashMap<WeaponType, forgia_damage::ElementAffinity>);
+
+// Weapon VFX constants migrated to FpsTuning (wfx_fire_shake, wfx_impact_*, wfx_muzzle_*, wfx_tracer_*, wfx_sfx_volume)
+
+// =============================================================================
+// Arena V1 loadout — MAR / Shotgun / Rocket (story-421)
+// Layout constant: authoritative list of Arena V1 weapons.
+// Not a magic number — it is structural (which weapons exist in this mode).
+// Balance values (damage, rate) live in FpsTuning as always.
+// =============================================================================
+
+pub const ARENA_V1_WEAPONS: [WeaponType; 4] = [
+    WeaponType::ModernAR,       // Digit1 = Pépin
+    WeaponType::AssaultRifle,   // Digit2 = Bourrasque
+    WeaponType::Shotgun,        // Digit3 = Madame Lenoir
+    WeaponType::RocketLauncher, // Digit4 = Boucherie
+];
+
+// =============================================================================
+// Weapon Types & Data
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum WeaponType {
+    #[default]
+    ModernAR,
+    AssaultRifle,
+    AK47,
+    Shotgun,
+    PlasmaRifle,
+    RocketLauncher,
+    Chainsaw,
+}
+
+impl WeaponType {
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            WeaponType::ModernAR => "Modern AR",
+            WeaponType::AssaultRifle => "Assault Rifle",
+            WeaponType::AK47 => "AK-47",
+            WeaponType::Shotgun => "Shotgun",
+            WeaponType::PlasmaRifle => "Plasma Rifle",
+            WeaponType::RocketLauncher => "Rocket Launcher",
+            WeaponType::Chainsaw => "Chainsaw",
+        }
+    }
+
+    /// Cycle to next weapon type
+    pub fn next(self) -> Self {
+        match self {
+            WeaponType::ModernAR => WeaponType::AssaultRifle,
+            WeaponType::AssaultRifle => WeaponType::AK47,
+            WeaponType::AK47 => WeaponType::Shotgun,
+            WeaponType::Shotgun => WeaponType::PlasmaRifle,
+            WeaponType::PlasmaRifle => WeaponType::RocketLauncher,
+            WeaponType::RocketLauncher => WeaponType::Chainsaw,
+            WeaponType::Chainsaw => WeaponType::ModernAR,
+        }
+    }
+
+    /// Cycle to next weapon within a restricted set (Arena V1: MAR/Shotgun/Rocket).
+    /// If current is not in the set, resets to the first element.
+    pub fn next_in_set(self, set: &[WeaponType]) -> WeaponType {
+        if set.is_empty() {
+            return self;
+        }
+        let pos = set.iter().position(|w| *w == self);
+        match pos {
+            Some(i) => set[(i + 1) % set.len()],
+            None => set[0],
+        }
+    }
+
+    /// Whether this weapon is melee (swing animation instead of recoil)
+    pub fn is_melee(&self) -> bool {
+        matches!(self, WeaponType::Chainsaw)
+    }
+
+    /// Clé de l'arme dans les génomes ET nom de son GLB
+    /// (`models/weapons/forgia/<clé>.glb`).
+    ///
+    /// # Pourquoi elle vit ICI et pas chez ses lecteurs
+    ///
+    /// Cette table existait en **deux copies** — `forgia_viewmodel::
+    /// weapon_genome_key` et `forgia_mode_roguelite::weapon_select::vm_key`, la
+    /// seconde se déclarant elle-même « dupliquée pour éviter la dép crate ».
+    /// Une troisième copie s'annonçait avec l'arme tenue en main à la 3ᵉ
+    /// personne : le moment de rassembler. `forgia-combat` est déjà la
+    /// dépendance commune des trois, donc l'ajout ne coûte aucun lien nouveau.
+    ///
+    /// Les deux anciennes fonctions restent, et délèguent : leurs appelants
+    /// n'ont pas à savoir que la table a déménagé.
+    pub fn genome_key(self) -> &'static str {
+        match self {
+            WeaponType::AssaultRifle => "bourrasque",
+            WeaponType::Shotgun => "madame_lenoir",
+            WeaponType::RocketLauncher => "boucherie",
+            // Les trois variantes sans arme livrée (AK47, PlasmaRifle,
+            // Chainsaw) retombent sur Pépin, comme les deux tables d'origine.
+            _ => "pepin",
+        }
+    }
+
+    // `stats()` + `WeaponData` retirés 2026-05-19 (Vague 2 audit forensic).
+    // Code mort confirmé : 0 call-site externe, 0 UFCS, struct non préludée.
+    // Le firing path V2 lit damage/fire_rate/range/pellets/spread_deg via
+    // `forgia-fps::ViewmodelGenomeEntry` chargé depuis `viewmodel_arena.toml`.
+    // La vraie migration TOML weapons (avec splash/projectile speed/falloff
+    // unifiés) ne sera envisagée qu'avec un besoin multi-consommateur mesuré.
+}
+
+// =============================================================================
+// Equipped Weapons Resource (story-455 Phase A — replaces V1 infinite-ammo stub)
+// =============================================================================
+//
+// `slots` est populated lazy par `forgia-fps::sync_ammo_slots_from_genome` quand
+// le genome `viewmodel_arena.toml` arrive (Asset Created/Modified). Tant qu'un
+// slot n'est pas présent, `slot_or_default()` retourne un slot par défaut
+// (mag=30, reserve=120, infinite=false) pour éviter les panics dans le UI.
+
+/// Où sort la balle **À L'ÉCRAN** : la bouche du canon de l'arme réellement
+/// visible, en coordonnées monde. `None` = aucune arme visible dans le monde.
+///
+/// # Le défaut que cette ressource évite
+///
+/// En vue subjective, le canon est à quelques centimètres de l'œil : faire
+/// partir la lueur et le traceur de la caméra ne se voit pas. En 3ᵉ personne la
+/// caméra est **3,2 m derrière le personnage** — les balles sortiraient de nulle
+/// part, à côté de son épaule, et le tir cesserait de venir de l'arme qu'on
+/// tient. Le rayon, lui, part toujours de la caméra (c'est ce qui fait que le
+/// réticule dit vrai) : seul le VISUEL suit la main.
+///
+/// C'est la répartition standard des jeux de tir à la 3ᵉ personne : le rayon
+/// décide, le canon raconte.
+///
+/// Écrite par le module qui rend l'arme visible (Expédition), lue par le chemin
+/// de tir. Absente ou `None` en vue subjective → repli sur le calcul caméra,
+/// donc aucun changement pour l'arène.
+#[derive(Resource, Default)]
+pub struct MuzzleWorld(pub Option<Vec3>);
+
+#[derive(Resource, Default)]
+pub struct EquippedWeapons {
+    pub current: WeaponType,
+    /// Ammo state par arme. Populated par genome sync system.
+    pub slots: HashMap<WeaponType, AmmoSlot>,
+}
+
+impl EquippedWeapons {
+    /// Slot de l'arme actuelle (immutable). None si pas encore initialisé par genome.
+    pub fn current_slot(&self) -> Option<&AmmoSlot> {
+        self.slots.get(&self.current)
+    }
+
+    /// Slot mutable de l'arme actuelle. None si pas encore initialisé.
+    pub fn current_slot_mut(&mut self) -> Option<&mut AmmoSlot> {
+        self.slots.get_mut(&self.current)
+    }
+
+    /// Slot d'une arme spécifique, fallback default si absent. **Lecture seule** —
+    /// utile pour HUD qui doit afficher quelque chose avant init.
+    pub fn slot_or_default(&self, w: WeaponType) -> AmmoSlot {
+        self.slots.get(&w).copied().unwrap_or_default()
+    }
+
+    /// Recharge **toutes** les armes à bloc et rend le nombre de slots touchés.
+    ///
+    /// À appeler au démarrage d'une run. Les slots survivent d'une run à l'autre
+    /// (la Resource n'est pas state-scopée), donc sans ceci une run relancée
+    /// hérite des munitions de la précédente — cf `AmmoSlot::refill`.
+    ///
+    /// Rend un compte plutôt que rien : c'est ce qui permet au log de distinguer
+    /// « rechargé 4 armes » de « 0 slot, le génome n'était pas encore arrivé ».
+    pub fn refill_all(&mut self) -> usize {
+        for slot in self.slots.values_mut() {
+            slot.refill();
+        }
+        self.slots.len()
+    }
+
+    /// Iter slots existants (pour HUD slot strip).
+    pub fn iter_slots(&self) -> impl Iterator<Item = (WeaponType, &AmmoSlot)> {
+        self.slots.iter().map(|(w, s)| (*w, s))
+    }
+}
+
+// =============================================================================
+// Fire Cooldown (weapon-specific, presence = on cooldown)
+// =============================================================================
+
+#[derive(Resource)]
+pub struct WeaponFireCooldown {
+    pub timer: Timer,
+}
+
+// =============================================================================
+// Projectile Components (for Plasma & Rocket)
+// =============================================================================
+
+#[derive(Component)]
+pub struct DoomProjectile {
+    pub direction: Vec3,
+    pub speed: f32,
+    pub damage: f32,
+    pub splash_radius: f32,
+}
+
+// =============================================================================
+// Damage falloff (story-432 V5-D)
+// =============================================================================
+//
+// `HITSCAN_SPEED` / `NO_SPLASH` retirés avec `WeaponData` (Vague 2, code mort).
+
+/// Damage falloff distance-based (story-432 V5-D).
+///
+/// Pattern Apex/Halo : full damage jusqu'à `start_pct` du range, puis interp
+/// linéaire vers `floor_mult` à range max. Hors-range = floor_mult (Halo)
+/// plutôt que 0 (TTK plus skill-friendly que cut-off brutal).
+pub fn damage_falloff(dist: f32, range: f32, start_pct: f32, floor_mult: f32) -> f32 {
+    if range <= 0.0 {
+        return 1.0;
+    }
+    let dist_pct = (dist / range).clamp(0.0, 1.0);
+    if dist_pct < start_pct {
+        1.0
+    } else {
+        let span = (1.0 - start_pct).max(1e-4);
+        let t = ((dist_pct - start_pct) / span).clamp(0.0, 1.0);
+        1.0 + (floor_mult - 1.0) * t
+    }
+}
+
+// =============================================================================
+// Pre-built casing resources (audit-2026-05-02 #43 cache)
+// =============================================================================
+
+/// Pre-built brass casing mesh + material, shared across all firing events.
+/// Eliminates per-shot `meshes.add()` + `materials.add()` allocations.
+#[derive(Resource)]
+pub struct CasingResources {
+    pub mesh: Handle<Mesh>,
+    pub material: Handle<StandardMaterial>,
+}
+
+/// Startup system: pre-build the brass casing mesh + material once.
+pub fn setup_casing_resources(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.insert_resource(CasingResources {
+        mesh: meshes.add(Cuboid::new(0.004, 0.004, 0.012)),
+        material: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.85, 0.70, 0.30),     // brass
+            emissive: LinearRgba::new(1.5, 1.0, 0.3, 1.0), // warm glint for bloom catch
+            metallic: 0.95,
+            perceptual_roughness: 0.2,
+            ..default()
+        }),
+    });
+}
+
+/// Fire cooldown tick
+pub fn weapon_cooldown_tick_system(
+    time: Res<Time>,
+    mut commands: Commands,
+    cd: Option<ResMut<WeaponFireCooldown>>,
+) {
+    let Some(mut cd) = cd else { return };
+    cd.timer.tick(time.delta());
+    if cd.timer.is_finished() {
+        commands.remove_resource::<WeaponFireCooldown>();
+    }
+}
+
+// =============================================================================
+// TODO: Systems requiring cross-module deps
+// =============================================================================
+// The following systems are commented out until their deps are ported:
+//
+// - weapon_switch_system   → needs MessageReader<MouseWheel>, InputBlockers, GameMode
+// - weapon_digit_switch_system → needs InputBlockers, GameMode
+// - weapon_fire_system     → needs FpsTuning, GameAssets, BotHealth, GoblinGuard,
+//                            FpsCamera, WeaponViewmodel, ReloadState, WeaponVfxEffects
+//                            TracerResources, GenomeRegistry, CameraMode, WeaponRecoilImpulse
+// - doom_projectile_system → needs BotHealth, GoblinGuard, FpsTuning
+// - stagger_detection_system / stagger_tick_system / glory_kill_system
+//                          → needs GoblinGuard, FpsTuning, PlayerHealth, LocalPlayer
+// - pickup_collection_system / pickup_spin_system
+//                          → needs PlayerHealth, PlayerArmor, HealthPickup, ArmorPickup, AmmoPickup
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn weapon_next_cycles_all_7() {
+        let mut w = WeaponType::ModernAR;
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..7 {
+            seen.insert(format!("{:?}", w));
+            w = w.next();
+        }
+        assert_eq!(seen.len(), 7);
+        assert_eq!(w, WeaponType::ModernAR); // full cycle
+    }
+
+    #[test]
+    fn weapon_next_in_set_arena_v1_cycles_full() {
+        let mut w = ARENA_V1_WEAPONS[0];
+        for _ in 0..ARENA_V1_WEAPONS.len() {
+            w = w.next_in_set(&ARENA_V1_WEAPONS);
+        }
+        assert_eq!(w, ARENA_V1_WEAPONS[0]); // back to start après len() itérations
+    }
+
+    #[test]
+    fn damage_falloff_no_falloff_before_start() {
+        // at 0% range → always 1.0
+        assert!((damage_falloff(0.0, 100.0, 0.5, 0.3) - 1.0).abs() < 1e-5);
+        // at 40% of range, start_pct=0.5 → still 1.0
+        assert!((damage_falloff(40.0, 100.0, 0.5, 0.3) - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn damage_falloff_floor_at_max_range() {
+        // at 100% range → floor_mult
+        let result = damage_falloff(100.0, 100.0, 0.5, 0.3);
+        assert!((result - 0.3).abs() < 1e-4);
+    }
+
+    #[test]
+    fn chainsaw_is_melee() {
+        assert!(WeaponType::Chainsaw.is_melee());
+        assert!(!WeaponType::ModernAR.is_melee());
+    }
+}

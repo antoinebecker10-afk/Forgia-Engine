@@ -1,0 +1,42 @@
+[package]
+name = "forgia-rpg"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Forgia V2 — Mode RPG OpenWorld : spawn world + NPCs + interactions. Phase 0."
+
+[lints]
+workspace = true
+
+[dependencies]
+web-time = { workspace = true }
+bevy = { workspace = true }
+bevy_rapier3d = { workspace = true }
+bevy_egui = { workspace = true }
+forgia-core = { workspace = true }
+forgia-assets = { workspace = true }
+forgia-input = { workspace = true }
+forgia-player = { workspace = true }
+forgia-combat = { workspace = true }
+forgia-damage = { workspace = true }
+forgia-terrain = { workspace = true }
+forgia-foliage = { workspace = true }
+forgia-audio = { workspace = true }
+forgia-rpg-data = { workspace = true }
+forgia-camera-orbit = { workspace = true }
+forgia-secondary-motion = { workspace = true }
+forgia-anim-debug = { workspace = true }
+forgia-anim-locomotion = { workspace = true }
+forgia-skeleton-template = { workspace = true }
+forgia-rig-topology = { workspace = true }
+forgia-auto-rig = { workspace = true }
+forgia-ik = { workspace = true }
+forgia-prefab = { workspace = true }
+forgia-village-loader = { workspace = true }
+forgia-genome-village = { workspace = true }
+# Story-578 — toolbox procédurale : génère un village RPG (build_city + routes) sur le terrain.
+forgia-worldgen = { workspace = true }
+forgia-streaming = { workspace = true }
+forgia-water = { workspace = true }
+noise = { workspace = true }
+leafwing-input-manager = { workspace = true }

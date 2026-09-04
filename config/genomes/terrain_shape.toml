@@ -1,0 +1,66 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# terrain_shape.toml — Forgia V2 — FORME du relief RPG (genome data-driven)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Tune la forme du terrain SANS REBUILD. Édite ce fichier puis :
+#   - Increment 1 (actuel) : ressors au menu et re-entre en RPG → terrain régénéré.
+#   - Increment 2 (à venir) : Shift+F12 régénère en live.
+#
+# Consommé par forgia-rpg::make_terrain_config → forgia_terrain::heightmap_at
+# (toutes les surfaces re-samplent : chunks, LOD2, leveling village, spawn, foliage).
+# sea_level reste piloté par la const RPG (couplé à l'eau) — pas ici.
+
+schema_version = 1
+
+# Hauteur max du relief (m). sea_level RPG = 4. Amplitude = max_height - 4.
+#   80  = dramatique rolling (défaut actuel, pics ~60-80m, vallées-lacs).
+#   50  = collines douces.    120-180 = montagnes (pentes plus raides, re-tester KCC).
+max_height = 80.0
+
+# Largeur (m) du fade de bord du monde vers sea_level (anneau extérieur uniquement,
+# n'affecte pas la zone jouable centrale). Monter = bords plus doux.
+edge_falloff_m = 80.0
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Domain warping (IQ) — terrain NATUREL vs blobs Perlin alignés grille.
+# ──────────────────────────────────────────────────────────────────────────────
+# Déplace les coords d'échantillonnage avec un bruit basse-fréquence → vallées
+# tortueuses + crêtes organiques. Gros gain de naturel pour 2 samples/vertex.
+#   warp_strength : amplitude (m) du déplacement. 0 = OFF (Perlin brut, blobs).
+#     ~40 = naturel équilibré. ~80 = très sinueux. >120 = chaotique.
+#   warp_freq : 0.006 = grandes sinuosités. ↑ = détail plus tortueux.
+warp_strength = 40.0
+warp_freq = 0.006
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Octaves Perlin (freq, amp) — empilées pour former le relief.
+# ──────────────────────────────────────────────────────────────────────────────
+# Retune 2026-06-06 : amplitudes hautes-fréquences réduites → pentes ~40°
+# (traversable, sous le KCC max_slope 50°) + collines rolling lisses.
+#
+# Tuning :
+#   - freq BASSE (0.003) = grande forme (collines larges). Baisser → collines + larges.
+#   - amp = contribution en hauteur. La 1ère (1.0) domine la forme.
+#   - Hautes fréquences (0.025/0.060) = détail/rugosité. Monter leur amp = + jagged
+#     (et + raide → risque blocage KCC). Baisser = + lisse.
+# Tu peux ajouter/retirer des octaves librement (le nombre est libre).
+#   - ridged = true sur une octave → crêtes ACÉRÉES (montagnes) au lieu de
+#     collines douces. Idéal sur une octave moyenne (0.008-0.025). Mixe une
+#     base smooth + 1 octave ridged = chaînes de montagnes sur fond rolling.
+
+[[octaves]]
+freq = 0.003   # base — grande forme du monde (NE PAS trop monter la freq)
+amp  = 1.0
+
+[[octaves]]
+freq = 0.008   # ondulation secondaire
+amp  = 0.40
+# ridged = true   # ← décommente pour transformer cette octave en chaîne de montagnes
+
+[[octaves]]
+freq = 0.025   # détail moyen
+amp  = 0.08
+
+[[octaves]]
+freq = 0.060   # rugosité fine (texture)
+amp  = 0.025

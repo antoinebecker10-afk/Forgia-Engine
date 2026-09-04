@@ -1,0 +1,179 @@
+id = "arena_bot"
+name = "Arena Bot"
+domain = "Creature"
+category = "Creature"
+description = "Hitscan bot IA V1 pour l'arène FPS — FSM 4 états (Roam/Chase/Shoot/Flee)"
+version = "1.0.0"
+
+# === Spawn ===
+
+[[genes]]
+id = "arena_bot_count"
+label = "Bot Count"
+chromosome = "Spawn"
+target = "Value"
+min = 0.0
+max = 8.0
+default = 4.0
+layer = "arena_bot"
+
+# === Combat ===
+
+[[genes]]
+id = "arena_bot_max_hp"
+label = "Max HP"
+chromosome = "Combat"
+target = "Value"
+min = 10.0
+max = 200.0
+default = 50.0
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_hitscan_damage"
+label = "Hitscan Damage"
+chromosome = "Combat"
+target = "Value"
+min = 1.0
+max = 50.0
+default = 8.0
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_fire_rate_hz"
+label = "Fire Rate (Hz)"
+chromosome = "Combat"
+target = "Value"
+min = 0.1
+max = 5.0
+default = 0.7
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_accuracy_jitter_deg"
+label = "Accuracy Jitter (deg)"
+chromosome = "Combat"
+target = "Value"
+min = 0.0
+max = 20.0
+default = 3.0
+layer = "arena_bot"
+
+# === Senses ===
+
+[[genes]]
+id = "arena_bot_vision_range_m"
+label = "Vision Range (m)"
+chromosome = "Senses"
+target = "Value"
+min = 5.0
+max = 80.0
+default = 35.0
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_fov_deg"
+label = "FOV (deg)"
+chromosome = "Senses"
+target = "Value"
+min = 45.0
+max = 360.0
+default = 110.0
+layer = "arena_bot"
+
+# === Movement ===
+
+[[genes]]
+id = "arena_bot_chase_speed_mps"
+label = "Chase Speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 1.0
+max = 15.0
+default = 4.0
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_roam_speed_mps"
+label = "Roam Speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 0.5
+max = 8.0
+default = 2.0
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_flee_speed_mps"
+label = "Flee Speed (m/s)"
+chromosome = "Movement"
+target = "Value"
+min = 1.0
+max = 15.0
+default = 5.5
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_roam_radius_m"
+label = "Roam Radius (m)"
+chromosome = "Movement"
+target = "Value"
+min = 5.0
+max = 80.0
+default = 30.0
+layer = "arena_bot"
+
+# === FSM ===
+
+[[genes]]
+id = "arena_bot_flee_hp_pct"
+label = "Flee HP Threshold (pct)"
+chromosome = "FSM"
+target = "Value"
+min = 0.0
+max = 0.9
+default = 0.25
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_state_min_duration_s"
+label = "State Min Duration (s)"
+chromosome = "FSM"
+target = "Value"
+min = 0.0
+max = 5.0
+default = 0.5
+layer = "arena_bot"
+
+# === Navigation (story-423 Phase B) ===
+
+[[genes]]
+id = "arena_bot_nav_agent_radius"
+label = "Nav Agent Radius (m)"
+chromosome = "Movement"
+target = "Value"
+min = 0.1
+max = 2.0
+default = 0.4
+layer = "arena_bot"
+
+[[genes]]
+id = "arena_bot_nav_max_speed_mult"
+label = "Nav Max Speed Multiplier"
+chromosome = "Movement"
+target = "Value"
+min = 1.0
+max = 3.0
+default = 1.5
+layer = "arena_bot"
+
+# === Respawn (story-433) ===
+[[genes]]
+id = "arena_bot_respawn_cooldown_s"
+label = "Respawn Cooldown (s)"
+chromosome = "Spawn"
+target = "Value"
+min = 0.0
+max = 30.0
+default = 3.0
+layer = "arena_bot"

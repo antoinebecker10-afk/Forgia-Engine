@@ -1,0 +1,36 @@
+{
+  "name": "expedition_animation_audit",
+  "workflow": "expedition_animation_audit",
+  "boot_mode": "expedition",
+  "ready_timeout_s": 90,
+  "action_timeout_s": 12,
+  "sample_after_s": 0.35,
+  "settle_between_actions_s": 0.35,
+  "transition_timeout_ms": 900,
+  "maximum_transition_ms": 500,
+  "assertions": {
+    "game_mode": "Expedition",
+    "run_state_prefix": "None"
+  },
+  "animation_steps": [
+    {"action": "move_forward", "frames": 600, "sample_after_s": 0.08, "expected_state": "Marche", "expected_clip": "Marche"},
+    {"action": "diagonal_forward_right", "frames": 600, "sample_after_s": 0.08, "expected_state": "Marche", "expected_clip": "Marche"},
+    {"action": "sprint_forward", "frames": 600, "sample_after_s": 0.08, "expected_state": "Course", "expected_clip": "Course"},
+    {"action": "sprint_turn_right", "frames": 600, "sample_after_s": 0.08, "expected_state": "Course", "expected_clip": "Course"},
+    {"action": "sprint_jump", "frames": 600, "sample_after_s": 0.08, "expected_state": "Saut", "expected_clip": "Saut"},
+    {"action": "crouch", "frames": 600, "sample_after_s": 0.08, "expected_state": "AccroupiIdle", "expected_clip": "AccroupiIdle"},
+    {"action": "crouch_forward", "frames": 600, "sample_after_s": 0.08, "expected_state": "AccroupiMarche", "expected_clip": "AccroupiMarche"},
+    {"action": "crouch_backward", "frames": 600, "sample_after_s": 0.08, "expected_state": "AccroupiArriere", "expected_clip": "AccroupiArriere"},
+    {"action": "move_backward", "frames": 600, "sample_after_s": 0.08, "expected_state": "MarcheArriere", "expected_clip": "MarcheArriere"},
+    {"action": "strafe_right", "frames": 600, "sample_after_s": 0.08, "expected_state": "PasDeCote", "expected_clip": "PasDeCote"},
+    {"action": "jump", "frames": 600, "sample_after_s": 0.08, "expected_state": "Saut", "expected_clip": "Saut"},
+    {"action": "slide", "frames": 600, "sample_after_s": 0.08, "expected_state": "Glissade", "expected_clip": "Glissade"},
+    {"action": "turn_right", "frames": 600, "sample_after_s": 0.08, "expected_state": "Virage", "expected_clip": "Virage"},
+    {"action": "fire", "frames": 600, "sample_after_s": 0.08, "expected_state": "Tir", "expected_clip": "Tir"}
+  ],
+  "evidence_sensors": [
+    "forgia2_animation.json",
+    "forgia2_expedition_posture.json",
+    "forgia2_expedition_aim.json"
+  ]
+}

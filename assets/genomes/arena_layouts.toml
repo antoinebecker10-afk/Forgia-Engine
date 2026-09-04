@@ -1,0 +1,381 @@
+# Authored arena layouts — Tier 1 (story-625). Modèle Returnal hybride.
+#
+# Chaque [layouts.<stage_id>] compose une arène depuis des GLB atomiques
+# (kit Inferno / KayKit déjà présents), placés À LA MAIN (data-driven, 0 hardcode
+# Rust). stage_id matche `roguelite_stages.toml`. Cible art-direction :
+# `docs/lore/locations/crypts_of_anvil.md`.
+#
+# Consommé par `forgia-stage::spawn_stage_arena_on_request` via AssetServer.
+# IMPORTANT : les pièces sont spawnées au CHARGEMENT du stage (pas live) — éditer
+# ce fichier demande de RE-ENTRER dans l'arène pour voir le changement.
+#
+# Schema d'une pièce :
+#   prefab/pos/rot_deg/scale/role/walkable/blocker/section (cf authored.rs)
+#
+# ⚠️ FOOTPRINTS RÉELS MESURÉS (AABB GLB, scratchpad/measure_glb_aabb.py) — espacer
+# avec dist(A,B) > footprint_r(A)+footprint_r(B) sinon z-fighting / chevauchement :
+#   CirclePlatformSmall_001 : 19m large, top 3.67m, r=9.6
+#   Brazier_002 r=1.0 (top 2.7) · Brazier_004 r=1.3 (plat)
+#   ColumnBigBroken_001 r=2.3 (h4.6) · ColumnBigBroken_002 r=1.2 (h3.7)
+#   Vase_001 r=0.67 · Vase_002 r=0.56
+#   TowerBig_001 : 15m large, 47m haut, r=7.5
+#   StairsMiddle_001 : 10x12m, h5.5, r=6.2
+#   StatueKnight_002 : 21m large, 37m haut, r=10.8
+#   PedestalBig_001 : 21m large, h6, r=10.7
+#   (RockBig_001/003 = blocs 25-35m → RETIRÉS Tier 1, inadaptés comme cover ;
+#    Tier 2 : sourcer de vrais petits rochers de cover.)
+#
+# NOTE : seuls les stages listés ici ont une coquille authored. crypts_of_anvil
+# (story-625) + forge_sanctum « Le Bourg de l'Enclume » (story-660).
+
+[layouts.crypts_of_anvil]
+# Story-682 — OÙ LE JOUEUR APPARAÎT. Défaut trouvé par le test de dégagement,
+# PAS en jeu : un tertre (`Mound_005`, r=2,7 m) est à 1 m de l'origine, où le
+# joueur apparaissait. Même cause que le puits de forge_sanctum, une carte plus
+# loin — c'est pour ça que le correctif est un test et pas un déplacement.
+#
+# (0, 0, 6) : juste au sud de la fosse de mêlée, on la regarde sans y être. Le
+# bloqueur le plus proche est le tertre à 7 m (il en faut 4,5).
+player_spawn = [0.0, 0.0, 6.0]
+suppress_procedural_modules = true
+
+# ── La fosse à mêlée (centrale) ───────────────────────────────────────────────
+# Plateforme ronde 19m, surface à 3.67m. role melee_pit → AnchorKind MeleePit +
+# nom Module_melee_pit_authored : la porte du boss s'y pose (boss_portal raycaste
+# la surface, exige > 0.5m → OK à 3.67m). scale 1.0 = valeur prouvée (le procédural
+# l'utilisait ainsi). Ne PAS remonter le scale (à 2.0 la porte se pose à ~7m en l'air).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/CirclePlatformSmall_001.glb"
+pos = [0.0, 0.0, -16.0]
+scale = 1.0
+role = "melee_pit"
+section = "fosse_melee"
+
+# Braseros AU SOL, à côté de la plateforme (r9.6) — pas dessus (sinon enfoncés
+# sous la surface à 3.67m). dist au centre platform ~14m > 9.6+1.3.
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Brazier_002.glb"
+pos = [13.0, 0.0, -22.0]
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Brazier_004.glb"
+pos = [-13.0, 0.0, -22.0]
+section = "fosse_melee"
+
+# ── La cour des forges éteintes (colonnes brisées, cover haut) ────────────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/ColumnBigBroken_001.glb"
+pos = [26.0, 0.0, 2.0]
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/ColumnBigBroken_002.glb"
+pos = [-26.0, 0.0, 2.0]
+rot_deg = 20.0
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Vase_001.glb"
+pos = [16.0, 0.0, -32.0]
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Vase_002.glb"
+pos = [-16.0, 0.0, -32.0]
+section = "cour_forges"
+
+# ── Le perchoir du contremaître (bord, grande tour + escalier d'accès) ───────
+# Tour 15m large / 47m haut. dist tour↔escalier ~16m > 7.5+6.2 (pas de z-fight).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/TowerBig_001.glb"
+pos = [-52.0, 0.0, 40.0]
+rot_deg = 90.0
+role = "sniper_perch"
+walkable = true
+section = "perchoir"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/StairsMiddle_001.glb"
+pos = [-39.0, 0.0, 31.0]
+rot_deg = 90.0
+walkable = true
+section = "perchoir"
+
+# ── L'entrée (landmarks, à l'arrière de l'arène) ─────────────────────────────
+# Statue 21m large/37m haut + piédestal 21m large : très espacés (dist 48m).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/StatueKnight_002.glb"
+pos = [24.0, 0.0, 52.0]
+rot_deg = 180.0
+role = "landmark"
+section = "entree"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/PedestalBig_001.glb"
+pos = [-24.0, 0.0, 52.0]
+section = "entree"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COVER DENSE — identité crypts (story-625, bible §"cover dense" + "cages
+# renversées en cover bas"). Footprints RÉELS mesurés (measure_glb_aabb.py),
+# espacement validé pairwise (validate_cover_spacing.py : 0 chevauchement / 24).
+#   Mound_005/008 : r1.95, top 0.5-0.7m  → cover BAS (s'accroupir derrière)
+#   Box_001       : r0.79, top 1.35m     → caisse, cover taille
+#   RockMid_001   : r6.34, top 6.28m     → cover HAUT
+#   RockMid_003   : r4.86, top 8.37m     → cover haut
+#   Crag_001      : r5.09, top 7.74m     → cover haut
+# `blocker = true` → collider TriMesh (lib.rs:1026) : le cover BLOQUE réellement.
+# Props narratifs (Chest/Well/Gold) = decor non-bloquant ("foutoir d'âmes").
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Cover bas en anneau autour de la fosse à mêlée (plateforme r9.6) ──────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Mound_005.glb"
+pos = [14.0, 0.0, -8.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Mound_008.glb"
+pos = [-14.0, 0.0, -8.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [7.0, 0.0, -3.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [-7.0, 0.0, -3.0]
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Mound_005.glb"
+pos = [0.0, 0.0, -1.0]
+rot_deg = 35.0
+role = "cover_low"
+blocker = true
+section = "fosse_melee"
+
+# ── Champ de cover haut dans la cour des forges (sight-lines cassées) ─────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/RockMid_001.glb"
+pos = [13.0, 0.0, 9.0]
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/RockMid_003.glb"
+pos = [-13.0, 0.0, 9.0]
+rot_deg = 45.0
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Crag_001.glb"
+pos = [0.0, 0.0, 20.0]
+role = "cover_high"
+blocker = true
+section = "cour_forges"
+
+# Caisses sur les flancs (cover bas latéral).
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [19.0, 0.0, -3.0]
+rot_deg = 25.0
+role = "cover_low"
+blocker = true
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/Box_001.glb"
+pos = [-19.0, 0.0, -3.0]
+rot_deg = -15.0
+role = "cover_low"
+blocker = true
+section = "cour_forges"
+
+# ── Props narratifs (le foutoir d'âmes — decor non-bloquant) ─────────────────
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/ChestBig_001.glb"
+pos = [21.0, 0.0, 15.0]
+rot_deg = 200.0
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/WellSmall_001.glb"
+pos = [-21.0, 0.0, 16.0]
+section = "cour_forges"
+
+[[layouts.crypts_of_anvil.pieces]]
+prefab = "models/environment/inferno/GoldPileSmall_001.glb"
+pos = [5.0, 0.0, 1.0]
+section = "fosse_melee"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LE BOURG DE L'ENCLUME — forge_sanctum authored (story-660, 2026-07-02).
+# DA : place de village-forge DIURNE (kit medieval_hexagon + rochers nature) —
+# température CHAUDE/claire vs Cryptes sombres roses → différenciation instantanée.
+# Règles appliquées (recherche level-art 2026-07-02, rapport gunfire-like) :
+#   · 1 focal point « weenie » : le BEFFROI (église ×10, 16.5m, visible partout)
+#   · 70/30 : 3 clusters denses (marché SE / taverne W / ruelle NE) + lanes ouvertes
+#   · centre = puits (landmark bas, combat rapproché autour)
+#   · perchoir accessible en 2 marches de rochers (walkable)
+# ⚠️ AABB MESURÉS (scratchpad/aabb.py) — kit medieval = MINIATURES table-top :
+#   church 1.03x1.65x1.16 (×10 → r~7.5) · tavern 1.17x1.40x1.33 (×9 → r~5.6)
+#   market 1.80x0.98x1.32 (×7 → r~5.5) · home_A 0.79x0.93x0.85 (×8 → r~3.3)
+#   home_B 0.87x1.28x1.10 (×8 → r~3.9) · well 0.65x0.83x0.75 (×5 → r~1.8)
+#   rock_medium_1 3.23x2.26x2.99 (r~1.6/scale) · rock_medium_2 3.05x1.90x2.48
+# Arène extent 80m (rayon 40) — pièce la plus lointaine : beffroi z-28+r7.5 = 35.5 ✓
+
+[layouts.forge_sanctum]
+suppress_procedural_modules = true
+# Story-682 — OÙ LE JOUEUR APPARAÎT.
+#
+# Rapporté en jeu : « je spawn dans le puits, donc je suis bloqué ». Le puits est
+# à [0,0,0] avec `blocker = true` — c'est VOULU (« centre = puits, combat
+# rapproché autour ») — mais l'apparition du joueur était en dur à l'origine
+# pour tous les stages. Deux décisions autorées sur la même coordonnée, aucune
+# ne connaissant l'autre.
+#
+# (0, 0, 12) : plein sud du puits, dos à la place. Le premier regard cadre le
+# puits à 12 m puis le beffroi 40 m derrière — le « weenie » de la carte. Le
+# blocker le plus proche après le puits est un rocher à 12,2 m.
+player_spawn = [0.0, 0.0, 12.0]
+
+# ── Le beffroi (focal point nord — visible de partout) ───────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_church_red.gltf"
+pos = [0.0, 0.0, -28.0]
+rot_deg = 180.0
+scale = 10.0
+role = "landmark"
+blocker = true
+section = "beffroi"
+
+# ── La place du puits (centre — mêlée autour du puits) ───────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_well_red.gltf"
+pos = [0.0, 0.0, 0.0]
+scale = 5.0
+role = "melee_pit"
+blocker = true
+section = "place_du_puits"
+
+# ── Le marché (cluster SE — étals + couverts bas) ────────────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_market_red.gltf"
+pos = [18.0, 0.0, 14.0]
+rot_deg = -30.0
+scale = 7.0
+role = "cover_high"
+blocker = true
+section = "marche"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [10.0, 0.0, 20.0]
+rot_deg = 70.0
+scale = 1.4
+role = "cover_low"
+blocker = true
+section = "marche"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_2.gltf"
+pos = [26.0, 0.0, 8.0]
+rot_deg = 160.0
+scale = 1.5
+role = "cover_low"
+blocker = true
+section = "marche"
+
+# ── La taverne (cluster ouest — gros bloc + cover) ───────────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_tavern_red.gltf"
+pos = [-22.0, 0.0, 6.0]
+rot_deg = 45.0
+scale = 9.0
+role = "cover_high"
+blocker = true
+section = "taverne"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_2.gltf"
+pos = [-12.0, 0.0, 14.0]
+rot_deg = 20.0
+scale = 1.3
+role = "cover_low"
+blocker = true
+section = "taverne"
+
+# ── La ruelle (cluster NE — 2 maisons serrées = couloir de flanc) ────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_home_A_red.gltf"
+pos = [16.0, 0.0, -18.0]
+rot_deg = 15.0
+scale = 8.0
+role = "cover_high"
+blocker = true
+section = "ruelle"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models/kaykit/medieval_hexagon/buildings/red/building_home_B_red.gltf"
+pos = [26.0, 0.0, -9.0]
+rot_deg = -20.0
+scale = 8.0
+role = "cover_high"
+blocker = true
+section = "ruelle"
+
+# ── Le perchoir (SW — 2 rochers en marches, sommet ~4.3m walkable) ───────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [-13.0, 0.0, -19.0]
+rot_deg = 110.0
+scale = 1.5
+walkable = true
+section = "perchoir"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [-18.0, 0.0, -23.0]
+rot_deg = 250.0
+scale = 2.5
+role = "sniper_perch"
+walkable = true
+section = "perchoir"
+
+# ── Couverts épars dans les lanes ouvertes (busy vs open) ────────────────────
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_1.gltf"
+pos = [-4.0, 0.0, 24.0]
+rot_deg = 200.0
+scale = 1.4
+role = "cover_low"
+blocker = true
+section = "lanes"
+
+[[layouts.forge_sanctum.pieces]]
+prefab = "models-v1/nature/rock_medium_2.gltf"
+pos = [8.0, 0.0, -10.0]
+rot_deg = 320.0
+scale = 1.3
+role = "cover_low"
+blocker = true
+section = "lanes"

@@ -1,0 +1,28 @@
+# Le vent du Vallon — couche definition.
+#
+# Ce fichier ne regle QUE le mouvement. Le MASQUE de raideur, lui, est cuit par
+# `tools/blender/expedition/14_ancrage.py` dans l'alpha de COLOR_0 : c'est lui
+# qui dit quel sommet bouge, et de combien relativement aux autres.
+#
+# Ces cinq nombres se reglent a l'oeil, en jeu, et ils l'assument : aucune
+# mesure ne derive l'amplitude credible d'une bourrasque.
+
+# Debattement de la pointe la plus souple, en metres.
+# 0,18 : une touffe de 40 cm qui bat de 18 cm se lit comme du vent ; au-dela
+# elle a l'air d'etre frappee.
+amplitude_m = 0.18
+
+# Cap du vent, en degres. Il descend le vallon d'ouest en est, comme le joueur.
+cap_deg = 35.0
+
+# Periode de la rafale (le mouvement d'ensemble), en secondes.
+rafale_s = 4.5
+
+# Periode du frisson (le detail), en secondes. Une seule frequence donne un
+# balancier de metronome ; c'est la superposition des deux qui fait du vent.
+frisson_s = 1.3
+
+# Longueur d'onde SPATIALE, en metres. C'est elle qui empeche toute la prairie
+# de battre a l'unisson : sans decalage spatial, mille touffes pulsent comme un
+# seul organisme.
+houle_m = 14.0

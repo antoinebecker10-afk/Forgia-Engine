@@ -1,0 +1,97 @@
+id = "dungeon_default"
+name = "Dungeon BSP"
+domain = "Building"
+category = "Building"
+description = "BSP dungeon generation: cell size, corridors, recursion, decorations"
+version = "1.0.0"
+
+[[genes]]
+id = "map_width"
+label = "Map Width"
+chromosome = "Layout"
+target = "Value"
+min = 60.0
+max = 200.0
+default = 120.0
+layer = "structure"
+
+[[genes]]
+id = "map_depth"
+label = "Map Depth"
+chromosome = "Layout"
+target = "Value"
+min = 40.0
+max = 150.0
+default = 90.0
+layer = "structure"
+
+[[genes]]
+id = "max_depth"
+label = "BSP Depth"
+chromosome = "Layout"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 5.0
+layer = "structure"
+
+[[genes]]
+id = "min_partition"
+label = "Min Partition"
+chromosome = "Layout"
+target = "Value"
+min = 10.0
+max = 30.0
+default = 18.0
+layer = "structure"
+
+[[genes]]
+id = "corridor_width"
+label = "Corridor Width"
+chromosome = "Corridors"
+target = "Value"
+min = 2.0
+max = 8.0
+default = 4.0
+layer = "structure"
+
+[[genes]]
+id = "room_pad"
+label = "Room Padding"
+chromosome = "Rooms"
+target = "Value"
+min = 1.0
+max = 6.0
+default = 3.0
+layer = "structure"
+
+[[genes]]
+id = "fire_chance"
+label = "Torch Density"
+chromosome = "Decoration"
+target = "Value"
+min = 0.0
+max = 1.0
+default = 0.25
+layer = "decoration"
+
+[[genes]]
+id = "global_scale"
+label = "Global Scale"
+chromosome = "Layout"
+target = "Value"
+min = 1.0
+max = 4.0
+default = 2.0
+layer = "structure"
+
+# Constraints
+[[constraints]]
+source = "map_width"
+target = "map_depth"
+ratio = 0.75
+
+[[constraints]]
+source = "max_depth"
+target = "min_partition"
+ratio = -0.5
