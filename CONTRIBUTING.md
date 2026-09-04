@@ -206,5 +206,6 @@ La liste vit dans `CLAUDE.md`, section « Anti-traps ». Les plus coûteux :
 ## Licence des contributions
 
 Sauf mention contraire explicite, toute contribution soumise pour inclusion dans Forgia
-est réputée l'être sous la double licence du projet (MIT ou Apache-2.0), sans condition
-supplémentaire.
+est réputée l'être sous la licence MIT du projet, sans condition supplémentaire. Une
+dépendance nouvelle doit passer `cargo deny check licenses` : la liste des licences
+admises est dans `deny.toml`.

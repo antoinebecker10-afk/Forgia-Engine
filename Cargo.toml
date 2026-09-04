@@ -74,7 +74,7 @@ members = [
 ]
 
 [workspace.package]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 # Lints workspace — inherited by each crate via [lints] workspace = true
 # Stricter than V1 from day 1 : 0 dead_code tolerated, 0 hardcode in gameplay paths.
@@ -227,7 +227,7 @@ name = "forgia"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
-description = "Forgia V2 — YouTube of gaming. Play / Build / Edit funnel."
+description = "Forgia, moteur de jeu 3D IA-natif sur Bevy : génomes TOML bornés, capteurs, gates mécaniques."
 
 [lints]
 workspace = true

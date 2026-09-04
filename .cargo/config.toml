@@ -43,7 +43,7 @@ forgia-memory = "run -p forgia --profile release-fast --features profile-tracy-m
 # `bevy-brp` peut alors interroger le monde vivant sans toucher aux builds joueur.
 forgia-brp = "run -p forgia --features dev-brp --"
 # Audit local rapide et sans compilation du code du jeu.
-forgia-supply-chain = "deny check advisories bans sources"
+forgia-supply-chain = "deny check advisories bans sources licenses"
 
 # Bevy + wgpu + Tracy peuvent épuiser la RAM/pagefile si rustc compile les 20+
 # crates lourdes en parallèle. Deux jobs gardent le build reproductible sur la

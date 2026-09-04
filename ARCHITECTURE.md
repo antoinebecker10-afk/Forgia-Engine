@@ -5,11 +5,13 @@
 > gate échoue). Réécrit intégralement le 2026-06-10 (story-593) après l'audit complet —
 > la version précédente décrivait 258 crates pour 62 réelles.
 >
-> **Dernière révision** : 2026-06-10.
+> **Dernière révision** : 2026-06-10. Les compteurs de lignes et la colonne « Wired »
+> datent de cette révision ; le câblage mesuré au 2026-09-04, les crates orphelines et
+> les défauts connus sont dans [docs/ETAT.md](docs/ETAT.md).
 
 ## 1. Vue d'ensemble
 
-Workspace Rust de **62 crates + xtask**, binaire canonique = package racine `forgia`
+Workspace Rust de **68 crates + xtask**, binaire canonique = package racine `forgia`
 (`src/main.rs`, pattern root-binary Renzora) qui appelle `forgia_game::run_game()`.
 `forgia-game` est une **lib** d'assemblage (~135 LOC) : elle câble tous les plugins.
 
@@ -40,7 +42,7 @@ Définie dans `crates/forgia-core/src/lib.rs` (module `system_set` inline — il
 PAS de fichier system_set.rs). Dérive connue (audit 2026-06-10) : la chaîne player de
 `forgia-player` est hors GameSet — fix prévu M2 (roadmap B4).
 
-## 3. Les 62 crates réelles (gardé par arch-drift)
+## 3. Les 68 crates réelles (gardé par arch-drift)
 
 > LOC mesurées le 2026-06-10. Wired : ✅ = add_plugins direct dans forgia-game,
 > ✦ = consommée transitivement (lib), 🔧 = outil dev/CLI (pas dans le binaire jeu),

@@ -30,3 +30,27 @@ unused = "warn"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+[licenses]
+# Le moteur est sous MIT : ses dépendances doivent rester permissives. Une licence
+# à choix (« A OR B ») passe dès qu'une option figure ici ; une licence composée
+# (« A AND B ») exige toutes ses parties. Inventaire : docs/licences/README.md.
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "Zlib",
+    "BSL-1.0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "CC0-1.0",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+]
+confidence-threshold = 0.8

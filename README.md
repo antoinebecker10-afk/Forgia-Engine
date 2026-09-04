@@ -95,6 +95,8 @@ décrite dans [`docs/stories/README.md`](docs/stories/README.md).
   Les packs utilisés en développement sont des packs CC0 ou commerciaux ;
   `assets/packs.toml` décrit le mécanisme d'installation des packs CC0 par manifeste et
   empreinte SHA-256. Seules les polices, sous SIL Open Font License, sont incluses.
+  Quatre fichiers de données décrivant la scène d'un lot commercial ont également été
+  retirés : le détail est dans [docs/licences/README.md](docs/licences/README.md) §6.
 - **Le jeu qui a servi de client interne.** Son design, son contenu et ses stories de
   travail ne font pas partie de cette publication. Les crates de mode
   (`forgia-mode-roguelite`, `forgia-mode-expedition`, `forgia-mode-fps-arena`) restent
@@ -104,6 +106,19 @@ décrite dans [`docs/stories/README.md`](docs/stories/README.md).
 
 Conséquence : le workspace compile et les tests se lancent par crate, mais lancer le
 binaire `forgia` sans assets n'ouvre pas un jeu jouable.
+
+---
+
+## État du moteur
+
+Le moteur est publié tel quel, avec ses défauts nommés. Le socle (génomes, capteurs,
+gates, PCG, auto-rig, terrain SDF) compile et se teste ; les modes de jeu ont servi de
+client interne et ne sont plus développés activement. Ce qui est vérifié, ce qui est
+partiel et ce qui est cassé, mesuré le 4 septembre 2026, est dans
+[docs/ETAT.md](docs/ETAT.md) : c'est le document à lire avant de bâtir dessus.
+
+Le système de génome, réutilisable seul dans un autre projet Bevy, a son propre
+document : [GENOME.md](GENOME.md).
 
 ---
 
@@ -160,8 +175,11 @@ cargo run --profile release-fast
 
 | Document | Rôle |
 | --- | --- |
+| [docs/ETAT.md](docs/ETAT.md) | **L'état du moteur** : vérifié, partiel, cassé, mesuré le 2026-09-04 |
+| [GENOME.md](GENOME.md) | **Le système de génome**, spécifié pour être réutilisé seul |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Les crates réelles, l'assemblage, la chaîne `GameSet`, les capteurs |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, conventions, workflow |
+| [docs/licences/README.md](docs/licences/README.md) | Licences des dépendances et provenance des données embarquées |
 | [CLAUDE.md](CLAUDE.md) | Le contrat qui régit le travail des agents IA sur ce dépôt |
 | [docs/adr/](docs/adr/) | Décisions structurantes |
 | [docs/explainer-genome-system.md](docs/explainer-genome-system.md) | La couche de données, expliquée |
@@ -180,12 +198,11 @@ valeur de gameplay en dur, un capteur par feature) sont dans
 
 ## Licence
 
-Forgia est distribué sous double licence, au choix du destinataire :
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
+Forgia est distribué sous licence MIT ([LICENSE](LICENSE)). Toutes les dépendances du
+`Cargo.lock` sont sous licence permissive et `cargo deny check licenses` refuse toute
+dérive ; l'inventaire complet, les cas particuliers et la provenance des données
+embarquées sont dans [docs/licences/README.md](docs/licences/README.md).
 
 Les polices de `assets/fonts/` sont sous SIL Open Font License 1.1 (fichiers `OFL-*.txt`
 à côté d'elles). Sauf mention contraire explicite, toute contribution soumise pour
-inclusion dans Forgia est réputée l'être sous cette double licence, sans condition
-supplémentaire.
+inclusion dans Forgia est réputée l'être sous licence MIT, sans condition supplémentaire.
