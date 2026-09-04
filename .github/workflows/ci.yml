@@ -143,6 +143,19 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
+  # Forgia est sous MIT : une dépendance sous licence non permissive rendrait la
+  # distribution du binaire illégale, et rien dans un build ne le signalerait.
+  # La liste blanche vit dans deny.toml ; l'inventaire dans docs/licences/.
+  # `advisories` couvre en même temps les vulnérabilités connues du Cargo.lock.
+  licences:
+    name: Licences et vulnérabilités des dépendances
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses advisories sources
+
   ratchets:
     name: Ratchets (gates xtask)
     runs-on: ubuntu-latest

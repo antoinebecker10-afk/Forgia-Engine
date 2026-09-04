@@ -20,6 +20,7 @@ est resté à l'état d'échafaudage. Le tri ci-dessous ne cache ni l'un ni l'au
 | **Ce qui est gardé** | 4 gates verts sur 8 (voir §4) |
 | **Ce qui est rouge en CI** | le job `fmt` (**227** écarts) et le job `ratchets` (**4** gates) |
 | **Sûreté mémoire** | **0** bloc `unsafe` dans tout le workspace |
+| **Chaîne d'approvisionnement** | `cargo deny check licenses advisories sources` : **ok** sur les trois volets, 782 dépendances |
 | **Dette déclarée** | 29 `allow(dead_code)`, 84 marqueurs `TODO`/`FIXME` |
 | **Plateforme** | Windows 10+ visé ; CI sur Ubuntu ; portage wasm/WebGPU validé en local seulement |
 | **Réseau** | **aucun**. Pas une ligne, pas une dépendance |
@@ -54,10 +55,14 @@ testées, câblées, et leurs contrats sont documentés dans le code.
 ## 3. Ce qui a été relancé pour ce document
 
 ```bash
-rustup run stable cargo check --workspace --all-targets   # 0 erreur, 0 warning, 5 min 04
-rustup run stable cargo test -p <crate>                   # par crate, voir tableau
-rustup run stable cargo deny check licenses               # ok
+rustup run stable cargo check --workspace --all-targets       # 0 erreur, 0 warning
+rustup run stable cargo test -p <crate>                       # par crate, voir tableau
+rustup run stable cargo deny check licenses advisories sources # ok sur les 3 volets
 ```
+
+Deux vulnérabilités connues ont été corrigées avant publication, par mise à jour du
+verrou : `rtrb` 0.3.5 et `webbrowser` 1.2.4. Le détail est dans
+[docs/licences/README.md](licences/README.md) §2.
 
 | Crate | Tests | Verdict |
 | --- | --- | --- |
@@ -135,7 +140,7 @@ Sept crates n'ont **aucun test** : `forgia-crosshair`, `forgia-juice-screen-flas
 | --- | --- |
 | **Double `Health`** | `forgia-combat` porte la santé des ennemis, `forgia-damage` celle du joueur. Deux types pour un concept : toute logique transverse doit gérer les deux |
 | **Contrôleur joueur hors `GameSet`** | La chaîne de `forgia-player` échappe à l'ordonnancement canonique (Lock L7). L'ordre relatif à la physique n'est donc pas garanti par la structure |
-| **Trois chemins de chargement des génomes** | Voir [GENOME.md](../GENOME.md) §4. Un seul recharge à chaud ; le dossier `config/` n'est même pas validé |
+| **Trois chemins de chargement des génomes** | Voir [GENOME.md](../GENOME.md) §4. Un seul recharge à chaud, et c'est le moins emprunté : 14 chemins passent par le socle, 56 lisent le disque à la main. Le dossier `config/` (19 fichiers) n'est même pas validé par le gate |
 | **Bornes des gènes non appliquées au runtime** | Le gate les vérifie, l'exécution ne les impose pas, et deux consommateurs les réécrivent en dur dans le Rust. Détail et correction dans [GENOME.md](../GENOME.md) §6 |
 | **`forgia-terrain` porte un portage V1 dormant** | Environ 30 % de la crate sous `allow(dead_code)` : 11 des 29 tolérances du workspace sont là |
 | **Crates QA neutralisées par défaut** | `forgia-qa-core` et `forgia-qa-replay` sont montées mais inertes sans la feature `qa-runtime`. Une décision non tranchée (ADR-0004, statut `PROPOSED`) |

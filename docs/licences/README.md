@@ -15,9 +15,10 @@ est réputée l'être sous cette même licence, sans condition supplémentaire.
 
 ## 2. Les dépendances : 782 paquets, toutes permissives
 
-`cargo deny check licenses` rend **ok**. La liste blanche vit dans
-[`deny.toml`](../../deny.toml) : une dépendance nouvelle sous une licence absente de
-cette liste fait échouer le contrôle.
+`cargo deny check licenses advisories sources` rend **ok** sur les trois volets. La liste
+blanche vit dans [`deny.toml`](../../deny.toml) : une dépendance nouvelle sous une licence
+absente de cette liste fait échouer le contrôle, et le job CI `licences` le rejoue à
+chaque poussée. Ce n'est donc pas un audit ponctuel, c'est une barrière.
 
 Inventaire complet, un paquet par ligne : [`dependances.csv`](dependances.csv)
 (nom, version, licence, dépôt). Régénération : voir §7.
@@ -48,6 +49,23 @@ Inventaire complet, un paquet par ligne : [`dependances.csv`](dependances.csv)
 
 Aucune dépendance sous GPL, AGPL, SSPL, BUSL ou licence non commerciale n'est
 effectivement liée.
+
+### Vulnérabilités : deux corrigées avant publication
+
+L'audit `advisories` du 2026-09-04 a trouvé deux failles connues dans le `Cargo.lock`,
+toutes deux dans des dépendances transitives. Les deux ont été corrigées par mise à jour
+du verrou, sans changement d'API :
+
+| Avis | Paquet | Nature | Correctif appliqué |
+| --- | --- | --- | --- |
+| [RUSTSEC-2026-0274](https://rustsec.org/advisories/RUSTSEC-2026-0274) | `rtrb` (via `kira`, l'audio) | double libération et usage après libération dans `ReadChunk::commit` si un `Drop` panique | 0.3.4 vers **0.3.5** |
+| [RUSTSEC-2026-0257](https://rustsec.org/advisories/RUSTSEC-2026-0257) | `webbrowser` (via `bevy_egui`) | injection d'arguments par la variable `BROWSER` sous Unix | 1.2.1 vers **1.2.4** |
+
+Deux avis restent **ignorés explicitement** dans `deny.toml`, avec leur raison :
+RUSTSEC-2026-0194 et RUSTSEC-2026-0195 visent `wayland-scanner`, une macro de compilation
+propre à Linux, dont l'amont fige `quick-xml` en version 0.39. La cible de production
+étant Windows, l'exposition est nulle ; l'ignorance est datée et justifiée dans le
+fichier, pas silencieuse.
 
 ## 3. Ce que le dépôt distribue comme données
 
@@ -114,8 +132,8 @@ emplacement ; ils ne signifient pas que ce contenu est ici.
 ## 7. Refaire l'audit
 
 ```bash
-# licences des dépendances, contre la liste blanche de deny.toml
-rustup run stable cargo deny check licenses
+# licences, vulnérabilités et provenance des dépendances (ce que fait la CI)
+rustup run stable cargo deny check licenses advisories sources
 
 # audit complet chaîne d'approvisionnement (vulnérabilités, sources, licences)
 cargo forgia-supply-chain

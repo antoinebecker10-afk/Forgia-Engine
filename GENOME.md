@@ -176,16 +176,18 @@ Répartition mesurée :
 C'est le point où la description honnête diverge de la description idéale. Le dépôt
 charge ses génomes de trois façons, qui n'ont pas les mêmes propriétés.
 
-| Chemin | Mécanisme | Rechargement à chaud | Fichiers |
+| Chemin | Mécanisme | Rechargement à chaud | Chemins distincts mesurés |
 | --- | --- | --- | --- |
-| **1. Asset Bevy** | `asset_server.load("genomes/x.toml")` vers `Genome<T>` | **Oui**, par le `file_watcher` de Bevy (activé hors wasm dans `forgia-game`) | 14 chemins distincts |
-| **2. Lecture directe** | `std::fs::read_to_string("assets/genomes/x.toml")` au démarrage | Non par défaut. Deux modules (`weapon_vfx`, `death_ascension`) ajoutent leur propre veille sur la date de modification | une trentaine |
-| **3. Dossier `config/`** | `std::fs` au démarrage | Non. `config/genomes/streaming.toml` le dit explicitement dans son en-tête : relancer le jeu | 19 |
+| **1. Asset Bevy** | `asset_server.load("genomes/x.toml")` vers `Genome<T>` | **Oui**, par le `file_watcher` de Bevy (activé hors wasm dans `forgia-game`) | **14** |
+| **2. Lecture directe** | `std::fs::read_to_string("assets/genomes/x.toml")` au démarrage | Non par défaut. Deux modules (`weapon_vfx`, `death_ascension`) ajoutent leur propre veille sur la date de modification | **56** |
+| **3. Dossier `config/`** | `std::fs` au démarrage | Non. `config/genomes/streaming.toml` le dit explicitement dans son en-tête : relancer le jeu | **19** |
 
-**Le chemin 1 est le bon.** Les deux autres sont de la dette : ils existent parce que
-certains consommateurs sont des fonctions pures appelées hors du monde ECS, ou parce
-qu'ils ont été écrits avant que le socle existe. Un projet qui reprend le système ne
-devrait implémenter que le chemin 1.
+**Le chemin 1 est le bon, et c'est le moins emprunté.** Quatorze chemins passent par le
+socle contre cinquante-six qui lisent le disque à la main : la majorité des génomes de ce
+dépôt **ne se rechargent donc pas à chaud**, contrairement à ce que la présence du socle
+laisse croire. Les chemins 2 et 3 sont de la dette, née de consommateurs qui sont des
+fonctions pures appelées hors du monde ECS, ou qui ont été écrits avant le socle. Un
+projet qui reprend le système ne devrait implémenter que le chemin 1.
 
 ### Sur le raccourci Shift+F12
 
@@ -271,12 +273,14 @@ La crate est autonome. Marche à suivre :
    `Cargo.toml` : elle est déclarée mais aucun code ne l'utilise.
 2. **Activer le `file_watcher` de Bevy** hors wasm, sinon le rechargement à chaud
    n'existe pas :
+
    ```toml
    [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
    bevy = { version = "0.18.1", features = ["file_watcher"] }
    ```
 3. **Déclarer un schéma** dans la crate qui consomme, avec son `Default` en miroir du
    TOML :
+
    ```rust
    #[derive(Deserialize, TypePath, Reflect, Clone)]
    #[serde(default)]
@@ -286,8 +290,10 @@ La crate est autonome. Marche à suivre :
        fn default() -> Self { Self { damage: 14.0 } }
    }
    ```
+
 4. **Enregistrer, charger, synchroniser.** Le motif complet, tel qu'il est écrit dans
    `crates/forgia-damage/src/lib.rs`, tient en trois systèmes :
+
    ```rust
    app.register_genome::<WeaponTuning>()
       .init_resource::<Weapon>()            // la Resource lue par le gameplay
