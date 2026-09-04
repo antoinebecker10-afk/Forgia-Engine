@@ -64,18 +64,22 @@ Deux vulnérabilités connues ont été corrigées avant publication, par mise �
 verrou : `rtrb` 0.3.5 et `webbrowser` 1.2.4. Le détail est dans
 [docs/licences/README.md](licences/README.md) §2.
 
-| Crate | Tests | Verdict |
+| Crate | Tests passés | Verdict |
 | --- | --- | --- |
+| `forgia-stage` | 165 | vert |
 | `forgia-observability` | 140 | vert |
+| `forgia-terrain` | 127 | vert |
 | `forgia-core` | 64 (2 ignorés) | vert |
 | `forgia-damage` | 26 | vert |
 | `forgia-pcg-core` | 23 | vert |
 | `forgia-rng` | 10 | vert |
 | `forgia-genome-core` | 6 | vert |
+| **Total relancé** | **561** | **vert** |
 
 > **`cargo test --workspace` est instable en local** (builds concurrents, artefacts
-> incrémentaux). La CI et le développement testent **par crate**. Les 2 280 tests du
-> dépôt n'ont pas tous été relancés pour ce document : six crates l'ont été.
+> incrémentaux). La CI et le développement testent **par crate**. Les 2 280 fonctions
+> `#[test]` du dépôt n'ont pas toutes été relancées pour ce document : huit crates l'ont
+> été, pour 561 tests passés.
 
 ---
 
