@@ -1,25 +1,25 @@
 # Le système de génome
 
-> **Le code définit les mécanismes, le génome définit les valeurs, et chaque valeur porte
-> son domaine de validité.**
+> Le code décrit les mécanismes du jeu, les fichiers de génome donnent les valeurs, et
+> chaque valeur est accompagnée de ses limites.
 
-Ce document spécifie la couche de données de Forgia : ce qu'elle fait, comment elle est
+Ce document décrit la couche de données de Forgia : ce qu'elle fait, comment elle est
 faite, ce qu'elle ne fait pas, et comment la reprendre dans un autre projet Bevy sans
 prendre le reste du moteur. Tout ce qui y figure a été mesuré sur le dépôt le
-4 septembre 2026, y compris les défauts.
+4 septembre 2026, défauts compris.
 
 Le noyau tient en un fichier : [`crates/forgia-genome-core/src/lib.rs`](crates/forgia-genome-core/src/lib.rs).
 Il dépend de `bevy`, `serde`, `toml` et `thiserror`, et de rien d'autre.
 
 ---
 
-## 1. L'idée, et la seule décision qui compte
+## 1. L'idée, et la décision qui compte
 
 Tout moteur finit avec une couche de réglage : fichiers de configuration, objets
-scriptables, tables de données. Ici elle s'appelle le **génome**, et la métaphore
-biologique porte le sens plutôt que la marque. Un génome décrit un concept de jeu (une
-arme, un biome, un ennemi). Il contient des **chromosomes** (groupes cohérents) faits de
-**gènes** (un paramètre chacun).
+scriptables, tables de données. Ici elle s'appelle le **génome**. Le vocabulaire
+biologique sert à décrire la structure, il n'est pas décoratif. Un génome décrit un
+concept de jeu (une arme, un biome, un ennemi). Il contient des **chromosomes** (des
+groupes de paramètres qui vont ensemble) faits de **gènes** (un paramètre chacun).
 
 Une configuration classique écrit `damage = 14`. Un gène écrit `damage = 14, valide dans
 [5, 35]` :
@@ -34,21 +34,19 @@ max = 35.0
 default = 14.0
 ```
 
-Cette borne transforme la couche de données : elle cesse d'être « des valeurs que
-quelqu'un a tapées » pour devenir un **espace de mutation déclaré**.
+Écrire la limite à côté de la valeur change ce qu'on peut faire du fichier :
 
-- **Un outil peut régler le jeu sans le casser.** Ici l'outil est une IA (« rends ce
-  fusil plus percutant » revient à déplacer trois gènes dans leurs bornes), mais la même
-  propriété sert des curseurs d'éditeur, des balayages d'équilibrage, des tests A/B, des
-  variantes procédurales. `damage = 9999` est irreprésentable par construction.
-- **Le ressenti devient un espace de recherche.** Équilibrer, c'est explorer une région
-  bornée, plus modifier des nombres magiques éparpillés dans le code.
+- **Un outil peut régler le jeu sans pouvoir le casser.** Ici l'outil est une IA
+  (« rends ce fusil plus percutant » revient à déplacer trois gènes dans leurs limites),
+  mais la même propriété sert des curseurs d'éditeur, des campagnes d'équilibrage, des
+  tests A/B, des variantes générées. Un fichier ne peut pas demander `damage = 9999`.
+- **Équilibrer devient une recherche dans un espace connu**, au lieu de modifier des
+  nombres écrits un peu partout dans le code.
 
-Si vous ne reprenez qu'une chose de ce document : **reprenez les bornes**. Une donnée
-rechargeable à chaud est un acquis banal ; c'est le `min`/`max` déclaré à côté du
-`default`, paramètre par paramètre, qui rend la couche de données sûre à confier à un
-outil, à un game designer ou à une IA, c'est-à-dire à tout ce qui modifie des valeurs
-plus vite qu'un humain ne les relit.
+Si vous ne reprenez qu'une chose de ce document, reprenez les limites. Le rechargement à
+chaud existe déjà dans beaucoup de moteurs. Ce qui rend la couche de données sûre à
+confier à un outil, à un game designer ou à une IA, c'est le `min` et le `max` écrits à
+côté du `default`, paramètre par paramètre.
 
 ---
 
@@ -173,8 +171,8 @@ Répartition mesurée :
 
 ## 4. Les trois chemins de chargement
 
-C'est le point où la description honnête diverge de la description idéale. Le dépôt
-charge ses génomes de trois façons, qui n'ont pas les mêmes propriétés.
+Le dépôt charge ses génomes de trois façons, qui n'ont pas les mêmes propriétés. C'est
+l'endroit où le système réel s'écarte de ce qu'il devrait être.
 
 | Chemin | Mécanisme | Rechargement à chaud | Chemins distincts mesurés |
 | --- | --- | --- | --- |
@@ -182,11 +180,11 @@ charge ses génomes de trois façons, qui n'ont pas les mêmes propriétés.
 | **2. Lecture directe** | `std::fs::read_to_string("assets/genomes/x.toml")` au démarrage | Non par défaut. Deux modules (`weapon_vfx`, `death_ascension`) ajoutent leur propre veille sur la date de modification | **56** |
 | **3. Dossier `config/`** | `std::fs` au démarrage | Non. `config/genomes/streaming.toml` le dit explicitement dans son en-tête : relancer le jeu | **19** |
 
-**Le chemin 1 est le bon, et c'est le moins emprunté.** Quatorze chemins passent par le
-socle contre cinquante-six qui lisent le disque à la main : la majorité des génomes de ce
-dépôt **ne se rechargent donc pas à chaud**, contrairement à ce que la présence du socle
-laisse croire. Les chemins 2 et 3 sont de la dette, née de consommateurs qui sont des
-fonctions pures appelées hors du monde ECS, ou qui ont été écrits avant le socle. Un
+**Le chemin 1 est le bon, et c'est le moins utilisé.** Quatorze chemins passent par le
+socle, cinquante-six lisent le disque directement : **la majorité des génomes de ce dépôt
+ne se rechargent pas à chaud**, alors que la présence du socle le laisse croire. Les
+chemins 2 et 3 sont de la dette. Ils viennent de consommateurs qui sont des fonctions
+pures appelées hors du monde ECS, ou qui ont été écrits avant que le socle existe. Un
 projet qui reprend le système ne devrait implémenter que le chemin 1.
 
 ### Sur le raccourci Shift+F12
@@ -332,8 +330,7 @@ chaque crate publie un `manifest.toml` déclarant ce qu'elle sait faire (catégo
 intention, gènes exposés, messages émis et consommés, capteur, shader, dépendances), afin
 qu'un agent puisse composer un jeu en choisissant des crates.
 
-**Ce mécanisme n'est pas en service**, et le document le dit plutôt que de le laisser
-croire :
+**Ce mécanisme n'est pas en service.** Voici son état exact :
 
 - 20 crates sur 68 portent un `manifest.toml` ;
 - sur ces 20, **17 sont au statut `stub`**, 1 `wip`, 2 `ready` ;
@@ -347,22 +344,22 @@ fonctionnalité livrée.
 
 ## 9. Ce que le système remplace, et ce qu'il ne remplace pas
 
-**Il remplace** une couche de script pour le réglage. Beaucoup de moteurs embarquent Lua
-essentiellement pour que les designers puissent modifier des nombres pendant l'exécution.
-Une donnée bornée et rechargeable couvre ce besoin avec zéro machine virtuelle, zéro
-liaison à maintenir, zéro surface d'interface binaire.
+**Il remplace** une couche de script destinée au réglage. Beaucoup de moteurs embarquent
+Lua surtout pour que les designers puissent modifier des nombres pendant l'exécution. Des
+données limitées et rechargeables couvrent ce besoin sans machine virtuelle, sans liaisons
+à maintenir et sans interface binaire.
 
-**Il ne remplace pas** un langage de script pour de la logique : un génome décrit des
-valeurs, pas des comportements. La question de routage à se poser avant chaque
-modification est toujours la même : *est-ce une donnée ou du code ?* Un mécanisme nouveau
-est du code, compilé et vérifié par le typage. Une valeur nouvelle d'un mécanisme
-existant est un gène, rechargé à chaud, borné et validé.
+**Il ne remplace pas** un langage de script destiné à écrire de la logique. Un génome
+décrit des valeurs, il ne décrit pas des comportements. La question à se poser avant
+chaque modification reste la même : est-ce une donnée ou du code ? Un mécanisme nouveau
+est du code, compilé et vérifié par le typage. Une valeur nouvelle d'un mécanisme qui
+existe déjà est un gène, rechargé à chaud, limité et validé.
 
-**Conséquence pratique** : l'itération se sépare proprement en deux vitesses. Le ressenti
-et l'équilibrage itèrent en secondes ; seuls les changements de structure paient le coût
-de compilation. Et l'identité d'un contenu devient un petit fichier texte, relisible en
-revue de code, versionnable, et générable par un outil.
+**En pratique**, le travail se sépare en deux vitesses. Le ressenti et l'équilibrage se
+règlent en quelques secondes, et seuls les changements de structure demandent une
+recompilation. Une arme ou un biome devient un petit fichier texte, qu'on peut relire en
+revue de code, versionner, et faire générer par un outil.
 
 ---
 
-*Forgia est sous licence MIT. Le noyau tient dans un fichier, prenez-le.*
+*Forgia est sous licence MIT. Le noyau tient dans un fichier : vous pouvez le copier.*

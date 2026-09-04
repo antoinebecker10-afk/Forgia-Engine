@@ -18,7 +18,7 @@ est réputée l'être sous cette même licence, sans condition supplémentaire.
 `cargo deny check licenses advisories sources` rend **ok** sur les trois volets. La liste
 blanche vit dans [`deny.toml`](../../deny.toml) : une dépendance nouvelle sous une licence
 absente de cette liste fait échouer le contrôle, et le job CI `licences` le rejoue à
-chaque poussée. Ce n'est donc pas un audit ponctuel, c'est une barrière.
+chaque poussée. Le contrôle est donc permanent, et pas seulement fait une fois.
 
 Inventaire complet, un paquet par ligne : [`dependances.csv`](dependances.csv)
 (nom, version, licence, dépôt). Régénération : voir §7.
@@ -64,8 +64,8 @@ du verrou, sans changement d'API :
 Deux avis restent **ignorés explicitement** dans `deny.toml`, avec leur raison :
 RUSTSEC-2026-0194 et RUSTSEC-2026-0195 visent `wayland-scanner`, une macro de compilation
 propre à Linux, dont l'amont fige `quick-xml` en version 0.39. La cible de production
-étant Windows, l'exposition est nulle ; l'ignorance est datée et justifiée dans le
-fichier, pas silencieuse.
+étant Windows, l'exposition est nulle. Chaque exception porte sa raison écrite dans le
+fichier.
 
 ## 3. Ce que le dépôt distribue comme données
 

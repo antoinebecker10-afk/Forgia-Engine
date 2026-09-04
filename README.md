@@ -43,24 +43,26 @@ setup : le reste des outils est déjà déclaré dans `rust-toolchain.toml` et
 
 Un agent qui travaille sur un gros codebase échoue toujours de la même façon : il ne voit
 pas l'état réel du programme, il devine des valeurs, et il déclare « fait » ce qui ne
-l'est pas. Forgia répond aux trois par de la mécanique, jamais par de la discipline.
+l'est pas. Forgia traite ces trois problèmes par des mécanismes automatiques, plutôt que
+par des consignes que l'agent devrait suivre.
 
-**1. Des capteurs, pas des logs.** Chaque système significatif écrit un
-`forgia2_<feature>.json` à 1 Hz, au format `{id, severity, next_step, ...}`. Diagnostiquer
-une régression, c'est lire des fichiers. Le `next_step` n'est pas décoratif : un capteur
-qui alerte doit dire quoi faire. Et un capteur dont tous les compteurs sont à zéro n'a pas
-le droit de rapporter `ok`, parce qu'un système inerte ne lève aucune erreur.
+**1. Le jeu écrit son état dans des fichiers.** Chaque système important écrit un
+`forgia2_<feature>.json` une fois par seconde, au format
+`{id, severity, next_step, ...}`. Pour diagnostiquer une régression, on lit ces fichiers
+au lieu de lancer le jeu. Le champ `next_step` dit quoi faire quand le capteur alerte. Et
+un capteur dont tous les compteurs sont à zéro n'a pas le droit de rapporter `ok` : un
+système qui ne tourne plus ne lève aucune erreur, c'est ce qui le rend invisible.
 
-**2. Des valeurs bornées, hors du code.** 1 883 gènes répartis dans 167 fichiers TOML,
-chacun avec son `min`, son `max` et son `default`. Aucune valeur de gameplay n'est écrite
-en dur, et `damage = 9999` est irreprésentable par construction. La couche de données
-cesse d'être « des valeurs que quelqu'un a tapées » pour devenir un espace de mutation
-déclaré, sûr à confier à un outil. Spécification complète : **[GENOME.md](GENOME.md)**,
-et le système est aussi publié seul dans
+**2. Les valeurs de jeu vivent hors du code, avec leurs limites.** 1 883 gènes répartis
+dans 167 fichiers TOML, chacun avec son `min`, son `max` et son `default`. Aucune valeur
+de gameplay n'est écrite en dur dans le Rust. Comme la limite est écrite à côté de la
+valeur, un outil peut régler le jeu sans pouvoir le casser : un fichier ne peut pas
+demander `damage = 9999`. Le détail est dans **[GENOME.md](GENOME.md)**, et le système est
+aussi publié seul dans
 [antoinebecker10-afk/genome](https://github.com/antoinebecker10-afk/genome).
 
-**3. Des ratchets, pas des recommandations.** Huit gates exécutables refusent la dérive
-au lieu de la signaler :
+**3. Huit contrôles bloquent au lieu d'avertir.** Ils s'exécutent en ligne de commande et
+font échouer la CI :
 
 | Gate | Ce qu'il refuse |
 | --- | --- |
@@ -73,9 +75,9 @@ au lieu de la signaler :
 | `no-scaffold` | Le retour des crates vides |
 | `story-gate` | Un « DONE » auto-déclaré dont le code n'existe pas |
 
-**4. Des critères réfutables.** Tout travail non trivial a une story avec des critères
-qu'on peut réfuter, pas seulement cocher, et `story-gate` vérifie mécaniquement qu'un
-« DONE » correspond à du code livré.
+**4. Chaque chantier porte des critères vérifiables.** Tout travail non trivial a une
+story dont les critères se testent, et `story-gate` vérifie qu'une story marquée « DONE »
+correspond à du code réellement livré.
 
 ## Ce que contient le dépôt
 
@@ -89,8 +91,8 @@ qu'on peut réfuter, pas seulement cocher, et `story-gate` vérifie mécaniqueme
 
 **Ce qu'il ne contient pas** : aucun asset binaire (ni modèle, ni texture, ni son), le jeu
 qui a servi de client interne et son design, et l'outillage d'agent privé de l'auteur. Les
-crates de mode restent dans le workspace parce que le moteur a été conçu en les faisant
-vivre : elles compilent, mais ne se jouent pas sans assets.
+crates de mode restent dans le workspace parce que le moteur a été construit en les
+faisant tourner. Elles compilent, mais il faut fournir des assets pour les jouer.
 
 ## Stack
 
@@ -140,7 +142,8 @@ le format conforme (`cargo fmt --all`) et réparer les quatre gates rouges.
 
 ## Licence
 
-MIT ([LICENSE](LICENSE)). Toutes les dépendances sont sous licence permissive et
-`cargo deny check licenses advisories sources` refuse toute dérive, en local comme en CI.
-Les polices de `assets/fonts/` sont sous SIL Open Font License 1.1. Sauf mention contraire
-explicite, toute contribution est réputée soumise sous licence MIT.
+MIT ([LICENSE](LICENSE)). Toutes les dépendances sont sous licence permissive, et
+`cargo deny check licenses advisories sources` bloque en local comme en CI si une
+dépendance nouvelle sort de la liste autorisée. Les polices de `assets/fonts/` sont sous
+SIL Open Font License 1.1. Sauf mention contraire explicite, toute contribution est
+réputée soumise sous licence MIT.

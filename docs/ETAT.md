@@ -1,13 +1,13 @@
 # État du moteur
 
-> Mesuré le **4 septembre 2026** sur ce dépôt, avec rustc 1.96.1. Chaque chiffre de ce
-> document vient d'une commande, pas d'un souvenir ; la commande est citée quand elle
-> n'est pas évidente. Lisez ce document avant de bâtir sur Forgia : il dit ce qui tient,
-> ce qui est partiel, et ce qui est cassé.
+> Mesuré le **4 septembre 2026** sur ce dépôt, avec rustc 1.96.1. Chaque chiffre a été
+> obtenu par une commande, citée quand elle n'est pas évidente. Lisez ce document avant de
+> bâtir sur Forgia : il donne l'état réel de chaque partie du moteur.
 
 Forgia a été écrit en construisant un jeu avec lui. Ce jeu n'est pas publié ici, mais il
-explique la forme du moteur : ce qui a servi est solide et testé, ce qui n'a jamais servi
-est resté à l'état d'échafaudage. Le tri ci-dessous ne cache ni l'un ni l'autre.
+explique la forme du moteur. Les parties qui ont servi tous les jours sont testées et
+solides. Celles qui n'ont jamais servi sont restées à l'état d'échafaudage. Le tri
+ci-dessous montre les deux.
 
 ---
 
@@ -26,11 +26,11 @@ est resté à l'état d'échafaudage. Le tri ci-dessous ne cache ni l'un ni l'au
 | **Réseau** | **aucun**. Pas une ligne, pas une dépendance |
 | **Script runtime** | **aucun**. Ni Lua, ni Luau, ni WASM de gameplay |
 
-**Ce que le dépôt n'est pas** : un jeu qu'on lance. Il ne contient **aucun asset binaire**
+**Le dépôt n'est pas un jeu qu'on lance.** Il ne contient **aucun asset binaire**
 (0 fichier `.glb`, `.png`, `.ogg`, `.ktx2` suivi par git). Le binaire `forgia` compile,
-mais sans assets fournis par vous, il n'ouvre pas une scène jouable. Je ne l'ai pas lancé
-pour rédiger ce document : tout ce qui suit est mesuré à la compilation, aux tests et aux
-gates, jamais au ressenti en jeu.
+mais il faut fournir vos propres assets pour obtenir une scène jouable. Le jeu n'a pas été
+lancé pour rédiger ce document : tout ce qui suit est mesuré à la compilation, aux tests
+et aux gates.
 
 ---
 
@@ -94,9 +94,9 @@ verrou : `rtrb` 0.3.5 et `webbrowser` 1.2.4. Le détail est dans
 | `deps-mortes` | **rouge** | `forgia-mode-roguelite` déclare `forgia-mode-fps-arena` sans jamais le référencer. 22 dépendances mortes au total, dont 21 tolérées par la baseline |
 | `plugin-gate` | **rouge** | `ExpeditionCampementsPlugin` n'est monté par aucun test, **et le gate lui-même panique** : `end byte index is not a char boundary` à `xtask/src/main.rs:786`, un découpage d'octets au milieu d'un caractère UTF-8 |
 
-**Les quatre rouges étaient déjà rouges avant la publication** : ils sont identiques sur
-le dépôt d'origine. Ce ne sont pas des régressions d'extraction, ce sont des dettes
-connues et non payées.
+**Les quatre rouges étaient déjà rouges avant la publication** : ils rendent le même
+verdict sur le dépôt d'origine. L'extraction n'a rien cassé ; ce sont des dettes connues
+et non payées.
 
 **Le format n'est pas conforme non plus** : `cargo fmt --all -- --check` rend **227
 écarts**. Le job `fmt` de la CI sera rouge au premier push, comme le job `ratchets`. Ce
@@ -149,7 +149,7 @@ Sept crates n'ont **aucun test** : `forgia-crosshair`, `forgia-juice-screen-flas
 
 ## 7. Ce qui manque franchement
 
-Ce ne sont pas des dettes, ce sont des absences. Les nommer évite de chercher.
+Ces fonctionnalités n'existent pas dans le moteur. Les nommer évite de les chercher.
 
 - **Le réseau.** Il n'y a rien : ni transport, ni réplication, ni prédiction. Aucune
   dépendance réseau dans le `Cargo.lock`.
@@ -194,5 +194,4 @@ cargo xtask sensor-audit                                  # capteurs orphelins e
 cargo xtask deps-mortes                                   # dépendances internes inutilisées
 ```
 
-Un chiffre de ce document qui contredit une de ces commandes est faux : c'est la commande
-qui a raison.
+Si un chiffre de ce document contredit une de ces commandes, croyez la commande.

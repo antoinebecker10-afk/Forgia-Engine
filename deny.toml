@@ -33,8 +33,9 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 
 [licenses]
 # Le moteur est sous MIT : ses dépendances doivent rester permissives. Une licence
-# à choix (« A OR B ») passe dès qu'une option figure ici ; une licence composée
-# (« A AND B ») exige toutes ses parties. Inventaire : docs/licences/README.md.
+# à choix (« A OR B ») passe dès qu'une option figure ici. Une licence composée
+# (« A AND B ») exige que toutes ses parties y figurent. Inventaire complet :
+# docs/licences/README.md.
 allow = [
     "MIT",
     "MIT-0",
